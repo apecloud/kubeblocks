@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -97,7 +98,7 @@ func (r *ParametersDefinitionReconciler) reconcile(reqCtx intctrlutil.RequestCtx
 
 	// Automatically convert cue to openAPISchema.
 	if err := updateParametersSchema(parametersDef, r.Client, reqCtx.Ctx); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to generate openAPISchema").Error())
 	}
 
 	if err := updateParamDefinitionStatus(r.Client, reqCtx, parametersDef, parametersv1alpha1.PDAvailablePhase); err != nil {

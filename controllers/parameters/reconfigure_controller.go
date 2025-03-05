@@ -26,6 +26,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,7 +97,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	config := &corev1.ConfigMap{}
 	// TODO(leon): data or universal?
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, inDataContextUnspecified()); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configmap")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	if !checkConfigurationObject(config) {
@@ -109,7 +110,8 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			errors.Wrap(err, "failed to check last-applied-configuration").Error())
 	}
 	if isAppliedConfigs {
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
@@ -117,7 +119,8 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	resources, err := prepareRelatedResource(reqCtx, r.Client, config)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to fetch related resources")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			errors.Wrap(err, "failed to fetch related resources").Error())
 	}
 	if resources.configSpec == nil {
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].",

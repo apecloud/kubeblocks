@@ -25,6 +25,7 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -103,7 +104,7 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 
 	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, componentParameter)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to get related object").Error())
 	}
 	if !fetcherTask.ClusterObj.GetDeletionTimestamp().IsZero() {
 		reqCtx.Log.Info("cluster is deleting, skip reconcile")
@@ -115,10 +116,11 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 
 	taskCtx, err := NewTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to create task context.")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to create task context").Error())
 	}
 	if err := r.runTasks(taskCtx, tasks, fetcherTask); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			errors.Wrap(err, "failed to run parameters reconcile task").Error())
 	}
 	return intctrlutil.Reconciled()
 }
@@ -130,7 +132,8 @@ func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *
 	patch := client.MergeFrom(componentParam.DeepCopy())
 	componentParam.Status.Message = msg
 	if err := r.Client.Status().Patch(reqCtx.Ctx, componentParam, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update configuration status.")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			errors.Wrap(err, "failed to update componentParameter status").Error())
 	}
 	return intctrlutil.Reconciled()
 }

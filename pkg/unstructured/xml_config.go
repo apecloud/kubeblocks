@@ -142,6 +142,11 @@ func (x *xmlConfig) Marshal() (string, error) {
 }
 
 func (x *xmlConfig) Unmarshal(str string) error {
+	if str == "" {
+		x.data = mxjv2.New()
+		return nil
+	}
+
 	m, err := mxjv2.NewMapXml([]byte(str), true)
 	if err != nil {
 		return err

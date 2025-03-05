@@ -91,8 +91,6 @@ func TestEmptyXMLFormat(t *testing.T) {
 	assert.EqualValues(t, xmlConfigObj.Get("profiles.web2.timeout_before_checking_execution_speed"), 600)
 
 	// check None-EOF error
-
-	xmlConfigObj, err = LoadConfig("invalid test", "invalid xml format", parametersv1alpha1.XML)
+	_, err = LoadConfig("invalid test", "invalid xml format", parametersv1alpha1.XML)
 	assert.NotNil(t, err)
-
 }

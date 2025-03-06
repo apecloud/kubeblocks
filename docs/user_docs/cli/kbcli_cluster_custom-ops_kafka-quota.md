@@ -1,27 +1,39 @@
 ---
-title: kbcli dataprotection list-action-set
+title: kbcli cluster custom-ops kafka-quota
 ---
 
-List actionsets
+Create a custom ops with opsDef kafka-quota
 
 ```
-kbcli dataprotection list-action-set [flags]
+kbcli cluster custom-ops kafka-quota <ClusterName> [flags]
 ```
 
 ### Examples
 
 ```
-  # list all action sets
-  kbcli dp list-as
+  # Create a kafka-quota ops
+  kbcli cluster custom-ops kafka-quota <clusterName> --component <componentName>
 ```
 
 ### Options
 
 ```
-  -h, --help              help for list-action-set
-  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
-  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
-      --show-labels       When printing, show all labels as the last column (default hide labels column)
+      --auto-approve                   Skip interactive approval before promote the instance
+      --client string                  client id.
+      --component string               Specify the component name of the cluster. if not specified, using the first component which referenced the defined componentDefinition.
+      --consumer-byte-rate int         the maximum number of messages that can be consumed per second, measured in bytes/sec
+      --controller-mutation-rate int   partition mutation quota to control the rate at which mutations are accepted for user requests.
+      --delete-quotas stringArray      
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
+  -h, --help                           help for kafka-quota
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --producer-byte-rate int         the maximum number of messages that can be produced per second, measured in bytes/sec
+      --request-percentage int         request percentage.
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+      --user string                    user name
 ```
 
 ### Options inherited from parent commands
@@ -45,12 +57,11 @@ kbcli dataprotection list-action-set [flags]
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-* [kbcli dataprotection](kbcli_dataprotection.md)	 - Data protection command.
+* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

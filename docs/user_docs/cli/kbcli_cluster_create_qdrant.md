@@ -30,12 +30,11 @@ kbcli cluster create qdrant NAME [flags]
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --rbac-enabled                   Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                   The number of replicas. Value range [1, 16]. (default 1)
       --storage float                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --storage-class-name string      Storage class name of the data volume
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
+      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Delete, WipeOut]. (default "Delete")
       --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
       --version string                 The version of Qdrant. (default "1.10.0")

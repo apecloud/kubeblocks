@@ -1,24 +1,34 @@
 ---
-title: kbcli clusterversion set-default
+title: kbcli trace create
 ---
 
-Set the clusterversion to the default clusterversion for its clusterdefinition.
+create a trace.
 
 ```
-kbcli clusterversion set-default NAME [flags]
+kbcli trace create trace-name [flags]
 ```
 
 ### Examples
 
 ```
-  # set ac-mysql-8.0.30 as the default clusterversion
-  kbcli clusterversion set-default ac-mysql-8.0.30
+  # create a trace for cluster has the same name 'pg-cluster'
+  kbcli trace create pg-cluster
+  
+  # create a trace for cluster has the name of 'pg-cluster'
+  kbcli trace create pg-cluster-trace --cluster-name pg-cluster
+  
+  # create a trace with custom locale, stateEvaluationExpression
+  kbcli trace create pg-cluster-trace --locale zh_cn --cel-state-evaluation-expression "has(object.status.phase) && object.status.phase == \"Running\""
 ```
 
 ### Options
 
 ```
-  -h, --help   help for set-default
+      --cel-state-evaluation-expression string   Specify CEL state evaluation expression.
+      --cluster-name string                      Specify target cluster name.
+      --depth int                                Specify object tree depth to display.
+  -h, --help                                     help for create
+      --locale string                            Specify locale.
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +57,7 @@ kbcli clusterversion set-default NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
+* [kbcli trace](kbcli_trace.md)	 - trace management command
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

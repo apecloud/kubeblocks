@@ -19,6 +19,7 @@ kbcli cluster restore [flags]
 
 ```
       --backup string                   Backup name
+      --backup-namespace string         Backup namespace
       --dry-run string[="unchanged"]    Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                            Edit the API resource before creating
   -h, --help                            help for restore

@@ -1,13 +1,24 @@
 ---
-title: kbcli alert
+title: kbcli trace watch
 ---
 
-Manage alert receiver, include add, list and delete receiver.
+watch a trace.
+
+```
+kbcli trace watch trace-name [flags]
+```
+
+### Examples
+
+```
+  # watch a trace
+  kbcli trace watch pg-cluster-trace
+```
 
 ### Options
 
 ```
-  -h, --help   help for alert
+  -h, --help   help for watch
 ```
 
 ### Options inherited from parent commands
@@ -36,12 +47,7 @@ Manage alert receiver, include add, list and delete receiver.
 
 ### SEE ALSO
 
-
-* [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
-* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
-* [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
-* [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
-* [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
+* [kbcli trace](kbcli_trace.md)	 - trace management command
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

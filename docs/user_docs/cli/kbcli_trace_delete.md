@@ -1,30 +1,24 @@
 ---
-title: kbcli cluster list-accounts
+title: kbcli trace delete
 ---
 
-List accounts for a cluster
+Delete a trace.
 
 ```
-kbcli cluster list-accounts [flags]
+kbcli trace delete trace-name [flags]
 ```
 
 ### Examples
 
 ```
-  # list all users for component
-  kbcli cluster list-accounts CLUSTERNAME --component COMPNAME
-  # list all users with default component
-  kbcli cluster list-accounts CLUSTERNAME
-  # list all users from instance
-  kbcli cluster list-accounts --instance INSTANCE
+  # Delete a trace
+  kbcli trace delete pg-cluster
 ```
 
 ### Options
 
 ```
-      --component string   Specify the name of component to be connected. If not specified, pick the first one.
-  -h, --help               help for list-accounts
-  -i, --instance string    Specify the name of instance to be connected.
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
@@ -53,7 +47,7 @@ kbcli cluster list-accounts [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli trace](kbcli_trace.md)	 - trace management command
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,31 +1,13 @@
 ---
-title: kbcli alert config-smtpserver
+title: kbcli trace
 ---
 
-Set smtp server config
-
-```
-kbcli alert config-smtpserver [flags]
-```
-
-### Examples
-
-```
-
-	# Set smtp server config
-	kbcli alert config-smtpserver --smtp-from alert-test@apecloud.com --smtp-smarthost smtp.feishu.cn:587 --smtp-auth-username alert-test@apecloud.com --smtp-auth-password 123456abc --smtp-auth-identity alert-test@apecloud.com
-	
-```
+trace management command
 
 ### Options
 
 ```
-  -h, --help                        help for config-smtpserver
-      --smtp-auth-identity string   The identity to authenticate to the smarthost.
-      --smtp-auth-password string   The password to authenticate to the smarthost.
-      --smtp-auth-username string   The username to authenticate to the smarthost.
-      --smtp-from string            The email address to send alert.
-      --smtp-smarthost string       The smtp host to send alert.
+  -h, --help   help for trace
 ```
 
 ### Options inherited from parent commands
@@ -54,7 +36,12 @@ kbcli alert config-smtpserver [flags]
 
 ### SEE ALSO
 
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
+
+* [kbcli trace create](kbcli_trace_create.md)	 - create a trace.
+* [kbcli trace delete](kbcli_trace_delete.md)	 - Delete a trace.
+* [kbcli trace list](kbcli_trace_list.md)	 - list all traces.
+* [kbcli trace update](kbcli_trace_update.md)	 - update a trace.
+* [kbcli trace watch](kbcli_trace_watch.md)	 - watch a trace.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

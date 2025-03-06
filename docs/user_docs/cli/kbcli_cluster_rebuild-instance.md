@@ -39,6 +39,7 @@ kbcli cluster rebuild-instance NAME [flags]
       --node strings                   specified the target node which rebuilds the instance on the node otherwise will rebuild on a random node. format: insName1=nodeName,insName2=nodeName
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --restore-env stringArray        provide the necessary env for the 'Restore' operation from the backup. format: key1=value, key2=value
+      --source-backup-target string    To rebuild a sharding component instance from a backup, you can specify the name of the source backup target
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 

@@ -26,20 +26,20 @@ kbcli cluster create mongodb NAME [flags]
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                           Edit the API resource before creating
   -h, --help                           help for mongodb
+      --hostnetwork string              Legal values [enabled, disabled]. (default "enabled")
       --memory float                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
       --mode string                    Cluster topology mode. Legal values [standalone, replicaset]. (default "standalone")
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --rbac-enabled                   Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                   The number of replicas, for standalone mode, the replicas is 1, for replicaset mode, the default replicas is 3. Value range [1, 5]. (default 1)
       --storage float                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --storage-class-name string      Storage class name of the data volume
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
+      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Delete, WipeOut]. (default "Delete")
       --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
-      --version string                 Cluster version. Legal values [7.0.12, 6.0.16, 5.0.28, 4.4.29, 4.2.24, 4.0.28]. (default "6.0.16")
+      --version string                 Cluster version. Legal values [8.0.4, 7.0.16, 7.0.12, 6.0.20, 6.0.16, 5.0.30, 5.0.28, 4.4.29, 4.2.24, 4.0.28]. (default "6.0.16")
 ```
 
 ### Options inherited from parent commands

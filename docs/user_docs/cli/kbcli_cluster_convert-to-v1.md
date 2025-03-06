@@ -1,24 +1,29 @@
 ---
-title: kbcli alert list-smtpserver
+title: kbcli cluster convert-to-v1
 ---
 
-List alert smtp servers config.
+convert cluster api version.
 
 ```
-kbcli alert list-smtpserver [flags]
+kbcli cluster convert-to-v1 [NAME] [flags]
 ```
 
 ### Examples
 
 ```
-  # list alert smtp servers config
-  kbcli alert list-smtpserver
+  # convert a v1alpha1 cluster
+  kbcli cluster convert-to-v1 mycluster
+  
+  # convert a v1alpha1 cluster with --dry-run
+  kbcli cluster convert-to-v1 mycluster --dry-run
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-smtpserver
+      --dry-run   dry run mode
+  -h, --help      help for convert-to-v1
+      --no-diff   only print the new cluster yaml
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +52,7 @@ kbcli alert list-smtpserver [flags]
 
 ### SEE ALSO
 
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

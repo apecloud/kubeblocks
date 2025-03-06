@@ -33,6 +33,7 @@ kbcli cluster expose NAME --enable=[true|false] --type=[intranet|internet] [flag
   -h, --help                           help for expose
       --name string                    OpsRequest name. if not specified, it will be randomly generated
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --role-selector roleSelector     The Component's exposed Services may target replicas based on their roles using roleSelector, this flag must be set when the component specified has roles
       --sub-type string                Expose sub type, currently supported types are 'NodePort', 'LoadBalancer', only available if type is intranet (default "LoadBalancer")
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
       --type string                    Expose type, currently supported types are 'intranet', 'internet'

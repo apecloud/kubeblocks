@@ -5,32 +5,26 @@ title: kbcli cluster promote
 Promote a non-primary or non-leader instance as the new primary or leader of the cluster
 
 ```
-kbcli cluster promote NAME [--component=<comp-name>] [--instance <instance-name>] [flags]
+kbcli cluster promote NAME [--instance <instance-name>] [flags]
 ```
 
 ### Examples
 
 ```
   # Promote the instance mycluster-mysql-1 as the new primary or leader.
-  kbcli cluster promote mycluster --instance mycluster-mysql-1
-  
-  # Promote a non-primary or non-leader instance as the new primary or leader, the new primary or leader is determined by the system.
-  kbcli cluster promote mycluster
-  
-  # If the cluster has multiple components, you need to specify a component, otherwise an error will be reported.
-  kbcli cluster promote mycluster --component=mysql --instance mycluster-mysql-1
+  kbcli cluster promote mycluster --candidate mycluster-mysql-1
 ```
 
 ### Options
 
 ```
       --auto-approve                   Skip interactive approval before promote the instance
-      --component string               Specify the component name of the cluster, if the cluster has multiple components, you need to specify a component
+      --candidate string               Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running "kbcli cluster list-instances"
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                           Edit the API resource before creating
       --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
   -h, --help                           help for promote
-      --instance string                Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running "kbcli cluster list-instances"
+      --instance string                Specify the instance name that will transfer its role to the candidate pod, If not set, the current primary or leader of the cluster will be used.
       --name string                    OpsRequest name. if not specified, it will be randomly generated
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed

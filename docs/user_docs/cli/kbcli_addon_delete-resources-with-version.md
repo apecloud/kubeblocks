@@ -1,32 +1,29 @@
 ---
-title: kbcli cluster revoke-role
+title: kbcli addon delete-resources-with-version
 ---
 
-Revoke role from account
+Delete the sub-resources of specified addon and versions
 
 ```
-kbcli cluster revoke-role [flags]
+kbcli addon delete-resources-with-version [flags]
 ```
 
 ### Examples
 
 ```
-  # revoke role from user
-  kbcli cluster revoke-role CLUSTERNAME --component COMPNAME --name USERNAME --role ROLENAME
-  # revoke role from user with default component
-  kbcli cluster revoke-role CLUSTERNAME --name USERNAME --role ROLENAME
-  # revoke role from user for instance
-  kbcli cluster revoke-role --instance INSTANCE --name USERNAME --role ROLENAME
+  # Delete specific versions of redis addon resources
+  kbcli addon delete-resources-with-version redis --versions=0.9.1,0.9.2
+  
+  # Delete all unused and outdated resources of redis addon
+  kbcli addon delete-resources-with-version redis --all-unused-versions=true
 ```
 
 ### Options
 
 ```
-      --component string   Specify the name of component to be connected. If not specified, pick the first one.
-  -h, --help               help for revoke-role
-  -i, --instance string    Specify the name of instance to be connected.
-      --name string        Required user name, please specify it.
-  -r, --role string        Role name should be one of [SUPERUSER, READWRITE, READONLY].
+      --all-unused-versions   If set to true, all the resources which are not currently used and not with the newest version will be deleted.
+  -h, --help                  help for delete-resources-with-version
+      --versions strings      Specify the versions of resources to delete.
 ```
 
 ### Options inherited from parent commands
@@ -55,7 +52,7 @@ kbcli cluster revoke-role [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

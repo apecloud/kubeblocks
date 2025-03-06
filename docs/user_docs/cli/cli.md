@@ -8,13 +8,13 @@ sidebar_position: 1
 
 Addon command.
 
-* [kbcli addon delete-resources-with-version](kbcli_addon_delete-resources-with-version.md)	 - Delete the sub-resources of specified addon and versions
 * [kbcli addon describe](kbcli_addon_describe.md)	 - Describe an addon specification.
 * [kbcli addon disable](kbcli_addon_disable.md)	 - Disable an addon.
 * [kbcli addon enable](kbcli_addon_enable.md)	 - Enable an addon.
 * [kbcli addon index](kbcli_addon_index.md)	 - Manage custom addon indexes
 * [kbcli addon install](kbcli_addon_install.md)	 - Install KubeBlocks addon
 * [kbcli addon list](kbcli_addon_list.md)	 - List addons.
+* [kbcli addon purge](kbcli_addon_purge.md)	 - Purge the sub-resources of specified addon and versions
 * [kbcli addon search](kbcli_addon_search.md)	 - Search the addon from index
 * [kbcli addon uninstall](kbcli_addon_uninstall.md)	 - Uninstall an existed addon
 * [kbcli addon upgrade](kbcli_addon_upgrade.md)	 - Upgrade an existed addon to latest version or a specified version
@@ -40,6 +40,7 @@ Cluster command.
 * [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - Cancel the pending/creating/running OpsRequest which type is vscale or hscale.
 * [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
+* [kbcli cluster convert-to-v1](kbcli_cluster_convert-to-v1.md)	 - convert cluster api version.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.
@@ -104,14 +105,6 @@ ComponentVersions command.
 
 * [kbcli componentversion describe](kbcli_componentversion_describe.md)	 - Describe ComponentVersion.
 * [kbcli componentversion list](kbcli_componentversion_list.md)	 - List ComponentVersion.
-
-
-## [dashboard](kbcli_dashboard.md)
-
-List and open the KubeBlocks dashboards.
-
-* [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards.
-* [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
 
 
 ## [dataprotection](kbcli_dataprotection.md)

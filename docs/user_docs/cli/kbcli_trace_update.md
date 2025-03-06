@@ -1,31 +1,33 @@
 ---
-title: kbcli cluster describe-account
+title: kbcli trace update
 ---
 
-Describe account roles and related information
+update a trace.
 
 ```
-kbcli cluster describe-account [flags]
+kbcli trace update trace-name [flags]
 ```
 
 ### Examples
 
 ```
-  # describe account and show role information
-  kbcli cluster describe-account CLUSTERNAME --component COMPNAME --name USERNAME
-  # describe account with default component
-  kbcli cluster describe-account CLUSTERNAME --name USERNAME
-  # describe account for instance
-  kbcli cluster describe-account --instance INSTANCE --name USERNAME
+  # update a trace with custom locale, stateEvaluationExpression
+  kbcli trace update pg-cluster-trace --locale zh_cn --cel-state-evaluation-expression "has(object.status.phase) && object.status.phase == \"Running\""
 ```
 
 ### Options
 
 ```
-      --component string   Specify the name of component to be connected. If not specified, pick the first one.
-  -h, --help               help for describe-account
-  -i, --instance string    Specify the name of instance to be connected.
-      --name string        Required user name, please specify it.
+      --allow-missing-template-keys              If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --cel-state-evaluation-expression string   Specify CEL state evaluation expression.
+      --depth int                                Specify object tree depth to display. (default -1)
+      --dry-run string[="unchanged"]             Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --edit                                     Edit the API resource
+  -h, --help                                     help for update
+      --locale string                            Specify locale.
+  -o, --output string                            Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
+      --show-managed-fields                      If true, keep the managedFields when printing objects in JSON or YAML format.
+      --template string                          Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
 ```
 
 ### Options inherited from parent commands
@@ -54,7 +56,7 @@ kbcli cluster describe-account [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli trace](kbcli_trace.md)	 - trace management command
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

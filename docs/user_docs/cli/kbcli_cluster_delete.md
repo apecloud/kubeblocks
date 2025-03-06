@@ -26,7 +26,6 @@ kbcli cluster delete NAME [flags]
       --grace-period int   Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion). (default -1)
   -h, --help               help for delete
       --now                If true, resources are signaled for immediate shutdown (same as --grace-period=1).
-      --rbac-enabled       Specify whether rbac resources will be deleted by kbcli
   -l, --selector string    Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 

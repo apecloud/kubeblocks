@@ -1,46 +1,45 @@
 ---
-title: kbcli cluster create minio
+title: kbcli cluster custom-ops kafka-user-acl
 ---
 
-Create a minio cluster.
+Create a custom ops with opsDef kafka-user-acl
 
 ```
-kbcli cluster create minio NAME [flags]
+kbcli cluster custom-ops kafka-user-acl <ClusterName> [flags]
 ```
 
 ### Examples
 
 ```
-  # Create a cluster with the default values
-  kbcli cluster create minio
-  
-  # Create a cluster with the specified cpu, memory and storage
-  kbcli cluster create minio --cpu 1 --memory 2 --storage 10
+  # Create a kafka-user-acl ops
+  kbcli cluster custom-ops kafka-user-acl <clusterName> --component <componentName> --operations=<operations> --type=<type>
 ```
 
 ### Options
 
 ```
-      --availability-policy string     The availability policy of cluster. Legal values [none, node, zone]. (default "node")
-      --cpu float                      CPU cores. Value range [0.5, 64]. (default 0.5)
-      --disable-exporter               Enable or disable monitor. (default true)
+      --allow-hosts stringArray        
+      --allow-users stringArray        
+      --auto-approve                   Skip interactive approval before promote the instance
+      --cluster string                 Indicates to the script that the user is trying to interact with acls on the singular cluster resource.
+      --component string               Specify the component name of the cluster. if not specified, using the first component which referenced the defined componentDefinition.
+      --consumer                       indicate to add or remove the acl of consumer.
+      --deny-hosts stringArray         
+      --deny-users stringArray         
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                           Edit the API resource before creating
-  -h, --help                           help for minio
-      --host-network-accessible        Specify whether the cluster can be accessed from within the VPC.
-      --memory float                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
-      --node-labels stringToString     Node label selector (default [])
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
+      --group string                   consumer-group.
+  -h, --help                           help for kafka-user-acl
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
+      --operations stringArray         
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --publicly-accessible            Specify whether the cluster can be accessed from the public internet.
-      --rbac-enabled                   Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
-      --replicas int                   The number of replicas Value range [1, 5]. (default 1)
-      --storage float                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
-      --storage-class-name string      Storage class name of the data volume
-      --tenancy string                 The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
-      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
-      --topology-keys stringArray      Topology keys for affinity
+      --pattern-type string            Resource pattern type.
+      --producer                       indicate to add or remove the acl of producer.
+      --topic string                   topic name.
+      --transactional-id string        The transactionalId to which ACLs should be added or removed. A value of * indicates the ACLs should apply to all transactionalIds.
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+      --type string                    user name
 ```
 
 ### Options inherited from parent commands
@@ -53,7 +52,6 @@ kbcli cluster create minio NAME [flags]
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -69,7 +67,7 @@ kbcli cluster create minio NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
+* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

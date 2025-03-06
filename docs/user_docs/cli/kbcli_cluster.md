@@ -41,6 +41,7 @@ Cluster command.
 * [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - Cancel the pending/creating/running OpsRequest which type is vscale or hscale.
 * [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
+* [kbcli cluster convert-to-v1](kbcli_cluster_convert-to-v1.md)	 - convert cluster api version.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.

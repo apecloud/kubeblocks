@@ -21,24 +21,29 @@ kbcli cluster create mysql NAME [flags]
 ### Options
 
 ```
-      --cpu float                      CPU cores. Value range [0.5, 64]. (default 1)
-      --disable-exporter               Enable or disable monitor. (default true)
-      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
-      --edit                           Edit the API resource before creating
-  -h, --help                           help for mysql
-      --memory float                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
-      --mode string                    Cluster topology mode. Legal values [standalone, replication, raftGroup]. (default "standalone")
-      --node-labels stringToString     Node label selector (default [])
-  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --rbac-enabled                   Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
-      --replicas int                   The number of replicas. Value range [1, 5]. (default 1)
-      --storage float                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
-      --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
-      --topology-keys stringArray      Topology keys for affinity
-      --version string                 Cluster version, run "kbcli cv list --devel" to see all versions. Legal values [mysql-8.4, mysql-8.0, mysql-5.7, mysql-orc-8.0, mysql-orc-5.7]. (default "mysql-8.0")
+      --cpu float                                                   CPU cores. Value range [0.5, 64]. (default 1)
+      --disable-exporter                                            Enable or disable monitor. (default true)
+      --dry-run string[="unchanged"]                                Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                                                        Edit the API resource before creating
+  -h, --help                                                        help for mysql
+      --memory float                                                Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
+      --node-labels stringToString                                  Node label selector (default [])
+      --orchestrator.cluster-service-selector.cluster-name string   orchestrator cluster name for service selector
+      --orchestrator.cluster-service-selector.namespace string      orchestrator cluster namespace for service selector
+      --orchestrator.service-reference.endpoint string              Endpoint name of the service reference, format: <host>:<port>
+  -o, --output format                                               Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --pod-anti-affinity string                                    Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --proxysql.cpu float                                           (default 1)
+      --proxysql.memory float                                       Memory, the unit is Gi. (default 1)
+      --proxysql.replicas int                                        (default 1)
+      --replicas int                                                The number of replicas. Value range [1, 5]. (default 1)
+      --storage float                                               Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
+      --tenancy string                                              Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
+      --termination-policy string                                   The termination policy of cluster. Legal values [DoNotTerminate, Delete, WipeOut]. (default "Delete")
+      --tolerations strings                                         Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
+      --topology string                                             Topology type of the serve. Note that under the orc/orc-proxysql topology, it is necessary to specify the Orchestrator cluster information. You should choose either orchestrator.cluster-service-selector or orchestrator.service-reference. This means that depending on your setup, you will configure one of these options to properly integrate with the Orchestrator service for managing your MySQL cluster. Legal values [semisync, semisync-proxysql, mgr, mgr-proxysql, orc, orc-proxysql]. (default "semisync")
+      --topology-keys stringArray                                   Topology keys for affinity
+      --version string                                              MySQL version Legal values [8.0.39, 8.0.38, 8.0.37, 8.0.36, 8.4.2, 8.4.1, 8.4.0, 5.7.44]. (default "8.0.39")
 ```
 
 ### Options inherited from parent commands

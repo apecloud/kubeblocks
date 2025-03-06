@@ -1,32 +1,29 @@
 ---
-title: kbcli cluster list-backup
+title: kbcli cluster list-backup-policies
 ---
 
-List backups.
+List backups policies.
 
 ```
-kbcli cluster list-backup [flags]
+kbcli cluster list-backup-policies [flags]
 ```
 
 ### Examples
 
 ```
-  # list all backups
-  kbcli cluster list-backup
+  # list all backup policies
+  kbcli cluster list-backup-policies
   
-  # list all backups of the cluster
-  kbcli cluster list-backup <clusterName>
-  
-  # list the specified backups
-  kbcli cluster list-backup --names b1,b2
+  # using short cmd to list backup policy of the specified cluster
+  kbcli cluster list-bp mycluster
 ```
 
 ### Options
 
 ```
   -A, --all-namespaces     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-  -h, --help               help for list-backup
-      --names strings      The backup name to get the details.
+  -h, --help               help for list-backup-policies
+      --names strings      The backup policy name to get the details.
   -n, --namespace string   specified the namespace
   -o, --output format      prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
   -l, --selector string    Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.

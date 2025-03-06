@@ -1,32 +1,27 @@
 ---
-title: kbcli cluster grant-role
+title: kbcli dataprotection list-action-sets
 ---
 
-Grant role to account
+List actionsets
 
 ```
-kbcli cluster grant-role [flags]
+kbcli dataprotection list-action-sets [flags]
 ```
 
 ### Examples
 
 ```
-  # grant role to user
-  kbcli cluster grant-role CLUSTERNAME --component COMPNAME --name USERNAME --role ROLENAME
-  # grant role to user with default component
-  kbcli cluster grant-role CLUSTERNAME --name USERNAME --role ROLENAME
-  # grant role to user for instance
-  kbcli cluster grant-role --instance INSTANCE --name USERNAME --role ROLENAME
+  # list all action sets
+  kbcli dp list-as
 ```
 
 ### Options
 
 ```
-      --component string   Specify the name of component to be connected. If not specified, pick the first one.
-  -h, --help               help for grant-role
-  -i, --instance string    Specify the name of instance to be connected.
-      --name string        Required user name, please specify it.
-  -r, --role string        Role name should be one of [SUPERUSER, READWRITE, READONLY].
+  -h, --help              help for list-action-sets
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
+      --show-labels       When printing, show all labels as the last column (default hide labels column)
 ```
 
 ### Options inherited from parent commands
@@ -55,7 +50,7 @@ kbcli cluster grant-role [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli dataprotection](kbcli_dataprotection.md)	 - Data protection command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

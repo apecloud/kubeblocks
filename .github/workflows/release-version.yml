@@ -129,13 +129,6 @@ jobs:
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
-      - name: Checkout kubeblocks-addons ${{ github.ref_name }}
-        uses: actions/checkout@v4
-        with:
-          repository: apecloud/kubeblocks-addons
-          path: kubeblocks-addons
-          ref: ${{ github.ref_name }}
-
       - name: checkout kbcli code
         uses: actions/checkout@v4
         with:
@@ -150,6 +143,7 @@ jobs:
           echo "copy kbcli user docs to kubeblocks docs"
           rm -rf ${{ github.workspace }}/docs/user_docs/cli/*
           cp -r ${{ github.workspace }}/kbcli/docs/user_docs/cli/* ${{ github.workspace }}/docs/user_docs/cli/
+          rm -rf ${{ github.workspace }}/kbcli
           FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
           git add ${{ github.workspace }}/docs/user_docs/cli/*
           if [[ -n "$FILE_CHANGES" ]]; then
@@ -162,6 +156,13 @@ jobs:
           
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
+
+      - name: Checkout kubeblocks-addons ${{ github.ref_name }}
+        uses: actions/checkout@v4
+        with:
+          repository: apecloud/kubeblocks-addons
+          path: kubeblocks-addons
+          ref: ${{ github.ref_name }}
 
       - name: upgrade addons version
         id: upgrade_addon_version

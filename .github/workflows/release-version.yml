@@ -134,7 +134,7 @@ jobs:
         with:
           repository: apecloud/kbcli
           path: kbcli
-          ref: ${{ github.ref_name }}
+          ref: "release-1.0"
           token: ${{ env.GITHUB_TOKEN }}
 
       - name: Update kbcli doc
@@ -150,7 +150,7 @@ jobs:
             echo $FILE_CHANGES
             git config --local user.name "$GITHUB_ACTOR"
             git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-            git commit -a -m "chore: auto update kbcli user docs"
+            git commit -m "chore: auto update kbcli user docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
           

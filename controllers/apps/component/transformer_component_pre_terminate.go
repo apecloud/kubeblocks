@@ -25,8 +25,10 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -69,11 +71,18 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
+	provisioned, err := t.provisioned(transCtx)
+	if err != nil {
+		return err
+	}
+	if !provisioned {
+		return nil
+	}
+
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
 	}
-	err := t.preTerminate(transCtx, compDef)
-	if err != nil {
+	if err = t.preTerminate(transCtx, compDef); err != nil {
 		return lifecycle.IgnoreNotDefined(err)
 	}
 	return t.markPreTerminateDone(transCtx, dag)
@@ -86,6 +95,25 @@ func (t *componentPreTerminateTransformer) skipPreTerminate(transCtx *componentT
 	}
 	skip, ok := comp.Annotations[constant.SkipPreTerminateAnnotationKey]
 	return ok && strings.ToLower(skip) == "true"
+}
+
+func (t *componentPreTerminateTransformer) provisioned(transCtx *componentTransformContext) (bool, error) {
+	its := &workloads.InstanceSet{}
+	itsKey := types.NamespacedName{
+		Namespace: transCtx.Component.Namespace,
+		Name:      transCtx.Component.Name,
+	}
+	if err := transCtx.Client.Get(transCtx.Context, itsKey, its); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	provisioned, err := component.GetReplicasStatusFunc(its, func(s component.ReplicaStatus) bool {
+		return s.Provisioned
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(provisioned) > 0, nil
 }
 
 func (t *componentPreTerminateTransformer) checkPreTerminateDone(transCtx *componentTransformContext, dag *graph.DAG) bool {
@@ -151,7 +179,7 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp)
 	if err != nil {
 		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration,
-			fmt.Sprintf("build synthesized component failed at pre-terminate transformer: %s", err.Error()))
+			fmt.Sprintf("build synthesized component failed at pre-terminate: %s", err.Error()))
 	}
 	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
 	if err != nil {

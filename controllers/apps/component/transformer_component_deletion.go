@@ -129,14 +129,15 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 			if appsutil.IsOwnedByInstanceSet(object) {
 				continue
 			}
-			skipDeletion, err := handleRBACResourceDeletion(object, transCtx, comp, graphCli, dag)
-			if err != nil {
-				return fmt.Errorf("handle rbac deletion failed: %w", err)
+
+			switch object.(type) {
+			case *corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding:
+				if err := handleRBACResourceDeletion(object, transCtx, comp, graphCli, dag, matchLabels); err != nil {
+					return fmt.Errorf("handle rbac deletion failed: %w", err)
+				}
+			default:
+				graphCli.Delete(dag, object)
 			}
-			if skipDeletion {
-				continue
-			}
-			graphCli.Delete(dag, object)
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
 		return intctrlutil.NewRequeueError(time.Second*1, "not all component sub-resources deleted")
@@ -158,61 +159,24 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 }
 
 func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformContext, comp *appsv1.Component,
-	graphCli model.GraphClient, dag *graph.DAG) (skipDeletion bool, err error) {
-	switch v := obj.(type) {
-	case *corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding:
-		// list other components that reference the same componentdefinition
-		transCtx.Logger.V(1).Info("handling rbac resources deletion",
-			"comp", comp.Name, "name", klog.KObj(v).String())
-		compDefName := comp.Spec.CompDef
-		compList := &appsv1.ComponentList{}
-		if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(comp.Namespace),
-			client.MatchingLabels{constant.ComponentDefinitionLabelKey: compDefName}); err != nil {
-			return false, err
-		}
-		// if any, transfer ownership to any other component
-		for _, otherComp := range compList.Items {
-			// skip current component
-			if otherComp.Name == comp.Name {
-				continue
-			}
-			// skip deleting component
-			if !otherComp.DeletionTimestamp.IsZero() {
-				continue
-			}
-
-			if err := controllerutil.RemoveControllerReference(comp, v, model.GetScheme()); err != nil {
-				return false, err
-			}
-			if err := controllerutil.SetControllerReference(&otherComp, v, model.GetScheme()); err != nil {
-				return false, err
-			}
-			// component controller selects a comp's subresource by labels, so change them too
-			clusterName, err := component.GetClusterName(&otherComp)
-			if err != nil {
-				return false, err
-			}
-			compShortName, err := component.ShortName(clusterName, otherComp.Name)
-			if err != nil {
-				return false, err
-			}
-			newLabels := constant.GetCompLabels(clusterName, compShortName)
-			for k, val := range newLabels {
-				v.GetLabels()[k] = val
-			}
-			graphCli.Update(dag, nil, v)
-			gvk, err := apiutil.GVKForObject(v, model.GetScheme())
-			if err != nil {
-				return false, err
-			}
-			transCtx.Logger.V(1).Info("rbac resources owner transferred, skip deletion",
-				"fromComp", comp.Name, "toComp", otherComp.Name, "name", klog.KObj(v).String(), "gvk", gvk)
-			return true, nil
-		}
-		return false, nil
-	default:
-		return false, nil
+	graphCli model.GraphClient, dag *graph.DAG, matchLabels map[string]string) (err error) {
+	// orphan a rbac resource so that it can be adopted by another component
+	// this means these resources won't get automatically deleted
+	if err := controllerutil.RemoveControllerReference(comp, obj, model.GetScheme()); err != nil {
+		return err
 	}
+	for k := range matchLabels {
+		delete(obj.GetLabels(), k)
+	}
+
+	graphCli.Update(dag, nil, obj)
+	gvk, err := apiutil.GVKForObject(obj, model.GetScheme())
+	if err != nil {
+		return err
+	}
+	transCtx.Logger.V(1).Info("rbac resources orphaned",
+		"component", comp.Name, "name", klog.KObj(obj).String(), "gvk", gvk)
+	return nil
 }
 
 func notifyDependents4CompDeletion(transCtx *componentTransformContext, dag *graph.DAG) error {

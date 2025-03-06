@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -147,7 +148,8 @@ func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformC
 		}
 		return nil, err
 	}
-	if !cmpFn(oldObj, obj) {
+	// adopt any orphaned object
+	if !cmpFn(oldObj, obj) || metav1.GetControllerOf(oldObj) == nil {
 		transCtx.Logger.V(1).Info("updating rbac resources",
 			"name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
 		graphCli.Update(dag, oldObj, obj, appsutil.InDataContext4G())
@@ -160,7 +162,7 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext,
 	synthesizedComp := transCtx.SynthesizeComponent
 
 	sa := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-	if err := setCompOwnershipNFinalizer(transCtx.Component, sa); err != nil {
+	if err := intctrlutil.SetOwnership(transCtx.Component, sa, model.GetScheme(), ""); err != nil {
 		return nil, err
 	}
 
@@ -177,7 +179,7 @@ func createOrUpdateRole(transCtx *componentTransformContext, graphCli model.Grap
 	if role == nil {
 		return nil, nil
 	}
-	if err := setCompOwnershipNFinalizer(transCtx.Component, role); err != nil {
+	if err := intctrlutil.SetOwnership(transCtx.Component, role, model.GetScheme(), ""); err != nil {
 		return nil, err
 	}
 	return createOrUpdate(transCtx, role, graphCli, dag, func(old, new *rbacv1.Role) bool {
@@ -201,7 +203,7 @@ func createOrUpdateRoleBinding(transCtx *componentTransformContext,
 			Kind:     "Role",
 			Name:     cmpdRole.Name,
 		}, serviceAccountName)
-		if err := setCompOwnershipNFinalizer(transCtx.Component, cmpdRoleBinding); err != nil {
+		if err := intctrlutil.SetOwnership(transCtx.Component, cmpdRoleBinding, model.GetScheme(), ""); err != nil {
 			return nil, err
 		}
 		rb, err := createOrUpdate(transCtx, cmpdRoleBinding, graphCli, dag, cmpRoleBinding)
@@ -222,7 +224,7 @@ func createOrUpdateRoleBinding(transCtx *componentTransformContext,
 			},
 			serviceAccountName,
 		)
-		if err := setCompOwnershipNFinalizer(transCtx.Component, clusterPodRoleBinding); err != nil {
+		if err := intctrlutil.SetOwnership(transCtx.Component, clusterPodRoleBinding, model.GetScheme(), ""); err != nil {
 			return nil, err
 		}
 		rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)

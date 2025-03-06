@@ -90,13 +90,14 @@ var _ = BeforeSuite(func() {
 
 	err = parametersv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(parametersv1alpha1.AddToScheme)
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = appsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(appsv1.AddToScheme)
 	err = workloadsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(parametersv1alpha1.AddToScheme)
 
 	// +kubebuilder:scaffold:scheme
 

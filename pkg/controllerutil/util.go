@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/scheme"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -79,6 +80,7 @@ func GetUncachedObjects() []client.Object {
 		&corev1.ConfigMap{},
 		&corev1.Secret{},
 		&appsv1.Cluster{},
+		&parametersv1alpha1.ComponentParameter{},
 	}
 }
 

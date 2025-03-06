@@ -81,3 +81,16 @@ func TestXMLFormat(t *testing.T) {
 	assert.Nil(t, xmlConfigObj.Update("profiles_test", "not_exist"))
 	assert.EqualValues(t, xmlConfigObj.Get("profiles_test"), "not_exist")
 }
+
+func TestEmptyXMLFormat(t *testing.T) {
+	xmlConfigObj, err := LoadConfig("empty_test", "", parametersv1alpha1.XML)
+	assert.Nil(t, err)
+	assert.NotNil(t, xmlConfigObj)
+	assert.EqualValues(t, xmlConfigObj.GetAllParameters(), map[string]interface{}{})
+	assert.Nil(t, xmlConfigObj.Update("profiles.web2.timeout_before_checking_execution_speed", 600))
+	assert.EqualValues(t, xmlConfigObj.Get("profiles.web2.timeout_before_checking_execution_speed"), 600)
+
+	// check None-EOF error
+	_, err = LoadConfig("invalid test", "invalid xml format", parametersv1alpha1.XML)
+	assert.NotNil(t, err)
+}

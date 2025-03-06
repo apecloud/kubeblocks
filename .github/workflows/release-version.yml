@@ -129,13 +129,6 @@ jobs:
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
-      - name: Checkout kubeblocks-addons ${{ github.ref_name }}
-        uses: actions/checkout@v4
-        with:
-          repository: apecloud/kubeblocks-addons
-          path: kubeblocks-addons
-          ref: ${{ github.ref_name }}
-
       - name: checkout kbcli code
         uses: actions/checkout@v4
         with:
@@ -150,18 +143,30 @@ jobs:
           echo "copy kbcli user docs to kubeblocks docs"
           rm -rf ${{ github.workspace }}/docs/user_docs/cli/*
           cp -r ${{ github.workspace }}/kbcli/docs/user_docs/cli/* ${{ github.workspace }}/docs/user_docs/cli/
-          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
-          git add ${{ github.workspace }}/docs/user_docs/cli/*
+          rm -rf ${{ github.workspace }}/kbcli
+          RELEASE_COMMIT_TMP="${{ github.sha }}"
+          if [[ -n "${RELEASE_COMMIT}" ]]; then
+              RELEASE_COMMIT_TMP="${RELEASE_COMMIT}"
+          fi
+          FILE_CHANGES=`git diff --name-only ${RELEASE_COMMIT_TMP}`
           if [[ -n "$FILE_CHANGES" ]]; then
             echo $FILE_CHANGES
+            git add ${{ github.workspace }}/docs/user_docs/cli/*
             git config --local user.name "$GITHUB_ACTOR"
             git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-            git commit -a -m "chore: auto update kbcli user docs"
+            git commit -m "chore: auto update kbcli user docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
           
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
+
+      - name: Checkout kubeblocks-addons ${{ github.ref_name }}
+        uses: actions/checkout@v4
+        with:
+          repository: apecloud/kubeblocks-addons
+          path: kubeblocks-addons
+          ref: ${{ github.ref_name }}
 
       - name: upgrade addons version
         id: upgrade_addon_version

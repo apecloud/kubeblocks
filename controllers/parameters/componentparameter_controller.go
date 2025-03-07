@@ -187,9 +187,12 @@ func updateCompParamStatus(status *parametersv1alpha1.ComponentParameterStatus, 
 
 func (r *ComponentParameterReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) func() (*ctrl.Result, error) {
 	return func() (*ctrl.Result, error) {
-		var cms = &corev1.ConfigMapList{}
-		matchLabels := client.MatchingLabels(constant.GetCompLabels(componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName))
-		if err := r.Client.List(reqCtx.Ctx, cms, client.InNamespace(componentParameter.Namespace), matchLabels); err != nil {
+		cms := &corev1.ConfigMapList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(componentParameter.GetNamespace()),
+			client.MatchingLabels(constant.GetCompLabels(componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)),
+		}
+		if err := r.Client.List(reqCtx.Ctx, cms, listOpts...); err != nil {
 			return &reconcile.Result{}, err
 		}
 		if err := removeConfigRelatedFinalizer(reqCtx.Ctx, r.Client, cms.Items); err != nil {

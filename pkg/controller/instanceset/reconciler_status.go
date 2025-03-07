@@ -189,6 +189,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 4. set members status
 	setMembersStatus(its, podList)
 
+	// 5. set instance status
+	setInstanceStatus(its, podList)
+
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -326,4 +329,29 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 		return ParseParentNameAndOrdinal(membersStatus[i].PodName)
 	}
 	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
+}
+
+func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
+	// compose new instance status
+	newInstanceStatus := make([]workloads.InstanceStatus, 0)
+	for _, pod := range pods {
+		instanceStatus := workloads.InstanceStatus{
+			PodName: pod.Name,
+		}
+		newInstanceStatus = append(newInstanceStatus, instanceStatus)
+	}
+
+	syncInstanceConfigStatus(its, newInstanceStatus)
+
+	its.Status.InstanceStatus = newInstanceStatus
+}
+
+func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+	status := make(map[string]int64)
+	for _, config := range its.Spec.Configs {
+		status[config.Name] = config.Generation
+	}
+	for i := range instanceStatus {
+		instanceStatus[i].Configs = status
+	}
 }

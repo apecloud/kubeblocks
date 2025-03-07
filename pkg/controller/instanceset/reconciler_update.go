@@ -22,6 +22,7 @@ package instanceset
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -258,32 +259,20 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 	)
 
 	isConfigUpdate := func(config workloads.Configuration) bool {
-		for _, member := range its.Status.MembersStatus {
-			if member.PodName == pod.Name {
-				return member.ConfigurationGeneration >= config.Generation
-			}
-		}
-		return config.Generation >= its.Generation
-	}
-
-	configUpdated := func(config workloads.Configuration) {
-		if its.Status.MembersStatus == nil {
-			its.Status.MembersStatus = make([]workloads.MemberStatus, 0)
-		}
-		for i, member := range its.Status.MembersStatus {
-			if member.PodName == pod.Name {
-				its.Status.MembersStatus[i].ConfigurationGeneration = its.Generation
-				return
-			}
-		}
-		its.Status.MembersStatus = append(its.Status.MembersStatus, workloads.MemberStatus{
-			PodName:                 pod.Name,
-			ConfigurationGeneration: its.Generation,
+		idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+			return instance.PodName == pod.Name
 		})
+		if idx >= 0 {
+			generation, ok := its.Status.InstanceStatus[idx].Configs[config.Name]
+			if ok {
+				return config.Generation > generation
+			}
+		}
+		return config.Generation > 0
 	}
 
 	reconfigure := func(config workloads.Configuration) error {
-		if its.Spec.Reconfigure == nil && config.Reconfigure == nil {
+		if config.Reconfigure == nil {
 			return nil // skip
 		}
 
@@ -296,7 +285,7 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		}
 
 		lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-			Reconfigure: its.Spec.Reconfigure,
+			Reconfigure: config.Reconfigure,
 		}
 		templateVars := func() map[string]any {
 			if its.Spec.TemplateVars == nil {
@@ -313,10 +302,10 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 			return err
 		}
 
-		if config.Reconfigure != nil {
-			err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Args)
+		if len(config.ReconfigureActionName) == 0 {
+			err = lfa.Reconfigure(tree.Context, nil, nil, config.Parameters)
 		} else {
-			err = lfa.Reconfigure2(tree.Context, nil, nil, config.Args)
+			err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
 		}
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
@@ -337,7 +326,6 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 			if err := reconfigure(config); err != nil {
 				return err
 			}
-			configUpdated(config)
 		}
 	}
 	return nil

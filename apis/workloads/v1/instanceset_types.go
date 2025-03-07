@@ -228,11 +228,6 @@ type InstanceSetSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
-	// Defines the default procedure that update a replica with new configuration.
-	//
-	// +optional
-	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
-
 	// +optional
 	Configs []Configuration `json:"configs,omitempty"`
 }
@@ -300,6 +295,11 @@ type InstanceSetStatus struct {
 	//
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
+
+	// Provides the status of each instance in the ITS.
+	//
+	// +optional
+	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
@@ -438,22 +438,26 @@ type MembershipReconfiguration struct {
 }
 
 type Configuration struct {
+	// The name of the config.
 	Name string `json:"name"`
 
+	// The generation of the config.
 	Generation int64 `json:"generation"`
-
-	// The name of the custom reconfigure action.
-	//
-	// +optional
-	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`
 
 	// The custom reconfigure action.
 	//
 	// +optional
 	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
 
+	// The name of the custom reconfigure action.
+	//
 	// +optional
-	Args map[string]string `json:"args,omitempty"`
+	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`
+
+	// The parameters to call the reconfigure action.
+	//
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 type MemberStatus struct {
@@ -467,9 +471,19 @@ type MemberStatus struct {
 	//
 	// +optional
 	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+}
 
+type InstanceStatus struct {
+	// Represents the name of the pod.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	PodName string `json:"podName"`
+
+	// The status of configs.
+	//
 	// +optional
-	ConfigurationGeneration int64 `json:"configurationGeneration,omitempty"`
+	Configs map[string]int64 `json:"configs,omitempty"`
 }
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate

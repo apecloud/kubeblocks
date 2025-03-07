@@ -113,18 +113,9 @@ func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Opti
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, lfa, opts))
 }
 
-func (a *kbagent) Reconfigure(ctx context.Context, cli client.Reader, opts *Options, created, removed, updated string) error {
+func (a *kbagent) Reconfigure(ctx context.Context, cli client.Reader, opts *Options, args map[string]string) error {
 	lfa := &reconfigure{
-		created: created,
-		removed: removed,
-		updated: updated,
-	}
-	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Reconfigure, lfa, opts))
-}
-
-func (a *kbagent) Reconfigure2(ctx context.Context, cli client.Reader, opts *Options, args map[string]string) error {
-	lfa := &reconfigure{
-		// TODO
+		args: args,
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Reconfigure, lfa, opts))
 }

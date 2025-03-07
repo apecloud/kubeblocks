@@ -227,6 +227,14 @@ type InstanceSetSpec struct {
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+
+	// Defines the default procedure that update a replica with new configuration.
+	//
+	// +optional
+	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
+
+	// +optional
+	Configs []Configuration `json:"configs,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet
@@ -429,6 +437,25 @@ type MembershipReconfiguration struct {
 	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
 }
 
+type Configuration struct {
+	Name string `json:"name"`
+
+	Generation int64 `json:"generation"`
+
+	// The name of the custom reconfigure action.
+	//
+	// +optional
+	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`
+
+	// The custom reconfigure action.
+	//
+	// +optional
+	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
+
+	// +optional
+	Args map[string]string `json:"args,omitempty"`
+}
+
 type MemberStatus struct {
 	// Represents the name of the pod.
 	//
@@ -440,6 +467,9 @@ type MemberStatus struct {
 	//
 	// +optional
 	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+
+	// +optional
+	ConfigurationGeneration int64 `json:"configurationGeneration,omitempty"`
 }
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate

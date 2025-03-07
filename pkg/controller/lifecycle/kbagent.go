@@ -122,6 +122,13 @@ func (a *kbagent) Reconfigure(ctx context.Context, cli client.Reader, opts *Opti
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Reconfigure, lfa, opts))
 }
 
+func (a *kbagent) Reconfigure2(ctx context.Context, cli client.Reader, opts *Options, args map[string]string) error {
+	lfa := &reconfigure{
+		// TODO
+	}
+	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Reconfigure, lfa, opts))
+}
+
 func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error {
 	lfa := &accountProvision{
 		statement: statement,

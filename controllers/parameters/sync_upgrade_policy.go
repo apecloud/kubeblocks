@@ -81,7 +81,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 
 		err         error
 		ctx         = rctx.Ctx
-		configKey   = rctx.getConfigKey()
+		configKey   = rctx.generateConfigIdentifier()
 		versionHash = rctx.getTargetVersionHash()
 		selector    = intctrlutil.GetPodSelector(rctx.ParametersDef)
 		fileName    string

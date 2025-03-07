@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"math"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -129,13 +130,13 @@ func GetClientFactory() createReconfigureClient {
 	return newGRPCClient
 }
 
-func (param *reconfigureContext) getConfigKey() string {
+func (param *reconfigureContext) generateConfigIdentifier() string {
 	key := param.ConfigTemplate.Name
 	if param.ConfigDescription != nil && param.ConfigDescription.Name != "" {
 		hash, _ := util.ComputeHash(param.ConfigDescription.Name)
-		key = key + "/" + hash
+		key = key + "-" + hash
 	}
-	return key
+	return strings.ReplaceAll(key, "_", "-")
 }
 
 func (param *reconfigureContext) getTargetVersionHash() string {

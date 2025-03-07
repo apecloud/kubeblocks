@@ -49,7 +49,7 @@ func (p *restartContainerUpgradePolicy) GetPolicyName() string {
 }
 
 func (p *restartContainerUpgradePolicy) restartPods(rctx reconfigureContext, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
-	var configKey = rctx.getConfigKey()
+	var configKey = rctx.generateConfigIdentifier()
 	var configVersion = rctx.getTargetVersionHash()
 
 	for _, pod := range pods {

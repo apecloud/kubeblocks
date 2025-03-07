@@ -49,7 +49,7 @@ func (s *restartPolicy) GetPolicyName() string {
 func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
 	var (
 		newVersion = rctx.getTargetVersionHash()
-		configKey  = rctx.getConfigKey()
+		configKey  = rctx.generateConfigIdentifier()
 
 		retStatus = ESRetry
 		progress  = core.NotStarted

@@ -21,27 +21,21 @@ package component
 
 import (
 	"crypto/sha256"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type componentReconfigureTransformer struct{}
@@ -71,24 +65,78 @@ func (t *componentReconfigureTransformer) Transform(ctx graph.TransformContext, 
 
 func (t *componentReconfigureTransformer) handleReconfigure(transCtx *componentTransformContext, dag *graph.DAG,
 	runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) error {
+	var (
+		synthesizedComp = transCtx.SynthesizeComponent
+	)
+
+	its, inDag := t.itsObject(transCtx, dag)
+	if its == nil {
+		return nil
+	}
+
+	defer func() {
+		if !inDag {
+			runningIts := transCtx.RunningWorkload.(*workloads.InstanceSet)
+			if !reflect.DeepEqual(runningIts.Spec.Configs, its.Spec.Configs) {
+				graphCli, _ := transCtx.Client.(model.GraphClient)
+				// its is copied from running its, and only the spec.configs is modified.
+				graphCli.Update(dag, nil, its)
+			}
+		}
+	}()
+
 	if len(toCreate) > 0 || len(toDelete) > 0 {
-		// since pod volumes changed, the workload will be restarted, cancel the queued reconfigure.
-		return t.cancelQueuedReconfigure(transCtx, dag)
+		// since pod volumes changed, the workload will be restarted
+		its.Spec.Configs = nil
+		return nil
+	}
+
+	reconfigure := func(tpl component.SynthesizedFileTemplate, changes fileTemplateChanges) {
+		var (
+			action     *kbappsv1.Action
+			actionName string
+		)
+		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+			if tpl.Reconfigure == nil {
+				return // disabled by the external system
+			}
+		}
+		action = tpl.Reconfigure
+		actionName = component.UDFReconfigureActionName(tpl)
+		if action == nil && synthesizedComp.LifecycleActions != nil {
+			action = synthesizedComp.LifecycleActions.Reconfigure
+			actionName = ""
+		}
+		if action == nil {
+			return // has no reconfigure action defined
+		}
+
+		if its.Spec.Configs == nil {
+			its.Spec.Configs = make([]workloads.Configuration, 0)
+		}
+		for i, config := range its.Spec.Configs {
+			if config.Name == tpl.Name {
+				its.Spec.Configs[i] = workloads.Configuration{
+					Name:                  tpl.Name,
+					Generation:            its.Generation,
+					Reconfigure:           action,
+					ReconfigureActionName: actionName,
+					Args:                  lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
+				}
+			}
+		}
 	}
 
 	changes := t.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
-	if len(changes) > 0 {
-		msg, err := json.Marshal(changes)
-		if err != nil {
-			return err
-		}
-		if err := t.queueReconfigure(transCtx, dag, string(msg)); err != nil {
-			return err
-		}
-		return intctrlutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("pending reconfigure task: %s", msg))
+	if len(changes) == 0 {
+		return nil
 	}
-
-	return t.reconfigure(transCtx, dag)
+	for _, tpl := range synthesizedComp.FileTemplates {
+		if change, ok := changes[tpl.Name]; ok {
+			reconfigure(tpl, change)
+		}
+	}
+	return nil
 }
 
 func (t *componentReconfigureTransformer) templateFileChanges(transCtx *componentTransformContext,
@@ -174,159 +222,159 @@ type fileTemplateChanges struct {
 	Updated string `json:"updated,omitempty"`
 }
 
-func (t *componentReconfigureTransformer) reconfigure(transCtx *componentTransformContext, dag *graph.DAG) error {
-	replicas, changes, err := t.reconfigureStatus(transCtx, dag)
-	if err != nil {
-		return err
-	}
-	for _, replica := range replicas {
-		if err := t.reconfigureReplica(transCtx, changes, replica); err != nil {
-			return err
-		}
-		if err := t.reconfigured(transCtx, dag, []string{replica}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (t *componentReconfigureTransformer) reconfigureReplica(transCtx *componentTransformContext,
-	changes map[string]fileTemplateChanges, replica string) error {
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-	)
-	pod := &corev1.Pod{}
-	podKey := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      replica,
-	}
-	if err := transCtx.Client.Get(transCtx.Context, podKey, pod); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	for _, tpl := range synthesizedComp.FileTemplates {
-		if change, ok := changes[tpl.Name]; ok {
-			if err := t.reconfigureReplicaTemplate(transCtx, tpl, change, pod); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (t *componentReconfigureTransformer) reconfigureReplicaTemplate(transCtx *componentTransformContext,
-	tpl component.SynthesizedFileTemplate, changes fileTemplateChanges, pod *corev1.Pod) error {
-	var (
-		synthesizedComp  = transCtx.SynthesizeComponent
-		lifecycleActions = synthesizedComp.LifecycleActions
-	)
-	if (lifecycleActions == nil || lifecycleActions.Reconfigure == nil) && tpl.Reconfigure == nil {
-		return nil // has no reconfigure action defined
-	}
-
-	reconfigure := func(lfa lifecycle.Lifecycle) error {
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
-			if tpl.Reconfigure == nil {
-				return nil // disabled by the external
-			}
-		}
-		if tpl.Reconfigure != nil {
-			actionName := component.UDFReconfigureActionName(tpl)
-			args := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
-			return lfa.UserDefined(transCtx.Context, transCtx.Client, nil, actionName, tpl.Reconfigure, args)
-		}
-		return lfa.Reconfigure(transCtx.Context, transCtx.Client, nil, changes.Created, changes.Removed, changes.Updated)
-	}
-
-	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		lifecycleActions, synthesizedComp.TemplateVars, pod)
-	if err != nil {
-		return err
-	}
-
-	if err := reconfigure(lfa); err != nil {
-		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-			return intctrlutil.NewDelayedRequeueError(time.Second,
-				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
-		}
-		return err
-	}
-	return nil
-}
-
-func (t *componentReconfigureTransformer) queueReconfigure(transCtx *componentTransformContext, dag *graph.DAG, changes string) error {
-	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
-		s.Reconfigured = ptr.To(changes)
-	})
-}
-
-func (t *componentReconfigureTransformer) cancelQueuedReconfigure(transCtx *componentTransformContext, dag *graph.DAG) error {
-	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
-		s.Reconfigured = nil
-	})
-}
-
-func (t *componentReconfigureTransformer) reconfigured(transCtx *componentTransformContext, dag *graph.DAG, replicas []string) error {
-	replicasSet := sets.New(replicas...)
-	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
-		if replicasSet.Has(s.Name) {
-			s.Reconfigured = ptr.To("")
-		}
-	})
-}
-
-func (t *componentReconfigureTransformer) updateReconfigureStatus(
-	transCtx *componentTransformContext, dag *graph.DAG, f func(*component.ReplicaStatus)) error {
-	its, inDag := t.itsObject(transCtx, dag)
-	if its == nil {
-		return nil
-	}
-	err := component.UpdateReplicasStatusFunc(its, func(r *component.ReplicasStatus) error {
-		for i := range r.Status {
-			f(&r.Status[i])
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	if !inDag {
-		runningIts := transCtx.RunningWorkload.(*workloads.InstanceSet)
-		if !reflect.DeepEqual(runningIts.Annotations, its.Annotations) {
-			graphCli, _ := transCtx.Client.(model.GraphClient)
-			// its is copied from running its, and only the annotation is modified.
-			graphCli.Update(dag, nil, its)
-		}
-	}
-	return nil
-}
-
-func (t *componentReconfigureTransformer) reconfigureStatus(
-	transCtx *componentTransformContext, dag *graph.DAG) ([]string, map[string]fileTemplateChanges, error) {
-	its, _ := t.itsObject(transCtx, dag)
-	if its == nil {
-		return nil, nil, nil
-	}
-
-	var err1 error
-	changes := map[string]fileTemplateChanges{}
-	replicas, err2 := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
-		if r.Reconfigured == nil || len(*r.Reconfigured) == 0 {
-			return false
-		}
-		if len(changes) == 0 {
-			err1 = json.Unmarshal([]byte(*r.Reconfigured), &changes)
-		}
-		return true
-	})
-	if err2 != nil {
-		return nil, nil, err2
-	}
-	if err1 != nil {
-		return nil, nil, err1
-	}
-	return replicas, changes, nil
-}
+// func (t *componentReconfigureTransformer) reconfigure(transCtx *componentTransformContext, dag *graph.DAG) error {
+//	replicas, changes, err := t.reconfigureStatus(transCtx, dag)
+//	if err != nil {
+//		return err
+//	}
+//	for _, replica := range replicas {
+//		if err := t.reconfigureReplica(transCtx, changes, replica); err != nil {
+//			return err
+//		}
+//		if err := t.reconfigured(transCtx, dag, []string{replica}); err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+// }
+//
+// func (t *componentReconfigureTransformer) reconfigureReplica(transCtx *componentTransformContext,
+//	changes map[string]fileTemplateChanges, replica string) error {
+//	var (
+//		synthesizedComp = transCtx.SynthesizeComponent
+//	)
+//	pod := &corev1.Pod{}
+//	podKey := types.NamespacedName{
+//		Namespace: synthesizedComp.Namespace,
+//		Name:      replica,
+//	}
+//	if err := transCtx.Client.Get(transCtx.Context, podKey, pod); err != nil {
+//		return client.IgnoreNotFound(err)
+//	}
+//	for _, tpl := range synthesizedComp.FileTemplates {
+//		if change, ok := changes[tpl.Name]; ok {
+//			if err := t.reconfigureReplicaTemplate(transCtx, tpl, change, pod); err != nil {
+//				return err
+//			}
+//		}
+//	}
+//	return nil
+// }
+//
+// func (t *componentReconfigureTransformer) reconfigureReplicaTemplate(transCtx *componentTransformContext,
+//	tpl component.SynthesizedFileTemplate, changes fileTemplateChanges, pod *corev1.Pod) error {
+//	var (
+//		synthesizedComp  = transCtx.SynthesizeComponent
+//		lifecycleActions = synthesizedComp.LifecycleActions
+//	)
+//	if (lifecycleActions == nil || lifecycleActions.Reconfigure == nil) && tpl.Reconfigure == nil {
+//		return nil // has no reconfigure action defined
+//	}
+//
+//	reconfigure := func(lfa lifecycle.Lifecycle) error {
+//		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+//			if tpl.Reconfigure == nil {
+//				return nil // disabled by the external
+//			}
+//		}
+//		if tpl.Reconfigure != nil {
+//			actionName := component.UDFReconfigureActionName(tpl)
+//			args := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
+//			return lfa.UserDefined(transCtx.Context, transCtx.Client, nil, actionName, tpl.Reconfigure, args)
+//		}
+//		return lfa.Reconfigure(transCtx.Context, transCtx.Client, nil, changes.Created, changes.Removed, changes.Updated)
+//	}
+//
+//	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+//		lifecycleActions, synthesizedComp.TemplateVars, pod)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if err := reconfigure(lfa); err != nil {
+//		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+//			return intctrlutil.NewDelayedRequeueError(time.Second,
+//				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
+//		}
+//		return err
+//	}
+//	return nil
+// }
+//
+// func (t *componentReconfigureTransformer) queueReconfigure(transCtx *componentTransformContext, dag *graph.DAG, changes string) error {
+//	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
+//		s.Reconfigured = ptr.To(changes)
+//	})
+// }
+//
+// func (t *componentReconfigureTransformer) cancelQueuedReconfigure(transCtx *componentTransformContext, dag *graph.DAG) error {
+//	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
+//		s.Reconfigured = nil
+//	})
+// }
+//
+// func (t *componentReconfigureTransformer) reconfigured(transCtx *componentTransformContext, dag *graph.DAG, replicas []string) error {
+//	replicasSet := sets.New(replicas...)
+//	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
+//		if replicasSet.Has(s.Name) {
+//			s.Reconfigured = ptr.To("")
+//		}
+//	})
+// }
+//
+// func (t *componentReconfigureTransformer) updateReconfigureStatus(
+//	transCtx *componentTransformContext, dag *graph.DAG, f func(*component.ReplicaStatus)) error {
+//	its, inDag := t.itsObject(transCtx, dag)
+//	if its == nil {
+//		return nil
+//	}
+//	err := component.UpdateReplicasStatusFunc(its, func(r *component.ReplicasStatus) error {
+//		for i := range r.Status {
+//			f(&r.Status[i])
+//		}
+//		return nil
+//	})
+//	if err != nil {
+//		return err
+//	}
+//
+//	if !inDag {
+//		runningIts := transCtx.RunningWorkload.(*workloads.InstanceSet)
+//		if !reflect.DeepEqual(runningIts.Annotations, its.Annotations) {
+//			graphCli, _ := transCtx.Client.(model.GraphClient)
+//			// its is copied from running its, and only the annotation is modified.
+//			graphCli.Update(dag, nil, its)
+//		}
+//	}
+//	return nil
+// }
+//
+// func (t *componentReconfigureTransformer) reconfigureStatus(
+//	transCtx *componentTransformContext, dag *graph.DAG) ([]string, map[string]fileTemplateChanges, error) {
+//	its, _ := t.itsObject(transCtx, dag)
+//	if its == nil {
+//		return nil, nil, nil
+//	}
+//
+//	var err1 error
+//	changes := map[string]fileTemplateChanges{}
+//	replicas, err2 := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
+//		if r.Reconfigured == nil || len(*r.Reconfigured) == 0 {
+//			return false
+//		}
+//		if len(changes) == 0 {
+//			err1 = json.Unmarshal([]byte(*r.Reconfigured), &changes)
+//		}
+//		return true
+//	})
+//	if err2 != nil {
+//		return nil, nil, err2
+//	}
+//	if err1 != nil {
+//		return nil, nil, err1
+//	}
+//	return replicas, changes, nil
+// }
 
 func (t *componentReconfigureTransformer) itsObject(transCtx *componentTransformContext, dag *graph.DAG) (*workloads.InstanceSet, bool) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)

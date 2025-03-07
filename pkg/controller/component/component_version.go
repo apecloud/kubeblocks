@@ -298,11 +298,15 @@ func checkNMergeImages(serviceVersion string, appsInDef, appsInVer map[string]ap
 	apps := make(map[string]appNameVersionImage)
 	merge := func(name string, def, ver appNameVersionImage) appNameVersionImage {
 		if len(ver.name) == 0 {
+			// if not required, fallback to image in cmpd directly
+			if !def.required {
+				return def
+			}
 			match, err := CompareServiceVersion(serviceVersion, def.version)
 			if err != nil {
 				def.err = fmt.Errorf("failed to compare service version (service version: %s, def version: %s): %w", serviceVersion, def.version, err)
 			}
-			if !match && def.required {
+			if !match {
 				def.err = fmt.Errorf("no matched image found for container %s with required version %s", name, serviceVersion)
 			}
 			return def

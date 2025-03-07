@@ -1135,16 +1135,6 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
-// RerenderResourceType defines the resource requirements for a component.
-// +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls}
-type RerenderResourceType string
-
-const (
-	ComponentVScaleType RerenderResourceType = "vscale"
-	ComponentHScaleType RerenderResourceType = "hscale"
-)
-
 type LogConfig struct {
 	// Specifies a descriptive label for the log type, such as 'slow' for a MySQL slow log file.
 	// It provides a clear identification of the log's purpose and content.

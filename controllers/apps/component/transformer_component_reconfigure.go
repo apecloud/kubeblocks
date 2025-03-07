@@ -229,6 +229,7 @@ func (t *componentReconfigureTransformer) reconfigureReplicaTemplate(transCtx *c
 				return nil // disabled by the external
 			}
 		}
+		// TODO: variables, dynamic render
 		if tpl.Reconfigure != nil {
 			actionName := component.UDFReconfigureActionName(tpl)
 			args := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)

@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -118,6 +119,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
+		KBAgentTasks:                     make([]proto.Task, 0),
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {

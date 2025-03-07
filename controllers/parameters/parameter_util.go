@@ -25,11 +25,14 @@ import (
 
 	"github.com/imdario/mergo"
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -256,4 +259,46 @@ func syncComponentParameterStatus(rctx *ReconcileContext, parameter *parametersv
 		syncConfigTemplateStatus(&parameter.Status.ReconfiguringStatus[i], &rctx.ComponentParameterObj.Status)
 	}
 	return nil
+}
+
+func handleClusterDeleted(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter) (*ctrl.Result, error) {
+	var cluster appsv1.Cluster
+
+	clusterKey := client.ObjectKey{
+		Namespace: parameter.GetNamespace(),
+		Name:      parameter.Spec.ClusterName,
+	}
+	if err := cli.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	if !cluster.IsDeleting() {
+		return updateOwnerReference(reqCtx, cli, &cluster, parameter)
+	}
+	reqCtx.Log.Info("cluster is deleting, delete parameter", "parameters", client.ObjectKeyFromObject(parameter))
+	if err := cli.Delete(reqCtx.Ctx, parameter); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+func updateOwnerReference(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, parameter *parametersv1alpha1.Parameter) (*ctrl.Result, error) {
+	clusterName := parameter.Labels[constant.AppInstanceLabelKey]
+	if clusterName == parameter.Spec.ClusterName && model.IsOwnerOf(cluster, parameter) {
+		return nil, nil
+	}
+
+	patch := client.MergeFrom(parameter.DeepCopy())
+	if parameter.Labels == nil {
+		parameter.Labels = make(map[string]string)
+	}
+	if !model.IsOwnerOf(cluster, parameter) {
+		if err := intctrlutil.SetOwnerReference(cluster, parameter); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
+	}
+	parameter.Labels[constant.AppInstanceLabelKey] = parameter.Spec.ClusterName
+	if err := cli.Patch(reqCtx.Ctx, parameter, patch); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }

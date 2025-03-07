@@ -11277,7 +11277,7 @@ int32
 </em>
 </td>
 <td>
-<p>The maximum limit of replicas.</p>
+<p>The maximum limit of shards.</p>
 </td>
 </tr>
 </tbody>

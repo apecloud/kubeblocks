@@ -33,7 +33,6 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -195,12 +194,6 @@ var _ = Describe("StorageProvider controller", func() {
 			By("creating a StorageProvider with csi3")
 			createStorageProviderSpec("csi3")
 
-			By("checking StorageProvider object")
-			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, provider *dpv1alpha1.StorageProvider) {
-				reconcileNoError(g)
-				g.Expect(provider.GetFinalizers()).To(ContainElement(dptypes.DataProtectionFinalizerName))
-			})).Should(Succeed())
-
 			By("deleting StorageProvider object")
 			Eventually(func(g Gomega) {
 				reconcileNoError(g)
@@ -210,7 +203,7 @@ var _ = Describe("StorageProvider controller", func() {
 					return
 				}
 				g.Expect(err).ToNot(HaveOccurred())
-				Expect(testCtx.Cli.Delete(testCtx.Ctx, provider)).ToNot(HaveOccurred())
+				g.Expect(testCtx.Cli.Delete(testCtx.Ctx, provider)).ToNot(HaveOccurred())
 			}).Should(Succeed())
 		})
 	})

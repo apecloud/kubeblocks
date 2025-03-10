@@ -23,9 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/rogpeppe/go-internal/semver"
 	appsv1 "k8s.io/api/apps/v1"
@@ -259,8 +261,17 @@ func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method
 }
 
 func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
-	// if expiration is already set, do not update it.
-	if backup.Status.Expiration != nil {
+	backupType := backup.Labels[types.BackupTypeLabelKey]
+	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseRunning {
+			backup.Status.Expiration = &metav1.Time{
+				// A continuous backup is allowed to run indefinitely
+				Time: time.Unix(math.MaxInt32, 0),
+			}
+			return nil
+		}
+	} else if backup.Status.Expiration != nil {
+		// if expiration is already set, do not update it except for continuous backup.
 		return nil
 	}
 
@@ -275,17 +286,13 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 		return nil
 	}
 
-	var expiration *metav1.Time
-	if backup.Status.StartTimestamp != nil {
-		expiration = &metav1.Time{
-			Time: backup.Status.StartTimestamp.Add(duration),
-		}
-	} else {
-		expiration = &metav1.Time{
-			Time: backup.CreationTimestamp.Add(duration),
-		}
+	startTime := backup.GetStartTime()
+	if startTime == nil {
+		startTime = &backup.CreationTimestamp
 	}
-	backup.Status.Expiration = expiration
+	backup.Status.Expiration = &metav1.Time{
+		Time: startTime.Add(duration),
+	}
 	return nil
 }
 

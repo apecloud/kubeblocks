@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -29,7 +28,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
@@ -53,7 +51,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
-	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -1599,21 +1596,6 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testReconfigure := func(compName, compDefName, fileTemplate string) {
-		By("mock reconfigure action calls")
-		var (
-			reconfigure string
-			parameters  map[string]string
-		)
-		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
-					reconfigure = req.Action
-					parameters = req.Parameters
-				}
-				return kbagentproto.ActionResponse{}, nil
-			}).AnyTimes()
-		})
-
 		createCompObj(compName, compDefName, nil)
 
 		By("check the file template object")
@@ -1624,12 +1606,6 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
 			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
 		})).Should(Succeed())
-
-		By("mock pods")
-		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
-		for i := range pods {
-			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
-		}
 
 		By("update the config template variables")
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
@@ -1648,31 +1624,20 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
 		})).Should(Succeed())
 
-		By("check the reconfigure action call")
-		Eventually(func(g Gomega) {
-			g.Expect(reconfigure).Should(Equal("reconfigure"))
-			g.Expect(parameters).ShouldNot(BeNil())
-			g.Expect(parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
-			g.Expect(parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
-		}).Should(Succeed())
+		By("check the workload updated")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty())
+			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
+		})).Should(Succeed())
 	}
 
 	testReconfigureUDF := func(compName, compDefName, fileTemplate string) {
-		By("mock reconfigure action calls")
-		var (
-			reconfigure string
-			parameters  map[string]string
-		)
-		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
-					reconfigure = req.Action
-					parameters = req.Parameters
-				}
-				return kbagentproto.ActionResponse{}, nil
-			}).AnyTimes()
-		})
-
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
 				{
@@ -1694,12 +1659,6 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
 		})).Should(Succeed())
 
-		By("mock pods")
-		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
-		for i := range pods {
-			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
-		}
-
 		By("update the config template variables")
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 			comp.Spec.Configs[0].Variables = map[string]string{
@@ -1712,88 +1671,21 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "warn"))
 		})).Should(Succeed())
 
-		By("check the reconfigure action call")
-		Eventually(func(g Gomega) {
-			g.Expect(reconfigure).Should(Equal(fmt.Sprintf("udf-reconfigure-%s", fileTemplate)))
-			g.Expect(parameters).ShouldNot(BeNil())
-			g.Expect(parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
-			g.Expect(parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
-		}).Should(Succeed())
-	}
-
-	testReconfigureStatus := func(compName, compDefName, fileTemplate string) {
-		By("mock reconfigure action calls")
-		var (
-			replicas  = 3
-			callTimes = 0
-		)
-		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
-					callTimes += 1
-					if callTimes >= replicas {
-						return kbagentproto.ActionResponse{}, fmt.Errorf("mock internal error")
-					}
-				}
-				return kbagentproto.ActionResponse{}, nil
-			}).AnyTimes()
-		})
-
-		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetReplicas(int32(replicas))
-		})
-
-		By("check the file template object")
-		fileTemplateCMKey := types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
-		}
-		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
-			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
-		})).Should(Succeed())
-
-		By("mock pods")
-		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
-		for i := range pods {
-			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
-		}
-
-		By("update the config template variables")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
-				{
-					Name: ptr.To(fileTemplate),
-					Variables: map[string]string{
-						"LOG_LEVEL": "debug",
-					},
-				},
-			}
-		})()).Should(Succeed())
-
-		By("check the file template object again")
-		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
-			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
-		})).Should(Succeed())
-
-		By("check the reconfigure action call")
-		Eventually(func(g Gomega) {
-			g.Expect(callTimes >= replicas).Should(BeTrue())
-		}).Should(Succeed())
-
-		By("check the replicas status")
+		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
-				g.Expect(r.Reconfigured).ShouldNot(BeNil())
-				return len(*r.Reconfigured) > 0
-			})
-			g.Expect(err).Should(BeNil())
-			g.Expect(len(replicas)).Should(Equal(1))
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("udf-reconfigure-%s", fileTemplate)))
+			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
 	}
 
-	testReconfigureStatusCanceled := func(compName, compDefName, fileTemplate string) {
-		testReconfigureStatus(compName, compDefName, fileTemplate)
+	testReconfigureVolumeChanged := func(compName, compDefName, fileTemplate string) {
+		testReconfigure(compName, compDefName, fileTemplate)
 
 		By("update the cmpd to add a new config template (volume)")
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
@@ -1820,16 +1712,10 @@ var _ = Describe("Component Controller", func() {
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, newFileTemplateCMKey, &corev1.ConfigMap{}, true)).Should(Succeed())
 
-		By("check the replicas status")
+		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			// all the reconfigure tasks of all replicas have been canceled
-			replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
-				g.Expect(r.Reconfigured).Should(BeNil())
-				return true
-			})
-			g.Expect(err).Should(BeNil())
-			g.Expect(len(replicas)).Should(Equal(3))
+			g.Expect(its.Spec.Configs).Should(BeNil())
 		})).Should(Succeed())
 	}
 
@@ -2392,12 +2278,8 @@ var _ = Describe("Component Controller", func() {
 			testReconfigureUDF(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
-		It("reconfigure - status", func() {
-			testReconfigureStatus(defaultCompName, compDefObj.Name, fileTemplate)
-		})
-
-		It("reconfigure - canceled by volumes change", func() {
-			testReconfigureStatusCanceled(defaultCompName, compDefObj.Name, fileTemplate)
+		It("reconfigure - volume changed", func() {
+			testReconfigureVolumeChanged(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

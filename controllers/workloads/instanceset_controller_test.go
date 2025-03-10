@@ -20,11 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +40,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -73,7 +78,7 @@ var _ = Describe("InstanceSet Controller", func() {
 		cleanEnv()
 	})
 
-	createITSObj := func(name string, processor func(factory *testapps.MockInstanceSetFactory)) {
+	createITSObj := func(name string, processors ...func(factory *testapps.MockInstanceSetFactory)) {
 		By("create a ITS object")
 		container := corev1.Container{
 			Name:  "foo",
@@ -84,8 +89,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 			AddContainer(container).
 			SetReplicas(1)
-		if processor != nil {
-			processor(f)
+		for _, processor := range processors {
+			if processor != nil {
+				processor(f)
+			}
 		}
 		itsObj = f.Create(&testCtx).GetObject()
 		itsKey = client.ObjectKeyFromObject(itsObj)
@@ -288,6 +295,250 @@ var _ = Describe("InstanceSet Controller", func() {
 				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+		})
+	})
+
+	Context("reconfigure", func() {
+		It("instance status", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.AddConfigs(workloads.Configuration{
+					Name:       "server",
+					Generation: int64(1),
+				})
+			})
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server": int64(1),
+					},
+				}))
+			})).Should(Succeed())
+		})
+
+		It("instance status - update", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.AddConfigs(workloads.Configuration{
+					Name:       "server",
+					Generation: int64(1),
+				})
+			})
+
+			By("update configs")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs = []workloads.Configuration{
+					{
+						Name:       "server",
+						Generation: 128,
+					},
+				}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server": int64(128),
+					},
+				}))
+			})).Should(Succeed())
+		})
+
+		It("instance status - different generations", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.AddConfigs([]workloads.Configuration{
+					{
+						Name:       "server",
+						Generation: int64(1),
+					},
+					{
+						Name:       "logging",
+						Generation: int64(2),
+					},
+				}...)
+			})
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server":  int64(1),
+						"logging": int64(2),
+					},
+				}))
+			})).Should(Succeed())
+
+			By("update the server config")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs[0].Generation = 128
+			})()).ShouldNot(HaveOccurred())
+
+			By("check instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server":  int64(128),
+						"logging": int64(2),
+					},
+				}))
+			})).Should(Succeed())
+		})
+
+		It("reconfigure", func() {
+			By("mock reconfigure action calls")
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				})
+			})
+
+			By("mock pods running and available")
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-0", itsObj.Name),
+			}
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{
+					{
+						Type:               corev1.PodReady,
+						Status:             corev1.ConditionTrue,
+						LastTransitionTime: metav1.Now(),
+					},
+				}
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name: pod.Spec.Containers[0].Name,
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{},
+						},
+						Image: pod.Spec.Containers[0].Image,
+					},
+				}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
+
+			By("update configs")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs = []workloads.Configuration{
+					{
+						Name:                  "server",
+						Generation:            128,
+						Reconfigure:           testapps.NewLifecycleAction("reconfigure"),
+						ReconfigureActionName: "", // the default reconfigure action
+						Parameters:            map[string]string{"foo": "bar"},
+					},
+				}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).ShouldNot(BeNil())
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+		})
+
+		It("reconfigure - udf", func() {
+			By("mock reconfigure action calls")
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				})
+			})
+
+			By("mock pods running and available")
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-0", itsObj.Name),
+			}
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{
+					{
+						Type:               corev1.PodReady,
+						Status:             corev1.ConditionTrue,
+						LastTransitionTime: metav1.Now(),
+					},
+				}
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name: pod.Spec.Containers[0].Name,
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{},
+						},
+						Image: pod.Spec.Containers[0].Image,
+					},
+				}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
+
+			By("update configs")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs = []workloads.Configuration{
+					{
+						Name:                  "server",
+						Generation:            128,
+						Reconfigure:           testapps.NewLifecycleAction("reconfigure"),
+						ReconfigureActionName: "reconfigure-server",
+						Parameters:            map[string]string{"foo": "bar"},
+					},
+				}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(ContainSubstring("reconfigure-server"))
+				g.Expect(parameters).ShouldNot(BeNil())
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
 		})
 	})
 })

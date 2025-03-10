@@ -199,9 +199,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updatingPods++
 		}
 
-		// reload the new configuration
-		if err = r.reconfigure(tree, its, pod); err != nil {
-			return kubebuilderx.Continue, err
+		if updatePolicy != RecreatePolicy {
+			// reload the new configuration
+			if err = r.reconfigure(tree, its, pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
 		}
 
 		updatedPods++

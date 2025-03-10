@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -326,13 +326,13 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
-	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
+	isSpecUpdated := !equality.Semantic.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	if isSpecUpdated {
 		UpdateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
 	}
 
-	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
-	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
+	isLabelsUpdated := !equality.Semantic.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
+	isAnnotationsUpdated := !equality.Semantic.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
 		return nil
 	}
@@ -1024,7 +1024,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		// if both pvc and pv not found, do nothing
 		return nil
 	}
-	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+	if equality.Semantic.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
 		// this could happen if create pvc succeeded but last step failed
 		updatePVCByRecreateFromStep(pvRestorePolicyStep)
 		return nil

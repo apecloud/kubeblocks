@@ -188,7 +188,6 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, nil
 	}
 
-	clusterName, _ := component.GetClusterName(comp)
 	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
 	if err != nil {
 		return nil, err
@@ -197,15 +196,16 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	initParameters, err := resolveInitParameters(reqCtx, reader, clusterName, comp)
+	initParameters, err := resolveInitParameters(reqCtx, reader, comp)
 	if err != nil {
 		return nil, err
 	}
 	parameterSpecs := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls)
-	if err = handleCustomParameterTemplate(comp, parameterSpecs); err != nil {
+	if err = handleCustomParameterTemplate(comp.Spec.Annotations, parameterSpecs); err != nil {
 		return nil, err
 	}
 
+	clusterName, _ := component.GetClusterName(comp)
 	componentName, _ := component.ShortName(clusterName, comp.Name)
 	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
 		configcore.GenerateComponentConfigurationName(clusterName, componentName)).
@@ -227,11 +227,11 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	return parameterObj, err
 }
 
-func handleCustomParameterTemplate(comp *appsv1.Component, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
-	if len(comp.Annotations) == 0 {
+func handleCustomParameterTemplate(annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
+	if len(annotations) == 0 {
 		return nil
 	}
-	customParamsTpl := comp.Annotations[constant.CustomParameterTemplateAnnotationKey]
+	customParamsTpl := annotations[constant.CustomParameterTemplateAnnotationKey]
 	if customParamsTpl == "" {
 		return nil
 	}
@@ -254,14 +254,14 @@ func handleCustomParameterTemplate(comp *appsv1.Component, specs []parametersv1a
 	return nil
 }
 
-func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, clusterName string, comp *appsv1.Component) (parametersv1alpha1.ComponentParameters, error) {
+func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (parametersv1alpha1.ComponentParameters, error) {
 	resolveShardingName := func(comp *appsv1.Component) string {
 		if len(comp.Labels) == 0 {
 			return ""
 		}
 		return comp.Labels[constant.KBAppShardingNameLabelKey]
 	}
-	componentMatcher := func(name string) func(parametersv1alpha1.Parameter) bool {
+	componentMatcher := func(clusterName, compName string) func(parametersv1alpha1.Parameter) bool {
 		return func(pcr parametersv1alpha1.Parameter) bool {
 			if model.IsObjectDeleting(&pcr) {
 				return false
@@ -270,7 +270,7 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 				return false
 			}
 			for _, parameter := range pcr.Spec.ComponentParameters {
-				if parameter.ComponentName == name {
+				if parameter.ComponentName == compName {
 					return true
 				}
 			}
@@ -278,44 +278,47 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 		}
 	}
 
-	listOpts := []client.ListOption{
+	parameters := &parametersv1alpha1.ParameterList{}
+	clusterName, _ := component.GetClusterName(comp)
+	listOptions := []client.ListOption{
 		client.MatchingLabels{
 			constant.AppInstanceLabelKey:    clusterName,
 			constant.ParametersInitLabelKey: "true",
 		},
 		client.InNamespace(comp.Namespace),
 	}
-	parameters := &parametersv1alpha1.ParameterList{}
-	if err := reader.List(reqCtx.Ctx, parameters, listOpts...); err != nil {
+	if err := reader.List(reqCtx.Ctx, parameters, listOptions...); err != nil {
 		return nil, errors.Wrapf(err, "failed to list init parameters: %v", client.ObjectKeyFromObject(comp))
 	}
 
-	compRealName := comp.Name
+	compRealName, _ := component.ShortName(clusterName, comp.Name)
 	if shardingName := resolveShardingName(comp); shardingName != "" {
 		compRealName = shardingName
 	}
 
-	parameterCRs := generics.FindFunc(parameters.Items, componentMatcher(compRealName))
+	parameterCRs := generics.FindFunc(parameters.Items, componentMatcher(clusterName, compRealName))
 	if len(parameterCRs) == 0 {
 		return nil, nil
 	}
-	return resolveInitParametersFromParameterCR(parameterCRs, compRealName), nil
+	return resolveInitParametersFromParameterCR(parameterCRs, compRealName)
 }
 
-func resolveInitParametersFromParameterCR(parameterCRs []parametersv1alpha1.Parameter, compName string) parametersv1alpha1.ComponentParameters {
+func resolveInitParametersFromParameterCR(parameterCRs []parametersv1alpha1.Parameter, compName string) (parametersv1alpha1.ComponentParameters, error) {
+	var initParams parametersv1alpha1.ComponentParameters
+
 	slices.SortStableFunc(parameterCRs, func(a, b parametersv1alpha1.Parameter) int {
 		return a.CreationTimestamp.Compare(b.CreationTimestamp.Time)
 	})
-
-	initParams := parametersv1alpha1.ComponentParameters{}
 	for _, pcr := range parameterCRs {
 		for _, compParams := range pcr.Spec.ComponentParameters {
 			if compParams.ComponentName == compName {
-				_ = mergeWithOverride(initParams, compParams.Parameters)
+				if err := mergeWithOverride(&initParams, compParams.Parameters); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
-	return initParams
+	return initParams, nil
 }
 
 func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {

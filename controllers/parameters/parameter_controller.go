@@ -179,7 +179,7 @@ func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *par
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 		return r.failWithTerminalReconcile(reqCtx, parameter, err)
 	}
-	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 }
 
 func (r *ParameterReconciler) filterParametersResources(ctx context.Context, object client.Object) []reconcile.Request {

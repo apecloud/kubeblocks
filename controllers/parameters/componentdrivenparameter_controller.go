@@ -21,9 +21,12 @@ package parameters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +44,7 @@ import (
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // ComponentDrivenParameterReconciler reconciles a Parameter object
@@ -184,6 +188,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, nil
 	}
 
+	clusterName, _ := component.GetClusterName(comp)
 	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
 	if err != nil {
 		return nil, err
@@ -192,15 +197,22 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
+	initParameters, err := resolveInitParameters(reqCtx, reader, clusterName, comp)
+	if err != nil {
+		return nil, err
+	}
+	parameterSpecs := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls)
+	if err = handleCustomParameterTemplate(comp, parameterSpecs); err != nil {
+		return nil, err
+	}
 
-	clusterName, _ := component.GetClusterName(comp)
 	componentName, _ := component.ShortName(clusterName, comp.Name)
 	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
 		configcore.GenerateComponentConfigurationName(clusterName, componentName)).
 		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, componentName, cmpd.Name)).
 		ClusterRef(clusterName).
 		Component(componentName).
-		SetConfigurationItem(configctrl.ClassifyParamsFromConfigTemplate(nil, cmpd, paramsDefs, tpls)).
+		SetConfigurationItem(parameterSpecs).
 		GetObject()
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
@@ -213,6 +225,97 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		err = configctrl.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
 	}
 	return parameterObj, err
+}
+
+func handleCustomParameterTemplate(comp *appsv1.Component, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
+	if len(comp.Annotations) == 0 {
+		return nil
+	}
+	customParamsTpl := comp.Annotations[constant.CustomParameterTemplateAnnotationKey]
+	if customParamsTpl == "" {
+		return nil
+	}
+
+	var customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension
+	if err := json.Unmarshal([]byte(customParamsTpl), &customTemplates); err != nil {
+		return errors.Wrap(err, "failed to unmarshal custom parameter template")
+	}
+
+	for tplName, tpl := range customTemplates {
+		match := func(spec parametersv1alpha1.ConfigTemplateItemDetail) bool {
+			return spec.Name == tplName
+		}
+		index := generics.FindFirstFunc(specs, match)
+		if index < 0 {
+			return fmt.Errorf("custom template[%s] not found in component definition", tplName)
+		}
+		specs[index].CustomTemplates = tpl.DeepCopy()
+	}
+	return nil
+}
+
+func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, clusterName string, comp *appsv1.Component) (parametersv1alpha1.ComponentParameters, error) {
+	resolveShardingName := func(comp *appsv1.Component) string {
+		if len(comp.Labels) == 0 {
+			return ""
+		}
+		return comp.Labels[constant.KBAppShardingNameLabelKey]
+	}
+	componentMatcher := func(name string) func(parametersv1alpha1.Parameter) bool {
+		return func(pcr parametersv1alpha1.Parameter) bool {
+			if model.IsObjectDeleting(&pcr) {
+				return false
+			}
+			if pcr.Spec.ClusterName != clusterName {
+				return false
+			}
+			for _, parameter := range pcr.Spec.ComponentParameters {
+				if parameter.ComponentName == name {
+					return true
+				}
+			}
+			return false
+		}
+	}
+
+	listOpts := []client.ListOption{
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.ParametersInitLabelKey: "true",
+		},
+		client.InNamespace(comp.Namespace),
+	}
+	parameters := &parametersv1alpha1.ParameterList{}
+	if err := reader.List(reqCtx.Ctx, parameters, listOpts...); err != nil {
+		return nil, errors.Wrapf(err, "failed to list init parameters: %v", client.ObjectKeyFromObject(comp))
+	}
+
+	compRealName := comp.Name
+	if shardingName := resolveShardingName(comp); shardingName != "" {
+		compRealName = shardingName
+	}
+
+	parameterCRs := generics.FindFunc(parameters.Items, componentMatcher(compRealName))
+	if len(parameterCRs) == 0 {
+		return nil, nil
+	}
+	return resolveInitParametersFromParameterCR(parameterCRs, compRealName), nil
+}
+
+func resolveInitParametersFromParameterCR(parameterCRs []parametersv1alpha1.Parameter, compName string) parametersv1alpha1.ComponentParameters {
+	slices.SortStableFunc(parameterCRs, func(a, b parametersv1alpha1.Parameter) int {
+		return a.CreationTimestamp.Compare(b.CreationTimestamp.Time)
+	})
+
+	initParams := parametersv1alpha1.ComponentParameters{}
+	for _, pcr := range parameterCRs {
+		for _, compParams := range pcr.Spec.ComponentParameters {
+			if compParams.ComponentName == compName {
+				_ = mergeWithOverride(initParams, compParams.Parameters)
+			}
+		}
+	}
+	return initParams
 }
 
 func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
@@ -231,6 +334,9 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 	return configctrl.MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
 		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
+		}
+		if expected.CustomTemplates != nil {
+			dest.CustomTemplates = expected.CustomTemplates
 		}
 		dest.Payload = expected.Payload
 	})

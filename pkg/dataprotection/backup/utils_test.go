@@ -20,13 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backup
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/utils/pointer"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -84,6 +89,85 @@ func TestBuildCronJobSchedule(t *testing.T) {
 			tz, cronExp := BuildCronJobSchedule(cronExpression)
 			assert.Equal(t, tt.cronExpression, cronExp)
 			assert.Equal(t, tt.timeZone, tz)
+		})
+	}
+}
+
+func TestSetExpirationByCreationTime(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		name          string
+		backup        *dpv1alpha1.Backup
+		expectedError bool
+		verify        func(*testing.T, *dpv1alpha1.Backup)
+	}{
+		{
+			name: "already has expiration",
+			backup: &dpv1alpha1.Backup{
+				Status: dpv1alpha1.BackupStatus{
+					Expiration: &metav1.Time{Time: now.Add(24 * time.Hour)},
+				},
+			},
+			expectedError: false,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.NotNil(t, b.Status.Expiration)
+			},
+		},
+		{
+			name: "continuous backup type",
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						dptypes.BackupTypeLabelKey: string(dpv1alpha1.BackupTypeContinuous),
+					},
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					RetentionPeriod: "24h",
+				},
+			},
+			expectedError: false,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.Equal(t, time.Unix(math.MaxInt32, 0).UTC(), b.Status.Expiration.Time.UTC())
+			},
+		},
+		{
+			name: "with retention period and start timestamp",
+			backup: &dpv1alpha1.Backup{
+				Spec: dpv1alpha1.BackupSpec{
+					RetentionPeriod: "24h",
+				},
+				Status: dpv1alpha1.BackupStatus{
+					StartTimestamp: &now,
+				},
+			},
+			expectedError: false,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.Equal(t, now.Add(24*time.Hour).UTC(), b.Status.Expiration.Time.UTC())
+			},
+		},
+		{
+			name: "invalid retention period",
+			backup: &dpv1alpha1.Backup{
+				Spec: dpv1alpha1.BackupSpec{
+					RetentionPeriod: "invalid",
+				},
+			},
+			expectedError: true,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.Nil(t, b.Status.Expiration)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := SetExpirationByCreationTime(tt.backup)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			tt.verify(t, tt.backup)
 		})
 	}
 }

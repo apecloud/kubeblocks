@@ -23,9 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/rogpeppe/go-internal/semver"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
@@ -261,6 +264,13 @@ func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method
 func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 	// if expiration is already set, do not update it.
 	if backup.Status.Expiration != nil {
+		return nil
+	}
+
+	if backupType := backup.Labels[dptypes.BackupTypeLabelKey]; backupType == string(dpv1alpha1.BackupTypeContinuous) {
+		backup.Status.Expiration = &metav1.Time{
+			Time: time.Unix(math.MaxInt32, 0),
+		}
 		return nil
 	}
 

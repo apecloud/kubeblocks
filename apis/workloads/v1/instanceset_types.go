@@ -34,9 +34,10 @@ import (
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},shortName=its
-// +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[?(@.role.isLeader==true)].podName",description="leader instance name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
-// +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
+// +kubebuilder:printcolumn:name="DESIRED",type="string",JSONPath=".spec.replicas",description="desired replicas."
+// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.updatedReplicas",description="updated replicas."
+// +kubebuilder:printcolumn:name="AVAILABLE",type="string",JSONPath=".status.availableReplicas",description="available replicas, which are ready for at least minReadySeconds."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // InstanceSet is the Schema for the instancesets API.

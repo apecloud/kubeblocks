@@ -20,17 +20,21 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: leader instance name.
-      jsonPath: .status.membersStatus[?(@.role.isLeader==true)].podName
-      name: LEADER
-      type: string
     - description: ready replicas.
       jsonPath: .status.readyReplicas
       name: READY
       type: string
-    - description: total replicas.
-      jsonPath: .status.replicas
-      name: REPLICAS
+    - description: desired replicas.
+      jsonPath: .spec.replicas
+      name: DESIRED
+      type: string
+    - description: updated replicas.
+      jsonPath: .status.updatedReplicas
+      name: UP-TO-DATE
+      type: string
+    - description: available replicas, which are ready for at least minReadySeconds.
+      jsonPath: .status.availableReplicas
+      name: AVAILABLE
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE

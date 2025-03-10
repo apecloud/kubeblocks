@@ -21,12 +21,12 @@ package operations
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -209,7 +209,7 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 		failedCount += subFailedCount
 		opsRes.OpsRequest.Status.Components[v.ComponentName] = compStatus
 	}
-	if !reflect.DeepEqual(oldCluster.Spec, opsRes.Cluster.Spec) {
+	if !equality.Semantic.DeepEqual(oldCluster.Spec, opsRes.Cluster.Spec) {
 		if err = cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
 			return opsRequestPhase, 0, err
 		}

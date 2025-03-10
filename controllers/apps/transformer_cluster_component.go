@@ -21,11 +21,11 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -233,9 +233,9 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
 
-	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
-		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
-		reflect.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
+	if equality.Semantic.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
+		equality.Semantic.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
+		equality.Semantic.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
 		return nil
 	}
 	return compObjCopy

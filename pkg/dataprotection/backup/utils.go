@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
@@ -262,15 +261,17 @@ func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method
 }
 
 func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
-	// if expiration is already set, do not update it.
-	if backup.Status.Expiration != nil {
-		return nil
-	}
-
-	if backupType := backup.Labels[dptypes.BackupTypeLabelKey]; backupType == string(dpv1alpha1.BackupTypeContinuous) {
-		backup.Status.Expiration = &metav1.Time{
-			Time: time.Unix(math.MaxInt32, 0),
+	backupType := backup.Labels[types.BackupTypeLabelKey]
+	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseRunning {
+			backup.Status.Expiration = &metav1.Time{
+				// A continuous backup is allowed to run indefinitely
+				Time: time.Unix(math.MaxInt32, 0),
+			}
+			return nil
 		}
+	} else if backup.Status.Expiration != nil {
+		// if expiration is already set, do not update it except for continuous backup.
 		return nil
 	}
 

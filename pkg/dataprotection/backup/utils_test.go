@@ -114,7 +114,7 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 			},
 		},
 		{
-			name: "continuous backup type",
+			name: "continuous backup type with running phase",
 			backup: &dpv1alpha1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -124,10 +124,37 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 				Spec: dpv1alpha1.BackupSpec{
 					RetentionPeriod: "24h",
 				},
+				Status: dpv1alpha1.BackupStatus{
+					Phase: dpv1alpha1.BackupPhaseRunning,
+				},
 			},
 			expectedError: false,
 			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
 				assert.Equal(t, time.Unix(math.MaxInt32, 0).UTC(), b.Status.Expiration.Time.UTC())
+			},
+		},
+		{
+			name: "continuous backup type with completed phase",
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						dptypes.BackupTypeLabelKey: string(dpv1alpha1.BackupTypeContinuous),
+					},
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					RetentionPeriod: "24h",
+				},
+				Status: dpv1alpha1.BackupStatus{
+					Phase: dpv1alpha1.BackupPhaseCompleted,
+					TimeRange: &dpv1alpha1.BackupTimeRange{
+						Start: &now,
+						End:   func() *metav1.Time { t := metav1.NewTime(now.Add(1 * time.Hour)); return &t }(),
+					},
+				},
+			},
+			expectedError: false,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.Equal(t, now.Add(24*time.Hour).UTC(), b.Status.Expiration.Time.UTC())
 			},
 		},
 		{
@@ -143,6 +170,7 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 			expectedError: false,
 			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
 				assert.Equal(t, now.Add(24*time.Hour).UTC(), b.Status.Expiration.Time.UTC())
+				assert.NotEqual(t, now.Add(24*time.Hour).UTC(), b.Status.StartTimestamp.Time.UTC())
 			},
 		},
 		{

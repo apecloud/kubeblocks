@@ -286,17 +286,13 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 		return nil
 	}
 
-	var expiration *metav1.Time
-	if backup.Status.StartTimestamp != nil {
-		expiration = &metav1.Time{
-			Time: backup.Status.StartTimestamp.Add(duration),
-		}
-	} else {
-		expiration = &metav1.Time{
-			Time: backup.CreationTimestamp.Add(duration),
-		}
+	startTime := backup.GetStartTime()
+	if startTime == nil {
+		startTime = &backup.CreationTimestamp
 	}
-	backup.Status.Expiration = expiration
+	backup.Status.Expiration = &metav1.Time{
+		Time: startTime.Add(duration),
+	}
 	return nil
 }
 

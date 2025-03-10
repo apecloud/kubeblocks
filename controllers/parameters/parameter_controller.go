@@ -168,7 +168,7 @@ func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *par
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 		return r.failWithTerminalReconcile(reqCtx, parameter, err)
 	}
-	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 }
 
 func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {

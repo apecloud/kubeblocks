@@ -39,6 +39,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -99,14 +100,15 @@ func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager, multiC
 func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
 	tasks := generateReconcileTasks(reqCtx, componentParameter)
 	if len(tasks) == 0 {
+		reqCtx.Log.Info("nothing to reconcile")
 		return intctrlutil.Reconciled()
 	}
 
 	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, componentParameter)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to get related object").Error())
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to get related object").Error())
 	}
-	if !fetcherTask.ClusterObj.GetDeletionTimestamp().IsZero() {
+	if model.IsObjectDeleting(fetcherTask.ComponentObj) {
 		reqCtx.Log.Info("cluster is deleting, skip reconcile")
 		return intctrlutil.Reconciled()
 	}

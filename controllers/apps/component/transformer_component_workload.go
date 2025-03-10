@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -466,9 +466,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 
-	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
-	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
-	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
+	isSpecUpdated := !equality.Semantic.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
+	isLabelsUpdated := !equality.Semantic.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
+	isAnnotationsUpdated := !equality.Semantic.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
 		return nil
 	}
@@ -1021,7 +1021,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		// if both pvc and pv not found, do nothing
 		return nil
 	}
-	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
+	if equality.Semantic.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
 		pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain &&
 		pv.Annotations != nil &&
 		len(pv.Annotations[constant.PVLastClaimPolicyAnnotationKey]) > 0 &&

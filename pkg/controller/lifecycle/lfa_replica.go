@@ -40,9 +40,7 @@ func FileTemplateChanges(created, removed, updated string) map[string]string {
 }
 
 type reconfigure struct {
-	created string
-	removed string
-	updated string
+	args map[string]string
 }
 
 var _ lifecycleAction = &reconfigure{}
@@ -57,5 +55,5 @@ func (a *reconfigure) parameters(ctx context.Context, cli client.Reader) (map[st
 	// - KB_CONFIG_FILES_CREATED: file1,file2...
 	// - KB_CONFIG_FILES_REMOVED: file1,file2...
 	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-	return FileTemplateChanges(a.created, a.removed, a.updated), nil
+	return a.args, nil
 }

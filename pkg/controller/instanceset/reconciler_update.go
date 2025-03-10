@@ -22,6 +22,7 @@ package instanceset
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
@@ -196,6 +198,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingPods++
 		}
+
+		if updatePolicy != RecreatePolicy {
+			// reload the new configuration
+			if err = r.reconfigure(tree, its, pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
+
 		updatedPods++
 	}
 	if !isBlocked {
@@ -212,17 +222,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		return nil
 	}
 
-	clusterName, err := func() (string, error) {
-		var clusterName string
-		if its.Labels != nil {
-			clusterName = its.Labels[constant.AppInstanceLabelKey]
-		}
-		if len(clusterName) == 0 {
-			return "", fmt.Errorf("InstanceSet %s/%s has no label %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
-		}
-		return clusterName, nil
-
-	}()
+	clusterName, err := r.clusterName(its)
 	if err != nil {
 		return err
 	}
@@ -253,6 +253,95 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	}
 	tree.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
 	return nil
+}
+
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
+	var (
+		clusterName string
+	)
+
+	isConfigUpdate := func(config workloads.Configuration) bool {
+		idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+			return instance.PodName == pod.Name
+		})
+		if idx >= 0 {
+			generation, ok := its.Status.InstanceStatus[idx].Configs[config.Name]
+			if ok {
+				return config.Generation > generation
+			}
+		}
+		return config.Generation > 0
+	}
+
+	reconfigure := func(config workloads.Configuration) error {
+		if config.Reconfigure == nil {
+			return nil // skip
+		}
+
+		if len(clusterName) == 0 {
+			var err error
+			clusterName, err = r.clusterName(its)
+			if err != nil {
+				return err
+			}
+		}
+
+		lifecycleActions := &kbappsv1.ComponentLifecycleActions{
+			Reconfigure: config.Reconfigure,
+		}
+		templateVars := func() map[string]any {
+			if its.Spec.TemplateVars == nil {
+				return nil
+			}
+			m := make(map[string]any)
+			for k, v := range its.Spec.TemplateVars {
+				m[k] = v
+			}
+			return m
+		}()
+		lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod)
+		if err != nil {
+			return err
+		}
+
+		if len(config.ReconfigureActionName) == 0 {
+			err = lfa.Reconfigure(tree.Context, nil, nil, config.Parameters)
+		} else {
+			err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
+		}
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
+			}
+			if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+				return intctrlutil.NewDelayedRequeueError(time.Second,
+					fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
+			}
+			return err
+		}
+		tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "generation", config.Generation)
+		return nil
+	}
+
+	for _, config := range its.Spec.Configs {
+		if isConfigUpdate(config) {
+			if err := reconfigure(config); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *updateReconciler) clusterName(its *workloads.InstanceSet) (string, error) {
+	var clusterName string
+	if its.Labels != nil {
+		clusterName = its.Labels[constant.AppInstanceLabelKey]
+	}
+	if len(clusterName) == 0 {
+		return "", fmt.Errorf("InstanceSet %s/%s has no label %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
+	}
+	return clusterName, nil
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

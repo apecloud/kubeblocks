@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -373,4 +375,23 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 	}
 
 	return nil
+}
+
+func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
+	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
+	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
+		}
+	}
+	return matchedPVCs, nil
 }

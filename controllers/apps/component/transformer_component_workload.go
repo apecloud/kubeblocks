@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -1021,7 +1022,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		// if both pvc and pv not found, do nothing
 		return nil
 	}
-	if component.ResourceSemanticEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
+	if equality.Semantic.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
 		pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain &&
 		pv.Annotations != nil &&
 		len(pv.Annotations[constant.PVLastClaimPolicyAnnotationKey]) > 0 &&

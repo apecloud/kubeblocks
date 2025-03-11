@@ -29,6 +29,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -219,7 +220,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
-		component.ResourceSemanticEqual(oldCompObj.Spec.Resources, compProto.Spec.Resources) &&
+		equality.Semantic.DeepEqual(oldCompObj.Spec.Resources, compProto.Spec.Resources) &&
 		reflect.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
 		return nil
 	}

@@ -29,8 +29,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
@@ -79,6 +82,7 @@ func (r *ParameterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *ParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&parametersv1alpha1.Parameter{}).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.filterParametersResources)).
 		Complete(r)
 }
 
@@ -106,6 +110,13 @@ func (r *ParameterReconciler) handleComponent(rctx *ReconcileContext, updatedPar
 }
 
 func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) (ctrl.Result, error) {
+	res, err := handleClusterDeleted(reqCtx, r.Client, parameter)
+	if res != nil {
+		return *res, err
+	}
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	if intctrlutil.ParametersTerminalPhases(parameter.Status, parameter.Generation) {
 		return intctrlutil.Reconciled()
 	}
@@ -169,6 +180,25 @@ func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *par
 		return r.failWithTerminalReconcile(reqCtx, parameter, err)
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+}
+
+func (r *ParameterReconciler) filterParametersResources(ctx context.Context, object client.Object) []reconcile.Request {
+	listOpts := []client.ListOption{
+		client.InNamespace(object.GetNamespace()),
+		client.MatchingLabels{constant.AppInstanceLabelKey: object.GetName()},
+	}
+	parameters := &parametersv1alpha1.ParameterList{}
+	if err := r.Client.List(ctx, parameters, listOpts...); err != nil {
+		log.FromContext(ctx).Error(err, "failed to list parameters", "clusterKey", client.ObjectKeyFromObject(object))
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(parameters.Items))
+	for _, parameter := range parameters.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&parameter),
+		})
+	}
+	return requests
 }
 
 func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {

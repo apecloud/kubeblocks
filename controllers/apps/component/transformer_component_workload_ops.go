@@ -670,21 +670,28 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			return // has no reconfigure action defined
 		}
 
+		config := workloads.Configuration{
+			Name:                  tpl.Name,
+			Generation:            r.component.Generation,
+			Reconfigure:           action,
+			ReconfigureActionName: actionName,
+			Parameters:            lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
+		}
 		if r.protoITS.Spec.Configs == nil {
 			r.protoITS.Spec.Configs = make([]workloads.Configuration, 0)
 		}
-		for i, config := range r.protoITS.Spec.Configs {
-			if config.Name == tpl.Name {
-				r.protoITS.Spec.Configs[i] = workloads.Configuration{
-					Name:                  tpl.Name,
-					Generation:            r.runningITS.Generation + 1,
-					Reconfigure:           action,
-					ReconfigureActionName: actionName,
-					Parameters:            lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
-				}
-			}
+		idx := slices.IndexFunc(r.protoITS.Spec.Configs, func(cfg workloads.Configuration) bool {
+			return cfg.Name == tpl.Name
+		})
+		if idx >= 0 {
+			r.protoITS.Spec.Configs[idx] = config
+		} else {
+			r.protoITS.Spec.Configs = append(r.protoITS.Spec.Configs, config)
 		}
 	}
+
+	// make a copy of configs from the running ITS
+	r.protoITS.Spec.Configs = slices.Clone(r.runningITS.Spec.Configs)
 
 	templateChanges := r.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
 	for _, tpl := range synthesizedComp.FileTemplates {

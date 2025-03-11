@@ -1678,7 +1678,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
 			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("udf-reconfigure-%s", fileTemplate)))
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-%s", fileTemplate)))
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())

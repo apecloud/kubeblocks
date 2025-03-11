@@ -21,9 +21,11 @@ package dataprotection
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,18 +82,23 @@ func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// get provider object
 	provider := &dpv1alpha1.StorageProvider{}
 	if err := r.Get(ctx, req.NamespacedName, provider); err != nil {
+		if apierrors.IsNotFound(err) {
+			r.removeDependency(req.Name)
+			return intctrlutil.Reconciled()
+		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get StorageProvider")
 	}
 
 	// add dependency to CSIDriver
 	r.ensureDependency(provider)
 
-	// handle finalizer
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, provider, dptypes.DataProtectionFinalizerName, func() (*ctrl.Result, error) {
-		return nil, r.deleteExternalResources(reqCtx, provider)
-	})
-	if res != nil {
-		return *res, err
+	// We should not add a finalizer to the StorageProvider resource,
+	// because when KubeBlocks is uninstalled, the controller workload will be stopped first,
+	// so the finalizer will not be processed, preventing those StorageProvider resources
+	// from being deleted.
+	// Remove the finalizer if it's present.
+	if err := r.removeFinalizer(reqCtx, provider); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to remove finalizer")
 	}
 
 	// check CSI driver if specified
@@ -115,6 +122,19 @@ func (r *StorageProviderReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return intctrlutil.Reconciled()
+}
+
+func (r *StorageProviderReconciler) removeFinalizer(reqCtx intctrlutil.RequestCtx,
+	provider *dpv1alpha1.StorageProvider) error {
+	pos := slices.Index(provider.Finalizers, dptypes.DataProtectionFinalizerName)
+	if pos < 0 {
+		return nil
+	}
+	provider.Finalizers = slices.Delete(provider.Finalizers, pos, pos+1)
+	if err := r.Update(reqCtx.Ctx, provider); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *StorageProviderReconciler) updateStatus(reqCtx intctrlutil.RequestCtx,
@@ -195,26 +215,19 @@ func (r *StorageProviderReconciler) ensureDependency(provider *dpv1alpha1.Storag
 	r.driverDependencies[driverName] = append(list, provider.Name)
 }
 
-func (r *StorageProviderReconciler) removeDependency(provider *dpv1alpha1.StorageProvider) {
-	if provider.Spec.CSIDriverName == "" {
-		return
-	}
+func (r *StorageProviderReconciler) removeDependency(providerName string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	list := r.driverDependencies[provider.Spec.CSIDriverName]
-	for i, x := range list {
-		if x == provider.Name {
-			list[i] = list[len(list)-1]
-			r.driverDependencies[provider.Spec.CSIDriverName] = list[:len(list)-1]
-			return
+	for driverName := range r.driverDependencies {
+		list := r.driverDependencies[driverName]
+		for i, x := range list {
+			if x == providerName {
+				list[i] = list[len(list)-1]
+				r.driverDependencies[driverName] = list[:len(list)-1]
+				break
+			}
 		}
 	}
-}
-
-func (r *StorageProviderReconciler) deleteExternalResources(
-	reqCtx intctrlutil.RequestCtx, provider *dpv1alpha1.StorageProvider) error {
-	r.removeDependency(provider)
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -20,7 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"k8s.io/apimachinery/pkg/api/equality"
+	"reflect"
+	
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -45,8 +46,8 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 	controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)
 
-	if equality.Semantic.DeepEqual(transCtx.ComponentOrig.Finalizers, comp.Finalizers) &&
-		equality.Semantic.DeepEqual(transCtx.ComponentOrig.Labels, comp.Labels) {
+	if reflect.DeepEqual(transCtx.ComponentOrig.Finalizers, comp.Finalizers) &&
+		reflect.DeepEqual(transCtx.ComponentOrig.Labels, comp.Labels) {
 		return nil
 	}
 

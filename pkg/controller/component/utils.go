@@ -21,6 +21,8 @@ package component
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"regexp"
 	"slices"
 	"strings"
@@ -65,6 +67,10 @@ func CompDefMatched(compDef, compDefPattern string) bool {
 		return false
 	}
 	return regex.MatchString(compDef)
+}
+
+func ResourceSemanticEqual(old, new corev1.ResourceRequirements) bool {
+	return equality.Semantic.DeepEqual(old, new)
 }
 
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {

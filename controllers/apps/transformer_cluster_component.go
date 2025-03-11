@@ -21,11 +21,11 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -202,7 +202,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Annotations = compProto.Annotations
 	compObjCopy.Labels = compProto.Labels
 
-	// merge spec
+	// merge spec except resources
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
@@ -216,7 +216,6 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
-	// compObjCopy.Spec.Monitor = compProto.Spec.Monitor
 	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.InstanceUpdateStrategy = compProto.Spec.InstanceUpdateStrategy
@@ -233,11 +232,13 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
 
-	if equality.Semantic.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
-		equality.Semantic.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
-		equality.Semantic.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
+	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
+		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
+		component.ResourceSemanticEqual(oldCompObj.Spec.Resources, compProto.Spec.Resources) &&
+		reflect.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
 		return nil
 	}
+	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	return compObjCopy
 }
 

@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -266,7 +265,7 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 		if backup.Status.Phase == dpv1alpha1.BackupPhaseRunning {
 			backup.Status.Expiration = &metav1.Time{
 				// A continuous backup is allowed to run indefinitely
-				Time: time.Unix(math.MaxInt32, 0),
+				Time: time.Date(9999, time.Month(1), 1, 0, 0, 0, 0, time.UTC),
 			}
 			return nil
 		}

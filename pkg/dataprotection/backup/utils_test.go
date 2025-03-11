@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backup
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -130,7 +129,7 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 			},
 			expectedError: false,
 			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
-				assert.Equal(t, time.Unix(math.MaxInt32, 0).UTC(), b.Status.Expiration.Time.UTC())
+				assert.Equal(t, time.Date(9999, time.Month(1), 1, 0, 0, 0, 0, time.UTC).UTC(), b.Status.Expiration.Time.UTC())
 			},
 		},
 		{

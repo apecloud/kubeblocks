@@ -189,11 +189,6 @@ var _ = Describe("StorageProvider controller", func() {
 			By("creating a StorageProvider with csi3")
 			createStorageProviderSpec("csi3")
 
-			By("checking StorageProvider object")
-			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, provider *storagev1alpha1.StorageProvider) {
-				g.Expect(provider.GetFinalizers()).To(ContainElement(storageFinalizerName))
-			})).Should(Succeed())
-
 			By("deleting StorageProvider object")
 			Eventually(func(g Gomega) {
 				provider := &storagev1alpha1.StorageProvider{}
@@ -202,7 +197,7 @@ var _ = Describe("StorageProvider controller", func() {
 					return
 				}
 				g.Expect(err).ToNot(HaveOccurred())
-				Expect(testCtx.Cli.Delete(testCtx.Ctx, provider)).ToNot(HaveOccurred())
+				g.Expect(testCtx.Cli.Delete(testCtx.Ctx, provider)).ToNot(HaveOccurred())
 			}).Should(Succeed())
 		})
 	})

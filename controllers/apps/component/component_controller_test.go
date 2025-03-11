@@ -1152,6 +1152,31 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
+	checkRBACResourceOrphaned := func(saName, rbName string, orphaned bool) {
+		saKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      saName,
+		}
+		rbKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      rbName,
+		}
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			if orphaned {
+				g.Expect(metav1.GetControllerOf(sa)).Should(BeNil())
+			} else {
+				g.Expect(metav1.GetControllerOf(sa)).ShouldNot(BeNil())
+			}
+		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, rbKey, func(g Gomega, rb *rbacv1.RoleBinding) {
+			if orphaned {
+				g.Expect(metav1.GetControllerOf(rb)).Should(BeNil())
+			} else {
+				g.Expect(metav1.GetControllerOf(rb)).ShouldNot(BeNil())
+			}
+		})).Should(Succeed())
+	}
+
 	testCompRBAC := func(compName, compDefName, saName string) {
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
@@ -1182,9 +1207,9 @@ var _ = Describe("Component Controller", func() {
 		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
 
-		By("check the RBAC resources deleted")
+		By("check the RBAC resources orphaned")
 		saName := constant.GenerateDefaultServiceAccountName(compDefName)
-		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
+		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
@@ -1196,10 +1221,11 @@ var _ = Describe("Component Controller", func() {
 
 		By("check the RBAC resources deleted")
 		saName := constant.GenerateDefaultServiceAccountName(compDefName)
-		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
+		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
 
 		By("re-create component with same name")
 		testCompRBAC(compName, compDefName, "")
+		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), false)
 	}
 
 	testSharedRBACResourceDeletion := func(compNamePrefix, compDefName string) {
@@ -1236,8 +1262,17 @@ var _ = Describe("Component Controller", func() {
 		By("delete first component")
 		testapps.DeleteObject(&testCtx, comp1Key, &kbappsv1.Component{})
 		Eventually(testapps.CheckObjExists(&testCtx, comp1Key, &kbappsv1.Component{}, false)).Should(Succeed())
+		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
 
-		By("check rbac resources owner transferred")
+		By("trigger reconcile")
+		Expect(testapps.GetAndChangeObj(&testCtx, comp2Key, func(comp *kbappsv1.Component) {
+			if comp.Annotations == nil {
+				comp.Annotations = map[string]string{}
+			}
+			comp.Annotations["reconcile"] = time.Now().String()
+		})()).Should(Succeed())
+		By("check rbac resources adopted")
+		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), false)
 		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
 			refs := sa.GetOwnerReferences()
 			g.Expect(refs).Should(HaveLen(1))
@@ -1883,7 +1918,7 @@ var _ = Describe("Component Controller", func() {
 			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefObj.Name)
 		})
 
-		It("transfers rbac resources' ownership when multiple components share them", func() {
+		It("adopts an orphaned rbac resource", func() {
 			testSharedRBACResourceDeletion(defaultCompName, compDefObj.Name)
 		})
 

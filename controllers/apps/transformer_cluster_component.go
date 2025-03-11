@@ -210,7 +210,6 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Labels = compProto.Spec.Labels
 	compObjCopy.Spec.Annotations = compProto.Spec.Annotations
 	compObjCopy.Spec.Env = compProto.Spec.Env
-	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.Volumes = compProto.Spec.Volumes
 	compObjCopy.Spec.Services = compProto.Spec.Services

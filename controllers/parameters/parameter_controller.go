@@ -175,11 +175,18 @@ func (r *ParameterReconciler) failWithTerminalReconcile(reqCtx intctrlutil.Reque
 	return updateParameterStatus(reqCtx, r.Client, parameter, patch, true)
 }
 
+func (r *ParameterReconciler) failWithRetryReconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
+	patch := parameter.DeepCopy()
+	parameter.Status.Phase = parametersv1alpha1.CRunningPhase
+	parameter.Status.Message = err.Error()
+	return updateParameterStatus(reqCtx, r.Client, parameter, patch, false)
+}
+
 func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 		return r.failWithTerminalReconcile(reqCtx, parameter, err)
 	}
-	return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	return r.failWithRetryReconcile(reqCtx, parameter, err)
 }
 
 func (r *ParameterReconciler) filterParametersResources(ctx context.Context, object client.Object) []reconcile.Request {

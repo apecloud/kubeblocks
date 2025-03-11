@@ -268,7 +268,11 @@ func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv
 		return "", map[string]string{"reason": "the component objects are not found"}
 	}
 
-	phase := appsv1.ComponentPhase(composeClusterPhase(statusList))
+	composedPhase := composeClusterPhase(statusList)
+	if composedPhase == appsv1.AbnormalClusterPhase {
+		composedPhase = appsv1.FailedClusterPhase
+	}
+	phase := appsv1.ComponentPhase(composedPhase)
 	return phase, phasedMessage[phase]
 }
 

@@ -2267,7 +2267,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.Configuration">Configuration</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -29617,8 +29617,8 @@ bool
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.Configuration">
-[]Configuration
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
 </a>
 </em>
 </td>
@@ -29745,7 +29745,7 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 </td>
 </tr></tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.Configuration">Configuration
+<h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
@@ -29806,6 +29806,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>The name of the custom reconfigure action.</p>
+<p>An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.</p>
 </td>
 </tr>
 <tr>
@@ -30143,8 +30144,8 @@ bool
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.Configuration">
-[]Configuration
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
 </a>
 </em>
 </td>

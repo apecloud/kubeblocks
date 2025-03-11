@@ -260,7 +260,7 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		clusterName string
 	)
 
-	isConfigUpdate := func(config workloads.Configuration) bool {
+	isConfigUpdate := func(config workloads.ConfigTemplate) bool {
 		idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
 			return instance.PodName == pod.Name
 		})
@@ -273,7 +273,7 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		return config.Generation > 0
 	}
 
-	reconfigure := func(config workloads.Configuration) error {
+	reconfigure := func(config workloads.ConfigTemplate) error {
 		if config.Reconfigure == nil {
 			return nil // skip
 		}

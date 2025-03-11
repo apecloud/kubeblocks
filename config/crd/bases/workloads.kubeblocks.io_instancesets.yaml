@@ -347,7 +347,11 @@ spec:
                           type: integer
                       type: object
                     reconfigureActionName:
-                      description: The name of the custom reconfigure action.
+                      description: |-
+                        The name of the custom reconfigure action.
+
+
+                        An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
                       type: string
                   required:
                   - generation

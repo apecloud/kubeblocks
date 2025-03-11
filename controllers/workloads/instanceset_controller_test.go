@@ -301,7 +301,7 @@ var _ = Describe("InstanceSet Controller", func() {
 	Context("reconfigure", func() {
 		It("instance status", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.AddConfigs(workloads.Configuration{
+				f.AddConfigs(workloads.ConfigTemplate{
 					Name:       "server",
 					Generation: int64(1),
 				})
@@ -321,7 +321,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 		It("instance status - update", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.AddConfigs(workloads.Configuration{
+				f.AddConfigs(workloads.ConfigTemplate{
 					Name:       "server",
 					Generation: int64(1),
 				})
@@ -329,7 +329,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs = []workloads.Configuration{
+				its.Spec.Configs = []workloads.ConfigTemplate{
 					{
 						Name:       "server",
 						Generation: 128,
@@ -351,7 +351,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 		It("instance status - different generations", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.AddConfigs([]workloads.Configuration{
+				f.AddConfigs([]workloads.ConfigTemplate{
 					{
 						Name:       "server",
 						Generation: int64(1),
@@ -448,7 +448,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs = []workloads.Configuration{
+				its.Spec.Configs = []workloads.ConfigTemplate{
 					{
 						Name:                  "server",
 						Generation:            128,
@@ -522,7 +522,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs = []workloads.Configuration{
+				its.Spec.Configs = []workloads.ConfigTemplate{
 					{
 						Name:                  "server",
 						Generation:            128,

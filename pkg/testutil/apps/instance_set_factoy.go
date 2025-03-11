@@ -114,7 +114,7 @@ func (factory *MockInstanceSetFactory) AddContainer(container corev1.Container) 
 	return factory
 }
 
-func (factory *MockInstanceSetFactory) AddConfigs(config ...workloads.Configuration) *MockInstanceSetFactory {
+func (factory *MockInstanceSetFactory) AddConfigs(config ...workloads.ConfigTemplate) *MockInstanceSetFactory {
 	configs := &factory.Get().Spec.Configs
 	*configs = append(*configs, config...)
 	return factory

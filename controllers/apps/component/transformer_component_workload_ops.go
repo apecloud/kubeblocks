@@ -670,7 +670,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			return // has no reconfigure action defined
 		}
 
-		config := workloads.Configuration{
+		config := workloads.ConfigTemplate{
 			Name:                  tpl.Name,
 			Generation:            r.component.Generation,
 			Reconfigure:           action,
@@ -678,9 +678,9 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			Parameters:            lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
 		}
 		if r.protoITS.Spec.Configs == nil {
-			r.protoITS.Spec.Configs = make([]workloads.Configuration, 0)
+			r.protoITS.Spec.Configs = make([]workloads.ConfigTemplate, 0)
 		}
-		idx := slices.IndexFunc(r.protoITS.Spec.Configs, func(cfg workloads.Configuration) bool {
+		idx := slices.IndexFunc(r.protoITS.Spec.Configs, func(cfg workloads.ConfigTemplate) bool {
 			return cfg.Name == tpl.Name
 		})
 		if idx >= 0 {

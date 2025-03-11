@@ -229,7 +229,7 @@ type InstanceSetSpec struct {
 	Paused bool `json:"paused,omitempty"`
 
 	// +optional
-	Configs []Configuration `json:"configs,omitempty"`
+	Configs []ConfigTemplate `json:"configs,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet
@@ -437,7 +437,7 @@ type MembershipReconfiguration struct {
 	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
 }
 
-type Configuration struct {
+type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
@@ -450,6 +450,8 @@ type Configuration struct {
 	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
 
 	// The name of the custom reconfigure action.
+	//
+	// An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
 	//
 	// +optional
 	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`

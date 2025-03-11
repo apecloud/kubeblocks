@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/rogpeppe/go-internal/semver"
 	appsv1 "k8s.io/api/apps/v1"
@@ -259,19 +258,28 @@ func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method
 	return nil
 }
 
-func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
+func SetExpirationTime(backup *dpv1alpha1.Backup) error {
+	resetExpiration := func() {
+		backup.Status.Expiration = nil
+	}
+
+	phase := backup.Status.Phase
 	backupType := backup.Labels[types.BackupTypeLabelKey]
-	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
-		if backup.Status.Phase == dpv1alpha1.BackupPhaseRunning {
-			backup.Status.Expiration = &metav1.Time{
-				// A continuous backup is allowed to run indefinitely
-				Time: time.Date(9999, time.Month(1), 1, 0, 0, 0, 0, time.UTC),
+	timePoint := backup.GetStartTime()
+	if phase == dpv1alpha1.BackupPhaseCompleted {
+		// if backup is completed, set expiration time based on completion time.
+		timePoint = backup.Status.CompletionTimestamp
+	} else {
+		if backupType == string(dpv1alpha1.BackupTypeContinuous) {
+			if phase == dpv1alpha1.BackupPhaseRunning {
+				// do not set expiration for running continuous backup.
+				resetExpiration()
+				return nil
 			}
+		} else if backup.Status.Expiration != nil {
+			// if expiration is already set, do not update it except for continuous backup.
 			return nil
 		}
-	} else if backup.Status.Expiration != nil {
-		// if expiration is already set, do not update it except for continuous backup.
-		return nil
 	}
 
 	duration, err := backup.Spec.RetentionPeriod.ToDuration()
@@ -282,15 +290,15 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 	// if duration is zero, the backup will be kept forever.
 	// Do not set expiration time for it.
 	if duration.Seconds() == 0 {
+		resetExpiration()
 		return nil
 	}
 
-	startTime := backup.GetStartTime()
-	if startTime == nil {
-		startTime = &backup.CreationTimestamp
+	if timePoint == nil {
+		timePoint = &backup.CreationTimestamp
 	}
 	backup.Status.Expiration = &metav1.Time{
-		Time: startTime.Add(duration),
+		Time: timePoint.Add(duration),
 	}
 	return nil
 }

@@ -129,7 +129,31 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 			},
 			expectedError: false,
 			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
-				assert.Equal(t, time.Date(9999, time.Month(1), 1, 0, 0, 0, 0, time.UTC).UTC(), b.Status.Expiration.Time.UTC())
+				assert.Nil(t, b.Status.Expiration)
+			},
+		},
+		{
+			name: "continuous backup type with failed phase",
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						dptypes.BackupTypeLabelKey: string(dpv1alpha1.BackupTypeContinuous),
+					},
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					RetentionPeriod: "24h",
+				},
+				Status: dpv1alpha1.BackupStatus{
+					Phase: dpv1alpha1.BackupPhaseFailed,
+					TimeRange: &dpv1alpha1.BackupTimeRange{
+						Start: &now,
+						End:   func() *metav1.Time { t := metav1.NewTime(now.Add(1 * time.Hour)); return &t }(),
+					},
+				},
+			},
+			expectedError: false,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.Equal(t, now.Add(24*time.Hour).UTC(), b.Status.Expiration.Time.UTC())
 			},
 		},
 		{
@@ -144,11 +168,8 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 					RetentionPeriod: "24h",
 				},
 				Status: dpv1alpha1.BackupStatus{
-					Phase: dpv1alpha1.BackupPhaseCompleted,
-					TimeRange: &dpv1alpha1.BackupTimeRange{
-						Start: &now,
-						End:   func() *metav1.Time { t := metav1.NewTime(now.Add(1 * time.Hour)); return &t }(),
-					},
+					Phase:               dpv1alpha1.BackupPhaseCompleted,
+					CompletionTimestamp: &now,
 				},
 			},
 			expectedError: false,
@@ -169,7 +190,18 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 			expectedError: false,
 			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
 				assert.Equal(t, now.Add(24*time.Hour).UTC(), b.Status.Expiration.Time.UTC())
-				assert.NotEqual(t, now.Add(24*time.Hour).UTC(), b.Status.StartTimestamp.Time.UTC())
+			},
+		},
+		{
+			name: "without retention period",
+			backup: &dpv1alpha1.Backup{
+				Status: dpv1alpha1.BackupStatus{
+					StartTimestamp: &now,
+				},
+			},
+			expectedError: false,
+			verify: func(t *testing.T, b *dpv1alpha1.Backup) {
+				assert.Nil(t, b.Status.Expiration)
 			},
 		},
 		{
@@ -188,7 +220,7 @@ func TestSetExpirationByCreationTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := SetExpirationByCreationTime(tt.backup)
+			err := SetExpirationTime(tt.backup)
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {

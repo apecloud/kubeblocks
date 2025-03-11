@@ -76,12 +76,12 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock pod-1 restart
 						if index == 1 {
-							updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+							updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 						}
 					})),
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock all pod restart
-						updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+						updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 					})),
 				}),
 				testutil.WithTimes(3),
@@ -129,7 +129,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2,
 						withReadyPod(0, 2), func(pod *corev1.Pod, _ int) {
-							updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+							updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 						})),
 				}),
 				testutil.WithAnyTimes(),
@@ -166,12 +166,12 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock pod-1 restart
 						if index == 1 {
-							updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+							updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 						}
 					})),
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock all pod restart
-						updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+						updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 					})),
 				}),
 				testutil.WithTimes(3),

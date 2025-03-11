@@ -22,13 +22,13 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -189,7 +189,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	ictrlutil.MergeMetadataMapInplace(compProto.Annotations, &compObjCopy.Annotations)
 	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
 
-	// merge spec
+	// merge spec except resources
 	compObjCopy.Spec.TerminationPolicy = compProto.Spec.TerminationPolicy
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
@@ -218,11 +218,13 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
 	compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
 
-	if equality.Semantic.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
-		equality.Semantic.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
-		equality.Semantic.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
+	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
+		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
+		component.ResourceSemanticEqual(oldCompObj.Spec.Resources, compProto.Spec.Resources) &&
+		reflect.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
 		return nil
 	}
+	compObjCopy.Spec.Resources = compProto.Spec.Resources
 	return compObjCopy
 }
 

@@ -26,6 +26,8 @@ import (
 	"slices"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -90,6 +92,10 @@ func DefNameMatched(defName, defNamePattern string) bool {
 		return false
 	}
 	return regex.MatchString(defName)
+}
+
+func ResourceSemanticEqual(old, new corev1.ResourceRequirements) bool {
+	return equality.Semantic.DeepEqual(old, new)
 }
 
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {

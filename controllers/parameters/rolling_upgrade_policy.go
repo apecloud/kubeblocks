@@ -69,7 +69,7 @@ func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (
 
 	var (
 		rollingReplicas = rctx.maxRollingReplicas()
-		configKey       = rctx.getConfigKey()
+		configKey       = rctx.generateConfigIdentifier()
 		configVersion   = rctx.getTargetVersionHash()
 	)
 

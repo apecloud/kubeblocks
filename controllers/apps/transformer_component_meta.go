@@ -21,7 +21,7 @@ package apps
 
 import (
 	"reflect"
-	
+
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"

@@ -201,13 +201,14 @@ func (r *ParameterReconciler) filterParametersResources(ctx context.Context, obj
 	return requests
 }
 
-func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
+func validateCustomTemplate(ctx context.Context, cli client.Reader, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
 	for configSpec, custom := range templates {
 		cm := &corev1.ConfigMap{}
 		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s] for custom template: %s", custom.TemplateRef, configSpec)
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s/%s] for custom template: %s",
+					custom.Namespace, custom.TemplateRef, configSpec)
 			}
 			return err
 		}

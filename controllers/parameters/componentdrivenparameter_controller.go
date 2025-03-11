@@ -201,7 +201,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, err
 	}
 	parameterSpecs := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls)
-	if err = handleCustomParameterTemplate(comp.Spec.Annotations, parameterSpecs); err != nil {
+	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
 		return nil, err
 	}
 
@@ -227,7 +227,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	return parameterObj, err
 }
 
-func handleCustomParameterTemplate(annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
+func handleCustomParameterTemplate(ctx context.Context, reader client.Reader, annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
 	if len(annotations) == 0 {
 		return nil
 	}
@@ -239,6 +239,9 @@ func handleCustomParameterTemplate(annotations map[string]string, specs []parame
 	var customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension
 	if err := json.Unmarshal([]byte(customParamsTpl), &customTemplates); err != nil {
 		return errors.Wrap(err, "failed to unmarshal custom parameter template")
+	}
+	if err := validateCustomTemplate(ctx, reader, customTemplates); err != nil {
+		return errors.Wrap(err, "failed to validate custom parameter template")
 	}
 
 	for tplName, tpl := range customTemplates {

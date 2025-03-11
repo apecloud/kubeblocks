@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"encoding/json"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -82,6 +85,31 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
 		})()).Should(Succeed())
 
+		By("Create init parameters")
+		key := testapps.GetRandomizedKey(testCtx.DefaultNamespace, defaultCompName)
+		testparameters.NewParameterFactory(key.Name, key.Namespace, clusterName, defaultCompName).
+			AddParameters("innodb-buffer-pool-size", "1024M").
+			AddParameters("max_connections", "100").
+			AddLabels(constant.AppInstanceLabelKey, clusterName).
+			AddLabels(constant.ParametersInitLabelKey, "true").
+			Create(&testCtx)
+
+		By("Create a custom template cm")
+		tplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "custom-tpl")
+		tpl := testparameters.NewComponentTemplateFactory(tplKey.Name, testCtx.DefaultNamespace).
+			AddConfigFile(testparameters.MysqlConfigFile, "abcde=1234").
+			Create(&testCtx).
+			GetObject()
+
+		customTemplate := parametersv1alpha1.ConfigTemplateExtension{
+			TemplateRef: tpl.Name,
+			Namespace:   tpl.Namespace,
+			Policy:      parametersv1alpha1.ReplacePolicy,
+		}
+		annotationValue, _ := json.Marshal(map[string]parametersv1alpha1.ConfigTemplateExtension{
+			configSpecName: customTemplate,
+		})
+
 		By("Create a component obj")
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 		compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
@@ -89,9 +117,9 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).
+			SetAnnotations(map[string]string{constant.CustomParameterTemplateAnnotationKey: string(annotationValue)}).
 			Create(&testCtx).
 			GetObject()
-
 		return compObj
 	}
 
@@ -108,6 +136,9 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.Payload).Should(HaveKey(constant.ReplicasPayload))
 				g.Expect(item.Payload).Should(HaveKey(constant.ComponentResourcePayload))
+				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
+				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb-buffer-pool-size", pointer.String("1024M")))
+				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
 			})).Should(Succeed())
 		})
 	})

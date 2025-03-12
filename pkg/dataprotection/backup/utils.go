@@ -258,10 +258,28 @@ func GetSchedulePolicyByMethod(backupSchedule *dpv1alpha1.BackupSchedule, method
 	return nil
 }
 
-func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
-	// if expiration is already set, do not update it.
-	if backup.Status.Expiration != nil {
-		return nil
+func SetExpirationTime(backup *dpv1alpha1.Backup) error {
+	resetExpiration := func() {
+		backup.Status.Expiration = nil
+	}
+
+	phase := backup.Status.Phase
+	backupType := backup.Labels[types.BackupTypeLabelKey]
+	timePoint := backup.GetStartTime()
+	if phase == dpv1alpha1.BackupPhaseCompleted {
+		// if backup is completed, set expiration time based on completion time.
+		timePoint = backup.Status.CompletionTimestamp
+	} else {
+		if backupType == string(dpv1alpha1.BackupTypeContinuous) {
+			if phase == dpv1alpha1.BackupPhaseRunning {
+				// do not set expiration for running continuous backup.
+				resetExpiration()
+				return nil
+			}
+		} else if backup.Status.Expiration != nil {
+			// if expiration is already set, do not update it except for continuous backup.
+			return nil
+		}
 	}
 
 	duration, err := backup.Spec.RetentionPeriod.ToDuration()
@@ -272,20 +290,16 @@ func SetExpirationByCreationTime(backup *dpv1alpha1.Backup) error {
 	// if duration is zero, the backup will be kept forever.
 	// Do not set expiration time for it.
 	if duration.Seconds() == 0 {
+		resetExpiration()
 		return nil
 	}
 
-	var expiration *metav1.Time
-	if backup.Status.StartTimestamp != nil {
-		expiration = &metav1.Time{
-			Time: backup.Status.StartTimestamp.Add(duration),
-		}
-	} else {
-		expiration = &metav1.Time{
-			Time: backup.CreationTimestamp.Add(duration),
-		}
+	if timePoint == nil {
+		timePoint = &backup.CreationTimestamp
 	}
-	backup.Status.Expiration = expiration
+	backup.Status.Expiration = &metav1.Time{
+		Time: timePoint.Add(duration),
+	}
 	return nil
 }
 

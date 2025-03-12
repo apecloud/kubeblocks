@@ -536,7 +536,7 @@ func (r *BackupReconciler) patchBackupStatus(
 		request.Status.BaseBackupName = request.BaseBackup.Name
 	}
 
-	if err = dpbackup.SetExpirationByCreationTime(request.Backup); err != nil {
+	if err = dpbackup.SetExpirationTime(request.Backup); err != nil {
 		return err
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
@@ -598,10 +598,6 @@ func (r *BackupReconciler) handleRunningPhase(
 					existFailedAction = true
 					break actions
 				case dpv1alpha1.ActionPhaseRunning:
-					// update status
-					if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					}
 					waiting = true
 					break actions
 				}
@@ -609,6 +605,17 @@ func (r *BackupReconciler) handleRunningPhase(
 		}
 	}
 	if waiting {
+		// reset time related fields for continuous backup
+		request.Status.CompletionTimestamp = nil
+		request.Status.Duration = nil
+		err = dpbackup.SetExpirationTime(request.Backup)
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to set expiration time, %v", err))
+		}
+		// update status
+		if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		return intctrlutil.Reconciled()
 	}
 	if existFailedAction {
@@ -623,17 +630,9 @@ func (r *BackupReconciler) handleRunningPhase(
 		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
 		request.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-	if request.Spec.RetentionPeriod != "" {
-		// set expiration time
-		duration, err := request.Spec.RetentionPeriod.ToDuration()
-		if err != nil {
-			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to parse retention period %s, %v", request.Spec.RetentionPeriod, err))
-		}
-		if duration.Seconds() > 0 {
-			request.Status.Expiration = &metav1.Time{
-				Time: request.Status.CompletionTimestamp.Add(duration),
-			}
-		}
+	err = dpbackup.SetExpirationTime(request.Backup)
+	if err != nil {
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to set expiration time, %v", err))
 	}
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
 	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
@@ -679,13 +678,13 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	_ = dpbackup.SetExpirationByCreationTime(backup)
+	// set expiration time
+	_ = dpbackup.SetExpirationTime(backup)
 	if !backup.Status.StartTimestamp.IsZero() {
 		// round the duration to a multiple of seconds.
 		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
 		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-
 	for i := range backup.Status.Actions {
 		act := &backup.Status.Actions[i]
 		act.Phase = dpv1alpha1.ActionPhaseCompleted
@@ -722,7 +721,7 @@ func (r *BackupReconciler) updateStatusIfFailed(
 
 	// set expiration time for failed backup, make sure the failed backup will be
 	// deleted after the expiration time.
-	_ = dpbackup.SetExpirationByCreationTime(backup)
+	_ = dpbackup.SetExpirationTime(backup)
 
 	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")

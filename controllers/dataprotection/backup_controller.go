@@ -598,10 +598,6 @@ func (r *BackupReconciler) handleRunningPhase(
 					existFailedAction = true
 					break actions
 				case dpv1alpha1.ActionPhaseRunning:
-					// update status
-					if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					}
 					waiting = true
 					break actions
 				}
@@ -609,6 +605,17 @@ func (r *BackupReconciler) handleRunningPhase(
 		}
 	}
 	if waiting {
+		// reset time related fields for continuous backup
+		request.Status.CompletionTimestamp = nil
+		request.Status.Duration = nil
+		err = dpbackup.SetExpirationTime(request.Backup)
+		if err != nil {
+			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to set expiration time, %v", err))
+		}
+		// update status
+		if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		return intctrlutil.Reconciled()
 	}
 	if existFailedAction {
@@ -642,7 +649,6 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		backupTargetExists              = true
 		backupTargetIsStoppedOrDeleting bool
 		err                             error
-		completed                       = true
 	)
 	// check if target cluster exits
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
@@ -665,34 +671,28 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		for _, method := range backupSchedule.Spec.Schedules {
 			// if Continuous backupMethod is enabled, return
 			if method.BackupMethod == backup.Spec.BackupMethod && boolptr.IsSetToTrue(method.Enabled) {
-				completed = false
-				break
+				return false, nil
 			}
 		}
 	}
 	patch := client.MergeFrom(backup.DeepCopy())
-	if !completed {
-		// reset expiration time
-		_ = dpbackup.SetExpirationTime(backup)
-	} else {
-		backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-		backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-		// set expiration time
-		_ = dpbackup.SetExpirationTime(backup)
-		if !backup.Status.StartTimestamp.IsZero() {
-			// round the duration to a multiple of seconds.
-			duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
-			backup.Status.Duration = &metav1.Duration{Duration: duration}
-		}
-		for i := range backup.Status.Actions {
-			act := &backup.Status.Actions[i]
-			act.Phase = dpv1alpha1.ActionPhaseCompleted
-			act.AvailableReplicas = pointer.Int32(int32(0))
-			act.CompletionTimestamp = backup.Status.CompletionTimestamp
-		}
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	// set expiration time
+	_ = dpbackup.SetExpirationTime(backup)
+	if !backup.Status.StartTimestamp.IsZero() {
+		// round the duration to a multiple of seconds.
+		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+		backup.Status.Duration = &metav1.Duration{Duration: duration}
+	}
+	for i := range backup.Status.Actions {
+		act := &backup.Status.Actions[i]
+		act.Phase = dpv1alpha1.ActionPhaseCompleted
+		act.AvailableReplicas = pointer.Int32(int32(0))
+		act.CompletionTimestamp = backup.Status.CompletionTimestamp
 	}
 
-	return completed, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
+	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
 // handleCompletedPhase handles the backup object in completed phase.

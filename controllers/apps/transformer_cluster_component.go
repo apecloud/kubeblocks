@@ -21,6 +21,8 @@ package apps
 
 import (
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"reflect"
 	"slices"
 	"strconv"
@@ -196,13 +198,53 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
+	normalizeQuantity := func(name corev1.ResourceName, q resource.Quantity) resource.Quantity {
+		switch name {
+		case corev1.ResourceCPU:
+			return resource.MustParse(fmt.Sprintf("%dm", q.MilliValue()))
+		case corev1.ResourceMemory, corev1.ResourceStorage, corev1.ResourceEphemeralStorage:
+			return resource.MustParse(fmt.Sprintf("%dMi", q.Value()/1024/1024))
+		default:
+			return q.DeepCopy()
+		}
+	}
+
+	normalizeResourceList := func(resources *corev1.ResourceList) {
+		if resources == nil {
+			return
+		}
+		for k, v := range *resources {
+			(*resources)[k] = normalizeQuantity(k, v)
+		}
+	}
+
+	normalize := func(spec appsv1alpha1.ComponentSpec) appsv1alpha1.ComponentSpec {
+		normalized := spec.DeepCopy()
+		if normalized.Resources.Limits != nil {
+			normalizeResourceList(&normalized.Resources.Limits)
+		}
+		if normalized.Resources.Requests != nil {
+			normalizeResourceList(&normalized.Resources.Requests)
+		}
+		for i := range normalized.VolumeClaimTemplates {
+			vct := &normalized.VolumeClaimTemplates[i]
+			if vct.Spec.Resources.Limits != nil {
+				normalizeResourceList(&vct.Spec.Resources.Limits)
+			}
+			if vct.Spec.Resources.Requests != nil {
+				normalizeResourceList(&vct.Spec.Resources.Requests)
+			}
+		}
+		return *normalized
+	}
+
 	// merge labels and annotations
 	ictrlutil.MergeMetadataMapInplace(compObjCopy.Annotations, &compProto.Annotations)
 	ictrlutil.MergeMetadataMapInplace(compObjCopy.Labels, &compProto.Labels)
 	compObjCopy.Annotations = compProto.Annotations
 	compObjCopy.Labels = compProto.Labels
 
-	// merge spec except resources
+	// merge all spec fields
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ClassDefRef = compProto.Spec.ClassDefRef
@@ -230,14 +272,17 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
+	compObjCopy.Spec.Resources = compProto.Spec.Resources
 
-	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
-		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&
-		component.ResourceSemanticEqual(oldCompObj.Spec.Resources, compProto.Spec.Resources) &&
-		reflect.DeepEqual(oldCompObj.Spec, compObjCopy.Spec) {
+	metadataChanged := !reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) ||
+		!reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels)
+	specChanged := !reflect.DeepEqual(normalize(oldCompObj.Spec), normalize(compObjCopy.Spec))
+
+	// If nothing changed after normalization, return nil
+	if !metadataChanged && !specChanged {
 		return nil
 	}
-	compObjCopy.Spec.Resources = compProto.Spec.Resources
+
 	return compObjCopy
 }
 

@@ -175,11 +175,18 @@ func (r *ParameterReconciler) failWithTerminalReconcile(reqCtx intctrlutil.Reque
 	return updateParameterStatus(reqCtx, r.Client, parameter, patch, true)
 }
 
+func (r *ParameterReconciler) failWithRetryReconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
+	patch := parameter.DeepCopy()
+	parameter.Status.Phase = parametersv1alpha1.CRunningPhase
+	parameter.Status.Message = err.Error()
+	return updateParameterStatus(reqCtx, r.Client, parameter, patch, false)
+}
+
 func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 		return r.failWithTerminalReconcile(reqCtx, parameter, err)
 	}
-	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	return r.failWithRetryReconcile(reqCtx, parameter, err)
 }
 
 func (r *ParameterReconciler) filterParametersResources(ctx context.Context, object client.Object) []reconcile.Request {
@@ -201,13 +208,14 @@ func (r *ParameterReconciler) filterParametersResources(ctx context.Context, obj
 	return requests
 }
 
-func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
+func validateCustomTemplate(ctx context.Context, cli client.Reader, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
 	for configSpec, custom := range templates {
 		cm := &corev1.ConfigMap{}
 		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s] for custom template: %s", custom.TemplateRef, configSpec)
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s/%s] for custom template: %s",
+					custom.Namespace, custom.TemplateRef, configSpec)
 			}
 			return err
 		}

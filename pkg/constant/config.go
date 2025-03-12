@@ -47,6 +47,9 @@ const (
 	CMInsCurrentConfigurationHashLabelKey  = "config.kubeblocks.io/update-config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 	CMConfigurationTemplateVersion         = "config.kubeblocks.io/config-template-version"
+
+	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
+	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
 )
 
 const (

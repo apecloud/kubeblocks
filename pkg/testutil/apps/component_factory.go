@@ -66,6 +66,11 @@ func (factory *MockComponentFactory) SetResources(resources corev1.ResourceRequi
 	return factory
 }
 
+func (factory *MockComponentFactory) SetAnnotations(annotations map[string]string) *MockComponentFactory {
+	factory.Get().Spec.Annotations = annotations
+	return factory
+}
+
 func (factory *MockComponentFactory) SetTLSConfig(enable bool, issuer *appsv1.Issuer) *MockComponentFactory {
 	if enable {
 		factory.Get().Spec.TLSConfig = &appsv1.TLSConfig{

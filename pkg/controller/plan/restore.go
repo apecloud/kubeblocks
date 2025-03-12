@@ -155,6 +155,12 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 	return r.createRestoreAndWait(compObj, restores...)
 }
 
+func addItsMatchLabels(labels map[string]string, clusterName, compName string) {
+	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	itsMatchLabels := instanceset.GetMatchLabels(itsName)
+	intctrlutil.MergeMetadataMapInplace(itsMatchLabels, &labels)
+}
+
 func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, templateName string) (*dpv1alpha1.Restore, error) {
 	backupMethod := backupObj.Status.BackupMethod
 	if backupMethod == nil {
@@ -167,6 +173,8 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
 	pvcLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
+	// HACK: let InstanceSet to manage the PVC
+	addItsMatchLabels(pvcLabels, r.Cluster.Name, comp.Name)
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for _, v := range comp.VolumeClaimTemplates {
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {

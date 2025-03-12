@@ -92,7 +92,7 @@ func TestBuildCronJobSchedule(t *testing.T) {
 	}
 }
 
-func TestSetExpirationByCreationTime(t *testing.T) {
+func TestSetExpirationTime(t *testing.T) {
 	now := metav1.Now()
 	tests := []struct {
 		name          string

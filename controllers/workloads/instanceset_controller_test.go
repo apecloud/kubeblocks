@@ -319,80 +319,6 @@ var _ = Describe("InstanceSet Controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("instance status - update", func() {
-			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.AddConfigs(workloads.ConfigTemplate{
-					Name:       "server",
-					Generation: int64(1),
-				})
-			})
-
-			By("update configs")
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs = []workloads.ConfigTemplate{
-					{
-						Name:       "server",
-						Generation: 128,
-					},
-				}
-			})()).ShouldNot(HaveOccurred())
-
-			By("check instance status updated")
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server": int64(128),
-					},
-				}))
-			})).Should(Succeed())
-		})
-
-		It("instance status - different generations", func() {
-			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.AddConfigs([]workloads.ConfigTemplate{
-					{
-						Name:       "server",
-						Generation: int64(1),
-					},
-					{
-						Name:       "logging",
-						Generation: int64(2),
-					},
-				}...)
-			})
-
-			By("check instance status")
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server":  int64(1),
-						"logging": int64(2),
-					},
-				}))
-			})).Should(Succeed())
-
-			By("update the server config")
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[0].Generation = 128
-			})()).ShouldNot(HaveOccurred())
-
-			By("check instance status updated")
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server":  int64(128),
-						"logging": int64(2),
-					},
-				}))
-			})).Should(Succeed())
-		})
-
 		It("reconfigure", func() {
 			By("mock reconfigure action calls")
 			var (
@@ -412,7 +338,16 @@ var _ = Describe("InstanceSet Controller", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
 					Type: kbappsv1.RollingUpdateStrategyType,
-				})
+				}).AddConfigs([]workloads.ConfigTemplate{
+					{
+						Name:       "server",
+						Generation: int64(1),
+					},
+					{
+						Name:       "logging",
+						Generation: int64(2),
+					},
+				}...)
 			})
 
 			By("mock pods running and available")
@@ -440,7 +375,19 @@ var _ = Describe("InstanceSet Controller", func() {
 				}
 			})()).ShouldNot(HaveOccurred())
 
-			By("check the reconfigure action call")
+			By("check the init instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server":  int64(1),
+						"logging": int64(2),
+					},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action not called")
 			Eventually(func(g Gomega) {
 				g.Expect(reconfigure).Should(BeEmpty())
 				g.Expect(parameters).Should(BeNil())
@@ -448,16 +395,23 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs = []workloads.ConfigTemplate{
-					{
-						Name:                  "server",
-						Generation:            128,
-						Reconfigure:           testapps.NewLifecycleAction("reconfigure"),
-						ReconfigureActionName: "", // the default reconfigure action
-						Parameters:            map[string]string{"foo": "bar"},
-					},
-				}
+				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[1].ReconfigureActionName = ""
+				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
 			})()).ShouldNot(HaveOccurred())
+
+			By("check the instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server":  int64(1),
+						"logging": int64(128),
+					},
+				}))
+			})).Should(Succeed())
 
 			By("check the reconfigure action call")
 			Eventually(func(g Gomega) {
@@ -486,7 +440,16 @@ var _ = Describe("InstanceSet Controller", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
 					Type: kbappsv1.RollingUpdateStrategyType,
-				})
+				}).AddConfigs([]workloads.ConfigTemplate{
+					{
+						Name:       "server",
+						Generation: int64(1),
+					},
+					{
+						Name:       "logging",
+						Generation: int64(2),
+					},
+				}...)
 			})
 
 			By("mock pods running and available")
@@ -514,7 +477,19 @@ var _ = Describe("InstanceSet Controller", func() {
 				}
 			})()).ShouldNot(HaveOccurred())
 
-			By("check the reconfigure action call")
+			By("check the init instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server":  int64(1),
+						"logging": int64(2),
+					},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action not called")
 			Eventually(func(g Gomega) {
 				g.Expect(reconfigure).Should(BeEmpty())
 				g.Expect(parameters).Should(BeNil())
@@ -522,16 +497,23 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs = []workloads.ConfigTemplate{
-					{
-						Name:                  "server",
-						Generation:            128,
-						Reconfigure:           testapps.NewLifecycleAction("reconfigure"),
-						ReconfigureActionName: "reconfigure-server",
-						Parameters:            map[string]string{"foo": "bar"},
-					},
-				}
+				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[1].ReconfigureActionName = "reconfigure-server"
+				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
 			})()).ShouldNot(HaveOccurred())
+
+			By("check the instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: map[string]int64{
+						"server":  int64(1),
+						"logging": int64(128),
+					},
+				}))
+			})).Should(Succeed())
 
 			By("check the reconfigure action call")
 			Eventually(func(g Gomega) {

@@ -347,11 +347,33 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 }
 
 func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
-	status := make(map[string]int64)
-	for _, config := range its.Spec.Configs {
-		status[config.Name] = config.Generation
-	}
-	for i := range instanceStatus {
-		instanceStatus[i].Configs = status
+	if its.Status.InstanceStatus == nil {
+		// initialize
+		configs := make(map[string]int64)
+		for _, config := range its.Spec.Configs {
+			configs[config.Name] = config.Generation
+		}
+		for i := range instanceStatus {
+			instanceStatus[i].Configs = configs
+		}
+	} else {
+		// HACK: copy the existing config status from the current its.status.instanceStatus
+		configs := sets.New[string]()
+		for _, config := range its.Spec.Configs {
+			configs.Insert(config.Name)
+		}
+		for i, newStatus := range instanceStatus {
+			for _, status := range its.Status.InstanceStatus {
+				if status.PodName == newStatus.PodName {
+					if instanceStatus[i].Configs == nil {
+						instanceStatus[i].Configs = make(map[string]int64)
+					}
+					for name := range configs.Intersection(sets.KeySet(status.Configs)) {
+						instanceStatus[i].Configs[name] = status.Configs[name]
+					}
+					break
+				}
+			}
+		}
 	}
 }

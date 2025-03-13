@@ -31,6 +31,7 @@ import (
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -581,7 +582,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		// if both pvc and pv not found, do nothing
 		return nil
 	}
-	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
+	if equality.Semantic.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
 		pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain &&
 		pv.Annotations != nil &&
 		len(pv.Annotations[constant.PVLastClaimPolicyAnnotationKey]) > 0 &&

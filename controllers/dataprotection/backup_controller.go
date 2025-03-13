@@ -447,10 +447,17 @@ func (r *BackupReconciler) prepareBackupRequest(
 func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCtx,
 	request *dpbackup.Request,
 	target *dpv1alpha1.BackupTarget) error {
-	backupStatusTarget := dputils.GetBackupStatusTarget(request.Backup, target.Name)
 	var selectedPods []string
+	backupStatusTarget := dputils.GetBackupStatusTarget(request.Backup, target.Name)
 	if backupStatusTarget != nil {
 		selectedPods = backupStatusTarget.SelectedTargetPods
+	}
+	if request.ParentBackup != nil && len(selectedPods) == 0 {
+		// incremental backups should have the same target pods as the parent backup
+		parentBackupStatusTarget := dputils.GetBackupStatusTarget(request.ParentBackup, target.Name)
+		if parentBackupStatusTarget != nil && len(parentBackupStatusTarget.SelectedTargetPods) > 0 {
+			selectedPods = parentBackupStatusTarget.SelectedTargetPods
+		}
 	}
 	request.Target = target
 	backupType := dpv1alpha1.BackupTypeFull

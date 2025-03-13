@@ -84,12 +84,19 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 }
 
 func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
-	if r.Spec.RoleProbe == nil && r.Spec.Credential == nil {
+	if r.Spec.RoleProbe == nil && r.Spec.Credential == nil && len(r.Spec.Roles) == 0 &&
+		len(r.Status.MembersStatus) == 0 {
 		return nil
 	}
 	instanceConvert := instanceSetConverter{
-		RoleProbe:  r.Spec.RoleProbe,
-		Credential: r.Spec.Credential,
+		Spec: instanceSetSpecConverter{
+			Roles:      r.Spec.Roles,
+			RoleProbe:  r.Spec.RoleProbe,
+			Credential: r.Spec.Credential,
+		},
+		Status: instanceSetStatusConverter{
+			MembersStatus: r.Status.MembersStatus,
+		},
 	}
 	bytes, err := json.Marshal(instanceConvert)
 	if err != nil {
@@ -114,14 +121,26 @@ func (r *InstanceSet) incrementConvertFrom(srcRaw metav1.Object) error {
 		return err
 	}
 	delete(srcRaw.GetAnnotations(), kbIncrementConverterAK)
-	r.Spec.RoleProbe = instanceConvert.RoleProbe
-	r.Spec.Credential = instanceConvert.Credential
+	r.Spec.Roles = instanceConvert.Spec.Roles
+	r.Spec.RoleProbe = instanceConvert.Spec.RoleProbe
+	r.Spec.Credential = instanceConvert.Spec.Credential
+	r.Status.MembersStatus = instanceConvert.Status.MembersStatus
 	return nil
 }
 
 type instanceSetConverter struct {
-	RoleProbe  *RoleProbe  `json:"roleProbe,omitempty"`
-	Credential *Credential `json:"credential,omitempty"`
+	Spec   instanceSetSpecConverter   `json:"spec,omitempty"`
+	Status instanceSetStatusConverter `json:"status,omitempty"`
+}
+
+type instanceSetSpecConverter struct {
+	Roles      []ReplicaRole `json:"roles,omitempty"`
+	RoleProbe  *RoleProbe    `json:"roleProbe,omitempty"`
+	Credential *Credential   `json:"credential,omitempty"`
+}
+
+type instanceSetStatusConverter struct {
+	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 }
 
 func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {

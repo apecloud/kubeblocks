@@ -134,6 +134,12 @@ func getMatchLabels(name string) map[string]string {
 	}
 }
 
+// GetMatchLabels exposes getMatchLabels for external usages
+// TODO: remove this method when no usage
+func GetMatchLabels(name string) map[string]string {
+	return getMatchLabels(name)
+}
+
 func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
 	selectors := make(map[string]string)
 

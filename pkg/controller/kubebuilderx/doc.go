@@ -17,8 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Package kubebuilderx is a new framework builds upon the original DAG framework
-// (currently used in cluster and component controller),
+// Package kubebuilderx is a new framework builds upon the original DAG framework,
 // which abstracts the reconciliation process into two stages.
 // The first stage is the pure computation phase, where the goal is to generate an execution plan.
 // The second stage is the plan execution phase, responsible for applying the changes computed in the first stage to the K8s API server.

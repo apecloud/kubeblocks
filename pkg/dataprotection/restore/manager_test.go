@@ -45,7 +45,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var _ = Describe("Backup Deleter Test", func() {
+var _ = Describe("RestoreManager Test", func() {
 
 	cleanEnv := func() {
 		By("clean resources")

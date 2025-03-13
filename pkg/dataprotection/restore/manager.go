@@ -331,15 +331,20 @@ func (r *RestoreManager) AnalysisRestoreActionsWithBackup(stage dpv1alpha1.Resto
 	return allActionsFinished, existFailedAction
 }
 
-func addPodNameLabel(claim *dpv1alpha1.RestoreVolumeClaim, index int) {
-	itsName := claim.Labels[instanceset.WorkloadsInstanceLabelKey]
-	if itsName == "" {
+func addItsManagingLabels(claim *dpv1alpha1.RestoreVolumeClaim, index int) {
+	clusterName := claim.Labels[constant.AppInstanceLabelKey]
+	compName := claim.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || compName == "" {
 		return
 	}
 	if claim.Labels == nil {
 		claim.Labels = make(map[string]string)
 	}
-	// Don't override the existing value
+
+	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	itsMatchLabels := instanceset.GetMatchLabels(itsName)
+	intctrlutil.MergeMetadataMapInplace(itsMatchLabels, &claim.Labels)
+
 	if claim.Labels[constant.KBAppPodNameLabelKey] == "" {
 		podName := fmt.Sprintf("%s-%d", itsName, index)
 		claim.Labels[constant.KBAppPodNameLabelKey] = podName
@@ -399,9 +404,9 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 			for _, claim := range prepareDataConfig.RestoreVolumeClaimsTemplate.Templates {
 				index := i + int(claimTemplate.StartingIndex)
 				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
-				// HACK: add the apps.kubeblocks.io/pod-name label to the PVC,
+				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
-				addPodNameLabel(&claim, index)
+				addItsManagingLabels(&claim, index)
 				if err := createPVCWithSnapshot(claim); err != nil {
 					return err
 				}
@@ -498,9 +503,9 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 			for _, claim := range claimsTemplate.Templates {
 				index := i + int(claimsTemplate.StartingIndex)
 				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
-				// HACK: add the apps.kubeblocks.io/pod-name label to the PVC,
+				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
-				addPodNameLabel(&claim, index)
+				addItsManagingLabels(&claim, index)
 				volume, volumeMount, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim-tpl")
 				if err != nil {
 					return nil, err

@@ -1747,6 +1747,22 @@ var _ = Describe("cluster component transformer test", func() {
 			newCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1024Mi")
 			result := copyAndMergeComponent(oldCompObj, newCompObj)
 			Expect(result).To(BeNil()) // No change after normalization
+
+			// 1536.5Mi is equivalent to 1611137024, and 1611137026 = 1611137024 + 2
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1611137024")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1536.5Mi")
+			result = copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil()) // No change after normalization
+
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1611137026")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1536.5Mi")
+			result = copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil()) // No change after normalization
+
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1.5Gi")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1.512Gi")
+			result = copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil()) // No change after normalization
 		})
 
 		It("should handle nil resource limits", func() {

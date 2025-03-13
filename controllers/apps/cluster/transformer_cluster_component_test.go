@@ -28,6 +28,7 @@ import (
 
 	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1658,6 +1659,191 @@ var _ = Describe("cluster component transformer test", func() {
 					Expect(term.TopologyKey).Should(Equal(corev1.LabelHostname))
 				}
 			}
+		})
+	})
+
+	Context("testing component merge functionality", func() {
+		var (
+			oldCompObj *appsv1.Component
+			newCompObj *appsv1.Component
+		)
+
+		BeforeEach(func() {
+			// Initialize a base component
+			oldCompObj = &appsv1.Component{
+				Spec: appsv1.ComponentSpec{
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			}
+			newCompObj = oldCompObj.DeepCopy()
+		})
+
+		It("should return nil when no changes are made", func() {
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil())
+		})
+
+		It("should detect annotation changes", func() {
+			newCompObj.Annotations = map[string]string{"key": "value"}
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Annotations).To(HaveKeyWithValue("key", "value"))
+		})
+
+		It("should detect label changes", func() {
+			newCompObj.Labels = map[string]string{"app": "test"}
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Labels).To(HaveKeyWithValue("app", "test"))
+		})
+
+		It("should detect resource changes", func() {
+			// Change CPU resource
+			newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Spec.Resources.Limits[corev1.ResourceCPU]).To(Equal(resource.MustParse("2")))
+		})
+
+		It("should detect VolumeClaimTemplate changes", func() {
+			// Add a volume claim template
+			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{
+				{
+					Name: "app-data",
+					Spec: appsv1.PersistentVolumeClaimSpec{
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			}
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Spec.VolumeClaimTemplates).To(HaveLen(1))
+		})
+
+		It("should normalize CPU resources", func() {
+			// 1000m is equivalent to 1
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1000m")
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil()) // No change after normalization
+		})
+
+		It("should normalize memory resources", func() {
+			// 1024Mi is equivalent to 1Gi
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1Gi")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("1024Mi")
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil()) // No change after normalization
+		})
+
+		It("should handle nil resource limits", func() {
+			oldCompObj.Spec.Resources.Limits = nil
+			newCompObj.Spec.Resources.Limits = nil
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil())
+		})
+
+		It("should handle nil resource requests", func() {
+			oldCompObj.Spec.Resources.Requests = nil
+			newCompObj.Spec.Resources.Requests = nil
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil())
+		})
+
+		It("should detect changes when adding limits", func() {
+			oldCompObj.Spec.Resources.Limits = nil
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Spec.Resources.Limits).NotTo(BeNil())
+		})
+
+		It("should detect changes in VolumeClaimTemplate storage requests", func() {
+			vct := appsv1.ClusterComponentVolumeClaimTemplate{
+				Name: "app-data",
+				Spec: appsv1.PersistentVolumeClaimSpec{
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+
+			oldCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{vct}
+			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{*vct.DeepCopy()}
+			newCompObj.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] =
+				resource.MustParse("2Gi")
+			// Change storage request
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]).
+				To(Equal(resource.MustParse("2Gi")))
+		})
+
+		It("should normalize storage resources in VolumeClaimTemplates", func() {
+			vct := appsv1.ClusterComponentVolumeClaimTemplate{
+				Name: "app-data",
+				Spec: appsv1.PersistentVolumeClaimSpec{
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			oldCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{vct}
+			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{*vct.DeepCopy()}
+
+			// 1536Mi is equivalent to 1.5Gi
+			oldCompObj.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] =
+				resource.MustParse("1.5Gi")
+			newCompObj.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] =
+				resource.MustParse("1536Mi")
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil()) // No change after normalization
+		})
+
+		It("should handle zero resource values", func() {
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("0")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("0m")
+
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil()) // No change after normalization
+		})
+
+		It("should handle non-standard resource types", func() {
+			customResource := "example.com/custom-resource"
+			oldCompObj.Spec.Resources.Limits[corev1.ResourceName(customResource)] = resource.MustParse("5")
+			newCompObj.Spec.Resources.Limits[corev1.ResourceName(customResource)] = resource.MustParse("10")
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Spec.Resources.Limits[corev1.ResourceName(customResource)]).
+				To(Equal(resource.MustParse("10")))
+		})
+
+		It("should detect all changes when multiple fields change", func() {
+			newCompObj.Labels = map[string]string{"app": "test"}
+			newCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")
+			newCompObj.Spec.Replicas = 3
+
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Labels).To(HaveKeyWithValue("app", "test"))
+			Expect(result.Spec.Resources.Limits[corev1.ResourceCPU]).To(Equal(resource.MustParse("2")))
+			Expect(result.Spec.Replicas).To(Equal(int32(3)))
 		})
 	})
 })

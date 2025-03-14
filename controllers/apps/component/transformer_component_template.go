@@ -51,6 +51,7 @@ var _ graph.Transformer = &componentFileTemplateTransformer{}
 
 func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	synthesizedComp := transCtx.SynthesizeComponent
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
@@ -73,7 +74,14 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 
-	return t.buildPodVolumes(transCtx)
+	if err = t.buildPodVolumes(transCtx); err != nil {
+		return err
+	}
+
+	synthesizedComp.KBAgentTasks = append(synthesizedComp.KBAgentTasks,
+		*component.NewRenderTask(synthesizedComp.FullCompName, synthesizedComp.Generation, nil, synthesizedComp, nil))
+
+	return nil
 }
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
@@ -234,7 +242,10 @@ func renderFileTemplateData(transCtx *componentTransformContext,
 		variables[k] = v // override
 	}
 
-	tpl := template.New(fileTemplate.Name).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
+	tpl := template.New(fileTemplate.Name).Funcs(sprig.TxtFuncMap())
+	if !fileTemplate.RequiresPodRender {
+		tpl = tpl.Option("missingkey=error")
+	}
 	for key, val := range data {
 		ptpl, err := tpl.Parse(val)
 		if err != nil {

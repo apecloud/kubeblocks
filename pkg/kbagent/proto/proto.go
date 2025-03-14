@@ -88,6 +88,7 @@ type Task struct {
 	NotifyAtFinish      bool            `json:"notifyAtFinish,omitempty"`      // whether to notify the controller when the task is finished
 	ReportPeriodSeconds int32           `json:"reportPeriodSeconds,omitempty"` // the period to report the progress of the task
 	NewReplica          *NewReplicaTask `json:"newReplica,omitempty"`
+	Render              *RenderTask     `json:"render,omitempty"`
 }
 
 type TaskEvent struct {
@@ -108,4 +109,14 @@ type NewReplicaTask struct {
 	Replicas       string            `json:"replicas"`             // replicas to load the data
 	Parameters     map[string]string `json:"parameters,omitempty"` // parameters for data dump and load
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
+}
+
+type RenderTask struct {
+	Templates []RenderTaskFileTemplate `json:"templates"`
+}
+
+type RenderTaskFileTemplate struct {
+	Name      string            `json:"name"`
+	Files     []string          `json:"files"`
+	Variables map[string]string `json:"variables,omitempty"`
 }

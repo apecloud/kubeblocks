@@ -120,11 +120,18 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	if action.Exec == nil {
 		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
 	}
-	// HACK: pre-check for the reconfigure action
-	if err := checkReconfigure(ctx, req); err != nil {
+	if err := s.preExec(ctx, req, action); err != nil {
 		return nil, err
 	}
 	return s.handleExecAction(ctx, req, action)
+}
+
+func (s *actionService) preExec(ctx context.Context, req *proto.ActionRequest, action *proto.Action) error {
+	// HACK: pre-check for the reconfigure action
+	if err := checkReconfigure(ctx, req); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {

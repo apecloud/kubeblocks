@@ -51,6 +51,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 const (
@@ -237,6 +238,10 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		if err := t.handleWorkloadUpdate(reqCtx, dag, synthesizedComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
+
+		if err := updateEnvCM4KBAgentTask(reqCtx.Ctx, t.Client, dag, synthesizedComp, comp); err != nil {
+			return err
+		}
 	}
 
 	objCopy := copyAndMergeITS(runningITS, protoITS)
@@ -251,9 +256,6 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		})
 	}
 
-	// if start {
-	//	return intctrlutil.NewDelayedRequeueError(time.Second, "workload is starting")
-	// }
 	return nil
 }
 
@@ -412,6 +414,26 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 	synthesizeComp.PodSpec = podSpec
 }
 
+func updateEnvCM4KBAgentTask(ctx context.Context, cli client.Reader, dag *graph.DAG,
+	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component) error {
+	if len(synthesizedComp.KBAgentTasks) == 0 {
+		return nil
+	}
+	envVar, err := kbagent.BuildEnv4Worker(synthesizedComp.KBAgentTasks)
+	if err != nil {
+		return err
+	}
+	// apply the updated env to the env CM
+	transCtx := &componentTransformContext{
+		Context:             ctx,
+		Client:              model.NewGraphClient(cli),
+		SynthesizeComponent: synthesizedComp,
+		Component:           comp,
+	}
+	parameters := map[string]string{envVar.Name: envVar.Value}
+	return createOrUpdateEnvConfigMap(transCtx, dag, nil, parameters)
+}
+
 // copyAndMergeITS merges two ITS objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
@@ -528,32 +550,6 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 	for i := range itsProto.Spec.Template.Spec.Containers {
 		rollback(1, &itsProto.Spec.Template.Spec.Containers[i])
 	}
-}
-
-// expandVolume handles workload expand volume
-func (r *componentWorkloadOps) expandVolume() error {
-	return r.expandVolumeClaimTemplates(r.runningITS.Spec.VolumeClaimTemplates, r.synthesizeComp.VolumeClaimTemplates)
-}
-
-func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate) error {
-	for _, vct := range runningVCTs {
-		var proto *corev1.PersistentVolumeClaimTemplate
-		for i, v := range protoVCTs {
-			if v.Name == vct.Name {
-				proto = &protoVCTs[i]
-				break
-			}
-		}
-		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
-		if proto == nil {
-			continue
-		}
-
-		if err := r.expandVolumes(vct.Name, proto); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (r *componentWorkloadOps) horizontalScale() error {
@@ -732,20 +728,11 @@ func (r *componentWorkloadOps) scaleOut() error {
 		}
 
 		replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
-		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
+		task, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
 		if err != nil {
 			return err
 		}
-		// apply the updated env to the env CM
-		transCtx := &componentTransformContext{
-			Context:             r.reqCtx.Ctx,
-			Client:              model.NewGraphClient(r.cli),
-			SynthesizeComponent: r.synthesizeComp,
-			Component:           r.component,
-		}
-		if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters); err != nil {
-			return err
-		}
+		r.synthesizeComp.KBAgentTasks = append(r.synthesizeComp.KBAgentTasks, *task)
 		return nil
 	}(); err != nil {
 		return err
@@ -846,6 +833,27 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 		}
 	}
 	r.reqCtx.Log.Info("succeed to join member for pod", "pod", pod.Name)
+	return nil
+}
+
+func (r *componentWorkloadOps) expandVolume() error {
+	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
+		var proto *corev1.PersistentVolumeClaimTemplate
+		for i, v := range r.synthesizeComp.VolumeClaimTemplates {
+			if v.Name == vct.Name {
+				proto = &r.synthesizeComp.VolumeClaimTemplates[i]
+				break
+			}
+		}
+		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
+		if proto == nil {
+			continue
+		}
+
+		if err := r.expandVolumes(vct.Name, proto); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

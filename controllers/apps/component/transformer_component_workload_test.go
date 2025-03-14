@@ -31,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -158,8 +157,12 @@ var _ = Describe("Component Workload Operations Test", func() {
 				GetObject()
 
 			ops = &componentWorkloadOps{
+				transCtx: &componentTransformContext{
+					Context:       ctx,
+					Logger:        logger,
+					EventRecorder: clusterRecorder,
+				},
 				cli:            k8sClient,
-				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: clusterRecorder},
 				component:      comp,
 				synthesizeComp: synthesizeComp,
 				runningITS:     mockITS,

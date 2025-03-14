@@ -113,3 +113,14 @@ func (factory *MockInstanceSetFactory) AddContainer(container corev1.Container) 
 	*containers = append(*containers, container)
 	return factory
 }
+
+func (factory *MockInstanceSetFactory) AddConfigs(config ...workloads.ConfigTemplate) *MockInstanceSetFactory {
+	configs := &factory.Get().Spec.Configs
+	*configs = append(*configs, config...)
+	return factory
+}
+
+func (factory *MockInstanceSetFactory) SetInstanceUpdateStrategy(instanceUpdateStrategy *workloads.InstanceUpdateStrategy) *MockInstanceSetFactory {
+	factory.Get().Spec.InstanceUpdateStrategy = instanceUpdateStrategy
+	return factory
+}

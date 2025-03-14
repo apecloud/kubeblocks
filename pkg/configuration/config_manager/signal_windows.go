@@ -25,21 +25,21 @@ import (
 	"os"
 	"syscall"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
-var allUnixSignals = map[appsv1beta1.SignalType]os.Signal{
-	appsv1beta1.SIGHUP:  syscall.SIGHUP,
-	appsv1beta1.SIGINT:  syscall.SIGINT,
-	appsv1beta1.SIGQUIT: syscall.SIGQUIT,
-	appsv1beta1.SIGILL:  syscall.SIGILL,
-	appsv1beta1.SIGTRAP: syscall.SIGTRAP,
-	appsv1beta1.SIGABRT: syscall.SIGABRT,
-	appsv1beta1.SIGBUS:  syscall.SIGBUS,
-	appsv1beta1.SIGFPE:  syscall.SIGFPE,
-	appsv1beta1.SIGKILL: syscall.SIGKILL,
-	appsv1beta1.SIGSEGV: syscall.SIGSEGV,
-	appsv1beta1.SIGPIPE: syscall.SIGPIPE,
-	appsv1beta1.SIGALRM: syscall.SIGALRM,
-	appsv1beta1.SIGTERM: syscall.SIGTERM,
+var allUnixSignals = map[parametersv1alpha1.SignalType]os.Signal{
+	parametersv1alpha1.SIGHUP:  syscall.SIGHUP,
+	parametersv1alpha1.SIGINT:  syscall.SIGINT,
+	parametersv1alpha1.SIGQUIT: syscall.SIGQUIT,
+	parametersv1alpha1.SIGILL:  syscall.SIGILL,
+	parametersv1alpha1.SIGTRAP: syscall.SIGTRAP,
+	parametersv1alpha1.SIGABRT: syscall.SIGABRT,
+	parametersv1alpha1.SIGBUS:  syscall.SIGBUS,
+	parametersv1alpha1.SIGFPE:  syscall.SIGFPE,
+	parametersv1alpha1.SIGKILL: syscall.SIGKILL,
+	parametersv1alpha1.SIGSEGV: syscall.SIGSEGV,
+	parametersv1alpha1.SIGPIPE: syscall.SIGPIPE,
+	parametersv1alpha1.SIGALRM: syscall.SIGALRM,
+	parametersv1alpha1.SIGTERM: syscall.SIGTERM,
 }

@@ -28,7 +28,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramsdef
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName={paramsdef,pd}
 // +kubebuilder:printcolumn:name="FILE",type="string",JSONPath=".spec.fileName",description="config file name"
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

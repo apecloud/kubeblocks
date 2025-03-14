@@ -16,6 +16,7 @@ spec:
     plural: parametersdefinitions
     shortNames:
     - paramsdef
+    - pd
     singular: parametersdefinition
   scope: Cluster
   versions:

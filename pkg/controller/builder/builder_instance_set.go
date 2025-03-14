@@ -133,11 +133,6 @@ func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.M
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
-	builder.get().Spec.MembershipReconfiguration = reconfiguration
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions) *InstanceSetBuilder {
 	if lifecycleActions != nil && lifecycleActions.Switchover != nil {
 		if builder.get().Spec.MembershipReconfiguration == nil {

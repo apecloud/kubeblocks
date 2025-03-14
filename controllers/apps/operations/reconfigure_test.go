@@ -275,6 +275,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 						Policy:     "simple",
 						ExecResult: "none",
 					})
+					cm.Annotations[constant.ConfigurationRevision] = "1"
 					Expect(err).ShouldNot(HaveOccurred())
 					cm.Annotations[core.GenerateRevisionPhaseKey("1")] = string(b)
 				})).Should(Succeed())

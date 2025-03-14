@@ -236,6 +236,10 @@ func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (a
 		return appsv1alpha1.OpsFailedPhase,
 			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
 	case appsv1alpha1.CFinishedPhase:
+		params.reqCtx.Log.Info("reconfigure operation has been completed",
+			"config detail", *item,
+			"config status", *itemStatus,
+			"updated parameters", resolveUpdateParameters(params))
 		return appsv1alpha1.OpsSucceedPhase,
 			syncStatus(params.configurationStatus, params.resource, itemStatus, phase)
 	default:
@@ -331,7 +335,15 @@ func reconfiguringPhase(resource *configctrl.Fetcher,
 	if status.ReconcileDetail == nil || status.ReconcileDetail.CurrentRevision != status.UpdateRevision {
 		return appsv1alpha1.CPendingPhase
 	}
-	return intctrlutil.GetConfigSpecReconcilePhase(resource.ConfigMapObj, detail, status)
+	phase := intctrlutil.GetConfigSpecReconcilePhase(resource.ConfigMapObj, detail, status)
+	if phase == appsv1alpha1.CFinishedPhase {
+		// Check if the last configuration subresource (status) is the last version.
+		lastRevision, ok := resource.ConfigMapObj.Annotations[constant.ConfigurationRevision]
+		if !ok || status.UpdateRevision != lastRevision {
+			return appsv1alpha1.CRunningPhase
+		}
+	}
+	return phase
 }
 
 func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {
@@ -363,4 +375,23 @@ func initReconfigureStatus(opsRequest *appsv1alpha1.OpsRequest, componentName st
 		}
 	}
 	return status.ReconfiguringStatusAsComponent[componentName]
+}
+
+func resolveUpdateParameters(params reconfigureParams) map[string]map[string]*string {
+	parameters := make(map[string]map[string]*string, len(params.configurationItem.Keys))
+	for _, config := range params.configurationItem.Keys {
+		if len(config.Parameters) == 0 {
+			continue
+		}
+		parameters[config.Key] = parameterAsMap(config.Parameters)
+	}
+	return parameters
+}
+
+func parameterAsMap(parameters []appsv1alpha1.ParameterPair) map[string]*string {
+	paramsMap := make(map[string]*string, len(parameters))
+	for _, parameter := range parameters {
+		paramsMap[parameter.Key] = parameter.Value
+	}
+	return paramsMap
 }

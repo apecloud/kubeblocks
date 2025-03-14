@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -51,9 +52,13 @@ type ReconcileContext struct {
 func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
 	resourceCtx *render.ResourceCtx,
 	cm *corev1.ConfigMap,
+	cluster *appsv1.Cluster,
 	configSpecName string,
 	matchingLabels client.MatchingLabels) *ReconcileContext {
 	configContext := ReconcileContext{
+		ResourceFetcher: configctrl.ResourceFetcher[ReconcileContext]{
+			ClusterObj: cluster,
+		},
 		RequestCtx:     reqCtx,
 		ConfigMap:      cm,
 		Name:           configSpecName,

@@ -67,7 +67,7 @@ var _ = Describe("Parameter Controller", func() {
 
 			By("submit the parameter update request")
 			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, shardingCompName).
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
 				AddParameters("innodb-buffer-pool-size", "1024M").
 				AddParameters("max_connections", "100").
 				Create(&testCtx).

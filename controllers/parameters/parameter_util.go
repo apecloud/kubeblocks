@@ -237,8 +237,7 @@ func resolveComponentRefConfigMap(rctx *ReconcileContext) (map[string]*corev1.Co
 }
 
 func prepareResources(rctx *ReconcileContext, _ *parametersv1alpha1.Parameter) error {
-	return rctx.Cluster().
-		ComponentAndComponentDef().
+	return rctx.ComponentAndComponentDef().
 		SynthesizedComponent().
 		ComponentParameter().
 		ParametersDefinitions().

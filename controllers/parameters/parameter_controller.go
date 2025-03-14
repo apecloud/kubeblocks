@@ -172,7 +172,7 @@ func (r *ParameterReconciler) generateParameterTaskContext(
 					Namespace:     parameter.Namespace,
 					ClusterName:   parameter.Spec.ClusterName,
 					ComponentName: compName,
-				}, nil, "", nil))
+				}, nil, cluster, "", nil))
 		}
 	}
 	return rctxs, params, nil

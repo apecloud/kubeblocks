@@ -180,6 +180,13 @@ func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
 	if !IsApplyConfigChanged(configMap, item) {
 		return parametersv1alpha1.CPendingPhase
 	}
+	if status.Phase == parametersv1alpha1.CFinishedPhase {
+		// Check if the cr subresource (status) is the last version.
+		lastRevision, ok := configMap.Annotations[constant.ConfigurationRevision]
+		if !ok || status.UpdateRevision != lastRevision {
+			return parametersv1alpha1.CRunningPhase
+		}
+	}
 	return status.Phase
 }
 

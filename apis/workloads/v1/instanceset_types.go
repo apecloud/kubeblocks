@@ -226,9 +226,12 @@ type InstanceSetSpec struct {
 	TemplateVars map[string]string `json:"templateVars,omitempty"`
 
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
+	//
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
+	// Describe the configs to be reconfigured.
+	//
 	// +optional
 	Configs []ConfigTemplate `json:"configs,omitempty"`
 }
@@ -415,7 +418,19 @@ type InstanceStatus struct {
 	// The status of configs.
 	//
 	// +optional
-	Configs map[string]int64 `json:"configs,omitempty"`
+	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+}
+
+type InstanceConfigStatus struct {
+	// The name of the config.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The generation of the config.
+	//
+	// +kubebuilder:validation:Required
+	Generation int64 `json:"generation"`
 }
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate

@@ -312,8 +312,11 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server": int64(1),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							Generation: int64(1),
+						},
 					},
 				}))
 			})).Should(Succeed())
@@ -380,9 +383,15 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server":  int64(1),
-						"logging": int64(2),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							Generation: int64(1),
+						},
+						{
+							Name:       "logging",
+							Generation: int64(2),
+						},
 					},
 				}))
 			})).Should(Succeed())
@@ -406,9 +415,15 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server":  int64(1),
-						"logging": int64(128),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							Generation: int64(1),
+						},
+						{
+							Name:       "logging",
+							Generation: int64(128),
+						},
 					},
 				}))
 			})).Should(Succeed())
@@ -482,9 +497,15 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server":  int64(1),
-						"logging": int64(2),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							Generation: int64(1),
+						},
+						{
+							Name:       "logging",
+							Generation: int64(2),
+						},
 					},
 				}))
 			})).Should(Succeed())
@@ -508,9 +529,15 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: map[string]int64{
-						"server":  int64(1),
-						"logging": int64(128),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							Generation: int64(1),
+						},
+						{
+							Name:       "logging",
+							Generation: int64(128),
+						},
 					},
 				}))
 			})).Should(Succeed())

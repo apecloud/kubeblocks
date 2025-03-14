@@ -329,13 +329,24 @@ func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, p
 		return instance.PodName == pod.Name
 	})
 	if idx < 0 {
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name, Configs: map[string]int64{}})
+		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
 		idx = len(its.Status.InstanceStatus) - 1
 	}
+
 	if its.Status.InstanceStatus[idx].Configs == nil {
-		its.Status.InstanceStatus[idx].Configs = make(map[string]int64)
+		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
 	}
-	its.Status.InstanceStatus[idx].Configs[config.Name] = config.Generation
+	status := workloads.InstanceConfigStatus{
+		Name:       config.Name,
+		Generation: config.Generation,
+	}
+	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
+		if configStatus.Name == config.Name {
+			its.Status.InstanceStatus[idx].Configs[i] = status
+			return
+		}
+	}
+	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
 }
 
 func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
@@ -361,11 +372,12 @@ func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *core
 	if idx < 0 {
 		return true // new pod provisioned
 	}
-	generation, ok := its.Status.InstanceStatus[idx].Configs[config.Name]
-	if !ok {
-		return config.Generation <= 0
+	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
+		if configStatus.Name == config.Name {
+			return config.Generation <= configStatus.Generation
+		}
 	}
-	return config.Generation <= generation
+	return config.Generation <= 0
 }
 
 func (r *updateReconciler) clusterName(its *workloads.InstanceSet) (string, error) {

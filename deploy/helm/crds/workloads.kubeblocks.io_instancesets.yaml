@@ -66,6 +66,7 @@ spec:
               the configuration details for the state machine.
             properties:
               configs:
+                description: Describe the configs to be reconfigured.
                 items:
                   properties:
                     generation:
@@ -10425,11 +10426,21 @@ spec:
                 items:
                   properties:
                     configs:
-                      additionalProperties:
-                        format: int64
-                        type: integer
                       description: The status of configs.
-                      type: object
+                      items:
+                        properties:
+                          generation:
+                            description: The generation of the config.
+                            format: int64
+                            type: integer
+                          name:
+                            description: The name of the config.
+                            type: string
+                        required:
+                        - generation
+                        - name
+                        type: object
+                      type: array
                     podName:
                       default: Unknown
                       description: Represents the name of the pod.

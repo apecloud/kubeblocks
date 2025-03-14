@@ -349,9 +349,12 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
 	if its.Status.InstanceStatus == nil {
 		// initialize
-		configs := make(map[string]int64)
+		configs := make([]workloads.InstanceConfigStatus, 0)
 		for _, config := range its.Spec.Configs {
-			configs[config.Name] = config.Generation
+			configs = append(configs, workloads.InstanceConfigStatus{
+				Name:       config.Name,
+				Generation: config.Generation,
+			})
 		}
 		for i := range instanceStatus {
 			instanceStatus[i].Configs = configs
@@ -366,10 +369,12 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 			for _, status := range its.Status.InstanceStatus {
 				if status.PodName == newStatus.PodName {
 					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make(map[string]int64)
+						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
 					}
-					for name := range configs.Intersection(sets.KeySet(status.Configs)) {
-						instanceStatus[i].Configs[name] = status.Configs[name]
+					for j, config := range status.Configs {
+						if configs.Has(config.Name) {
+							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
+						}
 					}
 					break
 				}

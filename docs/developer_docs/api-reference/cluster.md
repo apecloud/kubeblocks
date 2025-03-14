@@ -29606,6 +29606,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
+<p>Describe the configs to be reconfigured.</p>
 </td>
 </tr>
 </table>
@@ -29729,6 +29730,45 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>The parameters to call the reconfigure action.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceConfigStatus">InstanceConfigStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>generation</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<p>The generation of the config.</p>
 </td>
 </tr>
 </tbody>
@@ -30061,6 +30101,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
+<p>Describe the configs to be reconfigured.</p>
 </td>
 </tr>
 </tbody>
@@ -30319,7 +30360,9 @@ string
 <td>
 <code>configs</code><br/>
 <em>
-map[string]int64
+<a href="#workloads.kubeblocks.io/v1.InstanceConfigStatus">
+[]InstanceConfigStatus
+</a>
 </em>
 </td>
 <td>

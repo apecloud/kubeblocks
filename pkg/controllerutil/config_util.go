@@ -133,8 +133,8 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 	return r
 }
 
-// IsApplyConfigChanged checks if the configuration is changed
-func IsApplyConfigChanged(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
+// IsApplyUpdatedParameters checks if the configuration is changed
+func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return false
 	}
@@ -170,14 +170,14 @@ func IsRerender(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTempl
 		!reflect.DeepEqual(updatedVersion.CustomTemplates, item.CustomTemplates)
 }
 
-// GetConfigSpecReconcilePhase gets the configuration phase
-func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
+// GetUpdatedParametersReconciledPhase gets the configuration phase
+func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ParameterPhase {
 	if status == nil || status.Phase == "" {
 		return parametersv1alpha1.CCreatingPhase
 	}
-	if !IsApplyConfigChanged(configMap, item) {
+	if !IsApplyUpdatedParameters(configMap, item) {
 		return parametersv1alpha1.CPendingPhase
 	}
 	if status.Phase == parametersv1alpha1.CFinishedPhase {

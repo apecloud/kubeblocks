@@ -71,7 +71,7 @@ func syncReconfiguringPhase(rctx *ReconcileContext, status *parametersv1alpha1.C
 			rctx.Log.Info("component status or spec not found", "component", parameterStatus.Name, "template", parameterStatus.Name)
 			continue
 		}
-		parameterStatus.Phase = intctrlutil.GetConfigSpecReconcilePhase(cm, *compSpec, compStatus)
+		parameterStatus.Phase = intctrlutil.GetUpdatedParametersReconciledPhase(cm, *compSpec, compStatus)
 		if finished {
 			finished = intctrlutil.IsParameterFinished(parameterStatus.Phase)
 		}

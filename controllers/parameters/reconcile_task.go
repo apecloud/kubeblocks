@@ -117,7 +117,7 @@ func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 			}
 			// Do reconcile for config template
 			configMap := resource.ConfigMapObj
-			switch intctrlutil.GetConfigSpecReconcilePhase(configMap, item, status) {
+			switch intctrlutil.GetUpdatedParametersReconciledPhase(configMap, item, status) {
 			default:
 				return syncStatus(configMap, status)
 			case parametersv1alpha1.CInitPhase,
@@ -138,7 +138,7 @@ func syncImpl(taskCtx *TaskContext,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
-	if intctrlutil.IsApplyConfigChanged(configMap, item) {
+	if intctrlutil.IsApplyUpdatedParameters(configMap, item) {
 		return syncStatus(configMap, status)
 	}
 

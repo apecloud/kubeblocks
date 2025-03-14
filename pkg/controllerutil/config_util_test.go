@@ -236,8 +236,8 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetConfigSpecReconcilePhase(tt.args.cm, tt.args.item, tt.args.status); got != tt.want {
-				t.Errorf("GetConfigSpecReconcilePhase() = %v, want %v", got, tt.want)
+			if got := GetUpdatedParametersReconciledPhase(tt.args.cm, tt.args.item, tt.args.status); got != tt.want {
+				t.Errorf("GetUpdatedParametersReconciledPhase() = %v, want %v", got, tt.want)
 			}
 		})
 	}

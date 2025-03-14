@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"errors"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,8 +37,10 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // ParameterReconciler reconciles a Parameter object
@@ -110,7 +113,17 @@ func (r *ParameterReconciler) handleComponent(rctx *ReconcileContext, updatedPar
 }
 
 func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) (ctrl.Result, error) {
-	res, err := handleClusterDeleted(reqCtx, r.Client, parameter)
+	var cluster appsv1.Cluster
+
+	clusterKey := client.ObjectKey{
+		Namespace: parameter.GetNamespace(),
+		Name:      parameter.Spec.ClusterName,
+	}
+	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	res, err := handleClusterDeleted(reqCtx, r.Client, parameter, &cluster)
 	if res != nil {
 		return *res, err
 	}
@@ -124,8 +137,12 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 	if err := r.validate(parameter, reqCtx.Ctx); err != nil {
 		return r.fail(reqCtx, parameter, err)
 	}
+
 	patch := parameter.DeepCopy()
-	rctxs, params := r.generateParameterTaskContext(reqCtx, parameter)
+	rctxs, params, err := r.generateParameterTaskContext(reqCtx, parameter, &cluster)
+	if err != nil {
+		return r.fail(reqCtx, parameter, err)
+	}
 	for i, rctx := range rctxs {
 		if err := r.handleComponent(rctx, params[i], parameter); err != nil {
 			return r.fail(reqCtx, parameter, err)
@@ -135,21 +152,30 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 	return updateParameterStatus(reqCtx, r.Client, parameter, patch, finished)
 }
 
-func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) ([]*ReconcileContext, []parametersv1alpha1.ComponentParameters) {
+func (r *ParameterReconciler) generateParameterTaskContext(
+	reqCtx intctrlutil.RequestCtx,
+	parameter *parametersv1alpha1.Parameter,
+	cluster *appsv1.Cluster) ([]*ReconcileContext, []parametersv1alpha1.ComponentParameters, error) {
 	var rctxs []*ReconcileContext
 	var params []parametersv1alpha1.ComponentParameters
-	for _, component := range parameter.Spec.ComponentParameters {
-		params = append(params, component.Parameters)
-		rctxs = append(rctxs, newParameterReconcileContext(reqCtx,
-			&render.ResourceCtx{
-				Context:       reqCtx.Ctx,
-				Client:        r.Client,
-				Namespace:     parameter.Namespace,
-				ClusterName:   parameter.Spec.ClusterName,
-				ComponentName: component.ComponentName,
-			}, nil, "", nil))
+	for _, compParameter := range parameter.Spec.ComponentParameters {
+		comps, err := resolveComponents(reqCtx.Ctx, r.Client, cluster, compParameter.ComponentName)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, compName := range comps {
+			params = append(params, compParameter.Parameters)
+			rctxs = append(rctxs, newParameterReconcileContext(reqCtx,
+				&render.ResourceCtx{
+					Context:       reqCtx.Ctx,
+					Client:        r.Client,
+					Namespace:     parameter.Namespace,
+					ClusterName:   parameter.Spec.ClusterName,
+					ComponentName: compName,
+				}, nil, "", nil))
+		}
 	}
-	return rctxs, params
+	return rctxs, params, nil
 }
 
 func (r *ParameterReconciler) validate(parameter *parametersv1alpha1.Parameter, ctx context.Context) error {
@@ -157,11 +183,11 @@ func (r *ParameterReconciler) validate(parameter *parametersv1alpha1.Parameter, 
 		return intctrlutil.NewFatalError("required component parameters")
 	}
 
-	for _, component := range parameter.Spec.ComponentParameters {
-		if len(component.Parameters) == 0 && len(component.CustomTemplates) == 0 {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "required parameters or custom templates for component[%s]", component.ComponentName)
+	for _, compParameter := range parameter.Spec.ComponentParameters {
+		if len(compParameter.Parameters) == 0 && len(compParameter.CustomTemplates) == 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "required parameters or custom templates for component[%s]", compParameter.ComponentName)
 		}
-		if err := validateCustomTemplate(ctx, r.Client, component.CustomTemplates); err != nil {
+		if err := validateCustomTemplate(ctx, r.Client, compParameter.CustomTemplates); err != nil {
 			return err
 		}
 	}
@@ -259,4 +285,35 @@ func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bo
 		}
 	}
 	return finished
+}
+
+func resolveComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, componentName string) ([]string, error) {
+	clusterSpec := cluster.Spec
+	compSpec := clusterSpec.GetComponentByName(componentName)
+	if compSpec != nil {
+		return []string{compSpec.Name}, nil
+	}
+
+	shardingComp := clusterSpec.GetShardingByName(componentName)
+	if shardingComp == nil {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `component not found: %s`, componentName)
+	}
+	components, err := intctrlutil.ListShardingComponents(ctx, reader, cluster, componentName)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs []error
+	transform := func(comp appsv1.Component) string {
+		compName, err := component.ShortName(cluster.Name, comp.Name)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		return compName
+	}
+	compNames := generics.Map(components, transform)
+	if len(errs) != 0 {
+		return nil, errors.Join(errs...)
+	}
+	return compNames, nil
 }

@@ -261,18 +261,9 @@ func syncComponentParameterStatus(rctx *ReconcileContext, parameter *parametersv
 	return nil
 }
 
-func handleClusterDeleted(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter) (*ctrl.Result, error) {
-	var cluster appsv1.Cluster
-
-	clusterKey := client.ObjectKey{
-		Namespace: parameter.GetNamespace(),
-		Name:      parameter.Spec.ClusterName,
-	}
-	if err := cli.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
-		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-	}
+func handleClusterDeleted(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, cluster *appsv1.Cluster) (*ctrl.Result, error) {
 	if !cluster.IsDeleting() {
-		return updateOwnerReference(reqCtx, cli, &cluster, parameter)
+		return updateOwnerReference(reqCtx, cli, cluster, parameter)
 	}
 	reqCtx.Log.Info("cluster is deleting, delete parameter", "parameters", client.ObjectKeyFromObject(parameter))
 	if err := cli.Delete(reqCtx.Ctx, parameter); err != nil {

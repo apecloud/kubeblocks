@@ -189,9 +189,9 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	normalizeQuantity := func(name corev1.ResourceName, q resource.Quantity) resource.Quantity {
 		switch name {
 		case corev1.ResourceCPU:
-			return resource.MustParse(fmt.Sprintf("%dm", q.MilliValue()))
+			return *resource.NewMilliQuantity(q.MilliValue(), resource.DecimalSI)
 		case corev1.ResourceMemory, corev1.ResourceStorage, corev1.ResourceEphemeralStorage:
-			return resource.MustParse(fmt.Sprintf("%dMi", q.Value()/1024/1024))
+			return *resource.NewQuantity(q.Value(), resource.BinarySI)
 		default:
 			return q.DeepCopy()
 		}

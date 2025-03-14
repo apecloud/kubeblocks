@@ -358,84 +358,13 @@ const (
 // +kubebuilder:object:generate=false
 type ReplicaRole = kbappsv1.ReplicaRole
 
-// AccessMode defines SVC access mode enums.
-// +enum
-type AccessMode string
-
-const (
-	ReadWriteMode AccessMode = "ReadWrite"
-	ReadonlyMode  AccessMode = "Readonly"
-	NoneMode      AccessMode = "None"
-)
-
-type Action struct {
-	// Refers to the utility image that contains the command which can be utilized to retrieve or process role information.
-	//
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// A set of instructions that will be executed within the Container to retrieve or process role information. This field is required.
-	//
-	// +kubebuilder:validation:Required
-	Command []string `json:"command"`
-
-	// Additional parameters used to perform specific statements. This field is optional.
-	//
-	// +optional
-	Args []string `json:"args,omitempty"`
-}
-
-// RoleUpdateMechanism defines the way how pod role label being updated.
-// +enum
-type RoleUpdateMechanism string
-
-const (
-	ReadinessProbeEventUpdate  RoleUpdateMechanism = "ReadinessProbeEventUpdate"
-	DirectAPIServerEventUpdate RoleUpdateMechanism = "DirectAPIServerEventUpdate"
-)
-
 type MembershipReconfiguration struct {
-	// Specifies the environment variables that can be used in all following Actions:
-	// - KB_ITS_USERNAME: Represents the username part of the credential
-	// - KB_ITS_PASSWORD: Represents the password part of the credential
-	// - KB_ITS_LEADER_HOST: Represents the leader host
-	// - KB_ITS_TARGET_HOST: Represents the target host
-	// - KB_ITS_SERVICE_PORT: Represents the service port
-	//
-	// Defines the action to perform a switchover.
-	// If the Image is not configured, the latest [BusyBox](https://busybox.net/) image will be used.
-	//
-	// +optional
-	SwitchoverAction *Action `json:"switchoverAction,omitempty"`
-
-	// Defines the action to add a member.
-	// If the Image is not configured, the Image from the previous non-nil action will be used.
-	//
-	// +optional
-	MemberJoinAction *Action `json:"memberJoinAction,omitempty"`
-
-	// Defines the action to remove a member.
-	// If the Image is not configured, the Image from the previous non-nil action will be used.
-	//
-	// +optional
-	MemberLeaveAction *Action `json:"memberLeaveAction,omitempty"`
-
-	// Defines the action to trigger the new member to start log syncing.
-	// If the Image is not configured, the Image from the previous non-nil action will be used.
-	//
-	// +optional
-	LogSyncAction *Action `json:"logSyncAction,omitempty"`
-
-	// Defines the action to inform the cluster that the new member can join voting now.
-	// If the Image is not configured, the Image from the previous non-nil action will be used.
-	//
-	// +optional
-	PromoteAction *Action `json:"promoteAction,omitempty"`
-
 	// Defines the procedure for a controlled transition of a role to a new replica.
 	//
 	// +optional
 	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
+
+	// TODO: member join/leave
 }
 
 type ConfigTemplate struct {

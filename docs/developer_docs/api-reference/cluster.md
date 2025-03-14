@@ -29626,78 +29626,6 @@ InstanceSetStatus
 </tr>
 </tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.AccessMode">AccessMode
-(<code>string</code> alias)</h3>
-<div>
-<p>AccessMode defines SVC access mode enums.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;None&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;ReadWrite&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Readonly&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.Action">Action
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the utility image that contains the command which can be utilized to retrieve or process role information.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>A set of instructions that will be executed within the Container to retrieve or process role information. This field is required.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>args</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Additional parameters used to perform specific statements. This field is optional.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1.ConditionType">ConditionType
 (<code>string</code> alias)</h3>
 <div>
@@ -30573,87 +30501,6 @@ ReplicaRole
 <tbody>
 <tr>
 <td>
-<code>switchoverAction</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the environment variables that can be used in all following Actions:
-- KB_ITS_USERNAME: Represents the username part of the credential
-- KB_ITS_PASSWORD: Represents the password part of the credential
-- KB_ITS_LEADER_HOST: Represents the leader host
-- KB_ITS_TARGET_HOST: Represents the target host
-- KB_ITS_SERVICE_PORT: Represents the service port</p>
-<p>Defines the action to perform a switchover.
-If the Image is not configured, the latest <a href="https://busybox.net/">BusyBox</a> image will be used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberJoinAction</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the action to add a member.
-If the Image is not configured, the Image from the previous non-nil action will be used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberLeaveAction</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the action to remove a member.
-If the Image is not configured, the Image from the previous non-nil action will be used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>logSyncAction</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the action to trigger the new member to start log syncing.
-If the Image is not configured, the Image from the previous non-nil action will be used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>promoteAction</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the action to inform the cluster that the new member can join voting now.
-If the Image is not configured, the Image from the previous non-nil action will be used.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>switchover</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -30667,24 +30514,6 @@ Action
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
-(<code>string</code> alias)</h3>
-<div>
-<p>RoleUpdateMechanism defines the way how pod role label being updated.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;DirectAPIServerEventUpdate&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

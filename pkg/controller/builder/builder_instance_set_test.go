@@ -55,12 +55,6 @@ var _ = Describe("instance_set builder", func() {
 			ParticipatesInQuorum: true,
 			UpdatePriority:       1,
 		}
-		reconfiguration := workloads.MembershipReconfiguration{
-			SwitchoverAction: &workloads.Action{
-				Image:   name,
-				Command: []string{"bar"},
-			},
-		}
 		pod := NewPodBuilder(ns, "foo").
 			AddContainer(corev1.Container{
 				Name:  "foo",
@@ -133,7 +127,6 @@ var _ = Describe("instance_set builder", func() {
 			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
 			AddMatchLabelsInMap(selectors).
 			SetRoles([]workloads.ReplicaRole{role}).
-			SetMembershipReconfiguration(&reconfiguration).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(vcs...).
 			AddVolumeClaimTemplates(vc).
@@ -158,8 +151,7 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.Selector.MatchLabels[selectorKey4]).Should(Equal(selectorValue4))
 		Expect(its.Spec.Roles).Should(HaveLen(1))
 		Expect(its.Spec.Roles[0]).Should(Equal(role))
-		Expect(its.Spec.MembershipReconfiguration).ShouldNot(BeNil())
-		Expect(*its.Spec.MembershipReconfiguration).Should(Equal(reconfiguration))
+		Expect(its.Spec.MembershipReconfiguration).Should(BeNil())
 		Expect(its.Spec.Template).Should(Equal(template))
 		Expect(its.Spec.VolumeClaimTemplates).Should(HaveLen(2))
 		Expect(its.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))

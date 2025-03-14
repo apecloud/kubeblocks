@@ -37,6 +37,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -330,12 +331,32 @@ func (r *RestoreManager) AnalysisRestoreActionsWithBackup(stage dpv1alpha1.Resto
 	return allActionsFinished, existFailedAction
 }
 
+func addItsManagingLabels(claim *dpv1alpha1.RestoreVolumeClaim, index int) {
+	clusterName := claim.Labels[constant.AppInstanceLabelKey]
+	compName := claim.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || compName == "" {
+		return
+	}
+	if claim.Labels == nil {
+		claim.Labels = make(map[string]string)
+	}
+
+	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	itsMatchLabels := instanceset.GetMatchLabels(itsName)
+	intctrlutil.MergeMetadataMapInplace(itsMatchLabels, &claim.Labels)
+
+	if claim.Labels[constant.KBAppPodNameLabelKey] == "" {
+		podName := fmt.Sprintf("%s-%d", itsName, index)
+		claim.Labels[constant.KBAppPodNameLabelKey] = podName
+	}
+}
+
 func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, target *dpv1alpha1.BackupStatusTarget) error {
 	prepareDataConfig := r.Restore.Spec.PrepareDataConfig
 	if prepareDataConfig == nil {
 		return nil
 	}
-	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim, claimIndex int) error {
+	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim) error {
 		if claim.VolumeSource == "" {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`claim "%s"" volumeSource can not be empty if the backup uses volume snapshot`, claim.Name))
 		}
@@ -371,7 +392,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		return r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec)
 	}
 	for i := range prepareDataConfig.RestoreVolumeClaims {
-		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i], i); err != nil {
+		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i]); err != nil {
 			return err
 		}
 	}
@@ -381,8 +402,12 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		for i := 0; i < restoreJobReplicas; i++ {
 			//  create pvc from claims template, build volumes and volumeMounts
 			for _, claim := range prepareDataConfig.RestoreVolumeClaimsTemplate.Templates {
-				claim.Name = fmt.Sprintf("%s-%d", claim.Name, i+int(claimTemplate.StartingIndex))
-				if err := createPVCWithSnapshot(claim, i); err != nil {
+				index := i + int(claimTemplate.StartingIndex)
+				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
+				// HACK: add InstanceSet related labels to the PVC,
+				// so that it can be managed by InstanceSet
+				addItsManagingLabels(&claim, index)
+				if err := createPVCWithSnapshot(claim); err != nil {
 					return err
 				}
 			}
@@ -476,7 +501,11 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		if claimsTemplate != nil {
 			//  create pvc from claims template, build volumes and volumeMounts
 			for _, claim := range claimsTemplate.Templates {
-				claim.Name = fmt.Sprintf("%s-%d", claim.Name, i+int(claimsTemplate.StartingIndex))
+				index := i + int(claimsTemplate.StartingIndex)
+				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
+				// HACK: add InstanceSet related labels to the PVC,
+				// so that it can be managed by InstanceSet
+				addItsManagingLabels(&claim, index)
 				volume, volumeMount, err := createPVCIfNotExistsAndBuildVolume(claim, "dp-claim-tpl")
 				if err != nil {
 					return nil, err

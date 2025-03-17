@@ -42,6 +42,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/operations"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 
@@ -102,6 +104,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
 		Owns(&batchv1.Job{}).
 		Owns(&dpv1alpha1.Restore{}).
+		Owns(&parametersv1alpha1.Parameter{}).
 		Complete(r)
 }
 
@@ -137,6 +140,9 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
 		if err := r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest); err != nil {
+			return nil, err
+		}
+		if err := r.deleteParametersWithOwner(reqCtx, opsRes.OpsRequest); err != nil {
 			return nil, err
 		}
 		return nil, operations.DequeueOpsRequestInClusterAnnotation(reqCtx.Ctx, r.Client, opsRes)
@@ -534,6 +540,30 @@ func (r *OpsRequestReconciler) deleteCreatedPodsInKBNamespace(reqCtx intctrlutil
 	}
 	for i := range podList.Items {
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &podList.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *OpsRequestReconciler) deleteParametersWithOwner(reqCtx intctrlutil.RequestCtx, opsRequest *opsv1alpha1.OpsRequest) error {
+	listOpts := []client.ListOption{
+		client.InNamespace(opsRequest.GetNamespace()),
+		client.MatchingLabels{
+			constant.OpsRequestNameLabelKey: opsRequest.Name,
+			constant.AppInstanceLabelKey:    opsRequest.Spec.ClusterName,
+		},
+	}
+	parameterCRs := &parametersv1alpha1.ParameterList{}
+	if err := r.Client.List(reqCtx.Ctx, parameterCRs, listOpts...); err != nil {
+		return err
+	}
+	for i := range parameterCRs.Items {
+		parameter := &parameterCRs.Items[i]
+		if !model.IsOwnerOf(opsRequest, parameter) {
+			continue
+		}
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, parameter); err != nil {
 			return err
 		}
 	}

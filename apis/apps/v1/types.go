@@ -747,7 +747,7 @@ type TLSSecretRef struct {
 // InstanceTemplate allows customization of individual replica configurations in a Component.
 type InstanceTemplate struct {
 	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
-	// This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal
+	// This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal. The name can't be empty.
 	// using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
 	// The specified name overrides any default naming conventions or patterns.
 	//

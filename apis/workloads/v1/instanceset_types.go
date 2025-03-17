@@ -267,6 +267,8 @@ type InstanceSetStatus struct {
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
+	CurrentInstances CurrentInstances `json:"currentInstances,omitempty"`
+
 	// Represents the latest available observations of an instanceset's current state.
 	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
 	//
@@ -433,6 +435,12 @@ type InstanceConfigStatus struct {
 	// +kubebuilder:validation:Required
 	Generation int64 `json:"generation"`
 }
+
+// CurrentInstances maps templates to current pods
+// key is template name (default template has empty name), value is a list of pod ordinals
+// store ordinals only to save some space.
+// the list is always sorted by ordinal
+type CurrentInstances map[string][]int32
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate
 type InstanceTemplateStatus struct {

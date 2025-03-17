@@ -2654,7 +2654,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>ClusterComponentConfig represents a configuration for a component.</p>
@@ -7974,7 +7974,7 @@ ContainerVars
 <h3 id="apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -8102,6 +8102,20 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 <em>(Optional)</em>
 <p>Defines Env to override.
 Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">
+[]ClusterComponentConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 </tbody>
@@ -8577,7 +8591,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.Ordinals">Ordinals
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>Ordinals represents a combination of continuous segments and individual values.</p>
@@ -9389,9 +9403,10 @@ it will be counted towards MaxUnavailable.</p>
 <h3 id="apps.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
+<p>SchedulingPolicy defines the scheduling policy for instances.</p>
 </div>
 <table>
 <thead>
@@ -29370,7 +29385,7 @@ Kubernetes core/v1.PodTemplateSpec
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
+<a href="#workloads.kubeblocks.io/v1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -29659,7 +29674,7 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 </div>
@@ -29865,7 +29880,7 @@ Kubernetes core/v1.PodTemplateSpec
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
+<a href="#workloads.kubeblocks.io/v1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -30368,6 +30383,155 @@ string
 <td>
 <em>(Optional)</em>
 <p>The status of configs.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the instance Pod created using this InstanceTemplate.
+This name is constructed by concatenating the Component&rsquo;s name, the template&rsquo;s name, and the instance&rsquo;s ordinal
+using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
+The specified name overrides any default naming conventions or patterns.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of instances (Pods) to create from this InstanceTemplate.
+This field allows setting how many replicated instances of the Component,
+with the specific overrides in the InstanceTemplate, are created.
+The default value is 1. A value of 0 disables instance creation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of this InstanceTemplate.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under this InstanceTemplate would be
+$(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+$(cluster.name)-$(component.name)-$(template.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a map of key-value pairs to be merged into the Pod&rsquo;s existing annotations.
+Existing keys will have their values overwritten, while new keys will be added to the annotations.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a map of key-value pairs that will be merged into the Pod&rsquo;s existing labels.
+Values for existing keys will be overwritten, and new keys will be added.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the resource requirements of the first container in the Pod.
+This field allows for customizing resource allocation (CPU, memory, etc.) for the container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describe the configs to be reconfigured.</p>
 </td>
 </tr>
 </tbody>

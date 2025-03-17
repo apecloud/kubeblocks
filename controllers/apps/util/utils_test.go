@@ -109,7 +109,7 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 					Name:      "backup1",
 					Namespace: "default",
 					Annotations: map[string]string{
-						constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"comp1":{"account1":"%s"}}`, string(encryptedPwd)),
+						constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"comp1":{"account1":"%s"}}`, encryptedPwd),
 					},
 				},
 			},

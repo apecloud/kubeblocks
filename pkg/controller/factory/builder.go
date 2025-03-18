@@ -153,7 +153,7 @@ func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.Ins
 			SchedulingPolicy: instances[i].SchedulingPolicy,
 			Resources:        instances[i].Resources,
 			Env:              instances[i].Env,
-			Configs:          nil, // TODO
+			Configs:          nil,
 		})
 	}
 	return instanceTemplates

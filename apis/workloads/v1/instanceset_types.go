@@ -331,11 +331,6 @@ type InstanceSetStatus struct {
 // +kubebuilder:object:generate=false
 type PersistentVolumeClaimRetentionPolicy = kbappsv1.PersistentVolumeClaimRetentionPolicy
 
-//// InstanceTemplate allows customization of individual replica configurations in a Component.
-////
-//// +kubebuilder:object:generate=false
-// type InstanceTemplate = kbappsv1.InstanceTemplate
-
 // Ordinals represents a combination of continuous segments and individual values.
 //
 // +kubebuilder:object:generate=false

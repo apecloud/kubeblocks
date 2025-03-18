@@ -108,23 +108,15 @@ type SidecarDefinitionSpec struct {
 	//
 	// This field is immutable.
 	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +optional
-	Configs []ComponentTemplateSpec `json:"configs,omitempty"`
+	Configs []ComponentFileTemplate `json:"configs,omitempty"`
 
 	// Specifies the scripts used by the Sidecar.
 	//
 	// This field is immutable.
 	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +optional
-	Scripts []ComponentTemplateSpec `json:"scripts,omitempty"`
+	Scripts []ComponentFileTemplate `json:"scripts,omitempty"`
 
 	// TODO:
 	//   1. services, volumes, service-refs, etc.

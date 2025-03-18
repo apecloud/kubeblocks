@@ -121,14 +121,11 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
-	if cluster.IsDeleting() {
-		return opsv1alpha1.OpsAbortedPhase, 0, nil
-	}
 	opsRes.Cluster = cluster
 	// check if the cluster is running
 	if cluster.Status.Phase == appsv1.RunningClusterPhase {
 		return opsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if cluster.Status.Phase == appsv1.FailedClusterPhase {
+	} else if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
 	return opsv1alpha1.OpsRunningPhase, 0, nil

@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"strconv"
 	"time"
@@ -35,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	testclocks "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -85,6 +85,9 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
+
+		// reset the fake clock
+		fakeClock = testclocks.NewFakeClock(time.Now())
 	}
 
 	var clusterInfo *testdp.BackupClusterInfo
@@ -322,8 +325,6 @@ var _ = Describe("Backup Controller test", func() {
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(0), batchv1.JobComplete)
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(1), batchv1.JobComplete)
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
-					log.Printf("backup creation time: %v", fetched.CreationTimestamp.UTC())
-					log.Printf("expiration time: %v", fetched.Status.Expiration.UTC())
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())
 					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))

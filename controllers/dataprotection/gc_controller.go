@@ -21,7 +21,6 @@ package dataprotection
 
 import (
 	"context"
-	lg "log"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -83,7 +82,6 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	}
 	reqCtx.Log.V(1).Info("gcController getting backup")
 
-	lg.Printf("gc now time: %v", r.clock.Now().UTC())
 	backup := &dpv1alpha1.Backup{}
 	if err := r.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
 		if apierrors.IsNotFound(err) {

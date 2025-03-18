@@ -388,7 +388,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 		volumes := podSpec.Volumes
 		for _, c := range *cc {
 			for _, v := range c.VolumeMounts {
-				// if volumeMounts belongs to kbScriptAndConfigVolumeNames, skip
+				// if volumeMounts belongs to configVolumeNames, skip
 				if slices.Contains(configVolumeNames, v.Name) {
 					continue
 				}

@@ -1,0 +1,26 @@
+# permissions for end users to edit componentparameters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: { { include "kubeblocks.fullname" . } }-componentparameter-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - componentparameters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - componentparameters/status
+  verbs:
+  - get

@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"time"
@@ -219,7 +220,9 @@ var _ = Describe("Backup Controller test", func() {
 		})
 
 		Context("creates a backup with retentionPeriod", func() {
-			const defaultRetentionPeriod = "7d"
+			// set enough duration to avoid test backup being gc-ed by gc controller
+			var defaultRetentionPeriod = dpv1alpha1.RetentionPeriod(
+				fmt.Sprintf("%dm", int64(math.Ceil((100 * fakeTick).Minutes()))))
 
 			It("create a valid backup", func() {
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
@@ -266,7 +269,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			It("create a backup with backupMethod and target", func() {
+			It("creates a backup with backupMethod and target", func() {
 				By("Set backupMethod's target")
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 					backupPolicy.Spec.BackupMethods[0].Target = &dpv1alpha1.BackupTarget{

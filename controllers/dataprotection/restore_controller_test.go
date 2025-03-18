@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -734,9 +733,9 @@ func mockBackupForRestore(
 				Start: &metav1.Time{},
 				End:   &metav1.Time{},
 			}
-			fakeClock.Step(time.Minute)
+			fakeClock.Step(fakeTick)
 			backup.Status.TimeRange.Start.Time = fakeClock.Now()
-			fakeClock.Step(time.Minute)
+			fakeClock.Step(fakeTick)
 			backup.Status.TimeRange.End.Time = fakeClock.Now()
 		})).Should(Succeed())
 	}

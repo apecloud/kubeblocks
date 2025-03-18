@@ -226,8 +226,14 @@ type InstanceSetSpec struct {
 	TemplateVars map[string]string `json:"templateVars,omitempty"`
 
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
+	//
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+
+	// Describe the configs to be reconfigured.
+	//
+	// +optional
+	Configs []ConfigTemplate `json:"configs,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet
@@ -294,6 +300,11 @@ type InstanceSetStatus struct {
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
+	// Provides the status of each instance in the ITS.
+	//
+	// +optional
+	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
+
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
 	//
@@ -359,6 +370,31 @@ type MembershipReconfiguration struct {
 	// TODO: member join/leave
 }
 
+type ConfigTemplate struct {
+	// The name of the config.
+	Name string `json:"name"`
+
+	// The generation of the config.
+	Generation int64 `json:"generation"`
+
+	// The custom reconfigure action.
+	//
+	// +optional
+	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
+
+	// The name of the custom reconfigure action.
+	//
+	// An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
+	//
+	// +optional
+	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`
+
+	// The parameters to call the reconfigure action.
+	//
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
 type MemberStatus struct {
 	// Represents the name of the pod.
 	//
@@ -370,6 +406,31 @@ type MemberStatus struct {
 	//
 	// +optional
 	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+}
+
+type InstanceStatus struct {
+	// Represents the name of the pod.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	PodName string `json:"podName"`
+
+	// The status of configs.
+	//
+	// +optional
+	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+}
+
+type InstanceConfigStatus struct {
+	// The name of the config.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The generation of the config.
+	//
+	// +kubebuilder:validation:Required
+	Generation int64 `json:"generation"`
 }
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate

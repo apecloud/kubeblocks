@@ -49,7 +49,6 @@ type SynthesizedComponent struct {
 	LogConfigs                       []kbappsv1.LogConfig `json:"logConfigs,omitempty"`
 	FileTemplates                    []SynthesizedFileTemplate
 	ConfigTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"configTemplates,omitempty"`
-	ScriptTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`

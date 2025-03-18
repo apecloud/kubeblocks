@@ -85,7 +85,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 
 	var configmaps []*corev1.ConfigMap
 	cachedObjs := resolveRerenderDependOnObjects(dag)
-	for _, tpls := range [][]appsv1.ComponentTemplateSpec{builtinComp.ScriptTemplates, builtinComp.ConfigTemplates} {
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{builtinComp.ConfigTemplates} {
 		objects, err := render.RenderTemplate(reconcileCtx, cluster, builtinComp, comp, cachedObjs, tpls)
 		if err != nil {
 			return err
@@ -138,7 +138,7 @@ func resolveRerenderDependOnObjects(dag *graph.DAG) []client.Object {
 
 func updatePodVolumes(podSpec *corev1.PodSpec, component *component.SynthesizedComponent) error {
 	volumes := make(map[string]appsv1.ComponentTemplateSpec, len(component.ConfigTemplates))
-	for _, tpls := range [][]appsv1.ComponentTemplateSpec{component.ConfigTemplates, component.ScriptTemplates} {
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{component.ConfigTemplates} {
 		for _, tpl := range tpls {
 			cmName := core.GetComponentCfgName(component.ClusterName, component.Name, tpl.Name)
 			volumes[cmName] = tpl

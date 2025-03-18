@@ -234,7 +234,7 @@ func (r *SidecarDefinitionReconciler) validateConfigNScript(cli client.Client, r
 	compDef := &appsv1.ComponentDefinition{
 		Spec: appsv1.ComponentDefinitionSpec{
 			Configs2: sidecarDef.Spec.Configs,
-			Scripts2: sidecarDef.Spec.Scripts,
+			Scripts:  sidecarDef.Spec.Scripts,
 		},
 	}
 	return validateComponentFileTemplate(cli, rctx, compDef)
@@ -329,10 +329,25 @@ func (r *SidecarDefinitionReconciler) validateMatchedCompDef(sidecarDef *appsv1.
 			}
 			return nil
 		}
+		validate2 := func(key string, sidecar, comp []appsv1.ComponentFileTemplate) error {
+			if len(sidecar) == 0 || len(comp) == 0 {
+				return nil
+			}
+			names := sets.New[string]()
+			for _, v := range comp {
+				names.Insert(v.Name)
+			}
+			for _, v := range sidecar {
+				if names.Has(v.Name) {
+					return fmt.Errorf("%s template %s is conflicted with the component definition %s", key, v.Name, compDef.Name)
+				}
+			}
+			return nil
+		}
 		if err := validate("config", sidecarDef.Spec.Configs, compDef.Spec.Configs); err != nil {
 			return err
 		}
-		return validate("script", sidecarDef.Spec.Scripts, compDef.Spec.Scripts)
+		return validate2("script", sidecarDef.Spec.Scripts, compDef.Spec.Scripts)
 	}
 	for _, f := range []func() error{vars, templates} {
 		if err := f(); err != nil {

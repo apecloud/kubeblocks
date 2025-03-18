@@ -33,9 +33,6 @@ func BuildConfigTemplateAnnotations(object client.Object, synthesizedComp *compo
 	for _, configTplSpec := range synthesizedComp.ConfigTemplates {
 		asMapAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(configTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configTplSpec.Name)
 	}
-	for _, scriptTplSpec := range synthesizedComp.ScriptTemplates {
-		asMapAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(scriptTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, scriptTplSpec.Name)
-	}
 	updateLabelsOrAnnotations(asMapAnnotations, object.GetAnnotations, object.SetAnnotations, constant.ConfigurationTplLabelPrefixKey)
 }
 

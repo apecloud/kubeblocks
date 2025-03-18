@@ -311,14 +311,6 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Configs2 []ComponentFileTemplate `json:"configs2,omitempty"`
 
-	// Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
-	// These scripts can be executed during container startup or via specific actions.
-	//
-	// This field is immutable.
-	//
-	// +optional
-	Scripts2 []ComponentFileTemplate `json:"scripts2,omitempty"`
-
 	// Specifies the configuration file templates and volume mount parameters used by the Component.
 	// It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.
 	//
@@ -369,19 +361,10 @@ type ComponentDefinitionSpec struct {
 	// Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
 	// These scripts can be executed during container startup or via specific actions.
 	//
-	// Each script group is encapsulated in a ComponentTemplateSpec that includes:
-	//
-	// - The ConfigMap containing the scripts.
-	// - The mount point where the scripts will be mounted inside the container.
-	//
 	// This field is immutable.
 	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
 	// +optional
-	Scripts []ComponentTemplateSpec `json:"scripts,omitempty"`
+	Scripts []ComponentFileTemplate `json:"scripts,omitempty"`
 
 	// An array of `SystemAccount` objects that define the system accounts needed
 	// for the management operations of the Component.

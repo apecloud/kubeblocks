@@ -174,8 +174,6 @@ var _ = BeforeSuite(func() {
 
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
-	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
-	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("CM_NAMESPACE", "default")
 	viper.SetDefault("HOST_PORT_CM_NAME", "kubeblocks-host-ports")
 	viper.SetDefault(constant.EnableRBACManager, true)

@@ -351,7 +351,7 @@ func (r *ComponentDefinitionReconciler) validateComponentTemplate(cli client.Cli
 		}
 		return nil
 	}
-	for _, tpls := range [][]appsv1.ComponentTemplateSpec{cmpd.Spec.Configs, cmpd.Spec.Scripts} {
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{cmpd.Spec.Configs} {
 		for _, tpl := range tpls {
 			if err := validateTemplate(tpl); err != nil {
 				return err
@@ -372,7 +372,7 @@ func validateComponentFileTemplate(cli client.Client, rctx intctrlutil.RequestCt
 		}
 		return nil
 	}
-	for _, tpls := range [][]appsv1.ComponentFileTemplate{cmpd.Spec.Configs2, cmpd.Spec.Scripts2} {
+	for _, tpls := range [][]appsv1.ComponentFileTemplate{cmpd.Spec.Configs2, cmpd.Spec.Scripts} {
 		for _, tpl := range tpls {
 			if err := validateTemplate(tpl); err != nil {
 				return err

@@ -127,49 +127,6 @@ func (builder *ComponentDefinitionBuilder) AddServiceExt(name, serviceName strin
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddConfigTemplate(name, configTemplateRef,
-	namespace, volumeName string) *ComponentDefinitionBuilder {
-	config := appsv1.ComponentTemplateSpec{
-		Name:        name,
-		TemplateRef: configTemplateRef,
-		Namespace:   namespace,
-		VolumeName:  volumeName,
-	}
-	if builder.get().Spec.Configs == nil {
-		builder.get().Spec.Configs = make([]appsv1.ComponentTemplateSpec, 0)
-	}
-	builder.get().Spec.Configs = append(builder.get().Spec.Configs, config)
-	return builder
-}
-
-func (builder *ComponentDefinitionBuilder) AddLogConfig(name, filePathPattern string) *ComponentDefinitionBuilder {
-	logConfig := appsv1.LogConfig{
-		FilePathPattern: filePathPattern,
-		Name:            name,
-	}
-	if builder.get().Spec.LogConfigs == nil {
-		builder.get().Spec.LogConfigs = make([]appsv1.LogConfig, 0)
-	}
-	builder.get().Spec.LogConfigs = append(builder.get().Spec.LogConfigs, logConfig)
-	return builder
-}
-
-func (builder *ComponentDefinitionBuilder) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
-	mode *int32) *ComponentDefinitionBuilder {
-	script := appsv1.ComponentTemplateSpec{
-		Name:        name,
-		TemplateRef: configTemplateRef,
-		Namespace:   namespace,
-		VolumeName:  volumeName,
-		DefaultMode: mode,
-	}
-	if builder.get().Spec.Scripts == nil {
-		builder.get().Spec.Scripts = make([]appsv1.ComponentTemplateSpec, 0)
-	}
-	builder.get().Spec.Scripts = append(builder.get().Spec.Scripts, script)
-	return builder
-}
-
 func (builder *ComponentDefinitionBuilder) SetPolicyRules(rules []rbacv1.PolicyRule) *ComponentDefinitionBuilder {
 	builder.get().Spec.PolicyRules = rules
 	return builder

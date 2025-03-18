@@ -378,12 +378,9 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 
 // buildPodSpecVolumeMounts builds podSpec volumeMounts
 func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
-	kbScriptAndConfigVolumeNames := make([]string, 0)
-	for _, v := range synthesizeComp.ScriptTemplates {
-		kbScriptAndConfigVolumeNames = append(kbScriptAndConfigVolumeNames, v.VolumeName)
-	}
+	configVolumeNames := make([]string, 0)
 	for _, v := range synthesizeComp.ConfigTemplates {
-		kbScriptAndConfigVolumeNames = append(kbScriptAndConfigVolumeNames, v.VolumeName)
+		configVolumeNames = append(configVolumeNames, v.VolumeName)
 	}
 
 	podSpec := synthesizeComp.PodSpec
@@ -392,7 +389,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 		for _, c := range *cc {
 			for _, v := range c.VolumeMounts {
 				// if volumeMounts belongs to kbScriptAndConfigVolumeNames, skip
-				if slices.Contains(kbScriptAndConfigVolumeNames, v.Name) {
+				if slices.Contains(configVolumeNames, v.Name) {
 					continue
 				}
 				// if persistence is not found, add an emptyDir to pod.spec.volumes

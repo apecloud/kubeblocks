@@ -186,56 +186,17 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateR
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddConfigs(configs []kbappsv1.ComponentTemplateSpec) *MockComponentDefinitionFactory {
-	if f.Get().Spec.Configs == nil {
-		f.Get().Spec.Configs = make([]kbappsv1.ComponentTemplateSpec, 0)
-	}
-	f.Get().Spec.Configs = append(f.Get().Spec.Configs, configs...)
-	return f
-}
-
-func (f *MockComponentDefinitionFactory) AddScripts(scripts []kbappsv1.ComponentTemplateSpec) *MockComponentDefinitionFactory {
-	if f.Get().Spec.Scripts == nil {
-		f.Get().Spec.Scripts = make([]kbappsv1.ComponentTemplateSpec, 0)
-	}
-	f.Get().Spec.Scripts = append(f.Get().Spec.Scripts, scripts...)
-	return f
-}
-
-func (f *MockComponentDefinitionFactory) AddLogConfig(name, filePathPattern string) *MockComponentDefinitionFactory {
-	logConfig := kbappsv1.LogConfig{
-		FilePathPattern: filePathPattern,
-		Name:            name,
-	}
-	if f.Get().Spec.LogConfigs == nil {
-		f.Get().Spec.LogConfigs = make([]kbappsv1.LogConfig, 0)
-	}
-	f.Get().Spec.LogConfigs = append(f.Get().Spec.LogConfigs, logConfig)
-	return f
-}
-
-// func (f *MockComponentDefinitionFactory) SetMonitor(builtIn bool, scrapePort intstr.IntOrString, scrapePath string) *MockComponentDefinitionFactory {
-// 	f.Get().Spec.Monitor = &kbappsv1.MonitorConfig{
-// 		BuiltIn: builtIn,
-// 		Exporter: &kbappsv1.ExporterConfig{
-// 			ScrapePort: scrapePort,
-// 			ScrapePath: scrapePath,
-// 		},
-// 	}
-// 	return f
-// }
-
-func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplateRef, namespace, volumeName string,
+func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplate, namespace, volumeName string,
 	mode *int32) *MockComponentDefinitionFactory {
-	script := kbappsv1.ComponentTemplateSpec{
+	script := kbappsv1.ComponentFileTemplate{
 		Name:        name,
-		TemplateRef: configTemplateRef,
+		Template:    configTemplate,
 		Namespace:   namespace,
 		VolumeName:  volumeName,
 		DefaultMode: mode,
 	}
 	if f.Get().Spec.Scripts == nil {
-		f.Get().Spec.Scripts = make([]kbappsv1.ComponentTemplateSpec, 0)
+		f.Get().Spec.Scripts = make([]kbappsv1.ComponentFileTemplate, 0)
 	}
 	f.Get().Spec.Scripts = append(f.Get().Spec.Scripts, script)
 	return f

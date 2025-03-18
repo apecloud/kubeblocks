@@ -1289,22 +1289,6 @@ Each template is represented as a ConfigMap and may contain multiple config file
 </tr>
 <tr>
 <td>
-<code>scripts2</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
-[]ComponentFileTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
-These scripts can be executed during container startup or via specific actions.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
@@ -1356,8 +1340,8 @@ It allows you to specify multiple log types and their respective file paths for 
 <td>
 <code>scripts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
@@ -1365,11 +1349,6 @@ It allows you to specify multiple log types and their respective file paths for 
 <em>(Optional)</em>
 <p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
 These scripts can be executed during container startup or via specific actions.</p>
-<p>Each script group is encapsulated in a ComponentTemplateSpec that includes:</p>
-<ul>
-<li>The ConfigMap containing the scripts.</li>
-<li>The mount point where the scripts will be mounted inside the container.</li>
-</ul>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -5175,22 +5154,6 @@ Each template is represented as a ConfigMap and may contain multiple config file
 </tr>
 <tr>
 <td>
-<code>scripts2</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
-[]ComponentFileTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
-These scripts can be executed during container startup or via specific actions.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
@@ -5242,8 +5205,8 @@ It allows you to specify multiple log types and their respective file paths for 
 <td>
 <code>scripts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
@@ -5251,11 +5214,6 @@ It allows you to specify multiple log types and their respective file paths for 
 <em>(Optional)</em>
 <p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
 These scripts can be executed during container startup or via specific actions.</p>
-<p>Each script group is encapsulated in a ComponentTemplateSpec that includes:</p>
-<ul>
-<li>The ConfigMap containing the scripts.</li>
-<li>The mount point where the scripts will be mounted inside the container.</li>
-</ul>
 <p>This field is immutable.</p>
 </td>
 </tr>

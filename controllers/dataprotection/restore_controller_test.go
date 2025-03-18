@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	testclocks "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -88,9 +87,6 @@ var _ = Describe("Restore Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StorageClassSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
-
-		// reset the fake clock
-		fakeClock = testclocks.NewFakeClock(time.Now())
 	}
 
 	ensureNamespace := func(name string) {
@@ -738,9 +734,9 @@ func mockBackupForRestore(
 				Start: &metav1.Time{},
 				End:   &metav1.Time{},
 			}
-			fakeClock.Step(time.Hour)
+			fakeClock.Step(time.Minute)
 			backup.Status.TimeRange.Start.Time = fakeClock.Now()
-			fakeClock.Step(time.Hour)
+			fakeClock.Step(time.Minute)
 			backup.Status.TimeRange.End.Time = fakeClock.Now()
 		})).Should(Succeed())
 	}

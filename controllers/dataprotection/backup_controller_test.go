@@ -34,7 +34,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	testclocks "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -85,9 +84,6 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
-
-		// reset the fake clock
-		fakeClock = testclocks.NewFakeClock(time.Now())
 	}
 
 	var clusterInfo *testdp.BackupClusterInfo
@@ -223,10 +219,12 @@ var _ = Describe("Backup Controller test", func() {
 		})
 
 		Context("creates a backup with retentionPeriod", func() {
+			const defaultRetentionPeriod = "7d"
+
 			It("create a valid backup", func() {
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
-					backup.Spec.RetentionPeriod = "1h"
+					backup.Spec.RetentionPeriod = defaultRetentionPeriod
 				})
 				backupKey := client.ObjectKeyFromObject(backup)
 
@@ -257,7 +255,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("creating a backup using a not found backupPolicy")
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
 					backup.Spec.BackupPolicyName = "not-found"
-					backup.Spec.RetentionPeriod = "1h"
+					backup.Spec.RetentionPeriod = defaultRetentionPeriod
 				})
 				backupKey := client.ObjectKeyFromObject(backup)
 
@@ -313,7 +311,7 @@ var _ = Describe("Backup Controller test", func() {
 				Expect(targets).Should(HaveLen(2))
 				By("create a backup")
 				backup := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
-					backup.Spec.RetentionPeriod = "1h"
+					backup.Spec.RetentionPeriod = defaultRetentionPeriod
 				})
 				getJobKey := func(index int) client.ObjectKey {
 					return client.ObjectKey{

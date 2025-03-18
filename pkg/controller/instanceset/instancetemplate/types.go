@@ -19,16 +19,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package instancetemplate
 
-import workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+)
 
 const (
-	templateRefDataKey       = "instances"
-	templateRefAnnotationKey = "kubeblocks.io/template-ref"
+	// used to specify the configmap which stores the compressed instance template
+	TemplateRefAnnotationKey = "kubeblocks.io/template-ref"
+	TemplateRefDataKey       = "instances"
 
 	TemplateNameLabelKey = "workloads.kubeblocks.io/template-name"
 )
 
-type instanceSetExt struct {
-	its               *workloads.InstanceSet
-	instanceTemplates []*workloads.InstanceTemplate
+type InstanceSetExt struct {
+	InstanceSet       *workloads.InstanceSet
+	InstanceTemplates map[string]*workloads.InstanceTemplate // key is template name
+}
+
+// InstanceTemplateExt merges the default podSpec with overrides in the template
+type InstanceTemplateExt struct {
+	Name     string
+	Replicas int32
+	corev1.PodTemplateSpec
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }

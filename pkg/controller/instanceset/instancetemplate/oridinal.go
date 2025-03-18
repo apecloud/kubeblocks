@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // ConvertOrdinalsToSet assumes oridnals are valid
@@ -55,7 +56,7 @@ func convertOrdinalSetToSortedList(ordinalSet sets.Set[int32]) []int32 {
 	return sortedOrdinalList
 }
 
-func getOrdinal(podName string) (int32, error) {
+func GetOrdinal(podName string) (int32, error) {
 	index := strings.LastIndex(podName, "-")
 	if index < 0 {
 		return -1, fmt.Errorf("failed to get ordinal from pod %v", podName)
@@ -66,4 +67,8 @@ func getOrdinal(podName string) (int32, error) {
 		return -1, err
 	}
 	return int32(ordinal), nil
+}
+
+func GetInstanceName(its *workloads.InstanceSet, ordinal int32) string {
+	return fmt.Sprintf("%v-%v", its.Name, ordinal)
 }

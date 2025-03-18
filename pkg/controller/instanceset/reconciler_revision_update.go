@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -53,39 +56,34 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := buildInstanceSetExt(its, tree)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 
 	// 1. build all templates by applying instance template overrides to default pod template
-	instanceTemplateList := buildInstanceTemplateExts(itsExt)
+	instanceTemplateList, err := instancetemplate.BuildInstanceTemplateExts(itsExt)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 
-	// build instance revision list from instance templates
+	template2OrdinalSetMap, err := instancetemplate.GenerateTemplateName2OrdinalMap(itsExt)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	// 2. build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
 	for _, template := range instanceTemplateList {
-		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its, template.Name)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		instanceNames, err := GenerateInstanceNamesFromTemplate(its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
+		ordinalSet := template2OrdinalSetMap[template.Name]
 		revision, err := BuildInstanceTemplateRevision(&template.PodTemplateSpec, its)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		for _, name := range instanceNames {
-			instanceRevisionList = append(instanceRevisionList, instanceRevision{name: name, revision: revision})
+		for ordinal := range ordinalSet {
+			instanceName := fmt.Sprintf("%v-%v", its.Name, ordinal)
+			instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
 		}
-	}
-	// validate duplicate pod names
-	getNameFunc := func(r instanceRevision) string {
-		return r.name
-	}
-	if err := ValidateDupInstanceNames(instanceRevisionList, getNameFunc); err != nil {
-		return kubebuilderx.Continue, err
 	}
 
 	updatedRevisions := make(map[string]string, len(instanceRevisionList))

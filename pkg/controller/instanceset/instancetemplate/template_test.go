@@ -4,19 +4,26 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-var _ = Describe("GenerateAllInstanceNames", func() {
+var _ = Describe("Template tests", func() {
 	DescribeTable("generates instance ordinals",
 		func(its *workloads.InstanceSet, expected map[string]sets.Set[int32], expectError bool) {
 			Expect(validateOrdinals(its.Spec.Instances)).To(Succeed())
-			ordinals, err := GenerateTemplateName2OrdinalMap(its)
+			tree := kubebuilderx.NewObjectTree()
+			itsExt, err := BuildInstanceSetExt(its, tree)
+			Expect(err).NotTo(HaveOccurred())
+			ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
 			if expectError {
 				Expect(err).To(HaveOccurred())
 			} else {
@@ -200,8 +207,78 @@ var _ = Describe("GenerateAllInstanceNames", func() {
 			},
 		}
 
-		names, err := GenerateAllInstanceNames(its)
+		tree := kubebuilderx.NewObjectTree()
+		itsExt, err := BuildInstanceSetExt(its, tree)
+		Expect(err).NotTo(HaveOccurred())
+		names, err := GenerateAllInstanceNames(itsExt)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(names).To(Equal([]string{"foo-0", "foo-1", "foo-2", "foo-3", "foo-4"}))
+	})
+
+	Context("buildInstanceName2TemplateMap", func() {
+		var its *workloads.InstanceSet
+		BeforeEach(func() {
+			its = builder.NewInstanceSetBuilder(namespace, name).
+				SetReplicas(3).
+				SetTemplate(template).
+				SetVolumeClaimTemplates(volumeClaimTemplates...).
+				GetObject()
+		})
+
+		It("build an its with default template only", func() {
+			itsExt, err := BuildInstanceSetExt(its, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := BuildInstanceName2TemplateMap(itsExt)
+			Expect(err).Should(BeNil())
+			Expect(nameTemplate).Should(HaveLen(3))
+			name0 := its.Name + "-0"
+			Expect(nameTemplate).Should(HaveKey(name0))
+			Expect(nameTemplate).Should(HaveKey(its.Name + "-1"))
+			Expect(nameTemplate).Should(HaveKey(its.Name + "-2"))
+			nameTemplate[name0].PodTemplateSpec.Spec.Volumes = nil
+			defaultTemplate := its.Spec.Template.DeepCopy()
+			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(defaultTemplate.Spec))
+		})
+
+		It("build an its with one instance template override", func() {
+			nameOverride := "name-override"
+			annotationOverride := map[string]string{
+				"foo": "bar",
+			}
+			labelOverride := map[string]string{
+				"foo": "bar",
+			}
+			resources := corev1.ResourceRequirements{
+				Limits: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU: resource.MustParse("600m"),
+				},
+			}
+			instance := workloads.InstanceTemplate{
+				Name:        nameOverride,
+				Annotations: annotationOverride,
+				Labels:      labelOverride,
+				Resources:   &resources,
+			}
+			its.Spec.Instances = append(its.Spec.Instances, instance)
+			itsExt, err := BuildInstanceSetExt(its, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := BuildInstanceName2TemplateMap(itsExt)
+			Expect(err).Should(BeNil())
+			Expect(nameTemplate).Should(HaveLen(3))
+			name0 := its.Name + "-0"
+			name1 := its.Name + "-1"
+			nameOverridePodName := its.Name + "-2"
+			Expect(nameTemplate).Should(HaveKey(name0))
+			Expect(nameTemplate).Should(HaveKey(name1))
+			Expect(nameTemplate).Should(HaveKey(nameOverridePodName))
+			expectedTemplate := its.Spec.Template.DeepCopy()
+			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
+			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
+			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
+			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Annotations).Should(Equal(annotationOverride))
+			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Labels).Should(Equal(labelOverride))
+			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resources.Limits[corev1.ResourceCPU]))
+			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(its.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]))
+		})
 	})
 })

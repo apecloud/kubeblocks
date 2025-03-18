@@ -21,12 +21,15 @@ package instancetemplate
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -45,22 +48,57 @@ func init() {
 	runtime.Must(err)
 }
 
+func BuildInstanceName2TemplateMap(itsExt *InstanceSetExt) (map[string]*InstanceTemplateExt, error) {
+	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(itsExt)
+	if err != nil {
+		return nil, err
+	}
+
+	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
+	instanceTemplatesMap := itsExt.InstanceTemplates
+	for templateName, ordinalSet := range template2OrdinalSetMap {
+		tpl := instanceTemplatesMap[templateName]
+		tplExt := buildInstanceTemplateExt(tpl, itsExt.InstanceSet)
+		for ordinal := range ordinalSet {
+			instanceName := fmt.Sprintf("%v-%v", itsExt.InstanceSet.Name, ordinal)
+			allNameTemplateMap[instanceName] = tplExt
+		}
+	}
+
+	return allNameTemplateMap, nil
+}
+
+func BuildInstanceTemplateExts(itsExt *InstanceSetExt) ([]*InstanceTemplateExt, error) {
+	instanceTemplatesMap := itsExt.InstanceTemplates
+	templates := make([]*InstanceTemplateExt, 0, len(instanceTemplatesMap))
+	for templateName := range instanceTemplatesMap {
+		tpl := instanceTemplatesMap[templateName]
+		tplExt := buildInstanceTemplateExt(tpl, itsExt.InstanceSet)
+		templates = append(templates, tplExt)
+	}
+
+	return templates, nil
+}
+
 // GenerateTemplateName2OrdinalMap returns a map from template name to sorted ordinals
 // it rely on the instanceset's status to generate desired pod names
 // it may not be updated, but it should converge eventually
 //
 // template ordianls are assumed to be valid at this time
-func GenerateTemplateName2OrdinalMap(its *workloads.InstanceSet) (map[string]sets.Set[int32], error) {
+func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
 	allOrdinalSet := sets.New[int32]()
 	template2OrdinalSetMap := map[string]sets.Set[int32]{}
 	ordinalToTemplateMap := map[int32]string{}
-	// FIXME: take compressed templates into account
-	instanceTemplateList := buildInstanceTemplates(its, nil)
-
-	for _, t := range instanceTemplateList {
-		template2OrdinalSetMap[t.Name] = sets.New[int32]()
+	instanceTemplatesList := make([]*workloads.InstanceTemplate, 0, len(itsExt.InstanceTemplates))
+	for _, instanceTemplate := range itsExt.InstanceTemplates {
+		instanceTemplatesList = append(instanceTemplatesList, instanceTemplate)
+		template2OrdinalSetMap[instanceTemplate.Name] = sets.New[int32]()
 	}
-	for templateName, ordinals := range its.Status.CurrentInstances {
+	slices.SortFunc(instanceTemplatesList, func(a, b *workloads.InstanceTemplate) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	for templateName, ordinals := range itsExt.InstanceSet.Status.CurrentInstances {
 		template2OrdinalSetMap[templateName].Insert(ordinals...)
 		for _, ordinal := range ordinals {
 			allOrdinalSet.Insert(ordinal)
@@ -69,7 +107,7 @@ func GenerateTemplateName2OrdinalMap(its *workloads.InstanceSet) (map[string]set
 	}
 
 	// 1. handle those who have ordinals specified
-	for _, instanceTemplate := range instanceTemplateList {
+	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinalSet := template2OrdinalSetMap[instanceTemplate.Name]
 		desiredOrdinalSet := ConvertOrdinalsToSet(instanceTemplate.Ordinals)
 		if len(desiredOrdinalSet) == 0 {
@@ -92,15 +130,15 @@ func GenerateTemplateName2OrdinalMap(its *workloads.InstanceSet) (map[string]set
 	}
 
 	offlineOrdinals := sets.New[int32]()
-	for _, instance := range its.Spec.OfflineInstances {
-		ordinal, err := getOrdinal(instance)
+	for _, instance := range itsExt.InstanceSet.Spec.OfflineInstances {
+		ordinal, err := GetOrdinal(instance)
 		if err != nil {
 			return nil, err
 		}
 		offlineOrdinals.Insert(ordinal)
 	}
 	// 2. handle those who have decreased replicas
-	for _, instanceTemplate := range instanceTemplateList {
+	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinals := template2OrdinalSetMap[instanceTemplate.Name]
 		if toOffline := currentOrdinals.Intersection(offlineOrdinals); toOffline.Len() > 0 {
 			for ordinal := range toOffline {
@@ -108,6 +146,7 @@ func GenerateTemplateName2OrdinalMap(its *workloads.InstanceSet) (map[string]set
 				template2OrdinalSetMap[instanceTemplate.Name].Delete(ordinal)
 			}
 		}
+		// replicas must be non-nil
 		if int(*instanceTemplate.Replicas) < len(currentOrdinals) {
 			// delete in the name set from high to low
 			l := convertOrdinalSetToSortedList(currentOrdinals)
@@ -120,7 +159,7 @@ func GenerateTemplateName2OrdinalMap(its *workloads.InstanceSet) (map[string]set
 
 	// 3. handle those who have increased replicas
 	var cur int32 = 0
-	for _, instanceTemplate := range instanceTemplateList {
+	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinals := template2OrdinalSetMap[instanceTemplate.Name]
 		if int(*instanceTemplate.Replicas) > len(currentOrdinals) {
 			for i := len(currentOrdinals); i < int(*instanceTemplate.Replicas); i++ {
@@ -140,8 +179,8 @@ func GenerateTemplateName2OrdinalMap(its *workloads.InstanceSet) (map[string]set
 	return template2OrdinalSetMap, nil
 }
 
-func GenerateAllInstanceNames(its *workloads.InstanceSet) ([]string, error) {
-	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(its)
+func GenerateAllInstanceNames(itsExt *InstanceSetExt) ([]string, error) {
+	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(itsExt)
 	if err != nil {
 		return nil, err
 	}
@@ -152,27 +191,37 @@ func GenerateAllInstanceNames(its *workloads.InstanceSet) ([]string, error) {
 	instanceNames := make([]string, 0, len(allOrdinalSet))
 	allOrdinalList := convertOrdinalSetToSortedList(allOrdinalSet)
 	for _, ordinal := range allOrdinalList {
-		instanceNames = append(instanceNames, fmt.Sprintf("%v-%v", its.Name, ordinal))
+		instanceNames = append(instanceNames, fmt.Sprintf("%v-%v", itsExt.InstanceSet.Name, ordinal))
 	}
 	return instanceNames, nil
+}
+
+func buildInstanceTemplatesMap(its *workloads.InstanceSet, instancesCompressed *corev1.ConfigMap) map[string]*workloads.InstanceTemplate {
+	rtn := make(map[string]*workloads.InstanceTemplate)
+	l := BuildInstanceTemplates(its, instancesCompressed)
+	for _, t := range l {
+		rtn[t.Name] = t
+	}
+	return rtn
 }
 
 // build a complate instance template list.
 // That is to append a pseudo template (which equals to `.spec.template`)
 // to the end of the list, to fill up the replica count.
 // And also if there is any compressed template, add them too.
-func buildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
+//
+// It is not guaranteed that the returned list is sorted.
+func BuildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
 	var instanceTemplateList []*workloads.InstanceTemplate
 	var replicasInTemplates int32
 	instanceTemplates := getInstanceTemplates(its.Spec.Instances, instancesCompressed)
 	for i := range instanceTemplates {
 		instance := &instanceTemplates[i]
-		replicas := int32(1)
-		if instance.Replicas != nil {
-			replicas = *instance.Replicas
+		if instance.Replicas == nil {
+			instance.Replicas = ptr.To[int32](1)
 		}
 		instanceTemplateList = append(instanceTemplateList, instance)
-		replicasInTemplates += replicas
+		replicasInTemplates += *instance.Replicas
 	}
 	totalReplicas := *its.Spec.Replicas
 	if replicasInTemplates < totalReplicas {
@@ -187,29 +236,29 @@ func buildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *cor
 	return instanceTemplateList
 }
 
-func buildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*instanceSetExt, error) {
+func BuildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*InstanceSetExt, error) {
 	instancesCompressed, err := findTemplateObject(its, tree)
 	if err != nil {
 		return nil, err
 	}
 
-	instanceTemplateList := buildInstanceTemplates(its, instancesCompressed)
+	instanceTemplateMap := buildInstanceTemplatesMap(its, instancesCompressed)
 
-	return &instanceSetExt{
-		its:               its,
-		instanceTemplates: instanceTemplateList,
+	return &InstanceSetExt{
+		InstanceSet:       its,
+		InstanceTemplates: instanceTemplateMap,
 	}, nil
 }
 
-// PodsToCurrentInstances returns instanceset's .status.currentInstances
-func PodsToCurrentInstances(pods []corev1.Pod, its *workloads.InstanceSet) (workloads.CurrentInstances, error) {
+// PodsToCurrentInstances coverts pods to instanceset's .status.currentInstances
+func PodsToCurrentInstances(pods []*corev1.Pod, its *workloads.InstanceSet) (workloads.CurrentInstances, error) {
 	currentInstances := make(workloads.CurrentInstances)
 	for _, pod := range pods {
 		templateName, ok := pod.Labels[TemplateNameLabelKey]
 		if !ok {
-			return nil, fmt.Errorf("unknown pod %v", klog.KObj(&pod))
+			return nil, fmt.Errorf("unknown pod %v", klog.KObj(pod))
 		}
-		ordinal, err := getOrdinal(pod.Name)
+		ordinal, err := GetOrdinal(pod.Name)
 		if err != nil {
 			return nil, err
 		}

@@ -267,6 +267,7 @@ type InstanceSetStatus struct {
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
+	// FIXME: unify with InstanceStatus?
 	CurrentInstances CurrentInstances `json:"currentInstances,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.

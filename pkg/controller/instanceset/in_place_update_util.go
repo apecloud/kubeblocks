@@ -30,6 +30,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -294,23 +295,21 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return RecreatePolicy, nil
 	}
 
-	itsExt, err := buildInstanceSetExt(its, nil)
+	// FIXME: compressed templates
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	templateList := buildInstanceTemplateExts(itsExt)
-	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
-	templateName, _ := strings.CutPrefix(parentName, its.Name)
-	if len(templateName) > 0 {
-		templateName, _ = strings.CutPrefix(templateName, "-")
+	instance2TemplateMap, err := instancetemplate.BuildInstanceName2TemplateMap(itsExt)
+	if err != nil {
+		return NoOpsPolicy, err
 	}
-	index := slices.IndexFunc(templateList, func(templateExt *instanceTemplateExt) bool {
-		return templateName == templateExt.Name
-	})
-	if index < 0 {
+	template, ok := instance2TemplateMap[pod.Name]
+	if !ok {
 		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", pod.Name)
 	}
-	inst, err := buildInstanceByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
+
+	inst, err := buildInstanceByTemplate(pod.Name, template, its, getPodRevision(pod))
 	if err != nil {
 		return NoOpsPolicy, err
 	}

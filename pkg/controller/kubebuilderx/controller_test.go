@@ -135,7 +135,7 @@ type dummyReconciler struct {
 
 func (d *dummyReconciler) PreCondition(tree *ObjectTree) *CheckResult {
 	if d.preErr != nil {
-		return CheckResultWithError(d.preErr)
+		return ConditionUnsatisfiedWithError(d.preErr)
 	}
 	if d.unsatisfied {
 		return ConditionUnsatisfied

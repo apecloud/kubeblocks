@@ -313,7 +313,6 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	}
 	if len(r.restoreLabels) == 0 {
 		r.restoreLabels = constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name)
-		intctrlutil.MergeMetadataMapInplace(comp.Labels, &r.restoreLabels)
 	}
 	return metav1.ObjectMeta{
 		Name:      name,

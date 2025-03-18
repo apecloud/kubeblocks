@@ -99,7 +99,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ComponentServices:                compDefObj.Spec.Services,
 		LogConfigs:                       compDefObj.Spec.LogConfigs,
 		ConfigTemplates:                  compDefObj.Spec.Configs,
-		ScriptTemplates:                  compDefObj.Spec.Scripts,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
@@ -132,7 +131,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
-	if err = mergeUserDefinedVolumes(synthesizeComp, comp); err != nil {
+	if err = mergeUserDefinedVolumes(synthesizeComp, compDef, comp); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +141,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	overrideComponentServices(synthesizeComp, comp)
 
 	buildFileTemplates(synthesizeComp, compDef, comp)
-
 	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
@@ -153,7 +151,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
 
-	if err = buildSidecars(ctx, cli, comp, synthesizeComp); err != nil {
+	if err = buildSidecars(ctx, cli, synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -277,7 +275,7 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	}
 }
 
-func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
+func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) error {
 	if comp == nil {
 		return nil
 	}
@@ -297,20 +295,20 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 		volumes[vct.Name] = true
 	}
 
-	checkConfigNScriptTemplate := func(tpl appsv1.ComponentTemplateSpec) error {
-		if volumes[tpl.VolumeName] {
-			return fmt.Errorf("duplicated volume %s for template %s", tpl.VolumeName, tpl.Name)
+	checkConfigNScriptTemplate := func(name, volumeName string) error {
+		if volumes[volumeName] {
+			return fmt.Errorf("duplicated volume %s for template %s", volumeName, name)
 		}
-		volumes[tpl.VolumeName] = true
+		volumes[volumeName] = true
 		return nil
 	}
 	for _, tpl := range synthesizedComp.ConfigTemplates {
-		if err := checkConfigNScriptTemplate(tpl); err != nil {
+		if err := checkConfigNScriptTemplate(tpl.Name, tpl.VolumeName); err != nil {
 			return err
 		}
 	}
-	for _, tpl := range synthesizedComp.ScriptTemplates {
-		if err := checkConfigNScriptTemplate(tpl); err != nil {
+	for _, tpl := range compDef.Spec.Scripts {
+		if err := checkConfigNScriptTemplate(tpl.Name, tpl.VolumeName); err != nil {
 			return err
 		}
 	}
@@ -428,6 +426,17 @@ func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
 }
 
 func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) {
+	templates := make([]SynthesizedFileTemplate, 0)
+	for _, tpl := range compDef.Spec.Configs2 {
+		templates = append(templates, synthesizeFileTemplate(comp, tpl, true))
+	}
+	for _, tpl := range compDef.Spec.Scripts {
+		templates = append(templates, synthesizeFileTemplate(comp, tpl, false))
+	}
+	synthesizedComp.FileTemplates = templates
+}
+
+func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
 	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
 		tpl.Variables = utpl.Variables
 		if utpl.ConfigMap != nil {
@@ -447,28 +456,17 @@ func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.C
 		return tpl
 	}
 
-	synthesize := func(tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
-		stpl := SynthesizedFileTemplate{
-			ComponentFileTemplate: tpl,
-		}
-		if config {
-			for _, utpl := range comp.Spec.Configs {
-				if utpl.Name != nil && *utpl.Name == tpl.Name {
-					return merge(stpl, utpl)
-				}
+	stpl := SynthesizedFileTemplate{
+		ComponentFileTemplate: tpl,
+	}
+	if config {
+		for _, utpl := range comp.Spec.Configs {
+			if utpl.Name != nil && *utpl.Name == tpl.Name {
+				return merge(stpl, utpl)
 			}
 		}
-		return stpl
 	}
-
-	templates := make([]SynthesizedFileTemplate, 0)
-	for _, tpl := range compDef.Spec.Configs2 {
-		templates = append(templates, synthesize(tpl, true))
-	}
-	for _, tpl := range compDef.Spec.Scripts2 {
-		templates = append(templates, synthesize(tpl, false))
-	}
-	synthesizedComp.FileTemplates = templates
+	return stpl
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.

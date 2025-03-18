@@ -2633,7 +2633,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 <p>ClusterComponentConfig represents a configuration for a component.</p>
@@ -8060,20 +8060,6 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 <em>(Optional)</em>
 <p>Defines Env to override.
 Add new or override existing envs.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configs</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">
-[]ClusterComponentConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the configuration content of a config template.</p>
 </td>
 </tr>
 </tbody>
@@ -29632,7 +29618,7 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 </div>
@@ -30476,20 +30462,6 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 <em>(Optional)</em>
 <p>Defines Env to override.
 Add new or override existing envs.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>configs</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
-[]ConfigTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Describe the configs to be reconfigured.</p>
 </td>
 </tr>
 </tbody>

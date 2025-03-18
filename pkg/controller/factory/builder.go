@@ -144,7 +144,7 @@ func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.Ins
 	}
 	instanceTemplates := make([]workloads.InstanceTemplate, 0, len(instances))
 	for i := range instances {
-		instanceTemplates = append(instanceTemplates, workloads.InstanceTemplate{
+		instanceTemplates[i] = workloads.InstanceTemplate{
 			Name:             instances[i].Name,
 			Replicas:         instances[i].Replicas,
 			Ordinals:         instances[i].Ordinals,
@@ -153,8 +153,7 @@ func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.Ins
 			SchedulingPolicy: instances[i].SchedulingPolicy,
 			Resources:        instances[i].Resources,
 			Env:              instances[i].Env,
-			Configs:          nil,
-		})
+		}
 	}
 	return instanceTemplates
 }

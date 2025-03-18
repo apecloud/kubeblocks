@@ -399,11 +399,6 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Describe the configs to be reconfigured.
-	//
-	// +optional
-	Configs []ConfigTemplate `json:"configs,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {

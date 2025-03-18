@@ -120,7 +120,7 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	// check if the cluster is running
 	if cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
 		return appsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if cluster.Status.Phase == appsv1alpha1.FailedClusterPhase {
+	} else if cluster.Status.Phase == appsv1alpha1.FailedClusterPhase || cluster.IsDeleting() {
 		return appsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
 	return appsv1alpha1.OpsRunningPhase, 0, nil

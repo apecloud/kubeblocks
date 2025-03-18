@@ -257,6 +257,9 @@ func (t *clusterNormalizationTransformer) resolveShardingNCompDefinition(transCt
 		if err != nil {
 			return nil, nil, "", err
 		}
+		if len(sharding.Template.ComponentDef) == 0 {
+			sharding.Template.ComponentDef = shardingDef.Spec.Template.CompDef
+		}
 	}
 
 	spec := sharding.Template

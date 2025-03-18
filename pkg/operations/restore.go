@@ -121,6 +121,9 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
+	if cluster.IsDeleting() {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
 	opsRes.Cluster = cluster
 	// check if the cluster is running
 	if cluster.Status.Phase == appsv1.RunningClusterPhase {

@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"fmt"
+	"log"
 	"slices"
 	"strconv"
 	"time"
@@ -321,6 +322,8 @@ var _ = Describe("Backup Controller test", func() {
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(0), batchv1.JobComplete)
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(1), batchv1.JobComplete)
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					log.Printf("backup creation time: %v", fetched.CreationTimestamp.UTC())
+					log.Printf("expiration time: %v", fetched.Status.Expiration.UTC())
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
 					g.Expect(fetched.Status.CompletionTimestamp).ShouldNot(BeNil())
 					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))

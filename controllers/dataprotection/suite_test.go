@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"go/build"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -242,6 +243,7 @@ var _ = AfterSuite(func() {
 
 func mockGCReconciler(mgr ctrl.Manager) *GCReconciler {
 	fakeClock = testclocks.NewFakeClock(time.Now())
+	log.Printf("now time of fakeClock: %v", time.Now().UTC())
 	return &GCReconciler{
 		Client:    mgr.GetClient(),
 		Recorder:  mgr.GetEventRecorderFor("gc-controller"),

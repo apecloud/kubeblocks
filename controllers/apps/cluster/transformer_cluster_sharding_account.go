@@ -59,12 +59,12 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
-	for i, sharding := range transCtx.shardings {
+	for _, sharding := range transCtx.shardings {
 		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
 				if account.Shared != nil && *account.Shared {
-					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, transCtx.shardings[i], account.Name); err != nil {
+					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, sharding, account.Name); err != nil {
 						return err
 					}
 				}
@@ -90,7 +90,7 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 
 	// TODO: update
 
-	t.rewriteSystemAccount(transCtx, sharding, accountName)
+	t.rewriteSystemAccount(transCtx, sharding.Name, accountName)
 
 	return nil
 }
@@ -198,35 +198,50 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 	return secret, nil
 }
 
-func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, accountName string) {
+func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext, shardingName, accountName string) {
 	var (
 		cluster = transCtx.Cluster
 	)
 	newAccount := appsv1.ComponentSystemAccount{
 		Name: accountName,
 		SecretRef: &appsv1.ProvisionSecretRef{
-			Name:      shardingAccountSecretName(cluster.Name, sharding.Name, accountName),
+			Name:      shardingAccountSecretName(cluster.Name, shardingName, accountName),
 			Namespace: cluster.Namespace,
 		},
 	}
-	for i, account := range sharding.Template.SystemAccounts {
-		if account.Name == accountName {
-			newAccount.Disabled = account.Disabled
-			sharding.Template.SystemAccounts[i] = newAccount
-			return
-		}
-	}
-	sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{newAccount}
 
-	comps := transCtx.shardingComps[sharding.Name]
-	for i := range comps {
-		if comps[i].SystemAccounts == nil {
-			comps[i].SystemAccounts = []appsv1.ComponentSystemAccount{}
+	// update sharding
+	for i, sharding := range transCtx.shardings {
+		if sharding.Name == shardingName {
+			exist := false
+			for j, account := range sharding.Template.SystemAccounts {
+				if account.Name == accountName {
+					newAccount.Disabled = account.Disabled
+					transCtx.shardings[i].Template.SystemAccounts[j] = newAccount
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				if sharding.Template.SystemAccounts == nil {
+					transCtx.shardings[i].Template.SystemAccounts = []appsv1.ComponentSystemAccount{}
+				}
+				transCtx.shardings[i].Template.SystemAccounts =
+					append(transCtx.shardings[i].Template.SystemAccounts, newAccount)
+			}
+			break
 		}
-		comps[i].SystemAccounts = append(comps[i].SystemAccounts, newAccount)
 	}
-	transCtx.shardingComps[sharding.Name] = comps
+
+	// update sharding components
+	shardingComps := transCtx.shardingComps[shardingName]
+	for i := range shardingComps {
+		if shardingComps[i].SystemAccounts == nil {
+			shardingComps[i].SystemAccounts = []appsv1.ComponentSystemAccount{}
+		}
+		shardingComps[i].SystemAccounts = append(shardingComps[i].SystemAccounts, newAccount)
+	}
+	transCtx.shardingComps[shardingName] = shardingComps
 }
 
 func shardingAccountSecretName(cluster, sharding, account string) string {

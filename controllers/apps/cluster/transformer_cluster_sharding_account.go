@@ -59,12 +59,12 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
-	for _, sharding := range transCtx.shardings {
+	for i, sharding := range transCtx.shardings {
 		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
 				if account.Shared != nil && *account.Shared {
-					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, sharding, account.Name); err != nil {
+					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, transCtx.shardings[i], account.Name); err != nil {
 						return err
 					}
 				}
@@ -218,6 +218,15 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		}
 	}
 	sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{newAccount}
+
+	comps := transCtx.shardingComps[sharding.Name]
+	for i := range comps {
+		if comps[i].SystemAccounts == nil {
+			comps[i].SystemAccounts = []appsv1.ComponentSystemAccount{}
+		}
+		comps[i].SystemAccounts = append(comps[i].SystemAccounts, newAccount)
+	}
+	transCtx.shardingComps[sharding.Name] = comps
 }
 
 func shardingAccountSecretName(cluster, sharding, account string) string {

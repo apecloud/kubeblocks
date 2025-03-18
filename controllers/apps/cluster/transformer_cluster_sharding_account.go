@@ -118,7 +118,10 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	if err != nil {
 		return nil, err
 	}
-	password := t.buildPassword(transCtx, account, sharding.Name)
+	password, err := t.buildPassword(transCtx, account, sharding.Name)
+	if err != nil {
+		return nil, err
+	}
 	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 }
 
@@ -154,12 +157,15 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 	return appsv1.SystemAccount{}, fmt.Errorf("system account %s not found in component definition %s", accountName, compDef.Name)
 }
 
-func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) []byte {
-	password := []byte(appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name))
+func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) ([]byte, error) {
+	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation", account.Name, shardingName)
+	}
 	if len(password) == 0 {
 		password = t.generatePassword(account)
 	}
-	return password
+	return password, nil
 }
 
 func (t *clusterShardingAccountTransformer) generatePassword(account appsv1.SystemAccount) []byte {

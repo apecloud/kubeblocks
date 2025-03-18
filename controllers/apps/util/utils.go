@@ -22,6 +22,7 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -133,38 +134,41 @@ func GetRestoreSystemAccountPassword(
 	annotations map[string]string,
 	componentName,
 	accountName string,
-) string {
+) ([]byte, error) {
 	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
-		return ""
+		return nil, nil
 	}
 	backupMap := map[string]map[string]string{}
 	err := json.Unmarshal([]byte(valueString), &backupMap)
 	if err != nil {
-		return ""
+		return nil, err
 	}
 	backupSource, ok := backupMap[componentName]
 	if !ok {
-		return ""
+		return nil, nil
 	}
 	name, ok := backupSource[constant.BackupNameKeyForRestore]
-	namespace, ok2 := backupSource[constant.BackupNamespaceKeyForRestore]
-	if !ok || !ok2 || len(name) == 0 || len(namespace) == 0 {
-		return ""
+	if !ok || len(name) == 0 {
+		return nil, fmt.Errorf("backup name not found in restore annotation")
+	}
+	namespace, ok := backupSource[constant.BackupNamespaceKeyForRestore]
+	if !ok || len(namespace) == 0 {
+		return nil, fmt.Errorf("backup namespace not found in restore annotation")
 	}
 	backup := &dpv1alpha1.Backup{}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Name:      name,
 		Namespace: namespace,
 	}, backup); err != nil {
-		return ""
+		return nil, err
 	}
 	systemAccountsMap := map[string]string{}
 	encryptedSystemAccountsString := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
 	if encryptedSystemAccountsString != "" {
 		encryptedSystemAccountsMap := map[string]map[string]string{}
 		if err = json.Unmarshal([]byte(encryptedSystemAccountsString), &encryptedSystemAccountsMap); err != nil {
-			return ""
+			return nil, err
 		}
 		if val, ok := encryptedSystemAccountsMap[componentName]; ok {
 			systemAccountsMap = val
@@ -174,8 +178,8 @@ func GetRestoreSystemAccountPassword(
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	encryptedPwd, ok := systemAccountsMap[accountName]
 	if !ok {
-		return ""
+		return nil, nil
 	}
-	password, _ := e.Decrypt([]byte(encryptedPwd))
-	return password
+	password, err := e.Decrypt([]byte(encryptedPwd))
+	return []byte(password), err
 }

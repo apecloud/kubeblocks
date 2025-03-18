@@ -97,7 +97,8 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 		backup      *dpv1alpha1.Backup
 		component   string
 		account     string
-		want        string
+		wantPwd     []byte
+		wantErr     bool
 	}{
 		{
 			name: "normal case",
@@ -115,7 +116,8 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			},
 			component: "comp1",
 			account:   "account1",
-			want:      "test-password",
+			wantPwd:   []byte("test-password"),
+			wantErr:   false,
 		},
 		{
 			name: "empty restore annotation",
@@ -125,7 +127,8 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			backup:    &dpv1alpha1.Backup{},
 			component: "comp1",
 			account:   "account1",
-			want:      "",
+			wantPwd:   nil,
+			wantErr:   false,
 		},
 		{
 			name: "invalid restore annotation json",
@@ -135,27 +138,87 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			backup:    &dpv1alpha1.Backup{},
 			component: "comp1",
 			account:   "account1",
-			want:      "",
+			wantPwd:   nil,
+			wantErr:   true,
 		},
 		{
-			name: "component not found in restore annotation",
+			name: "missing backup name in annotation",
 			annotations: map[string]string{
-				constant.RestoreFromBackupAnnotationKey: `{"other-comp":{"name":"backup1","namespace":"default"}}`,
+				constant.RestoreFromBackupAnnotationKey: `{"comp1":{}}`,
 			},
 			backup:    &dpv1alpha1.Backup{},
 			component: "comp1",
 			account:   "account1",
-			want:      "",
+			wantPwd:   nil,
+			wantErr:   true,
 		},
 		{
-			name: "backup not found",
+			name: "missing backup namespace in annotation",
 			annotations: map[string]string{
-				constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"non-existent","namespace":"default"}}`,
+				constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1"}}`,
 			},
-			backup:    nil,
+			backup:    &dpv1alpha1.Backup{},
 			component: "comp1",
 			account:   "account1",
-			want:      "",
+			wantPwd:   nil,
+			wantErr:   true,
+		},
+		{
+			name: "invalid encrypted accounts json in backup",
+			annotations: map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+			},
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						constant.EncryptedSystemAccountsAnnotationKey: "invalid-json",
+					},
+				},
+			},
+			component: "comp1",
+			account:   "account1",
+			wantPwd:   nil,
+			wantErr:   true,
+		},
+		{
+			name: "account not found in backup",
+			annotations: map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+			},
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						constant.EncryptedSystemAccountsAnnotationKey: `{"comp1":{"other-account":"pwd"}}`,
+					},
+				},
+			},
+			component: "comp1",
+			account:   "account1",
+			wantPwd:   nil,
+			wantErr:   false,
+		},
+		{
+			name: "component not found in encrypted accounts",
+			annotations: map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+			},
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						constant.EncryptedSystemAccountsAnnotationKey: `{"other-comp":{"account1":"pwd"}}`,
+					},
+				},
+			},
+			component: "comp1",
+			account:   "account1",
+			wantPwd:   nil,
+			wantErr:   false,
 		},
 	}
 
@@ -163,13 +226,20 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			_ = dpv1alpha1.AddToScheme(scheme)
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects()
+			cli := fake.NewClientBuilder().WithScheme(scheme)
 			if tt.backup != nil {
 				cli = cli.WithObjects(tt.backup)
 			}
-			got := GetRestoreSystemAccountPassword(context.Background(), cli.Build(),
+
+			pwd, err := GetRestoreSystemAccountPassword(context.Background(), cli.Build(),
 				tt.annotations, tt.component, tt.account)
-			assert.Equal(t, tt.want, got)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantPwd, pwd)
+			}
 		})
 	}
 }

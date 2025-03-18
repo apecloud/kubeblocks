@@ -29,27 +29,28 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-func buildSidecars(ctx context.Context, cli client.Reader, comp *appsv1.Component, synthesizedComp *SynthesizedComponent) error {
+func buildSidecars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	for _, sidecar := range comp.Spec.Sidecars {
-		if err := buildSidecar(ctx, cli, sidecar, synthesizedComp); err != nil {
+		if err := buildSidecar(ctx, cli, synthesizedComp, comp, sidecar); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func buildSidecar(ctx context.Context, cli client.Reader, sidecar appsv1.Sidecar, synthesizedComp *SynthesizedComponent) error {
+func buildSidecar(ctx context.Context, cli client.Reader,
+	synthesizedComp *SynthesizedComponent, comp *appsv1.Component, sidecar appsv1.Sidecar) error {
 	sidecarDef, err := getNCheckSidecarDefinition(ctx, cli, sidecar.SidecarDef)
 	if err != nil {
 		return err
 	}
-	for _, builder := range []func(*appsv1.SidecarDefinition, *SynthesizedComponent) error{
+	for _, builder := range []func(*SynthesizedComponent, *appsv1.SidecarDefinition, *appsv1.Component) error{
 		buildSidecarContainers,
 		buildSidecarVars,
 		buildSidecarConfigs,
 		buildSidecarScripts,
 	} {
-		if err := builder(sidecarDef, synthesizedComp); err != nil {
+		if err := builder(synthesizedComp, sidecarDef, comp); err != nil {
 			return err
 		}
 	}
@@ -73,12 +74,12 @@ func getNCheckSidecarDefinition(ctx context.Context, cli client.Reader, name str
 	return sidecarDef, nil
 }
 
-func buildSidecarContainers(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
+func buildSidecarContainers(synthesizedComp *SynthesizedComponent, sidecarDef *appsv1.SidecarDefinition, _ *appsv1.Component) error {
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, sidecarDef.Spec.Containers...)
 	return nil
 }
 
-func buildSidecarVars(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
+func buildSidecarVars(synthesizedComp *SynthesizedComponent, sidecarDef *appsv1.SidecarDefinition, _ *appsv1.Component) error {
 	if sidecarDef.Spec.Vars != nil {
 		if synthesizedComp.SidecarVars == nil {
 			synthesizedComp.SidecarVars = make([]appsv1.EnvVar, 0)
@@ -89,16 +90,16 @@ func buildSidecarVars(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *Syn
 	return nil
 }
 
-func buildSidecarConfigs(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
-	if sidecarDef.Spec.Configs != nil {
-		synthesizedComp.ConfigTemplates = append(synthesizedComp.ConfigTemplates, sidecarDef.Spec.Configs...)
+func buildSidecarConfigs(synthesizedComp *SynthesizedComponent, sidecarDef *appsv1.SidecarDefinition, comp *appsv1.Component) error {
+	for _, tpl := range sidecarDef.Spec.Configs {
+		synthesizedComp.FileTemplates = append(synthesizedComp.FileTemplates, synthesizeFileTemplate(comp, tpl, true))
 	}
 	return nil
 }
 
-func buildSidecarScripts(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
-	if sidecarDef.Spec.Scripts != nil {
-		synthesizedComp.ScriptTemplates = append(synthesizedComp.ScriptTemplates, sidecarDef.Spec.Scripts...)
+func buildSidecarScripts(synthesizedComp *SynthesizedComponent, sidecarDef *appsv1.SidecarDefinition, comp *appsv1.Component) error {
+	for _, tpl := range sidecarDef.Spec.Scripts {
+		synthesizedComp.FileTemplates = append(synthesizedComp.FileTemplates, synthesizeFileTemplate(comp, tpl, false))
 	}
 	return nil
 }

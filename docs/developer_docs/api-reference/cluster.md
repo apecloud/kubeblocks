@@ -2221,8 +2221,8 @@ the component definition of @selectors automatically.</p>
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
@@ -2236,8 +2236,8 @@ the component definition of @selectors automatically.</p>
 <td>
 <code>scripts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
@@ -5573,7 +5573,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -6747,7 +6747,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -11403,8 +11403,8 @@ the component definition of @selectors automatically.</p>
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
@@ -11418,8 +11418,8 @@ the component definition of @selectors automatically.</p>
 <td>
 <code>scripts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>

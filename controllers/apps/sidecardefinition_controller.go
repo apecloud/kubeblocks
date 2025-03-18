@@ -233,11 +233,11 @@ func (r *SidecarDefinitionReconciler) validateConfigNScript(cli client.Client, r
 
 	compDef := &appsv1.ComponentDefinition{
 		Spec: appsv1.ComponentDefinitionSpec{
-			Configs: sidecarDef.Spec.Configs,
-			Scripts: sidecarDef.Spec.Scripts,
+			Configs2: sidecarDef.Spec.Configs,
+			Scripts2: sidecarDef.Spec.Scripts,
 		},
 	}
-	return validateComponentTemplate(cli, rctx, compDef)
+	return validateComponentFileTemplate(cli, rctx, compDef)
 }
 
 func (r *SidecarDefinitionReconciler) validateNResolveOwner(_ client.Client, _ intctrlutil.RequestCtx,
@@ -314,7 +314,7 @@ func (r *SidecarDefinitionReconciler) validateMatchedCompDef(sidecarDef *appsv1.
 	}
 
 	templates := func() error {
-		validate := func(key string, sidecar, comp []appsv1.ComponentTemplateSpec) error {
+		validate := func(key string, sidecar []appsv1.ComponentFileTemplate, comp []appsv1.ComponentTemplateSpec) error {
 			if len(sidecar) == 0 || len(comp) == 0 {
 				return nil
 			}
@@ -329,7 +329,6 @@ func (r *SidecarDefinitionReconciler) validateMatchedCompDef(sidecarDef *appsv1.
 			}
 			return nil
 		}
-
 		if err := validate("config", sidecarDef.Spec.Configs, compDef.Spec.Configs); err != nil {
 			return err
 		}

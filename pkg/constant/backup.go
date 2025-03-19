@@ -28,5 +28,4 @@ const (
 	EnvForRestore                     = "restoreEnv"
 	ParametersForRestore              = "restoreParameters"
 	ConnectionPassword                = "connectionPassword"
-	EncryptedSystemAccounts           = "encryptedSystemAccounts"
 )

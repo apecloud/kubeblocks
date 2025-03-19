@@ -29,10 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -118,7 +118,10 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	if err != nil {
 		return nil, err
 	}
-	password := t.buildPassword(transCtx, account, sharding.Name)
+	password, err := t.buildPassword(transCtx, account, sharding.Name)
+	if err != nil {
+		return nil, err
+	}
 	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 }
 
@@ -154,12 +157,15 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 	return appsv1.SystemAccount{}, fmt.Errorf("system account %s not found in component definition %s", accountName, compDef.Name)
 }
 
-func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) []byte {
-	password := []byte(factory.GetRestoreSystemAccountPassword(transCtx.Cluster.Annotations, shardingName, account.Name))
+func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) ([]byte, error) {
+	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation", account.Name, shardingName)
+	}
 	if len(password) == 0 {
 		password = t.generatePassword(account)
 	}
-	return password
+	return password, nil
 }
 
 func (t *clusterShardingAccountTransformer) generatePassword(account appsv1.SystemAccount) []byte {

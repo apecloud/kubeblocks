@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -27,8 +30,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var RequeueDuration = time.Millisecond * 1000
@@ -120,4 +126,60 @@ func IsOwnedByInstanceSet(obj client.Object) bool {
 		}
 	}
 	return false
+}
+
+func GetRestoreSystemAccountPassword(
+	ctx context.Context,
+	cli client.Reader,
+	annotations map[string]string,
+	componentName,
+	accountName string,
+) ([]byte, error) {
+	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return nil, nil
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return nil, err
+	}
+	backupSource, ok := backupMap[componentName]
+	if !ok {
+		return nil, nil
+	}
+	name, ok := backupSource[constant.BackupNameKeyForRestore]
+	if !ok || len(name) == 0 {
+		return nil, fmt.Errorf("backup name not found in restore annotation")
+	}
+	namespace, ok := backupSource[constant.BackupNamespaceKeyForRestore]
+	if !ok || len(namespace) == 0 {
+		return nil, fmt.Errorf("backup namespace not found in restore annotation")
+	}
+	backup := &dpv1alpha1.Backup{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, backup); err != nil {
+		return nil, err
+	}
+	systemAccountsMap := map[string]string{}
+	encryptedSystemAccountsString := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
+	if encryptedSystemAccountsString != "" {
+		encryptedSystemAccountsMap := map[string]map[string]string{}
+		if err = json.Unmarshal([]byte(encryptedSystemAccountsString), &encryptedSystemAccountsMap); err != nil {
+			return nil, err
+		}
+		if val, ok := encryptedSystemAccountsMap[componentName]; ok {
+			systemAccountsMap = val
+		}
+	}
+
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	encryptedPwd, ok := systemAccountsMap[accountName]
+	if !ok {
+		return nil, nil
+	}
+	password, err := e.Decrypt([]byte(encryptedPwd))
+	return []byte(password), err
 }

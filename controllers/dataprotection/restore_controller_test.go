@@ -617,7 +617,7 @@ var _ = Describe("Restore Controller test", func() {
 				parentBackupName string
 				ancestorBackups  = []*dpv1alpha1.Backup{}
 				cnt              = 0
-				testClock        = testclocks.NewFakeClock(time.Now())
+				testClock        = testclocks.NewFakeClock(time.Now().Add(time.Hour))
 			)
 
 			genIncBackupName := func() string {
@@ -630,6 +630,7 @@ var _ = Describe("Restore Controller test", func() {
 					Start: &metav1.Time{},
 					End:   &metav1.Time{},
 				}
+				// testClock is only used to mock timestamps in ascending order, Step() don't affect the real or logic time of test
 				testClock.Step(time.Minute)
 				backup.Status.TimeRange.Start.Time = testClock.Now()
 				testClock.Step(time.Minute)

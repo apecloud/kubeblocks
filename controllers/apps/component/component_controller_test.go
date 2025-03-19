@@ -1587,7 +1587,7 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testReconfigureVolumes := func(compName, compDefName, fileTemplate string) {
+	testFileTemplateVolumes := func(compName, compDefName, fileTemplate string) {
 		createCompObj(compName, compDefName, nil)
 
 		By("mock a file template object that not defined in the cmpd")
@@ -1603,13 +1603,25 @@ var _ = Describe("Component Controller", func() {
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, cm)).Should(Succeed())
 
+		// trigger the component to reconcile
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the pod volumes")
+		itsKey := compKey
 		fileTemplateCMKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
 		}
-
-		By("check the pod volumes")
-		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			expectVolume := corev1.Volume{
 				Name: fileTemplate,
@@ -1626,7 +1638,10 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 
 		By("check the file template objects")
-		Eventually(testapps.CheckObjExists(&testCtx, fileTemplateCMKey, &corev1.ConfigMap{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug")) // updated
+		})).Should(Succeed())
+		// deleted
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
 	}
 
@@ -2252,7 +2267,7 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 
-	Context("reconfigure file (config/script) template", func() {
+	Context("file (config/script) template", func() {
 		var (
 			fileTemplate = "log-conf"
 		)
@@ -2302,7 +2317,7 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("add/delete volumes", func() {
-			testReconfigureVolumes(defaultCompName, compDefObj.Name, fileTemplate)
+			testFileTemplateVolumes(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
 		It("reconfigure", func() {

@@ -62,11 +62,6 @@ type instanceTemplateExt struct {
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
 }
 
-type instanceSetExt struct {
-	its               *workloads.InstanceSet
-	instanceTemplates []*workloads.InstanceTemplate
-}
-
 var (
 	reader *zstd.Decoder
 	writer *zstd.Encoder
@@ -696,53 +691,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) error {
-	replicasInTemplates := int32(0)
-	itsExt, err := buildInstanceSetExt(its, tree)
-	if err != nil {
-		return err
-	}
-	templateNames := sets.New[string]()
-	for _, template := range itsExt.instanceTemplates {
-		replicas := int32(1)
-		if template.Replicas != nil {
-			replicas = *template.Replicas
-		}
-		replicasInTemplates += replicas
-		if templateNames.Has(template.Name) {
-			err = fmt.Errorf("duplicate instance template name: %s", template.Name)
-			if tree != nil {
-				tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
-			}
-			return err
-		}
-		templateNames.Insert(template.Name)
-	}
-	// sum of spec.templates[*].replicas should not greater than spec.replicas
-	if replicasInTemplates > *its.Spec.Replicas {
-		err = fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
-		if tree != nil {
-			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
-		}
-		return err
-	}
-
-	// try to generate all pod names
-	var instances []InstanceTemplate
-	for i := range its.Spec.Instances {
-		instances = append(instances, &its.Spec.Instances[i])
-	}
-	_, err = GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances, its.Spec.DefaultTemplateOrdinals)
-	if err != nil {
-		if tree != nil {
-			tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
-		}
-		return err
-	}
-
-	return nil
-}
-
 func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
 	podTemplate := filterInPlaceFields(template)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
@@ -819,10 +767,5 @@ func findTemplateObject(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTre
 		template, _ = templateObj.(*corev1.ConfigMap)
 		return template, nil
 	}
-	return nil, nil
-}
-
-func buildInstanceSetExt(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*instanceSetExt, error) {
-	// FIXME: remove this function
 	return nil, nil
 }

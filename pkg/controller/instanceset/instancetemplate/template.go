@@ -205,12 +205,13 @@ func buildInstanceTemplatesMap(its *workloads.InstanceSet, instancesCompressed *
 	return rtn
 }
 
-// build a complate instance template list.
-// That is to append a pseudo template (which equals to `.spec.template`)
+// BuildInstanceTemplates builds a complate instance template list,
+// i.e. append a pseudo template (which equals to `.spec.template`)
 // to the end of the list, to fill up the replica count.
 // And also if there is any compressed template, add them too.
 //
 // It is not guaranteed that the returned list is sorted.
+// It is assumed that its spec is valid, e.g. replicasInTemplates < totalReplica.
 func BuildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *corev1.ConfigMap) []*workloads.InstanceTemplate {
 	var instanceTemplateList []*workloads.InstanceTemplate
 	var replicasInTemplates int32
@@ -227,11 +228,8 @@ func BuildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *cor
 	if replicasInTemplates < totalReplicas {
 		replicas := totalReplicas - replicasInTemplates
 		instance := &workloads.InstanceTemplate{Replicas: &replicas, Ordinals: its.Spec.DefaultTemplateOrdinals}
-		// FIXME: is it necessary to let the default template be the first one?
-		t := []*workloads.InstanceTemplate{instance}
-		instanceTemplateList = append(t, instanceTemplateList...)
+		instanceTemplateList = append(instanceTemplateList, instance)
 	}
-	// FIXME: what about replicasInTemplates > totalReplica?
 
 	return instanceTemplateList
 }

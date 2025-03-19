@@ -48,7 +48,8 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
+	if err := instancetemplate.ValidateInstanceTemplates(its, tree); err != nil {
+		tree.EventRecorder.Event(its, corev1.EventTypeWarning, EventReasonInvalidSpec, err.Error())
 		return kubebuilderx.ConditionUnsatisfiedWithError(err)
 	}
 	return kubebuilderx.ConditionSatisfied

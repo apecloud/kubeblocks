@@ -197,26 +197,6 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("validateSpec", func() {
-		It("should work well", func() {
-			By("a valid spec")
-			Expect(validateSpec(its, nil)).Should(Succeed())
-
-			By("sum of replicas in instance exceeds spec.replicas")
-			its2 := its.DeepCopy()
-			replicas := int32(4)
-			name := "barrrrr"
-			instance := workloads.InstanceTemplate{
-				Name:     name,
-				Replicas: &replicas,
-			}
-			its2.Spec.Instances = append(its2.Spec.Instances, instance)
-			err := validateSpec(its2, nil)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
-		})
-	})
-
 	Context("copyAndMerge", func() {
 		It("should work well", func() {
 			By("merge svc")

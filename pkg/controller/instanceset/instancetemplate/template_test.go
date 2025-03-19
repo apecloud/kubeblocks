@@ -13,15 +13,13 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 var _ = Describe("Template tests", func() {
 	DescribeTable("generates instance ordinals",
 		func(its *workloads.InstanceSet, expected map[string]sets.Set[int32], expectError bool) {
-			Expect(validateOrdinals(its.Spec.Instances)).To(Succeed())
-			tree := kubebuilderx.NewObjectTree()
-			itsExt, err := BuildInstanceSetExt(its, tree)
+			Expect(validateOrdinals(its)).To(Succeed())
+			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
 			ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
 			if expectError {
@@ -207,8 +205,7 @@ var _ = Describe("Template tests", func() {
 			},
 		}
 
-		tree := kubebuilderx.NewObjectTree()
-		itsExt, err := BuildInstanceSetExt(its, tree)
+		itsExt, err := BuildInstanceSetExt(its, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names, err := GenerateAllInstanceNames(itsExt)
 		Expect(err).NotTo(HaveOccurred())

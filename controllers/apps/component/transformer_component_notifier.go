@@ -129,6 +129,10 @@ func (t *componentNotifierTransformer) notify(transCtx *componentTransformContex
 		return client.IgnoreNotFound(err)
 	}
 
+	if model.IsObjectUpdating(comp) {
+		return nil // skip if the target component is being updated
+	}
+
 	compCopy := comp.DeepCopy()
 	if compCopy.Annotations == nil {
 		compCopy.Annotations = make(map[string]string)

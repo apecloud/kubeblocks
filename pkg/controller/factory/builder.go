@@ -269,39 +269,6 @@ func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string 
 	return password
 }
 
-// GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(annotations map[string]string, componentName, accountName string) string {
-	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
-	if len(valueString) == 0 {
-		return ""
-	}
-	backupMap := map[string]map[string]string{}
-	err := json.Unmarshal([]byte(valueString), &backupMap)
-	if err != nil {
-		return ""
-	}
-	backupSource, ok := backupMap[componentName]
-	if !ok {
-		return ""
-	}
-	systemAccountsString, ok := backupSource[constant.EncryptedSystemAccounts]
-	if !ok {
-		return ""
-	}
-	systemAccountsMap := map[string]string{}
-	err = json.Unmarshal([]byte(systemAccountsString), &systemAccountsMap)
-	if err != nil {
-		return ""
-	}
-	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	encryptedPwd, ok := systemAccountsMap[accountName]
-	if !ok {
-		return ""
-	}
-	password, _ := e.Decrypt([]byte(encryptedPwd))
-	return password
-}
-
 // TODO: add dynamicLabels and dynamicAnnotations by @zhangtao
 
 func BuildConfigMapWithTemplate(cluster *kbappsv1.Cluster,

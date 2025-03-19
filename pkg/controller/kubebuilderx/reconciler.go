@@ -55,20 +55,25 @@ type CheckResult struct {
 	Err       error
 }
 
-var ConditionUnsatisfied = &CheckResult{}
-var ConditionSatisfied = &CheckResult{Satisfied: true}
+var (
+	// ConditionSatisfied means the corresponding Reconcile() should be invoked
+	ConditionSatisfied = &CheckResult{Satisfied: true}
+
+	// ConditionUnsatisfied means the corresponding Reconcile() should be skipped
+	ConditionUnsatisfied = &CheckResult{}
+
+	// ConditionUnsatisfiedWithError means the corresponding and all the following
+	// Reconcile() should be skipped
+	ConditionUnsatisfiedWithError = func(err error) *CheckResult {
+		return &CheckResult{Satisfied: false, Err: err}
+	}
+)
 
 type controlMethod string
 
 const (
-	// cntn tells the control flow to continue
 	cntn controlMethod = "Continue"
-
-	// cmmt tells the control flow to stop and jump to the commit phase
 	cmmt controlMethod = "Commit"
-
-	// rtry tells the control flow to stop, jump to the commit phase
-	// and retry from the beginning with a delay specified by Result.RetryAfter
 	rtry controlMethod = "Retry"
 )
 
@@ -77,22 +82,29 @@ type Result struct {
 	RetryAfter time.Duration
 }
 
-var Continue = Result{Next: cntn}
-var Commit = Result{Next: cmmt}
+var (
+	// Continue tells the control flow to continue
+	Continue = Result{Next: cntn}
+
+	// Commit tells the control flow to stop and jump to the commit phase
+	Commit = Result{Next: cmmt}
+
+	// RetryAfter tells the control flow to stop, jump to the commit phase
+	// and retry from the beginning with a delay specified by `after`.
+	RetryAfter = func(after time.Duration) Result {
+		return Result{Next: rtry, RetryAfter: after}
+	}
+)
 
 var ErrDeepCopyFailed = errors.New("DeepCopyFailed")
 
 type Reconciler interface {
+	// PreCondition should return ConditionSatisfied if Reconcile() should be invoked,
+	// otherwise return ConditionUnsatisfied.
 	PreCondition(*ObjectTree) *CheckResult
+
+	// Reconcile contains the business logic and modifies the object tree.
 	Reconcile(tree *ObjectTree) (Result, error)
-}
-
-func CheckResultWithError(err error) *CheckResult {
-	return &CheckResult{Satisfied: false, Err: err}
-}
-
-func RetryAfter(after time.Duration) Result {
-	return Result{Next: rtry, RetryAfter: after}
 }
 
 func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {

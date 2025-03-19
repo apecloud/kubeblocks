@@ -168,14 +168,17 @@ func (t *componentAccountTransformer) buildAccountHash(account synthesizedSystem
 func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount) (*corev1.Secret, error) {
 	var password []byte
+	var err error
 	switch {
 	case account.SecretRef != nil:
-		var err error
 		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
 			return nil, err
 		}
 	default:
-		password = t.buildPassword(ctx, account)
+		password, err = t.buildPassword(ctx, account)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(password) > maximumPasswordLength {
 		return nil, errPasswordTooLong
@@ -203,18 +206,22 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	return secret.Data[passwordKey], nil
 }
 
-func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account synthesizedSystemAccount) []byte {
+func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
 	// get restore password if exists during recovery.
-	password := factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
-	if account.InitAccount && password == "" {
+	password, err := appsutil.GetRestoreSystemAccountPassword(ctx.Context, ctx.Client,
+		ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation", account.Name, ctx.SynthesizeComponent.Name)
+	}
+	if account.InitAccount && len(password) == 0 {
 		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account).
 		// This is compatibility processing.
-		password = factory.GetRestorePassword(ctx.SynthesizeComponent)
+		password = []byte(factory.GetRestorePassword(ctx.SynthesizeComponent))
 	}
-	if password == "" {
-		return t.generatePassword(account)
+	if len(password) == 0 {
+		return t.generatePassword(account), nil
 	}
-	return []byte(password)
+	return password, nil
 }
 
 func (t *componentAccountTransformer) generatePassword(account synthesizedSystemAccount) []byte {

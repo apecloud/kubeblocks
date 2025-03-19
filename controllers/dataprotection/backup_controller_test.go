@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"fmt"
-	"math"
 	"slices"
 	"strconv"
 	"time"
@@ -220,9 +219,7 @@ var _ = Describe("Backup Controller test", func() {
 		})
 
 		Context("creates a backup with retentionPeriod", func() {
-			// set enough duration to avoid test backup being gc-ed by gc controller
-			var defaultRetentionPeriod = dpv1alpha1.RetentionPeriod(
-				fmt.Sprintf("%dm", int64(math.Ceil((1000 * fakeTick).Minutes()))))
+			const defaultRetentionPeriod = "7h"
 
 			It("create a valid backup", func() {
 				By("creating a backup from backupPolicy " + testdp.BackupPolicyName)

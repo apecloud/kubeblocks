@@ -64,7 +64,6 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var fakeClock *testclocks.FakeClock
-var fakeTick = time.Minute
 
 func init() {
 	viper.AutomaticEnv()

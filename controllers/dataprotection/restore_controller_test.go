@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	testclocks "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -615,6 +617,7 @@ var _ = Describe("Restore Controller test", func() {
 				parentBackupName string
 				ancestorBackups  = []*dpv1alpha1.Backup{}
 				cnt              = 0
+				testClock        = testclocks.NewFakeClock(time.Now())
 			)
 
 			genIncBackupName := func() string {
@@ -622,14 +625,27 @@ var _ = Describe("Restore Controller test", func() {
 				return fmt.Sprintf("inc-backup-%d", cnt)
 			}
 
+			changeTimeRange := func(backup *dpv1alpha1.Backup) {
+				backup.Status.TimeRange = &dpv1alpha1.BackupTimeRange{
+					Start: &metav1.Time{},
+					End:   &metav1.Time{},
+				}
+				testClock.Step(time.Minute)
+				backup.Status.TimeRange.Start.Time = testClock.Now()
+				testClock.Step(time.Minute)
+				backup.Status.TimeRange.End.Time = testClock.Now()
+			}
+
 			BeforeEach(func() {
 				By("mock completed full backup and parent incremental backup")
 				baseBackup = mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, true, false, dpv1alpha1.BackupTypeFull)
+				Expect(testapps.ChangeObjStatus(&testCtx, baseBackup, func() { changeTimeRange(baseBackup) })).Should(Succeed())
 				actionSet = testdp.NewFakeIncActionSet(&testCtx)
 				parentBackupName = baseBackup.Name
 				for i := 0; i < 3; i++ {
 					backup := mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, true, false, dpv1alpha1.BackupTypeIncremental,
 						genIncBackupName(), parentBackupName, baseBackup.Name)
+					Expect(testapps.ChangeObjStatus(&testCtx, backup, func() { changeTimeRange(backup) })).Should(Succeed())
 					ancestorBackups = append(ancestorBackups, backup)
 					parentBackupName = backup.Name
 				}
@@ -647,7 +663,7 @@ var _ = Describe("Restore Controller test", func() {
 						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 							testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
 						f.SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
-					}, nil, genIncBackupName(), parentBackupName, baseBackup.Name)
+					}, changeTimeRange, genIncBackupName(), parentBackupName, baseBackup.Name)
 
 				By("wait for creating jobs and pvcs")
 				checkJobAndPVCSCount(restore, replicas, replicas, 0)
@@ -729,14 +745,6 @@ func mockBackupForRestore(
 				PortName:      testdp.PortName,
 			}
 			testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
-			backup.Status.TimeRange = &dpv1alpha1.BackupTimeRange{
-				Start: &metav1.Time{},
-				End:   &metav1.Time{},
-			}
-			fakeClock.Step(fakeTick)
-			backup.Status.TimeRange.Start.Time = fakeClock.Now()
-			fakeClock.Step(fakeTick)
-			backup.Status.TimeRange.End.Time = fakeClock.Now()
 		})).Should(Succeed())
 	}
 	return backup

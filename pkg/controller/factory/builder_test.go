@@ -133,9 +133,9 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			tplCfg := appsv1.ComponentTemplateSpec{
-				Name:        "test-config-tpl",
-				TemplateRef: "test-config-tpl",
+			tplCfg := appsv1.ComponentFileTemplate{
+				Name:     "test-config-tpl",
+				Template: "test-config-tpl",
 			}
 			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
 				"test-cm", tplCfg)

@@ -74,7 +74,7 @@ max_connections=666
 	var (
 		mockClient      *testutil.K8sClientMockHelper
 		templateBuilder render.TemplateRender
-		configSpec      appsv1.ComponentTemplateSpec
+		configSpec      appsv1.ComponentFileTemplate
 		paramsDefs      *parametersv1alpha1.ParametersDefinition
 		pdcr            *parametersv1alpha1.ParamConfigRenderer
 
@@ -108,10 +108,10 @@ max_connections=666
 		updatedCMObject.SetName(updatedCMName)
 		updatedCMObject.SetNamespace("default")
 
-		configSpec = appsv1.ComponentTemplateSpec{
-			Name:        testConfigSpecName,
-			TemplateRef: baseCMObject.GetName(),
-			Namespace:   "default",
+		configSpec = appsv1.ComponentFileTemplate{
+			Name:      testConfigSpecName,
+			Template:  baseCMObject.GetName(),
+			Namespace: "default",
 		}
 
 		templateBuilder = render.NewTemplateBuilder(&render.ReconcileCtx{

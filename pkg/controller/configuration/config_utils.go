@@ -46,13 +46,13 @@ import (
 
 // BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, configmaps []*corev1.ConfigMap) error {
+func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) error {
 	var (
 		err         error
 		buildParams *cfgcm.CfgManagerBuildParams
 
 		podSpec      = synthesizedComp.PodSpec
-		configSpecs  = synthesizedComp.ConfigTemplates
+		configSpecs  = synthesizedComp.ConfigTemplates2
 		configRender *parametersv1alpha1.ParamConfigRenderer
 		paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	)
@@ -156,9 +156,9 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 	podSpec.Volumes = podVolumes
 }
 
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentTemplateSpec) {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentFileTemplate) ([]corev1.VolumeMount, []appsv1.ComponentFileTemplate) {
 	// Ignore useless configTemplate
-	usingConfigSpecs := make([]appsv1.ComponentTemplateSpec, 0, len(configSpecs))
+	usingConfigSpecs := make([]appsv1.ComponentFileTemplate, 0, len(configSpecs))
 	config2Containers := make(map[string][]*corev1.Container)
 	for _, configSpec := range configSpecs {
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
@@ -323,10 +323,10 @@ func enableShardingHVScaleTrigger(configDescs []parametersv1alpha1.ComponentConf
 }
 
 func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
-	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
-	for _, config := range cmpd.Spec.Configs {
+	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs2))
+	for _, config := range cmpd.Spec.Configs2 {
 		cm := &corev1.ConfigMap{}
-		if err := reader.Get(ctx, client.ObjectKey{Name: config.TemplateRef, Namespace: config.Namespace}, cm); err != nil {
+		if err := reader.Get(ctx, client.ObjectKey{Name: config.Template, Namespace: config.Namespace}, cm); err != nil {
 			return nil, err
 		}
 		tpls[config.Name] = cm

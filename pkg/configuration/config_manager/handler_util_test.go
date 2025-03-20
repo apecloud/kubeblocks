@@ -156,12 +156,12 @@ var _ = Describe("Handler Util Test", func() {
 		}
 	}
 
-	mockConfigSpec := func(tplName string) appsv1.ComponentTemplateSpec {
-		return appsv1.ComponentTemplateSpec{
-			Name:        tplName,
-			TemplateRef: "config_template",
-			Namespace:   "default",
-			VolumeName:  "for_test",
+	mockConfigSpec := func(tplName string) appsv1.ComponentFileTemplate {
+		return appsv1.ComponentFileTemplate{
+			Name:       tplName,
+			Template:   "config_template",
+			Namespace:  "default",
+			VolumeName: "for_test",
 		}
 	}
 
@@ -270,7 +270,7 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestGetSupportReloadConfigSpecs", func() {
 		It("not support reload", func() {
-			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentTemplateSpec{{
+			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentFileTemplate{{
 				Name: "test",
 			}}, nil, nil)
 			Expect(err).Should(Succeed())
@@ -278,10 +278,10 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("not ComponentConfigDescription", func() {
-			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentTemplateSpec{{
-				Name:        "test",
-				TemplateRef: "config_template",
-				Namespace:   "default",
+			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentFileTemplate{{
+				Name:      "test",
+				Template:  "config_template",
+				Namespace: "default",
 			}}, nil, []*parametersv1alpha1.ParametersDefinition{mockParametersDef("test", nil)})
 			Expect(err).Should(Succeed())
 			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
@@ -291,7 +291,7 @@ var _ = Describe("Handler Util Test", func() {
 			ccName := "config_constraint"
 			configtpl := mockConfigSpec(ccName)
 			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1.ComponentTemplateSpec{configtpl},
+				[]appsv1.ComponentFileTemplate{configtpl},
 				mockConfigDescription(configtpl.Name, parametersv1alpha1.Ini),
 				nil,
 			)
@@ -311,7 +311,7 @@ var _ = Describe("Handler Util Test", func() {
 
 			cd := mockConfigDescription(ccName, parametersv1alpha1.Ini)
 			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1.ComponentTemplateSpec{mockConfigSpec(ccName)},
+				[]appsv1.ComponentFileTemplate{mockConfigSpec(ccName)},
 				cd,
 				[]*parametersv1alpha1.ParametersDefinition{pd},
 			)
@@ -433,7 +433,7 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
 			ReloadAction: reloadAction,
 			ReloadType:   reloadType,
-			ConfigSpec: appsv1.ComponentTemplateSpec{
+			ConfigSpec: appsv1.ComponentFileTemplate{
 				VolumeName: volumeName,
 			}}}
 	}

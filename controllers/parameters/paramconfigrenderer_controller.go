@@ -112,7 +112,7 @@ func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.Request
 	if err := validateParametersDefs(ctx, cli, parameterTemplate.ParametersDefs); err != nil {
 		return err
 	}
-	if err := validateParametersConfigs(parameterTemplate.Configs, cmpd.Spec.Configs); err != nil {
+	if err := validateParametersConfigs(parameterTemplate.Configs, cmpd.Spec.Configs2); err != nil {
 		return err
 	}
 	return nil
@@ -167,9 +167,9 @@ func fillParameterTemplate(reqCtx intctrlutil.RequestCtx, cli client.Client, tem
 	return cli.Patch(reqCtx.Ctx, deepCopy, client.MergeFrom(template))
 }
 
-func validateParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescription, templates []appsv1.ComponentTemplateSpec) error {
+func validateParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescription, templates []appsv1.ComponentFileTemplate) error {
 	for _, config := range configs {
-		match := func(spec appsv1.ComponentTemplateSpec) bool {
+		match := func(spec appsv1.ComponentFileTemplate) bool {
 			return config.TemplateName == spec.Name
 		}
 		if len(generics.FindFunc(templates, match)) == 0 {

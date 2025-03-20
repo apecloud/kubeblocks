@@ -255,12 +255,12 @@ func BuildConfigMapWithTemplate(cluster *kbappsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
-	configTemplateSpec kbappsv1.ComponentTemplateSpec) *corev1.ConfigMap {
+	configTemplateSpec kbappsv1.ComponentFileTemplate) *corev1.ConfigMap {
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
-		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
+		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.Template).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
 		SetData(configs).

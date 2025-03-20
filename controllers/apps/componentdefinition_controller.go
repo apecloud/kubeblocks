@@ -191,7 +191,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateVolumes,
 		r.validateHostNetwork,
 		r.validateServices,
-		r.validateConfigNScript,
+		r.validateFileTemplate,
 		r.validateSystemAccounts,
 		r.validateReplicasLimit,
 		r.validateAvailable,
@@ -331,34 +331,9 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateConfigNScript(cli client.Client, rctx intctrlutil.RequestCtx,
+func (r *ComponentDefinitionReconciler) validateFileTemplate(cli client.Client, rctx intctrlutil.RequestCtx,
 	compDef *appsv1.ComponentDefinition) error {
-	if err := r.validateComponentTemplate(cli, rctx, compDef); err != nil {
-		return err
-	}
 	return validateComponentFileTemplate(cli, rctx, compDef)
-}
-
-func (r *ComponentDefinitionReconciler) validateComponentTemplate(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1.ComponentDefinition) error {
-	validateObject := func(objectKey client.ObjectKey) error {
-		configObj := &corev1.ConfigMap{}
-		return cli.Get(rctx.Ctx, objectKey, configObj)
-	}
-	validateTemplate := func(tpl appsv1.ComponentTemplateSpec) error {
-		if tpl.TemplateRef != "" {
-			return validateObject(client.ObjectKey{Namespace: tpl.Namespace, Name: tpl.TemplateRef})
-		}
-		return nil
-	}
-	for _, tpls := range [][]appsv1.ComponentTemplateSpec{cmpd.Spec.Configs} {
-		for _, tpl := range tpls {
-			if err := validateTemplate(tpl); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func validateComponentFileTemplate(cli client.Client, rctx intctrlutil.RequestCtx, cmpd *appsv1.ComponentDefinition) error {

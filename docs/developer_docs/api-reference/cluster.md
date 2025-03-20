@@ -1289,22 +1289,17 @@ Each template is represented as a ConfigMap and may contain multiple config file
 </tr>
 <tr>
 <td>
-<code>configs</code><br/>
+<code>scripts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the configuration file templates and volume mount parameters used by the Component.
-It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.</p>
-<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; configuration files.
-Each template is represented as a ConfigMap and may contain multiple configuration files,
-with each file being a key in the ConfigMap.</p>
-<p>The rendered configuration files will be mounted into the Component&rsquo;s containers
-according to the specified volume mount parameters.</p>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -1333,22 +1328,6 @@ It allows you to specify multiple log types and their respective file paths for 
  - filePathPattern: /data/mysql/log/mysqld-slowquery.log
    name: slow
 </code></pre>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scripts</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
-[]ComponentFileTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
-These scripts can be executed during container startup or via specific actions.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -5154,22 +5133,17 @@ Each template is represented as a ConfigMap and may contain multiple config file
 </tr>
 <tr>
 <td>
-<code>configs</code><br/>
+<code>scripts</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-[]ComponentTemplateSpec
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the configuration file templates and volume mount parameters used by the Component.
-It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.</p>
-<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; configuration files.
-Each template is represented as a ConfigMap and may contain multiple configuration files,
-with each file being a key in the ConfigMap.</p>
-<p>The rendered configuration files will be mounted into the Component&rsquo;s containers
-according to the specified volume mount parameters.</p>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -5198,22 +5172,6 @@ It allows you to specify multiple log types and their respective file paths for 
  - filePathPattern: /data/mysql/log/mysqld-slowquery.log
    name: slow
 </code></pre>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scripts</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
-[]ComponentFileTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
-These scripts can be executed during container startup or via specific actions.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -6698,96 +6656,6 @@ ProvisionSecretRef
 <p>Refers to the secret from which data will be copied to create the new account.</p>
 <p>For user-specified passwords, the maximum length is limited to 64 bytes.</p>
 <p>This field is immutable once set.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the configuration template.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>templateRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace of the referenced configuration template ConfigMap object.
-An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the volume name of PodTemplate. The configuration file produced through the configuration
-template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
-The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>defaultMode</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
-However, certain database engines may require different file permissions.
-You can specify the desired file permissions here.</p>
-<p>Must be specified as an octal value between 0000 and 0777 (inclusive),
-or as a decimal value between 0 and 511 (inclusive).
-YAML supports both octal and decimal values for file permissions.</p>
-<p>Please note that this setting only affects the permissions of the files themselves.
-Directories within the specified path are not impacted by this setting.
-It&rsquo;s important to be aware that this setting might conflict with other options
-that influence the file mode, such as fsGroup.
-In such cases, the resulting file mode may have additional bits set.
-Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
 </td>
 </tr>
 </tbody>

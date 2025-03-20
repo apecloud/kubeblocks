@@ -97,8 +97,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
+		ConfigTemplates2:                 compDefObj.Spec.Configs2,
 		LogConfigs:                       compDefObj.Spec.LogConfigs,
-		ConfigTemplates:                  compDefObj.Spec.Configs,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
@@ -302,7 +302,7 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, compDef *app
 		volumes[volumeName] = true
 		return nil
 	}
-	for _, tpl := range synthesizedComp.ConfigTemplates {
+	for _, tpl := range compDef.Spec.Configs2 {
 		if err := checkConfigNScriptTemplate(tpl.Name, tpl.VolumeName); err != nil {
 			return err
 		}
@@ -382,9 +382,9 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 		return checkConfigTemplates(synthesizedComp)
 	}
 
-	templates := make(map[string]*appsv1.ComponentTemplateSpec)
-	for i, template := range synthesizedComp.ConfigTemplates {
-		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
+	templates := make(map[string]*appsv1.ComponentFileTemplate)
+	for i, template := range synthesizedComp.ConfigTemplates2 {
+		templates[template.Name] = &synthesizedComp.ConfigTemplates2[i]
 	}
 
 	for _, config := range comp.Spec.Configs {
@@ -402,12 +402,12 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
 		}
 		switch {
-		case len(template.TemplateRef) == 0 && !specified():
+		case len(template.Template) == 0 && !specified():
 			return fmt.Errorf("there is no content provided for config template %s", *config.Name)
-		case len(template.TemplateRef) > 0 && specified():
+		case len(template.Template) > 0 && specified():
 			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
 		case specified():
-			template.TemplateRef = config.ConfigMap.Name
+			template.Template = config.ConfigMap.Name
 			template.Namespace = synthesizedComp.Namespace
 		default:
 			// do nothing
@@ -417,8 +417,8 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 }
 
 func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
-	for _, template := range synthesizedComp.ConfigTemplates {
-		if len(template.TemplateRef) == 0 {
+	for _, template := range synthesizedComp.ConfigTemplates2 {
+		if len(template.Template) == 0 {
 			return fmt.Errorf("required config template is empty: %s", template.Name)
 		}
 	}

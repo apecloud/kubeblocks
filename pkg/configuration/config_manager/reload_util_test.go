@@ -335,9 +335,9 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test2",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentTemplateSpec{
-							Name:        "test",
-							TemplateRef: "test_cm",
+						ConfigSpec: appsv1.ComponentFileTemplate{
+							Name:     "test",
+							Template: "test_cm",
 						},
 					}},
 				},
@@ -346,17 +346,17 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test3",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentTemplateSpec{
-							Name:        "test",
-							TemplateRef: "test_cm",
+						ConfigSpec: appsv1.ComponentFileTemplate{
+							Name:     "test",
+							Template: "test_cm",
 						},
 						ReloadType: parametersv1alpha1.ShellType,
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentTemplateSpec{
-							Name:        "test2",
-							TemplateRef: "test_cm",
+						ConfigSpec: appsv1.ComponentFileTemplate{
+							Name:     "test2",
+							Template: "test_cm",
 						},
 						ReloadType: parametersv1alpha1.TPLScriptType,
 					}}},
@@ -365,17 +365,17 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test4",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentTemplateSpec{
-							Name:        "test",
-							TemplateRef: "test_cm",
+						ConfigSpec: appsv1.ComponentFileTemplate{
+							Name:     "test",
+							Template: "test_cm",
 						},
 						ReloadType: parametersv1alpha1.UnixSignalType,
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentTemplateSpec{
-							Name:        "test2",
-							TemplateRef: "test_cm",
+						ConfigSpec: appsv1.ComponentFileTemplate{
+							Name:     "test2",
+							Template: "test_cm",
 						},
 						ReloadType: parametersv1alpha1.TPLScriptType,
 					}}},

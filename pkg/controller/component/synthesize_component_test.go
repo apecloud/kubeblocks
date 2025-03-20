@@ -74,18 +74,6 @@ var _ = Describe("synthesized component", func() {
 							VolumeName: "serverConf",
 						},
 					},
-					// TODO: remove me
-					Configs: []appsv1.ComponentTemplateSpec{
-						{
-							Name:        "logConf",
-							TemplateRef: "logConf",
-							VolumeName:  "logConf",
-						},
-						{
-							Name:       "serverConf",
-							VolumeName: "serverConf",
-						},
-					},
 				},
 			}
 			comp = &appsv1.Component{
@@ -107,9 +95,6 @@ var _ = Describe("synthesized component", func() {
 		})
 
 		It("ok", func() {
-			// TODO: remove me
-			compDef.Spec.Configs[1].TemplateRef = "serverConf"
-
 			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 
@@ -196,9 +181,6 @@ var _ = Describe("synthesized component", func() {
 		})
 
 		It("external managed - lazy provision", func() {
-			// TODO: remove me
-			compDef.Spec.Configs[1].TemplateRef = "serverConf"
-
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
 				Name:            ptr.To(compDef.Spec.Configs2[1].Name),
 				ExternalManaged: ptr.To(true),
@@ -223,126 +205,126 @@ var _ = Describe("synthesized component", func() {
 		})
 	})
 
-	Context("config template", func() {
-		BeforeEach(func() {
-			compDef = &appsv1.ComponentDefinition{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-compdef",
-				},
-				Spec: appsv1.ComponentDefinitionSpec{
-					Configs: []appsv1.ComponentTemplateSpec{
-						{
-							Name:        "app",
-							TemplateRef: "app",
-							VolumeName:  "app",
-						},
-						{
-							Name:       "external",
-							VolumeName: "external",
-						},
-					},
-				},
-			}
-			comp = &appsv1.Component{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      "test-cluster-comp",
-					Labels: map[string]string{
-						constant.AppInstanceLabelKey: "test-cluster",
-					},
-					Annotations: map[string]string{
-						constant.KBAppClusterUIDKey:      "uuid",
-						constant.KubeBlocksGenerationKey: "1",
-					},
-				},
-				Spec: appsv1.ComponentSpec{
-					Configs: []appsv1.ClusterComponentConfig{},
-				},
-			}
-		})
-
-		It("ok", func() {
-			compDef.Spec.Configs[1].TemplateRef = "external"
-
-			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
-			Expect(err).Should(BeNil())
-
-			Expect(synthesizedComp).ShouldNot(BeNil())
-			Expect(synthesizedComp.ConfigTemplates).Should(BeEquivalentTo(compDef.Spec.Configs))
-		})
-
-		It("has config template not specified", func() {
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("required config template is empty"))
-		})
-
-		It("w/ comp override - ok", func() {
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: ptr.To("external"),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "external-cm",
-						},
-					},
-				},
-			})
-			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
-			Expect(err).Should(BeNil())
-
-			Expect(synthesizedComp).ShouldNot(BeNil())
-			Expect(synthesizedComp.ConfigTemplates[0]).Should(BeEquivalentTo(compDef.Spec.Configs[0]))
-
-			expectExternalConfig := compDef.Spec.Configs[1]
-			expectExternalConfig.TemplateRef = comp.Spec.Configs[0].ConfigMap.Name
-			expectExternalConfig.Namespace = comp.Namespace
-			Expect(synthesizedComp.ConfigTemplates[1]).Should(BeEquivalentTo(expectExternalConfig))
-		})
-
-		PIt("w/ comp override - not defined", func() {
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: ptr.To("not-defined"),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "external-cm",
-						},
-					},
-				},
-			})
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not defined in definition"))
-		})
-
-		It("w/ comp override - both specified", func() {
-			compDef.Spec.Configs[1].TemplateRef = "external"
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: ptr.To("external"),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "external-cm",
-						},
-					},
-				},
-			})
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("partial overriding is not supported"))
-		})
-
-		It("w/ comp override - both not specified", func() {
-			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name:                         ptr.To("external"),
-				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{},
-			})
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("there is no content provided for config template"))
-		})
-	})
+	// Context("config template", func() {
+	//	BeforeEach(func() {
+	//		compDef = &appsv1.ComponentDefinition{
+	//			ObjectMeta: metav1.ObjectMeta{
+	//				Name: "test-compdef",
+	//			},
+	//			Spec: appsv1.ComponentDefinitionSpec{
+	//				Configs: []appsv1.ComponentTemplateSpec{
+	//					{
+	//						Name:        "app",
+	//						TemplateRef: "app",
+	//						VolumeName:  "app",
+	//					},
+	//					{
+	//						Name:       "external",
+	//						VolumeName: "external",
+	//					},
+	//				},
+	//			},
+	//		}
+	//		comp = &appsv1.Component{
+	//			ObjectMeta: metav1.ObjectMeta{
+	//				Namespace: testCtx.DefaultNamespace,
+	//				Name:      "test-cluster-comp",
+	//				Labels: map[string]string{
+	//					constant.AppInstanceLabelKey: "test-cluster",
+	//				},
+	//				Annotations: map[string]string{
+	//					constant.KBAppClusterUIDKey:      "uuid",
+	//					constant.KubeBlocksGenerationKey: "1",
+	//				},
+	//			},
+	//			Spec: appsv1.ComponentSpec{
+	//				Configs: []appsv1.ClusterComponentConfig{},
+	//			},
+	//		}
+	//	})
+	//
+	//	It("ok", func() {
+	//		compDef.Spec.Configs[1].TemplateRef = "external"
+	//
+	//		synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	//		Expect(err).Should(BeNil())
+	//
+	//		Expect(synthesizedComp).ShouldNot(BeNil())
+	//		Expect(synthesizedComp.ConfigTemplates).Should(BeEquivalentTo(compDef.Spec.Configs))
+	//	})
+	//
+	//	It("has config template not specified", func() {
+	//		_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	//		Expect(err).ShouldNot(BeNil())
+	//		Expect(err.Error()).Should(ContainSubstring("required config template is empty"))
+	//	})
+	//
+	//	It("w/ comp override - ok", func() {
+	//		comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+	//			Name: ptr.To("external"),
+	//			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+	//				ConfigMap: &corev1.ConfigMapVolumeSource{
+	//					LocalObjectReference: corev1.LocalObjectReference{
+	//						Name: "external-cm",
+	//					},
+	//				},
+	//			},
+	//		})
+	//		synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	//		Expect(err).Should(BeNil())
+	//
+	//		Expect(synthesizedComp).ShouldNot(BeNil())
+	//		Expect(synthesizedComp.ConfigTemplates[0]).Should(BeEquivalentTo(compDef.Spec.Configs[0]))
+	//
+	//		expectExternalConfig := compDef.Spec.Configs[1]
+	//		expectExternalConfig.TemplateRef = comp.Spec.Configs[0].ConfigMap.Name
+	//		expectExternalConfig.Namespace = comp.Namespace
+	//		Expect(synthesizedComp.ConfigTemplates[1]).Should(BeEquivalentTo(expectExternalConfig))
+	//	})
+	//
+	//	PIt("w/ comp override - not defined", func() {
+	//		comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+	//			Name: ptr.To("not-defined"),
+	//			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+	//				ConfigMap: &corev1.ConfigMapVolumeSource{
+	//					LocalObjectReference: corev1.LocalObjectReference{
+	//						Name: "external-cm",
+	//					},
+	//				},
+	//			},
+	//		})
+	//		_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	//		Expect(err).ShouldNot(BeNil())
+	//		Expect(err.Error()).Should(ContainSubstring("not defined in definition"))
+	//	})
+	//
+	//	It("w/ comp override - both specified", func() {
+	//		compDef.Spec.Configs[1].TemplateRef = "external"
+	//		comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+	//			Name: ptr.To("external"),
+	//			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+	//				ConfigMap: &corev1.ConfigMapVolumeSource{
+	//					LocalObjectReference: corev1.LocalObjectReference{
+	//						Name: "external-cm",
+	//					},
+	//				},
+	//			},
+	//		})
+	//		_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	//		Expect(err).ShouldNot(BeNil())
+	//		Expect(err.Error()).Should(ContainSubstring("partial overriding is not supported"))
+	//	})
+	//
+	//	It("w/ comp override - both not specified", func() {
+	//		comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+	//			Name:                         ptr.To("external"),
+	//			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{},
+	//		})
+	//		_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	//		Expect(err).ShouldNot(BeNil())
+	//		Expect(err.Error()).Should(ContainSubstring("there is no content provided for config template"))
+	//	})
+	// })
 
 	Context("env", func() {
 		BeforeEach(func() {

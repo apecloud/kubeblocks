@@ -27,7 +27,6 @@ import (
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -163,10 +162,6 @@ func GenerateUniqKeyWithConfig(label string, configKey string) string {
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(constant.ConfigurationConstraintsLabelPrefixKey, configKey)
-}
-
-func GetInstanceCMName(obj client.Object, tpl *appsv1.ComponentTemplateSpec) string {
-	return getInstanceCfgCMName(obj.GetName(), tpl.Name)
 }
 
 // getInstanceCfgCMName configmap generation rule for configuration file.

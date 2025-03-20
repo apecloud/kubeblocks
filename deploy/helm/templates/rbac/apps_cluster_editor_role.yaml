@@ -24,3 +24,5 @@ rules:
   - clusters/status
   verbs:
   - get
+  - patch
+  - update

@@ -24,3 +24,5 @@ rules:
   - configconstraints/status
   verbs:
   - get
+  - patch
+  - update

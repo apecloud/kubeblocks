@@ -24,3 +24,5 @@ rules:
   - instancesets/status
   verbs:
   - get
+  - patch
+  - update

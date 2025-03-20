@@ -1740,7 +1740,7 @@ var _ = Describe("Component Controller", func() {
 		By("update the cmpd to add a new config template (volume)")
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
-			cmpd.Spec.Configs2 = append(cmpd.Spec.Configs2, kbappsv1.ComponentFileTemplate{
+			cmpd.Spec.Configs = append(cmpd.Spec.Configs, kbappsv1.ComponentFileTemplate{
 				Name:       "server-conf",
 				Template:   "test-log-conf-template", // reuse log-conf template
 				Namespace:  testCtx.DefaultNamespace,
@@ -2290,7 +2290,7 @@ var _ = Describe("Component Controller", func() {
 			// mock the cmpd to add the config file template and volume mount
 			compDefKey := client.ObjectKeyFromObject(compDefObj)
 			Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
-				cmpd.Spec.Configs2 = []kbappsv1.ComponentFileTemplate{
+				cmpd.Spec.Configs = []kbappsv1.ComponentFileTemplate{
 					{
 						Name:       fileTemplate,
 						Template:   "test-log-conf-template",

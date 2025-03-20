@@ -62,7 +62,7 @@ var _ = Describe("synthesized component", func() {
 					Name: "test-compdef",
 				},
 				Spec: appsv1.ComponentDefinitionSpec{
-					Configs2: []appsv1.ComponentFileTemplate{
+					Configs: []appsv1.ComponentFileTemplate{
 						{
 							Name:       "logConf",
 							Template:   "logConf",
@@ -100,16 +100,16 @@ var _ = Describe("synthesized component", func() {
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
-				ComponentFileTemplate: compDef.Spec.Configs2[0],
+				ComponentFileTemplate: compDef.Spec.Configs[0],
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
-				ComponentFileTemplate: compDef.Spec.Configs2[1],
+				ComponentFileTemplate: compDef.Spec.Configs[1],
 			}))
 		})
 
 		It("override", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: ptr.To(compDef.Spec.Configs2[1].Name),
+				Name: ptr.To(compDef.Spec.Configs[1].Name),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -128,14 +128,14 @@ var _ = Describe("synthesized component", func() {
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
-				ComponentFileTemplate: compDef.Spec.Configs2[0],
+				ComponentFileTemplate: compDef.Spec.Configs[0],
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
-					Name:       compDef.Spec.Configs2[1].Name,
+					Name:       compDef.Spec.Configs[1].Name,
 					Template:   comp.Spec.Configs[0].ConfigMap.Name,
 					Namespace:  comp.Namespace,
-					VolumeName: compDef.Spec.Configs2[1].VolumeName,
+					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
 				Reconfigure: comp.Spec.Configs[0].Reconfigure,
 			}))
@@ -146,7 +146,7 @@ var _ = Describe("synthesized component", func() {
 
 		It("external managed", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: ptr.To(compDef.Spec.Configs2[1].Name),
+				Name: ptr.To(compDef.Spec.Configs[1].Name),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -166,14 +166,14 @@ var _ = Describe("synthesized component", func() {
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
-				ComponentFileTemplate: compDef.Spec.Configs2[0],
+				ComponentFileTemplate: compDef.Spec.Configs[0],
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
-					Name:       compDef.Spec.Configs2[1].Name,
+					Name:       compDef.Spec.Configs[1].Name,
 					Template:   comp.Spec.Configs[0].ConfigMap.Name,
 					Namespace:  comp.Namespace,
-					VolumeName: compDef.Spec.Configs2[1].VolumeName,
+					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
 				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
 				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
@@ -182,7 +182,7 @@ var _ = Describe("synthesized component", func() {
 
 		It("external managed - lazy provision", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name:            ptr.To(compDef.Spec.Configs2[1].Name),
+				Name:            ptr.To(compDef.Spec.Configs[1].Name),
 				ExternalManaged: ptr.To(true),
 			})
 			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
@@ -190,14 +190,14 @@ var _ = Describe("synthesized component", func() {
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
-				ComponentFileTemplate: compDef.Spec.Configs2[0],
+				ComponentFileTemplate: compDef.Spec.Configs[0],
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
-					Name:       compDef.Spec.Configs2[1].Name,
+					Name:       compDef.Spec.Configs[1].Name,
 					Template:   "",
 					Namespace:  "",
-					VolumeName: compDef.Spec.Configs2[1].VolumeName,
+					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
 				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
 				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,

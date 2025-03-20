@@ -184,7 +184,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if cmpd, err = getCompDefinition(reqCtx.Ctx, reader, comp); err != nil {
 		return nil, err
 	}
-	if len(cmpd.Spec.Configs2) == 0 {
+	if len(cmpd.Spec.Configs) == 0 {
 		return nil, nil
 	}
 
@@ -325,8 +325,8 @@ func resolveInitParametersFromParameterCR(parameterCRs []parametersv1alpha1.Para
 }
 
 func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
-	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs2))
-	for _, config := range cmpd.Spec.Configs2 {
+	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
+	for _, config := range cmpd.Spec.Configs {
 		cm := &corev1.ConfigMap{}
 		if err := reader.Get(ctx, client.ObjectKey{Name: config.Template, Namespace: config.Namespace}, cm); err != nil {
 			return nil, err

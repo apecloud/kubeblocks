@@ -1150,8 +1150,8 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Configs2 != nil {
-		in, out := &in.Configs2, &out.Configs2
+	if in.Configs != nil {
+		in, out := &in.Configs, &out.Configs
 		*out = make([]ComponentFileTemplate, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

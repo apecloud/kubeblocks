@@ -1272,7 +1272,7 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
-<code>configs2</code><br/>
+<code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
 []ComponentFileTemplate
@@ -5116,7 +5116,7 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
-<code>configs2</code><br/>
+<code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
 []ComponentFileTemplate

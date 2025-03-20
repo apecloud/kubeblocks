@@ -30,7 +30,7 @@ import (
 // BuildConfigTemplateAnnotations builds config template annotations for object
 func BuildConfigTemplateAnnotations(object client.Object, synthesizedComp *component.SynthesizedComponent) {
 	asMapAnnotations := make(map[string]string)
-	for _, configTplSpec := range synthesizedComp.ConfigTemplates2 {
+	for _, configTplSpec := range synthesizedComp.ConfigTemplates {
 		asMapAnnotations[core.GenerateTPLUniqLabelKeyWithConfig(configTplSpec.Name)] = core.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configTplSpec.Name)
 	}
 	updateLabelsOrAnnotations(asMapAnnotations, object.GetAnnotations, object.SetAnnotations, constant.ConfigurationTplLabelPrefixKey)

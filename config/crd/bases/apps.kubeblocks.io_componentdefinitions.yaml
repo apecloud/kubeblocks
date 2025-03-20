@@ -4215,7 +4215,7 @@ spec:
                         type: integer
                     type: object
                 type: object
-              configs2:
+              configs:
                 description: |-
                   Specifies the config file templates and volume mount parameters used by the Component.
 

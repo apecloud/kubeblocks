@@ -233,8 +233,8 @@ func (r *SidecarDefinitionReconciler) validateConfigNScript(cli client.Client, r
 
 	compDef := &appsv1.ComponentDefinition{
 		Spec: appsv1.ComponentDefinitionSpec{
-			Configs2: sidecarDef.Spec.Configs,
-			Scripts:  sidecarDef.Spec.Scripts,
+			Configs: sidecarDef.Spec.Configs,
+			Scripts: sidecarDef.Spec.Scripts,
 		},
 	}
 	return validateComponentFileTemplate(cli, rctx, compDef)
@@ -329,7 +329,7 @@ func (r *SidecarDefinitionReconciler) validateMatchedCompDef(sidecarDef *appsv1.
 			}
 			return nil
 		}
-		if err := validate("config", sidecarDef.Spec.Configs, compDef.Spec.Configs2); err != nil {
+		if err := validate("config", sidecarDef.Spec.Configs, compDef.Spec.Configs); err != nil {
 			return err
 		}
 		return validate("script", sidecarDef.Spec.Scripts, compDef.Spec.Scripts)

@@ -137,7 +137,7 @@ func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters
 	return func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 		classParameters := configctrl.ClassifyComponentParameters(updatedParameters,
 			flatten(rctx.ParametersDefs),
-			rctx.ComponentDefObj.Spec.Configs2,
+			rctx.ComponentDefObj.Spec.Configs,
 			configmaps,
 		)
 		for tpl, m := range classParameters {

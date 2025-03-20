@@ -37,8 +37,8 @@ func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParamet
 	tpls map[string]*corev1.ConfigMap) []parametersv1alpha1.ConfigTemplateItemDetail {
 	var itemDetails []parametersv1alpha1.ConfigTemplateItemDetail
 
-	classifyParams := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs2, tpls)
-	for _, template := range cmpd.Spec.Configs2 {
+	classifyParams := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls)
+	for _, template := range cmpd.Spec.Configs {
 		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
 	}
 	return itemDetails

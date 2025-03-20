@@ -178,10 +178,10 @@ func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplate,
 		Namespace:  namespace,
 		VolumeName: volumeName,
 	}
-	if f.Get().Spec.Configs2 == nil {
-		f.Get().Spec.Configs2 = make([]kbappsv1.ComponentFileTemplate, 0)
+	if f.Get().Spec.Configs == nil {
+		f.Get().Spec.Configs = make([]kbappsv1.ComponentFileTemplate, 0)
 	}
-	f.Get().Spec.Configs2 = append(f.Get().Spec.Configs2, config)
+	f.Get().Spec.Configs = append(f.Get().Spec.Configs, config)
 	return f
 }
 

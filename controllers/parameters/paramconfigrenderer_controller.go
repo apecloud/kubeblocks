@@ -112,7 +112,7 @@ func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.Request
 	if err := validateParametersDefs(ctx, cli, parameterTemplate.ParametersDefs); err != nil {
 		return err
 	}
-	if err := validateParametersConfigs(parameterTemplate.Configs, cmpd.Spec.Configs2); err != nil {
+	if err := validateParametersConfigs(parameterTemplate.Configs, cmpd.Spec.Configs); err != nil {
 		return err
 	}
 	return nil

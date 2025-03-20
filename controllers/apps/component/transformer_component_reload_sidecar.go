@@ -56,7 +56,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 
-	if len(builtinComp.ConfigTemplates2) == 0 {
+	if len(builtinComp.ConfigTemplates) == 0 {
 		return nil
 	}
 

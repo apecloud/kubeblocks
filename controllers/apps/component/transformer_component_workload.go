@@ -340,7 +340,7 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentT
 // buildPodSpecVolumeMounts builds podSpec volumeMounts
 func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 	configVolumeNames := make([]string, 0)
-	for _, v := range synthesizeComp.ConfigTemplates2 {
+	for _, v := range synthesizeComp.ConfigTemplates {
 		configVolumeNames = append(configVolumeNames, v.VolumeName)
 	}
 

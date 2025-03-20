@@ -97,7 +97,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
-		ConfigTemplates2:                 compDefObj.Spec.Configs2,
+		ConfigTemplates:                  compDefObj.Spec.Configs,
 		LogConfigs:                       compDefObj.Spec.LogConfigs,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
@@ -302,7 +302,7 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, compDef *app
 		volumes[volumeName] = true
 		return nil
 	}
-	for _, tpl := range compDef.Spec.Configs2 {
+	for _, tpl := range compDef.Spec.Configs {
 		if err := checkConfigNScriptTemplate(tpl.Name, tpl.VolumeName); err != nil {
 			return err
 		}
@@ -383,8 +383,8 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 	}
 
 	templates := make(map[string]*appsv1.ComponentFileTemplate)
-	for i, template := range synthesizedComp.ConfigTemplates2 {
-		templates[template.Name] = &synthesizedComp.ConfigTemplates2[i]
+	for i, template := range synthesizedComp.ConfigTemplates {
+		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
 	}
 
 	for _, config := range comp.Spec.Configs {
@@ -417,7 +417,7 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 }
 
 func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
-	for _, template := range synthesizedComp.ConfigTemplates2 {
+	for _, template := range synthesizedComp.ConfigTemplates {
 		if len(template.Template) == 0 {
 			return fmt.Errorf("required config template is empty: %s", template.Name)
 		}
@@ -427,7 +427,7 @@ func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
 
 func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) {
 	templates := make([]SynthesizedFileTemplate, 0)
-	for _, tpl := range compDef.Spec.Configs2 {
+	for _, tpl := range compDef.Spec.Configs {
 		templates = append(templates, synthesizeFileTemplate(comp, tpl, true))
 	}
 	for _, tpl := range compDef.Spec.Scripts {

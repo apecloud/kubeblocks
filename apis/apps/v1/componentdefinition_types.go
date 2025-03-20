@@ -309,7 +309,7 @@ type ComponentDefinitionSpec struct {
 	// This field is immutable.
 	//
 	// +optional
-	Configs2 []ComponentFileTemplate `json:"configs2,omitempty"`
+	Configs []ComponentFileTemplate `json:"configs,omitempty"`
 
 	// Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
 	// These scripts can be executed during container startup or via specific actions.

@@ -90,7 +90,7 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 
 	// TODO: update
 
-	t.rewriteSystemAccount(transCtx, sharding, accountName)
+	t.rewriteSystemAccount(transCtx, sharding.Name, accountName)
 
 	return nil
 }
@@ -204,26 +204,44 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 	return secret, nil
 }
 
-func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, accountName string) {
+func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext, shardingName, accountName string) {
 	var (
 		cluster = transCtx.Cluster
 	)
 	newAccount := appsv1.ComponentSystemAccount{
 		Name: accountName,
 		SecretRef: &appsv1.ProvisionSecretRef{
-			Name:      shardingAccountSecretName(cluster.Name, sharding.Name, accountName),
+			Name:      shardingAccountSecretName(cluster.Name, shardingName, accountName),
 			Namespace: cluster.Namespace,
 		},
 	}
-	for i, account := range sharding.Template.SystemAccounts {
-		if account.Name == accountName {
-			newAccount.Disabled = account.Disabled
-			sharding.Template.SystemAccounts[i] = newAccount
-			return
+
+	// update sharding
+	for i, sharding := range transCtx.shardings {
+		if sharding.Name == shardingName {
+			exist := false
+			for j, account := range sharding.Template.SystemAccounts {
+				if account.Name == accountName {
+					newAccount.Disabled = account.Disabled
+					transCtx.shardings[i].Template.SystemAccounts[j] = newAccount
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				transCtx.shardings[i].Template.SystemAccounts =
+					append(transCtx.shardings[i].Template.SystemAccounts, newAccount)
+			}
+			break
 		}
 	}
-	sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{newAccount}
+
+	// update sharding components
+	shardingComps := transCtx.shardingComps[shardingName]
+	for i := range shardingComps {
+		shardingComps[i].SystemAccounts = append(shardingComps[i].SystemAccounts, newAccount)
+	}
+	transCtx.shardingComps[shardingName] = shardingComps
 }
 
 func shardingAccountSecretName(cluster, sharding, account string) string {

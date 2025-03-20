@@ -223,9 +223,6 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 				}
 			}
 			if !exist {
-				if sharding.Template.SystemAccounts == nil {
-					transCtx.shardings[i].Template.SystemAccounts = []appsv1.ComponentSystemAccount{}
-				}
 				transCtx.shardings[i].Template.SystemAccounts =
 					append(transCtx.shardings[i].Template.SystemAccounts, newAccount)
 			}
@@ -236,9 +233,6 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 	// update sharding components
 	shardingComps := transCtx.shardingComps[shardingName]
 	for i := range shardingComps {
-		if shardingComps[i].SystemAccounts == nil {
-			shardingComps[i].SystemAccounts = []appsv1.ComponentSystemAccount{}
-		}
 		shardingComps[i].SystemAccounts = append(shardingComps[i].SystemAccounts, newAccount)
 	}
 	transCtx.shardingComps[shardingName] = shardingComps

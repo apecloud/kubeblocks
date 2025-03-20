@@ -141,6 +141,13 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// create indexer used by gc controller
+	if err := mgr.GetFieldIndexer().IndexField(
+		context.Background(),
+		&dpv1alpha1.Backup{},
+		"backup.policyAndMethod", indexBackupByPolicyAndMethod); err != nil {
+		return err
+	}
 	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
@@ -157,6 +164,11 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		b.Owns(&vsv1beta1.VolumeSnapshot{}, builder.Predicates{})
 	}
 	return b.Complete(r)
+}
+
+func indexBackupByPolicyAndMethod(rawObj client.Object) []string {
+	backup := rawObj.(*dpv1alpha1.Backup)
+	return []string{strings.Join([]string{backup.Spec.BackupPolicyName, backup.Spec.BackupMethod}, ",")}
 }
 
 func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Object) []reconcile.Request {

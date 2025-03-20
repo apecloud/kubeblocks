@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -191,6 +192,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 5. set instance status
 	setInstanceStatus(its, podList)
+
+	currentInstances, err := instancetemplate.PodsToCurrentInstances(podList, its)
+	if err != nil {
+		// FIXME: log error and continue?
+		return kubebuilderx.Continue, err
+	}
+	its.Status.CurrentInstances = currentInstances
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil

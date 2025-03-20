@@ -52,7 +52,7 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 		buildParams *cfgcm.CfgManagerBuildParams
 
 		podSpec      = synthesizedComp.PodSpec
-		configSpecs  = synthesizedComp.ConfigTemplates
+		configSpecs  = component.ConfigTemplates(synthesizedComp)
 		configRender *parametersv1alpha1.ParamConfigRenderer
 		paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	)
@@ -148,9 +148,9 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 		&configManager.CMConfigVolumes,
 	} {
 		for i := range *vm {
-			podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
+			podVolumes = intctrlutil.CreateVolumeIfNotExist(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
 				return (*vm)[i]
-			}, nil)
+			})
 		}
 	}
 	podSpec.Volumes = podVolumes

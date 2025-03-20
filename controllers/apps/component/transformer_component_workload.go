@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
-	"slices"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -73,8 +72,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.RunningWorkload = runningITS
 
-	// inject volume mounts and build its proto
-	buildPodSpecVolumeMounts(synthesizeComp)
 	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
 		return err
@@ -335,39 +332,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentT
 		return err
 	}
 	return nil
-}
-
-// buildPodSpecVolumeMounts builds podSpec volumeMounts
-func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
-	configVolumeNames := make([]string, 0)
-	for _, v := range synthesizeComp.ConfigTemplates {
-		configVolumeNames = append(configVolumeNames, v.VolumeName)
-	}
-
-	podSpec := synthesizeComp.PodSpec
-	for _, cc := range []*[]corev1.Container{&podSpec.Containers, &podSpec.InitContainers} {
-		volumes := podSpec.Volumes
-		for _, c := range *cc {
-			for _, v := range c.VolumeMounts {
-				// if volumeMounts belongs to configVolumeNames, skip
-				if slices.Contains(configVolumeNames, v.Name) {
-					continue
-				}
-				// if persistence is not found, add an emptyDir to pod.spec.volumes
-				createFn := func(_ string) corev1.Volume {
-					return corev1.Volume{
-						Name: v.Name,
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					}
-				}
-				volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, createFn, nil)
-			}
-		}
-		podSpec.Volumes = volumes
-	}
-	synthesizeComp.PodSpec = podSpec
 }
 
 // copyAndMergeITS merges two ITS objects for updating:

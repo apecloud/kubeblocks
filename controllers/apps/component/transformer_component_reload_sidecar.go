@@ -27,20 +27,20 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
-// componentReloadActionSidecarTransformer handles component configuration render
-type componentReloadActionSidecarTransformer struct {
+type componentReloadSidecarTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &componentReloadActionSidecarTransformer{}
+var _ graph.Transformer = &componentReloadSidecarTransformer{}
 
-func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentReloadSidecarTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 
 	comp := transCtx.Component
@@ -51,12 +51,12 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 	if common.IsCompactMode(compOrig.Annotations) {
-		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
+		transCtx.V(1).Info("Component is in compact mode, no need to create reload sidecars",
 			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 
-	if len(builtinComp.ConfigTemplates) == 0 {
+	if len(component.ConfigTemplates(builtinComp)) == 0 {
 		return nil
 	}
 

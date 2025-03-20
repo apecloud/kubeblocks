@@ -97,7 +97,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
-		ConfigTemplates:                  compDefObj.Spec.Configs,
 		LogConfigs:                       compDefObj.Spec.LogConfigs,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
@@ -126,12 +125,17 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// build scheduling policy for workload
 	buildSchedulingPolicy(synthesizeComp, comp)
 
+	buildFileTemplates(synthesizeComp, compDef, comp)
+	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
+
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
 
-	// build volumes & volumeClaimTemplates
+	// build volumeClaimTemplates & volumes
 	buildVolumeClaimTemplates(synthesizeComp, comp)
-	if err = mergeUserDefinedVolumes(synthesizeComp, compDef, comp); err != nil {
+	if err = mergeUserDefinedVolumes(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -139,11 +143,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
-
-	buildFileTemplates(synthesizeComp, compDef, comp)
-	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
-		return nil, err
-	}
 
 	// build serviceAccountName
 	buildServiceAccountName(synthesizeComp)
@@ -158,6 +157,9 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err = buildKBAgentContainer(synthesizeComp); err != nil {
 		return nil, errors.Wrap(err, "build kb-agent container failed")
 	}
+
+	// build volume mounts after kb-agent containers
+	buildVolumeMounts(synthesizeComp)
 
 	if err = buildServiceReferences(ctx, cli, synthesizeComp, compDef, comp); err != nil {
 		return nil, errors.Wrap(err, "build service references failed")
@@ -275,46 +277,72 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	}
 }
 
-func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) error {
+func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil {
 		return nil
 	}
-	volumes := map[string]bool{}
+	volumes := sets.New[string]()
 	for _, vols := range [][]corev1.Volume{synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes} {
 		for _, vol := range vols {
-			if volumes[vol.Name] {
+			if volumes.Has(vol.Name) {
 				return fmt.Errorf("duplicated volume %s", vol.Name)
 			}
-			volumes[vol.Name] = true
+			volumes.Insert(vol.Name)
 		}
 	}
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
-		if volumes[vct.Name] {
+		if volumes.Has(vct.Name) {
 			return fmt.Errorf("duplicated volume %s", vct.Name)
 		}
-		volumes[vct.Name] = true
+		volumes.Insert(vct.Name)
 	}
 
-	checkConfigNScriptTemplate := func(name, volumeName string) error {
-		if volumes[volumeName] {
-			return fmt.Errorf("duplicated volume %s for template %s", volumeName, name)
+	checkFileTemplate := func(name, volumeName string) error {
+		if volumes.Has(volumeName) {
+			return fmt.Errorf("duplicated volume %s for file template %s", volumeName, name)
 		}
-		volumes[volumeName] = true
+		volumes.Insert(volumeName)
 		return nil
 	}
-	for _, tpl := range compDef.Spec.Configs {
-		if err := checkConfigNScriptTemplate(tpl.Name, tpl.VolumeName); err != nil {
+	for _, tpl := range synthesizedComp.FileTemplates {
+		if err := checkFileTemplate(tpl.Name, tpl.VolumeName); err != nil {
 			return err
 		}
 	}
-	for _, tpl := range compDef.Spec.Scripts {
-		if err := checkConfigNScriptTemplate(tpl.Name, tpl.VolumeName); err != nil {
-			return err
-		}
-	}
-
 	synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes...)
 	return nil
+}
+
+func buildVolumeMounts(synthesizedComp *SynthesizedComponent) {
+	templateVolumes := sets.New[string]()
+	for _, tpl := range synthesizedComp.FileTemplates {
+		templateVolumes.Insert(tpl.VolumeName)
+	}
+
+	podSpec := synthesizedComp.PodSpec
+	for _, cc := range []*[]corev1.Container{&podSpec.Containers, &podSpec.InitContainers} {
+		volumes := podSpec.Volumes
+		for _, c := range *cc {
+			for _, v := range c.VolumeMounts {
+				// if the volume mount belongs to the file template, skip
+				if templateVolumes.Has(v.Name) {
+					continue
+				}
+				// if persistence is not found, add an emptyDir to it
+				createFn := func(_ string) corev1.Volume {
+					return corev1.Volume{
+						Name: v.Name,
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					}
+				}
+				volumes = intctrlutil.CreateVolumeIfNotExist(volumes, v.Name, createFn)
+			}
+		}
+		podSpec.Volumes = volumes
+	}
+	synthesizedComp.PodSpec = podSpec
 }
 
 // limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.
@@ -379,17 +407,19 @@ func overrideComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv
 
 func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil || len(comp.Spec.Configs) == 0 {
-		return checkConfigTemplates(synthesizedComp)
+		return nil
 	}
 
 	templates := make(map[string]*appsv1.ComponentFileTemplate)
-	for i, template := range synthesizedComp.ConfigTemplates {
-		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
+	for i, tpl := range synthesizedComp.FileTemplates {
+		if tpl.Config {
+			templates[tpl.Name] = &synthesizedComp.FileTemplates[i].ComponentFileTemplate
+		}
 	}
 
 	for _, config := range comp.Spec.Configs {
 		if config.Name == nil || len(*config.Name) == 0 {
-			continue // not supported now
+			continue // not supported now, ignore
 		}
 		template := templates[*config.Name]
 		if template == nil {
@@ -411,15 +441,6 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 			template.Namespace = synthesizedComp.Namespace
 		default:
 			// do nothing
-		}
-	}
-	return checkConfigTemplates(synthesizedComp)
-}
-
-func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
-	for _, template := range synthesizedComp.ConfigTemplates {
-		if len(template.Template) == 0 {
-			return fmt.Errorf("required config template is empty: %s", template.Name)
 		}
 	}
 	return nil
@@ -458,6 +479,7 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 
 	stpl := SynthesizedFileTemplate{
 		ComponentFileTemplate: tpl,
+		Config:                config,
 	}
 	if config {
 		for _, utpl := range comp.Spec.Configs {

@@ -20,39 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type createVolumeFn func(volumeName string) corev1.Volume
-type updateVolumeFn func(*corev1.Volume) error
 
-func findVolumeWithVolumeName(volumes []corev1.Volume, volumeName string) int {
-	for index, itr := range volumes {
-		if itr.Name == volumeName {
-			return index
+func CreateVolumeIfNotExist(volumes []corev1.Volume, volumeName string, createFn createVolumeFn) []corev1.Volume {
+	for _, vol := range volumes {
+		if vol.Name == volumeName {
+			return volumes
 		}
 	}
-	return -1
-}
-
-func CreateOrUpdateVolume(volumes []corev1.Volume, volumeName string, createFn createVolumeFn, updateFn updateVolumeFn) ([]corev1.Volume, error) {
-	// for update volume
-	if existIndex := findVolumeWithVolumeName(volumes, volumeName); existIndex >= 0 {
-		if updateFn == nil {
-			return volumes, nil
-		}
-		if err := updateFn(&volumes[existIndex]); err != nil {
-			return volumes, err
-		}
-		return volumes, nil
-	}
-
-	// for create volume
-	return append(volumes, createFn(volumeName)), nil
+	return append(volumes, createFn(volumeName))
 }
 
 func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {

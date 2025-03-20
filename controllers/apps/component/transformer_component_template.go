@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -113,7 +114,11 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-		synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, t.newVolume(tpl, objName))
+		createFn := func(_ string) corev1.Volume {
+			return t.newVolume(tpl, objName)
+		}
+		synthesizedComp.PodSpec.Volumes =
+			intctrlutil.CreateVolumeIfNotExist(synthesizedComp.PodSpec.Volumes, tpl.VolumeName, createFn)
 	}
 	return nil
 }

@@ -507,6 +507,7 @@ func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTem
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
+		AddLabels(instancetemplate.TemplateNameLabelKey, template.Name).
 		AddLabels(constant.KBAppPodNameLabelKey, name). // used as a pod-service selector
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*template.Spec.DeepCopy()).

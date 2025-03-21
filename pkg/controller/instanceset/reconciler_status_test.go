@@ -252,7 +252,7 @@ var _ = Describe("status reconciler test", func() {
 			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 			Expect(its.Status.Conditions).Should(HaveLen(3))
-			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}
+			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-4", "bar-5", "bar-6"}
 			message, err := json.Marshal(failureNames)
 			Expect(err).Should(BeNil())
 			Expect(its.Status.Conditions[0].Type).Should(BeEquivalentTo(workloads.InstanceReady))

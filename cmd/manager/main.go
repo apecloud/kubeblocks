@@ -447,33 +447,31 @@ func main() {
 			os.Exit(1)
 		}
 
-		if !viper.GetBool(constant.DualOperatorsMode) {
-			if err = (&configuration.ConfigConstraintReconciler{
-				Client:   mgr.GetClient(),
-				Scheme:   mgr.GetScheme(),
-				Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-			}).SetupWithManager(mgr); err != nil {
-				setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-				os.Exit(1)
-			}
+		if err = (&configuration.ConfigConstraintReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+			os.Exit(1)
+		}
 
-			if err = (&configuration.ReconfigureReconciler{
-				Client:   client,
-				Scheme:   mgr.GetScheme(),
-				Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-			}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-				setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-				os.Exit(1)
-			}
+		if err = (&configuration.ReconfigureReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
 
-			if err = (&configuration.ConfigurationReconciler{
-				Client:   client,
-				Scheme:   mgr.GetScheme(),
-				Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-			}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-				setupLog.Error(err, "unable to create controller", "controller", "Configuration")
-				os.Exit(1)
-			}
+		if err = (&configuration.ConfigurationReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+			os.Exit(1)
 		}
 
 		if err = (&appscontrollers.SystemAccountReconciler{

@@ -29,6 +29,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -159,6 +160,16 @@ func syncImpl(taskCtx *TaskContext,
 	var baseConfig = configMap
 	var updatedConfig *corev1.ConfigMap
 	if intctrlutil.IsRerender(configMap, item) {
+		log.FromContext(taskCtx.ctx).
+			WithName("ParameterReconcileTask").
+			WithValues("cluster", taskCtx.component.ClusterName,
+				"component", taskCtx.component.Name,
+				"parameterTpl", item.Name).
+			Info("rerender parameter template",
+				"appliedConfigMeta", resolveLastConfigMeta(configMap),
+				"revision", revision,
+				"configMeta", item,
+			)
 		if baseConfig, err = configctrl.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
@@ -177,6 +188,16 @@ func syncImpl(taskCtx *TaskContext,
 	status.Phase = parametersv1alpha1.CMergedPhase
 	status.UpdateRevision = revision
 	return nil
+}
+
+func resolveLastConfigMeta(configMap *corev1.ConfigMap) any {
+	if configMap == nil || len(configMap.Annotations) == 0 {
+		return nil
+	}
+	return map[string]string{
+		"revision":   configMap.Annotations[constant.ConfigurationRevision],
+		"configMeta": configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey],
+	}
 }
 
 func mergeAndApplyConfig(resourceCtx *render.ResourceCtx,

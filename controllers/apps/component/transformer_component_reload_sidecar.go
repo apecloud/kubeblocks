@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
-
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -62,6 +59,13 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
+	if len(builtinComp.ConfigTemplates) == 0 {
+		return nil
+	}
+
+	if err := updatePodVolumes(builtinComp.PodSpec, builtinComp); err != nil {
+		return err
+	}
 
 	clusterKey := types.NamespacedName{
 		Namespace: builtinComp.Namespace,
@@ -82,58 +86,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		ClusterName:   builtinComp.ClusterName,
 		ComponentName: builtinComp.Name,
 	}
-
-	var configmaps []*corev1.ConfigMap
-	cachedObjs := resolveRerenderDependOnObjects(dag)
-	for _, tpls := range [][]appsv1.ComponentTemplateSpec{builtinComp.ConfigTemplates} {
-		objects, err := render.RenderTemplate(reconcileCtx, cluster, builtinComp, comp, cachedObjs, tpls)
-		if err != nil {
-			return err
-		}
-		configmaps = append(configmaps, objects...)
-	}
-
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if err := ensureConfigMapsPresence(transCtx, graphCli, dag, configmaps...); err != nil {
-		return err
-	}
-	if err := updatePodVolumes(builtinComp.PodSpec, builtinComp); err != nil {
-		return err
-	}
-	if len(builtinComp.ConfigTemplates) == 0 {
-		return nil
-	}
-
-	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef, configmaps)
-}
-
-func ensureConfigMapsPresence(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {
-	for _, configmap := range configmaps {
-		var cm = &corev1.ConfigMap{}
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(configmap), cm); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-			cli.Create(dag, configmap, appsutil.InDataContext4G())
-		}
-	}
-	return nil
-}
-
-func resolveRerenderDependOnObjects(dag *graph.DAG) []client.Object {
-	var dependOnObjs []client.Object
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*model.ObjectVertex)
-		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
-			dependOnObjs = append(dependOnObjs, cm)
-			continue
-		}
-		if secret, ok := v.Obj.(*corev1.Secret); ok {
-			dependOnObjs = append(dependOnObjs, secret)
-			continue
-		}
-	}
-	return dependOnObjs
+	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef)
 }
 
 func updatePodVolumes(podSpec *corev1.PodSpec, component *component.SynthesizedComponent) error {

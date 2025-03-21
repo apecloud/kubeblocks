@@ -28,6 +28,10 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
+const (
+	defaultInstanceTemplateReplicas = 1
+)
+
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -327,10 +331,90 @@ type InstanceSetStatus struct {
 // +kubebuilder:object:generate=false
 type PersistentVolumeClaimRetentionPolicy = kbappsv1.PersistentVolumeClaimRetentionPolicy
 
-// InstanceTemplate allows customization of individual replica configurations in a Component.
+// Ordinals represents a combination of continuous segments and individual values.
 //
 // +kubebuilder:object:generate=false
-type InstanceTemplate = kbappsv1.InstanceTemplate
+type Ordinals = kbappsv1.Ordinals
+
+// SchedulingPolicy defines the scheduling policy for instances.
+//
+// +kubebuilder:object:generate=false
+type SchedulingPolicy = kbappsv1.SchedulingPolicy
+
+// InstanceTemplate allows customization of individual replica configurations in a Component.
+type InstanceTemplate struct {
+	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
+	// This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal
+	// using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
+	// The specified name overrides any default naming conventions or patterns.
+	//
+	// +kubebuilder:validation:MaxLength=54
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
+	// This field allows setting how many replicated instances of the Component,
+	// with the specific overrides in the InstanceTemplate, are created.
+	// The default value is 1. A value of 0 disables instance creation.
+	//
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the desired Ordinals of this InstanceTemplate.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under this InstanceTemplate would be
+	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+	// $(cluster.name)-$(component.name)-$(template.name)-7
+	Ordinals Ordinals `json:"ordinals,omitempty"`
+
+	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
+	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Specifies a map of key-value pairs that will be merged into the Pod's existing labels.
+	// Values for existing keys will be overwritten, and new keys will be added.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies the scheduling policy for the Component.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
+
+	// Specifies an override for the resource requirements of the first container in the Pod.
+	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
+	//
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Defines Env to override.
+	// Add new or override existing envs.
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+func (t *InstanceTemplate) GetName() string {
+	return t.Name
+}
+
+func (t *InstanceTemplate) GetReplicas() int32 {
+	if t.Replicas != nil {
+		return *t.Replicas
+	}
+	return defaultInstanceTemplateReplicas
+}
+
+func (t *InstanceTemplate) GetOrdinals() Ordinals {
+	return t.Ordinals
+}
 
 // PodUpdatePolicyType indicates how pods should be updated
 //

@@ -35,7 +35,7 @@ type ParameterMeta struct {
 	ConfigTemplateName string
 }
 
-func ResolveConfigParameterSchema(paramDef *parametersv1alpha1.ParametersDefinition, configTemplate *appsv1.ComponentTemplateSpec) map[string]*ParameterMeta {
+func ResolveConfigParameterSchema(paramDef *parametersv1alpha1.ParametersDefinition, configTemplate *appsv1.ComponentFileTemplate) map[string]*ParameterMeta {
 	if paramDef.Spec.ParametersSchema == nil || paramDef.Spec.ParametersSchema.SchemaInJSON == nil {
 		return nil
 	}

@@ -118,7 +118,7 @@ var _ = Describe("Config Builder Test", func() {
 		return []ConfigSpecMeta{
 			{
 				ConfigSpecInfo: ConfigSpecInfo{
-					ConfigSpec: appsv1.ComponentTemplateSpec{
+					ConfigSpec: appsv1.ComponentFileTemplate{
 						Name:       "pg_config",
 						VolumeName: "pg_config",
 					},

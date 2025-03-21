@@ -79,7 +79,7 @@ type reconfigureContext struct {
 	Client client.Client
 
 	Cluster        *appsv1.Cluster
-	ConfigTemplate appsv1.ComponentTemplateSpec
+	ConfigTemplate appsv1.ComponentFileTemplate
 
 	// Associated component for cluster.
 	ClusterComponent *appsv1.ClusterComponentSpec

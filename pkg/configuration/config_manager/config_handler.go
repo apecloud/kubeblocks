@@ -449,7 +449,7 @@ func createDownwardHandler(meta *ConfigSpecInfo) (map[string]ConfigHandler, erro
 
 	handlers := make(map[string]ConfigHandler)
 	for _, field := range meta.DownwardAPIOptions {
-		mockConfigSpec := &ConfigSpecInfo{ConfigSpec: appsv1.ComponentTemplateSpec{
+		mockConfigSpec := &ConfigSpecInfo{ConfigSpec: appsv1.ComponentFileTemplate{
 			Name:       strings.Join([]string{meta.ConfigSpec.Name, field.Name}, "."),
 			VolumeName: field.MountPoint,
 		}}

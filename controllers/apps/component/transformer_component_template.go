@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -59,12 +60,7 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		return err
 	}
 
-	runningObjs, err := getFileTemplateObjects(transCtx)
-	if err != nil {
-		return err
-	}
-
-	protoObjs, err := buildFileTemplateObjects(transCtx)
+	runningObjs, protoObjs, err := prepareFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
@@ -113,7 +109,11 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-		synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, t.newVolume(tpl, objName))
+		createFn := func(_ string) corev1.Volume {
+			return t.newVolume(tpl, objName)
+		}
+		synthesizedComp.PodSpec.Volumes =
+			intctrlutil.CreateVolumeIfNotExist(synthesizedComp.PodSpec.Volumes, tpl.VolumeName, createFn)
 	}
 	return nil
 }
@@ -134,6 +134,27 @@ func (t *componentFileTemplateTransformer) newVolume(tpl component.SynthesizedFi
 		vol.VolumeSource.ConfigMap.DefaultMode = ptr.To[int32](0444)
 	}
 	return vol
+}
+
+func prepareFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, map[string]*corev1.ConfigMap, error) {
+	runningObjs, err := getFileTemplateObjects(transCtx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	protoObjs, err := buildFileTemplateObjects(transCtx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+		runningObj, ok := runningObjs[tpl.Name]
+		if ok && !model.IsOwnerOf(transCtx.Component, runningObj) {
+			return nil, nil, fmt.Errorf("the CM object name for file template %s conflicts", tpl.Name)
+		}
+	}
+
+	return runningObjs, protoObjs, nil
 }
 
 func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {

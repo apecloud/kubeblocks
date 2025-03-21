@@ -132,9 +132,7 @@ spec:
                       properties:
                         defaultMode:
                           description: |-
-                            The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
-                            However, certain database engines may require different file permissions.
-                            You can specify the desired file permissions here.
+                            The operator attempts to set default file permissions (0444).
 
 
                             Must be specified as an octal value between 0000 and 0777 (inclusive),
@@ -151,28 +149,27 @@ spec:
                           format: int32
                           type: integer
                         name:
-                          description: Specifies the name of the configuration template.
+                          description: Specifies the name of the template.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         namespace:
                           default: default
-                          description: |-
-                            Specifies the namespace of the referenced configuration template ConfigMap object.
-                            An empty namespace is equivalent to the "default" namespace.
+                          description: Specifies the namespace of the referenced template
+                            ConfigMap object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
-                        templateRef:
-                          description: Specifies the name of the referenced configuration
-                            template ConfigMap object.
+                        template:
+                          description: Specifies the name of the referenced template
+                            ConfigMap object.
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         volumeName:
                           description: |-
-                            Refers to the volume name of PodTemplate. The configuration file produced through the configuration
-                            template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
+                            Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
+                            the corresponding volume. Must be a DNS_LABEL name.
                             The volume name must be defined in podSpec.containers[*].volumeMounts.
                           maxLength: 63
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$

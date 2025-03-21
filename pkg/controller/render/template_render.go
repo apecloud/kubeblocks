@@ -70,7 +70,7 @@ func NewTemplateBuilder(reconcileCtx *ReconcileCtx) TemplateRender {
 
 // RenderComponentTemplate renders config file by config template provided by provider.
 func (r *templateRenderWrapper) RenderComponentTemplate(
-	templateSpec appsv1.ComponentTemplateSpec,
+	templateSpec appsv1.ComponentFileTemplate,
 	cmName string,
 	dataValidator RenderedValidator) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
@@ -91,12 +91,12 @@ func (r *templateRenderWrapper) RenderComponentTemplate(
 }
 
 // RenderConfigMapTemplate renders config file using template engine
-func (r *templateRenderWrapper) RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec) (map[string]string, error) {
+func (r *templateRenderWrapper) RenderConfigMapTemplate(templateSpec appsv1.ComponentFileTemplate) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := r.cli.Get(r.ctx, client.ObjectKey{
 		Namespace: templateSpec.Namespace,
-		Name:      templateSpec.TemplateRef,
+		Name:      templateSpec.Template,
 	}, cmObj); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (r *templateRenderWrapper) RenderConfigMapTemplate(templateSpec appsv1.Comp
 		return map[string]string{}, nil
 	}
 
-	r.setTemplateName(templateSpec.TemplateRef)
+	r.setTemplateName(templateSpec.Template)
 	renderedData, err := r.render(cmObj.Data)
 	if err != nil {
 		return nil, core.WrapError(err, "failed to render configmap")

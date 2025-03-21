@@ -162,7 +162,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// render config/script templates
 			&componentFileTemplateTransformer{},
 			// render component configurations
-			&componentReloadActionSidecarTransformer{Client: r.Client},
+			&componentReloadSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
 			// handle the component workload

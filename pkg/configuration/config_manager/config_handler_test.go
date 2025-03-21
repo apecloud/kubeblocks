@@ -67,12 +67,12 @@ var _ = Describe("Config Handler Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	newConfigSpec := func() appsv1.ComponentTemplateSpec {
-		return appsv1.ComponentTemplateSpec{
-			Name:        "config",
-			TemplateRef: "config-template",
-			VolumeName:  "/opt/config",
-			Namespace:   "default",
+	newConfigSpec := func() appsv1.ComponentFileTemplate {
+		return appsv1.ComponentFileTemplate{
+			Name:       "config",
+			Template:   "config-template",
+			VolumeName: "/opt/config",
+			Namespace:  "default",
 		}
 	}
 
@@ -176,7 +176,7 @@ var _ = Describe("Config Handler Test", func() {
 			_, err = CreateExecHandler([]string{}, "", nil, "")
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
 			c, err := CreateExecHandler([]string{"go", "version"}, "", &ConfigSpecInfo{
-				ConfigSpec: appsv1.ComponentTemplateSpec{
+				ConfigSpec: appsv1.ComponentFileTemplate{
 					Name: "for_test",
 				}},
 				"")

@@ -36,7 +36,7 @@ import (
 type reconfigureRelatedResource struct {
 	ctx        context.Context
 	client     client.Client
-	configSpec *appsv1.ComponentTemplateSpec
+	configSpec *appsv1.ComponentFileTemplate
 
 	clusterName   string
 	componentName string

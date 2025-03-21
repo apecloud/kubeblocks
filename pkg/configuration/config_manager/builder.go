@@ -379,7 +379,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 	return data, nil
 }
 
-func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentTemplateSpec) error {
+func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentFileTemplate) error {
 	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,
@@ -396,16 +396,12 @@ func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *Cf
 	return nil
 }
 
-func GetScriptsMountPoint(configSpec appsv1.ComponentTemplateSpec) string {
+func GetScriptsMountPoint(configSpec appsv1.ComponentFileTemplate) string {
 	return filepath.Join(KBScriptVolumePath, configSpec.Name)
 }
 
-func GetScriptsVolumeName(configSpec appsv1.ComponentTemplateSpec) string {
+func GetScriptsVolumeName(configSpec appsv1.ComponentFileTemplate) string {
 	return fmt.Sprintf("%s%s", scriptVolumePrefix, configSpec.Name)
-}
-
-func GetConfigVolumeName(configSpec appsv1.ComponentTemplateSpec) string {
-	return fmt.Sprintf("%s%s", configVolumePrefix, configSpec.Name)
 }
 
 func buildConfigManagerCommonArgs(volumeDirs []corev1.VolumeMount) []string {

@@ -307,7 +307,7 @@ func (in *ConfigTemplateItemDetail) DeepCopyInto(out *ConfigTemplateItemDetail) 
 	}
 	if in.ConfigSpec != nil {
 		in, out := &in.ConfigSpec, &out.ConfigSpec
-		*out = new(v1.ComponentTemplateSpec)
+		*out = new(v1.ComponentFileTemplate)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.CustomTemplates != nil {

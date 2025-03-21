@@ -201,7 +201,7 @@ func actionToolsScripts(paramDef parametersv1alpha1.ParametersDefinitionSpec) []
 	return uniqueSlice(scriptConfigs)
 }
 
-func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentTemplateSpec,
+func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentFileTemplate,
 	configDescs []parametersv1alpha1.ComponentConfigDescription,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition) ([]ConfigSpecMeta, error) {
 	resolveReloadAction := func(fileName string) *parametersv1alpha1.ParametersDefinition {
@@ -212,7 +212,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentTemplateSpec,
 		}
 		return nil
 	}
-	resolveConfigTemplate := func(name string) *appsv1.ComponentTemplateSpec {
+	resolveConfigTemplate := func(name string) *appsv1.ComponentFileTemplate {
 		for i, configSpec := range configSpecs {
 			if configSpec.Name == name {
 				return &configSpecs[i]

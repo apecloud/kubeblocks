@@ -294,7 +294,7 @@ func resolveReloadActionPolicy(jsonPatch string,
 
 // genReconfigureActionTasks generates a list of reconfiguration tasks based on the provided templateSpec,
 // reconfiguration context, configuration patch, and a restart flag.
-func genReconfigureActionTasks(templateSpec *appsv1.ComponentTemplateSpec, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]ReloadAction, error) {
+func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]ReloadAction, error) {
 	var tasks []ReloadAction
 
 	// If the patch or ConfigRender is nil, return a single restart task.
@@ -336,7 +336,7 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentTemplateSpec, rctx 
 	return tasks, nil
 }
 
-func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentTemplateSpec, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
+func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
 	reCtx := reconfigureContext{
 		RequestCtx:               rctx.RequestCtx,
 		Client:                   rctx.Client,
@@ -359,7 +359,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}
 }
 
-func buildRestartTask(configTemplate *appsv1.ComponentTemplateSpec, rctx *ReconcileContext) reconfigureTask {
+func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) reconfigureTask {
 	return reconfigureTask{
 		ReloadPolicy: parametersv1alpha1.RestartPolicy,
 		taskCtx: reconfigureContext{

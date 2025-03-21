@@ -38,10 +38,10 @@ var _ = Describe("configuration builder", func() {
 		config := NewComponentParameterBuilder(ns, name).
 			ClusterRef(clusterName).
 			Component(componentName).
-			AddConfigurationItem(appsv1.ComponentTemplateSpec{
+			AddConfigurationItem(appsv1.ComponentFileTemplate{
 				Name: "mysql-config",
 			}).
-			AddConfigurationItem(appsv1.ComponentTemplateSpec{
+			AddConfigurationItem(appsv1.ComponentFileTemplate{
 				Name: "mysql-oteld-config",
 			}).
 			GetObject()

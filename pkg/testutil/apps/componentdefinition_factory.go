@@ -171,23 +171,21 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef,
-	namespace, volumeName string) *MockComponentDefinitionFactory {
-	config := kbappsv1.ComponentTemplateSpec{
-		Name:        name,
-		TemplateRef: configTemplateRef,
-		Namespace:   namespace,
-		VolumeName:  volumeName,
+func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplate, namespace, volumeName string) *MockComponentDefinitionFactory {
+	config := kbappsv1.ComponentFileTemplate{
+		Name:       name,
+		Template:   configTemplate,
+		Namespace:  namespace,
+		VolumeName: volumeName,
 	}
 	if f.Get().Spec.Configs == nil {
-		f.Get().Spec.Configs = make([]kbappsv1.ComponentTemplateSpec, 0)
+		f.Get().Spec.Configs = make([]kbappsv1.ComponentFileTemplate, 0)
 	}
 	f.Get().Spec.Configs = append(f.Get().Spec.Configs, config)
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplate, namespace, volumeName string,
-	mode *int32) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddScriptTemplate(name, configTemplate, namespace, volumeName string, mode *int32) *MockComponentDefinitionFactory {
 	script := kbappsv1.ComponentFileTemplate{
 		Name:        name,
 		Template:    configTemplate,

@@ -38,7 +38,7 @@ type ConfigSpecInfo struct {
 	*parametersv1alpha1.ReloadAction `json:",inline"`
 
 	ReloadType      parametersv1alpha1.DynamicReloadType `json:"reloadType"`
-	ConfigSpec      appsv1.ComponentTemplateSpec         `json:"configSpec"`
+	ConfigSpec      appsv1.ComponentFileTemplate         `json:"configSpec"`
 	FormatterConfig parametersv1alpha1.FileFormatConfig  `json:"formatterConfig"`
 	ConfigFile      string                               `json:"configFile"`
 

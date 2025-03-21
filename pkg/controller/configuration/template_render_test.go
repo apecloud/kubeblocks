@@ -91,11 +91,11 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		}
 		item := parametersv1alpha1.ConfigTemplateItemDetail{
 			Name: configTemplateName,
-			ConfigSpec: &appsv1.ComponentTemplateSpec{
-				Name:        configTemplateName,
-				Namespace:   testCtx.DefaultNamespace,
-				TemplateRef: mysqlConfigName,
-				VolumeName:  testapps.ConfVolumeName,
+			ConfigSpec: &appsv1.ComponentFileTemplate{
+				Name:       configTemplateName,
+				Namespace:  testCtx.DefaultNamespace,
+				Template:   mysqlConfigName,
+				VolumeName: testapps.ConfVolumeName,
 			},
 			CustomTemplates: customTemplate,
 		}
@@ -108,7 +108,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			Expect(err).Should(Succeed())
 			return configReaders[configdesc.Name]
 		}
-		params := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentTemplateSpec{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl})
+		params := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl})
 
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())

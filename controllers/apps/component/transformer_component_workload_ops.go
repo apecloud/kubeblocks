@@ -619,12 +619,7 @@ func (r *componentWorkloadOps) buildProtoITSWorkloadVertex() *model.ObjectVertex
 }
 
 func (r *componentWorkloadOps) reconfigure() error {
-	runningObjs, err := getFileTemplateObjects(r.transCtx)
-	if err != nil {
-		return err
-	}
-
-	protoObjs, err := buildFileTemplateObjects(r.transCtx)
+	runningObjs, protoObjs, err := prepareFileTemplateObjects(r.transCtx)
 	if err != nil {
 		return err
 	}

@@ -67,7 +67,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
 		SetTemplate(getTemplate(synthesizedComp)).
-		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		SetSelectorMatchLabel(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetVolumeClaimTemplates(getVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).

@@ -35,7 +35,7 @@ var _ = Describe("object generation transformer test.", func() {
 			SetUID(uid).
 			AddLabels(constant.AppComponentLabelKey, name).
 			SetReplicas(3).
-			AddMatchLabelsInMap(selectors).
+			SetSelectorMatchLabel(selectors).
 			SetRoles(roles).
 			SetTemplate(template).
 			GetObject()

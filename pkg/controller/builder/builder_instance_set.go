@@ -55,7 +55,7 @@ func (builder *InstanceSetBuilder) SetMinReadySeconds(minReadySeconds int32) *In
 	return builder
 }
 
-func (builder *InstanceSetBuilder) AddMatchLabelsInMap(labels map[string]string) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetSelectorMatchLabel(labels map[string]string) *InstanceSetBuilder {
 	selector := builder.get().Spec.Selector
 	if selector == nil {
 		selector = &metav1.LabelSelector{}

@@ -243,7 +243,7 @@ var _ = Describe("util test", func() {
 				"label1": "value1",
 				"label2": "value2",
 			}
-			primary := builder.NewInstanceSetBuilder(namespace, name).AddLabelsInMap(labels).AddMatchLabelsInMap(labels).GetObject()
+			primary := builder.NewInstanceSetBuilder(namespace, name).AddLabelsInMap(labels).SetSelectorMatchLabel(labels).GetObject()
 			criteria := &OwnershipCriteria{
 				SelectorCriteria: &FieldPath{
 					Path: "spec.selector.matchLabels",

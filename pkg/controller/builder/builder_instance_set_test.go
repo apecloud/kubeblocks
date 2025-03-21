@@ -123,7 +123,7 @@ var _ = Describe("instance_set builder", func() {
 		its := NewInstanceSetBuilder(ns, name).
 			SetReplicas(replicas).
 			SetMinReadySeconds(minReadySeconds).
-			AddMatchLabelsInMap(selectors).
+			SetSelectorMatchLabel(selectors).
 			SetRoles([]workloads.ReplicaRole{role}).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(vcs...).

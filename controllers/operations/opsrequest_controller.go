@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/operations"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 
@@ -102,6 +103,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
 		Owns(&batchv1.Job{}).
 		Owns(&dpv1alpha1.Restore{}).
+		Owns(&parametersv1alpha1.Parameter{}).
 		Complete(r)
 }
 

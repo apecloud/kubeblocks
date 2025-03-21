@@ -45,6 +45,7 @@ const (
 	compDefName      = "test-compdef"
 	clusterName      = "test-cluster"
 	defaultCompName  = "mysql"
+	shardingCompName = "sharding-test"
 	defaultITSName   = "mysql-statefulset"
 	configSpecName   = "mysql-config-tpl"
 	configVolumeName = "mysql-config"
@@ -119,6 +120,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 		AddComponent(defaultCompName, compDefObj.GetName()).
+		AddSharding(shardingCompName, "", compDefObj.GetName()).
+		SetShards(5).
 		Create(&testCtx).
 		GetObject()
 

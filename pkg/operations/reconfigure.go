@@ -28,6 +28,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -49,6 +50,8 @@ func init() {
 	opsManager.RegisterOps(opsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
+var noRequeueAfter time.Duration = 0
+
 // ActionStartedCondition the started condition when handle the reconfiguring request.
 func (r *reconfigureAction) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
 	return opsv1alpha1.NewReconfigureCondition(opsRes.OpsRequest), nil
@@ -60,9 +63,9 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 
 func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 
-	var parameters = &parametersv1alpha1.Parameter{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(resource.OpsRequest), parameters); err != nil {
-		return "", 30 * time.Second, err
+	var parameters = parametersv1alpha1.Parameter{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(resource.OpsRequest), &parameters); err != nil {
+		return "", noRequeueAfter, err
 	}
 
 	opsDeepCopy := resource.OpsRequest.DeepCopy()
@@ -79,19 +82,23 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 
 func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource, opsDeepCopy *opsv1alpha1.OpsRequest, phase opsv1alpha1.OpsPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, resource, opsDeepCopy, phase); err != nil {
-		return "", 30 * time.Second, err
+		return "", noRequeueAfter, err
 	}
-	return phase, 30 * time.Second, nil
+	return phase, noRequeueAfter, nil
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (err error) {
-	parameter, err := buildReconfigureParameter(resource.OpsRequest)
-	if err != nil {
+	if len(resource.OpsRequest.Spec.Reconfigures) == 0 {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
+	}
+
+	parameter := buildReconfigureParameter(resource.OpsRequest)
+	if err = intctrlutil.SetControllerReference(resource.OpsRequest, parameter); err != nil {
 		return err
 	}
 
-	var param = &parametersv1alpha1.Parameter{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(parameter), param); err != nil {
+	var checkObj = parametersv1alpha1.Parameter{}
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(parameter), &checkObj); err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			return cli.Create(reqCtx.Ctx, parameter)
 		}
@@ -100,18 +107,15 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	return nil
 }
 
-func buildReconfigureParameter(ops *opsv1alpha1.OpsRequest) (*parametersv1alpha1.Parameter, error) {
-	if len(ops.Spec.Reconfigures) == 0 {
-		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, ops.GetName())
-	}
-
+func buildReconfigureParameter(ops *opsv1alpha1.OpsRequest) *parametersv1alpha1.Parameter {
 	paramBuilder := builder.NewParameterBuilder(ops.Namespace, ops.GetName()).
+		AddLabels(constant.AppInstanceLabelKey, ops.Spec.ClusterName).
+		AddLabels(constant.OpsRequestNameLabelKey, ops.Name).
 		ClusterRef(ops.Spec.ClusterName)
 	for _, reconfigure := range ops.Spec.Reconfigures {
 		if len(reconfigure.Parameters) != 0 {
 			paramBuilder.SetComponentParameters(reconfigure.ComponentName, intctrlutil.TransformComponentParameters(reconfigure.Parameters))
 		}
 	}
-
-	return paramBuilder.GetObject(), nil
+	return paramBuilder.GetObject()
 }

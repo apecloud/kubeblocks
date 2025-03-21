@@ -177,6 +177,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			ComponentName: resources.componentName,
 		},
 		configMap,
+		nil,
 		resources.configSpec.Name,
 		resources.componentMatchLabels())
 	if err := rctx.GetRelatedObjects(); err != nil {

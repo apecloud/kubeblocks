@@ -278,8 +278,10 @@ func resolveReloadActionPolicy(jsonPatch string,
 
 	// make decision
 	switch {
-	case !dynamicUpdate && intctrlutil.NeedDynamicReloadAction(pd): // static parameters update
+	case !dynamicUpdate && intctrlutil.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
 		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
+	case !dynamicUpdate: // static parameters update and only need to restart
+		policy = parametersv1alpha1.RestartPolicy
 	case cfgcm.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
 		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
 	case enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update

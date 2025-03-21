@@ -24,3 +24,5 @@ rules:
   - parameters/status
   verbs:
   - get
+  - patch
+  - update

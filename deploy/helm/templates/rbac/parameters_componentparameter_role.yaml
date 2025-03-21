@@ -24,3 +24,5 @@ rules:
   - componentparameters/status
   verbs:
   - get
+  - patch
+  - update

@@ -49,7 +49,7 @@ var _ = Describe("instance_set builder", func() {
 			podUpdatePolicy              = kbappsv1.PreferInPlacePodUpdatePolicyType
 		)
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
-		selectors := map[string]string{selectorKey4: selectorValue4}
+		selectors := map[string]string{selectorKey1: selectorValue1, selectorKey2: selectorValue2, selectorKey3: selectorValue3, selectorKey4: selectorValue4}
 		role := workloads.ReplicaRole{
 			Name:                 "foo",
 			ParticipatesInQuorum: true,
@@ -123,9 +123,7 @@ var _ = Describe("instance_set builder", func() {
 		its := NewInstanceSetBuilder(ns, name).
 			SetReplicas(replicas).
 			SetMinReadySeconds(minReadySeconds).
-			AddMatchLabel(selectorKey1, selectorValue1).
-			AddMatchLabels(selectorKey2, selectorValue2, selectorKey3, selectorValue3).
-			AddMatchLabelsInMap(selectors).
+			SetSelectorMatchLabel(selectors).
 			SetRoles([]workloads.ReplicaRole{role}).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(vcs...).

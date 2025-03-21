@@ -24,3 +24,5 @@ rules:
   - paramconfigrenderers/status
   verbs:
   - get
+  - patch
+  - update

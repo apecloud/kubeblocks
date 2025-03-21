@@ -28,6 +28,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
+const clusterUIDKey = "apps.kubeblocks.io/cluster-uid"
+
 // ConvertTo converts this Component to the Hub version (v1).
 func (r *Component) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*appsv1.Component)
@@ -78,7 +80,14 @@ func (r *Component) incrementConvertTo(dstRaw metav1.Object) (incrementChange, e
 	// changed
 	comp := dstRaw.(*appsv1.Component)
 	comp.Status.Message = r.Status.Message
-
+	if _, ok := r.Annotations[clusterUIDKey]; !ok {
+		if clusterUID, exist := r.Labels[clusterUIDKey]; exist {
+			if r.Annotations == nil {
+				r.Annotations = make(map[string]string)
+			}
+			r.Annotations[clusterUIDKey] = clusterUID
+		}
+	}
 	// deleted
 	return &componentConverter{
 		EnabledLogs:            r.Spec.EnabledLogs,

@@ -107,7 +107,7 @@ var _ = Describe("instance util test", func() {
 				AddAnnotations(randStr, randStr).
 				AddLabels(randStr, randStr).
 				SetReplicas(3).
-				AddMatchLabelsInMap(selectors).
+				SetSelectorMatchLabel(selectors).
 				SetTemplate(*podTemplate).
 				SetVolumeClaimTemplates(volumeClaimTemplates...).
 				SetMinReadySeconds(minReadySeconds).

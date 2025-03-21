@@ -43,7 +43,7 @@ var _ = Describe("update reconciler test", func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
 			SetReplicas(3).
-			AddMatchLabelsInMap(selectors).
+			SetSelectorMatchLabel(selectors).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetMinReadySeconds(minReadySeconds).

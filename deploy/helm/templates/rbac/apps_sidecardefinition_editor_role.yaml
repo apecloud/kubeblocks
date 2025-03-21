@@ -24,3 +24,5 @@ rules:
   - sidecardefinitions/status
   verbs:
   - get
+  - patch
+  - update

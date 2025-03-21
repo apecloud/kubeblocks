@@ -409,6 +409,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Paused = itsProto.Spec.Paused
 	itsObjCopy.Spec.Configs = itsProto.Spec.Configs
+	itsObjCopy.Spec.Selector = itsProto.Spec.Selector
 
 	if itsObjCopy.Spec.InstanceUpdateStrategy != nil && itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
 		// use oldITS because itsObjCopy has been overwritten

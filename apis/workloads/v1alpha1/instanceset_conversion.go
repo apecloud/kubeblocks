@@ -176,6 +176,23 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 			its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = r.Spec.UpdateStrategy.MaxUnavailable
 		}
 	}
+
+	if len(r.Spec.Roles) > 0 {
+		its.Spec.Roles = make([]workloadsv1.ReplicaRole, len(r.Spec.Roles))
+		highestUpdatePriority := len(r.Spec.Roles)
+		for i, v1alphaRole := range r.Spec.Roles {
+			role := &its.Spec.Roles[i]
+			role.Name = v1alphaRole.Name
+			switch v1alphaRole.AccessMode {
+			case ReadWriteMode:
+				role.UpdatePriority = highestUpdatePriority
+			case ReadonlyMode:
+				role.UpdatePriority = highestUpdatePriority - 1
+			case NoneMode:
+				role.UpdatePriority = 0
+			}
+		}
+	}
 }
 
 func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
@@ -185,16 +202,16 @@ func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
 	//   updateStrategy.maxUnavailable -> instanceUpdateStrategy.rollingUpdate.maxUnavailable
 	//   updateStrategy.memberUpdateStrategy -> memberUpdateStrategy
 	r.Spec.MemberUpdateStrategy = (*MemberUpdateStrategy)(its.Spec.MemberUpdateStrategy)
+	if r.Spec.UpdateStrategy == nil {
+		r.Spec.UpdateStrategy = &InstanceUpdateStrategy{
+			MemberUpdateStrategy: r.Spec.MemberUpdateStrategy,
+		}
+	}
 	if its.Spec.InstanceUpdateStrategy == nil {
 		return
 	}
 	if its.Spec.InstanceUpdateStrategy.RollingUpdate == nil {
 		return
-	}
-	if r.Spec.UpdateStrategy == nil {
-		r.Spec.UpdateStrategy = &InstanceUpdateStrategy{
-			MemberUpdateStrategy: r.Spec.MemberUpdateStrategy,
-		}
 	}
 	if its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas != nil {
 		partition, _ := intstr.GetScaledValueFromIntOrPercent(its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas, int(*its.Spec.Replicas), false)

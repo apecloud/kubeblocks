@@ -93,7 +93,7 @@ var _ = Describe("builder", func() {
 
 	newClusterObjs := func(compDefObj *appsv1.ComponentDefinition) (*appsv1.ComponentDefinition, *appsv1.Cluster, *component.SynthesizedComponent) {
 		cluster, compDef, _ := newAllFieldsClusterObj(compDefObj, false)
-		synthesizedComponent := newAllFieldsSynthesizedComponent(compDef, cluster)
+		synthesizedComponent := newAllFieldsSynthesizedComponent(compDef.DeepCopy(), cluster)
 		return compDef, cluster, synthesizedComponent
 	}
 

@@ -410,10 +410,10 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 		return nil
 	}
 
-	templates := make(map[string]*appsv1.ComponentFileTemplate)
+	templates := make(map[string]*SynthesizedFileTemplate)
 	for i, tpl := range synthesizedComp.FileTemplates {
 		if tpl.Config {
-			templates[tpl.Name] = &synthesizedComp.FileTemplates[i].ComponentFileTemplate
+			templates[tpl.Name] = &synthesizedComp.FileTemplates[i]
 		}
 	}
 
@@ -421,26 +421,22 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 		if config.Name == nil || len(*config.Name) == 0 {
 			continue // not supported now, ignore
 		}
-		template := templates[*config.Name]
-		if template == nil {
-			continue
-			// TODO: remove me
-			// return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
+		tpl := templates[*config.Name]
+		if tpl == nil {
+			return fmt.Errorf("the config template %s is not defined", *config.Name)
 		}
 
 		specified := func() bool {
 			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
 		}
-		switch {
-		case len(template.Template) == 0 && !specified():
-			return fmt.Errorf("there is no content provided for config template %s", *config.Name)
-		case len(template.Template) > 0 && specified():
-			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
-		case specified():
-			template.Template = config.ConfigMap.Name
-			template.Namespace = synthesizedComp.Namespace
-		default:
-			// do nothing
+		if specified() {
+			tpl.Template = config.ConfigMap.Name
+			tpl.Namespace = synthesizedComp.Namespace
+			continue
+		}
+
+		if len(tpl.Template) == 0 && (tpl.ExternalManaged == nil || !*tpl.ExternalManaged) {
+			return fmt.Errorf("there is no template provided for config template %s", *config.Name)
 		}
 	}
 	return nil

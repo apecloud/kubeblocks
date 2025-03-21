@@ -101,9 +101,11 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: compDef.Spec.Configs[0],
+				Config:                true,
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: compDef.Spec.Configs[1],
+				Config:                true,
 			}))
 		})
 
@@ -129,6 +131,7 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: compDef.Spec.Configs[0],
+				Config:                true,
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
@@ -137,6 +140,7 @@ var _ = Describe("synthesized component", func() {
 					Namespace:  comp.Namespace,
 					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
+				Config:      true,
 				Reconfigure: comp.Spec.Configs[0].Reconfigure,
 			}))
 		})
@@ -164,6 +168,7 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: compDef.Spec.Configs[0],
+				Config:                true,
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
@@ -172,6 +177,7 @@ var _ = Describe("synthesized component", func() {
 					Namespace:  comp.Namespace,
 					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
+				Config:          true,
 				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
 				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 			}))
@@ -188,6 +194,7 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: compDef.Spec.Configs[0],
+				Config:                true,
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
@@ -196,6 +203,7 @@ var _ = Describe("synthesized component", func() {
 					Namespace:  "",
 					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
+				Config:          true,
 				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
 				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 			}))

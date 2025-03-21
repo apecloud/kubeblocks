@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -106,6 +107,11 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
+	if err := r.isBackupDeletable(backup); err != nil {
+		reqCtx.Log.V(1).Info(fmt.Sprintf("backup is not deletable: %v, skipping", err))
+		return intctrlutil.Reconciled()
+	}
+
 	reqCtx.Log.Info("backup has expired, delete it", "backup", req.String())
 	if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, backup); err != nil {
 		reqCtx.Log.Error(err, "failed to delete backup")
@@ -122,4 +128,9 @@ func getGCFrequency() time.Duration {
 		return time.Duration(gcFrequencySeconds) * time.Second
 	}
 	return dptypes.DefaultGCFrequencySeconds
+}
+
+// isBackupDeletable returns true if the backup can be deleted.
+func (r *GCReconciler) isBackupDeletable(backup *dpv1alpha1.Backup) error {
+	return nil
 }

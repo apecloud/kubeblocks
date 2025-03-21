@@ -852,6 +852,14 @@ spec:
                   Specifies the directory inside the backup repository to store the backup.
                   This path is relative to the path of the backup repository.
                 type: string
+              retentionPolicy:
+                default: retentionNoBackups
+                description: Specifies the backup retention policy. This has a precedence
+                  over `backup.spec.deletionPolicy`.
+                enum:
+                - retentionLatestBackup
+                - retentionNoBackups
+                type: string
               target:
                 description: |-
                   Specifies the target information to back up, such as the target pod, the

@@ -114,6 +114,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 		compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
+			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).

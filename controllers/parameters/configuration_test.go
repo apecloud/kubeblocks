@@ -120,6 +120,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 		AddComponent(defaultCompName, compDefObj.GetName()).
+		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddSharding(shardingCompName, "", compDefObj.GetName()).
 		SetShards(5).
 		Create(&testCtx).
@@ -129,6 +130,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 	fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 	compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
+		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
 		SetReplicas(1).

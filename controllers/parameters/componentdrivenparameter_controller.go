@@ -81,6 +81,9 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, comp); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+	if !intctrlutil.ObjectAPIVersionSupported(comp) {
+		return intctrlutil.Reconciled()
+	}
 	return r.reconcile(reqCtx, comp)
 }
 

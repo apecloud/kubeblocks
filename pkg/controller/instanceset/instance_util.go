@@ -772,7 +772,7 @@ func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).
-		AddMatchLabelsInMap(parent.Labels).
+		SetSelectorMatchLabel(parent.Labels).
 		SetTemplate(*podTemplate).
 		GetObject()
 

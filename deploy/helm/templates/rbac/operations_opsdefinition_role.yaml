@@ -24,3 +24,5 @@ rules:
   - opsdefinitions/status
   verbs:
   - get
+  - patch
+  - update

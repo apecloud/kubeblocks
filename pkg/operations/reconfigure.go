@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,6 +89,10 @@ func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, res
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (err error) {
+	if !intctrlutil.ObjectAPIVersionSupported(resource.Cluster) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`api version "%s" is not supported, you can upgrade the cluster to v1 version`, resource.Cluster.APIVersion))
+	}
+
 	if len(resource.OpsRequest.Spec.Reconfigures) == 0 {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
 	}

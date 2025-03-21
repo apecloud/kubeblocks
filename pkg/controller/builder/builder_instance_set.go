@@ -55,26 +55,13 @@ func (builder *InstanceSetBuilder) SetMinReadySeconds(minReadySeconds int32) *In
 	return builder
 }
 
-func (builder *InstanceSetBuilder) AddMatchLabel(key, value string) *InstanceSetBuilder {
-	labels := make(map[string]string, 1)
-	labels[key] = value
-	return builder.AddMatchLabelsInMap(labels)
-}
-
-func (builder *InstanceSetBuilder) AddMatchLabels(keyValues ...string) *InstanceSetBuilder {
-	return builder.AddMatchLabelsInMap(WithMap(keyValues...))
-}
-
-func (builder *InstanceSetBuilder) AddMatchLabelsInMap(labels map[string]string) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetSelectorMatchLabel(labels map[string]string) *InstanceSetBuilder {
 	selector := builder.get().Spec.Selector
 	if selector == nil {
 		selector = &metav1.LabelSelector{}
 		builder.get().Spec.Selector = selector
 	}
-	matchLabels := builder.get().Spec.Selector.MatchLabels
-	if matchLabels == nil {
-		matchLabels = make(map[string]string, len(labels))
-	}
+	matchLabels := make(map[string]string, len(labels))
 	for k, v := range labels {
 		matchLabels[k] = v
 	}

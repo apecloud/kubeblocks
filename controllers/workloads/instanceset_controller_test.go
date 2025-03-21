@@ -132,7 +132,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				Spec:       pod.Spec,
 			}
 			its := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
-				AddMatchLabelsInMap(commonLabels).
+				SetSelectorMatchLabel(commonLabels).
 				AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 				SetTemplate(template).
 				GetObject()

@@ -24,3 +24,5 @@ rules:
   - shardingdefinitions/status
   verbs:
   - get
+  - patch
+  - update

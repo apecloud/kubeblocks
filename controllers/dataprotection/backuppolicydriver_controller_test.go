@@ -126,9 +126,9 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 				&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
 
 			By("sync from backup policy template")
-			testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {
+			Expect(testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {
 				template.Spec.Target.Strategy = dpv1alpha1.PodSelectionStrategyAll
-			})
+			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
 				g.Expect(policy.Spec.Target.PodSelector).ShouldNot(BeNil())
 				g.Expect(policy.Spec.Target.PodSelector.Strategy).Should(Equal(dpv1alpha1.PodSelectionStrategyAll))
@@ -136,17 +136,17 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 
 			By("not sync from backup policy template")
 			// 1. disable sync from template
-			testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
+			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 				bp.Annotations[disableSyncFromTemplateAnnotation] = "true"
-			})
+			})).Should(Succeed())
 			// 2. update bpt
-			testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {
+			Expect(testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {
 				template.Spec.Target.Strategy = dpv1alpha1.PodSelectionStrategyAny
-			})
+			})).Should(Succeed())
 			// 3. update backup policy
-			testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {
+			Expect(testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {
 				template.Spec.BackoffLimit = pointer.Int32(int32(10))
-			})
+			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
 				g.Expect(*policy.Spec.BackoffLimit).Should(BeEquivalentTo(10))
 				g.Expect(policy.Spec.Target.PodSelector.Strategy).Should(Equal(dpv1alpha1.PodSelectionStrategyAll))

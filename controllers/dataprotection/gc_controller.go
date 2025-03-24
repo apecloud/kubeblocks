@@ -108,8 +108,7 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if deletable, err := r.isBackupDeletable(ctx, backup); !deletable {
-		reqCtx.Log.V(1).Info(fmt.Sprintf("backup is not deletable, skipping: %v", err))
+	if deletable, err := r.isBackupDeletable(reqCtx, backup); !deletable {
 		return intctrlutil.Reconciled()
 	} else if err != nil {
 		reqCtx.Log.Error(err, "failed to check backup deletability")
@@ -135,9 +134,9 @@ func getGCFrequency() time.Duration {
 }
 
 // isBackupDeletable returns true if the backup can be deleted.
-func (r *GCReconciler) isBackupDeletable(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
-	err := r.Get(ctx, client.ObjectKey{
+	err := r.Get(reqCtx.Ctx, client.ObjectKey{
 		Name:      backup.Spec.BackupPolicyName,
 		Namespace: backup.Namespace,
 	}, backupPolicy)
@@ -147,39 +146,71 @@ func (r *GCReconciler) isBackupDeletable(ctx context.Context, backup *dpv1alpha1
 	if err != nil {
 		return true, err
 	}
+	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
+	if len(backupType) == 0 || backupType == string(dpv1alpha1.BackupTypeContinuous) ||
+		backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+		return true, nil
+	}
+	// relatedMethod is the incremental backup method or compatible full backup method
+	var relatedMethod string
+	for _, method := range backupPolicy.Spec.BackupMethods {
+		if backupType == string(dpv1alpha1.BackupTypeFull) && method.CompatibleMethod == backup.Spec.BackupMethod {
+			relatedMethod = method.Name
+			break
+		} else if backupType == string(dpv1alpha1.BackupTypeIncremental) && method.Name == backup.Spec.BackupMethod {
+			relatedMethod = method.CompatibleMethod
+			break
+		}
+	}
+	if len(relatedMethod) != 0 {
+		isParent, err := r.isParentBackup(reqCtx.Ctx, backup)
+		if err != nil {
+			return true, err
+		}
+		if isParent {
+			reqCtx.Log.V(1).Info(fmt.Sprintf(
+				"backup %s/%s is a parent backup and will be retained, skipping",
+				backup.Namespace, backup.Name))
+			return false, nil
+		}
+	}
 	if backupPolicy.Spec.RetentionPolicy == dpv1alpha1.BackupPolicyRetentionPolicyRetentionLatestBackup {
-		isLatest, err := r.isLatestCompletedFullBackup(ctx, backup)
+		isLatest, err := r.isLatestCompletedBackup(reqCtx.Ctx, backup, relatedMethod)
 		if err != nil {
 			return true, err
 		}
 		if isLatest {
-			return false, fmt.Errorf("%s/%s is the latest completed full backup", backup.Namespace, backup.Name)
+			reqCtx.Log.V(1).Info(fmt.Sprintf(
+				"backup %s/%s is the latest completed backup and will be retained, skipping",
+				backup.Namespace, backup.Name))
+			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func (r *GCReconciler) isLatestCompletedFullBackup(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
-	// check if the backup is the latest full backup
-	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
-	if backupType != string(dpv1alpha1.BackupTypeFull) || backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+// isLatestCompletedBackup returns true if the backup is the latest completed backup.
+func (r *GCReconciler) isLatestCompletedBackup(ctx context.Context, backup *dpv1alpha1.Backup, relatedMethod string) (bool, error) {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return false, nil
 	}
-	backupList := &dpv1alpha1.BackupList{}
-	if err := r.List(ctx, backupList, client.InNamespace(backup.Namespace),
-		client.MatchingLabels(map[string]string{
-			dptypes.ClusterUIDLabelKey:   backup.Labels[dptypes.ClusterUIDLabelKey],
-			dptypes.BackupPolicyLabelKey: backup.Spec.BackupPolicyName,
-		})); err != nil && !apierrors.IsNotFound(err) {
+	// check if the backup is the latest completed backup
+	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
+	if backupType != string(dpv1alpha1.BackupTypeFull) && backupType != string(dpv1alpha1.BackupTypeIncremental) {
+		return false, nil
+	}
+	backupList, err := r.getRelatedBackups(ctx, backup)
+	if err != nil {
 		return false, err
-	} else if apierrors.IsNotFound(err) {
+	}
+	if backupList == nil {
 		return false, nil
 	}
 	// get completed backups
 	completedBackups := make([]dpv1alpha1.Backup, 0)
 	for _, b := range backupList.Items {
-		if len(b.Spec.BackupMethod) != 0 && b.Spec.BackupMethod == backup.Spec.BackupMethod &&
-			b.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted && len(b.Spec.BackupMethod) != 0 &&
+			(b.Spec.BackupMethod == backup.Spec.BackupMethod || b.Spec.BackupMethod == relatedMethod) {
 			completedBackups = append(completedBackups, b)
 		}
 	}
@@ -191,9 +222,43 @@ func (r *GCReconciler) isLatestCompletedFullBackup(ctx context.Context, backup *
 		i, j = j, i
 		return dputils.CompareWithBackupStopTime(completedBackups[i], completedBackups[j])
 	})
-	// retain the backup if it is the latest full backup
+	// retain the backup if it is the latest completed backup
 	if backupList.Items[0].Name == backup.Name {
 		return true, nil
+	}
+	return false, nil
+}
+
+func (r *GCReconciler) getRelatedBackups(ctx context.Context, backup *dpv1alpha1.Backup) (*dpv1alpha1.BackupList, error) {
+	clusterUID := backup.Labels[dptypes.ClusterUIDLabelKey]
+	if len(clusterUID) == 0 {
+		return nil, nil
+	}
+	backupList := &dpv1alpha1.BackupList{}
+	if err := r.List(ctx, backupList, client.InNamespace(backup.Namespace),
+		client.MatchingLabels(map[string]string{
+			dptypes.ClusterUIDLabelKey:   clusterUID,
+			dptypes.BackupPolicyLabelKey: backup.Spec.BackupPolicyName,
+		})); err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	} else if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	return backupList, nil
+}
+
+func (r *GCReconciler) isParentBackup(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+	backupList, err := r.getRelatedBackups(ctx, backup)
+	if err != nil {
+		return false, err
+	}
+	if backupList == nil {
+		return false, nil
+	}
+	for _, b := range backupList.Items {
+		if b.Status.ParentBackupName == backup.Name && b.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+			return true, nil
+		}
 	}
 	return false, nil
 }

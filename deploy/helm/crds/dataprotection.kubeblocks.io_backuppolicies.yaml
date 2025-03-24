@@ -853,12 +853,11 @@ spec:
                   This path is relative to the path of the backup repository.
                 type: string
               retentionPolicy:
-                default: retentionNoBackups
                 description: Specifies the backup retention policy. This has a precedence
-                  over `backup.spec.deletionPolicy`.
+                  over `backup.spec.retentionPeriod`.
                 enum:
                 - retentionLatestBackup
-                - retentionNoBackups
+                - none
                 type: string
               target:
                 description: |-

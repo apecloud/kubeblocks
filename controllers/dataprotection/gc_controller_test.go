@@ -82,6 +82,18 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 		var (
 			backupNamePrefix = "schedule-test-backup-"
 			backupPolicy     *dpv1alpha1.BackupPolicy
+			now              = metav1.Now()
+			backupStatus     = dpv1alpha1.BackupStatus{
+				Phase:               dpv1alpha1.BackupPhaseCompleted,
+				Expiration:          &now,
+				StartTimestamp:      &now,
+				CompletionTimestamp: &now,
+			}
+			autoBackupLabel = map[string]string{
+				dptypes.AutoBackupLabelKey:     "true",
+				dptypes.BackupScheduleLabelKey: testdp.BackupPolicyName,
+				dptypes.BackupMethodLabelKey:   testdp.BackupMethodName,
+			}
 		)
 
 		getJobKey := func(backup *dpv1alpha1.Backup) client.ObjectKey {
@@ -89,6 +101,21 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
 				Namespace: backup.Namespace,
 			}
+		}
+
+		checkBackupCompleted := func(key client.ObjectKey) {
+			Eventually(testapps.CheckObj(&testCtx, key,
+				func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+				})).Should(Succeed())
+		}
+
+		createBackup := func(name string) *dpv1alpha1.Backup {
+			return testdp.NewBackupFactory(testCtx.DefaultNamespace, name).
+				WithRandomName().AddLabelsInMap(autoBackupLabel).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.BackupMethodName).
+				Create(&testCtx).GetObject()
 		}
 
 		BeforeEach(func() {
@@ -106,35 +133,6 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 		})
 
 		It("delete expired backups", func() {
-			now := metav1.Now()
-			backupStatus := dpv1alpha1.BackupStatus{
-				Phase:               dpv1alpha1.BackupPhaseCompleted,
-				Expiration:          &now,
-				StartTimestamp:      &now,
-				CompletionTimestamp: &now,
-			}
-
-			autoBackupLabel := map[string]string{
-				dptypes.AutoBackupLabelKey:     "true",
-				dptypes.BackupScheduleLabelKey: testdp.BackupPolicyName,
-				dptypes.BackupMethodLabelKey:   testdp.BackupMethodName,
-			}
-
-			createBackup := func(name string) *dpv1alpha1.Backup {
-				return testdp.NewBackupFactory(testCtx.DefaultNamespace, name).
-					WithRandomName().AddLabelsInMap(autoBackupLabel).
-					SetBackupPolicyName(testdp.BackupPolicyName).
-					SetBackupMethod(testdp.BackupMethodName).
-					Create(&testCtx).GetObject()
-			}
-
-			checkBackupCompleted := func(key client.ObjectKey) {
-				Eventually(testapps.CheckObj(&testCtx, key,
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-					})).Should(Succeed())
-			}
-
 			setBackupUnexpired := func(backup *dpv1alpha1.Backup) {
 				backup.Status.Expiration = &metav1.Time{Time: fakeClock.Now().Add(time.Hour * 24)}
 				backup.Status.StartTimestamp = &metav1.Time{Time: fakeClock.Now().Add(time.Hour)}
@@ -171,6 +169,62 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 				client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
 			Eventually(testapps.CheckObjExists(&testCtx, backup1Key, &dpv1alpha1.Backup{}, true)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, expiredKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
+		})
+
+		It("should not delete the latest full backup", func() {
+			shouldNotDelete := func(key client.ObjectKey) {
+				Eventually(testapps.CheckObjExists(&testCtx, key, &dpv1alpha1.Backup{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+						g.Expect(fetched.DeletionTimestamp).To(BeNil())
+					})).Should(Succeed())
+			}
+
+			By("setting the backup policy retention policy to retention latest backup")
+			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+				policy.Spec.RetentionPolicy = dpv1alpha1.BackupPolicyRetentionPolicyRetentionLatestBackup
+			})).Should(Succeed())
+
+			By("creating an older full backup")
+			olderBackup := createBackup("older-full-backup")
+			olderKey := client.ObjectKeyFromObject(olderBackup)
+			testdp.PatchK8sJobStatus(&testCtx, getJobKey(olderBackup), batchv1.JobComplete)
+			checkBackupCompleted(olderKey)
+
+			By("setting the older full backup as expired")
+			expiredTime := metav1.Time{Time: fakeClock.Now().Add(-time.Hour * 24)}
+			olderBackup.Status.Expiration = &expiredTime
+			olderBackup.Status.StartTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour * 2)}
+			olderBackup.Status.CompletionTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour * 2)}
+			olderBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			testdp.PatchBackupStatus(&testCtx, olderKey, olderBackup.Status)
+
+			By("the older full backup should be not deleted, it is the latest backup for now")
+			Eventually(testapps.List(&testCtx, generics.BackupSignature,
+				client.MatchingLabels(autoBackupLabel),
+				client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
+			shouldNotDelete(olderKey)
+
+			By("creating the latest full backup")
+			latestBackup := createBackup("latest-full-backup")
+			latestKey := client.ObjectKeyFromObject(latestBackup)
+			testdp.PatchK8sJobStatus(&testCtx, getJobKey(latestBackup), batchv1.JobComplete)
+			checkBackupCompleted(latestKey)
+
+			By("setting the latest full backup as expired")
+			latestBackup.Status.Expiration = &expiredTime
+			latestBackup.Status.StartTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour)}
+			latestBackup.Status.CompletionTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour)}
+			latestBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			testdp.PatchBackupStatus(&testCtx, latestKey, latestBackup.Status)
+
+			By("verify the latest full backup is retained while older is deleted")
+			Eventually(testapps.List(&testCtx, generics.BackupSignature,
+				client.MatchingLabels(autoBackupLabel),
+				client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
+			shouldNotDelete(latestKey)
+			Eventually(testapps.CheckObjExists(&testCtx, olderKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
 		})
 	})
 })

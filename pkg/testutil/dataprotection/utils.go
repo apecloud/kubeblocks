@@ -116,6 +116,7 @@ func CreateBackupPolicyTpl(testCtx *testutil.TestContext, compDef string) *dpv1a
 	By("Creating a BackupPolicyTemplate")
 	ttl := "7d"
 	return NewBackupPolicyTemplateFactory(BackupPolicyTPLName).AddBackupMethod(BackupMethodName, false, ActionSetName).
+		SetTargetRole("").
 		SetBackupMethodVolumeMounts("data", "/data").
 		SetCompDefs(compDef).
 		AddBackupMethod(VSBackupMethodName, true, "").

@@ -119,6 +119,12 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
+            {{- if .Values.dataProtection.enableBackupEncryption }}
+            - name: DP_BACKUP_ENCRYPTION_SECRET_KEY_REF
+              value: {{ include "dataprotection.encryptionKeySecretKeyRef" . | fromYaml | toJson | quote }}
+            - name: DP_BACKUP_ENCRYPTION_ALGORITHM
+              value: {{ include "dataprotection.backupEncryptionAlgorithm" . }}
+            {{- end }}
             {{- if .Values.dataProtection.reconcileWorkers }}
             - name: DATAPROTECTION_RECONCILE_WORKERS
               value: {{ .Values.dataProtection.reconcileWorkers | quote }}

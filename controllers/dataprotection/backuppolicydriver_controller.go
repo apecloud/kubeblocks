@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cluster
+package dataprotection
 
 import (
 	"context"
@@ -27,15 +27,17 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -45,113 +47,72 @@ import (
 )
 
 const (
-	defaultCronExpression = "0 18 * * *"
+	defaultCronExpression      = "0 18 * * *"
+	syncFromTemplateAnnotation = "dataprotection.kubeblocks.io/sync-from-template"
 )
 
-// clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
-type clusterBackupPolicyTransformer struct {
-	*clusterTransformContext
+// BackupPolicyDriverReconciler reconciles a BackupPolicy object
+type BackupPolicyDriverReconciler struct {
+	client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
-var _ graph.Transformer = &clusterBackupPolicyTransformer{}
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
 
-// Transform transforms the backup policy template to the backup policy and backup schedule.
-func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	r.clusterTransformContext = ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(r.clusterTransformContext.OrigCluster) {
-		return nil
-	}
-	if common.IsCompactMode(r.clusterTransformContext.OrigCluster.Annotations) {
-		r.clusterTransformContext.V(1).Info("Cluster is in compact mode, no need to create backup related objects",
-			"cluster", client.ObjectKeyFromObject(r.clusterTransformContext.OrigCluster))
-		return nil
-	}
-	graphCli, _ := r.clusterTransformContext.Client.(model.GraphClient)
-	transformBackupPolicy := func(bpBuilder *backupPolicyBuilder) *dpv1alpha1.BackupPolicy {
-		// build the data protection backup policy from the template.
-		oldBackupPolicy, newBackupPolicy := bpBuilder.transformBackupPolicy()
-		if newBackupPolicy == nil {
-			return nil
-		}
-		if oldBackupPolicy == nil {
-			graphCli.Create(dag, newBackupPolicy)
-		} else {
-			graphCli.Patch(dag, oldBackupPolicy, newBackupPolicy)
-		}
-		return newBackupPolicy
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies/finalizers,verbs=update
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the backuppolicy closer to the desired state.
+func (r *BackupPolicyDriverReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
-	transformBackupSchedule := func(bpBuilder *backupPolicyBuilder, backupPolicy *dpv1alpha1.BackupPolicy) {
-		// if backup policy is nil, it means that the backup policy template
-		// is invalid, backup schedule depends on backup policy, so we do
-		// not need to transform backup schedule.
-		if backupPolicy == nil {
-			return
-		}
-		// build the data protection backup schedule from the template.
-		oldBackupSchedule, newBackupSchedule := bpBuilder.transformBackupSchedule(backupPolicy)
-		// merge cluster backup configuration into the backup schedule.
-		// If the backup schedule is nil, create a new backup schedule
-		// based on the cluster backup configuration.
-		// For a cluster, the default backup schedule is created by backup
-		// policy template, user can also configure cluster backup in the
-		// cluster custom object, such as enable cluster backup, set backup
-		// schedule, etc.
-		// We always prioritize the cluster backup configuration in the
-		// cluster object, so we need to merge the cluster backup configuration
-		// into the default backup schedule created by backup policy template
-		// if it exists.
-		newBackupSchedule = bpBuilder.mergeClusterBackup(backupPolicy, newBackupSchedule)
-		if newBackupSchedule == nil {
-			return
-		}
-		if oldBackupSchedule == nil {
-			graphCli.Create(dag, newBackupSchedule)
-		} else {
-			graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
-		}
-		graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
-		comps := graphCli.FindAll(dag, &appsv1.Component{})
-		graphCli.DependOn(dag, backupPolicy, comps...)
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
-	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		bpBuilder := newBackupPolicyBuilder(r, compSpec, bpt, componentName, isSharding)
-		policy := transformBackupPolicy(bpBuilder)
-		// only merge the first backupSchedule for the cluster backup.
-		transformBackupSchedule(bpBuilder, policy)
-		return nil
+	if model.IsObjectDeleting(cluster) {
+		return intctrlutil.Reconciled()
 	}
-
-	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		bpt, err := r.getBackupPolicyTemplate(compSpec.ComponentDef)
-		if err != nil {
-			return err
-		}
-		if bpt == nil {
-			return nil
-		}
-		return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding)
+	crdAPIVersion := cluster.GetAnnotations()[constant.CRDAPIVersionAnnotationKey]
+	if !intctrlutil.IsAPIVersionSupported(crdAPIVersion) {
+		return intctrlutil.Reconciled()
 	}
+	if err := r.reconcile(reqCtx, cluster); err != nil {
+		r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "ReconcileBackupPolicyFail", "failed to reconcile: %v", err)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
 
-	for i := range r.Cluster.Spec.ComponentSpecs {
-		compSpec := &r.Cluster.Spec.ComponentSpecs[i]
-		if err := transformComponentBackupPolicy(compSpec, compSpec.Name, false); err != nil {
+func (r *BackupPolicyDriverReconciler) reconcile(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) error {
+	for i := range cluster.Spec.ComponentSpecs {
+		compSpec := &cluster.Spec.ComponentSpecs[i]
+		if err := r.transformComponentBackupPolicyAndSchedule(reqCtx, cluster, compSpec, compSpec.Name, false); err != nil {
 			return err
 		}
 	}
-	for i := range r.Cluster.Spec.Shardings {
-		spec := r.Cluster.Spec.Shardings[i]
-		if err := transformComponentBackupPolicy(&spec.Template, spec.Name, true); err != nil {
+	for i := range cluster.Spec.Shardings {
+		spec := cluster.Spec.Shardings[i]
+		if err := r.transformComponentBackupPolicyAndSchedule(reqCtx, cluster, &spec.Template, spec.Name, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef string) (*dpv1alpha1.BackupPolicyTemplate, error) {
+func (r *BackupPolicyDriverReconciler) getBackupPolicyTemplate(reqCtx intctrlutil.RequestCtx, componentDef string) (*dpv1alpha1.BackupPolicyTemplate, error) {
 	bptList := &dpv1alpha1.BackupPolicyTemplateList{}
-	if err := r.Client.List(r.Context, bptList, client.MatchingLabels{
+	if err := r.Client.List(reqCtx.Ctx, bptList, client.MatchingLabels{
 		componentDef: componentDef,
 	}); err != nil {
 		return nil, err
@@ -162,11 +123,42 @@ func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef st
 	return nil, nil
 }
 
-type backupPolicyBuilder struct {
+func (r *BackupPolicyDriverReconciler) transformComponentBackupPolicyAndSchedule(reqCtx intctrlutil.RequestCtx,
+	cluster *appsv1.Cluster,
+	compSpec *appsv1.ClusterComponentSpec,
+	specName string,
+	isSharding bool) error {
+	bpt, err := r.getBackupPolicyTemplate(reqCtx, compSpec.ComponentDef)
+	if err != nil {
+		return err
+	}
+	if bpt == nil {
+		return nil
+	}
+	bpAndScheduleBuilder := newBackupPolicyAndScheduleBuilder(reqCtx, r.Client, r.Scheme,
+		cluster, compSpec, bpt, specName, isSharding)
+	bp, err := bpAndScheduleBuilder.transformBackupPolicy()
+	if err != nil {
+		return err
+	}
+	return bpAndScheduleBuilder.transformBackupSchedule(bp)
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *BackupPolicyDriverReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return intctrlutil.NewControllerManagedBy(mgr).
+		For(&appsv1.Cluster{}).
+		Owns(&dpv1alpha1.BackupPolicy{}).
+		Owns(&dpv1alpha1.BackupSchedule{}).
+		Complete(r)
+}
+
+type backupPolicyAndScheduleBuilder struct {
 	context.Context
-	Client client.Reader
+	Client client.Client
 	record.EventRecorder
 	logr.Logger
+	schema          *runtime.Scheme
 	Cluster         *appsv1.Cluster
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate
 	compSpec        *appsv1.ClusterComponentSpec
@@ -174,17 +166,21 @@ type backupPolicyBuilder struct {
 	isSharding      bool
 }
 
-func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
+func newBackupPolicyAndScheduleBuilder(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	schema *runtime.Scheme,
+	cluster *appsv1.Cluster,
 	compSpec *appsv1.ClusterComponentSpec,
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate,
 	componentName string,
-	isSharding bool) *backupPolicyBuilder {
-	return &backupPolicyBuilder{
-		Context:         r.Context,
-		Client:          r.Client,
-		EventRecorder:   r.EventRecorder,
-		Logger:          r.Logger,
-		Cluster:         r.Cluster,
+	isSharding bool) *backupPolicyAndScheduleBuilder {
+	return &backupPolicyAndScheduleBuilder{
+		Context:         reqCtx.Ctx,
+		Client:          cli,
+		EventRecorder:   reqCtx.Recorder,
+		schema:          schema,
+		Logger:          reqCtx.Log,
+		Cluster:         cluster,
 		compSpec:        compSpec,
 		backupPolicyTPL: backupPolicyTPL,
 		componentName:   componentName,
@@ -193,7 +189,7 @@ func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
 }
 
 // transformBackupPolicy transforms backup policy template to backup policy.
-func (r *backupPolicyBuilder) transformBackupPolicy() (*dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy) {
+func (r *backupPolicyAndScheduleBuilder) transformBackupPolicy() (*dpv1alpha1.BackupPolicy, error) {
 	backupPolicyName := generateBackupPolicyName(r.Cluster.Name, r.componentName)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
@@ -201,23 +197,35 @@ func (r *backupPolicyBuilder) transformBackupPolicy() (*dpv1alpha1.BackupPolicy,
 		Name:      backupPolicyName,
 	}, backupPolicy); client.IgnoreNotFound(err) != nil {
 		r.Error(err, "failed to get backup policy", "backupPolicy", backupPolicyName)
-		return nil, nil
+		return nil, err
 	}
 
 	if len(backupPolicy.Name) == 0 {
-		// build a new backup policy by the backup policy template.
-		return nil, r.buildBackupPolicy(backupPolicyName)
+		// create a new backup policy by the backup policy template.
+		backupPolicy = &dpv1alpha1.BackupPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        backupPolicyName,
+				Namespace:   r.Cluster.Namespace,
+				Labels:      r.buildLabels(),
+				Annotations: r.buildAnnotations(),
+			},
+		}
+		// sync from the backup policy template by default.
+		backupPolicy.Annotations[syncFromTemplateAnnotation] = "true"
+		r.buildBackupPolicy(backupPolicy)
+		if err := controllerutil.SetControllerReference(r.Cluster, backupPolicy, r.schema); err != nil {
+			return nil, err
+		}
+		return backupPolicy, r.Client.Create(r.Context, backupPolicy)
 	}
-
-	// sync the existing backup policy with the cluster changes
-	old := backupPolicy.DeepCopy()
-	r.syncBackupPolicy(backupPolicy)
-	return old, backupPolicy
+	r.buildBackupPolicy(backupPolicy)
+	return backupPolicy, r.Client.Update(r.Context, backupPolicy)
 }
 
-func (r *backupPolicyBuilder) transformBackupSchedule(
-	backupPolicy *dpv1alpha1.BackupPolicy,
-) (*dpv1alpha1.BackupSchedule, *dpv1alpha1.BackupSchedule) {
+func (r *backupPolicyAndScheduleBuilder) transformBackupSchedule(bp *dpv1alpha1.BackupPolicy) error {
+	if bp == nil {
+		return nil
+	}
 	scheduleName := generateBackupScheduleName(r.Cluster.Name, r.componentName)
 	backupSchedule := &dpv1alpha1.BackupSchedule{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
@@ -225,20 +233,115 @@ func (r *backupPolicyBuilder) transformBackupSchedule(
 		Name:      scheduleName,
 	}, backupSchedule); client.IgnoreNotFound(err) != nil {
 		r.Error(err, "failed to get backup schedule", "backupSchedule", scheduleName)
-		return nil, nil
+		return err
 	}
 
 	// build a new backup schedule from the backup policy template.
 	if len(backupSchedule.Name) == 0 {
-		return nil, r.buildBackupSchedule(scheduleName, backupPolicy)
+		backupSchedule = r.buildBackupSchedule(scheduleName, bp)
+		if err := controllerutil.SetControllerReference(r.Cluster, backupSchedule, r.schema); err != nil {
+			return err
+		}
+		r.mergeClusterBackup(bp, backupSchedule)
+		return r.Client.Create(r.Context, backupSchedule)
 	}
-
-	old := backupSchedule.DeepCopy()
 	r.syncBackupSchedule(backupSchedule)
-	return old, backupSchedule
+	r.mergeClusterBackup(bp, backupSchedule)
+	return r.Client.Update(r.Context, backupSchedule)
 }
 
-func (r *backupPolicyBuilder) setDefaultEncryptionConfig(backupPolicy *dpv1alpha1.BackupPolicy) {
+func (r *backupPolicyAndScheduleBuilder) buildBackupSchedule(
+	name string,
+	backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupSchedule {
+	if len(r.backupPolicyTPL.Spec.Schedules) == 0 {
+		return nil
+	}
+	backupSchedule := &dpv1alpha1.BackupSchedule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   r.Cluster.Namespace,
+			Labels:      r.buildLabels(),
+			Annotations: r.buildAnnotations(),
+		},
+		Spec: dpv1alpha1.BackupScheduleSpec{
+			BackupPolicyName: backupPolicy.Name,
+		},
+	}
+
+	var schedules []dpv1alpha1.SchedulePolicy
+	for _, s := range r.backupPolicyTPL.Spec.Schedules {
+		name = s.GetScheduleName()
+		schedules = append(schedules, dpv1alpha1.SchedulePolicy{
+			BackupMethod:    s.BackupMethod,
+			CronExpression:  s.CronExpression,
+			Enabled:         s.Enabled,
+			RetentionPeriod: s.RetentionPeriod,
+			Name:            name,
+			Parameters:      s.Parameters,
+		})
+	}
+	backupSchedule.Spec.Schedules = schedules
+	return backupSchedule
+}
+
+func (r *backupPolicyAndScheduleBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) {
+	scheduleNameMap := map[string]struct{}{}
+	for i := range backupSchedule.Spec.Schedules {
+		s := &backupSchedule.Spec.Schedules[i]
+		if len(s.Name) == 0 {
+			// assign to backupMethod if name is empty.
+			s.Name = s.BackupMethod
+		}
+		scheduleNameMap[s.Name] = struct{}{}
+	}
+	intctrlutil.MergeMetadataMapInplace(r.buildAnnotations(), &backupSchedule.Annotations)
+	intctrlutil.MergeMetadataMapInplace(r.buildLabels(), &backupSchedule.Labels)
+	// update backupSchedule annotation to reconcile it.
+	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
+	// sync the newly added schedule policies.
+	for _, s := range r.backupPolicyTPL.Spec.Schedules {
+		name := s.GetScheduleName()
+		if _, ok := scheduleNameMap[name]; ok {
+			continue
+		}
+		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, dpv1alpha1.SchedulePolicy{
+			BackupMethod:    s.BackupMethod,
+			CronExpression:  s.CronExpression,
+			Enabled:         s.Enabled,
+			RetentionPeriod: s.RetentionPeriod,
+			Name:            name,
+			Parameters:      s.Parameters,
+		})
+	}
+}
+
+// buildBackupPolicy builds a new backup policy by the backup policy template.
+func (r *backupPolicyAndScheduleBuilder) buildBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) {
+	bpSpec := &backupPolicy.Spec
+	// if cluster have backup repo, set backup repo name to backup policy.
+	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
+		bpSpec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
+	}
+	bpSpec.PathPrefix = buildBackupPathPrefix(r.Cluster, r.componentName)
+
+	r.setDefaultEncryptionConfig(backupPolicy)
+
+	intctrlutil.MergeMetadataMapInplace(r.buildAnnotations(), &backupPolicy.Annotations)
+	intctrlutil.MergeMetadataMapInplace(r.buildLabels(), &backupPolicy.Labels)
+
+	r.buildBackupMethods(backupPolicy)
+
+	if needSyncFromTemplate(backupPolicy) {
+		bpSpec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
+		if r.isSharding {
+			bpSpec.Targets = r.buildBackupTargets(backupPolicy.Spec.Targets)
+		} else {
+			bpSpec.Target = r.buildBackupTarget(backupPolicy.Spec.Target, r.backupPolicyTPL.Spec.Target, r.componentName)
+		}
+	}
+}
+
+func (r *backupPolicyAndScheduleBuilder) setDefaultEncryptionConfig(backupPolicy *dpv1alpha1.BackupPolicy) {
 	secretKeyRefJSON := viper.GetString(constant.CfgKeyDPBackupEncryptionSecretKeyRef)
 	if secretKeyRefJSON == "" {
 		return
@@ -262,93 +365,7 @@ func (r *backupPolicyBuilder) setDefaultEncryptionConfig(backupPolicy *dpv1alpha
 	}
 }
 
-func (r *backupPolicyBuilder) buildBackupSchedule(
-	name string,
-	backupPolicy *dpv1alpha1.BackupPolicy) *dpv1alpha1.BackupSchedule {
-	if len(r.backupPolicyTPL.Spec.Schedules) == 0 {
-		return nil
-	}
-	backupSchedule := &dpv1alpha1.BackupSchedule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   r.Cluster.Namespace,
-			Labels:      r.buildLabels(),
-			Annotations: r.buildAnnotations(),
-		},
-		Spec: dpv1alpha1.BackupScheduleSpec{
-			BackupPolicyName: backupPolicy.Name,
-		},
-	}
-
-	var schedules []dpv1alpha1.SchedulePolicy
-	for _, s := range r.backupPolicyTPL.Spec.Schedules {
-		name := s.GetScheduleName()
-		schedules = append(schedules, dpv1alpha1.SchedulePolicy{
-			BackupMethod:    s.BackupMethod,
-			CronExpression:  s.CronExpression,
-			Enabled:         s.Enabled,
-			RetentionPeriod: s.RetentionPeriod,
-			Name:            name,
-			Parameters:      s.Parameters,
-		})
-	}
-	backupSchedule.Spec.Schedules = schedules
-	return backupSchedule
-}
-
-func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) {
-	scheduleNameMap := map[string]struct{}{}
-	for i := range backupSchedule.Spec.Schedules {
-		s := &backupSchedule.Spec.Schedules[i]
-		if len(s.Name) == 0 {
-			// assign to backupMethod if name is empty.
-			s.Name = s.BackupMethod
-		}
-		scheduleNameMap[s.Name] = struct{}{}
-	}
-	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
-	// update backupSchedule annotation to reconcile it.
-	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
-	// sync the newly added schedule policies.
-	for _, s := range r.backupPolicyTPL.Spec.Schedules {
-		name := s.GetScheduleName()
-		if _, ok := scheduleNameMap[name]; ok {
-			continue
-		}
-		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, dpv1alpha1.SchedulePolicy{
-			BackupMethod:    s.BackupMethod,
-			CronExpression:  s.CronExpression,
-			Enabled:         s.Enabled,
-			RetentionPeriod: s.RetentionPeriod,
-			Name:            name,
-			Parameters:      s.Parameters,
-		})
-	}
-}
-
-// syncBackupPolicy syncs labels and annotations of the backup policy with the cluster changes.
-func (r *backupPolicyBuilder) syncBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) {
-	// update labels and annotations of the backup policy.
-	if backupPolicy.Annotations == nil {
-		backupPolicy.Annotations = map[string]string{}
-	}
-	if backupPolicy.Labels == nil {
-		backupPolicy.Labels = map[string]string{}
-	}
-	mergeMap(backupPolicy.Annotations, r.buildAnnotations())
-	mergeMap(backupPolicy.Labels, r.buildLabels())
-
-	// update backup repo of the backup policy.
-	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
-		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
-	}
-	backupPolicy.Spec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
-	backupPolicy.Spec.RetentionPolicy = r.backupPolicyTPL.Spec.RetentionPolicy
-	r.syncBackupMethods(backupPolicy)
-	r.syncBackupPolicyTargetSpec(backupPolicy)
-}
-
-func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role, alternateRole, compName string) {
+func (r *backupPolicyAndScheduleBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role, alternateRole, compName string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -356,7 +373,7 @@ func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTar
 	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
 		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 	}
-	if r.getCompReplicas(compName) == 1 {
+	if r.compSpec.Replicas == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
 		if podSelector.FallbackLabelSelector != nil && podSelector.FallbackLabelSelector.MatchLabels != nil {
 			delete(podSelector.FallbackLabelSelector.MatchLabels, constant.RoleLabelKey)
@@ -372,48 +389,18 @@ func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTar
 	}
 }
 
-func (r *backupPolicyBuilder) getCompReplicas(compName string) int32 {
-	comp := &appsv1.Component{}
-	name := fmt.Sprintf("%s-%s", r.Cluster.Name, compName)
-	if err := r.Client.Get(r.Context, client.ObjectKey{Name: name, Namespace: r.Cluster.Namespace}, comp); err != nil {
-		return r.compSpec.Replicas
-	}
-	return comp.Spec.Replicas
-}
-
-// buildBackupPolicy builds a new backup policy by the backup policy template.
-func (r *backupPolicyBuilder) buildBackupPolicy(backupPolicyName string) *dpv1alpha1.BackupPolicy {
-	backupPolicy := &dpv1alpha1.BackupPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        backupPolicyName,
-			Namespace:   r.Cluster.Namespace,
-			Labels:      r.buildLabels(),
-			Annotations: r.buildAnnotations(),
-		},
-	}
-	r.syncBackupMethods(backupPolicy)
-	bpSpec := backupPolicy.Spec
-	// if cluster have backup repo, set backup repo name to backup policy.
-	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
-		bpSpec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
-	}
-	bpSpec.PathPrefix = buildBackupPathPrefix(r.Cluster, r.componentName)
-	bpSpec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
-	bpSpec.RetentionPolicy = r.backupPolicyTPL.Spec.RetentionPolicy
-	backupPolicy.Spec = bpSpec
-	r.setDefaultEncryptionConfig(backupPolicy)
-	r.syncBackupPolicyTargetSpec(backupPolicy)
-	return backupPolicy
-}
-
-// syncBackupMethods syncs the backupMethod of tpl to backupPolicy.
-func (r *backupPolicyBuilder) syncBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy) {
+// buildBackupMethods build the backupMethod of tpl to backupPolicy.
+func (r *backupPolicyAndScheduleBuilder) buildBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy) {
 	var backupMethods []dpv1alpha1.BackupMethod
 	oldBackupMethodMap := map[string]dpv1alpha1.BackupMethod{}
 	for _, v := range backupPolicy.Spec.BackupMethods {
 		oldBackupMethodMap[v.Name] = v
 	}
 	for _, backupMethodTPL := range r.backupPolicyTPL.Spec.BackupMethods {
+		if oldMethod, ok := oldBackupMethodMap[backupMethodTPL.Name]; ok && !needSyncFromTemplate(backupPolicy) {
+			backupMethods = append(backupMethods, oldMethod)
+			continue
+		}
 		backupMethod := dpv1alpha1.BackupMethod{
 			Name:             backupMethodTPL.Name,
 			CompatibleMethod: backupMethodTPL.CompatibleMethod,
@@ -422,10 +409,7 @@ func (r *backupPolicyBuilder) syncBackupMethods(backupPolicy *dpv1alpha1.BackupP
 			TargetVolumes:    backupMethodTPL.TargetVolumes,
 			RuntimeSettings:  backupMethodTPL.RuntimeSettings,
 		}
-		if m, ok := oldBackupMethodMap[backupMethodTPL.Name]; ok {
-			backupMethod = m
-			delete(oldBackupMethodMap, backupMethod.Name)
-		} else if backupMethodTPL.Target != nil {
+		if backupMethodTPL.Target != nil {
 			if r.isSharding {
 				backupMethod.Targets = r.buildBackupTargets(backupMethod.Targets)
 			} else {
@@ -435,13 +419,10 @@ func (r *backupPolicyBuilder) syncBackupMethods(backupPolicy *dpv1alpha1.BackupP
 		backupMethod.Env = r.resolveBackupMethodEnv(r.compSpec, backupMethodTPL.Env)
 		backupMethods = append(backupMethods, backupMethod)
 	}
-	for _, v := range oldBackupMethodMap {
-		backupMethods = append(backupMethods, v)
-	}
 	backupPolicy.Spec.BackupMethods = backupMethods
 }
 
-func (r *backupPolicyBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterComponentSpec, envs []dpv1alpha1.EnvVar) []corev1.EnvVar {
+func (r *backupPolicyAndScheduleBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterComponentSpec, envs []dpv1alpha1.EnvVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for _, v := range envs {
 		if v.Value != nil {
@@ -460,7 +441,7 @@ func (r *backupPolicyBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterCom
 	return env
 }
 
-func (r *backupPolicyBuilder) matchMappingName(names []string, target string) bool {
+func (r *backupPolicyAndScheduleBuilder) matchMappingName(names []string, target string) bool {
 	for _, name := range names {
 		if component.PrefixOrRegexMatched(target, name) {
 			return true
@@ -469,15 +450,7 @@ func (r *backupPolicyBuilder) matchMappingName(names []string, target string) bo
 	return false
 }
 
-func (r *backupPolicyBuilder) syncBackupPolicyTargetSpec(backupPolicy *dpv1alpha1.BackupPolicy) {
-	if r.isSharding {
-		backupPolicy.Spec.Targets = r.buildBackupTargets(backupPolicy.Spec.Targets)
-	} else {
-		backupPolicy.Spec.Target = r.buildBackupTarget(backupPolicy.Spec.Target, r.backupPolicyTPL.Spec.Target, r.componentName)
-	}
-}
-
-func (r *backupPolicyBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarget) []dpv1alpha1.BackupTarget {
+func (r *backupPolicyAndScheduleBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarget) []dpv1alpha1.BackupTarget {
 	shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, r.componentName)
 	sourceTargetMap := map[string]*dpv1alpha1.BackupTarget{}
 	for i := range targets {
@@ -494,7 +467,7 @@ func (r *backupPolicyBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarg
 	return backupTargets
 }
 
-func (r *backupPolicyBuilder) buildBackupTarget(
+func (r *backupPolicyAndScheduleBuilder) buildBackupTarget(
 	oldTarget *dpv1alpha1.BackupTarget,
 	targetTpl dpv1alpha1.TargetInstance,
 	compName string,
@@ -538,7 +511,7 @@ func (r *backupPolicyBuilder) buildBackupTarget(
 	return target
 }
 
-func (r *backupPolicyBuilder) mergeClusterBackup(
+func (r *backupPolicyAndScheduleBuilder) mergeClusterBackup(
 	backupPolicy *dpv1alpha1.BackupPolicy,
 	backupSchedule *dpv1alpha1.BackupSchedule,
 ) *dpv1alpha1.BackupSchedule {
@@ -670,7 +643,7 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 	return backupSchedule
 }
 
-func (r *backupPolicyBuilder) buildAnnotations() map[string]string {
+func (r *backupPolicyAndScheduleBuilder) buildAnnotations() map[string]string {
 	annotations := map[string]string{
 		dptypes.DefaultBackupPolicyAnnotationKey:   "true",
 		constant.BackupPolicyTemplateAnnotationKey: r.backupPolicyTPL.Name,
@@ -681,7 +654,7 @@ func (r *backupPolicyBuilder) buildAnnotations() map[string]string {
 	return annotations
 }
 
-func (r *backupPolicyBuilder) buildLabels() map[string]string {
+func (r *backupPolicyAndScheduleBuilder) buildLabels() map[string]string {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:        constant.AppName,
 		constant.AppInstanceLabelKey:         r.Cluster.Name,
@@ -697,14 +670,14 @@ func (r *backupPolicyBuilder) buildLabels() map[string]string {
 
 // buildTargetPodLabels builds the target labels for the backup policy that will be
 // used to select the target pod.
-func (r *backupPolicyBuilder) buildTargetPodLabels(role string, fullCompName string) map[string]string {
+func (r *backupPolicyAndScheduleBuilder) buildTargetPodLabels(role string, fullCompName string) map[string]string {
 	labels := map[string]string{
 		constant.AppInstanceLabelKey:    r.Cluster.Name,
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.KBAppComponentLabelKey: fullCompName,
 	}
 	// append label to filter specific role of the component.
-	if len(role) > 0 && r.getCompReplicas(fullCompName) > 1 {
+	if len(role) > 0 && r.compSpec.Replicas > 1 {
 		// the role only works when the component has multiple replicas.
 		labels[constant.RoleLabelKey] = role
 	}
@@ -741,4 +714,15 @@ func mergeSchedulePolicy(src *dpv1alpha1.SchedulePolicy, dst *dpv1alpha1.Schedul
 	if src.CronExpression != "" {
 		dst.CronExpression = src.CronExpression
 	}
+}
+
+func boolValue(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
+}
+
+func needSyncFromTemplate(bp *dpv1alpha1.BackupPolicy) bool {
+	return bp.Annotations[syncFromTemplateAnnotation] == "true"
 }

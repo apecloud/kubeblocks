@@ -212,6 +212,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: actionCtx.cluster.Namespace,
 						Name:      jobName,
+						Labels:    constant.GetComponentWellKnownLabels(actionCtx.cluster.Name, actionCtx.compShortName),
 					},
 					Spec: corev1.PodSpec{
 						Volumes:       volumes,

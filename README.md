@@ -1,4 +1,4 @@
-# Welcome to the KubeBlocks project!
+
 
 [![Documentation status](https://github.com/apecloud/kubeblocks.io/workflows/Documentation/badge.svg)](https://kubeblocks.io)
 [![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/7544/badge)](https://bestpractices.coreinfrastructure.org/projects/7544)
@@ -14,6 +14,7 @@
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kubeblocks)](https://artifacthub.io/packages/search?repo=kubeblocks)
 
 ![image](./docs/img/banner-readme.jpeg)
+# Welcome to the KubeBlocks project!
 
 ## Motivation
 
@@ -106,8 +107,8 @@ You can also follow us on:
 
 Your contributions are welcomed and appreciated.
 
-- See the [Contributor Guide](docs/CONTRIBUTING.md) for details on typical contribution workflows.
-- See the [Developer Guide](docs%2F00%20-%20index.md) to get started with building and developing.
+- See the [Contributor Guide](https://github.com/apecloud/kubeblocks/blob/main/docs/CONTRIBUTING.md) for details on typical contribution workflows.
+- See the [Developer Guide](https://github.com/apecloud/kubeblocks/blob/main/docs/00%20-%20index.md) to get started with building and developing.
 
 ## Report Vulnerability
 
@@ -116,4 +117,4 @@ We consider security as the top priority issue. If you find any security issues,
 ## License
 
 KubeBlocks is under the GNU Affero General Public License v3.0.
-See the [LICENSE](./LICENSE) file for details.
+See the [LICENSE](https://github.com/apecloud/kubeblocks/blob/main/LICENSE) file for details.

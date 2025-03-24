@@ -26,8 +26,7 @@ import (
 )
 
 const (
-	trueVal              = "true"
-	backupMethodIndexKey = "spec.backupMethod"
+	trueVal = "true"
 )
 
 const (

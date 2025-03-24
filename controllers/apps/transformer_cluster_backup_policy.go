@@ -45,7 +45,8 @@ import (
 )
 
 const (
-	defaultCronExpression = "0 18 * * *"
+	defaultCronExpression             = "0 18 * * *"
+	disableSyncFromTemplateAnnotation = "dataprotection.kubeblocks.io/disable-sync-from-template"
 )
 
 // clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
@@ -356,9 +357,11 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp componentItem, ba
 	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
 		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
 	}
-	backupPolicy.Spec.BackoffLimit = r.backupPolicy.BackoffLimit
+	if needSyncFromTemplate(backupPolicy) {
+		backupPolicy.Spec.BackoffLimit = r.backupPolicy.BackoffLimit
+		r.syncBackupPolicyTargetSpec(backupPolicy, comp)
+	}
 	r.syncBackupMethods(backupPolicy, comp)
-	r.syncBackupPolicyTargetSpec(backupPolicy, comp)
 }
 
 func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentItem, target *dpv1alpha1.BackupTarget, role, alternateRole string) {
@@ -428,10 +431,11 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 	}
 	for _, v := range r.backupPolicy.BackupMethods {
 		backupMethod := v.BackupMethod
-		if m, ok := oldBackupMethodMap[backupMethod.Name]; ok {
-			backupMethod = m
-			delete(oldBackupMethodMap, backupMethod.Name)
-		} else if v.Target != nil {
+		if oldMethod, ok := oldBackupMethodMap[v.Name]; ok && !needSyncFromTemplate(backupPolicy) {
+			backupMethods = append(backupMethods, oldMethod)
+			continue
+		}
+		if v.Target != nil {
 			if comp.isSharding {
 				backupMethod.Targets = r.buildBackupTargets(backupMethod.Targets, comp)
 			} else {
@@ -441,9 +445,6 @@ func (r *clusterBackupPolicyTransformer) syncBackupMethods(backupPolicy *dpv1alp
 		mappingEnv := r.doEnvMapping(comp.compSpec, v.EnvMapping)
 		backupMethod.Env = dputils.MergeEnv(backupMethod.Env, mappingEnv)
 		backupMethods = append(backupMethods, backupMethod)
-	}
-	for _, v := range oldBackupMethodMap {
-		backupMethods = append(backupMethods, v)
 	}
 	backupPolicy.Spec.BackupMethods = backupMethods
 }
@@ -863,4 +864,8 @@ func mergeSchedulePolicy(src *dpv1alpha1.SchedulePolicy, dst *dpv1alpha1.Schedul
 	if src.CronExpression != "" {
 		dst.CronExpression = src.CronExpression
 	}
+}
+
+func needSyncFromTemplate(bp *dpv1alpha1.BackupPolicy) bool {
+	return bp.Annotations[disableSyncFromTemplateAnnotation] != "true"
 }

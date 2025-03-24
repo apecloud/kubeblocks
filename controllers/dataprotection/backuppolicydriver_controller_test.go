@@ -137,7 +137,7 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 			By("not sync from backup policy template")
 			// 1. disable sync from template
 			testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
-				bp.Annotations[syncFromTemplateAnnotation] = "false"
+				bp.Annotations[disableSyncFromTemplateAnnotation] = "true"
 			})
 			// 2. update bpt
 			testapps.ChangeObj(&testCtx, bpt, func(template *dpv1alpha1.BackupPolicyTemplate) {

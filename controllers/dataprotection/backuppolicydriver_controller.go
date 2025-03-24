@@ -47,8 +47,8 @@ import (
 )
 
 const (
-	defaultCronExpression      = "0 18 * * *"
-	syncFromTemplateAnnotation = "dataprotection.kubeblocks.io/sync-from-template"
+	defaultCronExpression             = "0 18 * * *"
+	disableSyncFromTemplateAnnotation = "dataprotection.kubeblocks.io/disable-sync-from-template"
 )
 
 // BackupPolicyDriverReconciler reconciles a BackupPolicy object
@@ -210,8 +210,6 @@ func (r *backupPolicyAndScheduleBuilder) transformBackupPolicy() (*dpv1alpha1.Ba
 				Annotations: r.buildAnnotations(),
 			},
 		}
-		// sync from the backup policy template by default.
-		backupPolicy.Annotations[syncFromTemplateAnnotation] = "true"
 		r.buildBackupPolicy(backupPolicy)
 		if err := controllerutil.SetControllerReference(r.Cluster, backupPolicy, r.schema); err != nil {
 			return nil, err
@@ -724,5 +722,5 @@ func boolValue(b *bool) bool {
 }
 
 func needSyncFromTemplate(bp *dpv1alpha1.BackupPolicy) bool {
-	return bp.Annotations[syncFromTemplateAnnotation] == "true"
+	return bp.Annotations[disableSyncFromTemplateAnnotation] != "true"
 }

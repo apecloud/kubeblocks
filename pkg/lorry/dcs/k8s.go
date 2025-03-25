@@ -258,6 +258,10 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 			// it is not a member pod
 			continue
 		}
+		jobName := pod.Labels["job-name"]
+		if jobName != "" {
+			continue // skip job pods
+		}
 		member := Member{}
 		member.Name = pod.Name
 		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
@@ -275,6 +279,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 		members = append(members, member)
 	}
 
+	store.logger.Info(fmt.Sprintf("members count: %d", len(members)))
 	return members, nil
 }
 

@@ -207,6 +207,9 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
 		return nil, err
 	}
+	if len(parameterSpecs) == 0 {
+		return nil, nil
+	}
 
 	clusterName, _ := component.GetClusterName(comp)
 	componentName, _ := component.ShortName(clusterName, comp.Name)

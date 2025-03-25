@@ -39,7 +39,9 @@ func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParamet
 
 	classifyParams := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls)
 	for _, template := range cmpd.Spec.Configs {
-		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
+		if _, ok := classifyParams[template.Name]; ok {
+			itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
+		}
 	}
 	return itemDetails
 }
@@ -60,7 +62,7 @@ func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParamete
 	parametersDefs []*parametersv1alpha1.ParametersDefinition,
 	templates []appsv1.ComponentTemplateSpec,
 	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
-	if len(parameters) == 0 || len(parametersDefs) == 0 {
+	if len(parameters) == 0 && len(parametersDefs) == 0 {
 		return nil
 	}
 	if len(parametersDefs) == 1 {

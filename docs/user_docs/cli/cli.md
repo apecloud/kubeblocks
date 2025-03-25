@@ -52,7 +52,6 @@ Cluster command.
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster describe-restore](kbcli_cluster_describe-restore.md)	 - Describe a restore
-* [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
 * [kbcli cluster edit-backup-policy](kbcli_cluster_edit-backup-policy.md)	 - Edit backup policy
 * [kbcli cluster edit-config](kbcli_cluster_edit-config.md)	 - Edit the config file of the component.
 * [kbcli cluster explain-config](kbcli_cluster_explain-config.md)	 - List the constraint for supported configuration params.

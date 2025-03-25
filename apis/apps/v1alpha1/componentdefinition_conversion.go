@@ -100,11 +100,12 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 		for i, v1alphaRole := range r.Spec.Roles {
 			role := &dstObj.Spec.Roles[i]
 			role.Name = v1alphaRole.Name
-			if v1alphaRole.Writable {
+			switch {
+			case v1alphaRole.Writable:
 				role.UpdatePriority = highestUpdatePriority
-			} else if v1alphaRole.Serviceable {
+			case v1alphaRole.Serviceable:
 				role.UpdatePriority = highestUpdatePriority - 1
-			} else {
+			default:
 				role.UpdatePriority = 1
 			}
 		}

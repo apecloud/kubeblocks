@@ -334,7 +334,7 @@ func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
 		cm := &corev1.ConfigMap{}
-		if err := reader.Get(ctx, client.ObjectKey{Name: config.TemplateRef, Namespace: config.Namespace}, cm); err != nil {
+		if err := reader.Get(ctx, client.ObjectKey{Name: config.Template, Namespace: config.Namespace}, cm); err != nil {
 			return nil, err
 		}
 		tpls[config.Name] = cm

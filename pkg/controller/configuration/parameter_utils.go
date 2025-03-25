@@ -46,7 +46,7 @@ func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParamet
 	return itemDetails
 }
 
-func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentTemplateSpec) parametersv1alpha1.ConfigTemplateItemDetail {
+func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentFileTemplate) parametersv1alpha1.ConfigTemplateItemDetail {
 	itemDetail := parametersv1alpha1.ConfigTemplateItemDetail{
 		Name:       template.Name,
 		ConfigSpec: template.DeepCopy(),
@@ -60,7 +60,7 @@ func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1
 
 func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParameters,
 	parametersDefs []*parametersv1alpha1.ParametersDefinition,
-	templates []appsv1.ComponentTemplateSpec,
+	templates []appsv1.ComponentFileTemplate,
 	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
 	if len(parameters) == 0 && len(parametersDefs) == 0 {
 		return nil
@@ -107,7 +107,7 @@ func updateConfigParameter(paramKey string,
 }
 
 func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.ParametersDefinition,
-	templates []appsv1.ComponentTemplateSpec,
+	templates []appsv1.ComponentFileTemplate,
 	tpls map[string]*corev1.ConfigMap) map[string]*intctrlutil.ParameterMeta {
 	paramMeta := make(map[string]*intctrlutil.ParameterMeta)
 	mergeParams := func(params map[string]*intctrlutil.ParameterMeta) {
@@ -125,7 +125,7 @@ func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.
 }
 
 func transformParametersInFile(paramDef *parametersv1alpha1.ParametersDefinition,
-	templates []appsv1.ComponentTemplateSpec,
+	templates []appsv1.ComponentFileTemplate,
 	parameters parametersv1alpha1.ComponentParameters,
 	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
 	configSpec := resolveConfigSpecFromParametersDefinition(templates, paramDef, tpls)
@@ -141,9 +141,9 @@ func transformParametersInFile(paramDef *parametersv1alpha1.ParametersDefinition
 	}
 }
 
-func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentTemplateSpec,
+func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentFileTemplate,
 	paramDef *parametersv1alpha1.ParametersDefinition,
-	tpls map[string]*corev1.ConfigMap) *appsv1.ComponentTemplateSpec {
+	tpls map[string]*corev1.ConfigMap) *appsv1.ComponentFileTemplate {
 	for i, item := range templates {
 		tpl, ok := tpls[item.Name]
 		if !ok {

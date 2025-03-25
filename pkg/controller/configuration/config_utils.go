@@ -52,7 +52,7 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 		buildParams *cfgcm.CfgManagerBuildParams
 
 		podSpec      = synthesizedComp.PodSpec
-		configSpecs  = synthesizedComp.ConfigTemplates
+		configSpecs  = component.ConfigTemplates(synthesizedComp)
 		configRender *parametersv1alpha1.ParamConfigRenderer
 		paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	)
@@ -148,17 +148,17 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 		&configManager.CMConfigVolumes,
 	} {
 		for i := range *vm {
-			podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
+			podVolumes = intctrlutil.CreateVolumeIfNotExist(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
 				return (*vm)[i]
-			}, nil)
+			})
 		}
 	}
 	podSpec.Volumes = podVolumes
 }
 
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentTemplateSpec) {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentFileTemplate) ([]corev1.VolumeMount, []appsv1.ComponentFileTemplate) {
 	// Ignore useless configTemplate
-	usingConfigSpecs := make([]appsv1.ComponentTemplateSpec, 0, len(configSpecs))
+	usingConfigSpecs := make([]appsv1.ComponentFileTemplate, 0, len(configSpecs))
 	config2Containers := make(map[string][]*corev1.Container)
 	for _, configSpec := range configSpecs {
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
@@ -326,7 +326,7 @@ func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
 		cm := &corev1.ConfigMap{}
-		if err := reader.Get(ctx, client.ObjectKey{Name: config.TemplateRef, Namespace: config.Namespace}, cm); err != nil {
+		if err := reader.Get(ctx, client.ObjectKey{Name: config.Template, Namespace: config.Namespace}, cm); err != nil {
 			return nil, err
 		}
 		tpls[config.Name] = cm

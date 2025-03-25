@@ -46,9 +46,8 @@ type SynthesizedComponent struct {
 	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	PVCRetentionPolicy               kbappsv1.PersistentVolumeClaimRetentionPolicy
-	LogConfigs                       []kbappsv1.LogConfig `json:"logConfigs,omitempty"`
 	FileTemplates                    []SynthesizedFileTemplate
-	ConfigTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"configTemplates,omitempty"`
+	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
@@ -82,6 +81,7 @@ type SynthesizedComponent struct {
 
 type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
+	Config          bool
 	Variables       map[string]string
 	Reconfigure     *kbappsv1.Action
 	ExternalManaged *bool

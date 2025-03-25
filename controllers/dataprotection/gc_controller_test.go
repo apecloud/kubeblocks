@@ -223,7 +223,7 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 			incrementalBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 			testdp.PatchBackupStatus(&testCtx, incrementalKey, incrementalBackup.Status)
 
-			By("the incremental backup should be not deleted, it is the latest backup for now")
+			By("the incremental backup should be not deleted, its parent is the latest backup for now")
 			time.Sleep(2 * gcFrequency)
 			Eventually(testapps.List(&testCtx, generics.BackupSignature,
 				client.MatchingLabels(autoBackupLabel),

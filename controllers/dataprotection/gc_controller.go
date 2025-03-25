@@ -155,32 +155,18 @@ func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *
 		method := dputils.GetBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)
 		if method != nil {
 			actionSet := &dpv1alpha1.ActionSet{}
-			if len(method.ActionSetName) == 0 {
-				actionSet = nil
-			} else {
+			if len(method.ActionSetName) != 0 {
 				err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: method.ActionSetName}, actionSet)
 				if apierrors.IsNotFound(err) {
 					return true, nil
 				} else if err != nil {
-					return true, err
+					return false, err
 				}
 			}
 			backupType = string(dputils.GetBackupType(actionSet, method.SnapshotVolumes))
 		}
 	}
 	if backupType == string(dpv1alpha1.BackupTypeIncremental) {
-		parentBackup := &dpv1alpha1.Backup{}
-		if len(backup.Status.ParentBackupName) != 0 {
-			err := r.Get(reqCtx.Ctx, client.ObjectKey{
-				Name:      backup.Status.ParentBackupName,
-				Namespace: backup.Namespace,
-			}, parentBackup)
-			if apierrors.IsNotFound(err) {
-				return true, nil
-			} else if err != nil {
-				return true, err
-			}
-		}
 		reqCtx.Log.V(1).Info(fmt.Sprintf(
 			"backup %s/%s is an incremental backup and will be auto-deleted when its parent backup is deleted, skipping",
 			backup.Namespace, backup.Name))

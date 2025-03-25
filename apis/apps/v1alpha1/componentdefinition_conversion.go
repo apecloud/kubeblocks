@@ -78,6 +78,8 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 
 	// deleted
 	c := &componentDefinitionConverter{
+		Configs:          r.Spec.Configs,
+		Scripts:          r.Spec.Scripts,
 		Monitor:          r.Spec.Monitor,
 		RoleArbitrator:   r.Spec.RoleArbitrator,
 		LifecycleActions: r.Spec.LifecycleActions.DeepCopy(),
@@ -96,6 +98,8 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 func (r *ComponentDefinition) incrementConvertFrom(srcRaw metav1.Object, ic incrementChange) error {
 	// deleted
 	c := ic.(*componentDefinitionConverter)
+	r.Spec.Configs = c.Configs
+	r.Spec.Scripts = c.Scripts
 	r.Spec.Monitor = c.Monitor
 	r.Spec.RoleArbitrator = c.RoleArbitrator
 	r.Spec.LifecycleActions = c.LifecycleActions
@@ -343,6 +347,8 @@ func (r *ComponentDefinition) fromV1LifecycleAction(action *appsv1.Action) *Acti
 }
 
 type componentDefinitionConverter struct {
+	Configs                   []ComponentConfigSpec      `json:"configs,omitempty"`
+	Scripts                   []ComponentTemplateSpec    `json:"scripts,omitempty"`
 	Monitor                   *MonitorConfig             `json:"monitor,omitempty"`
 	LifecycleActions          *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 	RoleArbitrator            *RoleArbitrator            `json:"roleArbitrator,omitempty"`

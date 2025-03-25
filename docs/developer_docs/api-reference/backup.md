@@ -2236,8 +2236,8 @@ the BackupController.</p>
 <tbody><tr><td><p>&#34;&#34;</p></td>
 <td><p>BackupPolicyRetentionPolicyNone indicates that no backup retention policy is set.</p>
 </td>
-</tr><tr><td><p>&#34;retentionLatestBackup&#34;</p></td>
-<td><p>BackupPolicyRetentionPolicyRetentionLatestBackup indicates that the latest backup is retained.</p>
+</tr><tr><td><p>&#34;retainLatestBackup&#34;</p></td>
+<td><p>BackupPolicyRetentionPolicyRetainLatestBackup indicates that the latest backup is retained.</p>
 </td>
 </tr></tbody>
 </table>

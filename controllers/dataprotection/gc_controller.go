@@ -135,6 +135,9 @@ func getGCFrequency() time.Duration {
 
 // isBackupDeletable returns true if the backup can be deleted.
 func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+		return true, nil
+	}
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	err := r.Get(reqCtx.Ctx, client.ObjectKey{
 		Name:      backup.Spec.BackupPolicyName,
@@ -147,9 +150,23 @@ func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *
 		return true, err
 	}
 	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
-	if len(backupType) == 0 || backupType == string(dpv1alpha1.BackupTypeContinuous) ||
-		backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
-		return true, nil
+	if len(backupType) == 0 {
+		// fallback to get backup type from action set
+		method := dputils.GetBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)
+		if method != nil {
+			actionSet := &dpv1alpha1.ActionSet{}
+			if len(method.ActionSetName) == 0 {
+				actionSet = nil
+			} else {
+				err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: method.ActionSetName}, actionSet)
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return true, err
+				}
+			}
+			backupType = string(dputils.GetBackupType(actionSet, method.SnapshotVolumes))
+		}
 	}
 	// relatedMethod is the incremental backup method or compatible full backup method
 	var relatedMethod string
@@ -163,7 +180,7 @@ func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *
 		}
 	}
 	if len(relatedMethod) != 0 {
-		isParent, err := r.isParentBackup(reqCtx.Ctx, backup)
+		isParent, err := r.isParentBackup(reqCtx.Ctx, backup, relatedMethod)
 		if err != nil {
 			return true, err
 		}
@@ -174,15 +191,15 @@ func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *
 			return false, nil
 		}
 	}
-	if backupPolicy.Spec.RetentionPolicy == dpv1alpha1.BackupPolicyRetentionPolicyRetentionLatestBackup {
+	if backupPolicy.Spec.RetentionPolicy == dpv1alpha1.BackupPolicyRetentionPolicyRetainLatestBackup {
 		isLatest, err := r.isLatestCompletedBackup(reqCtx.Ctx, backup, relatedMethod)
 		if err != nil {
 			return true, err
 		}
 		if isLatest {
 			reqCtx.Log.V(1).Info(fmt.Sprintf(
-				"backup %s/%s is the latest completed backup and will be retained, skipping",
-				backup.Namespace, backup.Name))
+				"backup %s/%s is the latest completed backup of backup method %s and will be retained, skipping",
+				backup.Namespace, backup.Name, backup.Spec.BackupMethod))
 			return false, nil
 		}
 	}
@@ -194,23 +211,16 @@ func (r *GCReconciler) isLatestCompletedBackup(ctx context.Context, backup *dpv1
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return false, nil
 	}
-	// check if the backup is the latest completed backup
-	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
-	if backupType != string(dpv1alpha1.BackupTypeFull) && backupType != string(dpv1alpha1.BackupTypeIncremental) {
-		return false, nil
-	}
-	backupList, err := r.getRelatedBackups(ctx, backup)
+	relatedBackups, err := r.getRelatedBackups(ctx, backup, relatedMethod)
 	if err != nil {
 		return false, err
 	}
-	if backupList == nil {
+	if len(relatedBackups) == 0 {
 		return false, nil
 	}
-	// get completed backups
-	completedBackups := make([]dpv1alpha1.Backup, 0)
-	for _, b := range backupList.Items {
-		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted && len(b.Spec.BackupMethod) != 0 &&
-			(b.Spec.BackupMethod == backup.Spec.BackupMethod || b.Spec.BackupMethod == relatedMethod) {
+	completedBackups := make([]*dpv1alpha1.Backup, 0)
+	for _, b := range relatedBackups {
+		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
 			completedBackups = append(completedBackups, b)
 		}
 	}
@@ -220,16 +230,34 @@ func (r *GCReconciler) isLatestCompletedBackup(ctx context.Context, backup *dpv1
 	// sort by stop time in descending order
 	sort.Slice(completedBackups, func(i, j int) bool {
 		i, j = j, i
-		return dputils.CompareWithBackupStopTime(completedBackups[i], completedBackups[j])
+		return dputils.CompareWithBackupStopTime(*completedBackups[i], *completedBackups[j])
 	})
 	// retain the backup if it is the latest completed backup
-	if backupList.Items[0].Name == backup.Name {
+	if completedBackups[0].Name == backup.Name {
 		return true, nil
 	}
 	return false, nil
 }
 
-func (r *GCReconciler) getRelatedBackups(ctx context.Context, backup *dpv1alpha1.Backup) (*dpv1alpha1.BackupList, error) {
+// isParentBackup returns true if the backup is a parent backup.
+func (r *GCReconciler) isParentBackup(ctx context.Context, backup *dpv1alpha1.Backup, relatedMethod string) (bool, error) {
+	relatedBackups, err := r.getRelatedBackups(ctx, backup, relatedMethod)
+	if err != nil {
+		return false, err
+	}
+	if len(relatedBackups) == 0 {
+		return false, nil
+	}
+	for _, b := range relatedBackups {
+		if b.Status.Phase != dpv1alpha1.BackupPhaseFailed && b.Status.ParentBackupName == backup.Name {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// getRelatedBackups returns the related backups of the given backup.
+func (r *GCReconciler) getRelatedBackups(ctx context.Context, backup *dpv1alpha1.Backup, relatedMethod string) ([]*dpv1alpha1.Backup, error) {
 	clusterUID := backup.Labels[dptypes.ClusterUIDLabelKey]
 	if len(clusterUID) == 0 {
 		return nil, nil
@@ -244,21 +272,11 @@ func (r *GCReconciler) getRelatedBackups(ctx context.Context, backup *dpv1alpha1
 	} else if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
-	return backupList, nil
-}
-
-func (r *GCReconciler) isParentBackup(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
-	backupList, err := r.getRelatedBackups(ctx, backup)
-	if err != nil {
-		return false, err
-	}
-	if backupList == nil {
-		return false, nil
-	}
-	for _, b := range backupList.Items {
-		if b.Status.ParentBackupName == backup.Name && b.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
-			return true, nil
+	var filtered []*dpv1alpha1.Backup
+	for i, b := range backupList.Items {
+		if len(b.Spec.BackupMethod) != 0 && (b.Spec.BackupMethod == backup.Spec.BackupMethod || b.Spec.BackupMethod == relatedMethod) {
+			filtered = append(filtered, &backupList.Items[i])
 		}
 	}
-	return false, nil
+	return filtered, nil
 }

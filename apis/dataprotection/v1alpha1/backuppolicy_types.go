@@ -327,12 +327,12 @@ const (
 
 // BackupPolicyRetentionPolicy defines the backup retention policy.
 // +enum
-// +kubebuilder:validation:Enum={retentionLatestBackup,none}
+// +kubebuilder:validation:Enum={retainLatestBackup,none}
 type BackupPolicyRetentionPolicy string
 
 const (
-	// BackupPolicyRetentionPolicyRetentionLatestBackup indicates that the latest backup is retained.
-	BackupPolicyRetentionPolicyRetentionLatestBackup BackupPolicyRetentionPolicy = "retentionLatestBackup"
+	// BackupPolicyRetentionPolicyRetainLatestBackup indicates that the latest backup is retained.
+	BackupPolicyRetentionPolicyRetainLatestBackup BackupPolicyRetentionPolicy = "retainLatestBackup"
 	// BackupPolicyRetentionPolicyNone indicates that no backup retention policy is set.
 	BackupPolicyRetentionPolicyNone BackupPolicyRetentionPolicy = ""
 )

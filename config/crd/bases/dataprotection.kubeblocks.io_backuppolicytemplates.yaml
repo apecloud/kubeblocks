@@ -348,7 +348,7 @@ spec:
               retentionPolicy:
                 description: Defines the backup retention policy to be used.
                 enum:
-                - retentionLatestBackup
+                - retainLatestBackup
                 - none
                 type: string
               schedules:

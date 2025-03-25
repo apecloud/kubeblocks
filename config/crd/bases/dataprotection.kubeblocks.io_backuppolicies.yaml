@@ -856,7 +856,7 @@ spec:
                 description: Specifies the backup retention policy. This has a precedence
                   over `backup.spec.retentionPeriod`.
                 enum:
-                - retentionLatestBackup
+                - retainLatestBackup
                 - none
                 type: string
               target:

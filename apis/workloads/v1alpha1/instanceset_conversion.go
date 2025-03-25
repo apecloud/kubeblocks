@@ -189,7 +189,7 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 			case ReadonlyMode:
 				role.UpdatePriority = highestUpdatePriority - 1
 			case NoneMode:
-				role.UpdatePriority = 0
+				role.UpdatePriority = 1
 			}
 		}
 	}

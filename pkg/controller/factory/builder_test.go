@@ -93,7 +93,7 @@ var _ = Describe("builder", func() {
 
 	newClusterObjs := func(compDefObj *appsv1.ComponentDefinition) (*appsv1.ComponentDefinition, *appsv1.Cluster, *component.SynthesizedComponent) {
 		cluster, compDef, _ := newAllFieldsClusterObj(compDefObj, false)
-		synthesizedComponent := newAllFieldsSynthesizedComponent(compDef, cluster)
+		synthesizedComponent := newAllFieldsSynthesizedComponent(compDef.DeepCopy(), cluster)
 		return compDef, cluster, synthesizedComponent
 	}
 
@@ -133,9 +133,9 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			tplCfg := appsv1.ComponentTemplateSpec{
-				Name:        "test-config-tpl",
-				TemplateRef: "test-config-tpl",
+			tplCfg := appsv1.ComponentFileTemplate{
+				Name:     "test-config-tpl",
+				Template: "test-config-tpl",
 			}
 			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
 				"test-cm", tplCfg)

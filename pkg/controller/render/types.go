@@ -57,7 +57,7 @@ type TemplateRender interface {
 	// Returns:
 	// - A map containing the rendered template data.
 	// - An error if the rendering fails.
-	RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec) (map[string]string, error)
+	RenderConfigMapTemplate(templateSpec appsv1.ComponentFileTemplate) (map[string]string, error)
 
 	// RenderComponentTemplate renders a component template and validates the rendered data.
 	//
@@ -69,7 +69,7 @@ type TemplateRender interface {
 	// Returns:
 	// - A pointer to the rendered ConfigMap.
 	// - An error if the rendering or validation fails.
-	RenderComponentTemplate(templateSpec appsv1.ComponentTemplateSpec,
+	RenderComponentTemplate(templateSpec appsv1.ComponentFileTemplate,
 		cmName string,
 		dataValidator RenderedValidator) (*corev1.ConfigMap, error)
 }

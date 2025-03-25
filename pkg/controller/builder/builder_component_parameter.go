@@ -44,7 +44,7 @@ func (c *ComponentParameterBuilder) Component(component string) *ComponentParame
 	return c
 }
 
-func (c *ComponentParameterBuilder) AddConfigurationItem(configSpec appsv1.ComponentTemplateSpec) *ComponentParameterBuilder {
+func (c *ComponentParameterBuilder) AddConfigurationItem(configSpec appsv1.ComponentFileTemplate) *ComponentParameterBuilder {
 	c.get().Spec.ConfigItemDetails = append(c.get().Spec.ConfigItemDetails,
 		parametersv1alpha1.ConfigTemplateItemDetail{
 			Name:       configSpec.Name,

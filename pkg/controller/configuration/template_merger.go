@@ -41,16 +41,16 @@ type mergeContext struct {
 	render.TemplateRender
 
 	template     parametersv1alpha1.ConfigTemplateExtension
-	configSpec   appsv1.ComponentTemplateSpec
+	configSpec   appsv1.ComponentFileTemplate
 	paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	configRender *parametersv1alpha1.ParamConfigRenderer
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
-	templateSpec := appsv1.ComponentTemplateSpec{
+	templateSpec := appsv1.ComponentFileTemplate{
 		// Name:        m.template.Name,
-		Namespace:   m.template.Namespace,
-		TemplateRef: m.template.TemplateRef,
+		Namespace: m.template.Namespace,
+		Template:  m.template.TemplateRef,
 	}
 	configs, err := m.RenderConfigMapTemplate(templateSpec)
 	if err != nil {
@@ -127,7 +127,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 
 func NewTemplateMerger(template parametersv1alpha1.ConfigTemplateExtension,
 	templateRender render.TemplateRender,
-	configSpec appsv1.ComponentTemplateSpec,
+	configSpec appsv1.ComponentFileTemplate,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configRender *parametersv1alpha1.ParamConfigRenderer,
 ) (TemplateMerger, error) {
@@ -157,7 +157,7 @@ func NewTemplateMerger(template parametersv1alpha1.ConfigTemplateExtension,
 
 func mergerConfigTemplate(template parametersv1alpha1.ConfigTemplateExtension,
 	templateRender render.TemplateRender,
-	configSpec appsv1.ComponentTemplateSpec,
+	configSpec appsv1.ComponentFileTemplate,
 	baseData map[string]string,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configRender *parametersv1alpha1.ParamConfigRenderer) (map[string]string, error) {

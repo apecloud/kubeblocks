@@ -282,7 +282,7 @@ func updateConfigLabels(obj *corev1.ConfigMap,
 	hash, _ := cfgutil.ComputeHash(obj.Data)
 	obj.Labels[constant.CMInsConfigurationHashLabelKey] = hash
 	obj.Labels[constant.CMConfigurationSpecProviderLabelKey] = item.Name
-	obj.Labels[constant.CMConfigurationTemplateNameLabelKey] = item.ConfigSpec.TemplateRef
+	obj.Labels[constant.CMConfigurationTemplateNameLabelKey] = item.ConfigSpec.Template
 	return nil
 }
 

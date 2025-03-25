@@ -46,14 +46,6 @@ const (
 	DefaultMySQLContainerName = "mysql"
 
 	NginxImage = "nginx"
-
-	DefaultConfigSpecName          = "config-cm"
-	DefaultConfigSpecTplRef        = "env-from-config-tpl"
-	DefaultConfigSpecVolumeName    = "volume"
-	DefaultConfigSpecConstraintRef = "env-from-config-test"
-	DefaultScriptSpecName          = "script-cm"
-	DefaultScriptSpecTplRef        = "env-from-config-tpl"
-	DefaultScriptSpecVolumeName    = "script-volume"
 )
 
 var (
@@ -250,22 +242,6 @@ var (
 			DataLoad:         nil,
 			Reconfigure:      nil,
 			AccountProvision: NewLifecycleAction("account-provision"),
-		},
-	}
-
-	DefaultCompDefConfigs = []appsv1.ComponentTemplateSpec{
-		{
-			Name:        DefaultConfigSpecName,
-			TemplateRef: DefaultConfigSpecTplRef,
-			VolumeName:  DefaultConfigSpecVolumeName,
-		},
-	}
-
-	DefaultCompDefScripts = []appsv1.ComponentTemplateSpec{
-		{
-			Name:        DefaultScriptSpecName,
-			TemplateRef: DefaultScriptSpecTplRef,
-			VolumeName:  DefaultScriptSpecVolumeName,
 		},
 	}
 

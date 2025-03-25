@@ -93,7 +93,7 @@ type ConfigTemplateItemDetail struct {
 	// It ensures that the configuration adheres to certain requirements and limitations.
 	//
 	// +optional
-	ConfigSpec *appsv1.ComponentTemplateSpec `json:"configSpec,omitempty"`
+	ConfigSpec *appsv1.ComponentFileTemplate `json:"configSpec,omitempty"`
 
 	// Specifies the user-defined configuration template.
 	//

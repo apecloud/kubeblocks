@@ -20,11 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	"fmt"
-	"slices"
-	"sort"
-
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -34,88 +29,14 @@ import (
 )
 
 type createVolumeFn func(volumeName string) corev1.Volume
-type updateVolumeFn func(*corev1.Volume) error
 
-var (
-	scriptsDefaultMode int32 = 0555
-	configsDefaultMode int32 = 0444
-)
-
-func findVolumeWithVolumeName(volumes []corev1.Volume, volumeName string) int {
-	for index, itr := range volumes {
-		if itr.Name == volumeName {
-			return index
+func CreateVolumeIfNotExist(volumes []corev1.Volume, volumeName string, createFn createVolumeFn) []corev1.Volume {
+	for _, vol := range volumes {
+		if vol.Name == volumeName {
+			return volumes
 		}
 	}
-	return -1
-}
-
-func CreateOrUpdateVolume(volumes []corev1.Volume, volumeName string, createFn createVolumeFn, updateFn updateVolumeFn) ([]corev1.Volume, error) {
-	// for update volume
-	if existIndex := findVolumeWithVolumeName(volumes, volumeName); existIndex >= 0 {
-		if updateFn == nil {
-			return volumes, nil
-		}
-		if err := updateFn(&volumes[existIndex]); err != nil {
-			return volumes, err
-		}
-		return volumes, nil
-	}
-
-	// for create volume
-	return append(volumes, createFn(volumeName)), nil
-}
-
-func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1.ComponentTemplateSpec, configSet []string) error {
-	var (
-		err        error
-		podVolumes = podSpec.Volumes
-		volumeKeys = maps.Keys(volumes)
-	)
-
-	// sort the volumes
-	sort.Strings(volumeKeys)
-	// Update PodTemplate Volumes
-	for _, cmName := range volumeKeys {
-		templateSpec := volumes[cmName]
-		if templateSpec.VolumeName == "" {
-			continue
-		}
-		if podVolumes, err = CreateOrUpdateVolume(podVolumes, templateSpec.VolumeName, func(volumeName string) corev1.Volume {
-			return corev1.Volume{
-				Name: volumeName,
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-						// TODO: remove ComponentTemplateSpec.DefaultMode
-						DefaultMode: BuildVolumeMode(configSet, templateSpec),
-					},
-				},
-			}
-		}, func(volume *corev1.Volume) error {
-			configMap := volume.ConfigMap
-			if configMap == nil {
-				return fmt.Errorf("mount volume[%s] requires a ConfigMap: [%+v]", volume.Name, volume)
-			}
-			configMap.Name = cmName
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	podSpec.Volumes = podVolumes
-	return nil
-}
-
-func BuildVolumeMode(configs []string, configSpec appsv1.ComponentTemplateSpec) *int32 {
-	// If the defaultMode is not set, permissions are automatically set based on the template type.
-	if !viper.GetBool(constant.FeatureGateIgnoreConfigTemplateDefaultMode) && configSpec.DefaultMode != nil {
-		return configSpec.DefaultMode
-	}
-	if slices.Contains(configs, configSpec.Name) {
-		return &configsDefaultMode
-	}
-	return &scriptsDefaultMode
+	return append(volumes, createFn(volumeName))
 }
 
 func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {

@@ -58,13 +58,13 @@ type BackupPolicyDriverReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get
 
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies/status,verbs=get
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupschedules,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backupschedules/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backuppolicy closer to the desired state.
@@ -128,6 +128,9 @@ func (r *BackupPolicyDriverReconciler) transformComponentBackupPolicyAndSchedule
 	compSpec *appsv1.ClusterComponentSpec,
 	specName string,
 	isSharding bool) error {
+	if len(compSpec.ComponentDef) == 0 {
+		return nil
+	}
 	bpt, err := r.getBackupPolicyTemplate(reqCtx, compSpec.ComponentDef)
 	if err != nil {
 		return err

@@ -79,11 +79,12 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 	dstObj := dstRaw.(*appsv1.ComponentDefinition)
 	// deleted
 	c := &componentDefinitionConverter{
+		Configs:          r.Spec.Configs,
+		Scripts:          r.Spec.Scripts,
 		Monitor:          r.Spec.Monitor,
 		RoleArbitrator:   r.Spec.RoleArbitrator,
 		LifecycleActions: r.Spec.LifecycleActions.DeepCopy(),
 		Roles:            r.Spec.Roles,
-		Configs:          r.Spec.Configs,
 		SystemAccounts:   r.Spec.SystemAccounts,
 	}
 	if r.Spec.LifecycleActions != nil && r.Spec.LifecycleActions.Switchover != nil {

@@ -334,6 +334,7 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupPolicy(backupPolicy *dpv1alp
 
 	if needSyncFromTemplate(backupPolicy) {
 		bpSpec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
+		bpSpec.RetentionPolicy = r.backupPolicyTPL.Spec.RetentionPolicy
 		if r.isSharding {
 			bpSpec.Targets = r.buildBackupTargets(backupPolicy.Spec.Targets)
 		} else {

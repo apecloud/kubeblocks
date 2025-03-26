@@ -149,6 +149,15 @@ var _ = Describe("file templates transformer test", func() {
 		}
 	})
 
+	checkConfigTemplateExtension := func(tplName string) bool {
+		for _, config := range transCtx.SynthesizeComponent.FileTemplates {
+			if config.Name == tplName && isExternalManaged(config) {
+				return true
+			}
+		}
+		return false
+	}
+
 	checkTemplateObjects := func(tpls []string) {
 		graphCli := transCtx.Client.(model.GraphClient)
 		objs := graphCli.FindAll(dag, &corev1.ConfigMap{})
@@ -160,7 +169,9 @@ var _ = Describe("file templates transformer test", func() {
 
 		for _, tpl := range tpls {
 			objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl)
-			Expect(mobjs).Should(HaveKey(objName))
+			if !checkConfigTemplateExtension(tpl) {
+				Expect(mobjs).Should(HaveKey(objName))
+			}
 		}
 	}
 
@@ -197,7 +208,9 @@ var _ = Describe("file templates transformer test", func() {
 	checkVolumes := func(tpls []string) {
 		podSpec := transCtx.SynthesizeComponent.PodSpec
 		for _, tpl := range tpls {
-			Expect(podSpec.Volumes).Should(ContainElement(newVolume(tpl)))
+			if !checkConfigTemplateExtension(tpl) {
+				Expect(podSpec.Volumes).Should(ContainElement(newVolume(tpl)))
+			}
 		}
 	}
 

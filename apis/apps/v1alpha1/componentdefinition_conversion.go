@@ -34,15 +34,11 @@ func (r *ComponentDefinition) ConvertTo(dstRaw conversion.Hub) error {
 	// objectMeta
 	dst.ObjectMeta = r.ObjectMeta
 
-	// there may be issues with serializing and copying statements with different structures.
-	// so skip copying the systemAccount as it's not needed.
-	//systemAccountsSnapshot := r.Spec.SystemAccounts
-	//r.Spec.SystemAccounts = nil
 	// spec
 	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
 		return err
 	}
-	//r.Spec.SystemAccounts = systemAccountsSnapshot
+
 	if err := incrementConvertTo(r, dst); err != nil {
 		return err
 	}

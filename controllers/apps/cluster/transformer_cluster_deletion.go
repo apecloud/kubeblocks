@@ -161,8 +161,6 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 		&appsv1.ComponentList{},
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
-		&dpv1alpha1.BackupPolicyList{},
-		&dpv1alpha1.BackupScheduleList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }

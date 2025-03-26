@@ -36,19 +36,6 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-func boolValue(b *bool) bool {
-	if b == nil {
-		return false
-	}
-	return *b
-}
-
-func mergeMap(dst, src map[string]string) {
-	for key, val := range src {
-		dst[key] = val
-	}
-}
-
 type gvkNObjKey struct {
 	schema.GroupVersionKind
 	client.ObjectKey

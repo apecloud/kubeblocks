@@ -39,7 +39,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -106,12 +105,10 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		resetTestContext()
@@ -175,9 +172,6 @@ var _ = Describe("Cluster Controller", func() {
 			AddClusterTopology(defaultTopology).
 			Create(&testCtx).
 			GetObject()
-
-		By("Create a bpt obj")
-		testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
@@ -306,20 +300,6 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature,
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
-
-		By("checking backup policy")
-		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName)
-		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
-		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
-			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
-			g.Expect(bp.Spec.Targets[0].Name).ShouldNot(BeEmpty())
-		})).Should(Succeed())
-
-		By("checking backup schedule")
-		backupScheduleName := generateBackupScheduleName(clusterKey.Name, compTplName)
-		backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
-		Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
-			&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
 	}
 
 	createClusterObjWithMultipleTemplates := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
@@ -927,185 +907,6 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
 			})).Should(Succeed())
-		})
-	})
-
-	Context("cluster with backup", func() {
-		const (
-			backupRepoName   = "test-backup-repo"
-			backupMethodName = "test-backup-method"
-		)
-
-		BeforeEach(func() {
-			cleanEnv()
-			createAllDefinitionObjects()
-		})
-
-		createClusterWithBackup := func(backup *appsv1.ClusterBackup) {
-			By("Creating a cluster")
-			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				WithRandomName().
-				AddComponent(defaultCompName, compDefName).
-				SetBackup(backup).
-				Create(&testCtx).GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			By("Waiting for the cluster controller to create resources completely")
-			waitForCreatingResourceCompletely(clusterKey)
-		}
-
-		It("Creating cluster without backup", func() {
-			createClusterWithBackup(nil)
-			Eventually(testapps.List(&testCtx, generics.BackupPolicySignature,
-				client.MatchingLabels{
-					constant.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
-		})
-
-		It("Creating cluster with backup", func() {
-			var (
-				boolTrue  = true
-				boolFalse = false
-				int64Ptr  = func(in int64) *int64 {
-					return &in
-				}
-				retention = func(s string) dpv1alpha1.RetentionPeriod {
-					return dpv1alpha1.RetentionPeriod(s)
-				}
-			)
-
-			var testCases = []struct {
-				desc   string
-				backup *appsv1.ClusterBackup
-			}{
-				{
-					desc: "backup with snapshot method",
-					backup: &appsv1.ClusterBackup{
-						Enabled:                 &boolTrue,
-						RetentionPeriod:         retention("1d"),
-						Method:                  testdp.VSBackupMethodName,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						PITREnabled:             &boolTrue,
-						RepoName:                backupRepoName,
-					},
-				},
-				{
-					desc: "backup with snapshot method and specified continuous method",
-					backup: &appsv1.ClusterBackup{
-						Enabled:                 &boolTrue,
-						RetentionPeriod:         retention("1d"),
-						Method:                  testdp.VSBackupMethodName,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						ContinuousMethod:        testdp.ContinuousMethodName1,
-						PITREnabled:             &boolTrue,
-						RepoName:                backupRepoName,
-					},
-				},
-				{
-					desc: "disable backup",
-					backup: &appsv1.ClusterBackup{
-						Enabled:                 &boolFalse,
-						RetentionPeriod:         retention("1d"),
-						Method:                  testdp.VSBackupMethodName,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						PITREnabled:             &boolTrue,
-						RepoName:                backupRepoName,
-					},
-				},
-				{
-					desc: "backup with backup tool",
-					backup: &appsv1.ClusterBackup{
-						Enabled:                 &boolTrue,
-						RetentionPeriod:         retention("2d"),
-						Method:                  testdp.BackupMethodName,
-						CronExpression:          "*/1 * * * *",
-						StartingDeadlineMinutes: int64Ptr(int64(10)),
-						RepoName:                backupRepoName,
-						PITREnabled:             &boolFalse,
-					},
-				},
-				{
-					desc:   "backup is nil",
-					backup: nil,
-				},
-			}
-
-			for _, t := range testCases {
-				By(t.desc)
-				backup := t.backup
-				createClusterWithBackup(backup)
-
-				checkSchedule := func(g Gomega, schedule *dpv1alpha1.BackupSchedule) {
-					var policy *dpv1alpha1.SchedulePolicy
-					hasCheckPITRMethod := false
-					for i := range schedule.Spec.Schedules {
-						s := &schedule.Spec.Schedules[i]
-						if s.BackupMethod == backup.Method {
-							Expect(*s.Enabled).Should(BeEquivalentTo(*backup.Enabled))
-							policy = s
-							continue
-						}
-						if !slices.Contains([]string{testdp.ContinuousMethodName, testdp.ContinuousMethodName1}, s.BackupMethod) {
-							if boolptr.IsSetToTrue(backup.Enabled) {
-								// another full backup method should be disabled.
-								Expect(*s.Enabled).Should(BeFalse())
-							}
-							continue
-						}
-						if len(backup.ContinuousMethod) == 0 {
-							// first continuous backup method should be equal to "PITREnabled", another is disabled.
-							if !hasCheckPITRMethod {
-								Expect(*s.Enabled).Should(BeEquivalentTo(*backup.PITREnabled))
-								hasCheckPITRMethod = true
-							} else {
-								Expect(*s.Enabled).Should(BeFalse())
-							}
-						} else {
-							// specified continuous backup method should be equal to "PITREnabled", another is disabled.
-							if backup.ContinuousMethod == s.BackupMethod {
-								Expect(*s.Enabled).Should(BeEquivalentTo(*backup.PITREnabled))
-							} else {
-								Expect(*s.Enabled).Should(BeFalse())
-							}
-						}
-					}
-					if backup.Enabled != nil && *backup.Enabled {
-						Expect(policy).ShouldNot(BeNil())
-						Expect(policy.RetentionPeriod).Should(BeEquivalentTo(backup.RetentionPeriod))
-						Expect(policy.CronExpression).Should(BeEquivalentTo(backup.CronExpression))
-					}
-				}
-
-				checkPolicy := func(g Gomega, policy *dpv1alpha1.BackupPolicy) {
-					if backup != nil && backup.RepoName != "" {
-						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
-					}
-					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
-					g.Expect(policy.Spec.Targets).Should(HaveLen(0))
-					g.Expect(policy.Spec.Target).ShouldNot(BeNil())
-					g.Expect(policy.Spec.Target.Name).Should(BeEmpty())
-				}
-
-				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName)
-				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
-				backupPolicy := &dpv1alpha1.BackupPolicy{}
-				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
-				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
-
-				By("checking backup schedule")
-				backupScheduleName := generateBackupScheduleName(clusterKey.Name, defaultCompName)
-				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
-				if backup == nil {
-					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
-						&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
-					continue
-				}
-				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, checkSchedule)).Should(Succeed())
-			}
 		})
 	})
 

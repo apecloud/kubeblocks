@@ -328,6 +328,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.BackupPolicyDriverReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-policy-driver-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyDriver")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.BackupScheduleReconciler{
 		Client:   dputils.NewCompatClient(mgr.GetClient()),
 		Scheme:   mgr.GetScheme(),

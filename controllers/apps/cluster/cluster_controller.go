@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -68,8 +67,6 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // dataprotection get list and delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
 // ClusterReconciler reconciles a Cluster object
@@ -149,8 +146,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterComponentTransformer{},
 			// update cluster components' status
 			&clusterComponentStatusTransformer{},
-			// build backuppolicy and backupschedule from backupPolicyTemplate
-			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
 			&clusterOwnershipTransformer{},
 			// update cluster status
@@ -185,7 +180,5 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
 		Owns(&corev1.Secret{}).  // sharding account secret
-		Owns(&dpv1alpha1.BackupPolicy{}).
-		Owns(&dpv1alpha1.BackupSchedule{}).
 		Complete(r)
 }

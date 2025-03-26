@@ -136,6 +136,7 @@ var _ = BeforeSuite(func() {
 		&dpv1alpha1.ActionSet{},
 		&dpv1alpha1.BackupPolicy{},
 		&dpv1alpha1.BackupSchedule{},
+		&dpv1alpha1.BackupPolicyTemplate{},
 		&dpv1alpha1.BackupRepo{},
 		&dpv1alpha1.Backup{},
 		&dpv1alpha1.Restore{},
@@ -170,6 +171,12 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager); err != nil {
 		os.Exit(1)
 	}
+	err = (&BackupPolicyDriverReconciler{
+		Client:   k8sClient,
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("backup-policy-driver-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupScheduleReconciler{
 		Client:   k8sClient,

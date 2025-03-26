@@ -76,9 +76,6 @@ spec:
               ${patch_crd_cmd} "componentversions.apps.kubeblocks.io"
               ${patch_crd_cmd} "instancesets.workloads.kubeblocks.io"
               ${patch_crd_cmd} "servicedescriptors.apps.kubeblocks.io"
-              # TODO: add it with new cc api
-              # ${patch_crd_cmd} "configconstraints.apps.kubeblocks.io"
-              ${patch_crd_cmd} "configurations.apps.kubeblocks.io"
               
               # 3. start KubeBlocks
               kubectl patch deployment {{ include "kubeblocks.fullname" . }} -n {{ .Release.Namespace }} -p '{"spec":{"replicas":{{ .Values.replicaCount }}}}'

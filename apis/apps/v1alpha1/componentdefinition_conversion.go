@@ -38,6 +38,7 @@ func (r *ComponentDefinition) ConvertTo(dstRaw conversion.Hub) error {
 	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
 		return err
 	}
+
 	if err := incrementConvertTo(r, dst); err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 
 // convertTo converts this ComponentDefinition to the Hub version (v1).
 func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incrementChange, error) {
-
+	dstObj := dstRaw.(*appsv1.ComponentDefinition)
 	// deleted
 	c := &componentDefinitionConverter{
 		Configs:          r.Spec.Configs,
@@ -83,12 +84,36 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 		Monitor:          r.Spec.Monitor,
 		RoleArbitrator:   r.Spec.RoleArbitrator,
 		LifecycleActions: r.Spec.LifecycleActions.DeepCopy(),
+		Roles:            r.Spec.Roles,
+		SystemAccounts:   r.Spec.SystemAccounts,
 	}
 	if r.Spec.LifecycleActions != nil && r.Spec.LifecycleActions.Switchover != nil {
 		c.LifecycleActionSwitchover = r.Spec.LifecycleActions.Switchover
 	}
+	if len(r.Spec.Roles) > 0 {
+		dstObj.Spec.Roles = make([]appsv1.ReplicaRole, len(r.Spec.Roles))
+		highestUpdatePriority := len(r.Spec.Roles)
+		for i, v1alphaRole := range r.Spec.Roles {
+			role := &dstObj.Spec.Roles[i]
+			role.Name = v1alphaRole.Name
+			switch {
+			case v1alphaRole.Writable:
+				role.UpdatePriority = highestUpdatePriority
+			case v1alphaRole.Serviceable:
+				role.UpdatePriority = highestUpdatePriority - 1
+			default:
+				role.UpdatePriority = 1
+			}
+		}
+	}
+	for i := range r.Spec.Scripts {
+		dstObj.Spec.Scripts[i].Template = r.Spec.Scripts[i].TemplateRef
+	}
+	for i := range r.Spec.Configs {
+		dstObj.Spec.Configs[i].Template = r.Spec.Configs[i].TemplateRef
+	}
 	// changed
-	if err := r.changesToComponentDefinition(dstRaw.(*appsv1.ComponentDefinition)); err != nil {
+	if err := r.changesToComponentDefinition(dstObj); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -109,7 +134,8 @@ func (r *ComponentDefinition) incrementConvertFrom(srcRaw metav1.Object, ic incr
 		}
 		r.Spec.LifecycleActions.Switchover = c.LifecycleActionSwitchover
 	}
-
+	r.Spec.Roles = c.Roles
+	r.Spec.SystemAccounts = c.SystemAccounts
 	// changed
 	return r.changesFromComponentDefinition(srcRaw.(*appsv1.ComponentDefinition))
 }
@@ -353,4 +379,6 @@ type componentDefinitionConverter struct {
 	LifecycleActions          *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 	RoleArbitrator            *RoleArbitrator            `json:"roleArbitrator,omitempty"`
 	LifecycleActionSwitchover *ComponentSwitchover       `json:"lifecycleActionSwitchover,omitempty"`
+	Roles                     []ReplicaRole              `json:"roles,omitempty"`
+	SystemAccounts            []SystemAccount            `json:"systemAccounts,omitempty"`
 }

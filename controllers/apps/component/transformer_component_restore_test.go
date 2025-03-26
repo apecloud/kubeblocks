@@ -79,7 +79,6 @@ var _ = Describe("component restore test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)

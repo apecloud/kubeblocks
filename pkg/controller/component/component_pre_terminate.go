@@ -21,11 +21,13 @@ package component
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -116,5 +118,18 @@ func needDoPreTerminate(ctx context.Context, cli client.Reader, actionCtx *Actio
 		return false, nil
 	}
 
+	if skipPreTerminateByUser(actionCtx) {
+		return false, nil
+	}
+
 	return needDoActionByCheckingJobNAnnotation(ctx, cli, actionCtx)
+}
+
+func skipPreTerminateByUser(actionCtx *ActionContext) bool {
+	comp := actionCtx.component
+	if comp == nil || comp.Annotations == nil {
+		return false
+	}
+	skip, ok := comp.Annotations[constant.SkipPreTerminateAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
 }

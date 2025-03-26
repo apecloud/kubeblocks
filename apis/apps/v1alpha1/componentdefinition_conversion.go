@@ -36,13 +36,13 @@ func (r *ComponentDefinition) ConvertTo(dstRaw conversion.Hub) error {
 
 	// there may be issues with serializing and copying statements with different structures.
 	// so skip copying the systemAccount as it's not needed.
-	systemAccountsSnapshot := r.Spec.SystemAccounts
-	r.Spec.SystemAccounts = nil
+	//systemAccountsSnapshot := r.Spec.SystemAccounts
+	//r.Spec.SystemAccounts = nil
 	// spec
 	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
 		return err
 	}
-	r.Spec.SystemAccounts = systemAccountsSnapshot
+	//r.Spec.SystemAccounts = systemAccountsSnapshot
 	if err := incrementConvertTo(r, dst); err != nil {
 		return err
 	}
@@ -80,15 +80,14 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 
 // convertTo converts this ComponentDefinition to the Hub version (v1).
 func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incrementChange, error) {
-
+	dstObj := dstRaw.(*appsv1.ComponentDefinition)
 	// deleted
 	c := &componentDefinitionConverter{
-		Configs:          r.Spec.Configs,
-		Scripts:          r.Spec.Scripts,
 		Monitor:          r.Spec.Monitor,
 		RoleArbitrator:   r.Spec.RoleArbitrator,
 		LifecycleActions: r.Spec.LifecycleActions.DeepCopy(),
 		Roles:            r.Spec.Roles,
+		Configs:          r.Spec.Configs,
 		SystemAccounts:   r.Spec.SystemAccounts,
 	}
 	if r.Spec.LifecycleActions != nil && r.Spec.LifecycleActions.Switchover != nil {
@@ -117,7 +116,7 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 		dstObj.Spec.Configs[i].Template = r.Spec.Configs[i].TemplateRef
 	}
 	// changed
-	if err := r.changesToComponentDefinition(dstRaw.(*appsv1.ComponentDefinition)); err != nil {
+	if err := r.changesToComponentDefinition(dstObj); err != nil {
 		return nil, err
 	}
 	return c, nil

@@ -535,6 +535,20 @@ EncryptionConfig
 Encryption will be disabled if the field is not set.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>retentionPolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyRetentionPolicy">
+BackupPolicyRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the backup retention policy. This has a precedence over <code>backup.spec.retentionPeriod</code>.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -2204,6 +2218,29 @@ the BackupController.</p>
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicyRetentionPolicy">BackupPolicyRetentionPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec</a>)
+</p>
+<div>
+<p>BackupPolicyRetentionPolicy defines the backup retention policy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;&#34;</p></td>
+<td><p>BackupPolicyRetentionPolicyNone indicates that no backup retention policy is set.</p>
+</td>
+</tr><tr><td><p>&#34;retainLatestBackup&#34;</p></td>
+<td><p>BackupPolicyRetentionPolicyRetainLatestBackup indicates that the latest backup is retained.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicySpec">BackupPolicySpec
 </h3>
 <p>
@@ -2331,6 +2368,20 @@ EncryptionConfig
 <em>(Optional)</em>
 <p>Specifies the parameters for encrypting backup data.
 Encryption will be disabled if the field is not set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retentionPolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyRetentionPolicy">
+BackupPolicyRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the backup retention policy. This has a precedence over <code>backup.spec.retentionPeriod</code>.</p>
 </td>
 </tr>
 </tbody>
@@ -2529,6 +2580,20 @@ int32
 <p>Specifies the maximum number of retry attempts for a backup before it is considered a failure.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>retentionPolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyRetentionPolicy">
+BackupPolicyRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the backup retention policy to be used.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -2653,6 +2718,20 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the maximum number of retry attempts for a backup before it is considered a failure.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retentionPolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyRetentionPolicy">
+BackupPolicyRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the backup retention policy to be used.</p>
 </td>
 </tr>
 </tbody>

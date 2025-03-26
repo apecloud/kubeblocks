@@ -345,6 +345,12 @@ spec:
                 maxItems: 128
                 minItems: 1
                 type: array
+              retentionPolicy:
+                description: Defines the backup retention policy to be used.
+                enum:
+                - retainLatestBackup
+                - none
+                type: string
               schedules:
                 description: |-
                   Defines the execution plans for backup tasks, specifying when and how backups should occur,

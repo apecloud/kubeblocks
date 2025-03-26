@@ -21,6 +21,8 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
+	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -106,6 +108,13 @@ func (r *GCReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
+	if deletable, err := r.isBackupDeletable(reqCtx, backup); !deletable {
+		return intctrlutil.Reconciled()
+	} else if err != nil {
+		reqCtx.Log.Error(err, "failed to check backup deletability")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
 	reqCtx.Log.Info("backup has expired, delete it", "backup", req.String())
 	if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, backup); err != nil {
 		reqCtx.Log.Error(err, "failed to delete backup")
@@ -122,4 +131,116 @@ func getGCFrequency() time.Duration {
 		return time.Duration(gcFrequencySeconds) * time.Second
 	}
 	return dptypes.DefaultGCFrequencySeconds
+}
+
+// isBackupDeletable returns true if the backup can be deleted.
+func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+		return true, nil
+	}
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	err := r.Get(reqCtx.Ctx, client.ObjectKey{
+		Name:      backup.Spec.BackupPolicyName,
+		Namespace: backup.Namespace,
+	}, backupPolicy)
+	if apierrors.IsNotFound(err) {
+		return true, nil
+	}
+	if err != nil {
+		return true, err
+	}
+	backupType := backup.Labels[dptypes.BackupTypeLabelKey]
+	if len(backupType) == 0 {
+		// fallback to get backup type from action set
+		method := dputils.GetBackupMethodByName(backup.Spec.BackupMethod, backupPolicy)
+		if method != nil {
+			actionSet := &dpv1alpha1.ActionSet{}
+			if len(method.ActionSetName) != 0 {
+				err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: method.ActionSetName}, actionSet)
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+			}
+			backupType = string(dputils.GetBackupType(actionSet, method.SnapshotVolumes))
+		}
+	}
+	if backupType == string(dpv1alpha1.BackupTypeIncremental) {
+		reqCtx.Log.V(1).Info(fmt.Sprintf(
+			"backup %s/%s is an incremental backup and will be auto-deleted when its parent backup is deleted, skipping",
+			backup.Namespace, backup.Name))
+		return false, nil
+	}
+	if backupPolicy.Spec.RetentionPolicy == dpv1alpha1.BackupPolicyRetentionPolicyRetainLatestBackup {
+		isLatest, err := r.isLatestCompletedBackup(reqCtx.Ctx, backup)
+		if err != nil {
+			return true, err
+		}
+		if isLatest {
+			reqCtx.Log.V(1).Info(fmt.Sprintf(
+				"backup %s/%s is the latest completed backup of backup method %s and will be retained, skipping",
+				backup.Namespace, backup.Name, backup.Spec.BackupMethod))
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// isLatestCompletedBackup returns true if the backup is the latest completed backup.
+func (r *GCReconciler) isLatestCompletedBackup(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+		return false, nil
+	}
+	relatedBackups, err := r.getRelatedBackups(ctx, backup)
+	if err != nil {
+		return false, err
+	}
+	if len(relatedBackups) == 0 {
+		return false, nil
+	}
+	completedBackups := make([]*dpv1alpha1.Backup, 0)
+	for _, b := range relatedBackups {
+		if b.Status.Phase == dpv1alpha1.BackupPhaseCompleted {
+			completedBackups = append(completedBackups, b)
+		}
+	}
+	if len(completedBackups) == 0 {
+		return false, nil
+	}
+	// sort by stop time in descending order
+	sort.Slice(completedBackups, func(i, j int) bool {
+		i, j = j, i
+		return dputils.CompareWithBackupStopTime(*completedBackups[i], *completedBackups[j])
+	})
+	// retain the backup if it is the latest completed backup
+	if completedBackups[0].Name == backup.Name {
+		return true, nil
+	}
+	return false, nil
+}
+
+// getRelatedBackups returns the related backups of the given backup.
+func (r *GCReconciler) getRelatedBackups(ctx context.Context, backup *dpv1alpha1.Backup) ([]*dpv1alpha1.Backup, error) {
+	clusterUID := backup.Labels[dptypes.ClusterUIDLabelKey]
+	if len(clusterUID) == 0 {
+		return nil, nil
+	}
+	backupList := &dpv1alpha1.BackupList{}
+	if err := r.List(ctx, backupList, client.InNamespace(backup.Namespace),
+		client.MatchingLabels(map[string]string{
+			dptypes.ClusterUIDLabelKey:   clusterUID,
+			dptypes.BackupPolicyLabelKey: backup.Spec.BackupPolicyName,
+		})); err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	} else if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	var filtered []*dpv1alpha1.Backup
+	for i, b := range backupList.Items {
+		if len(b.Spec.BackupMethod) != 0 && b.Spec.BackupMethod == backup.Spec.BackupMethod {
+			filtered = append(filtered, &backupList.Items[i])
+		}
+	}
+	return filtered, nil
 }

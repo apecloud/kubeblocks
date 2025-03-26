@@ -73,6 +73,11 @@ type BackupPolicyTemplateSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
+
+	// Defines the backup retention policy to be used.
+	//
+	// +optional
+	RetentionPolicy BackupPolicyRetentionPolicy `json:"retentionPolicy,omitempty"`
 }
 
 type BackupMethodTPL struct {

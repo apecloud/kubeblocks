@@ -343,6 +343,7 @@ func (r *backupPolicyBuilder) syncBackupPolicy(backupPolicy *dpv1alpha1.BackupPo
 		backupPolicy.Spec.BackupRepoName = &r.Cluster.Spec.Backup.RepoName
 	}
 	backupPolicy.Spec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
+	backupPolicy.Spec.RetentionPolicy = r.backupPolicyTPL.Spec.RetentionPolicy
 	r.syncBackupMethods(backupPolicy)
 	r.syncBackupPolicyTargetSpec(backupPolicy)
 }
@@ -398,6 +399,7 @@ func (r *backupPolicyBuilder) buildBackupPolicy(backupPolicyName string) *dpv1al
 	}
 	bpSpec.PathPrefix = buildBackupPathPrefix(r.Cluster, r.componentName)
 	bpSpec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
+	bpSpec.RetentionPolicy = r.backupPolicyTPL.Spec.RetentionPolicy
 	backupPolicy.Spec = bpSpec
 	r.setDefaultEncryptionConfig(backupPolicy)
 	r.syncBackupPolicyTargetSpec(backupPolicy)

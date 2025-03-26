@@ -79,6 +79,11 @@ type BackupPolicySpec struct {
 	//
 	// +optional
 	EncryptionConfig *EncryptionConfig `json:"encryptionConfig,omitempty"`
+
+	// Specifies the backup retention policy. This has a precedence over `backup.spec.retentionPeriod`.
+	//
+	// +optional
+	RetentionPolicy BackupPolicyRetentionPolicy `json:"retentionPolicy,omitempty"`
 }
 
 type BackupTarget struct {
@@ -318,6 +323,18 @@ type BackupPolicyPhase string
 const (
 	BackupPolicyAvailable BackupPolicyPhase = "Available"
 	BackupPolicyFailed    BackupPolicyPhase = "Failed"
+)
+
+// BackupPolicyRetentionPolicy defines the backup retention policy.
+// +enum
+// +kubebuilder:validation:Enum={retainLatestBackup,none}
+type BackupPolicyRetentionPolicy string
+
+const (
+	// BackupPolicyRetentionPolicyRetainLatestBackup indicates that the latest backup is retained.
+	BackupPolicyRetentionPolicyRetainLatestBackup BackupPolicyRetentionPolicy = "retainLatestBackup"
+	// BackupPolicyRetentionPolicyNone indicates that no backup retention policy is set.
+	BackupPolicyRetentionPolicyNone BackupPolicyRetentionPolicy = ""
 )
 
 // +genclient

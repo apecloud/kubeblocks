@@ -109,5 +109,8 @@ done
 # 4. change backupRepo
 takeOverResources BackupRepo ${release}-backuprepo
 
+# 5. takeover StorageClass
+takeOverResources StorageClass kb-default-sc
+
 # 5. set kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1alpha1 to old componentDefinition
 setCRDAPIVersion ComponentDefinition

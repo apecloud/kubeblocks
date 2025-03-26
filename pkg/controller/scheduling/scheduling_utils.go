@@ -58,13 +58,7 @@ func buildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComp
 		if err != nil {
 			return err
 		}
-		if len(tolerations) > 0 {
-			if len(schedulingPolicy.Tolerations) == 0 {
-				schedulingPolicy.Tolerations = tolerations
-			} else {
-				schedulingPolicy.Tolerations = append(schedulingPolicy.Tolerations, tolerations...)
-			}
-		}
+		intctrlutil.MergeList(&schedulingPolicy.Tolerations, &tolerations, makeCmp[corev1.Toleration]())
 		return nil
 	}
 
@@ -109,6 +103,7 @@ func makeCmp[E any]() func(E) func(E) bool {
 }
 
 // MergeAffinity merges src to dst, return value is deepcopied
+// Items in src will overwrite items in dst, if possible.
 func MergeAffinity(src, dst *corev1.Affinity) *corev1.Affinity {
 	if src == nil {
 		return dst.DeepCopy()

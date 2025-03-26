@@ -903,14 +903,9 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		replicas = *template.Replicas
 	}
 	templateExt.Replicas = replicas
-	if template.SchedulingPolicy != nil && template.SchedulingPolicy.NodeName != "" {
-		templateExt.Spec.NodeName = template.SchedulingPolicy.NodeName
-	}
 	mergeMap(&template.Annotations, &templateExt.Annotations)
 	mergeMap(&template.Labels, &templateExt.Labels)
-	if template.SchedulingPolicy != nil {
-		mergeMap(&template.SchedulingPolicy.NodeSelector, &templateExt.Spec.NodeSelector)
-	}
+
 	if len(templateExt.Spec.Containers) > 0 {
 		if template.Resources != nil {
 			src := template.Resources
@@ -928,20 +923,27 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		}
 	}
 
-	if template.SchedulingPolicy != nil {
-		intctrlutil.MergeList(&template.SchedulingPolicy.Tolerations, &templateExt.Spec.Tolerations,
+	if sp := template.SchedulingPolicy; sp != nil {
+		if sp.SchedulerName != "" {
+			templateExt.Spec.SchedulerName = sp.SchedulerName
+		}
+		mergeMap(&sp.NodeSelector, &templateExt.Spec.NodeSelector)
+		if sp.NodeName != "" {
+			templateExt.Spec.NodeName = sp.NodeName
+		}
+		templateExt.Spec.Affinity = scheduling.MergeAffinity(sp.Affinity, templateExt.Spec.Affinity)
+		intctrlutil.MergeList(&sp.Tolerations, &templateExt.Spec.Tolerations,
 			func(item corev1.Toleration) func(corev1.Toleration) bool {
 				return func(t corev1.Toleration) bool {
 					return reflect.DeepEqual(item, t)
 				}
 			})
-		intctrlutil.MergeList(&template.SchedulingPolicy.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
+		intctrlutil.MergeList(&sp.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
 			func(item corev1.TopologySpreadConstraint) func(corev1.TopologySpreadConstraint) bool {
 				return func(t corev1.TopologySpreadConstraint) bool {
 					return reflect.DeepEqual(item, t)
 				}
 			})
-		templateExt.Spec.Affinity = scheduling.MergeAffinity(template.SchedulingPolicy.Affinity, templateExt.Spec.Affinity)
 	}
 }
 

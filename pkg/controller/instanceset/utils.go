@@ -114,6 +114,8 @@ func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole 
 	return roleMap
 }
 
+// mergeMap merge src to dst, dst is modified in place
+// Items in src will overwrite items in dst, if possible.
 func mergeMap[K comparable, V any](src, dst *map[K]V) {
 	if len(*src) == 0 {
 		return

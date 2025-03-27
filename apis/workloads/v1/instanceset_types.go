@@ -86,6 +86,7 @@ type InstanceSetSpec struct {
 
 	// Specifies the desired Ordinals of the default template.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+	// If Ordinals are defined, their number must match the corresponding replicas.
 	//
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under the default template would be
@@ -269,6 +270,9 @@ type InstanceSetStatus struct {
 	// updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string `json:"updateRevision,omitempty"`
+
+	// FIXME: unify with InstanceStatus?
+	CurrentInstances CurrentInstances `json:"currentInstances,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.
 	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
@@ -516,6 +520,12 @@ type InstanceConfigStatus struct {
 	// +kubebuilder:validation:Required
 	Generation int64 `json:"generation"`
 }
+
+// CurrentInstances maps templates to current pods
+// key is template name (default template has empty name), value is a list of pod ordinals
+// store ordinals only to save some space.
+// the list is always sorted by ordinal
+type CurrentInstances map[string][]int32
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate
 type InstanceTemplateStatus struct {

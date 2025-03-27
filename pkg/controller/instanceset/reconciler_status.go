@@ -343,6 +343,7 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 
 	syncInstanceConfigStatus(its, newInstanceStatus)
 
+	sortInstanceStatus(newInstanceStatus)
 	its.Status.InstanceStatus = newInstanceStatus
 }
 
@@ -381,4 +382,11 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 			}
 		}
 	}
+}
+
+func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(instanceStatus[i].PodName)
+	}
+	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

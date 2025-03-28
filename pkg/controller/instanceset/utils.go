@@ -199,3 +199,58 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 	}
 	return updateStrategy
 }
+
+// these three pod condition functions are copied from kubernetes's pkg/api/v1/pod/util.go
+// since they are not "public" api of kubernetes
+
+// getPodCondition extracts the provided condition from the given status and returns that.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
+func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) (int, *corev1.PodCondition) {
+	if status == nil {
+		return -1, nil
+	}
+	return getPodConditionFromList(status.Conditions, conditionType)
+}
+
+// getPodConditionFromList extracts the provided condition from the given list of condition and
+// returns the index of the condition and the condition. Returns -1 and nil if the condition is not present.
+func getPodConditionFromList(conditions []corev1.PodCondition, conditionType corev1.PodConditionType) (int, *corev1.PodCondition) {
+	if conditions == nil {
+		return -1, nil
+	}
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return i, &conditions[i]
+		}
+	}
+	return -1, nil
+}
+
+// updatePodCondition updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
+// status has changed.
+// Returns true if pod condition has changed or has been added.
+func updatePodCondition(status *corev1.PodStatus, condition *corev1.PodCondition) bool {
+	condition.LastTransitionTime = metav1.Now()
+	// Try to find this pod condition.
+	conditionIndex, oldCondition := getPodCondition(status, condition.Type)
+
+	if oldCondition == nil {
+		// We are adding new pod condition.
+		status.Conditions = append(status.Conditions, *condition)
+		return true
+	}
+	// We are updating an existing condition, so we need to check if it has changed.
+	if condition.Status == oldCondition.Status {
+		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	isEqual := condition.Status == oldCondition.Status &&
+		condition.Reason == oldCondition.Reason &&
+		condition.Message == oldCondition.Message &&
+		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
+		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+
+	status.Conditions[conditionIndex] = *condition
+	// Return true if one of the fields have changed.
+	return !isEqual
+}

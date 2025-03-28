@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,21 +30,36 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParameters,
 	cmpd *appsv1.ComponentDefinition,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	tpls map[string]*corev1.ConfigMap) []parametersv1alpha1.ConfigTemplateItemDetail {
+	tpls map[string]*corev1.ConfigMap,
+	pcr *parametersv1alpha1.ParamConfigRenderer) []parametersv1alpha1.ConfigTemplateItemDetail {
 	var itemDetails []parametersv1alpha1.ConfigTemplateItemDetail
 
 	classifyParams := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls)
-	for _, template := range cmpd.Spec.Configs {
-		if _, ok := classifyParams[template.Name]; ok {
-			itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
-		}
+	for _, template := range ResolveParameterTemplate(cmpd.Spec, pcr.Spec) {
+		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
 	}
 	return itemDetails
+}
+
+func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, pcr parametersv1alpha1.ParamConfigRendererSpec) []appsv1.ComponentFileTemplate {
+	var templates []appsv1.ComponentFileTemplate
+
+	tpls := generics.Map(pcr.Configs, func(e parametersv1alpha1.ComponentConfigDescription) string {
+		return e.TemplateName
+	})
+
+	for _, config := range cmpd.Configs {
+		if slices.Contains(tpls, config.Name) {
+			templates = append(templates, config)
+		}
+	}
+	return templates
 }
 
 func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentFileTemplate) parametersv1alpha1.ConfigTemplateItemDetail {
@@ -62,7 +78,7 @@ func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParamete
 	parametersDefs []*parametersv1alpha1.ParametersDefinition,
 	templates []appsv1.ComponentFileTemplate,
 	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
-	if len(parameters) == 0 && len(parametersDefs) == 0 {
+	if len(parameters) == 0 || len(parametersDefs) == 0 {
 		return nil
 	}
 	if len(parametersDefs) == 1 {

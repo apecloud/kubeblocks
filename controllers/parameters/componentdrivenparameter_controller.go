@@ -166,9 +166,9 @@ func runningComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Read
 	return componentParameter, nil
 }
 
-func getCompDefinition(ctx context.Context, cli client.Reader, comp *appsv1.Component) (*appsv1.ComponentDefinition, error) {
+func getCompDefinition(ctx context.Context, cli client.Reader, cmpdName string) (*appsv1.ComponentDefinition, error) {
 	compKey := types.NamespacedName{
-		Name: comp.Spec.CompDef,
+		Name: cmpdName,
 	}
 	cmpd := &appsv1.ComponentDefinition{}
 	if err := cli.Get(ctx, compKey, cmpd); err != nil {
@@ -184,7 +184,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	var err error
 	var cmpd *appsv1.ComponentDefinition
 
-	if cmpd, err = getCompDefinition(reqCtx.Ctx, reader, comp); err != nil {
+	if cmpd, err = getCompDefinition(reqCtx.Ctx, reader, comp.Spec.CompDef); err != nil {
 		return nil, err
 	}
 	if len(cmpd.Spec.Configs) == 0 {
@@ -203,7 +203,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	parameterSpecs := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls)
+	parameterSpecs := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configRender)
 	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
 		return nil, err
 	}

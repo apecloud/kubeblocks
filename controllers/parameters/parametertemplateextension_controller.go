@@ -21,20 +21,23 @@ package parameters
 
 import (
 	"context"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // ParameterTemplateExtensionReconciler reconciles a ParameterTemplateExtension object
@@ -84,77 +87,94 @@ func (r *ParameterTemplateExtensionReconciler) Reconcile(ctx context.Context, re
 func (r *ParameterTemplateExtensionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Cluster{}).
+		Watches(&parametersv1alpha1.ComponentParameter{}, handler.EnqueueRequestsFromMapFunc(filterComponentParameterResources)).
 		Complete(r)
 }
 
-func (r *ParameterTemplateExtensionReconciler) reconcile(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (ctrl.Result, error) {
-	extractor := func(comp appsv1.ClusterComponentSpec) string {
-		return comp.ComponentDef
-	}
-
-	paramTplAsMap := make(map[string][]appsv1.ComponentFileTemplate)
-	cmpds := generics.Map(cluster.Spec.ComponentSpecs, extractor)
-	for _, cmpd := range cmpds {
-		paramTpl, err := resolveParameterTemplate(r.Client, reqCtx.Ctx, cmpd)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		paramTplAsMap[cmpd] = paramTpl
-	}
-	return r.update(reqCtx, cluster, paramTplAsMap)
+func filterComponentParameterResources(_ context.Context, object client.Object) []reconcile.Request {
+	cr := object.(*parametersv1alpha1.ComponentParameter)
+	return []reconcile.Request{{
+		NamespacedName: client.ObjectKey{
+			Name:      cr.Spec.ClusterName,
+			Namespace: cr.Namespace,
+		}}}
 }
 
-func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster, paramTplAsMap map[string][]appsv1.ComponentFileTemplate) (ctrl.Result, error) {
-	patch := client.MergeFrom(cluster.DeepCopy())
-	for i := range cluster.Spec.ComponentSpecs {
-		updateParameterConfigExtension(&cluster.Spec.ComponentSpecs[i], paramTplAsMap, cluster.Name)
+func (r *ParameterTemplateExtensionReconciler) reconcile(reqCtx intctrlutil.RequestCtx, runningCluster *appsv1.Cluster) (ctrl.Result, error) {
+	expectedCluster, err := updateConfigsForParameterTemplate(reqCtx, r.Client, runningCluster)
+	if err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
-	if err := r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
+	return r.update(reqCtx, runningCluster, expectedCluster)
+}
+
+func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) (*appsv1.Cluster, error) {
+	resolveParameterCR := func(compName string) (*parametersv1alpha1.ComponentParameter, error) {
+		parameterKey := client.ObjectKey{
+			Name:      configcore.GenerateComponentConfigurationName(cluster.Name, compName),
+			Namespace: cluster.Namespace,
+		}
+		parameterCr := &parametersv1alpha1.ComponentParameter{}
+		if err := reader.Get(reqCtx.Ctx, parameterKey, parameterCr); err != nil {
+			return nil, err
+		}
+		return parameterCr, nil
+	}
+	updateConfigObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
+		cmKey := client.ObjectKey{
+			Name:      configcore.GetComponentCfgName(cluster.Name, compName, pointer.StringDeref(config.Name, "")),
+			Namespace: cluster.Namespace,
+		}
+		cm := corev1.ConfigMap{}
+		if err := reader.Get(reqCtx.Ctx, cmKey, &cm); err != nil {
+			return err
+		}
+		config.ConfigMap = &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
+		}
+		return nil
+	}
+	checkAndUpdateConfigObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
+		if config.ConfigMap != nil {
+			return nil
+		}
+		parameterCR, err := resolveParameterCR(compName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return err
+			}
+			return nil
+		}
+		if intctrlutil.GetConfigTemplateItem(&parameterCR.Spec, pointer.StringDeref(config.Name, "")) == nil {
+			return nil
+		}
+		return updateConfigObject(compName, config)
+	}
+
+	expectedCluster := cluster.DeepCopy()
+	for i := range expectedCluster.Spec.ComponentSpecs {
+		compSpec := &expectedCluster.Spec.ComponentSpecs[i]
+		for j, config := range compSpec.Configs {
+			if !pointer.BoolDeref(config.ExternalManaged, false) {
+				continue
+			}
+			if pointer.StringDeref(config.Name, "") == "" {
+				continue
+			}
+			if err := checkAndUpdateConfigObject(compSpec.Name, &compSpec.Configs[j]); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return expectedCluster, nil
+}
+
+func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.RequestCtx, running, expected *appsv1.Cluster) (ctrl.Result, error) {
+	if reflect.DeepEqual(running.Spec, expected.Spec) {
+		return ctrl.Result{}, nil
+	}
+	if err := r.Client.Patch(reqCtx.Ctx, expected, client.MergeFrom(running)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
-}
-
-func updateParameterConfigExtension(compSpec *appsv1.ClusterComponentSpec, paramTplAsMap map[string][]appsv1.ComponentFileTemplate, clusterName string) {
-	newExtension := func(template appsv1.ComponentFileTemplate, compName string) appsv1.ClusterComponentConfig {
-		return appsv1.ClusterComponentConfig{
-			Name: pointer.String(template.Name),
-			ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: configcore.GetComponentCfgName(clusterName, compName, template.Name),
-					},
-				},
-			},
-			ExternalManaged: pointer.Bool(true),
-		}
-	}
-
-	for _, template := range paramTplAsMap[compSpec.ComponentDef] {
-		match := func(config appsv1.ClusterComponentConfig) bool {
-			return pointer.StringDeref(config.Name, "") == template.Name
-		}
-		index := generics.FindFirstFunc(compSpec.Configs, match)
-		if index < 0 {
-			compSpec.Configs = append(compSpec.Configs, newExtension(template, compSpec.Name))
-		} else {
-			compSpec.Configs[index] = newExtension(template, compSpec.Name)
-		}
-	}
-}
-
-func resolveParameterTemplate(reader client.Reader, ctx context.Context, cmpdName string) ([]appsv1.ComponentFileTemplate, error) {
-	cmpd, err := getCompDefinition(ctx, reader, cmpdName)
-	if err != nil {
-		return nil, err
-	}
-	if len(cmpd.Spec.Configs) == 0 {
-		return nil, nil
-	}
-
-	pcr, err := intctrlutil.ResolveComponentConfigRender(ctx, reader, cmpd)
-	if err != nil {
-		return nil, err
-	}
-	return configctrl.ResolveParameterTemplate(cmpd.Spec, pcr.Spec), nil
 }

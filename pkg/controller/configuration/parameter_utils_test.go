@@ -35,6 +35,7 @@ import (
 var _ = Describe("resource Fetcher", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var paramDef1, paramDef2 *configv1alpha1.ParametersDefinition
+	var pcr *configv1alpha1.ParamConfigRenderer
 
 	BeforeEach(func() {
 		paramDef1 = testparameters.NewParametersDefinitionFactory("param_def1").
@@ -56,6 +57,11 @@ var _ = Describe("resource Fetcher", func() {
   param14: string
 }`).GetObject()
 
+		pcr = testparameters.NewParamConfigRendererFactory("test").
+			SetConfigDescription("file1", configTemplateName, configv1alpha1.FileFormatConfig{Format: configv1alpha1.Ini}).
+			SetConfigDescription("file2", configTemplateName, configv1alpha1.FileFormatConfig{Format: configv1alpha1.Ini}).
+			GetObject()
+
 		compDefObj = allFieldsCompDefObj(false)
 		// clusterObj, _, _ = newAllFieldsClusterObj(compDefObj, false)
 	})
@@ -67,11 +73,12 @@ var _ = Describe("resource Fetcher", func() {
 				"param2": pointer.String("value2"),
 			}
 
-			paramItems := ClassifyParamsFromConfigTemplate(parameters, compDefObj, []*configv1alpha1.ParametersDefinition{paramDef1}, map[string]*corev1.ConfigMap{
+			paramItems, err := ClassifyParamsFromConfigTemplate(parameters, compDefObj, []*configv1alpha1.ParametersDefinition{paramDef1}, map[string]*corev1.ConfigMap{
 				configTemplateName: {
 					Data: map[string]string{
 						"file1": "",
-					}}})
+					}}}, pcr)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(paramItems).Should(HaveLen(1))
 			Expect(paramItems[0].ConfigFileParams).Should(HaveLen(1))
 			Expect(paramItems[0].ConfigFileParams).Should(HaveKey("file1"))
@@ -86,12 +93,13 @@ var _ = Describe("resource Fetcher", func() {
 				"param12": cfgutil.ToPointer("value2"),
 			}
 
-			paramItems := ClassifyParamsFromConfigTemplate(parameters, compDefObj, []*configv1alpha1.ParametersDefinition{paramDef1, paramDef2}, map[string]*corev1.ConfigMap{
+			paramItems, err := ClassifyParamsFromConfigTemplate(parameters, compDefObj, []*configv1alpha1.ParametersDefinition{paramDef1, paramDef2}, map[string]*corev1.ConfigMap{
 				configTemplateName: {
 					Data: map[string]string{
 						"file1": "",
 						"file2": "",
-					}}})
+					}}}, pcr)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(paramItems).Should(HaveLen(1))
 			Expect(paramItems[0].ConfigFileParams).Should(HaveLen(2))
 			Expect(paramItems[0].ConfigFileParams).Should(HaveKey("file1"))

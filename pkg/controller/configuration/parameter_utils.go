@@ -23,27 +23,28 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParameters,
 	cmpd *appsv1.ComponentDefinition,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	tpls map[string]*corev1.ConfigMap) []parametersv1alpha1.ConfigTemplateItemDetail {
+	tpls map[string]*corev1.ConfigMap,
+	pcr *parametersv1alpha1.ParamConfigRenderer) ([]parametersv1alpha1.ConfigTemplateItemDetail, error) {
 	var itemDetails []parametersv1alpha1.ConfigTemplateItemDetail
 
-	classifyParams := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls)
-	for _, template := range cmpd.Spec.Configs {
-		if _, ok := classifyParams[template.Name]; ok {
-			itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
-		}
+	classifyParams, err := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls, pcr)
+	if err != nil {
+		return nil, err
 	}
-	return itemDetails
+	for _, template := range cmpd.Spec.Configs {
+		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
+	}
+	return itemDetails, nil
 }
 
 func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentFileTemplate) parametersv1alpha1.ConfigTemplateItemDetail {
@@ -61,26 +62,32 @@ func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1
 func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParameters,
 	parametersDefs []*parametersv1alpha1.ParametersDefinition,
 	templates []appsv1.ComponentFileTemplate,
-	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
-	if len(parameters) == 0 && len(parametersDefs) == 0 {
-		return nil
+	tpls map[string]*corev1.ConfigMap,
+	pcr *parametersv1alpha1.ParamConfigRenderer) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
+	if len(parameters) == 0 {
+		return nil, nil
 	}
-	if len(parametersDefs) == 1 {
-		return transformParametersInFile(parametersDefs[0], templates, parameters, tpls)
+	if !hasValidParametersDefinition(parametersDefs) {
+		return transformDefaultParameters(parameters, pcr)
 	}
 
 	classifyParams := make(map[string]map[string]*parametersv1alpha1.ParametersInFile, len(templates))
-	parametersMap := resolveSchemaFromParametersDefinition(parametersDefs, templates, tpls)
-	for paramKey, paramValue := range parameters {
-		updateConfigParameter(paramKey, paramValue, parametersMap, classifyParams)
+	parametersMap, err := resolveSchemaFromParametersDefinition(parametersDefs, templates, tpls)
+	if err != nil {
+		return nil, err
 	}
-	return classifyParams
+	for paramKey, paramValue := range parameters {
+		if err = updateConfigParameter(paramKey, paramValue, parametersMap, classifyParams); err != nil {
+			return nil, err
+		}
+	}
+	return classifyParams, nil
 }
 
 func updateConfigParameter(paramKey string,
 	paramValue *string,
 	parametersMap map[string]*intctrlutil.ParameterMeta,
-	classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile) {
+	classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile) error {
 
 	deRefParamInTemplate := func(name string) map[string]*parametersv1alpha1.ParametersInFile {
 		if _, ok := classifyParams[name]; !ok {
@@ -98,17 +105,17 @@ func updateConfigParameter(paramKey string,
 		return v[fileName]
 	}
 
-	meta, ok := parametersMap[paramKey]
+	parameterMeta, ok := parametersMap[paramKey]
 	if !ok {
-		log.Log.Info("ignore invalid param", "param", paramKey)
-		return
+		return fmt.Errorf("parameter %s not found in parameters schema", paramKey)
 	}
-	deRefParamInFile(meta.ConfigTemplateName, meta.FileName).Parameters[paramKey] = paramValue
+	deRefParamInFile(parameterMeta.ConfigTemplateName, parameterMeta.FileName).Parameters[paramKey] = paramValue
+	return nil
 }
 
 func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.ParametersDefinition,
 	templates []appsv1.ComponentFileTemplate,
-	tpls map[string]*corev1.ConfigMap) map[string]*intctrlutil.ParameterMeta {
+	tpls map[string]*corev1.ConfigMap) (map[string]*intctrlutil.ParameterMeta, error) {
 	paramMeta := make(map[string]*intctrlutil.ParameterMeta)
 	mergeParams := func(params map[string]*intctrlutil.ParameterMeta) {
 		for key, meta := range params {
@@ -117,28 +124,42 @@ func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.
 	}
 	for _, parameterDef := range parametersDefs {
 		configSpec := resolveConfigSpecFromParametersDefinition(templates, parameterDef, tpls)
-		if configSpec != nil {
-			mergeParams(intctrlutil.ResolveConfigParameterSchema(parameterDef, configSpec))
+		if configSpec == nil {
+			return nil, fmt.Errorf("config template not found for parameters definition %s", parameterDef.Name)
 		}
+		mergeParams(intctrlutil.ResolveConfigParameterSchema(parameterDef, configSpec))
 	}
-	return paramMeta
+	return paramMeta, nil
 }
 
-func transformParametersInFile(paramDef *parametersv1alpha1.ParametersDefinition,
-	templates []appsv1.ComponentFileTemplate,
-	parameters parametersv1alpha1.ComponentParameters,
-	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
-	configSpec := resolveConfigSpecFromParametersDefinition(templates, paramDef, tpls)
-	if configSpec == nil {
-		ctrl.Log.Info(fmt.Sprintf("not found config template: [%v]", paramDef))
-		return nil
+func hasValidParametersDefinition(defs []*parametersv1alpha1.ParametersDefinition) bool {
+	if len(defs) == 0 {
+		return false
 	}
+	match := func(def *parametersv1alpha1.ParametersDefinition) bool {
+		return def.Spec.ParametersSchema != nil
+	}
+	return generics.CountFunc(defs, match) != 0
+}
+
+func transformDefaultParameters(
+	parameters parametersv1alpha1.ComponentParameters,
+	pcr *parametersv1alpha1.ParamConfigRenderer) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
+
+	match := func(config parametersv1alpha1.ComponentConfigDescription) bool {
+		return config.TemplateName != "" && config.FileFormatConfig != nil
+	}
+	configs := generics.FindFunc(pcr.Spec.Configs, match)
+	if len(configs) == 0 {
+		return nil, fmt.Errorf("the component does not support parameters reconfigure")
+	}
+	config := configs[0]
 	return map[string]map[string]*parametersv1alpha1.ParametersInFile{
-		configSpec.Name: {
-			paramDef.Spec.FileName: &parametersv1alpha1.ParametersInFile{
+		config.TemplateName: {
+			config.Name: &parametersv1alpha1.ParametersInFile{
 				Parameters: parameters,
 			}},
-	}
+	}, nil
 }
 
 func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentFileTemplate,

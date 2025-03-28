@@ -135,11 +135,15 @@ func updateCustomTemplates(rctx *ReconcileContext, parameter *parametersv1alpha1
 
 func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters, configmaps map[string]*corev1.ConfigMap) func(*ReconcileContext, *parametersv1alpha1.Parameter) error {
 	return func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
-		classParameters := configctrl.ClassifyComponentParameters(updatedParameters,
+		classParameters, err := configctrl.ClassifyComponentParameters(updatedParameters,
 			flatten(rctx.ParametersDefs),
 			rctx.ComponentDefObj.Spec.Configs,
 			configmaps,
+			rctx.ConfigRender,
 		)
+		if err != nil {
+			return err
+		}
 		for tpl, m := range classParameters {
 			configDescs := intctrlutil.GetComponentConfigDescriptions(&rctx.ConfigRender.Spec, tpl)
 			if len(configDescs) == 0 {

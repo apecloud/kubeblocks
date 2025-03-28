@@ -203,7 +203,10 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	parameterSpecs := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls)
+	parameterSpecs, err := configctrl.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configRender)
+	if err != nil {
+		return nil, err
+	}
 	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
 		return nil, err
 	}

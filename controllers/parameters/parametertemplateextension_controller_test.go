@@ -22,6 +22,7 @@ package parameters
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +42,30 @@ var _ = Describe("ParameterExtension Controller", func() {
 		It("Should reconcile success", func() {
 			_, _, clusterObj, _, _ := mockReconcileResource()
 
+			matchComponent := func(clusterSpec *appsv1.ClusterSpec, name string) *appsv1.ClusterComponentSpec {
+				for i, comp := range clusterSpec.ComponentSpecs {
+					if comp.Name == name {
+						return &clusterSpec.ComponentSpecs[i]
+					}
+				}
+				return nil
+			}
+
+			By("check cm resource")
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: configcore.GetComponentCfgName(clusterObj.Name, defaultCompName, configSpecName), Namespace: clusterObj.Namespace}, &corev1.ConfigMap{}, true)).Should(Succeed())
+
+			By("set external managed")
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+				compSpec := matchComponent(&cluster.Spec, defaultCompName)
+				Expect(compSpec).ToNot(BeNil())
+				compSpec.Configs = []appsv1.ClusterComponentConfig{{
+					Name:            pointer.String(configSpecName),
+					ExternalManaged: pointer.Bool(true),
+				}}
+			})).Should(Succeed())
+
+			By("check external resource")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				compSpec := cluster.Spec.GetComponentByName(defaultCompName)
 				g.Expect(compSpec).ShouldNot(BeNil())

@@ -131,6 +131,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updatedPods := 0
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	isBlocked := false
+	needRetry := false
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
@@ -144,8 +145,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
 			break
 		}
+		if !isPodReady(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
+			break
+		}
 		if !isPodAvailable(pod, its.Spec.MinReadySeconds) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+			// no pod event will trigger the next reconcilation, so retry it
+			needRetry = true
 			break
 		}
 
@@ -203,6 +210,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if !isBlocked {
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
+	}
+	if needRetry {
+		return kubebuilderx.RetryAfter(time.Second * time.Duration(its.Spec.MinReadySeconds)), nil
 	}
 	return kubebuilderx.Continue, nil
 }

@@ -19,11 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package instanceset
 
+import corev1 "k8s.io/api/core/v1"
+
 const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
 	RoleLabelKey = "kubeblocks.io/role"
+
+	PodConditionRoleProbeSucceeded corev1.PodConditionType = "workloads.kubeblocks.io/role-probe-succeeded"
 )
 
 const (

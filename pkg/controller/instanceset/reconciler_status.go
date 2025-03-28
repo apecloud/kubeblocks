@@ -105,11 +105,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		if isContainersReady(pod) && isRunningAndReady(pod) && !isTerminating(pod) {
+		if isImageMatched(pod) && isPodReady(pod) {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(pod.Name)
-			if isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
+			if isPodAvailable(pod, its.Spec.MinReadySeconds) {
 				availableReplicas++
 				template2TemplatesStatus[templateName].AvailableReplicas++
 			} else {

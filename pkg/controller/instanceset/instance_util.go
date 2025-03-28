@@ -151,26 +151,16 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
-func isRunningAndReady(pod *corev1.Pod) bool {
-	return pod.Status.Phase == corev1.PodRunning && podutils.IsPodReady(pod)
+// isReady returns true if pod is ready
+// Currently, if pod is being deleted and have a grace period, k8s still considers it ready,
+// which is not what we expect. See https://github.com/kubernetes/kubernetes/issues/129552
+func isPodReady(pod *corev1.Pod) bool {
+	return podutils.IsPodReady(pod) && !isTerminating(pod)
 }
 
-func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
-}
-
-func isContainersRunning(pod *corev1.Pod) bool {
-	for _, status := range pod.Status.ContainerStatuses {
-		if status.State.Running == nil {
-			return false
-		}
-	}
-	return true
-}
-
-func isContainersReady(pod *corev1.Pod) bool {
-	return isImageMatched(pod) && isContainersRunning(pod)
+// available is ready for at least minReadySeconds
+func isPodAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	return isPodReady(pod) && podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -181,20 +171,6 @@ func isCreated(pod *corev1.Pod) bool {
 // isTerminating returns true if pod's DeletionTimestamp has been set
 func isTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
-}
-
-// isHealthy returns true if pod is running and ready and has not been terminated
-func isHealthy(pod *corev1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminating(pod)
-}
-
-// isRoleReady returns true if pod has role label
-func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
-	if len(roles) == 0 {
-		return true
-	}
-	_, ok := pod.Labels[constant.RoleLabelKey]
-	return ok
 }
 
 // isImageMatched returns true if all container statuses have same image as defined in pod spec
@@ -777,6 +753,11 @@ func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 }
 
 func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
+	if len(parent.Spec.Roles) != 0 {
+		template.Spec.ReadinessGates = append(template.Spec.ReadinessGates, corev1.PodReadinessGate{
+			ConditionType: PodConditionRoleProbeSucceeded,
+		})
+	}
 	podTemplate := filterInPlaceFields(template)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).

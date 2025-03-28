@@ -29,6 +29,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -248,18 +249,31 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	// update pod role label
 	newPod := pod.DeepCopy()
 	role, ok := roleMap[roleName]
+	var conditionStatus corev1.ConditionStatus
+	var conditionReason string
 	switch ok {
 	case true:
 		newPod.Labels[RoleLabelKey] = role.Name
+		conditionStatus = corev1.ConditionTrue
+		conditionReason = "RoleProbeSucceeded"
 	case false:
 		delete(newPod.Labels, RoleLabelKey)
+		conditionStatus = corev1.ConditionFalse
+		conditionReason = "RoleProbeUnknownRole"
 	}
 
 	if newPod.Annotations == nil {
 		newPod.Annotations = map[string]string{}
 	}
 	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Update(ctx, newPod, inDataContext())
+	updatePodCondition(&newPod.Status, &corev1.PodCondition{
+		Type:          PodConditionRoleProbeSucceeded,
+		Status:        conditionStatus,
+		LastProbeTime: metav1.Now(),
+		Reason:        conditionReason,
+		Message:       fmt.Sprintf("Role probe returned with role: %v", role.Name),
+	})
+	return cli.Status().Update(ctx, newPod, inDataContext())
 }
 
 func inDataContext() *multicluster.ClientOption {

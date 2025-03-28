@@ -113,7 +113,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if !isOrderedReady {
 		for _, name := range newNameList {
 			if _, ok := createNameSet[name]; !ok {
-				if !isHealthy(oldInstanceMap[name]) {
+				if !isPodAvailable(oldInstanceMap[name], its.Spec.MinReadySeconds) {
 					concurrency--
 				}
 			}
@@ -129,7 +129,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			break
 		}
 		predecessor := getPredecessor(i)
-		if isOrderedReady && predecessor != nil && !isHealthy(predecessor) {
+		if isOrderedReady && predecessor != nil && !isPodAvailable(predecessor, its.Spec.MinReadySeconds) {
 			break
 		}
 		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
@@ -180,8 +180,8 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
-		if isOrderedReady && !isRunningAndReady(pod) {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Running and Ready",
+		if isOrderedReady && !isPodReady(pod) {
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Ready",
 				its.Namespace,
 				its.Name,
 				pod.Name)

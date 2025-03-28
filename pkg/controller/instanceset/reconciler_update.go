@@ -110,7 +110,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	currentUnavailable := 0
 	for _, pod := range oldPodList {
-		if !isHealthy(pod) {
+		if !isPodAvailable(pod, its.Spec.MinReadySeconds) {
 			currentUnavailable++
 		}
 	}
@@ -131,7 +131,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updatedPods := 0
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	isBlocked := false
-	needRetry := false
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
@@ -141,22 +140,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		if !isContainersReady(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not ready", its.Namespace, its.Name, pod.Name))
-			// as no further event triggers the next reconciliation, we need a retry
-			needRetry = true
+		if !isImageMatched(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
 			break
 		}
-		if !isHealthy(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
+		if !isPodAvailable(pod, its.Spec.MinReadySeconds) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !isRoleReady(pod, its.Spec.Roles) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
 			break
 		}
 
@@ -214,9 +203,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if !isBlocked {
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
-	}
-	if needRetry {
-		return kubebuilderx.RetryAfter(2 * time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }

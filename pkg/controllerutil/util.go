@@ -194,6 +194,9 @@ func DeleteOwnedResources[T generics.Object, PT generics.PObject[T], L generics.
 	return nil
 }
 
+// MergeList merge src to dst, dst is modified in place.
+// f returns a function that can be passed to slices.IndexFunc().
+// Items in src will overwrite items in dst, if possible.
 func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 	if len(*src) == 0 {
 		return

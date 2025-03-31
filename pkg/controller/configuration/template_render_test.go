@@ -108,7 +108,8 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			Expect(err).Should(Succeed())
 			return configReaders[configdesc.Name]
 		}
-		params := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl})
+		params, err := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl}, pdcr)
+		Expect(err).Should(Succeed())
 
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())

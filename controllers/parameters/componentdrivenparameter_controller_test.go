@@ -88,7 +88,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		By("Create init parameters")
 		key := testapps.GetRandomizedKey(testCtx.DefaultNamespace, defaultCompName)
 		testparameters.NewParameterFactory(key.Name, key.Namespace, clusterName, defaultCompName).
-			AddParameters("innodb-buffer-pool-size", "1024M").
+			AddParameters("innodb_buffer_pool_size", "1024M").
 			AddParameters("max_connections", "100").
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddLabels(constant.ParametersInitLabelKey, "true").
@@ -138,7 +138,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 				g.Expect(item.Payload).Should(HaveKey(constant.ReplicasPayload))
 				g.Expect(item.Payload).Should(HaveKey(constant.ComponentResourcePayload))
 				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
-				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb-buffer-pool-size", pointer.String("1024M")))
+				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
 			})).Should(Succeed())
 		})

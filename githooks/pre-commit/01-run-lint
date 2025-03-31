@@ -1,1 +1,2 @@
-../scripts/run-lint.sh
+#!/bin/sh
+make lint-fast

@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -109,12 +110,14 @@ func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 	return Task{
 		Name: item.Name,
 		Do: func(resource *Task, taskCtx *TaskContext, revision string) error {
-			configSpec := item.ConfigSpec
-			if configSpec == nil {
+			if item.ConfigSpec == nil {
 				return core.MakeError("not found config spec: %s", item.Name)
 			}
 			if err := resource.ConfigMap(item.Name).Complete(); err != nil {
-				return syncImpl(taskCtx, resource, item, status, revision, nil)
+				if apierrors.IsNotFound(err) {
+					return syncImpl(taskCtx, resource, item, status, revision, nil)
+				}
+				return err
 			}
 			// Do reconcile for config template
 			configMap := resource.ConfigMapObj

@@ -421,10 +421,10 @@ func (r *ComponentDefinitionReconciler) validateLifecycleActionBuiltInHandlers(l
 
 	for _, action := range actions {
 		if action.LifeCycleActionHandlers != nil && action.LifeCycleActionHandlers.BuiltinHandler != nil {
-			if !slices.Contains(supportedBuiltInHandlers, *lifecycleActions.RoleProbe.BuiltinHandler) {
-				return fmt.Errorf("the builtin handler %s is not supported", *lifecycleActions.RoleProbe.BuiltinHandler)
+			if !slices.Contains(supportedBuiltInHandlers, *action.LifeCycleActionHandlers.BuiltinHandler) {
+				return fmt.Errorf("the builtin handler %s is not supported", *action.LifeCycleActionHandlers.BuiltinHandler)
 			}
-			builtInHandlerMap[*lifecycleActions.RoleProbe.BuiltinHandler] = true
+			builtInHandlerMap[*action.LifeCycleActionHandlers.BuiltinHandler] = true
 		}
 	}
 

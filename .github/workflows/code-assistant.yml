@@ -1,24 +1,31 @@
 name: Code Assistant
+
 on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
   issue_comment:
     types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
 
-env:
-  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  CODE_ASSISTANT_API_URL: ${{ secrets.CODE_ASSISTANT_API_URL }}
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
   code-assistant:
-    name: Code Assistant
-    if: contains(github.event.comment.body, '/code-assistant')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ env.GH_TOKEN }}
-          fetch-depth: 0
-      - name: Code Assistant
-        uses: apecloud-inc/gha-code-assistant@main
-        env:
-          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
-          CODE_ASSISTANT_API_URL: ${{ env.CODE_ASSISTANT_API_URL }}
+    uses: All-Hands-AI/OpenHands/.github/workflows/openhands-resolver.yml@main
+    with:
+      macro: ${{ vars.MACRO || '@openhands-agent' }}
+      target_branch: ${{ vars.TARGET_BRANCH || 'main' }}
+      max_iterations: ${{ fromJson(vars.MAX_ITERATION || 50) }}
+      LLM_MODEL: ${{ vars.LLM_MODEL || 'anthropic/claude-3-7-sonnet-20250219' }}
+    secrets:
+      PAT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}

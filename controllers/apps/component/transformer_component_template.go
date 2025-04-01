@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -109,6 +110,10 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
+		// If the file template is managed by external, the volume mount object should be the external object.
+		if isExternalManaged(tpl) {
+			objName = tpl.Template
+		}
 		createFn := func(_ string) corev1.Volume {
 			return t.newVolume(tpl, objName)
 		}
@@ -183,6 +188,10 @@ func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*co
 func buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
 	objs := make(map[string]*corev1.ConfigMap)
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+		// If the file template is managed by external, the cm object has been rendered by the external manager.
+		if isExternalManaged(tpl) {
+			continue
+		}
 		obj, err := buildFileTemplateObject(transCtx, tpl)
 		if err != nil {
 			return nil, err
@@ -277,4 +286,8 @@ func fileTemplateObjectName(synthesizedComp *component.SynthesizedComponent, tpl
 func fileTemplateNameFromObject(synthesizedComp *component.SynthesizedComponent, obj *corev1.ConfigMap) string {
 	name, _ := strings.CutPrefix(obj.Name, fmt.Sprintf("%s-", synthesizedComp.FullCompName))
 	return name
+}
+
+func isExternalManaged(tpl component.SynthesizedFileTemplate) bool {
+	return pointer.BoolDeref(tpl.ExternalManaged, false)
 }

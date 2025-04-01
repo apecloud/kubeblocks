@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -41,10 +42,25 @@ func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParamet
 	if err != nil {
 		return nil, err
 	}
-	for _, template := range cmpd.Spec.Configs {
+	for _, template := range ResolveParameterTemplate(cmpd.Spec, pcr.Spec) {
 		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
 	}
 	return itemDetails, nil
+}
+
+func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, pcr parametersv1alpha1.ParamConfigRendererSpec) []appsv1.ComponentFileTemplate {
+	var templates []appsv1.ComponentFileTemplate
+
+	tpls := generics.Map(pcr.Configs, func(e parametersv1alpha1.ComponentConfigDescription) string {
+		return e.TemplateName
+	})
+
+	for _, config := range cmpd.Configs {
+		if slices.Contains(tpls, config.Name) {
+			templates = append(templates, config)
+		}
+	}
+	return templates
 }
 
 func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentFileTemplate) parametersv1alpha1.ConfigTemplateItemDetail {
@@ -133,9 +149,6 @@ func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.
 }
 
 func hasValidParametersDefinition(defs []*parametersv1alpha1.ParametersDefinition) bool {
-	if len(defs) == 0 {
-		return false
-	}
 	match := func(def *parametersv1alpha1.ParametersDefinition) bool {
 		return def.Spec.ParametersSchema != nil
 	}

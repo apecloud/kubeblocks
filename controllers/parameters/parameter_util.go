@@ -135,6 +135,9 @@ func updateCustomTemplates(rctx *ReconcileContext, parameter *parametersv1alpha1
 
 func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters, configmaps map[string]*corev1.ConfigMap) func(*ReconcileContext, *parametersv1alpha1.Parameter) error {
 	return func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
+		if !configctrl.HasValidParameterTemplate(rctx.ConfigRender) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("component[%s] does not support reconfigure", rctx.ComponentName))
+		}
 		classParameters, err := configctrl.ClassifyComponentParameters(updatedParameters,
 			flatten(rctx.ParametersDefs),
 			rctx.ComponentDefObj.Spec.Configs,

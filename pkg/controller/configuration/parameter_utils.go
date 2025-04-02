@@ -42,6 +42,9 @@ func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParamet
 	if err != nil {
 		return nil, err
 	}
+	if !HasValidParameterTemplate(pcr) {
+		return nil, nil
+	}
 	for _, template := range ResolveParameterTemplate(cmpd.Spec, pcr.Spec) {
 		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
 	}
@@ -63,6 +66,10 @@ func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, pcr parameter
 	return templates
 }
 
+func HasValidParameterTemplate(pcr *parametersv1alpha1.ParamConfigRenderer) bool {
+	return pcr != nil && len(pcr.Spec.Configs) != 0
+}
+
 func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentFileTemplate) parametersv1alpha1.ConfigTemplateItemDetail {
 	itemDetail := parametersv1alpha1.ConfigTemplateItemDetail{
 		Name:       template.Name,
@@ -80,7 +87,7 @@ func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParamete
 	templates []appsv1.ComponentFileTemplate,
 	tpls map[string]*corev1.ConfigMap,
 	pcr *parametersv1alpha1.ParamConfigRenderer) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
-	if len(parameters) == 0 {
+	if len(parameters) == 0 || !HasValidParameterTemplate(pcr) {
 		return nil, nil
 	}
 	if !hasValidParametersDefinition(parametersDefs) {

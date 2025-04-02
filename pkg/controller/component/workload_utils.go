@@ -136,6 +136,7 @@ func GenerateAllPodNames(
 		templates = append(templates, &workloads.InstanceTemplate{
 			Name:     instances[i].Name,
 			Replicas: instances[i].Replicas,
+			Ordinals: instances[i].Ordinals,
 		})
 	}
 	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})

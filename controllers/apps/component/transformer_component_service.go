@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -48,9 +47,6 @@ import (
 )
 
 var (
-	ordinalRegexpPattern = `-\d+$`
-	ordinalRegexp        = regexp.MustCompile(ordinalRegexpPattern)
-
 	multiClusterServicePlacementInMirror = "mirror"
 	multiClusterServicePlacementInUnique = "unique"
 )
@@ -134,48 +130,42 @@ func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentServ
 
 func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
-	pods, err := t.podsNameNOrdinal(synthesizeComp)
+	pods, err := t.podsNameNSuffix(synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
 
 	services := make([]*appsv1.ComponentService, 0)
-	for name, ordinal := range pods {
+	for podName, suffix := range pods {
 		svc := service.DeepCopy()
-		svc.Name = fmt.Sprintf("%s-%d", service.Name, ordinal)
+		svc.Name = fmt.Sprintf("%s-%s", service.Name, suffix)
 		if len(service.ServiceName) == 0 {
-			svc.ServiceName = fmt.Sprintf("%d", ordinal)
+			svc.ServiceName = suffix
 		} else {
-			svc.ServiceName = fmt.Sprintf("%s-%d", service.ServiceName, ordinal)
+			svc.ServiceName = fmt.Sprintf("%s-%s", service.ServiceName, suffix)
 		}
 		if svc.Spec.Selector == nil {
 			svc.Spec.Selector = make(map[string]string)
 		}
-		svc.Spec.Selector[constant.KBAppPodNameLabelKey] = name
+		svc.Spec.Selector[constant.KBAppPodNameLabelKey] = podName
 		services = append(services, svc)
 	}
 	return t.buildServices(comp, synthesizeComp, services)
 }
 
-func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component.SynthesizedComponent) (map[string]int, error) {
+func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent) (map[string]string, error) {
 	podNames, err := generatePodNames(synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
-	pods := make(map[string]int)
-	for _, name := range podNames {
-		ordinal, err := func() (int, error) {
-			result := ordinalRegexp.FindString(name)
-			if len(result) == 0 {
-				return 0, fmt.Errorf("invalid pod name: %s", name)
-			}
-			o, _ := strconv.Atoi(result[1:])
-			return o, nil
-		}()
-		if err != nil {
-			return nil, err
+	pods := make(map[string]string)
+	prefix := fmt.Sprintf("%s-", synthesizeComp.FullCompName)
+	for _, podName := range podNames {
+		suffix, found := strings.CutPrefix(podName, prefix)
+		if !found || len(suffix) == 0 {
+			return nil, fmt.Errorf("invalid pod name when building pod services: %s", podName)
 		}
-		pods[name] = ordinal
+		pods[podName] = suffix
 	}
 	return pods, nil
 }

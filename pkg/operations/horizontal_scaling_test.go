@@ -470,6 +470,46 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
+
+		It("h-scale new instance templates and ordinals", func() {
+			templateFoo := appsv1.InstanceTemplate{
+				Name:     insTplName,
+				Replicas: func() *int32 { r := int32(2); return &r }(),
+				Ordinals: appsv1.Ordinals{
+					Ranges: []appsv1.Range{
+						{
+							Start: 300,
+							End:   301,
+						},
+					},
+				},
+			}
+			instances := []appsv1.InstanceTemplate{templateFoo}
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, nil, opsv1alpha1.HorizontalScaling{
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					NewInstances: []appsv1.InstanceTemplate{templateFoo},
+				},
+			}, false)
+			By("verify cluster spec is correct")
+			var targetSpec *appsv1.ClusterComponentSpec
+			for i := range opsRes.Cluster.Spec.ComponentSpecs {
+				spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+				if spec.Name == defaultCompName {
+					targetSpec = spec
+				}
+			}
+
+			// auto-sync replicaChanges of the component to 6
+			Expect(targetSpec.Replicas).Should(BeEquivalentTo(5))
+			Expect(targetSpec.Instances).Should(HaveLen(1))
+			Expect(targetSpec.Instances).Should(Equal(instances))
+			By("mock two pods are created")
+			createPods(insTplName, 300, 301)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+		})
+
 		createOpsAndToCreatingPhase := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, horizontalScaling opsv1alpha1.HorizontalScaling, ignoreHscalingStrictValidate bool) *opsv1alpha1.OpsRequest {
 			if horizontalScaling.ComponentName == "" {
 				horizontalScaling.ComponentName = defaultCompName

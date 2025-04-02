@@ -142,7 +142,7 @@ func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.Ins
 	if instances == nil {
 		return nil
 	}
-	instanceTemplates := make([]workloads.InstanceTemplate, 0, len(instances))
+	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
 	for i := range instances {
 		instanceTemplates[i] = workloads.InstanceTemplate{
 			Name:             instances[i].Name,

@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // clusterComponentTransformer transforms components and shardings to mapping Component objects
@@ -226,6 +227,29 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 		return *normalized
 	}
 
+	mergeConfigs := func(running, expected []appsv1.ClusterComponentConfig) []appsv1.ClusterComponentConfig {
+		var mergedConfigs []appsv1.ClusterComponentConfig
+
+		mergedConfigs = append(mergedConfigs, expected...)
+		for _, config := range running {
+			if config.Name == nil || config.ConfigMap == nil {
+				continue
+			}
+			matchConfig := func(c appsv1.ClusterComponentConfig) bool {
+				return pointer.StringEqual(c.Name, config.Name)
+			}
+			index := generics.FindFirstFunc(mergedConfigs, matchConfig)
+			if index < 0 {
+				mergedConfigs = append(mergedConfigs, config)
+				continue
+			}
+			if mergedConfigs[index].ConfigMap == nil {
+				mergedConfigs[index].ConfigMap = config.ConfigMap
+			}
+		}
+		return mergedConfigs
+	}
+
 	// Merge metadata
 	ictrlutil.MergeMetadataMapInplace(compProto.Annotations, &compObjCopy.Annotations)
 	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
@@ -244,7 +268,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
-	compObjCopy.Spec.Configs = compProto.Spec.Configs
+	compObjCopy.Spec.Configs = mergeConfigs(compObjCopy.Spec.Configs, compProto.Spec.Configs)
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
 	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy

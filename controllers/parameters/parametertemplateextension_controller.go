@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +38,9 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // ParameterTemplateExtensionReconciler reconciles a ParameterTemplateExtension object
@@ -108,7 +111,7 @@ func (r *ParameterTemplateExtensionReconciler) reconcile(reqCtx intctrlutil.Requ
 	return r.update(reqCtx, runningCluster, expectedCluster)
 }
 
-func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) (*appsv1.Cluster, error) {
+func updateConfigsForComponent(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) error {
 	resolveParameterCR := func(compName string) (*parametersv1alpha1.ComponentParameter, error) {
 		parameterKey := client.ObjectKey{
 			Name:      configcore.GenerateComponentConfigurationName(cluster.Name, compName),
@@ -127,7 +130,7 @@ func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader cli
 		}
 		cm := corev1.ConfigMap{}
 		if err := reader.Get(reqCtx.Ctx, cmKey, &cm); err != nil {
-			return err
+			return client.IgnoreNotFound(err)
 		}
 		config.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
@@ -135,9 +138,6 @@ func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader cli
 		return nil
 	}
 	checkAndUpdateConfigObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
-		if config.ConfigMap != nil {
-			return nil
-		}
 		parameterCR, err := resolveParameterCR(compName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -146,27 +146,110 @@ func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader cli
 			return nil
 		}
 		if intctrlutil.GetConfigTemplateItem(&parameterCR.Spec, pointer.StringDeref(config.Name, "")) == nil {
+			reqCtx.Log.Info("config template does not support parameters extension", "component", compName, "config", config.Name)
 			return nil
 		}
 		return updateConfigObject(compName, config)
 	}
 
+	for j, config := range compSpec.Configs {
+		if !needUpdateConfigObject(config) {
+			continue
+		}
+		if err := checkAndUpdateConfigObject(compSpec.Name, &compSpec.Configs[j]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) (*appsv1.Cluster, error) {
 	expectedCluster := cluster.DeepCopy()
-	for i := range expectedCluster.Spec.ComponentSpecs {
-		compSpec := &expectedCluster.Spec.ComponentSpecs[i]
-		for j, config := range compSpec.Configs {
-			if !pointer.BoolDeref(config.ExternalManaged, false) {
+	if err := handleComponent(reqCtx, reader, expectedCluster); err != nil {
+		return nil, err
+	}
+	if err := handleShardingComponent(reqCtx, reader, expectedCluster); err != nil {
+		return nil, err
+	}
+	return expectedCluster, nil
+}
+
+func handleComponent(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) error {
+	for i := range cluster.Spec.ComponentSpecs {
+		compSpec := &cluster.Spec.ComponentSpecs[i]
+		if err := updateConfigsForComponent(reqCtx, reader, cluster, compSpec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func needUpdateConfigObject(config appsv1.ClusterComponentConfig) bool {
+	if !pointer.BoolDeref(config.ExternalManaged, false) {
+		return false
+	}
+	if pointer.StringDeref(config.Name, "") == "" {
+		return false
+	}
+	if config.ConfigMap != nil {
+		return false
+	}
+	return true
+}
+
+func hasValidConfigObject(config appsv1.ClusterComponentConfig) bool {
+	if !pointer.BoolDeref(config.ExternalManaged, false) {
+		return false
+	}
+	if pointer.StringDeref(config.Name, "") == "" {
+		return false
+	}
+	return config.ConfigMap != nil
+}
+
+func handleShardingComponent(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) error {
+	checkAndUpdateConfigObjectForSharding := func(shardingName string, config *appsv1.ClusterComponentConfig, sharding *appsv1.ClusterSharding) error {
+		comps, err := intctrlutil.GenShardingCompSpecList(reqCtx.Ctx, reader, cluster, sharding)
+		if err != nil {
+			return err
+		}
+		for _, comp := range comps {
+			if err := updateConfigsForComponent(reqCtx, reader, cluster, comp); err != nil {
+				return err
+			}
+		}
+		match := func(compSpec *appsv1.ClusterComponentSpec) bool {
+			for _, compConfig := range compSpec.Configs {
+				if pointer.StringEqual(compConfig.Name, config.Name) {
+					return hasValidConfigObject(compConfig)
+				}
+			}
+			return false
+		}
+		if generics.CountFunc(comps, match) == len(comps) {
+			config.ConfigMap = &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: parameterTemplateObjectName(cluster.Name, pointer.StringDeref(config.Name, ""))},
+			}
+		}
+		return nil
+	}
+
+	for i := range cluster.Spec.Shardings {
+		shardingSpec := &cluster.Spec.Shardings[i]
+		for j, config := range shardingSpec.Template.Configs {
+			if !needUpdateConfigObject(config) {
 				continue
 			}
-			if pointer.StringDeref(config.Name, "") == "" {
-				continue
-			}
-			if err := checkAndUpdateConfigObject(compSpec.Name, &compSpec.Configs[j]); err != nil {
-				return nil, err
+			if err := checkAndUpdateConfigObjectForSharding(shardingSpec.Name, &shardingSpec.Template.Configs[j], shardingSpec); err != nil {
+				return err
 			}
 		}
 	}
-	return expectedCluster, nil
+	return nil
+}
+
+func parameterTemplateObjectName(clusterName, tplName string) string {
+	return configcore.GetComponentCfgName(clusterName, "$()", tplName)
 }
 
 func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.RequestCtx, running, expected *appsv1.Cluster) (ctrl.Result, error) {

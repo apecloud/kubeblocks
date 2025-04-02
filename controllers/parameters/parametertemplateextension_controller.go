@@ -21,7 +21,6 @@ package parameters
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +37,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -208,16 +207,13 @@ func hasValidConfigObject(config appsv1.ClusterComponentConfig) bool {
 }
 
 func handleShardingComponent(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) error {
-	checkAndUpdateConfigObjectForSharding := func(shardingName string, config *appsv1.ClusterComponentConfig, sharding *appsv1.ClusterSharding) error {
-		comps, err := intctrlutil.GenShardingCompSpecList(reqCtx.Ctx, reader, cluster, sharding)
-		if err != nil {
-			return err
-		}
-		for _, comp := range comps {
+	checkAndUpdateConfigObjectForSharding := func(shardingName string, config *appsv1.ClusterComponentConfig, shardingComps []*appsv1.ClusterComponentSpec) error {
+		for _, comp := range shardingComps {
 			if err := updateConfigsForComponent(reqCtx, reader, cluster, comp); err != nil {
 				return err
 			}
 		}
+		// Wait until all components of sharding have generated the parameters-related ConfigMap object.
 		match := func(compSpec *appsv1.ClusterComponentSpec) bool {
 			for _, compConfig := range compSpec.Configs {
 				if pointer.StringEqual(compConfig.Name, config.Name) {
@@ -226,9 +222,13 @@ func handleShardingComponent(reqCtx intctrlutil.RequestCtx, reader client.Client
 			}
 			return false
 		}
-		if generics.CountFunc(comps, match) == len(comps) {
+		if generics.CountFunc(shardingComps, match) == len(shardingComps) {
+			// TODO: The Configs API does not support sharding component.
+			// Use a PlaceHolder to associate the sharding component with the cm objects rendered by the parameter controller.
 			config.ConfigMap = &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: parameterTemplateObjectName(cluster.Name, pointer.StringDeref(config.Name, ""))},
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: parameterTemplateObjectName(cluster.Name, pointer.StringDeref(config.Name, "")),
+				},
 			}
 		}
 		return nil
@@ -236,11 +236,15 @@ func handleShardingComponent(reqCtx intctrlutil.RequestCtx, reader client.Client
 
 	for i := range cluster.Spec.Shardings {
 		shardingSpec := &cluster.Spec.Shardings[i]
+		shardingComps, err := intctrlutil.GenShardingCompSpecList(reqCtx.Ctx, reader, cluster, shardingSpec)
+		if err != nil {
+			return err
+		}
 		for j, config := range shardingSpec.Template.Configs {
 			if !needUpdateConfigObject(config) {
 				continue
 			}
-			if err := checkAndUpdateConfigObjectForSharding(shardingSpec.Name, &shardingSpec.Template.Configs[j], shardingSpec); err != nil {
+			if err := checkAndUpdateConfigObjectForSharding(shardingSpec.Name, &shardingSpec.Template.Configs[j], shardingComps); err != nil {
 				return err
 			}
 		}
@@ -249,7 +253,7 @@ func handleShardingComponent(reqCtx intctrlutil.RequestCtx, reader client.Client
 }
 
 func parameterTemplateObjectName(clusterName, tplName string) string {
-	return configcore.GetComponentCfgName(clusterName, "$()", tplName)
+	return configcore.GetComponentCfgName(clusterName, constant.KBComponentNamePlaceHolder, tplName)
 }
 
 func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.RequestCtx, running, expected *appsv1.Cluster) (ctrl.Result, error) {

@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -430,7 +431,7 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
 		}
 		if specified() {
-			tpl.Template = config.ConfigMap.Name
+			tpl.Template = strings.ReplaceAll(config.ConfigMap.Name, constant.KBComponentNamePlaceHolder, synthesizedComp.Name)
 			tpl.Namespace = synthesizedComp.Namespace
 			continue
 		}

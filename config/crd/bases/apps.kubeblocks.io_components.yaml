@@ -892,9 +892,12 @@ spec:
                       description: Specifies the scheduling policy for the Component.
                       properties:
                         affinity:
-                          description: Specifies a group of affinity scheduling rules
-                            of the Cluster, including NodeAffinity, PodAffinity, and
-                            PodAntiAffinity.
+                          description: |-
+                            Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
+
+
+                            When merging, NodeAffinity's nodeSelectorTerms are overwritten by the destination's nodeSelectorTerms (if destination is not nil).
+                            Other lists are appended with duplicated items removed.
                           properties:
                             nodeAffinity:
                               description: Describes node affinity scheduling rules
@@ -2198,8 +2201,12 @@ spec:
                 description: Specifies the scheduling policy for the Component.
                 properties:
                   affinity:
-                    description: Specifies a group of affinity scheduling rules of
-                      the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
+                    description: |-
+                      Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
+
+
+                      When merging, NodeAffinity's nodeSelectorTerms are overwritten by the destination's nodeSelectorTerms (if destination is not nil).
+                      Other lists are appended with duplicated items removed.
                     properties:
                       nodeAffinity:
                         description: Describes node affinity scheduling rules for

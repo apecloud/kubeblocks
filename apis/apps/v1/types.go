@@ -639,6 +639,9 @@ type SchedulingPolicy struct {
 
 	// Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
 	//
+	// When merging, NodeAffinity's nodeSelectorTerms are overwritten by the destination's nodeSelectorTerms (if destination is not nil).
+	// Other lists are appended with duplicated items removed.
+	//
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 

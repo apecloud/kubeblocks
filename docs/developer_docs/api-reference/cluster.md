@@ -9281,6 +9281,8 @@ Kubernetes core/v1.Affinity
 <td>
 <em>(Optional)</em>
 <p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+<p>When merging, NodeAffinity&rsquo;s nodeSelectorTerms are overwritten by the destination&rsquo;s nodeSelectorTerms (if destination is not nil).
+Other lists are appended with duplicated items removed.</p>
 </td>
 </tr>
 <tr>

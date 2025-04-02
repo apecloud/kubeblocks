@@ -139,10 +139,7 @@ func MergeAffinity(src, dst *corev1.Affinity) *corev1.Affinity {
 			rtn.NodeAffinity = &corev1.NodeAffinity{}
 		}
 		if src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			if rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-				rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
-			}
-			intctrlutil.MergeList(&src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, &rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, makeCmp[corev1.NodeSelectorTerm]())
+			rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.DeepCopy()
 		}
 		intctrlutil.MergeList(&src.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, &rtn.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, makeCmp[corev1.PreferredSchedulingTerm]())
 	}

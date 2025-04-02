@@ -143,4 +143,35 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	Context("No ParamConfigRenderer", func() {
+		It("NPE test", func() {
+			initTestResource()
+
+			By("Create a component definition obj without ParamConfigRenderer")
+			key := testapps.GetRandomizedKey(testCtx.DefaultNamespace, compDefName)
+			compDefObj := testapps.NewComponentDefinitionFactory(key.Name).
+				WithRandomName().
+				SetDefaultSpec().
+				AddConfigTemplate(configSpecName, configSpecName, testCtx.DefaultNamespace, configVolumeName).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
+				obj.Status.Phase = appsv1.AvailablePhase
+			})()).Should(Succeed())
+
+			By("Create a component obj depends on the new cmpd")
+			key = testapps.GetRandomizedKey(testCtx.DefaultNamespace, defaultCompName)
+			compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, key.Name, compDefObj.Name).
+				AddLabels(constant.AppInstanceLabelKey, clusterName).
+				AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
+				SetUID(types.UID("test-uid")).
+				SetReplicas(1).
+				Create(&testCtx).
+				GetObject()
+
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compObj), &appsv1.Component{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compObj), &parametersv1alpha1.ComponentParameter{}, false)).Should(Succeed())
+		})
+	})
 })

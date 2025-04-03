@@ -660,6 +660,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		})
 		mergeMap(&newSvc.Annotations, &oldSvc.Annotations)
 		mergeMap(&newSvc.Labels, &oldSvc.Labels)
+		oldSvc.Spec.Selector = newSvc.Spec.Selector
 		oldSvc.Spec.Type = newSvc.Spec.Type
 		oldSvc.Spec.PublishNotReadyAddresses = newSvc.Spec.PublishNotReadyAddresses
 		// ignore NodePort&LB svc here, instanceSet only supports default headless svc

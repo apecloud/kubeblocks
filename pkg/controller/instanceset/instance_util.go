@@ -413,6 +413,7 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
 	var instanceNameList []string
 	usedNames := sets.New(offlineInstances...)
+	slices.Sort(ordinalList)
 	for _, ordinal := range ordinalList {
 		var name string
 		if len(templateName) == 0 {
@@ -424,6 +425,9 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 			continue
 		}
 		instanceNameList = append(instanceNameList, name)
+		if len(instanceNameList) == int(replicas) {
+			break
+		}
 	}
 	if int32(len(instanceNameList)) != replicas {
 		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
@@ -656,7 +660,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		})
 		mergeMap(&newSvc.Annotations, &oldSvc.Annotations)
 		mergeMap(&newSvc.Labels, &oldSvc.Labels)
-		mergeMap(&newSvc.Spec.Selector, &oldSvc.Spec.Selector)
+		oldSvc.Spec.Selector = newSvc.Spec.Selector
 		oldSvc.Spec.Type = newSvc.Spec.Type
 		oldSvc.Spec.PublishNotReadyAddresses = newSvc.Spec.PublishNotReadyAddresses
 		// ignore NodePort&LB svc here, instanceSet only supports default headless svc

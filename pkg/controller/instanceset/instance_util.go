@@ -346,7 +346,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
 		replicas := template.GetReplicas()
-		ordinalList, err := ConvertOrdinalsToSortedList(template.GetOrdinals())
+		ordinalList, err := ConvertOrdinalsToUnSortedList(template.GetOrdinals())
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +358,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 		totalReplicas += replicas
 	}
 	if totalReplicas < replicas {
-		ordinalList, err := ConvertOrdinalsToSortedList(defaultTemplateOrdinals)
+		ordinalList, err := ConvertOrdinalsToUnSortedList(defaultTemplateOrdinals)
 		if err != nil {
 			return nil, err
 		}
@@ -413,6 +413,7 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
 	var instanceNameList []string
 	usedNames := sets.New(offlineInstances...)
+	slices.Sort(ordinalList)
 	for _, ordinal := range ordinalList {
 		var name string
 		if len(templateName) == 0 {
@@ -441,7 +442,7 @@ func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName strin
 	if err != nil {
 		return nil, err
 	}
-	return ConvertOrdinalsToSortedList(ordinals)
+	return ConvertOrdinalsToUnSortedList(ordinals)
 }
 
 func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
@@ -456,7 +457,7 @@ func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) 
 	return kbappsv1.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
-func ConvertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
+func ConvertOrdinalsToUnSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
 	ordinalList := sets.New(ordinals.Discrete...)
 	for _, item := range ordinals.Ranges {
 		start := item.Start
@@ -473,9 +474,7 @@ func ConvertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
 			ordinalList.Insert(ordinal)
 		}
 	}
-	sortedOrdinalList := ordinalList.UnsortedList()
-	slices.Sort(sortedOrdinalList)
-	return sortedOrdinalList, nil
+	return ordinalList.UnsortedList(), nil
 }
 
 // ParseNodeSelectorOnceAnnotation will return a non-nil map

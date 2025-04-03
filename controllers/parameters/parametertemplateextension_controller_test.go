@@ -22,9 +22,9 @@ package parameters
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,10 +38,6 @@ import (
 )
 
 var _ = Describe("ParameterExtension Controller", func() {
-
-	BeforeEach(cleanEnv)
-
-	AfterEach(cleanEnv)
 
 	matchComponent := func(clusterSpec *appsv1.ClusterSpec, name string) *appsv1.ClusterComponentSpec {
 		for i, comp := range clusterSpec.ComponentSpecs {
@@ -58,6 +54,10 @@ var _ = Describe("ParameterExtension Controller", func() {
 	}
 
 	Context("When updating cluster configs", func() {
+		BeforeEach(cleanEnv)
+
+		AfterEach(cleanEnv)
+
 		It("Should reconcile success", func() {
 			_, _, clusterObj, _, _ := mockReconcileResource()
 
@@ -100,7 +100,7 @@ var _ = Describe("ParameterExtension Controller", func() {
 				By("create a sharding component: " + spec.Name)
 				comp, err := component.BuildComponent(clusterObj, spec, shardingLabels, nil)
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(k8sClient.Create(testCtx.Ctx, comp)).Should(Succeed())
+				Expect(testCtx.Create(testCtx.Ctx, comp)).Should(Succeed())
 
 				shardingCompParamKey := types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,

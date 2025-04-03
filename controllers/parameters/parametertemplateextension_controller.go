@@ -139,7 +139,7 @@ func updateConfigsForComponent(reqCtx intctrlutil.RequestCtx, reader client.Clie
 	checkAndUpdateConfigObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
 		parameterCR, err := resolveParameterCR(compName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				return err
 			}
 			return nil

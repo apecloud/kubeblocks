@@ -346,7 +346,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
 		replicas := template.GetReplicas()
-		ordinalList, err := ConvertOrdinalsToUnSortedList(template.GetOrdinals())
+		ordinalList, err := ConvertOrdinalsToSortedList(template.GetOrdinals())
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +358,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 		totalReplicas += replicas
 	}
 	if totalReplicas < replicas {
-		ordinalList, err := ConvertOrdinalsToUnSortedList(defaultTemplateOrdinals)
+		ordinalList, err := ConvertOrdinalsToSortedList(defaultTemplateOrdinals)
 		if err != nil {
 			return nil, err
 		}
@@ -442,7 +442,7 @@ func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName strin
 	if err != nil {
 		return nil, err
 	}
-	return ConvertOrdinalsToUnSortedList(ordinals)
+	return ConvertOrdinalsToSortedList(ordinals)
 }
 
 func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
@@ -457,7 +457,7 @@ func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) 
 	return kbappsv1.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
-func ConvertOrdinalsToUnSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
+func ConvertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
 	ordinalList := sets.New(ordinals.Discrete...)
 	for _, item := range ordinals.Ranges {
 		start := item.Start
@@ -474,7 +474,9 @@ func ConvertOrdinalsToUnSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) 
 			ordinalList.Insert(ordinal)
 		}
 	}
-	return ordinalList.UnsortedList(), nil
+	sortedOrdinalList := ordinalList.UnsortedList()
+	slices.Sort(sortedOrdinalList)
+	return sortedOrdinalList, nil
 }
 
 // ParseNodeSelectorOnceAnnotation will return a non-nil map

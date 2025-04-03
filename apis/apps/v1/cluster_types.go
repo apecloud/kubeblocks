@@ -342,6 +342,7 @@ type ClusterComponentSpec struct {
 	Replicas int32 `json:"replicas"`
 
 	// Specifies the scheduling policy for the Component.
+	// If defined, it will overwrite the scheduling policy defined in ClusterSpec.
 	//
 	// +optional
 	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`

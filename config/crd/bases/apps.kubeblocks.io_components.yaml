@@ -889,7 +889,9 @@ spec:
                           type: object
                       type: object
                     schedulingPolicy:
-                      description: Specifies the scheduling policy for the Component.
+                      description: |-
+                        Specifies the scheduling policy for the instance.
+                        If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or ClusterComponentSpec.
                       properties:
                         affinity:
                           description: Specifies a group of affinity scheduling rules

@@ -787,7 +787,8 @@ type InstanceTemplate struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies the scheduling policy for the Component.
+	// Specifies the scheduling policy for the instance.
+	// If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or ClusterComponentSpec.
 	//
 	// +optional
 	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`

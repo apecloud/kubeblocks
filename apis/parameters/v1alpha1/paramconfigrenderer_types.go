@@ -107,8 +107,8 @@ type ComponentConfigDescription struct {
 	//    sectionName: mysqld
 	// ```
 	//
-	// +kubebuilder:validation:Required
-	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig"`
+	// +optional
+	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig,omitempty"`
 
 	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 	//

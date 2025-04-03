@@ -927,23 +927,21 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		if sp.SchedulerName != "" {
 			templateExt.Spec.SchedulerName = sp.SchedulerName
 		}
-		mergeMap(&sp.NodeSelector, &templateExt.Spec.NodeSelector)
+		if sp.NodeSelector != nil {
+			templateExt.Spec.NodeSelector = sp.NodeSelector
+		}
 		if sp.NodeName != "" {
 			templateExt.Spec.NodeName = sp.NodeName
 		}
-		templateExt.Spec.Affinity = scheduling.MergeAffinity(sp.Affinity, templateExt.Spec.Affinity)
-		intctrlutil.MergeList(&sp.Tolerations, &templateExt.Spec.Tolerations,
-			func(item corev1.Toleration) func(corev1.Toleration) bool {
-				return func(t corev1.Toleration) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-		intctrlutil.MergeList(&sp.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
-			func(item corev1.TopologySpreadConstraint) func(corev1.TopologySpreadConstraint) bool {
-				return func(t corev1.TopologySpreadConstraint) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
+		if sp.Affinity != nil {
+			templateExt.Spec.Affinity = sp.Affinity
+		}
+		if sp.Tolerations != nil {
+			templateExt.Spec.Tolerations = sp.Tolerations
+		}
+		if sp.TopologySpreadConstraints != nil {
+			templateExt.Spec.TopologySpreadConstraints = sp.TopologySpreadConstraints
+		}
 	}
 }
 

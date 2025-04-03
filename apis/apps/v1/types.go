@@ -639,9 +639,6 @@ type SchedulingPolicy struct {
 
 	// Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
 	//
-	// When merging, NodeAffinity's nodeSelectorTerms are overwritten by the destination's nodeSelectorTerms (if destination is not nil).
-	// Other lists are appended with duplicated items removed.
-	//
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
@@ -790,7 +787,8 @@ type InstanceTemplate struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies the scheduling policy for the Component.
+	// Specifies the scheduling policy for the instance.
+	// If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or ClusterComponentSpec.
 	//
 	// +optional
 	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`

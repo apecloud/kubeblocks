@@ -196,6 +196,29 @@ var _ = Describe("Scheduling util test", func() {
 							{
 								MatchExpressions: []corev1.NodeSelectorRequirement{
 									{
+										Key:      "disktype",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"hdd",
+										},
+									},
+								},
+								MatchFields: nil,
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "topology.kubernetes.io/zone",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{
+											"west1",
+										},
+									},
+								},
+							},
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
 										Key:      "node-role.kubernetes.io/worker",
 										Operator: corev1.NodeSelectorOpExists,
 									},
@@ -545,31 +568,6 @@ var _ = Describe("Scheduling util test", func() {
 				},
 			}
 			Expect(rtn).Should(Equal(expectMergedAffinity))
-		})
-		It("don't overwrite when src's nodeaffinity is empty", func() {
-			src := &corev1.Affinity{
-				NodeAffinity: &corev1.NodeAffinity{},
-			}
-
-			dst := &corev1.Affinity{
-				NodeAffinity: &corev1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							{
-								MatchExpressions: []corev1.NodeSelectorRequirement{
-									{
-										Key:      "another",
-										Operator: corev1.NodeSelectorOpExists,
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-
-			rtn := MergeAffinity(src, dst)
-			Expect(rtn).Should(Equal(dst))
 		})
 	})
 })

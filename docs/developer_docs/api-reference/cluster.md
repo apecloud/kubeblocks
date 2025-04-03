@@ -2972,7 +2972,8 @@ SchedulingPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the scheduling policy for the Component.</p>
+<p>Specifies the scheduling policy for the Component.
+If defined, it will overwrite the scheduling policy defined in ClusterSpec.</p>
 </td>
 </tr>
 <tr>
@@ -7897,7 +7898,8 @@ SchedulingPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the scheduling policy for the Component.</p>
+<p>Specifies the scheduling policy for the instance.
+If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or ClusterComponentSpec.</p>
 </td>
 </tr>
 <tr>
@@ -9281,8 +9283,6 @@ Kubernetes core/v1.Affinity
 <td>
 <em>(Optional)</em>
 <p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
-<p>When merging, NodeAffinity&rsquo;s nodeSelectorTerms are overwritten by the destination&rsquo;s nodeSelectorTerms (if destination is not nil).
-Other lists are appended with duplicated items removed.</p>
 </td>
 </tr>
 <tr>

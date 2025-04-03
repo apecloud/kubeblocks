@@ -59,14 +59,13 @@ const (
 )
 
 var (
-	its                 *workloads.InstanceSet
-	priorityMap         map[string]int
-	reconciler          kubebuilderx.Reconciler
-	controller          *gomock.Controller
-	k8sMock             *mocks.MockClient
-	k8sMockStatusWriter *mocks.MockStatusWriter
-	ctx                 context.Context
-	logger              logr.Logger
+	its         *workloads.InstanceSet
+	priorityMap map[string]int
+	reconciler  kubebuilderx.Reconciler
+	controller  *gomock.Controller
+	k8sMock     *mocks.MockClient
+	ctx         context.Context
+	logger      logr.Logger
 
 	uid = types.UID("its-mock-uid")
 
@@ -245,7 +244,6 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	controller, k8sMock = testutil.SetupK8sMock()
-	k8sMockStatusWriter = mocks.NewMockStatusWriter(controller)
 	ctx = context.Background()
 	logger = logf.FromContext(ctx).WithValues("instance-set", "test")
 

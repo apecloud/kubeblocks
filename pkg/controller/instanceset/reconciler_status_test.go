@@ -254,7 +254,7 @@ var _ = Describe("status reconciler test", func() {
 			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
 
-			By("make all pods not ready")
+			By("make all pods failed")
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())

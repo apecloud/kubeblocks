@@ -179,9 +179,6 @@ var _ = Describe("instance util test", func() {
 			Expect(instance.pod.Spec.Volumes).Should(HaveLen(1))
 			Expect(instance.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
 			expectedTemplate := its.Spec.Template.DeepCopy()
-			expectedTemplate.Spec.ReadinessGates = []corev1.PodReadinessGate{
-				{ConditionType: PodConditionRoleProbeSucceeded},
-			}
 			Expect(instance.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
 			instance.pod.Spec.Volumes = nil
@@ -903,6 +900,16 @@ var _ = Describe("instance util test", func() {
 				Image: "apecloud.com/nginx",
 			}}
 			Expect(isImageMatched(pod)).Should(BeTrue())
+		})
+	})
+
+	Context("isRoleReady", func() {
+		It("should work well", func() {
+			pod := builder.NewPodBuilder(namespace, name).GetObject()
+			Expect(isRoleReady(pod, nil)).Should(BeTrue())
+			Expect(isRoleReady(pod, roles)).Should(BeFalse())
+			pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
+			Expect(isRoleReady(pod, roles)).Should(BeTrue())
 		})
 	})
 })

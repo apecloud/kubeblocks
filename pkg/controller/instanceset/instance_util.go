@@ -163,6 +163,15 @@ func isPodAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return isPodReady(pod) && podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
+// isRoleReady returns true if pod has role label
+func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
+	if len(roles) == 0 {
+		return true
+	}
+	_, ok := pod.Labels[constant.RoleLabelKey]
+	return ok
+}
+
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *corev1.Pod) bool {
 	return pod.Status.Phase != ""
@@ -753,11 +762,6 @@ func validateSpec(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) err
 }
 
 func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
-	if len(parent.Spec.Roles) != 0 {
-		template.Spec.ReadinessGates = append(template.Spec.ReadinessGates, corev1.PodReadinessGate{
-			ConditionType: PodConditionRoleProbeSucceeded,
-		})
-	}
 	podTemplate := filterInPlaceFields(template)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).

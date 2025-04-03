@@ -200,7 +200,7 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 	return updateStrategy
 }
 
-// these three pod condition functions are copied from kubernetes's pkg/api/v1/pod/util.go
+// these two pod condition functions are copied from kubernetes's pkg/api/v1/pod/util.go
 // since they are not "public" api of kubernetes
 
 // getPodCondition extracts the provided condition from the given status and returns that.
@@ -224,33 +224,4 @@ func getPodConditionFromList(conditions []corev1.PodCondition, conditionType cor
 		}
 	}
 	return -1, nil
-}
-
-// updatePodCondition updates existing pod condition or creates a new one. Sets LastTransitionTime to now if the
-// status has changed.
-// Returns true if pod condition has changed or has been added.
-func updatePodCondition(status *corev1.PodStatus, condition *corev1.PodCondition) bool {
-	condition.LastTransitionTime = metav1.Now()
-	// Try to find this pod condition.
-	conditionIndex, oldCondition := getPodCondition(status, condition.Type)
-
-	if oldCondition == nil {
-		// We are adding new pod condition.
-		status.Conditions = append(status.Conditions, *condition)
-		return true
-	}
-	// We are updating an existing condition, so we need to check if it has changed.
-	if condition.Status == oldCondition.Status {
-		condition.LastTransitionTime = oldCondition.LastTransitionTime
-	}
-
-	isEqual := condition.Status == oldCondition.Status &&
-		condition.Reason == oldCondition.Reason &&
-		condition.Message == oldCondition.Message &&
-		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
-		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
-
-	status.Conditions[conditionIndex] = *condition
-	// Return true if one of the fields have changed.
-	return !isEqual
 }

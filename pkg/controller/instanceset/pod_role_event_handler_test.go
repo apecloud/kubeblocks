@@ -90,17 +90,12 @@ var _ = Describe("pod role label event handler test", func() {
 					its.Spec.Roles = []workloads.ReplicaRole{role}
 					return nil
 				}).Times(1)
-			k8sMock.EXPECT().Status().Return(k8sMockStatusWriter).Times(1)
-			k8sMockStatusWriter.EXPECT().
+			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
 					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))
-					Expect(pd.Status.Conditions).ShouldNot(BeNil())
-					_, condition := getPodCondition(&pd.Status, PodConditionRoleProbeSucceeded)
-					Expect(condition).ShouldNot(BeNil())
-					Expect(condition.Status).Should(Equal(corev1.ConditionTrue))
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
@@ -160,8 +155,7 @@ var _ = Describe("pod role label event handler test", func() {
 					return nil
 				}).Times(1)
 			updateErr := fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again")
-			k8sMock.EXPECT().Status().Return(k8sMockStatusWriter).Times(1)
-			k8sMockStatusWriter.EXPECT().
+			k8sMock.EXPECT().
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
 					Expect(pd).ShouldNot(BeNil())

@@ -155,6 +155,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			needRetry = true
 			break
 		}
+		if !isRoleReady(pod, its.Spec.Roles) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+			break
+		}
 
 		updatePolicy, err := getPodUpdatePolicy(its, pod)
 		if err != nil {

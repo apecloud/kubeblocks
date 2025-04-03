@@ -424,6 +424,9 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 			continue
 		}
 		instanceNameList = append(instanceNameList, name)
+		if len(instanceNameList) == int(replicas) {
+			break
+		}
 	}
 	if int32(len(instanceNameList)) != replicas {
 		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",

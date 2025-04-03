@@ -649,6 +649,44 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
+	It("with templatesOrdinals range", func() {
+		By("replicas is equal to the length of ordinals ranges")
+		parentName := "test"
+		templateFoo := &workloads.InstanceTemplate{
+			Name:     "foo",
+			Replicas: pointer.Int32(3),
+			Ordinals: kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
+					{
+						Start: 1,
+						End:   2,
+					},
+					{
+						Start: 5,
+						End:   5,
+					},
+				},
+			},
+		}
+		instanceNameList, err := GenerateAllInstanceNames(parentName, 3, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
+		Expect(err).Should(BeNil())
+		Expect(len(instanceNameList)).Should(Equal(3))
+
+		By("replicas is less than the length of ordinals ranges")
+		templateFoo.Replicas = pointer.Int32(2)
+		instanceNameList, err = GenerateAllInstanceNames(parentName, 2, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
+		Expect(err).Should(BeNil())
+		Expect(len(instanceNameList)).Should(Equal(2))
+
+		By("replicas is greater than the length of ordinals ranges")
+		templateFoo.Replicas = pointer.Int32(4)
+		_, err = GenerateAllInstanceNames(parentName, 4, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
+		errInstanceNameListExpected := []string{"test-foo-1", "test-foo-2", "test-foo-5"}
+		errExpected := fmt.Errorf("for template '%s', expected %d instance names but generated %d: [%s]",
+			templateFoo.Name, *templateFoo.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", "))
+		Expect(err).Should(Equal(errExpected))
+	})
+
 	Context("GetOrdinalListByTemplateName", func() {
 		It("should work well", func() {
 			its := &workloads.InstanceSet{

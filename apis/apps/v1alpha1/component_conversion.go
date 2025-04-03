@@ -88,6 +88,7 @@ func (r *Component) incrementConvertTo(dstRaw metav1.Object) (incrementChange, e
 			r.Annotations[clusterUIDKey] = clusterUID
 		}
 	}
+	comp.Spec.TerminationPolicy = appsv1.Delete
 	// deleted
 	return &componentConverter{
 		EnabledLogs:            r.Spec.EnabledLogs,

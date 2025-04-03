@@ -45,7 +45,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 

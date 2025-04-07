@@ -303,6 +303,7 @@ const (
 	EnvForRestore                     = "restoreEnv"
 	ConnectionPassword                = "connectionPassword"
 	EncryptedSystemAccounts           = "encryptedSystemAccounts"
+	ParametersForRestore              = "restoreParameters"
 )
 
 const (

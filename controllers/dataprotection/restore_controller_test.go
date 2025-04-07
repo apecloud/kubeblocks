@@ -338,7 +338,7 @@ var _ = Describe("Restore Controller test", func() {
 				testdp.MockActionSetWithSchema(&testCtx, actionSet)
 				replicas := 3
 				startingIndex := 0
-				restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 							testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
@@ -534,7 +534,7 @@ var _ = Describe("Restore Controller test", func() {
 					constant.AppInstanceLabelKey: testdp.ClusterName,
 				}
 
-				restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {
 						f.SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
 						f.SetParameters(testdp.TestParameters)

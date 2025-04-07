@@ -271,7 +271,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		// 1. validate OpenApV3Schema
 		if parametersSchema != nil {
 			// covert to type map[string]interface{}
-			params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))
+			params, err := common.ConvertStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))
 			if err != nil {
 				return err
 			}

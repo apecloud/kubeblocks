@@ -192,6 +192,12 @@ type SchedulePolicy struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// Specifies the name of the schedule. Names cannot be duplicated.
+	// If the name is empty, it will be considered the same as the value of the backupMethod below.
+	//
+	// +optional
+	Name string `json:"name,omitempty"`
+
 	// Defines the backup method name that is defined in backupPolicy.
 	//
 	// +kubebuilder:validation:Required
@@ -219,6 +225,17 @@ type SchedulePolicy struct {
 	// +optional
 	// +kubebuilder:default="7d"
 	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 type TargetInstance struct {
@@ -336,4 +353,13 @@ type BackupPolicyTemplateList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupPolicyTemplate{}, &BackupPolicyTemplateList{})
+}
+
+// GetScheduleName gets the name of schedulePolicy.
+// If name is empty, return backupMethod.
+func (s *SchedulePolicy) GetScheduleName() string {
+	if len(s.Name) > 0 {
+		return s.Name
+	}
+	return s.BackupMethod
 }

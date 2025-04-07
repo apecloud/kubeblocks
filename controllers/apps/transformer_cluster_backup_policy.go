@@ -307,7 +307,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupSchedule(
 	}
 
 	var schedules []dpv1alpha1.SchedulePolicy
-	for _, s := range r.backupPolicyTPL.Spec.Schedules {
+	for _, s := range r.backupPolicy.Schedules {
 		name := s.GetScheduleName()
 		schedules = append(schedules, dpv1alpha1.SchedulePolicy{
 			BackupMethod:    s.BackupMethod,
@@ -336,7 +336,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupSchedule(backupSchedule *dpv1
 	// update backupSchedule annotation to reconcile it.
 	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
 	// sync the newly added schedule policies.
-	for _, s := range r.backupPolicyTPL.Spec.Schedules {
+	for _, s := range r.backupPolicy.Schedules {
 		name := s.GetScheduleName()
 		if _, ok := scheduleNameMap[name]; ok {
 			continue

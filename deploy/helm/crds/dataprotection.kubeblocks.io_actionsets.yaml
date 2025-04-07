@@ -269,6 +269,11 @@ spec:
                     - command
                     - image
                     type: object
+                  withParameters:
+                    description: Specifies the parameters used by the backup action
+                    items:
+                      type: string
+                    type: array
                 type: object
               backupType:
                 allOf:
@@ -457,6 +462,21 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
+              parametersSchema:
+                description: Specifies the schema of parameters in backups and restores
+                  before their usage.
+                properties:
+                  openAPIV3Schema:
+                    description: |-
+                      Defines the schema for parameters using the OpenAPI v3.
+                      The supported property types include:
+                      - string
+                      - number
+                      - integer
+                      - array: Note that only items of string type are supported.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
               restore:
                 description: Specifies the restore action.
                 properties:
@@ -568,6 +588,11 @@ spec:
                     - command
                     - image
                     type: object
+                  withParameters:
+                    description: Specifies the parameters used by the restore action
+                    items:
+                      type: string
+                    type: array
                 type: object
             required:
             - backupType

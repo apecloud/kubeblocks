@@ -19,7 +19,6 @@ package apps
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -48,6 +47,7 @@ var _ = Describe("", func() {
 
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupPolicyTemplateSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ActionSetSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -80,14 +80,46 @@ var _ = Describe("", func() {
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, "").
 				SetBackupMethodVolumeMounts("data", "/data").
-				AddSchedule(BackupMethod, "0 0 * * *", ttl, true).
-				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, "", nil).
+				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true, "", nil).
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *v1alpha1.BackupPolicyTemplate) {
 				g.Expect(pobj.GetLabels()[constant.ClusterDefLabelKey]).To(Equal(bpt.Spec.ClusterDefRef))
 				g.Expect(pobj.GetLabels()[compDef1]).To(Equal(compDef1))
 				g.Expect(pobj.GetLabels()[compDef2]).To(Equal(compDef2))
+			})).Should(Succeed())
+		})
+		It("test BackupPolicyTemplate schedule parameters", func() {
+			const (
+				scheduleName1 = "test1"
+				scheduleName2 = "test2"
+			)
+			By("set backup parameters and schema in acitionSet")
+			actionSet := testdp.NewFakeActionSet(&testCtx)
+			testdp.MockActionSetWithSchema(&testCtx, actionSet)
+			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName1, testdp.InvalidParameters).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName2, testdp.TestParameters).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, "", nil).
+				Create(&testCtx).GetObject()
+			key := client.ObjectKeyFromObject(bpt)
+			By("should be unavailable")
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
+				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.UnavailablePhase))
+				g.Expect(pobj.Status.Message).To(ContainSubstring(fmt.Sprintf(`fails to validate parameters of backupMethod "%s"`, BackupMethod)))
+			})).Should(Succeed())
+			By("should be available")
+			Expect(testapps.ChangeObj(&testCtx, bpt, func(pobj *dpv1alpha1.BackupPolicyTemplate) {
+				bpt.Spec.Schedules[0].Parameters = testdp.TestParameters
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
+				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.AvailablePhase))
+				g.Expect(pobj.Status.Message).To(BeEmpty())
 			})).Should(Succeed())
 		})
 	})

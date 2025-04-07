@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // TODO: @wangyelei could refactor to ops group
@@ -223,6 +225,8 @@ type SpecificOpsRequest struct {
 	ScriptSpec *ScriptSpec `json:"scriptSpec,omitempty"`
 
 	// Specifies the parameters to backup a Cluster.
+	//
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update backup.parameters"
 	// +optional
 	Backup *Backup `json:"backup,omitempty"`
 
@@ -235,6 +239,7 @@ type SpecificOpsRequest struct {
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
 	//
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update restore.parameters"
 	// +optional
 	Restore *Restore `json:"restore,omitempty"`
 
@@ -1020,6 +1025,16 @@ type Backup struct {
 	//
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update parameters"
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 type Restore struct {
@@ -1066,6 +1081,16 @@ type Restore struct {
 	//
 	// This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
 	DeferPostReadyUntilClusterRunning bool `json:"deferPostReadyUntilClusterRunning,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update parameters"
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 // ScriptSecret represents the secret that is used to execute the script.

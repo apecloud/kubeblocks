@@ -359,7 +359,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		RequestCtx: reqCtx,
 		Client:     r.Client,
 	}
-
 	if request.Annotations == nil {
 		request.Annotations = make(map[string]string)
 	}
@@ -398,6 +397,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 			return nil, err
 		}
 		request.ActionSet = actionSet
+
+		// validate parameters
+		if err := dputils.ValidateParameters(actionSet, backup.Spec.Parameters, true); err != nil {
+			return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
+		}
 	}
 
 	// check encryption config

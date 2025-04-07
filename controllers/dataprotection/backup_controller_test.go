@@ -490,7 +490,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 		})
-		
+
 		Context("creates a backup with encryption", func() {
 			const (
 				encryptionKeySecretName = "backup-encryption"

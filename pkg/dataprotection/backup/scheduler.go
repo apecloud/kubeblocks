@@ -199,7 +199,7 @@ func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*co
 	if err != nil {
 		return nil, err
 	}
-	createBackupCmd := fmt.Sprintf(`
+	createBackupCmd := fmt.Sprintf(`%s
 kubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup

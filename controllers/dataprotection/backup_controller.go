@@ -359,6 +359,7 @@ func (r *BackupReconciler) prepareBackupRequest(
 		RequestCtx: reqCtx,
 		Client:     r.Client,
 	}
+	
 	if request.Annotations == nil {
 		request.Annotations = make(map[string]string)
 	}

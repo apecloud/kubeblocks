@@ -19,6 +19,7 @@ package apps
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -47,7 +48,6 @@ var _ = Describe("", func() {
 
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupPolicyTemplateSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ActionSetSignature, true, ml)
 	}
 
 	BeforeEach(func() {

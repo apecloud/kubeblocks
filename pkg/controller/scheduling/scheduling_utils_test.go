@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 var _ = Describe("Scheduling util test", func() {
@@ -568,6 +570,28 @@ var _ = Describe("Scheduling util test", func() {
 				},
 			}
 			Expect(rtn).Should(Equal(expectMergedAffinity))
+		})
+	})
+
+	Context("ApplySchedulingPolicyToPodSpec", func() {
+		It("works", func() {
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			}
+
+			ApplySchedulingPolicyToPodSpec(&pod.Spec, nil)
+			Expect(pod.Spec.NodeSelector["foo"]).Should(Equal("bar"))
+
+			ApplySchedulingPolicyToPodSpec(&pod.Spec, &appsv1.SchedulingPolicy{
+				NodeSelector: map[string]string{
+					"foo": "baz",
+				},
+			})
+			Expect(pod.Spec.NodeSelector["foo"]).Should(Equal("baz"))
 		})
 	})
 })

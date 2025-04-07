@@ -2972,7 +2972,8 @@ SchedulingPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the scheduling policy for the Component.</p>
+<p>Specifies the scheduling policy for the Component.
+If defined, it will overwrite the scheduling policy defined in ClusterSpec.</p>
 </td>
 </tr>
 <tr>
@@ -7897,7 +7898,8 @@ SchedulingPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the scheduling policy for the Component.</p>
+<p>Specifies the scheduling policy for the instance.
+If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or ClusterComponentSpec.</p>
 </td>
 </tr>
 <tr>

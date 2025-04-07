@@ -923,28 +923,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		}
 	}
 
-	if sp := template.SchedulingPolicy; sp != nil {
-		if sp.SchedulerName != "" {
-			templateExt.Spec.SchedulerName = sp.SchedulerName
-		}
-		mergeMap(&sp.NodeSelector, &templateExt.Spec.NodeSelector)
-		if sp.NodeName != "" {
-			templateExt.Spec.NodeName = sp.NodeName
-		}
-		templateExt.Spec.Affinity = scheduling.MergeAffinity(sp.Affinity, templateExt.Spec.Affinity)
-		intctrlutil.MergeList(&sp.Tolerations, &templateExt.Spec.Tolerations,
-			func(item corev1.Toleration) func(corev1.Toleration) bool {
-				return func(t corev1.Toleration) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-		intctrlutil.MergeList(&sp.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
-			func(item corev1.TopologySpreadConstraint) func(corev1.TopologySpreadConstraint) bool {
-				return func(t corev1.TopologySpreadConstraint) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-	}
+	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

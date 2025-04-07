@@ -31,6 +31,18 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+// ApplySchedulingPolicyToPodSpec overrides podSpec with schedulingPolicy, if schedulingPolicy is not nil
+func ApplySchedulingPolicyToPodSpec(podSpec *corev1.PodSpec, schedulingPolicy *appsv1.SchedulingPolicy) {
+	if schedulingPolicy != nil {
+		podSpec.SchedulerName = schedulingPolicy.SchedulerName
+		podSpec.NodeSelector = schedulingPolicy.NodeSelector
+		podSpec.NodeName = schedulingPolicy.NodeName
+		podSpec.Affinity = schedulingPolicy.Affinity
+		podSpec.Tolerations = schedulingPolicy.Tolerations
+		podSpec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
+	}
+}
+
 func BuildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) (*appsv1.SchedulingPolicy, error) {
 	if cluster.Spec.SchedulingPolicy != nil || (compSpec != nil && compSpec.SchedulingPolicy != nil) {
 		return buildSchedulingPolicy(cluster, compSpec)

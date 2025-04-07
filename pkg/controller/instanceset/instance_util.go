@@ -45,6 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -922,26 +923,7 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		}
 	}
 
-	if sp := template.SchedulingPolicy; sp != nil {
-		if sp.SchedulerName != "" {
-			templateExt.Spec.SchedulerName = sp.SchedulerName
-		}
-		if sp.NodeSelector != nil {
-			templateExt.Spec.NodeSelector = sp.NodeSelector
-		}
-		if sp.NodeName != "" {
-			templateExt.Spec.NodeName = sp.NodeName
-		}
-		if sp.Affinity != nil {
-			templateExt.Spec.Affinity = sp.Affinity
-		}
-		if sp.Tolerations != nil {
-			templateExt.Spec.Tolerations = sp.Tolerations
-		}
-		if sp.TopologySpreadConstraints != nil {
-			templateExt.Spec.TopologySpreadConstraints = sp.TopologySpreadConstraints
-		}
-	}
+	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -123,7 +124,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	}
 
 	// build scheduling policy for workload
-	buildSchedulingPolicy(synthesizeComp, comp)
+	scheduling.ApplySchedulingPolicyToPodSpec(synthesizeComp.PodSpec, comp.Spec.SchedulingPolicy)
 
 	buildFileTemplates(synthesizeComp, compDef, comp)
 	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
@@ -248,18 +249,6 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 		synthesizedComp.PodSpec.Containers[i].Env = append(synthesizedComp.PodSpec.Containers[i].Env, comp.Spec.Env...)
 	}
 	return nil
-}
-
-func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) {
-	if comp.Spec.SchedulingPolicy != nil {
-		schedulingPolicy := comp.Spec.SchedulingPolicy
-		synthesizedComp.PodSpec.SchedulerName = schedulingPolicy.SchedulerName
-		synthesizedComp.PodSpec.NodeSelector = schedulingPolicy.NodeSelector
-		synthesizedComp.PodSpec.NodeName = schedulingPolicy.NodeName
-		synthesizedComp.PodSpec.Affinity = schedulingPolicy.Affinity
-		synthesizedComp.PodSpec.Tolerations = schedulingPolicy.Tolerations
-		synthesizedComp.PodSpec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
-	}
 }
 
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {

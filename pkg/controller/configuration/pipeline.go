@@ -112,7 +112,12 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
 			return
 		}
-		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
+
+		sharding, err := ResolveShardingReference(p.ctx.Cluster, p.ctx.Component)
+		if err != nil {
+			return err
+		}
+		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent, sharding)
 
 		existingConfiguration := appsv1alpha1.Configuration{}
 		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)

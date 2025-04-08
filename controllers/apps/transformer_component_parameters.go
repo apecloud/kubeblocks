@@ -44,9 +44,12 @@ func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformCon
 	if err := c.Get(ctx.GetContext(), configKey, &config); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-
+	sharding, err := configuration.ResolveShardingReference(transCtx.Cluster, transCtx.Component)
+	if err != nil {
+		return err
+	}
 	configNew := config.DeepCopy()
-	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp)
+	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp, sharding)
 	if err != nil {
 		return err
 	}

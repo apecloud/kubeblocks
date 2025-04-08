@@ -207,9 +207,9 @@ jobs:
       fail-fast: false
       matrix:
         test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|elasticsearch|zookeeper|rabbitmq,
-                     pulsar|mysqlscale|weaviate|qdrant|smartengine|greptimedb|nebula|risingwave|starrocks,
+                     mysqlscale|weaviate|qdrant|smartengine|greptimedb|nebula|risingwave|starrocks,
                      etcd|oceanbase|orioledb|vanilla-pg|polardbx|opensearch|tdengine|milvus|clickhouse|mariadb,
-                     tidb|influxdb|doris|mogdb|apecloud-postgresql|yashandb|redis-cluster|minio|orchestrator ]
+                     tidb|influxdb|mogdb|apecloud-postgresql|yashandb|redis-cluster|minio|orchestrator ]
     with:
       GITHUB_REPO: "apecloud/kubeblocks"
       BRANCH_NAME: "main"

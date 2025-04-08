@@ -14700,6 +14700,19 @@ MultipleClusterObjectValueFormatFlatten
 <tbody>
 <tr>
 <td>
+<code>requireAllComponentObjects</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RequireAllComponentObjects controls whether all component objects must exist before resolving.
+If set to true, resolving will only proceed if all component objects are present.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>strategy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.MultipleClusterObjectStrategy">
@@ -18284,6 +18297,8 @@ StatefulSetSpec
 <tbody><tr><td><p>&#34;hscale&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;vscale&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;shardingHScale&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

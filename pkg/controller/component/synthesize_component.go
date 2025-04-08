@@ -154,6 +154,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		ClusterName:                      clusterName,
 		ClusterUID:                       clusterUID,
 		Comp2CompDefs:                    comp2CompDef,
+		CompDef2CompCnt:                  buildCompDef2CompCount(cluster),
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		CompDefName:                      compDef.Name,
@@ -340,6 +341,32 @@ func buildLabelsAndAnnotations(compDef *appsv1alpha1.ComponentDefinition, comp *
 		// override annotations from component
 		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
 	}
+}
+
+func buildCompDef2CompCount(cluster *appsv1alpha1.Cluster) map[string]int32 {
+	if cluster == nil {
+		return nil
+	}
+
+	result := make(map[string]int32)
+
+	add := func(name string, cnt int32) {
+		if len(name) > 0 {
+			if val, ok := result[name]; !ok {
+				result[name] = cnt
+			} else {
+				result[name] = val + cnt
+			}
+		}
+	}
+
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		add(comp.ComponentDef, 1)
+	}
+	for _, spec := range cluster.Spec.ShardingSpecs {
+		add(spec.Template.ComponentDef, spec.Shards)
+	}
+	return result
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1alpha1.Component) error {

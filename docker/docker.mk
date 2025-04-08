@@ -28,8 +28,7 @@ DOCKER:=DOCKER_BUILDKIT=1 docker
 DOCKERFILE_DIR?=./docker
 
 # BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-# BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
-BUILDX_PLATFORMS ?= linux/arm64
+BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
 
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
@@ -81,7 +80,7 @@ else
 ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) --tag ${IMG}:latest
 else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) --tag ${IMG}:${VERSION} --load
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile --platform $(BUILDX_PLATFORMS) --tag ${IMG}:${VERSION}
 endif
 endif
 

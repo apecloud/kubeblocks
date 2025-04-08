@@ -450,7 +450,9 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 			tpl.Template = utpl.ConfigMap.Name
 		}
 		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
-		tpl.ExternalManaged = utpl.ExternalManaged
+		if utpl.ExternalManaged != nil {
+			tpl.ExternalManaged = utpl.ExternalManaged
+		}
 
 		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
 			if utpl.ConfigMap == nil {

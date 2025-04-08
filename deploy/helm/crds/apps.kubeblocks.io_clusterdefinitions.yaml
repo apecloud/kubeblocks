@@ -353,6 +353,7 @@ spec:
                               - vscale
                               - hscale
                               - tls
+                              - shardingHScale
                               type: string
                             type: array
                             x-kubernetes-list-type: set

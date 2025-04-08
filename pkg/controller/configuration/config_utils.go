@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -266,7 +267,7 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
+func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent, sharding *appsv1alpha1.ShardingSpec) (bool, error) {
 	updated := false
 	for i := range config.ConfigItemDetails {
 		configSpec := &config.ConfigItemDetails[i]
@@ -287,12 +288,28 @@ func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *comp
 			}
 			updated = updated || ret
 		}
+
+		// check sharding h-scale operation
+		if sharding != nil && enableShardingHScaleTrigger(configSpec.ConfigSpec) {
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ShardingPayload, resolveShardingResource(sharding))
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
 	}
 	return updated, nil
 }
 
 func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0
+}
+
+func resolveShardingResource(sharding *appsv1alpha1.ShardingSpec) map[string]string {
+	return map[string]string{
+		"shards":   strconv.Itoa(int(sharding.Shards)),
+		"replicas": strconv.Itoa(int(sharding.Template.Replicas)),
+	}
 }
 
 func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
@@ -303,10 +320,34 @@ func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
 }
 
+func enableShardingHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ShardingComponentHScaleType)
+}
+
 func configSetFromComponent(templates []appsv1alpha1.ComponentConfigSpec) []string {
 	configSet := make([]string, 0)
 	for _, template := range templates {
 		configSet = append(configSet, template.Name)
 	}
 	return configSet
+}
+
+func ResolveShardingReference(clusterObj *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) (*appsv1alpha1.ShardingSpec, error) {
+	resolveShardingName := func(comp *appsv1alpha1.Component) string {
+		if len(comp.Labels) == 0 {
+			return ""
+		}
+		return comp.Labels[constant.KBAppShardingNameLabelKey]
+	}
+
+	shardingName := resolveShardingName(comp)
+	if shardingName == "" {
+		return nil, nil
+	}
+	for i, sharding := range clusterObj.Spec.ShardingSpecs {
+		if sharding.Name == shardingName {
+			return &clusterObj.Spec.ShardingSpecs[i], nil
+		}
+	}
+	return nil, nil
 }

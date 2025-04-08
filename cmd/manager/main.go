@@ -125,7 +125,7 @@ func init() {
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault(constant.EnableRBACManager, true)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
-	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
+	viper.SetDefault(constant.KBToolsImage, "apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/kubeblocks-tools:0.9.4-beta.10")
 	viper.SetDefault(constant.KBEnvLorryHTTPPort, 3501)
 	viper.SetDefault(constant.KBEnvLorryGRPCPort, 50001)
 	viper.SetDefault(constant.KBEnvLorryLogLevel, "info")

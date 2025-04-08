@@ -243,6 +243,8 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 			compDef = cVar.ValueFrom.ServiceVarRef.CompDef
 		case cVar.ValueFrom.ServiceRefVarRef != nil:
 			compDef = cVar.ValueFrom.ServiceRefVarRef.CompDef
+		case cVar.ValueFrom.ResourceVarRef != nil:
+			compDef = cVar.ValueFrom.ResourceVarRef.CompDef
 		case cVar.ValueFrom.ComponentVarRef != nil:
 			compDef = cVar.ValueFrom.ComponentVarRef.CompDef
 		case cVar.ValueFrom.CredentialVarRef != nil:

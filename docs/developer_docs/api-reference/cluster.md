@@ -3571,7 +3571,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector</a>, <a href="#apps.kubeblocks.io/v1.TLSVarSelector">TLSVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ResourceVarSelector">ResourceVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector</a>, <a href="#apps.kubeblocks.io/v1.TLSVarSelector">TLSVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
@@ -8364,7 +8364,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.NamedVar">NamedVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ContainerVars">ContainerVars</a>, <a href="#apps.kubeblocks.io/v1.ResourceVars">ResourceVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>)
 </p>
 <div>
 </div>
@@ -9071,6 +9071,138 @@ int32
 </td>
 <td>
 <p>The maximum limit of replicas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ResourceVarSelector">ResourceVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>ResourceVarSelector selects a var from a kind of resource.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ResourceVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ResourceVars">
+ResourceVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ResourceVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ResourceVars">ResourceVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ResourceVarSelector">ResourceVarSelector</a>)
+</p>
+<div>
+<p>ResourceVars defines the vars that can be referenced from resources.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>cpu</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>cpuLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>memory</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>memoryLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>storage</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.NamedVar">
+NamedVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -11866,7 +11998,7 @@ This ensures that only one replica is unavailable at a time during the update pr
 <h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>, <a href="#apps.kubeblocks.io/v1.TLSVars">TLSVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1.ResourceVars">ResourceVars</a>, <a href="#apps.kubeblocks.io/v1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>, <a href="#apps.kubeblocks.io/v1.TLSVars">TLSVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -11983,6 +12115,20 @@ ServiceRefVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a ServiceRef.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resourceVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ResourceVarSelector">
+ResourceVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of a kind of resource.</p>
 </td>
 </tr>
 <tr>

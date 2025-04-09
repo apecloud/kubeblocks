@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -209,6 +210,12 @@ var _ = Describe("Backup Controller test", func() {
 					SetBackupMethod(testdp.BackupMethodName).
 					Create(&testCtx).GetObject()
 				By("check backup skip reconciliation")
+				_, err := (&BackupReconciler{
+					Client:   k8sClient,
+					Scheme:   k8sManager.GetScheme(),
+					Recorder: k8sManager.GetEventRecorderFor("backup-mock-controller"),
+				}).Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(bp)})
+				Expect(err).NotTo(HaveOccurred())
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bp), func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(BeEmpty())
 				})).Should(Succeed())

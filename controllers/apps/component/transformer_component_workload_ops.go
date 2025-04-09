@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
@@ -644,6 +645,22 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 		// since pod volumes changed, the workload will be restarted
 		r.protoITS.Spec.Configs = nil
 		return nil
+	}
+
+	for objName := range toUpdate {
+		tplName := fileTemplateNameFromObject(transCtx.SynthesizeComponent, protoObjs[objName])
+		for _, tpl := range synthesizedComp.FileTemplates {
+			if tpl.Name == tplName {
+				if ptr.Deref(tpl.RestartOnFileChange, false) {
+					// restart
+					if r.protoITS.Spec.Template.Annotations == nil {
+						r.protoITS.Spec.Template.Annotations = map[string]string{}
+					}
+					r.protoITS.Spec.Template.Annotations[constant.RestartAnnotationKey] = metav1.NowMicro().Format(time.RFC3339)
+					return nil
+				}
+			}
+		}
 	}
 
 	reconfigure := func(tpl component.SynthesizedFileTemplate, changes fileTemplateChanges) {

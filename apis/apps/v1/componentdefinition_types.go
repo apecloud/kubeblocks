@@ -1081,6 +1081,11 @@ type ComponentFileTemplate struct {
 	//
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`
+
+	// Specifies whether to restart the pod when the file changes.
+	//
+	// +optional
+	RestartOnFileChange *bool `json:"restartOnFileChange,omitempty"`
 }
 
 type LogConfig struct {

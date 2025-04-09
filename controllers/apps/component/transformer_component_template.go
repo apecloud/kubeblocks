@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -289,5 +288,5 @@ func fileTemplateNameFromObject(synthesizedComp *component.SynthesizedComponent,
 }
 
 func isExternalManaged(tpl component.SynthesizedFileTemplate) bool {
-	return pointer.BoolDeref(tpl.ExternalManaged, false)
+	return ptr.Deref(tpl.ExternalManaged, false)
 }

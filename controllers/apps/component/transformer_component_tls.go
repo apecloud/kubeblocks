@@ -45,7 +45,7 @@ type tlsIssuer interface {
 	update(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error)
 }
 
-// componentTLSTransformer handles the TLS configuration for the component.
+// componentTLSTransformer handles the TLS for the component.
 type componentTLSTransformer struct{}
 
 var _ graph.Transformer = &componentTLSTransformer{}

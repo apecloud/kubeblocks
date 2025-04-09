@@ -103,6 +103,10 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    restartOnFileChange:
+                      description: Specifies whether to restart the pod when the file
+                        changes.
+                      type: boolean
                     template:
                       description: Specifies the name of the referenced template ConfigMap
                         object.
@@ -1519,6 +1523,10 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    restartOnFileChange:
+                      description: Specifies whether to restart the pod when the file
+                        changes.
+                      type: boolean
                     template:
                       description: Specifies the name of the referenced template ConfigMap
                         object.

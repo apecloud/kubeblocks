@@ -241,6 +241,9 @@ func (r *ShardingDefinitionReconciler) requireParallelProvision() bool {
 			if v.ValueFrom.ServiceRefVarRef != nil {
 				return requireAll(v.ValueFrom.ServiceRefVarRef.MultipleClusterObjectOption)
 			}
+			if v.ValueFrom.ResourceVarRef != nil {
+				return requireAll(v.ValueFrom.ResourceVarRef.MultipleClusterObjectOption)
+			}
 			if v.ValueFrom.ComponentVarRef != nil {
 				return requireAll(v.ValueFrom.ComponentVarRef.MultipleClusterObjectOption)
 			}

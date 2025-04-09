@@ -32,6 +32,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -346,6 +347,8 @@ func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesi
 		return resolveTLSVarRef(ctx, cli, synthesizedComp, defineKey, *source.TLSVarRef)
 	case source.ServiceRefVarRef != nil:
 		return resolveServiceRefVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceRefVarRef)
+	case source.ResourceVarRef != nil:
+		return resolveResourceVarRef(ctx, cli, synthesizedComp, defineKey, *source.ResourceVarRef)
 	case source.ComponentVarRef != nil:
 		return resolveComponentVarRef(ctx, cli, synthesizedComp, defineKey, *source.ComponentVarRef)
 	case source.ClusterVarRef != nil:
@@ -1043,6 +1046,91 @@ func resolveServiceRefVarRefLow(ctx context.Context, cli client.Reader, synthesi
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
 	}
 	return resolveClusterObjectVars("ServiceRef", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
+}
+
+func resolveResourceVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1.ResourceVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1.ResourceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
+	switch {
+	case selector.CPU != nil || selector.CPULimit != nil:
+		resolveFunc = resolveResourceCPURef
+	case selector.Memory != nil || selector.MemoryLimit != nil:
+		resolveFunc = resolveResourceMemoryRef
+	case selector.Storage != nil:
+		resolveFunc = resolveResourceStorageRef
+	default:
+		return nil, nil, nil
+	}
+	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
+}
+
+func resolveResourceCPURef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1.ResourceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveCPU := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		comp := obj.(*appsv1.Component)
+		var quantity *resource.Quantity
+		if selector.CPU != nil {
+			quantity = comp.Spec.Resources.Requests.Cpu()
+		} else {
+			quantity = comp.Spec.Resources.Limits.Cpu()
+		}
+		val := int64(0)
+		if quantity != nil {
+			val = quantity.Value()
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: fmt.Sprintf("%d", val)}, nil, nil
+	}
+	cpuVar := selector.CPU
+	if cpuVar == nil {
+		cpuVar = selector.CPULimit
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, cpuVar, resolveCPU)
+}
+
+func resolveResourceMemoryRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1.ResourceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveMemory := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		comp := obj.(*appsv1.Component)
+		var quantity *resource.Quantity
+		if selector.Memory != nil {
+			quantity = comp.Spec.Resources.Requests.Memory()
+		} else {
+			quantity = comp.Spec.Resources.Limits.Memory()
+		}
+		val := int64(0)
+		if quantity != nil {
+			val = quantity.Value()
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: fmt.Sprintf("%d", val)}, nil, nil
+	}
+	memoryVar := selector.Memory
+	if memoryVar == nil {
+		memoryVar = selector.MemoryLimit
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, memoryVar, resolveMemory)
+}
+
+func resolveResourceStorageRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1.ResourceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveStorage := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		comp := obj.(*appsv1.Component)
+		var quantity *resource.Quantity
+		for _, vct := range comp.Spec.VolumeClaimTemplates {
+			if vct.Name == selector.Storage.Name {
+				quantity = vct.Spec.Resources.Requests.Storage()
+				if quantity == nil {
+					quantity = vct.Spec.Resources.Limits.Storage() // back-off to limit
+				}
+				break
+			}
+		}
+		val := int64(0)
+		if quantity != nil {
+			val = quantity.Value()
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: fmt.Sprintf("%d", val)}, nil, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Storage.Option, resolveStorage)
 }
 
 func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

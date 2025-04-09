@@ -92,6 +92,9 @@ func (t *componentNotifierTransformer) depended(transCtx *componentTransformCont
 			if v.ValueFrom.ServiceRefVarRef != nil {
 				return v.ValueFrom.ServiceRefVarRef.CompDef
 			}
+			if v.ValueFrom.ResourceVarRef != nil {
+				return v.ValueFrom.ResourceVarRef.CompDef
+			}
 			if v.ValueFrom.ComponentVarRef != nil {
 				return v.ValueFrom.ComponentVarRef.CompDef
 			}

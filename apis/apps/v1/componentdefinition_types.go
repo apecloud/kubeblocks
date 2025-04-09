@@ -611,6 +611,10 @@ type VarSource struct {
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
 
+	// Selects a defined var of a kind of resource.
+	// +optional
+	ResourceVarRef *ResourceVarSelector `json:"resourceVarRef,omitempty"`
+
 	// Selects a defined var of a Component.
 	// +optional
 	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
@@ -724,6 +728,24 @@ type ServiceRefVars struct {
 	CredentialVars `json:",inline"`
 }
 
+// ResourceVars defines the vars that can be referenced from resources.
+type ResourceVars struct {
+	// +optional
+	CPU *VarOption `json:"cpu,omitempty"`
+
+	// +optional
+	CPULimit *VarOption `json:"cpuLimit,omitempty"`
+
+	// +optional
+	Memory *VarOption `json:"memory,omitempty"`
+
+	// +optional
+	MemoryLimit *VarOption `json:"memoryLimit,omitempty"`
+
+	// +optional
+	Storage *NamedVar `json:"storage,omitempty"`
+}
+
 // HostNetworkVarSelector selects a var from host-network resources.
 type HostNetworkVarSelector struct {
 	// The component to select from.
@@ -763,6 +785,14 @@ type ServiceRefVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	ServiceRefVars `json:",inline"`
+}
+
+// ResourceVarSelector selects a var from a kind of resource.
+type ResourceVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	ResourceVars `json:",inline"`
 }
 
 // ComponentVarSelector selects a var from a Component.

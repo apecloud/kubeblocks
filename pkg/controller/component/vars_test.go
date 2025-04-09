@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/utils/ptr"
@@ -1555,6 +1556,151 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "serviceref-fqdn", "fqdn")
 				checkEnvVarWithValue(envVars, "serviceref-username", "username")
 				checkEnvVarWithValue(envVars, "serviceref-password", "password")
+			})
+		})
+
+		Context("resource vars", func() {
+			It("ok", func() {
+				vars := []appsv1.EnvVar{
+					{
+						Name: "cpu",
+						ValueFrom: &appsv1.VarSource{
+							ResourceVarRef: &appsv1.ResourceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ResourceVars: appsv1.ResourceVars{
+									CPU: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "cpuLimit",
+						ValueFrom: &appsv1.VarSource{
+							ResourceVarRef: &appsv1.ResourceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ResourceVars: appsv1.ResourceVars{
+									CPULimit: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "memory",
+						ValueFrom: &appsv1.VarSource{
+							ResourceVarRef: &appsv1.ResourceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ResourceVars: appsv1.ResourceVars{
+									Memory: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "memoryLimit",
+						ValueFrom: &appsv1.VarSource{
+							ResourceVarRef: &appsv1.ResourceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ResourceVars: appsv1.ResourceVars{
+									MemoryLimit: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "storage",
+						ValueFrom: &appsv1.VarSource{
+							ResourceVarRef: &appsv1.ResourceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ResourceVars: appsv1.ResourceVars{
+									Storage: &appsv1.NamedVar{
+										Name:   "data",
+										Option: &appsv1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "storageLog",
+						ValueFrom: &appsv1.VarSource{
+							ResourceVarRef: &appsv1.ResourceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ResourceVars: appsv1.ResourceVars{
+									Storage: &appsv1.NamedVar{
+										Name:   "log", // not-exist, expect it as 0
+										Option: &appsv1.VarRequired,
+									},
+								},
+							},
+						},
+					},
+				}
+				reader := &mockReader{
+					cli: testCtx.Cli,
+					objs: []client.Object{
+						&appsv1.Component{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+							},
+							Spec: appsv1.ComponentSpec{
+								CompDef: synthesizedComp.CompDefName,
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("1"),
+										corev1.ResourceMemory: resource.MustParse("1Gi"),
+									},
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("2"),
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+								},
+								VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{
+									{
+										Name: "data",
+										Spec: appsv1.PersistentVolumeClaimSpec{
+											Resources: corev1.VolumeResourceRequirements{
+												Requests: corev1.ResourceList{
+													corev1.ResourceStorage: resource.MustParse("10Gi"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				quantity := func(val string) string {
+					q := resource.MustParse(val)
+					return fmt.Sprintf("%d", q.Value())
+				}
+				checkEnvVarWithValue(envVars, "cpu", quantity("1"))
+				checkEnvVarWithValue(envVars, "cpuLimit", quantity("2"))
+				checkEnvVarWithValue(envVars, "memory", quantity("1Gi"))
+				checkEnvVarWithValue(envVars, "memoryLimit", quantity("2Gi"))
+				checkEnvVarWithValue(envVars, "storage", quantity("10Gi"))
+				checkEnvVarWithValue(envVars, "storageLog", "0")
 			})
 		})
 

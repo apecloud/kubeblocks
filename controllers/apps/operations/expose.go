@@ -264,7 +264,7 @@ func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
 		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
 		for i, clusterService := range cluster.Spec.Services {
 			// remove service from cluster
-			if clusterService.Name == genServiceName && clusterService.ComponentSelector == clusterCompSpecName {
+			if clusterService.Name == genServiceName && (clusterService.ComponentSelector == clusterCompSpecName || clusterService.ShardingSelector == clusterCompSpecName) {
 				cluster.Spec.Services = append(cluster.Spec.Services[:i], cluster.Spec.Services[i+1:]...)
 				break
 			}

@@ -20,11 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -64,4 +66,46 @@ func NewFakeIncActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
 		as.Name = IncActionSetName
 		as.Spec.BackupType = dpv1alpha1.BackupTypeIncremental
 	})
+}
+
+func MockRestoreCompleted(testCtx *testutil.TestContext, ml client.MatchingLabels) {
+	restoreList := dpv1alpha1.RestoreList{}
+	Expect(testCtx.Cli.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
+	for _, rs := range restoreList.Items {
+		err := testapps.GetAndChangeObjStatus(testCtx, client.ObjectKeyFromObject(&rs), func(res *dpv1alpha1.Restore) {
+			res.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+		})()
+		Expect(err).ShouldNot(HaveOccurred())
+	}
+}
+
+func MockActionSetWithSchema(testCtx *testutil.TestContext, actionSet *dpv1alpha1.ActionSet) {
+	Expect(testapps.ChangeObj(testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+		as.Spec.ParametersSchema = &dpv1alpha1.ActionSetParametersSchema{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					ParameterString: {
+						Type: ParameterStringType,
+					},
+					ParameterArray: {
+						Type: ParameterArrayType,
+						Items: &apiextensionsv1.JSONSchemaPropsOrArray{
+							Schema: &apiextensionsv1.JSONSchemaProps{
+								Type: ParameterStringType,
+							},
+						},
+					},
+				},
+			},
+		}
+		as.Spec.Backup.WithParameters = []string{ParameterString, ParameterArray}
+		as.Spec.Restore.WithParameters = []string{ParameterString, ParameterArray}
+		as.Spec.BackupType = dpv1alpha1.BackupTypeSelective
+	})).Should(Succeed())
+	By("the actionSet should be available")
+	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(actionSet),
+		func(g Gomega, as *dpv1alpha1.ActionSet) {
+			g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+			g.Expect(as.Status.Message).Should(BeEmpty())
+		})).Should(Succeed())
 }

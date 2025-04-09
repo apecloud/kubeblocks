@@ -69,3 +69,11 @@ func buildEnvBySecretKey(name, secretName, key string) corev1.EnvVar {
 		},
 	}
 }
+
+func BuildEnvByParameters(parameters []dpv1alpha1.ParameterPair) []corev1.EnvVar {
+	env := []corev1.EnvVar{}
+	for _, pair := range parameters {
+		env = append(env, corev1.EnvVar{Name: pair.Name, Value: pair.Value})
+	}
+	return env
+}

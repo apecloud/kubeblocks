@@ -398,6 +398,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 			return nil, err
 		}
 		request.ActionSet = actionSet
+
+		// validate parameters
+		if err := dputils.ValidateParameters(actionSet, backup.Spec.Parameters, true); err != nil {
+			return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
+		}
 	}
 
 	// check encryption config

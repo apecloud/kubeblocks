@@ -3864,6 +3864,19 @@ string
 <p>If the specified BackupMethod is incremental, <code>parentBackupName</code> is required.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ParameterPair
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod
@@ -18534,6 +18547,19 @@ ensuring the cluster&rsquo;s overall stability before proceeding.</p>
 <p>This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ParameterPair
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RetryPolicy">RetryPolicy
@@ -18854,6 +18880,19 @@ bool
 </tr>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the schedule. Names cannot be duplicated.
+If the name is empty, it will be considered the same as the value of the backupMethod below.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupMethod</code><br/>
 <em>
 string
@@ -18896,6 +18935,19 @@ Sample duration format:</p>
 <li>minutes: 	30m</li>
 </ul>
 <p>These durations can also be combined, for example: 30d12h30m.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ParameterPair
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
 </tbody>

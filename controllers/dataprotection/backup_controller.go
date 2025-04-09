@@ -99,6 +99,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// check whether to skip reconciliation
+	if val, ok := backup.Annotations[dptypes.SkipReconciliationAnnotationKey]; ok && strings.EqualFold(val, "true") {
+		reqCtx.Log.V(1).Info("skip reconciliation", "backup", req.NamespacedName)
+		return intctrlutil.Reconciled()
+	}
+
 	reqCtx.Log.V(1).Info("reconcile", "backup", req.NamespacedName, "phase", backup.Status.Phase)
 
 	// if backup is being deleted, set backup phase to Deleting. The backup

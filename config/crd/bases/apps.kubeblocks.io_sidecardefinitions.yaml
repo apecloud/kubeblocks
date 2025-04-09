@@ -86,6 +86,11 @@ spec:
                         Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
                       format: int32
                       type: integer
+                    externalManaged:
+                      description: |-
+                        ExternalManaged indicates whether the configuration is managed by an external system.
+                        When set to true, the controller will ignore the management of this configuration.
+                      type: boolean
                     name:
                       description: Specifies the name of the template.
                       maxLength: 63
@@ -1497,6 +1502,11 @@ spec:
                         Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
                       format: int32
                       type: integer
+                    externalManaged:
+                      description: |-
+                        ExternalManaged indicates whether the configuration is managed by an external system.
+                        When set to true, the controller will ignore the management of this configuration.
+                      type: boolean
                     name:
                       description: Specifies the name of the template.
                       maxLength: 63

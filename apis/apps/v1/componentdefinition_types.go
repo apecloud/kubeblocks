@@ -1045,6 +1045,12 @@ type ComponentFileTemplate struct {
 	//
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
+
+	// ExternalManaged indicates whether the configuration is managed by an external system.
+	// When set to true, the controller will ignore the management of this configuration.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
 type LogConfig struct {

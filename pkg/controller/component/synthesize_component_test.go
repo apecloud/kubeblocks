@@ -172,14 +172,14 @@ var _ = Describe("synthesized component", func() {
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
-					Name:       compDef.Spec.Configs[1].Name,
-					Template:   comp.Spec.Configs[0].ConfigMap.Name,
-					Namespace:  comp.Namespace,
-					VolumeName: compDef.Spec.Configs[1].VolumeName,
+					Name:            compDef.Spec.Configs[1].Name,
+					Template:        comp.Spec.Configs[0].ConfigMap.Name,
+					Namespace:       comp.Namespace,
+					VolumeName:      compDef.Spec.Configs[1].VolumeName,
+					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
-				Config:          true,
-				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
-				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
+				Config:      true,
+				Reconfigure: comp.Spec.Configs[0].Reconfigure,
 			}))
 		})
 
@@ -198,14 +198,14 @@ var _ = Describe("synthesized component", func() {
 			}))
 			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
-					Name:       compDef.Spec.Configs[1].Name,
-					Template:   "",
-					Namespace:  "",
-					VolumeName: compDef.Spec.Configs[1].VolumeName,
+					Name:            compDef.Spec.Configs[1].Name,
+					Template:        "",
+					Namespace:       "",
+					VolumeName:      compDef.Spec.Configs[1].VolumeName,
+					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
-				Config:          true,
-				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
-				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
+				Config:      true,
+				Reconfigure: comp.Spec.Configs[0].Reconfigure,
 			}))
 		})
 	})

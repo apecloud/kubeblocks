@@ -81,8 +81,7 @@ type SynthesizedComponent struct {
 
 type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
-	Config          bool
-	Variables       map[string]string
-	Reconfigure     *kbappsv1.Action
-	ExternalManaged *bool
+	Config      bool
+	Variables   map[string]string
+	Reconfigure *kbappsv1.Action
 }

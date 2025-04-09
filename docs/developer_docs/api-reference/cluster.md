@@ -5572,6 +5572,19 @@ In such cases, the resulting file mode may have additional bits set.
 Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged indicates whether the configuration is managed by an external system.
+When set to true, the controller will ignore the management of this configuration.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions

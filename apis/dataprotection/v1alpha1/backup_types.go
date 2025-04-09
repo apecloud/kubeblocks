@@ -244,7 +244,7 @@ const (
 
 // BackupPhase describes the lifecycle phase of a Backup.
 // +enum
-// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting}
+// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting,Paused}
 type BackupPhase string
 
 const (
@@ -264,6 +264,9 @@ const (
 
 	// BackupPhaseDeleting means the backup and all its associated data are being deleted.
 	BackupPhaseDeleting BackupPhase = "Deleting"
+
+	// BackupPhasePaused means the backup is paused.
+	BackupPhasePaused BackupPhase = "Paused"
 )
 
 type ActionStatus struct {

@@ -200,6 +200,19 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
 				})).Should(Succeed())
 			})
+
+			It("should skip reconciliation if skipReconciliation annotation is set", func() {
+				By("set skipReconciliation annotation")
+				bp := testdp.NewBackupFactory(testCtx.DefaultNamespace, "skip-reconciliation").
+					WithRandomName().AddAnnotations(dptypes.SkipReconciliationAnnotationKey, "true").
+					SetBackupPolicyName(testdp.BackupPolicyName).
+					SetBackupMethod(testdp.BackupMethodName).
+					Create(&testCtx).GetObject()
+				By("check backup skip reconciliation")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bp), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(BeEmpty())
+				})).Should(Succeed())
+			})
 		})
 
 		Context("create an invalid backup", func() {

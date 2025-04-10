@@ -120,14 +120,14 @@ const (
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHVScale}
+// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale}
 type RerenderResourceType string
 
 const (
-	ComponentVScaleType          RerenderResourceType = "vscale"
-	ComponentHScaleType          RerenderResourceType = "hscale"
-	ComponentTLSType             RerenderResourceType = "tls"
-	ShardingComponentHVScaleType RerenderResourceType = "shardingHVScale"
+	ComponentVScaleType         RerenderResourceType = "vscale"
+	ComponentHScaleType         RerenderResourceType = "hscale"
+	ComponentTLSType            RerenderResourceType = "tls"
+	ShardingComponentHScaleType RerenderResourceType = "shardingHScale"
 )
 
 // ParameterPhase defines the Configuration FSM phase

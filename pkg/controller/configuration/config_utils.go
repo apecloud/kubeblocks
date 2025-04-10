@@ -319,7 +319,7 @@ func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescriptio
 }
 
 func enableShardingHVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ShardingComponentHVScaleType)
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ShardingComponentHScaleType)
 }
 
 func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {

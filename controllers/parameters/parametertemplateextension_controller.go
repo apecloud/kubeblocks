@@ -127,7 +127,7 @@ func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader cli
 		}
 		cm := corev1.ConfigMap{}
 		if err := reader.Get(reqCtx.Ctx, cmKey, &cm); err != nil {
-			return err
+			return client.IgnoreNotFound(err)
 		}
 		config.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
@@ -140,7 +140,7 @@ func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader cli
 		}
 		parameterCR, err := resolveParameterCR(compName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				return err
 			}
 			return nil

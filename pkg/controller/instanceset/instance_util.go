@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -151,26 +150,13 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
-func isRunningAndReady(pod *corev1.Pod) bool {
-	return pod.Status.Phase == corev1.PodRunning && podutils.IsPodReady(pod)
-}
-
-func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
-}
-
-func isContainersRunning(pod *corev1.Pod) bool {
-	for _, status := range pod.Status.ContainerStatuses {
-		if status.State.Running == nil {
-			return false
-		}
+// isRoleReady returns true if pod has role label
+func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
+	if len(roles) == 0 {
+		return true
 	}
-	return true
-}
-
-func isContainersReady(pod *corev1.Pod) bool {
-	return isImageMatched(pod) && isContainersRunning(pod)
+	_, ok := pod.Labels[constant.RoleLabelKey]
+	return ok
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -181,20 +167,6 @@ func isCreated(pod *corev1.Pod) bool {
 // isTerminating returns true if pod's DeletionTimestamp has been set
 func isTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
-}
-
-// isHealthy returns true if pod is running and ready and has not been terminated
-func isHealthy(pod *corev1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminating(pod)
-}
-
-// isRoleReady returns true if pod has role label
-func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
-	if len(roles) == 0 {
-		return true
-	}
-	_, ok := pod.Labels[constant.RoleLabelKey]
-	return ok
 }
 
 // isImageMatched returns true if all container statuses have same image as defined in pod spec

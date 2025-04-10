@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
@@ -113,7 +114,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if !isOrderedReady {
 		for _, name := range newNameList {
 			if _, ok := createNameSet[name]; !ok {
-				if !isHealthy(oldInstanceMap[name]) {
+				if !intctrlutil.IsPodAvailable(oldInstanceMap[name], its.Spec.MinReadySeconds) {
 					concurrency--
 				}
 			}
@@ -129,7 +130,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			break
 		}
 		predecessor := getPredecessor(i)
-		if isOrderedReady && predecessor != nil && !isHealthy(predecessor) {
+		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
 			break
 		}
 		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
@@ -180,8 +181,8 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
-		if isOrderedReady && !isRunningAndReady(pod) {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Running and Ready",
+		if isOrderedReady && !intctrlutil.IsPodReady(pod) {
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Ready",
 				its.Namespace,
 				its.Name,
 				pod.Name)

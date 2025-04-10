@@ -66,7 +66,7 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 
 	for _, pod := range pods {
 		annotations := pod.Annotations
-		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.PodIsReady(&pod) {
+		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.IsPodReady(&pod) {
 			readyPods++
 		}
 	}

@@ -86,7 +86,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	}
 	// if pod is the latest version, we do nothing
 	if isPodUpdated {
-		if !intctrlutil.PodIsReady(pod) {
+		if !intctrlutil.IsPodReady(pod) {
 			return ErrWait
 		}
 		isRoleful := func() bool { return len(p.its.Spec.Roles) > 0 }()

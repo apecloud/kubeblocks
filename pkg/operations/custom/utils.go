@@ -396,7 +396,7 @@ func getTargetPods(
 		pod := pods[i]
 		targetPods = append(targetPods, pod)
 		// Preferably select available pod.
-		if podSelector.MultiPodSelectionPolicy == opsv1alpha1.Any && intctrlutil.IsAvailable(pod, 0) {
+		if podSelector.MultiPodSelectionPolicy == opsv1alpha1.Any && intctrlutil.IsPodAvailable(pod, 0) {
 			return []*corev1.Pod{pod}, nil
 		}
 	}

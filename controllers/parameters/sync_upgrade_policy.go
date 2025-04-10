@@ -108,7 +108,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 			progress++
 			continue
 		}
-		if !intctrlutil.PodIsReady(&pod) {
+		if !intctrlutil.IsPodReady(&pod) {
 			continue
 		}
 		if err = funcs.OnlineUpdatePodFunc(&pod, ctx, rctx.ReconfigureClientFactory, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {

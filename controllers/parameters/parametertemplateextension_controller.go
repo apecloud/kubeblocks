@@ -37,6 +37,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	componentctrl "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -46,10 +48,6 @@ type ParameterTemplateExtensionReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
-
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -70,23 +68,23 @@ func (r *ParameterTemplateExtensionReconciler) Reconcile(ctx context.Context, re
 			WithValues("Namespace", req.Namespace, "ParameterExtension", req.Name),
 	}
 
-	cluster := &appsv1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
+	component := &appsv1.Component{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, component); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if cluster.IsDeleting() {
+	if model.IsObjectDeleting(component) {
 		return intctrlutil.Reconciled()
 	}
-	if !intctrlutil.ObjectAPIVersionSupported(cluster) {
+	if !intctrlutil.ObjectAPIVersionSupported(component) {
 		return intctrlutil.Reconciled()
 	}
-	return r.reconcile(reqCtx, cluster)
+	return r.reconcile(reqCtx, component)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ParameterTemplateExtensionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Cluster{}).
+		For(&appsv1.Component{}).
 		Watches(&parametersv1alpha1.ComponentParameter{}, handler.EnqueueRequestsFromMapFunc(filterComponentParameterResources)).
 		Complete(r)
 }
@@ -95,24 +93,24 @@ func filterComponentParameterResources(_ context.Context, object client.Object) 
 	cr := object.(*parametersv1alpha1.ComponentParameter)
 	return []reconcile.Request{{
 		NamespacedName: client.ObjectKey{
-			Name:      cr.Spec.ClusterName,
+			Name:      componentctrl.FullName(cr.Spec.ClusterName, cr.Spec.ComponentName),
 			Namespace: cr.Namespace,
 		}}}
 }
 
-func (r *ParameterTemplateExtensionReconciler) reconcile(reqCtx intctrlutil.RequestCtx, runningCluster *appsv1.Cluster) (ctrl.Result, error) {
-	expectedCluster, err := updateConfigsForParameterTemplate(reqCtx, r.Client, runningCluster)
+func (r *ParameterTemplateExtensionReconciler) reconcile(reqCtx intctrlutil.RequestCtx, runningComponent *appsv1.Component) (ctrl.Result, error) {
+	expectedComponent, err := updateConfigsForParameterTemplate(reqCtx, r.Client, runningComponent)
 	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
-	return r.update(reqCtx, runningCluster, expectedCluster)
+	return r.update(reqCtx, runningComponent, expectedComponent)
 }
 
-func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) (*appsv1.Cluster, error) {
-	resolveParameterCR := func(compName string) (*parametersv1alpha1.ComponentParameter, error) {
+func updateConfigsForComponent(reqCtx intctrlutil.RequestCtx, reader client.Client, component *appsv1.Component) error {
+	resolveParameterCR := func(clusterName, compName string) (*parametersv1alpha1.ComponentParameter, error) {
 		parameterKey := client.ObjectKey{
-			Name:      configcore.GenerateComponentConfigurationName(cluster.Name, compName),
-			Namespace: cluster.Namespace,
+			Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+			Namespace: component.Namespace,
 		}
 		parameterCr := &parametersv1alpha1.ComponentParameter{}
 		if err := reader.Get(reqCtx.Ctx, parameterKey, parameterCr); err != nil {
@@ -120,56 +118,57 @@ func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader cli
 		}
 		return parameterCr, nil
 	}
-	updateConfigObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
+	updateConfigObject := func(clusterName, compName string, config *appsv1.ClusterComponentConfig) error {
 		cmKey := client.ObjectKey{
-			Name:      configcore.GetComponentCfgName(cluster.Name, compName, pointer.StringDeref(config.Name, "")),
-			Namespace: cluster.Namespace,
+			Name:      configcore.GetComponentCfgName(clusterName, compName, pointer.StringDeref(config.Name, "")),
+			Namespace: component.Namespace,
 		}
 		cm := corev1.ConfigMap{}
 		if err := reader.Get(reqCtx.Ctx, cmKey, &cm); err != nil {
-			return err
+			return client.IgnoreNotFound(err)
 		}
 		config.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
 		}
 		return nil
 	}
-	checkAndUpdateConfigObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
-		if config.ConfigMap != nil {
-			return nil
-		}
-		parameterCR, err := resolveParameterCR(compName)
+	checkAndUpdateConfigObject := func(clusterName, compName string, config *appsv1.ClusterComponentConfig) error {
+		parameterCR, err := resolveParameterCR(clusterName, compName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				return err
 			}
 			return nil
 		}
 		if intctrlutil.GetConfigTemplateItem(&parameterCR.Spec, pointer.StringDeref(config.Name, "")) == nil {
+			reqCtx.Log.Info("config template does not support parameters extension", "component", compName, "config", config.Name)
 			return nil
 		}
-		return updateConfigObject(compName, config)
+		return updateConfigObject(clusterName, compName, config)
 	}
 
-	expectedCluster := cluster.DeepCopy()
-	for i := range expectedCluster.Spec.ComponentSpecs {
-		compSpec := &expectedCluster.Spec.ComponentSpecs[i]
-		for j, config := range compSpec.Configs {
-			if !pointer.BoolDeref(config.ExternalManaged, false) {
-				continue
-			}
-			if pointer.StringDeref(config.Name, "") == "" {
-				continue
-			}
-			if err := checkAndUpdateConfigObject(compSpec.Name, &compSpec.Configs[j]); err != nil {
-				return nil, err
-			}
+	clusterName, _ := componentctrl.GetClusterName(component)
+	componentName, _ := componentctrl.ShortName(clusterName, component.Name)
+	for j, config := range component.Spec.Configs {
+		if !needUpdateConfigObject(config) {
+			continue
+		}
+		if err := checkAndUpdateConfigObject(clusterName, componentName, &component.Spec.Configs[j]); err != nil {
+			return err
 		}
 	}
-	return expectedCluster, nil
+	return nil
 }
 
-func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.RequestCtx, running, expected *appsv1.Cluster) (ctrl.Result, error) {
+func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, component *appsv1.Component) (*appsv1.Component, error) {
+	expectedComponent := component.DeepCopy()
+	if err := updateConfigsForComponent(reqCtx, reader, expectedComponent); err != nil {
+		return nil, err
+	}
+	return expectedComponent, nil
+}
+
+func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.RequestCtx, running, expected *appsv1.Component) (ctrl.Result, error) {
 	if reflect.DeepEqual(running.Spec, expected.Spec) {
 		return ctrl.Result{}, nil
 	}
@@ -177,4 +176,17 @@ func (r *ParameterTemplateExtensionReconciler) update(reqCtx intctrlutil.Request
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func needUpdateConfigObject(config appsv1.ClusterComponentConfig) bool {
+	if !pointer.BoolDeref(config.ExternalManaged, false) {
+		return false
+	}
+	if pointer.StringDeref(config.Name, "") == "" {
+		return false
+	}
+	if config.ConfigMap != nil {
+		return false
+	}
+	return true
 }

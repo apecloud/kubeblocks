@@ -46,7 +46,7 @@ var _ graph.Transformer = &clusterServiceTransformer{}
 
 func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 	if common.IsCompactMode(transCtx.OrigCluster.Annotations) {

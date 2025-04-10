@@ -74,7 +74,7 @@ var _ graph.Transformer = &clusterBackupPolicyTransformer{}
 // Transform transforms the backup policy template to the backup policy and backup schedule.
 func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	r.clusterTransformContext = ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(r.clusterTransformContext.OrigCluster) {
+	if r.clusterTransformContext.OrigCluster.IsDeleting() {
 		return nil
 	}
 	if common.IsCompactMode(r.clusterTransformContext.OrigCluster.Annotations) {

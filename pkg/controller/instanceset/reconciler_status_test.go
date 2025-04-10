@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -222,11 +223,13 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.Conditions[1].Type).Should(BeEquivalentTo(workloads.InstanceAvailable))
 			Expect(its.Status.Conditions[1].Status).Should(BeEquivalentTo(corev1.ConditionTrue))
 
-			By("make all pods failed")
+			By("make all pods not ready")
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				pod.Status.Phase = corev1.PodFailed
+				condition := intctrlutil.GetPodCondition(&pod.Status, corev1.PodReady)
+				Expect(condition).ShouldNot(BeNil())
+				condition.Status = corev1.ConditionFalse
 			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
@@ -251,6 +254,16 @@ var _ = Describe("status reconciler test", func() {
 				Expect(templateStatus.AvailableReplicas).Should(BeEquivalentTo(0))
 			}
 			Expect(its.Status.CurrentRevisions).Should(Equal(its.Status.UpdateRevisions))
+
+			By("make all pods failed")
+			for _, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				pod.Status.Phase = corev1.PodFailed
+			}
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.Conditions).Should(HaveLen(3))
 			failureNames := []string{"bar-0", "bar-1", "bar-2", "bar-3", "bar-foo-0", "bar-foo-1", "bar-hello-0"}
 			message, err := json.Marshal(failureNames)

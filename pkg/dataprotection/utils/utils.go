@@ -297,7 +297,7 @@ func GetFirstIndexRunningPod(podList *corev1.PodList) *corev1.Pod {
 		return podList.Items[i].Name < podList.Items[j].Name
 	})
 	for _, v := range podList.Items {
-		if intctrlutil.IsAvailable(&v, 0) {
+		if intctrlutil.IsPodAvailable(&v, 0) {
 			return &v
 		}
 	}

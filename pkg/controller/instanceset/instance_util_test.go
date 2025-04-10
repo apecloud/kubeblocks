@@ -74,23 +74,6 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("isRunningAndReady", func() {
-		It("should work well", func() {
-			By("creating a new pod")
-			pod := builder.NewPodBuilder(namespace, name).GetObject()
-			Expect(isRunningAndReady(pod)).Should(BeFalse())
-
-			By("set phase to running")
-			pod.Status.Phase = corev1.PodRunning
-			Expect(isRunningAndReady(pod)).Should(BeFalse())
-
-			By("set ready condition")
-			condition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue}
-			pod.Status.Conditions = append(pod.Status.Conditions, condition)
-			Expect(isRunningAndReady(pod)).Should(BeTrue())
-		})
-	})
-
 	Context("getPodRevision", func() {
 		It("should work well", func() {
 			pod := builder.NewPodBuilder(namespace, name).GetObject()

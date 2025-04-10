@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -149,18 +148,6 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 		}
 		return ordinal1 > ordinal2
 	})
-}
-
-// isReady returns true if pod is ready
-// Currently, if pod is being deleted and have a grace period, k8s still considers it ready,
-// which is not what we expect. See https://github.com/kubernetes/kubernetes/issues/129552
-func isPodReady(pod *corev1.Pod) bool {
-	return podutils.IsPodReady(pod) && !isTerminating(pod)
-}
-
-// available is ready for at least minReadySeconds
-func isPodAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	return isPodReady(pod) && podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
 // isRoleReady returns true if pod has role label

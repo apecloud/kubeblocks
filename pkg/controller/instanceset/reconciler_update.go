@@ -110,7 +110,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	currentUnavailable := 0
 	for _, pod := range oldPodList {
-		if !isPodAvailable(pod, its.Spec.MinReadySeconds) {
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			currentUnavailable++
 		}
 	}
@@ -145,11 +145,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
 			break
 		}
-		if !isPodReady(pod) {
+		if !intctrlutil.IsPodReady(pod) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
 			break
 		}
-		if !isPodAvailable(pod, its.Spec.MinReadySeconds) {
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
 			// no pod event will trigger the next reconciliation, so retry it
 			needRetry = true

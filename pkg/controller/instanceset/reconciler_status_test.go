@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("status reconciler test", func() {
@@ -226,9 +227,9 @@ var _ = Describe("status reconciler test", func() {
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
-				index, _ := getPodCondition(&pod.Status, corev1.PodReady)
-				Expect(index).ShouldNot(Equal(-1))
-				pod.Status.Conditions[index].Status = corev1.ConditionFalse
+				condition := intctrlutil.GetPodCondition(&pod.Status, corev1.PodReady)
+				Expect(condition).ShouldNot(BeNil())
+				condition.Status = corev1.ConditionFalse
 			}
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())

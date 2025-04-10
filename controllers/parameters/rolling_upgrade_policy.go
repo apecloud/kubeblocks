@@ -161,9 +161,9 @@ func classifyPodByStats(pods []corev1.Pod, targetReplicas int, minReadySeconds i
 	for i := 0; i < len(pods); i++ {
 		pod := &pods[i]
 		switch {
-		case podutil.IsAvailable(pod, minReadySeconds):
+		case podutil.IsPodAvailable(pod, minReadySeconds):
 			podsStats.available[pod.Name] = pod
-		case podutil.PodIsReady(pod):
+		case podutil.IsPodReady(pod):
 			podsStats.ready[pod.Name] = pod
 		default:
 		}

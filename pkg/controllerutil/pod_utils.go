@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -220,22 +221,21 @@ func GetStorageSizeFromPersistentVolume(pvc corev1.PersistentVolumeClaimTemplate
 	return -1
 }
 
-// PodIsReady checks if pod is ready
-func PodIsReady(pod *corev1.Pod) bool {
-	if pod.Status.Conditions == nil {
-		return false
-	}
+// isTerminating returns true if pod's DeletionTimestamp has been set
+func isTerminating(pod *corev1.Pod) bool {
+	return pod.DeletionTimestamp != nil
+}
 
-	if pod.DeletionTimestamp != nil {
-		return false
-	}
+// IsPodReady returns true if pod is ready
+// Currently, if pod is being deleted and have a grace period, k8s still considers it ready,
+// which is not what we expect. See https://github.com/kubernetes/kubernetes/issues/129552
+func IsPodReady(pod *corev1.Pod) bool {
+	return podutils.IsPodReady(pod) && !isTerminating(pod)
+}
 
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
+// IsPodAvailable returns true if pod is ready for at least minReadySeconds
+func IsPodAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now()) && !isTerminating(pod)
 }
 
 // GetContainerID gets the containerID from pod by name
@@ -252,33 +252,11 @@ func GetContainerID(pod *corev1.Pod, containerName string) string {
 	return ""
 }
 
-func isRunning(pod *corev1.Pod) bool {
-	return pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil
-}
-
-func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if !isRunning(pod) {
-		return false
-	}
-
-	condition := GetPodCondition(&pod.Status, corev1.PodReady)
-	if condition == nil || condition.Status != corev1.ConditionTrue {
-		return false
-	}
-	if minReadySeconds == 0 {
-		return true
-	}
-
-	var (
-		now                = metav1.Now()
-		minDuration        = time.Duration(minReadySeconds) * time.Second
-		lastTransitionTime = condition.LastTransitionTime
-	)
-
-	return !lastTransitionTime.IsZero() && lastTransitionTime.Add(minDuration).Before(now.Time)
-}
-
 func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
+	if status == nil {
+		return nil
+	}
+
 	if len(status.Conditions) == 0 {
 		return nil
 	}
@@ -341,7 +319,7 @@ func PodIsReadyWithLabel(pod corev1.Pod) bool {
 		return false
 	}
 
-	return PodIsReady(&pod)
+	return IsPodReady(&pod)
 }
 
 // GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision empty

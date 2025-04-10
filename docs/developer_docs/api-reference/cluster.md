@@ -5585,6 +5585,18 @@ bool
 When set to true, the controller will ignore the management of this configuration.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>restartOnFileChange</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart the pod when the file changes.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions

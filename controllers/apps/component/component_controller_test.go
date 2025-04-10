@@ -1645,7 +1645,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
 	}
 
-	testReconfigure := func(compName, compDefName, fileTemplate string) {
+	testReconfigureAction := func(compName, compDefName, fileTemplate string) {
 		createCompObj(compName, compDefName, nil)
 
 		By("check the file template object")
@@ -1687,7 +1687,7 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testReconfigureUDF := func(compName, compDefName, fileTemplate string) {
+	testReconfigureActionUDF := func(compName, compDefName, fileTemplate string) {
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
 				{
@@ -1735,7 +1735,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testReconfigureVolumeChanged := func(compName, compDefName, fileTemplate string) {
-		testReconfigure(compName, compDefName, fileTemplate)
+		testReconfigureAction(compName, compDefName, fileTemplate)
 
 		By("update the cmpd to add a new config template (volume)")
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
@@ -1766,6 +1766,52 @@ var _ = Describe("Component Controller", func() {
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(BeNil())
+		})).Should(Succeed())
+	}
+
+	testReconfigureRestart := func(compName, compDefName, fileTemplate string) {
+		// mock the cmpd to set restartOnFileChange
+		compDefKey := types.NamespacedName{Name: compDefName}
+		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+			for i := range cmpd.Spec.Configs {
+				cmpd.Spec.Configs[i].RestartOnFileChange = ptr.To(true)
+			}
+		})()).ShouldNot(HaveOccurred())
+
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+		})).Should(Succeed())
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+		})).Should(Succeed())
+
+		By("check the workload updated")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(BeNil())
+			g.Expect(its.Spec.Template.Annotations).ShouldNot(BeNil())
+			g.Expect(its.Spec.Template.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
 		})).Should(Succeed())
 	}
 
@@ -2320,16 +2366,20 @@ var _ = Describe("Component Controller", func() {
 			testFileTemplateVolumes(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
-		It("reconfigure", func() {
-			testReconfigure(defaultCompName, compDefObj.Name, fileTemplate)
+		It("reconfigure - action", func() {
+			testReconfigureAction(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
-		It("reconfigure - udf", func() {
-			testReconfigureUDF(defaultCompName, compDefObj.Name, fileTemplate)
+		It("reconfigure - action udf", func() {
+			testReconfigureActionUDF(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
 		It("reconfigure - volume changed", func() {
 			testReconfigureVolumeChanged(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - restart", func() {
+			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

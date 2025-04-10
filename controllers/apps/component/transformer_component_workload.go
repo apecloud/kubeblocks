@@ -37,7 +37,6 @@ import (
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -131,9 +130,6 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
 		return err
 	}
-
-	// build configuration template annotations to workload
-	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
 
 	return nil
 }

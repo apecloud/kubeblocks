@@ -153,7 +153,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentServiceTransformer{},
 			// handle component system accounts
 			&componentAccountTransformer{},
-			// handle the TLS configuration
+			// handle the TLS
 			&componentTLSTransformer{},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
@@ -161,7 +161,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountProvisionTransformer{},
 			// render config/script templates
 			&componentFileTemplateTransformer{},
-			// render component configurations
+			// HACK: the legacy reload sidecar
 			&componentReloadSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},

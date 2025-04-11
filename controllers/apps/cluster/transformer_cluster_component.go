@@ -52,7 +52,7 @@ var _ graph.Transformer = &clusterComponentTransformer{}
 
 func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 

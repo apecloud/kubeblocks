@@ -57,7 +57,7 @@ var _ graph.Transformer = &componentWorkloadTransformer{}
 
 func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 

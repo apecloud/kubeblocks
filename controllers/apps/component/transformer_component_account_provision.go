@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 const (
@@ -53,7 +52,7 @@ var _ graph.Transformer = &componentAccountProvisionTransformer{}
 
 func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {

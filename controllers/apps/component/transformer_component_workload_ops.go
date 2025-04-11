@@ -647,8 +647,12 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 		return nil
 	}
 
+	templateChanges := r.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
 	for objName := range toUpdate {
 		tplName := fileTemplateNameFromObject(transCtx.SynthesizeComponent, protoObjs[objName])
+		if _, ok := templateChanges[tplName]; !ok {
+			continue
+		}
 		for _, tpl := range synthesizedComp.FileTemplates {
 			if tpl.Name == tplName {
 				if ptr.Deref(tpl.RestartOnFileChange, false) {
@@ -706,7 +710,6 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 	// make a copy of configs from the running ITS
 	r.protoITS.Spec.Configs = slices.Clone(r.runningITS.Spec.Configs)
 
-	templateChanges := r.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
 	for _, tpl := range synthesizedComp.FileTemplates {
 		if changes, ok := templateChanges[tpl.Name]; ok {
 			reconfigure(tpl, changes)

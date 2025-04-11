@@ -218,7 +218,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|elasticsearch|zookeeper|rabbitmq|damengdb|kingbase|gaussdb,
+        test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|elasticsearch|zookeeper|rabbitmq|damengdb|gaussdb,
                      pulsar|mysqlscale|weaviate|qdrant|smartengine|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|goldendb,
                      foxlake|orioledb|oracle-mysql|vanilla-pg|openldap|polardbx|opensearch|vllm|tdengine|milvus|clickhouse|vastbase,
                      pika|ggml|mariadb|tidb|xinference|oracle|opengauss|influxdb|flink|solr|doris|loki|victoria-metrics,

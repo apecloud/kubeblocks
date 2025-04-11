@@ -131,6 +131,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleCompletedPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseDeleting:
 		return r.handleDeletingPhase(reqCtx, backup)
+	case dpv1alpha1.BackupPhasePaused:
+		return r.handlePausedPhase(reqCtx, backup)
 	case dpv1alpha1.BackupPhaseFailed:
 		if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
 			if backup.Status.StartTimestamp.IsZero() {
@@ -797,6 +799,70 @@ func (r *BackupReconciler) deleteRelatedBackups(
 		reqCtx.Log.Info("delete the related backup", "backup", fmt.Sprintf("%s/%s", bp.Namespace, bp.Name))
 	}
 	return nil
+}
+
+func (r *BackupReconciler) handlePausedPhase(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+
+	// 1. 挂起所有关联的备份Job
+	if requeue, err := r.suspendBackupJobs(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "failed to suspend backup jobs")
+	} else if requeue {
+		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "waiting for job suspension")
+	}
+
+	// 2. 更新备份状态为Paused（如果尚未更新）
+	if backup.Status.Phase != dpv1alpha1.BackupPhasePaused {
+		patch := client.MergeFrom(backup.DeepCopy())
+		backup.Status.Phase = dpv1alpha1.BackupPhasePaused
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		// 记录暂停持续时间
+		if backup.Status.StartTimestamp != nil {
+			duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+			backup.Status.Duration = &metav1.Duration{Duration: duration}
+		}
+		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		r.Recorder.Event(backup, corev1.EventTypeNormal, "BackupPaused", "Backup jobs have been suspended")
+	}
+
+	return intctrlutil.Reconciled()
+}
+
+// suspendBackupJobs 挂起所有关联的Job但不删除
+func (r *BackupReconciler) suspendBackupJobs(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup) (bool, error) {
+
+	// 获取所有关联的Job
+	jobList := &batchv1.JobList{}
+	labels := dpbackup.BuildBackupWorkloadLabels(backup)
+	if err := r.Client.List(reqCtx.Ctx, jobList,
+		client.InNamespace(backup.Namespace),
+		client.MatchingLabels(labels)); err != nil {
+		return false, fmt.Errorf("failed to list backup jobs: %w", err)
+	}
+
+	var needRequeue bool
+	for _, job := range jobList.Items {
+		// 如果已经是挂起状态则跳过
+		if job.Spec.Suspend != nil && *job.Spec.Suspend {
+			continue
+		}
+
+		// 更新Job为挂起状态
+		patch := client.MergeFrom(job.DeepCopy())
+		job.Spec.Suspend = pointer.Bool(true)
+		if err := r.Client.Patch(reqCtx.Ctx, &job, patch); err != nil {
+			return false, fmt.Errorf("failed to suspend job %s: %w", job.Name, err)
+		}
+		reqCtx.Log.Info("suspended backup job", "job", job.Name)
+		needRequeue = true // 需要等待Job状态更新
+	}
+
+	return needRequeue, nil
 }
 
 // PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.

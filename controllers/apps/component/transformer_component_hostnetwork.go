@@ -24,7 +24,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -34,7 +33,7 @@ var _ graph.Transformer = &componentHostNetworkTransformer{}
 
 func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 

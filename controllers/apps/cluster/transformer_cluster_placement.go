@@ -28,7 +28,6 @@ import (
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
@@ -41,7 +40,7 @@ var _ graph.Transformer = &clusterPlacementTransformer{}
 
 func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 

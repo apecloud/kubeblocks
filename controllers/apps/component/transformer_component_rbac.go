@@ -54,7 +54,7 @@ const EventReasonRBACManager = "RBACManager"
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	synthesizedComp := transCtx.SynthesizeComponent
-	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {

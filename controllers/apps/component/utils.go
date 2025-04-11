@@ -88,3 +88,10 @@ func mapDiff[T interface{}](m1, m2 map[string]T) (sets.Set[string], sets.Set[str
 	s1, s2 := sets.KeySet(m1), sets.KeySet(m2)
 	return setDiff(s1, s2)
 }
+
+func isCompDeleting(comp *appsv1.Component) bool {
+	if comp.GetDeletionTimestamp().IsZero() {
+		return false
+	}
+	return comp.Spec.TerminationPolicy != appsv1.DoNotTerminate
+}

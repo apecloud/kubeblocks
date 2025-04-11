@@ -25,7 +25,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type componentMonitorContainerTransformer struct{}
@@ -38,7 +37,7 @@ func (c componentMonitorContainerTransformer) Transform(ctx graph.TransformConte
 	compDef := transCtx.CompDef
 	synthesizeComp := transCtx.SynthesizeComponent
 
-	if model.IsObjectDeleting(compOrig) {
+	if isCompDeleting(compOrig) {
 		return
 	}
 	if common.IsCompactMode(compOrig.Annotations) {

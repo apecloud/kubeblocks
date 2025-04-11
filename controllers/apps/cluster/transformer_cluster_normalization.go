@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -49,7 +48,7 @@ var _ graph.Transformer = &clusterNormalizationTransformer{}
 func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 

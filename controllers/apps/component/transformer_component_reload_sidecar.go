@@ -30,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
@@ -47,7 +46,7 @@ func (t *componentReloadSidecarTransformer) Transform(ctx graph.TransformContext
 	compOrig := transCtx.ComponentOrig
 	builtinComp := transCtx.SynthesizeComponent
 
-	if model.IsObjectDeleting(compOrig) {
+	if isCompDeleting(compOrig) {
 		return nil
 	}
 	if common.IsCompactMode(compOrig.Annotations) {

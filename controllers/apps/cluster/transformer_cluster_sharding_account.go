@@ -44,7 +44,7 @@ var _ graph.Transformer = &clusterShardingAccountTransformer{}
 
 func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.Cluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 

@@ -474,6 +474,7 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 				return merge(stpl, utpl)
 			}
 		}
+		return merge(stpl, appsv1.ClusterComponentConfig{})
 	}
 	return stpl
 }

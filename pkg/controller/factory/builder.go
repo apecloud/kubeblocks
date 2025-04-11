@@ -73,7 +73,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	// build annotations
 	mergeAnnotations := intctrlutil.MergeMetadataMaps(
-		constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
+		constant.GetKBGenerationAnnotation(synthesizedComp.Generation),
 		getMonitorAnnotations(synthesizedComp, componentDef),
 		compDefLabel,
 		constant.GetServiceVersionAnnotation(synthesizedComp.ServiceVersion),

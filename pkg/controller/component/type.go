@@ -30,10 +30,10 @@ import (
 )
 
 type SynthesizedComponent struct {
-	Namespace            string                                 `json:"namespace,omitempty"`
-	ClusterName          string                                 `json:"clusterName,omitempty"`
-	ClusterUID           string                                 `json:"clusterUID,omitempty"`
-	ClusterGeneration    string                                 `json:"clusterGeneration,omitempty"`
+	Namespace            string `json:"namespace,omitempty"`
+	ClusterName          string `json:"clusterName,omitempty"`
+	ClusterUID           string `json:"clusterUID,omitempty"`
+	Generation           string
 	Comp2CompDefs        map[string]string                      `json:"comp2CompDefs,omitempty"`   // {compName: compDefName}
 	CompDef2CompCnt      map[string]int32                       `json:"compDef2CompCnt,omitempty"` // {compDefName: expected comp cnt}
 	Name                 string                                 `json:"name,omitempty"`            // the name of the component w/o clusterName prefix

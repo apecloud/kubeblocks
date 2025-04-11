@@ -43,7 +43,7 @@ var _ graph.Transformer = &clusterSharedAccountTransformer{}
 
 func (t *clusterSharedAccountTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.Cluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 

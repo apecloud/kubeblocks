@@ -39,7 +39,7 @@ var _ graph.Transformer = &clusterConnCredentialTransformer{}
 
 func (t *clusterConnCredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 	if common.IsCompactMode(transCtx.OrigCluster.Annotations) {

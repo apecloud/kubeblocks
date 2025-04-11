@@ -31,7 +31,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 // clusterComponentStatusTransformer transforms all cluster components' status.
@@ -41,7 +40,7 @@ var _ graph.Transformer = &clusterComponentStatusTransformer{}
 
 func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if transCtx.OrigCluster.IsDeleting() {
 		return nil
 	}
 

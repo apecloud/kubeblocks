@@ -110,7 +110,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	currentUnavailable := 0
 	for _, pod := range oldPodList {
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) && !isPodPending(pod) {
 			currentUnavailable++
 		}
 	}
@@ -133,6 +133,34 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	isBlocked := false
 	needRetry := false
 	sortObjects(oldPodList, priorities, false)
+
+	canBeUpdated := func(pod *corev1.Pod) bool {
+		// pending pod can be updated because there's no consequence of deleting it
+		if isPodPending(pod) {
+			return true
+		}
+		if !isImageMatched(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
+			return false
+		}
+		if !intctrlutil.IsPodReady(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
+			return false
+		}
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+			// no pod event will trigger the next reconciliation, so retry it
+			needRetry = true
+			return false
+		}
+		if !isRoleReady(pod, its.Spec.Roles) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+			return false
+		}
+
+		return true
+	}
+
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
@@ -141,22 +169,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		if !isImageMatched(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !intctrlutil.IsPodReady(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
-			// no pod event will trigger the next reconciliation, so retry it
-			needRetry = true
-			break
-		}
-		if !isRoleReady(pod, its.Spec.Roles) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+		if !canBeUpdated(pod) {
 			break
 		}
 

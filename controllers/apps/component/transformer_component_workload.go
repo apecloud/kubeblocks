@@ -144,6 +144,7 @@ func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp 
 	}
 }
 
+// FIXME: why need protoITS here?
 func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Context, cli client.Reader,
 	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
 	var (
@@ -165,7 +166,8 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 			podNameSet.Insert(pod.Name)
 		}
 
-		desiredPodNames, err := generatePodNames(synthesizedComp)
+		// FIXME: generate by runningITS may be wrong
+		desiredPodNames, err := component.GeneratePodNamesByITS(runningITS)
 		if err != nil {
 			return nil, err
 		}

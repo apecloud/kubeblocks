@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -74,7 +75,20 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 		return err
 	}
 
-	available, message, err := h.handleEvent(newProbeEvent(event, ppEvent), comp, compDef)
+	itsName, err := GetInstanceSetName(comp)
+	if err != nil {
+		return err
+	}
+	itsKey := types.NamespacedName{
+		Namespace: event.InvolvedObject.Namespace,
+		Name:      itsName,
+	}
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(reqCtx.Ctx, itsKey, its); err != nil {
+		return err
+	}
+
+	available, message, err := h.handleEvent(newProbeEvent(event, ppEvent), comp, compDef, its)
 	if err != nil {
 		return err
 	}
@@ -124,7 +138,7 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 	return nil
 }
 
-func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition) (*bool, string, error) {
+func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition, its *workloads.InstanceSet) (*bool, string, error) {
 	policy := GetComponentAvailablePolicy(compDef)
 	if policy.WithProbe == nil || policy.WithProbe.Condition == nil {
 		if policy.WithPhases != nil {
@@ -133,7 +147,7 @@ func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Compo
 		return nil, "", fmt.Errorf("the referenced ComponentDefinition does not have available probe defined, but we got a probe event? %s", compDef.Name)
 	}
 
-	events, err := h.pickupProbeEvents(event, *policy.WithProbe.TimeWindowSeconds, comp)
+	events, err := h.pickupProbeEvents(event, *policy.WithProbe.TimeWindowSeconds, comp, its)
 	if err != nil {
 		return nil, "", err
 	}
@@ -184,14 +198,14 @@ func newProbeEvent(event *corev1.Event, ppEvent *proto.ProbeEvent) probeEvent {
 	}
 }
 
-func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow int32, comp *appsv1.Component) ([]probeEvent, error) {
+func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow int32, comp *appsv1.Component, its *workloads.InstanceSet) ([]probeEvent, error) {
 	events, err := h.getCachedEvents(comp)
 	if err != nil {
 		return nil, err
 	}
 	events = append(events, event)
 
-	podNames, err := GenerateAllPodNames(comp.Spec.Replicas, comp.Spec.Instances, comp.Spec.OfflineInstances, comp.Name)
+	podNames, err := GeneratePodNamesByITS(its)
 	if err != nil {
 		return nil, err
 	}

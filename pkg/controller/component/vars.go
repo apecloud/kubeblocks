@@ -1242,6 +1242,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 	for i := range comp.Spec.Instances {
 		templates = append(templates, &comp.Spec.Instances[i])
 	}
+	// FIXME(jiacheng): use new api
 	names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, appsv1.Ordinals{})
 	if err != nil {
 		return "", err

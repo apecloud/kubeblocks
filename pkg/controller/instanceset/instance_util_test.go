@@ -38,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
@@ -101,69 +102,13 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("buildInstanceName2TemplateMap", func() {
-		It("build an its with default template only", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
-			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
-			Expect(err).Should(BeNil())
-			Expect(nameTemplate).Should(HaveLen(3))
-			name0 := its.Name + "-0"
-			Expect(nameTemplate).Should(HaveKey(name0))
-			Expect(nameTemplate).Should(HaveKey(its.Name + "-1"))
-			Expect(nameTemplate).Should(HaveKey(its.Name + "-2"))
-			nameTemplate[name0].PodTemplateSpec.Spec.Volumes = nil
-			defaultTemplate := its.Spec.Template.DeepCopy()
-			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(defaultTemplate.Spec))
-		})
-
-		It("build an its with one instance template override", func() {
-			nameOverride := "name-override"
-			nameOverride0 := its.Name + "-" + nameOverride + "-0"
-			annotationOverride := map[string]string{
-				"foo": "bar",
-			}
-			labelOverride := map[string]string{
-				"foo": "bar",
-			}
-			resources := corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU: resource.MustParse("600m"),
-				},
-			}
-			instance := workloads.InstanceTemplate{
-				Name:        nameOverride,
-				Annotations: annotationOverride,
-				Labels:      labelOverride,
-				Resources:   &resources,
-			}
-			its.Spec.Instances = append(its.Spec.Instances, instance)
-			itsExt, err := buildInstanceSetExt(its, nil)
-			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
-			Expect(err).Should(BeNil())
-			Expect(nameTemplate).Should(HaveLen(3))
-			name0 := its.Name + "-0"
-			name1 := its.Name + "-1"
-			Expect(nameTemplate).Should(HaveKey(name0))
-			Expect(nameTemplate).Should(HaveKey(name1))
-			Expect(nameTemplate).Should(HaveKey(nameOverride0))
-			expectedTemplate := its.Spec.Template.DeepCopy()
-			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Annotations).Should(Equal(annotationOverride))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Labels).Should(Equal(labelOverride))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resources.Limits[corev1.ResourceCPU]))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(its.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]))
-		})
-	})
-
 	Context("buildInstancePodByTemplate", func() {
 		It("should work well", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -186,9 +131,11 @@ var _ = Describe("instance util test", func() {
 		})
 
 		It("adds nodeSelector according to annotation", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
@@ -216,9 +163,11 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstancePVCByTemplate", func() {
 		It("should work well", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -230,26 +179,6 @@ var _ = Describe("instance util test", func() {
 			Expect(pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, name)))
 			Expect(pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
 			Expect(pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
-		})
-	})
-
-	Context("validateSpec", func() {
-		It("should work well", func() {
-			By("a valid spec")
-			Expect(validateSpec(its, nil)).Should(Succeed())
-
-			By("sum of replicas in instance exceeds spec.replicas")
-			its2 := its.DeepCopy()
-			replicas := int32(4)
-			name := "barrrrr"
-			instance := workloads.InstanceTemplate{
-				Name:     name,
-				Replicas: &replicas,
-			}
-			its2.Spec.Instances = append(its2.Spec.Instances, instance)
-			err := validateSpec(its2, nil)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
 		})
 	})
 

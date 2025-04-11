@@ -367,6 +367,7 @@ spec:
                 description: |-
                   Specifies the desired Ordinals of the default template.
                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+                  If Ordinals are defined, their number must match the corresponding replicas.
 
 
                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
@@ -381,7 +382,7 @@ spec:
                   ranges:
                     items:
                       description: |-
-                        Range represents a range with a start and an end value.
+                        Range represents a range with a start and an end value. Both start and end are included.
                         It is used to define a continuous segment.
                       properties:
                         end:
@@ -623,7 +624,7 @@ spec:
                         ranges:
                           items:
                             description: |-
-                              Range represents a range with a start and an end value.
+                              Range represents a range with a start and an end value. Both start and end are included.
                               It is used to define a continuous segment.
                             properties:
                               end:
@@ -2674,6 +2675,12 @@ spec:
 
 
                   Note: This field will be removed in future version.
+                type: string
+              podNamingRule:
+                default: Separated
+                enum:
+                - Separated
+                - Sequential
                 type: string
               podUpdatePolicy:
                 description: |-
@@ -10833,6 +10840,14 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              currentInstances:
+                additionalProperties:
+                  items:
+                    format: int32
+                    type: integer
+                  type: array
+                description: 'FIXME: unify with InstanceStatus?'
+                type: object
               currentReplicas:
                 description: |-
                   currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
@@ -11513,6 +11528,7 @@ spec:
                       description: |-
                         Specifies the desired Ordinals of this InstanceTemplate.
                         The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+                        If Ordinals are defined, their number must match the corresponding replicas.
 
 
                         For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},

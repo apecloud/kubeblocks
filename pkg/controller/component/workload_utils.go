@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -161,6 +162,28 @@ func GenerateAllPodNamesToSet(
 		podSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
 	}
 	return podSet, nil
+}
+
+// GenerateAllPodNamesToSet generate all pod names for a component
+// and return a set which key is the pod name and value is a template name.
+func GenerateAllPodNamesToSetNew(its *workloads.InstanceSet) (map[string]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	m, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	res := map[string]string{}
+	for instance, template := range m {
+		res[instance] = template.Name
+	}
+	return res, nil
 }
 
 func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {

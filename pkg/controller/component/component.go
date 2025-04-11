@@ -28,9 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 )
 
@@ -52,6 +54,30 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 
 func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
+}
+
+func GetInstanceSetName(comp *appsv1.Component) (string, error) {
+	compName, err := getCompLabelValue(comp, constant.KBAppComponentLabelKey)
+	if err != nil {
+		return "", err
+	}
+	clusterName, err := GetClusterName(comp)
+	if err != nil {
+		return "", err
+	}
+	return constant.GenerateWorkloadNamePattern(clusterName, compName), nil
+}
+
+func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	return nameBuilder.GenerateAllInstanceNames()
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.

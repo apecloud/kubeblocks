@@ -144,6 +144,7 @@ type InstanceTemplate struct {
 
 	// Specifies the desired Ordinals of this InstanceTemplate.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	// If Ordinals are defined, their number must match the corresponding replicas.
 	//
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under this InstanceTemplate would be

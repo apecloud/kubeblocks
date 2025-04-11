@@ -39,16 +39,55 @@ import (
 )
 
 var _ = Describe("update reconciler test", func() {
+	var replicas int32
+
 	BeforeEach(func() {
+		replicas = 3
 		its = builder.NewInstanceSetBuilder(namespace, name).
 			SetUID(uid).
-			SetReplicas(3).
+			SetReplicas(replicas).
 			SetSelectorMatchLabel(selectors).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetMinReadySeconds(minReadySeconds).
 			GetObject()
 	})
+
+	prepareForUpdate := func(tree *kubebuilderx.ObjectTree) {
+		By("fix meta")
+		reconciler = NewFixMetaReconciler()
+		res, err := reconciler.Reconcile(tree)
+		Expect(err).Should(BeNil())
+		Expect(res).Should(Equal(kubebuilderx.Commit))
+
+		By("update revisions")
+		reconciler = NewRevisionUpdateReconciler()
+		res, err = reconciler.Reconcile(tree)
+		Expect(err).Should(BeNil())
+		Expect(res).Should(Equal(kubebuilderx.Continue))
+
+		By("assistant object")
+		reconciler = NewAssistantObjectReconciler()
+		res, err = reconciler.Reconcile(tree)
+		Expect(err).Should(BeNil())
+		Expect(res).Should(Equal(kubebuilderx.Continue))
+
+		By("replicas alignment")
+		reconciler = NewReplicasAlignmentReconciler()
+		res, err = reconciler.Reconcile(tree)
+		Expect(err).Should(BeNil())
+		Expect(res).Should(Equal(kubebuilderx.Continue))
+	}
+
+	expectUpdatedPods := func(tree *kubebuilderx.ObjectTree, names []string) {
+		pods := tree.List(&corev1.Pod{})
+		Expect(pods).Should(HaveLen(int(replicas) - len(names)))
+		for _, name := range names {
+			Expect(slices.IndexFunc(pods, func(object client.Object) bool {
+				return object.GetName() == name
+			})).Should(BeNumerically("<", 0))
+		}
+	}
 
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
@@ -61,7 +100,7 @@ var _ = Describe("update reconciler test", func() {
 
 			By("prepare current tree")
 			// desired: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
-			replicas := int32(7)
+			replicas = int32(7)
 			its.Spec.Replicas = &replicas
 			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			nameHello := "hello"
@@ -77,30 +116,7 @@ var _ = Describe("update reconciler test", func() {
 			}
 			its.Spec.Instances = append(its.Spec.Instances, instanceFoo)
 
-			// prepare for update
-			By("fix meta")
-			reconciler = NewFixMetaReconciler()
-			res, err := reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Commit))
-
-			By("update revisions")
-			reconciler = NewRevisionUpdateReconciler()
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-
-			By("assistant object")
-			reconciler = NewAssistantObjectReconciler()
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-
-			By("replicas alignment")
-			reconciler = NewReplicasAlignmentReconciler()
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
+			prepareForUpdate(tree)
 
 			By("update all pods to ready with outdated revision")
 			pods := tree.List(&corev1.Pod{})
@@ -125,15 +141,6 @@ var _ = Describe("update reconciler test", func() {
 				makePodAvailableWithOldRevision(pod)
 			}
 
-			expectUpdatedPods := func(tree *kubebuilderx.ObjectTree, names []string) {
-				pods = tree.List(&corev1.Pod{})
-				Expect(pods).Should(HaveLen(int(replicas) - len(names)))
-				for _, name := range names {
-					Expect(slices.IndexFunc(pods, func(object client.Object) bool {
-						return object.GetName() == name
-					})).Should(BeNumerically("<", 0))
-				}
-			}
 			makePodLatestRevision := func(pod *corev1.Pod) {
 				labels := pod.Labels
 				if labels == nil {
@@ -150,7 +157,7 @@ var _ = Describe("update reconciler test", func() {
 			// expected: bar-hello-0 being deleted
 			defaultTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
-			res, err = reconciler.Reconcile(defaultTree)
+			res, err := reconciler.Reconcile(defaultTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(defaultTree, []string{"bar-hello-0"})
@@ -249,6 +256,41 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(strictInPlaceTree, []string{})
+		})
+
+		It("updates pending pod", func() {
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(3))
+			readyCondition := corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			}
+			for i, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				// mark the last pod pending with old revision
+				if i == len(pods)-1 {
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
+					pod.Status.Phase = corev1.PodPending
+					break
+				}
+				// mark first two pods available
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-2"})
 		})
 	})
 })

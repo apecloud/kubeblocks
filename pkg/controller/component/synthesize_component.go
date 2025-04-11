@@ -159,7 +159,7 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 		FullCompName:                     comp.Name,
 		CompDefName:                      compDef.Name,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
-		ClusterGeneration:                clusterGeneration(cluster, comp),
+		Generation:                       strconv.FormatInt(comp.Generation, 10),
 		UserDefinedLabels:                comp.Spec.Labels,
 		UserDefinedAnnotations:           comp.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
@@ -255,16 +255,6 @@ func buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	replaceContainerPlaceholderTokens(synthesizeComp, GetEnvReplacementMapForConnCredential(synthesizeComp.ClusterName))
 
 	return synthesizeComp, nil
-}
-
-func clusterGeneration(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) string {
-	if comp != nil && comp.Annotations != nil {
-		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
-			return generation
-		}
-	}
-	// back-off to use cluster.Generation
-	return strconv.FormatInt(cluster.Generation, 10)
 }
 
 func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (map[string]string, error) {

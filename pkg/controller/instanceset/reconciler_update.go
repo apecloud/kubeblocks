@@ -99,7 +99,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	currentUnavailable := 0
 	for _, pod := range oldPodList {
-		if !isHealthy(pod) {
+		if !isHealthy(pod) && !isPodPending(pod) {
 			currentUnavailable++
 		}
 	}
@@ -123,6 +123,34 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	isBlocked := false
 	needRetry := false
 	sortObjects(oldPodList, priorities, false)
+
+	canBeUpdated := func(pod *corev1.Pod) bool {
+		// pending pod can be updated because there's no consequence of deleting it
+		if isPodPending(pod) {
+			return true
+		}
+		// when PodUpdatePolicy is Recreate, no need to check whether containers are ready.
+		if its.Spec.PodUpdatePolicy != workloads.RecreatePodUpdatePolicyType && !isContainersReady(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not ready", its.Namespace, its.Name, pod.Name))
+			// as no further event triggers the next reconciliation, we need a retry
+			needRetry = true
+			return false
+		}
+		if !isHealthy(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
+			return false
+		}
+		if !isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+			return false
+		}
+		if !isRoleReady(pod, its.Spec.Roles) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+			return false
+		}
+		return true
+	}
+
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
@@ -130,23 +158,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatedPods >= partition {
 			break
 		}
-		// when PodUpdatePolicy is Recreate, no need to check whether containers are ready.
-		if its.Spec.PodUpdatePolicy != workloads.RecreatePodUpdatePolicyType && !isContainersReady(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not ready", its.Namespace, its.Name, pod.Name))
-			// as no further event triggers the next reconciliation, we need a retry
-			needRetry = true
-			break
-		}
-		if !isHealthy(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !isRoleReady(pod, its.Spec.Roles) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+
+		if !canBeUpdated(pod) {
 			break
 		}
 

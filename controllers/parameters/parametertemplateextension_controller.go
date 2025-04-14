@@ -109,7 +109,7 @@ func (r *ParameterTemplateExtensionReconciler) reconcile(reqCtx intctrlutil.Requ
 	return r.update(reqCtx, runningCluster, expectedCluster)
 }
 
-func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, cluster *appsv1.Cluster) (*appsv1.Cluster, error) {
+func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Reader, cluster *appsv1.Cluster) (*appsv1.Cluster, error) {
 	updateParameterObject := func(compName string, config *appsv1.ClusterComponentConfig) error {
 		cmKey := client.ObjectKey{
 			Name:      configcore.GetComponentCfgName(cluster.Name, compName, pointer.StringDeref(config.Name, "")),

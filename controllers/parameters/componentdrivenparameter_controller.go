@@ -354,5 +354,6 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 			dest.CustomTemplates = expected.CustomTemplates
 		}
 		dest.Payload = expected.Payload
+		dest.ConfigSpec = expected.ConfigSpec
 	})
 }

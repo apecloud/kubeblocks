@@ -458,9 +458,10 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 		fromPath = localChartsPath
 	}
 	copyChartsContainer := corev1.Container{
-		Name:    "copy-charts",
-		Image:   addon.Spec.Helm.ChartsImage,
-		Command: []string{"sh", "-c", fmt.Sprintf("cp %s/* /mnt/charts", fromPath)},
+		Name:            "copy-charts",
+		Image:           addon.Spec.Helm.ChartsImage,
+		Command:         []string{"sh", "-c", fmt.Sprintf("cp %s/* /mnt/charts", fromPath)},
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonChartsImgPullPolicy)),
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "charts",

@@ -148,14 +148,18 @@ spec:
             - name: ENABLE_RBAC_MANAGER
               value: {{ .Values.rbac.enabled | quote}}
             {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "true" }}
+            {{- with .Values.addonController }}
             - name: ADDON_JOB_TTL
               value: {{ .jobTTL | quote }}
             - name: ADDON_JOB_IMAGE_PULL_POLICY
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
+            {{- end }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
             - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
               value: {{ join " " .Values.addonHelmInstallOptions }}
+            - name: KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY
+              value: {{ .Values.addonChartsImage.pullPolicy | default "IfNotPresent" }}
             {{- end }}
             {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
             - name: RECOVER_VOLUME_EXPANSION_FAILURE

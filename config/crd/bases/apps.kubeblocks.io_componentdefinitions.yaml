@@ -8217,6 +8217,7 @@ spec:
                 minimum: 0
                 type: integer
               podManagementPolicy:
+                default: OrderedReady
                 description: |-
                   InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.
 

@@ -29,6 +29,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -188,7 +189,7 @@ func getMemberUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *w
 	if synthesizedComp.UpdateStrategy != nil {
 		return (*workloads.MemberUpdateStrategy)(synthesizedComp.UpdateStrategy)
 	}
-	return nil
+	return ptr.To(workloads.SerialUpdateStrategy)
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.

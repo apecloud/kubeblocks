@@ -457,6 +457,7 @@ type ComponentDefinitionSpec struct {
 	// - `Parallel`: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
 	// when scaling down.
 	//
+	// +kubebuilder:default=OrderedReady
 	// +optional
 	PodManagementPolicy *appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 

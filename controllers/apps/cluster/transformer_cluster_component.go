@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // clusterComponentTransformer transforms components and shardings to mapping Component objects
@@ -226,6 +227,31 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 		return *normalized
 	}
 
+	mergeConfigs := func(running, expected []appsv1.ClusterComponentConfig) []appsv1.ClusterComponentConfig {
+		matchConfig := func(config appsv1.ClusterComponentConfig) bool {
+			return pointer.BoolDeref(config.ExternalManaged, false) && config.ConfigMap != nil
+		}
+		if generics.CountFunc(running, matchConfig) == 0 {
+			return expected
+		}
+
+		ret := make([]appsv1.ClusterComponentConfig, 0, len(expected))
+		for _, config := range expected {
+			if config.ConfigMap != nil {
+				ret = append(ret, config)
+				continue
+			}
+			if !pointer.BoolDeref(config.ExternalManaged, false) {
+				ret = append(ret, config)
+				continue
+			}
+			if index := generics.FindFirstFunc(running, matchConfig); index >= 0 && running[index].ConfigMap != nil {
+				ret = append(ret, running[index])
+			}
+		}
+		return ret
+	}
+
 	// Merge metadata
 	ictrlutil.MergeMetadataMapInplace(compProto.Annotations, &compObjCopy.Annotations)
 	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
@@ -244,7 +270,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
-	compObjCopy.Spec.Configs = compProto.Spec.Configs
+	compObjCopy.Spec.Configs = mergeConfigs(compObjCopy.Spec.Configs, compProto.Spec.Configs)
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
 	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy

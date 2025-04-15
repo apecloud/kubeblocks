@@ -346,12 +346,17 @@ webhooks:
   conversionEnabled: false
   createSelfSignedCert: true
 
+## manager server settings
+manager:
+  leaderElectId: ""
+
 ## Data protection settings
 ##
 ## @param dataProtection.enabled - set the dataProtection controllers for backup functions
 ## @param dataProtection.gcFrequencySeconds - the frequency of garbage collection
 dataProtection:
   enabled: true
+  leaderElectId: ""
   # customizing the encryption key is strongly recommended.
   # if you do not specify a custom key, the default key will be used.
   # using the default key can potentially lead to the exposure of database passwords

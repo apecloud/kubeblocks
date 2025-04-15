@@ -267,6 +267,7 @@ var _ = Describe("update reconciler test", func() {
 
 			pods := tree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
+			lastPod := pods[len(pods)-1]
 			readyCondition := corev1.PodCondition{
 				Type:               corev1.PodReady,
 				Status:             corev1.ConditionTrue,
@@ -290,7 +291,7 @@ var _ = Describe("update reconciler test", func() {
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(tree, []string{"bar-2"})
+			expectUpdatedPods(tree, []string{lastPod.GetName()})
 		})
 	})
 })

@@ -73,7 +73,7 @@ fullnameOverride: ""
 ##
 ## @param rbac.additionalPolicyRules
 ## In your Componentdefinition CR's `policyRules` field, you can only define rules kubeblocks
-## already has. If you want to define a rule that kubeblocks does not have, you can add it here. 
+## already has. If you want to define a rule that kubeblocks does not have, you can add it here.
 ## This field is `[]rbacv1.PolicyRule`.
 rbac:
   enabled: true

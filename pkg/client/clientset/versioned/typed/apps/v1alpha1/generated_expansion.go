@@ -30,4 +30,6 @@ type ComponentVersionExpansion interface{}
 
 type ConfigConstraintExpansion interface{}
 
+type RolloutExpansion interface{}
+
 type ServiceDescriptorExpansion interface{}

@@ -484,6 +484,15 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
 			os.Exit(1)
 		}
+
+		if err = (&appscontrollers.RolloutReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("rollout-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Rollout")
+			os.Exit(1)
+		}
 	}
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {

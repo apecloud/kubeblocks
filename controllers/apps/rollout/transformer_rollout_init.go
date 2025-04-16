@@ -17,14 +17,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package constant
+package rollout
 
-// kubeblocks.io well-known finalizers
-const (
-	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
-	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
-	ConfigFinalizerName            = "config.kubeblocks.io/finalizer"
-	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
-	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
-	RolloutFinalizerName           = "rollout.kubeblocks.io/finalizer"
+import (
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
+
+type rolloutInitTransformer struct{}
+
+var _ graph.Transformer = &rolloutInitTransformer{}
+
+func (t *rolloutInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*rolloutTransformContext)
+
+	root := &model.ObjectVertex{Obj: transCtx.Rollout, OriObj: transCtx.RolloutOrig, Action: model.ActionStatusPtr()}
+	dag.AddVertex(root)
+
+	return nil
+}

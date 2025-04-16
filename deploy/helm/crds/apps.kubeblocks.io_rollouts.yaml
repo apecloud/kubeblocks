@@ -82,9 +82,6 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: name is immutable
-                        rule: self == oldSelf
                     promotion:
                       properties:
                         auto:
@@ -1780,9 +1777,6 @@ spec:
                       maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
-                      x-kubernetes-validations:
-                      - message: name is immutable
-                        rule: self == oldSelf
                   required:
                   - name
                   type: object

@@ -17,14 +17,24 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package constant
+package rollout
 
-// kubeblocks.io well-known finalizers
-const (
-	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
-	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
-	ConfigFinalizerName            = "config.kubeblocks.io/finalizer"
-	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
-	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
-	RolloutFinalizerName           = "rollout.kubeblocks.io/finalizer"
+import (
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
+
+func init() {
+	model.AddScheme(clientgoscheme.AddToScheme)
+	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
+	// model.AddScheme(dpv1alpha1.AddToScheme)
+	// model.AddScheme(snapshotv1.AddToScheme)
+	// model.AddScheme(snapshotv1beta1.AddToScheme)
+	// model.AddScheme(extensionsv1alpha1.AddToScheme)
+	// model.AddScheme(workloadsv1.AddToScheme)
+	// model.AddScheme(batchv1.AddToScheme)
+}

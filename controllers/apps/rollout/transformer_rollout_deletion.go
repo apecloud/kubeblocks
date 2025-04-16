@@ -17,14 +17,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package constant
+package rollout
 
-// kubeblocks.io well-known finalizers
-const (
-	DBClusterFinalizerName         = "cluster.kubeblocks.io/finalizer"
-	DBComponentFinalizerName       = "component.kubeblocks.io/finalizer"
-	ConfigFinalizerName            = "config.kubeblocks.io/finalizer"
-	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
-	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
-	RolloutFinalizerName           = "rollout.kubeblocks.io/finalizer"
+import (
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
+
+type rolloutDeletionTransformer struct{}
+
+var _ graph.Transformer = &rolloutDeletionTransformer{}
+
+func (t *rolloutDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*rolloutTransformContext)
+	if !model.IsObjectDeleting(transCtx.RolloutOrig) {
+		return nil
+	}
+
+	// graphCli, _ := transCtx.Client.(model.GraphClient)
+	// rollout := transCtx.Rollout
+
+	return nil // TODO
+}

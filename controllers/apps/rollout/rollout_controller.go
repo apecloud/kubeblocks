@@ -17,11 +17,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package rollout
 
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // RolloutReconciler reconciles a Rollout object
@@ -44,19 +48,55 @@ type RolloutReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Rollout object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *RolloutReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("rollout", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
 
-	// TODO(user): your logic here
+	reqCtx.Log.V(1).Info("reconcile", "rollout", req.NamespacedName)
 
-	return ctrl.Result{}, nil
+	planBuilder := newRolloutPlanBuilder(reqCtx, r.Client)
+	if err := planBuilder.Init(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	requeueError := func(err error) (ctrl.Result, error) {
+		if re, ok := err.(intctrlutil.RequeueError); ok {
+			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
+		}
+		if apierrors.IsConflict(err) {
+			return intctrlutil.Requeue(reqCtx.Log, err.Error())
+		}
+		c := planBuilder.(*rolloutPlanBuilder)
+		appsutil.SendWarningEventWithError(r.Recorder, c.transCtx.Rollout, corev1.EventTypeWarning, err)
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
+	plan, errBuild := planBuilder.
+		AddTransformer(
+			&rolloutDeletionTransformer{},
+			&rolloutMetaTransformer{},
+			&rolloutLoadTransformer{},
+			&rolloutInplaceTransformer{},
+			&rolloutReplaceTransformer{},
+			&rolloutCreateTransformer{},
+			&rolloutUpdateTransformer{},
+			&rolloutStatusTransformer{},
+		).Build()
+
+	if errExec := plan.Execute(); errExec != nil {
+		return requeueError(errExec)
+	}
+	if errBuild != nil {
+		return requeueError(errBuild)
+	}
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

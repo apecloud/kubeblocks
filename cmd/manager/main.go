@@ -63,6 +63,7 @@ import (
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
 	"github.com/apecloud/kubeblocks/controllers/apps/component"
+	"github.com/apecloud/kubeblocks/controllers/apps/rollout"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
@@ -485,7 +486,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.RolloutReconciler{
+		if err = (&rollout.RolloutReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("rollout-controller"),

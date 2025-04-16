@@ -29,8 +29,8 @@ import (
 
 // +genclient
 // +k8s:openapi-gen=true
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks}
 
 // Rollout is the Schema for the rollouts API
@@ -42,7 +42,7 @@ type Rollout struct {
 	Status RolloutStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RolloutList contains a list of Rollout
 type RolloutList struct {
@@ -74,13 +74,13 @@ type RolloutSpec struct {
 
 // RolloutStatus defines the observed state of Rollout
 type RolloutStatus struct {
+	Components []RolloutComponentStatus `json:"components,omitempty"`
 }
 
 type RolloutComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
 	// Specifies the target ServiceVersion of the component.
@@ -115,7 +115,6 @@ type RolloutSharding struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=15
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 }
 
@@ -190,4 +189,9 @@ type Metadata struct {
 
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type RolloutComponentStatus struct {
+	Name     string `json:"name"`
+	Replicas int32  `json:"replicas"`
 }

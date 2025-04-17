@@ -139,7 +139,7 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 	// get restore password if exists during recovery.
 	password, err := factory.GetRestoreSystemAccountPassword(ctx.Context, ctx.Client, ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation", account.Name, ctx.SynthesizeComponent.Name)
+		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation: %w", account.Name, ctx.SynthesizeComponent.Name, err)
 	}
 	if account.InitAccount && len(password) == 0 {
 		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account).

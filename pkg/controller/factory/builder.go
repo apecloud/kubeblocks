@@ -356,7 +356,13 @@ func GetRestoreSystemAccountPassword(
 	}
 	backupSource, ok := backupMap[componentName]
 	if !ok {
-		return nil, nil
+		for _, v := range backupMap {
+			backupSource = v
+			break
+		}
+		if backupSource == nil {
+			return nil, nil
+		}
 	}
 	name, ok := backupSource[constant.BackupNameKeyForRestore]
 	if !ok || len(name) == 0 {

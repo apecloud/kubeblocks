@@ -43,15 +43,11 @@ func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject
 
 	objs := make([]T, 0)
 	containers := cfgutil.NewSet()
-	configSpecKey := core.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
 	items := toObjects[T, L, PL](&objList)
 	for i := range items {
 		obj := toResourceObject(&items[i])
 		if objs == nil {
 			return nil, nil, core.MakeError("failed to convert to resource object")
-		}
-		if !foundComponentConfigSpec(obj.GetAnnotations(), configSpecKey, cfg.Name) {
-			continue
 		}
 		podTemplate := transformPodTemplate(obj)
 		if podTemplate == nil {
@@ -94,8 +90,4 @@ func toObjects[T generics.Object, L generics.ObjList[T], PL generics.PObjList[T,
 
 func toResourceObject(obj any) client.Object {
 	return obj.(client.Object)
-}
-
-func foundComponentConfigSpec(annotations map[string]string, key, value string) bool {
-	return len(annotations) != 0 && annotations[key] == value
 }

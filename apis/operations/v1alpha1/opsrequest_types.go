@@ -856,6 +856,25 @@ type Backup struct {
 	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
+type ExtraVolume struct {
+	// Name of the extra volume.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// VolumeSource defines the source of the volume.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	VolumeSource corev1.VolumeSource `json:"volumeSource"`
+
+	// VolumeMount defines how the volume should be mounted in the container.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	VolumeMount corev1.VolumeMount `json:"volumeMount"`
+}
+
 type Restore struct {
 	// Specifies the name of the Backup custom resource.
 	//
@@ -880,6 +899,18 @@ type Restore struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
+	// Specifies a list of extra volumes to be mounted in the container.
+	// These volumes are used to supply sensitive information (e.g. encryption keys)
+	// that support data recovery. This field is immutable once the resource is created.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=16
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update extraVolumes"
+	// +optional
+	ExtraVolumes []ExtraVolume `json:"extraVolumes,omitempty"`
 
 	// Specifies the policy for restoring volume claims of a Component's Pods.
 	// It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).

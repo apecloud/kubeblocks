@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -833,8 +832,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// comp2aName and comp2bName are not ready (exist) when updating comp1aName and comp1bName
 			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+			Expect(err).Should(BeNil())
 
 			// check the last two components under provisioning
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -1346,8 +1344,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 			// sharding2aName and sharding2bName are not ready (exist) when updating sharding1aName and sharding1bName
 			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+			Expect(err).Should(BeNil())
 
 			// check the last two components under provisioning
 			graphCli := transCtx.Client.(model.GraphClient)
@@ -1601,8 +1598,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 				// sharding1aName(comp1aName) is not ready (exist) when updating comp1aName(sharding1aName)
 				err := transformer.Transform(transCtx, dag)
-				Expect(err).ShouldNot(BeNil())
-				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+				Expect(err).Should(BeNil())
 
 				// check another component under provisioning
 				graphCli := transCtx.Client.(model.GraphClient)

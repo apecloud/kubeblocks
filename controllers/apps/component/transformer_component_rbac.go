@@ -169,7 +169,6 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext,
 	return createOrUpdate(transCtx, sa, graphCli, dag, func(old, new *corev1.ServiceAccount) bool {
 		return labelAndAnnotationEqual(old, new) &&
 			equality.Semantic.DeepEqual(old.ImagePullSecrets, new.ImagePullSecrets) &&
-			equality.Semantic.DeepEqual(old.Secrets, new.Secrets) &&
 			equality.Semantic.DeepEqual(old.AutomountServiceAccountToken, new.AutomountServiceAccountToken)
 	})
 }

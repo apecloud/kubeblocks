@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
@@ -336,36 +338,60 @@ func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *componen
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(annotations map[string]string, componentName, accountName string) string {
+func GetRestoreSystemAccountPassword(
+	ctx context.Context,
+	cli client.Reader,
+	annotations map[string]string,
+	componentName,
+	accountName string,
+) ([]byte, error) {
 	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
-		return ""
+		return nil, nil
 	}
 	backupMap := map[string]map[string]string{}
 	err := json.Unmarshal([]byte(valueString), &backupMap)
 	if err != nil {
-		return ""
+		return nil, err
 	}
 	backupSource, ok := backupMap[componentName]
 	if !ok {
-		return ""
+		return nil, nil
 	}
-	systemAccountsString, ok := backupSource[constant.EncryptedSystemAccounts]
-	if !ok {
-		return ""
+	name, ok := backupSource[constant.BackupNameKeyForRestore]
+	if !ok || len(name) == 0 {
+		return nil, fmt.Errorf("backup name not found in restore annotation")
+	}
+	namespace, ok := backupSource[constant.BackupNamespaceKeyForRestore]
+	if !ok || len(namespace) == 0 {
+		return nil, fmt.Errorf("backup namespace not found in restore annotation")
+	}
+	backup := &dpv1alpha1.Backup{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, backup); err != nil {
+		return nil, err
 	}
 	systemAccountsMap := map[string]string{}
-	err = json.Unmarshal([]byte(systemAccountsString), &systemAccountsMap)
-	if err != nil {
-		return ""
+	encryptedSystemAccountsString := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
+	if encryptedSystemAccountsString != "" {
+		encryptedSystemAccountsMap := map[string]map[string]string{}
+		if err = json.Unmarshal([]byte(encryptedSystemAccountsString), &encryptedSystemAccountsMap); err != nil {
+			return nil, err
+		}
+		if val, ok := encryptedSystemAccountsMap[componentName]; ok {
+			systemAccountsMap = val
+		}
 	}
+
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	encryptedPwd, ok := systemAccountsMap[accountName]
 	if !ok {
-		return ""
+		return nil, nil
 	}
-	password, _ := e.Decrypt([]byte(encryptedPwd))
-	return password
+	password, err := e.Decrypt([]byte(encryptedPwd))
+	return []byte(password), err
 }
 
 func BuildPVC(cluster *appsv1alpha1.Cluster,

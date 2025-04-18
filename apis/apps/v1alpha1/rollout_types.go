@@ -74,6 +74,29 @@ type RolloutSpec struct {
 
 // RolloutStatus defines the observed state of Rollout
 type RolloutStatus struct {
+	// The most recent generation number of the Rollout object that has been observed by the controller.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// The current phase of the Rollout.
+	//
+	// +optional
+	Phase RolloutPhase `json:"phase,omitempty"`
+
+	// Provides additional information about the phase.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// Represents a list of detailed status of the Rollout object.
+	//
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// Records the status information of all component within the Rollout.
+	//
+	// +optional
 	Components []RolloutComponentStatus `json:"components,omitempty"`
 }
 
@@ -190,6 +213,22 @@ type Metadata struct {
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
+
+// RolloutPhase defines the phase of the Rollout within the .status.phase field.
+//
+// +enum
+// +kubebuilder:validation:Enum={Pending,Running,Succeed,Failed}
+type RolloutPhase string
+
+const (
+	PendingRolloutPhase RolloutPhase = "Pending"
+
+	RunningRolloutPhase RolloutPhase = "Running"
+
+	SucceedRolloutPhase RolloutPhase = "Succeed"
+
+	FailedRolloutPhase RolloutPhase = "Failed"
+)
 
 type RolloutComponentStatus struct {
 	Name     string `json:"name"`

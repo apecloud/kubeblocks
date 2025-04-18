@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"fmt"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type rolloutStatusTransformer struct {
-}
+type rolloutStatusTransformer struct{}
 
 var _ graph.Transformer = &rolloutStatusTransformer{}
 
@@ -35,5 +37,55 @@ func (t *rolloutStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	if err := t.components(transCtx, dag); err != nil {
+		return err
+	}
+
+	// TODO: sharding
+
+	transCtx.Rollout.Status.ObservedGeneration = transCtx.Rollout.Generation
+
+	// TODO: phase & message, conditions
+
 	return nil
+}
+
+func (t *rolloutStatusTransformer) components(transCtx *rolloutTransformContext, dag *graph.DAG) error {
+	rollout := transCtx.Rollout
+	for _, comp := range rollout.Spec.Components {
+		if err := t.component(transCtx, rollout, comp); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext, rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+	spec := transCtx.ClusterComps[comp.Name]
+	if spec == nil {
+		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
+	}
+
+	func() {
+		for _, status := range rollout.Status.Components {
+			if status.Name == comp.Name {
+				return
+			}
+		}
+		rollout.Status.Components = append(rollout.Status.Components, appsv1alpha1.RolloutComponentStatus{
+			Name:     comp.Name,
+			Replicas: spec.Replicas,
+		})
+	}()
+
+	replicas, targetReplicas, err := t.replicas(rollout, comp, spec)
+	if err != nil {
+		return err
+	}
+
+	if (replicas + targetReplicas) > spec.Replicas {
+		return t.rolling(transCtx, comp, spec, replicas, targetReplicas)
+	}
+
+	return t.promote(transCtx, comp, spec, replicas, targetReplicas)
 }

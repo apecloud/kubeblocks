@@ -2,9 +2,9 @@
 
 [![Documentation status](https://github.com/apecloud/kubeblocks.io/workflows/Documentation/badge.svg)](https://kubeblocks.io)
 [![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/7544/badge)](https://bestpractices.coreinfrastructure.org/projects/7544)
-[![CICD Push](https://github.com/apecloud/kubeblocks/workflows/CICD-PUSH/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml)
-[![CodeQL](https://github.com/apecloud/kubeblocks/workflows/CodeQL/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/codeql.yml)
-[![Releases](https://github.com/apecloud/kubeblocks/actions/workflows/release-version.yml/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/release-version.yml)
+[![CICD Push](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml)
+[![CodeQL](https://github.com/apecloud/kubeblocks/actions/workflows/codeql.yml/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/codeql.yml)
+[![Releases](https://github.com/apecloud/kubeblocks/workflows/RELEASE-VERSION/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/release-version.yml)
 [![Release](https://img.shields.io/github/v/release/apecloud/kubeblocks)](https://github.com/apecloud/kubeblocks/releases/latest)
 [![LICENSE](https://img.shields.io/github/license/apecloud/kubeblocks.svg?style=flat-square)](/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/apecloud/kubeblocks)](https://goreportcard.com/report/github.com/apecloud/kubeblocks)

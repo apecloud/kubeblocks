@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -30,10 +31,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -454,6 +458,159 @@ var _ = Describe("builder", func() {
 			crb := BuildClusterRoleBinding(cluster, expectName)
 			Expect(crb).ShouldNot(BeNil())
 			Expect(crb.Name).Should(Equal(expectName))
+		})
+
+		It("GetRestoreSystemAccountPassword works", func() {
+			encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+			encryptedPwd, _ := encryptor.Encrypt([]byte("test-password"))
+
+			tests := []struct {
+				name        string
+				annotations map[string]string
+				backup      *dpv1alpha1.Backup
+				component   string
+				account     string
+				wantPwd     []byte
+				wantErr     bool
+			}{
+				{
+					name: "normal case",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+					},
+					backup: &dpv1alpha1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "backup1",
+							Namespace: "default",
+							Annotations: map[string]string{
+								constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"comp1":{"account1":"%s"}}`, encryptedPwd),
+							},
+						},
+					},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   []byte("test-password"),
+					wantErr:   false,
+				},
+				{
+					name: "empty restore annotation",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: "",
+					},
+					backup:    &dpv1alpha1.Backup{},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   false,
+				},
+				{
+					name: "invalid restore annotation json",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: "invalid-json",
+					},
+					backup:    &dpv1alpha1.Backup{},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   true,
+				},
+				{
+					name: "missing backup name in annotation",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: `{"comp1":{}}`,
+					},
+					backup:    &dpv1alpha1.Backup{},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   true,
+				},
+				{
+					name: "missing backup namespace in annotation",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1"}}`,
+					},
+					backup:    &dpv1alpha1.Backup{},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   true,
+				},
+				{
+					name: "invalid encrypted accounts json in backup",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+					},
+					backup: &dpv1alpha1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "backup1",
+							Namespace: "default",
+							Annotations: map[string]string{
+								constant.EncryptedSystemAccountsAnnotationKey: "invalid-json",
+							},
+						},
+					},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   true,
+				},
+				{
+					name: "account not found in backup",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+					},
+					backup: &dpv1alpha1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "backup1",
+							Namespace: "default",
+							Annotations: map[string]string{
+								constant.EncryptedSystemAccountsAnnotationKey: `{"comp1":{"other-account":"pwd"}}`,
+							},
+						},
+					},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   false,
+				},
+				{
+					name: "component not found in encrypted accounts",
+					annotations: map[string]string{
+						constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+					},
+					backup: &dpv1alpha1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "backup1",
+							Namespace: "default",
+							Annotations: map[string]string{
+								constant.EncryptedSystemAccountsAnnotationKey: `{"other-comp":{"account1":"pwd"}}`,
+							},
+						},
+					},
+					component: "comp1",
+					account:   "account1",
+					wantPwd:   nil,
+					wantErr:   false,
+				},
+			}
+
+			for _, tt := range tests {
+				cli := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+				if tt.backup != nil {
+					cli = cli.WithObjects(tt.backup)
+				}
+
+				pwd, err := GetRestoreSystemAccountPassword(context.Background(), cli.Build(),
+					tt.annotations, tt.component, tt.account)
+
+				if tt.wantErr {
+					Expect(err).Should(HaveOccurred())
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(pwd).Should(Equal(tt.wantPwd))
+				}
+			}
 		})
 	})
 })

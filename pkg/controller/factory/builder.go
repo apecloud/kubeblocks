@@ -356,6 +356,8 @@ func GetRestoreSystemAccountPassword(
 	}
 	backupSource, ok := backupMap[componentName]
 	if !ok {
+		// try to find the first available backup source, in case backup is done
+		// in another component
 		for _, v := range backupMap {
 			backupSource = v
 			break

@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -196,6 +197,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateReplicasLimit,
 		r.validateAvailable,
 		r.validateReplicaRoles,
+		r.validatePodManagementPolicy,
 		r.validatePolicyRules,
 		r.validateLifecycleActions,
 	} {
@@ -431,6 +433,18 @@ func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, 
 	cmpd *appsv1.ComponentDefinition) error {
 	if !checkUniqueItemWithValue(cmpd.Spec.Roles, "Name", nil) {
 		return fmt.Errorf("duplicate replica roles are not allowed")
+	}
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validatePodManagementPolicy(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
+	policy := cmpd.Spec.PodManagementPolicy
+	if policy != nil {
+		policies := []k8sappsv1.PodManagementPolicyType{k8sappsv1.OrderedReadyPodManagement, k8sappsv1.ParallelPodManagement}
+		if !slices.Contains(policies, *policy) {
+			return fmt.Errorf("invalid podManagementPolicy: %s", *policy)
+		}
 	}
 	return nil
 }

@@ -338,6 +338,9 @@ func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *componen
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
+//
+// it will find the first available backup source in the restore-from-backup annotaion,
+// because sometimes backup is done in a different component
 func GetRestoreSystemAccountPassword(
 	ctx context.Context,
 	cli client.Reader,
@@ -354,17 +357,13 @@ func GetRestoreSystemAccountPassword(
 	if err != nil {
 		return nil, err
 	}
-	backupSource, ok := backupMap[componentName]
-	if !ok {
-		// try to find the first available backup source, in case backup is done
-		// in another component
-		for _, v := range backupMap {
-			backupSource = v
-			break
-		}
-		if backupSource == nil {
-			return nil, nil
-		}
+	var backupSource map[string]string
+	for _, v := range backupMap {
+		backupSource = v
+		break
+	}
+	if backupSource == nil {
+		return nil, nil
 	}
 	name, ok := backupSource[constant.BackupNameKeyForRestore]
 	if !ok || len(name) == 0 {

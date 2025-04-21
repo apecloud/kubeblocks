@@ -105,14 +105,17 @@ func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.Transfor
 func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
 	var password []byte
+	var err error
 	switch {
 	case account.SecretRef != nil:
-		var err error
 		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
 			return nil, err
 		}
 	default:
-		password = t.buildPassword(ctx, account)
+		password, err = t.buildPassword(ctx, account)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
 }
@@ -132,18 +135,21 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	return secret.Data[constant.AccountPasswdForSecret], nil
 }
 
-func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {
+func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) ([]byte, error) {
 	// get restore password if exists during recovery.
-	password := factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
-	if account.InitAccount && password == "" {
+	password, err := factory.GetRestoreSystemAccountPassword(ctx.Context, ctx.Client, ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation: %w", account.Name, ctx.SynthesizeComponent.Name, err)
+	}
+	if account.InitAccount && len(password) == 0 {
 		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account).
 		// This is compatibility processing.
-		password = factory.GetRestorePassword(ctx.Cluster, ctx.SynthesizeComponent)
+		password = []byte(factory.GetRestorePassword(ctx.Cluster, ctx.SynthesizeComponent))
 	}
-	if password == "" {
-		return t.generatePassword(account)
+	if len(password) == 0 {
+		return t.generatePassword(account), nil
 	}
-	return []byte(password)
+	return password, nil
 }
 
 func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {

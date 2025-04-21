@@ -111,7 +111,7 @@ func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(tr
 	account *appsv1alpha1.ComponentSystemAccount, shardingSpec appsv1alpha1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
 	// Create the shared account secret if it does not exist
 	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
-	secret, err := t.buildAccountSecret(transCtx.Cluster, *account, shardingSpec.Name, secretName)
+	secret, err := t.buildAccountSecret(transCtx, *account, shardingSpec.Name, secretName)
 	if err != nil {
 		return err
 	}
@@ -144,13 +144,16 @@ func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(
 	}
 }
 
-func (t *clusterSharedAccountTransformer) buildAccountSecret(cluster *appsv1alpha1.Cluster,
+func (t *clusterSharedAccountTransformer) buildAccountSecret(transCtx *clusterTransformContext,
 	account appsv1alpha1.ComponentSystemAccount, shardingName, secretName string) (*corev1.Secret, error) {
-	password := []byte(factory.GetRestoreSystemAccountPassword(cluster.Annotations, shardingName, account.Name))
+	password, err := factory.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
+	if err != nil {
+		return nil, err
+	}
 	if len(password) == 0 {
 		password = t.generatePassword(account)
 	}
-	return t.buildAccountSecretWithPassword(cluster, account, shardingName, secretName, password)
+	return t.buildAccountSecretWithPassword(transCtx.Cluster, account, shardingName, secretName, password)
 }
 
 func (t *clusterSharedAccountTransformer) generatePassword(account appsv1alpha1.ComponentSystemAccount) []byte {

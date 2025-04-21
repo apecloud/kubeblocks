@@ -329,8 +329,9 @@ func newOrderedHandler(topology appsv1.ClusterTopology, orders []string, op int)
 				orders:   orders,
 			},
 			phasePrecondition: phasePrecondition{
-				topology: topology,
-				orders:   orders,
+				topology:       topology,
+				orders:         orders,
+				ignoreNotExist: op == updateOp,
 			},
 			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
@@ -497,8 +498,9 @@ func (c *notExistPrecondition) shardingExist(transCtx *clusterTransformContext, 
 }
 
 type phasePrecondition struct {
-	topology appsv1.ClusterTopology
-	orders   []string
+	topology       appsv1.ClusterTopology
+	orders         []string
+	ignoreNotExist bool
 }
 
 func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
@@ -548,7 +550,7 @@ func (c *phasePrecondition) compMatch(transCtx *clusterTransformContext, dag *gr
 
 	comp := &appsv1.Component{}
 	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
-		return false, client.IgnoreNotFound(err)
+		return c.ignoreNotExist, client.IgnoreNotFound(err)
 	}
 	if !c.expected(comp) {
 		transCtx.Logger.Info("waiting for predecessor component in expected phase",
@@ -585,6 +587,9 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 		return false, err
 	}
 	if len(comps) != len(protoComps) {
+		if len(comps) == 0 {
+			return c.ignoreNotExist, nil
+		}
 		return false, nil
 	}
 	for _, comp := range comps {

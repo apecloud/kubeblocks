@@ -82,7 +82,7 @@ jobs:
   release-tools-image:
     if: ${{ inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile-tools' }}
     needs: release-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-no-cache.yml@v0.1.91
     with:
       MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"

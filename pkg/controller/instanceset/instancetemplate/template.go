@@ -7,7 +7,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func BuildInstanceTemplateExts(itsExt *InstanceSetExt) ([]*InstanceTemplateExt, error) {
+func BuildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {
 	instanceTemplatesMap := itsExt.InstanceTemplates
 	templates := make([]*InstanceTemplateExt, 0, len(instanceTemplatesMap))
 	for templateName := range instanceTemplatesMap {
@@ -16,7 +16,7 @@ func BuildInstanceTemplateExts(itsExt *InstanceSetExt) ([]*InstanceTemplateExt, 
 		templates = append(templates, tplExt)
 	}
 
-	return templates, nil
+	return templates
 }
 
 func buildInstanceTemplatesMap(its *workloads.InstanceSet, instancesCompressed *corev1.ConfigMap) map[string]*workloads.InstanceTemplate {

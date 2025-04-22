@@ -38,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
@@ -138,9 +139,11 @@ var _ = Describe("instance util test", func() {
 				Resources:   &resources,
 			}
 			its.Spec.Instances = append(its.Spec.Instances, instance)
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name0 := its.Name + "-0"
@@ -161,9 +164,11 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstanceByTemplate", func() {
 		It("should work well", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -191,9 +196,11 @@ var _ = Describe("instance util test", func() {
 		})
 
 		It("adds nodeSelector according to annotation", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
@@ -221,9 +228,11 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstancePVCByTemplate", func() {
 		It("should work well", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"

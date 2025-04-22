@@ -154,8 +154,8 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 	return template2OrdinalSetMap, nil
 }
 
-func GenerateAllInstanceNames(itsExt *InstanceSetExt) ([]string, error) {
-	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(itsExt)
+func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
+	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(c.itsExt)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func GenerateAllInstanceNames(itsExt *InstanceSetExt) ([]string, error) {
 	instanceNames := make([]string, 0, len(allOrdinalSet))
 	allOrdinalList := convertOrdinalSetToSortedList(allOrdinalSet)
 	for _, ordinal := range allOrdinalList {
-		instanceNames = append(instanceNames, fmt.Sprintf("%v-%v", itsExt.InstanceSet.Name, ordinal))
+		instanceNames = append(instanceNames, fmt.Sprintf("%v-%v", c.itsExt.InstanceSet.Name, ordinal))
 	}
 	return instanceNames, nil
 }

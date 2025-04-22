@@ -42,6 +42,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
@@ -505,7 +506,7 @@ func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMappin
 	return nil
 }
 
-func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
+func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
@@ -589,7 +590,7 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	return inst, nil
 }
 
-func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
+func buildInstancePVCByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
 	// 2. build pvcs from template
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(parent.Name)

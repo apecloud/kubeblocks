@@ -68,7 +68,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err != nil {
 		return nil, err
 	}
-	comp2CompDef, err := buildComp2CompDefs(ctx, cli, comp.Namespace, clusterName)
+	comp2CompDef, err := BuildComp2CompDefs(ctx, cli, comp.Namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	return synthesizeComp, nil
 }
 
-func buildComp2CompDefs(ctx context.Context, cli client.Reader, namespace, clusterName string) (map[string]string, error) {
+func BuildComp2CompDefs(ctx context.Context, cli client.Reader, namespace, clusterName string) (map[string]string, error) {
 	if cli == nil {
 		return nil, nil // for test
 	}

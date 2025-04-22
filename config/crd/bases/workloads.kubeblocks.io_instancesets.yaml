@@ -584,6 +584,15 @@ spec:
                         - name
                         type: object
                       type: array
+                    images:
+                      additionalProperties:
+                        type: string
+                      description: 'TODO: corev1.Container'
+                      type: object
+                    initImages:
+                      additionalProperties:
+                        type: string
+                      type: object
                     labels:
                       additionalProperties:
                         type: string

@@ -73,7 +73,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetVolumeClaimTemplates(getVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
-		SetInstances(getInstanceTemplates(synthesizedComp.Instances)).
+		SetInstances(synthesizedComp.InstancesExt).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).
 		SetRoles(synthesizedComp.Roles).
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
@@ -137,26 +137,6 @@ func getVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []
 		vcts = append(vcts, pvc(vct))
 	}
 	return vcts
-}
-
-func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.InstanceTemplate {
-	if instances == nil {
-		return nil
-	}
-	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
-	for i := range instances {
-		instanceTemplates[i] = workloads.InstanceTemplate{
-			Name:             instances[i].Name,
-			Replicas:         instances[i].Replicas,
-			Ordinals:         instances[i].Ordinals,
-			Annotations:      instances[i].Annotations,
-			Labels:           instances[i].Labels,
-			SchedulingPolicy: instances[i].SchedulingPolicy,
-			Resources:        instances[i].Resources,
-			Env:              instances[i].Env,
-		}
-	}
-	return instanceTemplates
 }
 
 func getPodManagementPolicy(synthesizedComp *component.SynthesizedComponent) appsv1.PodManagementPolicyType {

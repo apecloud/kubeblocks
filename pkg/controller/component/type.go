@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type SynthesizedComponent struct {
@@ -61,6 +62,7 @@ type SynthesizedComponent struct {
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
+	InstancesExt                     []workloads.InstanceTemplate           `json:"instancesExt,omitempty"`
 	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
 	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`

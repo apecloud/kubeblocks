@@ -70,6 +70,13 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, message)
 	}
+	for i, tpl := range comp.Spec.Instances {
+		if len(tpl.ServiceVersion) > 0 {
+			if err = component.UpdateInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion, &synthesizedComp.InstancesExt[i]); err != nil {
+				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+			}
+		}
+	}
 	transCtx.SynthesizeComponent = synthesizedComp
 
 	return nil

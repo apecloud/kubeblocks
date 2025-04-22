@@ -129,11 +129,7 @@ func (mgr *Manager) JoinCurrentMemberToCluster(ctx context.Context, cluster *dcs
 		// return errors.New("member join command is empty!")
 		return nil
 	}
-	envs, err := util.GetGlobalSharedEnvs()
-	if err != nil {
-		return err
-	}
-
+	envs := os.Environ()
 	if cluster.Leader != nil && cluster.Leader.Name != "" {
 		leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
 		fqdn := cluster.GetMemberAddr(*leaderMember)

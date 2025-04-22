@@ -580,6 +580,7 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
 	}
+	// only four lifecycle actions, memberLeave, switchover, and roleProbe rely on default service account.
 	if synthesizeComp.LifecycleActions == nil ||
 		(synthesizeComp.LifecycleActions.RoleProbe == nil && synthesizeComp.LifecycleActions.Switchover == nil &&
 			synthesizeComp.LifecycleActions.MemberJoin == nil && synthesizeComp.LifecycleActions.MemberLeave == nil) {

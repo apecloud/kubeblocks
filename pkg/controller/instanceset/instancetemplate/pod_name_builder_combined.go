@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
-	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 
@@ -35,16 +33,6 @@ import (
 
 type combinedPodNameBuilder struct {
 	itsExt *InstanceSetExt
-}
-
-func NewCombimedPodNameBuilder(itsExt *InstanceSetExt) (*combinedPodNameBuilder, error) {
-	// validate status is not empty
-	if reflect.ValueOf(itsExt.InstanceSet.Status).IsZero() {
-		return nil, errors.New("instanceset status is empty")
-	}
-	return &combinedPodNameBuilder{
-		itsExt: itsExt,
-	}, nil
 }
 
 func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {

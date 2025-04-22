@@ -33,6 +33,9 @@ const (
 	TemplateNameLabelKey = "workloads.kubeblocks.io/template-name"
 )
 
+// InstanceSetExt has a complete list of instance templates.
+// i.e. it has a pseudo template (which equals to `.spec.template`)
+// to the end of the list, to fill up the replica count.
 type InstanceSetExt struct {
 	InstanceSet       *workloads.InstanceSet
 	InstanceTemplates map[string]*workloads.InstanceTemplate // key is template name

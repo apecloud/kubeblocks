@@ -114,20 +114,20 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 		return err
 	}
 
-	itsExt, err := BuildInstanceSetExt(its, tree)
+	_, err = BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return fmt.Errorf("failed to build instance set ext: %w", err)
 	}
 
 	// try to generate all pod names
 	// TODO: will this fail?
-	nameBuilder, err := NewPodNameBuilder(itsExt)
-	if err != nil {
-		return err
-	}
-	_, err = nameBuilder.GenerateAllInstanceNames()
-	if err != nil {
-		return err
-	}
+	// nameBuilder, err := NewPodNameBuilder(itsExt)
+	// if err != nil {
+	// 	return err
+	// }
+	// _, err = nameBuilder.GenerateAllInstanceNames()
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
 }

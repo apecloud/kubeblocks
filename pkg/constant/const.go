@@ -34,8 +34,9 @@ const (
 	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
 
 	// addon config keys
-	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
-	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"
+	CfgAddonJobImgPullPolicy    = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"
 
 	// data plane config key
 	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"

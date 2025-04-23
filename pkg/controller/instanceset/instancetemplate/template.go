@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 func BuildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {

@@ -806,7 +806,7 @@ type InstanceTemplate struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
-// Range represents a range with a start and an end value.
+// Range represents a range with a start and an end value. Both start and end are included.
 // It is used to define a continuous segment.
 type Range struct {
 	Start int32 `json:"start"`

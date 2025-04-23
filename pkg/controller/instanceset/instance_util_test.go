@@ -106,7 +106,7 @@ var _ = Describe("instance util test", func() {
 		It("should work well", func() {
 			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 			Expect(err).Should(BeNil())
 			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
@@ -138,7 +138,7 @@ var _ = Describe("instance util test", func() {
 		It("adds nodeSelector according to annotation", func() {
 			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 			Expect(err).Should(BeNil())
 			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
@@ -170,7 +170,7 @@ var _ = Describe("instance util test", func() {
 		It("should work well", func() {
 			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 			Expect(err).Should(BeNil())
 			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())

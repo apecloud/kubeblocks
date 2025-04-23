@@ -40,9 +40,10 @@ var _ = Describe("Combined Name builder tests", func() {
 			its.Spec.PodNamingRule = workloads.PodNamingRuleCombined
 			// FIXME
 			its.Status.ObservedGeneration = 1
-			Expect(validateOrdinals(its)).To(Succeed())
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
+			builder := combinedPodNameBuilder{itsExt: itsExt}
+			Expect(builder.Validate()).To(Succeed())
 			ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
 			if expectError {
 				Expect(err).To(HaveOccurred())
@@ -234,7 +235,7 @@ var _ = Describe("Combined Name builder tests", func() {
 
 		itsExt, err := BuildInstanceSetExt(its, nil)
 		Expect(err).NotTo(HaveOccurred())
-		builder, err := NewPodNameBuilder(itsExt)
+		builder, err := NewPodNameBuilder(itsExt, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names, err := builder.GenerateAllInstanceNames()
 		Expect(err).NotTo(HaveOccurred())
@@ -257,7 +258,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("build an its with default template only", func() {
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			builder, err := NewPodNameBuilder(itsExt)
+			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
 			nameTemplate, err := builder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
@@ -293,7 +294,7 @@ var _ = Describe("Combined Name builder tests", func() {
 			its.Spec.Instances = append(its.Spec.Instances, instance)
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			builder, err := NewPodNameBuilder(itsExt)
+			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
 			nameTemplate, err := builder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
@@ -312,6 +313,90 @@ var _ = Describe("Combined Name builder tests", func() {
 			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Labels).Should(Equal(labelOverride))
 			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resources.Limits[corev1.ResourceCPU]))
 			Expect(nameTemplate[nameOverridePodName].PodTemplateSpec.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(its.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]))
+		})
+	})
+
+	Describe("validateOrdinals", func() {
+		It("should validate ordinals successfully", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name: "template1",
+							Ordinals: kbappsv1.Ordinals{
+								Discrete: []int32{0, 1, 2},
+							},
+						},
+					},
+				},
+			}
+			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
+			err := builder.Validate()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should fail validation for negative ordinals", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name: "template1",
+							Ordinals: kbappsv1.Ordinals{
+								Discrete: []int32{-1, 0, 1},
+							},
+						},
+					},
+				},
+			}
+			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
+			err := builder.Validate()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ordinal(-1) must >= 0"))
+		})
+
+		It("should fail validation for duplicate ordinals", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					DefaultTemplateOrdinals: kbappsv1.Ordinals{
+						Discrete: []int32{1},
+					},
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name: "template1",
+							Ordinals: kbappsv1.Ordinals{
+								Discrete: []int32{0, 1},
+							},
+						},
+					},
+				},
+			}
+			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
+			err := builder.Validate()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("duplicate ordinal(1)"))
+		})
+
+		It("should take offlineInstances into consideration", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					DefaultTemplateOrdinals: kbappsv1.Ordinals{
+						Discrete: []int32{2},
+					},
+					OfflineInstances: []string{"instance-1"},
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name: "template1",
+							Ordinals: kbappsv1.Ordinals{
+								Discrete: []int32{0, 1},
+							},
+						},
+					},
+				},
+			}
+			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
+			err := builder.Validate()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("ordinal(1) exists in offlineInstances"))
 		})
 	})
 })

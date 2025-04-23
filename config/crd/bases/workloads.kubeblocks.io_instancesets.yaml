@@ -382,7 +382,7 @@ spec:
                   ranges:
                     items:
                       description: |-
-                        Range represents a range with a start and an end value.
+                        Range represents a range with a start and an end value. Both start and end are included.
                         It is used to define a continuous segment.
                       properties:
                         end:
@@ -620,7 +620,7 @@ spec:
                         ranges:
                           items:
                             description: |-
-                              Range represents a range with a start and an end value.
+                              Range represents a range with a start and an end value. Both start and end are included.
                               It is used to define a continuous segment.
                             properties:
                               end:

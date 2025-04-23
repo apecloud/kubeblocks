@@ -22,12 +22,13 @@ package instancetemplate
 import (
 	"testing"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
 const (

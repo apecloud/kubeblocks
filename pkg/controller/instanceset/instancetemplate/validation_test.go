@@ -26,86 +26,6 @@ import (
 )
 
 var _ = Describe("Validation", func() {
-	Describe("validateOrdinals", func() {
-		It("should validate ordinals successfully", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "template1",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{0, 1, 2},
-							},
-						},
-					},
-				},
-			}
-			err := validateOrdinals(its)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should fail validation for negative ordinals", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "template1",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{-1, 0, 1},
-							},
-						},
-					},
-				},
-			}
-			err := validateOrdinals(its)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ordinal(-1) must >= 0"))
-		})
-
-		It("should fail validation for duplicate ordinals", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					DefaultTemplateOrdinals: kbappsv1.Ordinals{
-						Discrete: []int32{1},
-					},
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "template1",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{0, 1},
-							},
-						},
-					},
-				},
-			}
-			err := validateOrdinals(its)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("duplicate ordinal(1)"))
-		})
-
-		It("should take offlineInstances into consideration", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					DefaultTemplateOrdinals: kbappsv1.Ordinals{
-						Discrete: []int32{2},
-					},
-					OfflineInstances: []string{"instance-1"},
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "template1",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{0, 1},
-							},
-						},
-					},
-				},
-			}
-			err := validateOrdinals(its)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ordinal(1) exists in offlineInstances"))
-		})
-	})
-
 	Describe("ValidateInstanceTemplates", func() {
 		It("should validate instance templates successfully", func() {
 			its := &workloads.InstanceSet{
@@ -169,6 +89,48 @@ var _ = Describe("Validation", func() {
 						{
 							Name:     "template2",
 							Replicas: ptr.To[int32](2),
+						},
+					},
+				},
+			}
+			tree := &kubebuilderx.ObjectTree{}
+			err := ValidateInstanceTemplates(its, tree)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not greater than replicas in spec(3)"))
+		})
+
+		It("should fail validation when total replicas restricted by ordinals do not equal to spec.replicas", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
+					DefaultTemplateOrdinals: kbappsv1.Ordinals{
+						Ranges: []kbappsv1.Range{
+							{
+								Start: 1,
+								End:   2,
+							},
+						},
+					},
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name:     "template1",
+							Replicas: ptr.To[int32](1),
+							Ordinals: kbappsv1.Ordinals{
+								Discrete: []int32{0},
+							},
+						},
+						{
+							Name:     "template2",
+							Replicas: ptr.To[int32](3),
+							Ordinals: kbappsv1.Ordinals{
+								Ranges: []kbappsv1.Range{
+									{
+										Start: 2,
+										End:   3,
+									},
+								},
+								Discrete: []int32{0},
+							},
 						},
 					},
 				},

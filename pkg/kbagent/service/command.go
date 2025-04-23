@@ -71,6 +71,9 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
+			if stdoutMsg := result.stdout.String(); len(stdoutMsg) > 0 {
+				errMsg += fmt.Sprintf(", stdout: %s", stdoutMsg)
+			}
 			return nil, errors.Wrapf(proto.ErrFailed, errMsg)
 		}
 		return nil, err

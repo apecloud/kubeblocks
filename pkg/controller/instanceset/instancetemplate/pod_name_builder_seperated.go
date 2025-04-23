@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,25 +45,6 @@ func (s *seperatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*I
 	return allNameTemplateMap, nil
 }
 
-// TODO: refactor
-// ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
-// -1 will be returned if no numeric suffix contained.
-func ParseParentNameAndOrdinal(s string) (string, int) {
-	parent := s
-	ordinal := -1
-
-	index := strings.LastIndex(s, "-")
-	if index < 0 {
-		return parent, ordinal
-	}
-	ordinalStr := s[index+1:]
-	if i, err := strconv.ParseInt(ordinalStr, 10, 32); err == nil {
-		ordinal = int(i)
-		parent = s[:index]
-	}
-	return parent, ordinal
-}
-
 func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	instanceNameList := make([]string, 0)
 	for _, template := range s.itsExt.InstanceTemplates {
@@ -77,9 +57,9 @@ func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 		instanceNameList = append(instanceNameList, names...)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-
 		return ParseParentNameAndOrdinal(instanceNameList[i])
 	}
+	// first sort with template name, then with ordinal
 	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
 	return instanceNameList, nil
 }

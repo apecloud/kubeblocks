@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,28 +44,65 @@ func (t *componentNotifierTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	dependents, err := t.dependents(transCtx)
+	synthesizedComp, err := t.init(transCtx)
+	if err != nil {
+		return err
+	}
+
+	dependents, err := t.dependents(transCtx.Context, transCtx.Client, synthesizedComp)
 	if err != nil {
 		return err
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, compName := range dependents {
-		if err = t.notify(transCtx, graphCli, dag, compName); err != nil {
+		if err = t.notify(transCtx.Context, transCtx.Client, graphCli, dag, synthesizedComp, compName); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *componentNotifierTransformer) dependents(transCtx *componentTransformContext) ([]string, error) {
-	synthesizedComp := transCtx.SynthesizeComponent
+func (t *componentNotifierTransformer) init(transCtx *componentTransformContext) (*component.SynthesizedComponent, error) {
+	if transCtx.SynthesizeComponent != nil {
+		return transCtx.SynthesizeComponent, nil
+	}
+
+	var (
+		ctx  = transCtx.Context
+		cli  = transCtx.Client
+		comp = transCtx.Component
+	)
+	clusterName, err := component.GetClusterName(comp)
+	if err != nil {
+		return nil, err
+	}
+	compName, err := component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return nil, err
+	}
+	comp2CompDef, err := component.BuildComp2CompDefs(ctx, cli, comp.Namespace, clusterName)
+	if err != nil {
+		return nil, err
+	}
+	return &component.SynthesizedComponent{
+		Namespace:     comp.Namespace,
+		ClusterName:   clusterName,
+		Comp2CompDefs: comp2CompDef,
+		Name:          compName,
+		Generation:    strconv.FormatInt(comp.Generation, 10),
+		CompDefName:   comp.Spec.CompDef,
+	}, nil
+}
+
+func (t *componentNotifierTransformer) dependents(ctx context.Context,
+	cli client.Reader, synthesizedComp *component.SynthesizedComponent) ([]string, error) {
 	dependents := make([]string, 0)
 	for compName, compDefName := range synthesizedComp.Comp2CompDefs {
 		if compName == synthesizedComp.Name {
 			continue // skip self
 		}
-		depended, err := t.depended(transCtx, compDefName)
+		depended, err := t.depended(ctx, cli, synthesizedComp, compDefName)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +113,8 @@ func (t *componentNotifierTransformer) dependents(transCtx *componentTransformCo
 	return dependents, nil
 }
 
-func (t *componentNotifierTransformer) depended(transCtx *componentTransformContext, compDefName string) (bool, error) {
+func (t *componentNotifierTransformer) depended(ctx context.Context,
+	cli client.Reader, synthesizedComp *component.SynthesizedComponent, compDefName string) (bool, error) {
 	compDefReferenced := func(v appsv1.EnvVar) string {
 		if v.ValueFrom != nil {
 			if v.ValueFrom.HostNetworkVarRef != nil {
@@ -102,12 +142,11 @@ func (t *componentNotifierTransformer) depended(transCtx *componentTransformCont
 		return ""
 	}
 
-	compDef, err := getNCheckCompDefinition(transCtx.Context, transCtx.Client, compDefName)
+	compDef, err := getNCheckCompDefinition(ctx, cli, compDefName)
 	if err != nil {
 		return false, err
 	}
 
-	synthesizedComp := transCtx.SynthesizeComponent
 	for _, v := range compDef.Spec.Vars {
 		compDefPattern := compDefReferenced(v)
 		if len(compDefPattern) > 0 {
@@ -119,16 +158,14 @@ func (t *componentNotifierTransformer) depended(transCtx *componentTransformCont
 	return false, nil
 }
 
-func (t *componentNotifierTransformer) notify(transCtx *componentTransformContext,
-	graphCli model.GraphClient, dag *graph.DAG, compName string) error {
-	synthesizedComp := transCtx.SynthesizeComponent
-
+func (t *componentNotifierTransformer) notify(ctx context.Context, cli client.Reader,
+	graphCli model.GraphClient, dag *graph.DAG, synthesizedComp *component.SynthesizedComponent, compName string) error {
 	comp := &appsv1.Component{}
 	compKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
 	}
-	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+	if err := cli.Get(ctx, compKey, comp); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 

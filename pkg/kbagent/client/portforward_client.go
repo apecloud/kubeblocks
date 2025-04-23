@@ -47,6 +47,10 @@ type portForwardClient struct {
 
 var _ Client = &portForwardClient{}
 
+func (pf *portForwardClient) Close() error {
+	return nil
+}
+
 // Action forwards the target port to localhost, and then execute the action.
 // Since we can't know httpClient's lifecycle, a portforward is bound to one request.
 // It's not efficient, but enough for debugging purposes.
@@ -107,7 +111,10 @@ func (pf *portForwardClient) Action(ctx context.Context, req proto.ActionRequest
 		return emptyResp, err
 	}
 
-	return client.Action(ctx, req)
+	rsp, err := client.Action(ctx, req)
+	_ = client.Close()
+
+	return rsp, err
 }
 
 func (pf *portForwardClient) createDialer(method string, url *url.URL, config *rest.Config) (httpstream.Dialer, error) {

@@ -56,6 +56,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+func (m *MockClient) Close() error {
+	return nil
+}
+
 // Action mocks base method.
 func (m *MockClient) Action(arg0 context.Context, arg1 proto.ActionRequest) (proto.ActionResponse, error) {
 	m.ctrl.T.Helper()

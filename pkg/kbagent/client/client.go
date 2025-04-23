@@ -21,6 +21,7 @@ package client
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -33,6 +34,7 @@ const (
 )
 
 type Client interface {
+	io.Closer
 	Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error)
 }
 

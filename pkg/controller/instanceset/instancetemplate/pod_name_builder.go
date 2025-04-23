@@ -19,10 +19,10 @@ func NewPodNameBuilder(itsExt *InstanceSetExt) (PodNameBuilder, error) {
 		return &combinedPodNameBuilder{
 			itsExt: itsExt,
 		}, nil
-	case workloads.PodNamingRuleSeperated:
+	// default to seperated naming rule, since it's the old behavior
+	default:
 		return &seperatedPodNameBuilder{
 			itsExt: itsExt,
 		}, nil
 	}
-	panic("unknown pod naming rule")
 }

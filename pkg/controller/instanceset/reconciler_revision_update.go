@@ -45,10 +45,6 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 	if tree.GetRoot() == nil || !model.IsObjectUpdating(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.ConditionUnsatisfiedWithError(err)
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 

@@ -58,10 +58,6 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.ConditionUnsatisfiedWithError(err)
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 

@@ -51,10 +51,6 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.ConditionUnsatisfiedWithError(err)
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 

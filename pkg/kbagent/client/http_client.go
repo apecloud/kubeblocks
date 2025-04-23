@@ -43,6 +43,11 @@ type httpClient struct {
 
 var _ Client = &httpClient{}
 
+func (c *httpClient) Close() error {
+	c.client.CloseIdleConnections()
+	return nil
+}
+
 func (c *httpClient) Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 	rsp := proto.ActionResponse{}
 

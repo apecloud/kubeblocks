@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	defaultMaxConcurrency = 8
+	defaultMaxConcurrency = 32
 )
 
 var serverConfig server.Config

@@ -171,6 +171,65 @@ func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	return instanceNames, nil
 }
 
+// Validate checks if the instanceset spec is valid
+// Ordinals should be unique globally.
+func (c *combinedPodNameBuilder) Validate() error {
+	ordinalSet := sets.New[int32]()
+	offlineOrdinals := sets.New[int32]()
+	for _, name := range c.itsExt.InstanceSet.Spec.OfflineInstances {
+		ordinal, err := GetOrdinal(name)
+		if err != nil {
+			return err
+		}
+		if offlineOrdinals.Has(ordinal) {
+			return fmt.Errorf("duplicate offlineInstance: %v", name)
+		}
+		offlineOrdinals.Insert(ordinal)
+	}
+	tpls := make([]workloads.InstanceTemplate, 0, len(c.itsExt.InstanceSet.Spec.Instances)+1)
+	tpls = append(tpls, workloads.InstanceTemplate{Ordinals: c.itsExt.InstanceSet.Spec.DefaultTemplateOrdinals})
+	tpls = append(tpls, c.itsExt.InstanceSet.Spec.Instances...)
+	for _, tmpl := range c.itsExt.InstanceTemplates {
+		ordinals := tmpl.Ordinals
+		for _, item := range ordinals.Discrete {
+			if item < 0 {
+				return fmt.Errorf("ordinal(%v) must >= 0", item)
+			}
+			if ordinalSet.Has(item) {
+				return fmt.Errorf("duplicate ordinal(%v)", item)
+			}
+			if offlineOrdinals.Has(item) {
+				return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
+			}
+			ordinalSet.Insert(item)
+		}
+
+		for _, item := range ordinals.Ranges {
+			start := item.Start
+			end := item.End
+
+			if start < 0 {
+				return fmt.Errorf("ordinal's start(%v) must >= 0", start)
+			}
+
+			if start > end {
+				return fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
+			}
+
+			for ordinal := start; ordinal <= end; ordinal++ {
+				if ordinalSet.Has(ordinal) {
+					return fmt.Errorf("duplicate ordinal(%v)", item)
+				}
+				if offlineOrdinals.Has(ordinal) {
+					return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
+				}
+				ordinalSet.Insert(ordinal)
+			}
+		}
+	}
+	return nil
+}
+
 // PodsToCurrentInstances converts pods to instanceset's .status.currentInstances
 func PodsToCurrentInstances(pods []*corev1.Pod, its *workloads.InstanceSet) (workloads.CurrentInstances, error) {
 	currentInstances := make(workloads.CurrentInstances)

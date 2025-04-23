@@ -24,70 +24,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-// validate a complete instance template list
-// TODO: take compressed templates into consideration
-func validateOrdinals(its *workloads.InstanceSet) error {
-	ordinalSet := sets.New[int32]()
-	offlineOrdinals := sets.New[int32]()
-	for _, name := range its.Spec.OfflineInstances {
-		ordinal, err := GetOrdinal(name)
-		if err != nil {
-			return err
-		}
-		if offlineOrdinals.Has(ordinal) {
-			return fmt.Errorf("duplicate offlineInstance: %v", name)
-		}
-		offlineOrdinals.Insert(ordinal)
-	}
-	tpls := make([]workloads.InstanceTemplate, 0, len(its.Spec.Instances)+1)
-	tpls = append(tpls, workloads.InstanceTemplate{Ordinals: its.Spec.DefaultTemplateOrdinals})
-	tpls = append(tpls, its.Spec.Instances...)
-	for _, tmpl := range tpls {
-		ordinals := tmpl.Ordinals
-		for _, item := range ordinals.Discrete {
-			if item < 0 {
-				return fmt.Errorf("ordinal(%v) must >= 0", item)
-			}
-			if ordinalSet.Has(item) {
-				return fmt.Errorf("duplicate ordinal(%v)", item)
-			}
-			if offlineOrdinals.Has(item) {
-				return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
-			}
-			ordinalSet.Insert(item)
-		}
-
-		for _, item := range ordinals.Ranges {
-			start := item.Start
-			end := item.End
-
-			if start < 0 {
-				return fmt.Errorf("ordinal's start(%v) must >= 0", start)
-			}
-
-			if start > end {
-				return fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
-			}
-
-			for ordinal := start; ordinal <= end; ordinal++ {
-				if ordinalSet.Has(ordinal) {
-					return fmt.Errorf("duplicate ordinal(%v)", item)
-				}
-				if offlineOrdinals.Has(ordinal) {
-					return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
-				}
-				ordinalSet.Insert(ordinal)
-			}
-		}
-	}
-	return nil
-}
-
 func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) error {
-	if err := validateOrdinals(its); err != nil {
-		return fmt.Errorf("failed to validate ordinals: %w", err)
-	}
-
 	instancesCompressed, err := findTemplateObject(its, tree)
 	if err != nil {
 		return fmt.Errorf("failed to find compreesssed template: %w", err)
@@ -114,20 +51,21 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 		return err
 	}
 
-	_, err = BuildInstanceSetExt(its, tree)
+	itsExt, err := BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return fmt.Errorf("failed to build instance set ext: %w", err)
 	}
 
 	// try to generate all pod names
-	// TODO: will this fail?
-	// nameBuilder, err := NewPodNameBuilder(itsExt)
-	// if err != nil {
-	// 	return err
-	// }
-	// _, err = nameBuilder.GenerateAllInstanceNames()
-	// if err != nil {
-	// 	return err
-	// }
+	nameBuilder, err := NewPodNameBuilder(itsExt, &PodNameBuilderOpts{AllowEmptyStatus: true})
+	if err != nil {
+		return err
+	}
+	if err := nameBuilder.Validate(); err != nil {
+		return fmt.Errorf("failed to validate instanceset spec: %w", err)
+	}
+	if _, err := nameBuilder.GenerateAllInstanceNames(); err != nil {
+		return err
+	}
 	return nil
 }

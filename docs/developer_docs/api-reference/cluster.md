@@ -8951,7 +8951,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Ordinals">Ordinals</a>)
 </p>
 <div>
-<p>Range represents a range with a start and an end value.
+<p>Range represents a range with a start and an end value. Both start and end are included.
 It is used to define a continuous segment.</p>
 </div>
 <table>

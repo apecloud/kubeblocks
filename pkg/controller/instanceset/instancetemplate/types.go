@@ -52,4 +52,6 @@ type InstanceTemplateExt struct {
 type PodNameBuilder interface {
 	BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error)
 	GenerateAllInstanceNames() ([]string, error)
+	// different strategy may have different validation rules
+	Validate() error
 }

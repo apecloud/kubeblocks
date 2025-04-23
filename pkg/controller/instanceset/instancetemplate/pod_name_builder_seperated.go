@@ -83,6 +83,11 @@ func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	return instanceNameList, nil
 }
 
+func (s *seperatedPodNameBuilder) Validate() error {
+	// TODO
+	return nil
+}
+
 func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePriorityFunc func(i int) int, reverse bool) {
 	if getRolePriorityFunc == nil {
 		getRolePriorityFunc = func(_ int) int {

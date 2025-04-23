@@ -37,12 +37,11 @@ var _ = Describe("Seperated Name builder tests", func() {
 	DescribeTable("generates instance ordinals",
 		// expected doesn't need its name prefix
 		func(its *workloads.InstanceSet, expected []string, expectError bool) {
-			its.Spec.PodNamingRule = workloads.PodNamingRuleSeperated
-			Expect(validateOrdinals(its)).To(Succeed())
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
-			builder, err := NewPodNameBuilder(itsExt)
+			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(builder.Validate()).To(Succeed())
 			instanceNames, err := builder.GenerateAllInstanceNames()
 			expectedFull := make([]string, len(expected))
 			for i, name := range expected {
@@ -142,7 +141,7 @@ var _ = Describe("Seperated Name builder tests", func() {
 
 		itsExt, err := BuildInstanceSetExt(its, nil)
 		Expect(err).NotTo(HaveOccurred())
-		builder, err := NewPodNameBuilder(itsExt)
+		builder, err := NewPodNameBuilder(itsExt, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names, err := builder.GenerateAllInstanceNames()
 		Expect(err).NotTo(HaveOccurred())
@@ -168,7 +167,7 @@ var _ = Describe("Seperated Name builder tests", func() {
 		It("build an its with default template only", func() {
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			builder, err := NewPodNameBuilder(itsExt)
+			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
 			nameTemplate, err := builder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
@@ -204,7 +203,7 @@ var _ = Describe("Seperated Name builder tests", func() {
 			its.Spec.Instances = append(its.Spec.Instances, instance)
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			builder, err := NewPodNameBuilder(itsExt)
+			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
 			nameTemplate, err := builder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())

@@ -13,10 +13,10 @@ on:
         default: ''
       TEST_TYPE:
         description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|mysqlscale|weaviate|qdrant|
-        smartengine|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|orioledb|vanilla-pg|asmysql|openldap|
-        polardbx|opensearch|elasticsearch|vllm|tdengine|milvus|clickhouse|pika|ggml|zookeeper|mariadb|tidb|xinference|
-        oracle|opengauss|influxdb|flink|solr|mogdb|oceanbase-ent|starrocks-ent|apecloud-postgresql|yashandb|
-        redis-cluster|camellia-redis-proxy|dmdb|minio|orchestrator|rabbitmq|loki|victoria-metrics|gaussdb|damengdb|
+        smartengine|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|orioledb|vanilla-pg|asmysql|openldap|
+        polardbx|opensearch|elasticsearch|vllm|tdengine|milvus|clickhouse|ggml|zookeeper|mariadb|tidb|xinference|
+        oracle|opengauss|influxdb|flink|solr|mogdb|oceanbase-ent|starrocks-ent|yashandb|
+        redis-cluster|dmdb|minio|orchestrator|rabbitmq|loki|victoria-metrics|gaussdb|damengdb|
         kingbase|vastbase|mssql|rocketmq)'
         required: false
         default: ''

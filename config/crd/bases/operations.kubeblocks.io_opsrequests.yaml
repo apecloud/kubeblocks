@@ -2163,7 +2163,7 @@ spec:
                     inPlace:
                       description: |-
                         When it is set to true, the instance will be rebuilt in-place.
-                        By default, a new pod will be created. Once the new pod is ready to serve,
+                        If false, a new pod will be created. Once the new pod is ready to serve,
                         the instance that require rebuilding will be taken offline.
                       type: boolean
                     instances:
@@ -2318,6 +2318,7 @@ spec:
                       type: string
                   required:
                   - componentName
+                  - inPlace
                   - instances
                   type: object
                 type: array

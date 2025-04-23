@@ -314,7 +314,10 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		if cli == nil {
 			continue // not kb-agent container and port defined, for test only
 		}
+
 		rsp, err := cli.Action(ctx, *req)
+		_ = cli.Close()
+
 		if err != nil {
 			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), pod.Name)
 		}

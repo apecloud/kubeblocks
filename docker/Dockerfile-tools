@@ -11,9 +11,9 @@
 #TARGETARCH - Architecture from --platform, e.g. arm64
 #TARGETVARIANT - used to set target ARM variant, e.g. v7
 
-ARG GO_VERSION=1.21-alpine
+ARG GO_VERSION=1.23-alpine
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG GOPROXY
@@ -63,8 +63,7 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/kbagent cmd/kbagent/main.go
 
-# Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625
-FROM docker.io/alpine:3.19.1 as dist
+FROM docker.io/alpine:3.21.3 AS dist
 ARG APK_MIRROR
 
 # install tools via apk

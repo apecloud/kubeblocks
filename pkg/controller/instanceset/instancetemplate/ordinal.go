@@ -72,3 +72,22 @@ func GetOrdinal(podName string) (int32, error) {
 func GetInstanceName(its *workloads.InstanceSet, ordinal int32) string {
 	return fmt.Sprintf("%v-%v", its.Name, ordinal)
 }
+
+// TODO: Merge this to GetOrdinal
+// ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
+// -1 will be returned if no numeric suffix contained.
+func ParseParentNameAndOrdinal(s string) (string, int) {
+	parent := s
+	ordinal := -1
+
+	index := strings.LastIndex(s, "-")
+	if index < 0 {
+		return parent, ordinal
+	}
+	ordinalStr := s[index+1:]
+	if i, err := strconv.ParseInt(ordinalStr, 10, 32); err == nil {
+		ordinal = int(i)
+		parent = s[:index]
+	}
+	return parent, ordinal
+}

@@ -72,13 +72,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		}
 		instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
 	}
-	// validate duplicate pod names
-	getNameFunc := func(r instanceRevision) string {
-		return r.name
-	}
-	if err := ValidateDupInstanceNames(instanceRevisionList, getNameFunc); err != nil {
-		return kubebuilderx.Continue, err
-	}
 
 	updatedRevisions := make(map[string]string, len(instanceRevisionList))
 	for _, r := range instanceRevisionList {

@@ -186,9 +186,6 @@ func (c *combinedPodNameBuilder) Validate() error {
 		}
 		offlineOrdinals.Insert(ordinal)
 	}
-	tpls := make([]workloads.InstanceTemplate, 0, len(c.itsExt.InstanceSet.Spec.Instances)+1)
-	tpls = append(tpls, workloads.InstanceTemplate{Ordinals: c.itsExt.InstanceSet.Spec.DefaultTemplateOrdinals})
-	tpls = append(tpls, c.itsExt.InstanceSet.Spec.Instances...)
 	for _, tmpl := range c.itsExt.InstanceTemplates {
 		ordinals := tmpl.Ordinals
 		for _, item := range ordinals.Discrete {

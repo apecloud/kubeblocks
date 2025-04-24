@@ -299,7 +299,11 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		for i := range job.Spec.Template.Spec.Containers {
 			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
 		}
-		if err := component.BuildJobTolerations(job, cluster); err != nil {
+		comp, err := component.GetComponentByName(ctx, cli, synthesizedComp.Namespace, synthesizedComp.FullCompName)
+		if err != nil {
+			return nil, err
+		}
+		if err := component.BuildJobSchdulingPolicy(job, comp, cluster); err != nil {
 			return nil, err
 		}
 		return job, nil

@@ -21,7 +21,6 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -38,8 +37,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // LifeCycleActionType represents the lifecycle action type.
@@ -232,7 +231,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 				},
 			},
 		}
-		if err := BuildJobTolerations(jobObj, actionCtx.cluster); err != nil {
+		if err := BuildJobSchdulingPolicy(jobObj, actionCtx.component, actionCtx.cluster); err != nil {
 			return nil, err
 		}
 		for i := range jobObj.Spec.Template.Spec.Containers {
@@ -266,27 +265,25 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 	return renderedJob, nil
 }
 
-// BuildJobTolerations builds the job tolerations.
-func BuildJobTolerations(job *batchv1.Job, cluster *appsv1alpha1.Cluster) error {
-	// build data plane tolerations from config
-	var tolerations []corev1.Toleration
-	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
-		if err := json.Unmarshal([]byte(val), &tolerations); err != nil {
+func BuildJobSchdulingPolicy(job *batchv1.Job, comp *appsv1alpha1.Component, cluster *appsv1alpha1.Cluster) error {
+	var (
+		schedulingPolicy = comp.Spec.SchedulingPolicy
+		err              error
+	)
+	if schedulingPolicy == nil {
+		// for compatibility, we need to build scheduling policy from component's affinity and tolerations
+		schedulingPolicy, err = scheduling.BuildSchedulingPolicy4Component(cluster.Name,
+			comp.Name, comp.Spec.Affinity, comp.Spec.Tolerations)
+		if err != nil {
 			return err
 		}
 	}
-
-	if len(job.Spec.Template.Spec.Tolerations) > 0 {
-		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, tolerations...)
-	} else {
-		job.Spec.Template.Spec.Tolerations = tolerations
-	}
-
-	// build job tolerations from legacy cluster.spec.Tolerations
-	if len(cluster.Spec.Tolerations) > 0 {
-		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.Tolerations...)
-	}
-
+	job.Spec.Template.Spec.SchedulerName = schedulingPolicy.SchedulerName
+	job.Spec.Template.Spec.NodeSelector = schedulingPolicy.NodeSelector
+	job.Spec.Template.Spec.NodeName = schedulingPolicy.NodeName
+	job.Spec.Template.Spec.Affinity = schedulingPolicy.Affinity
+	job.Spec.Template.Spec.Tolerations = schedulingPolicy.Tolerations
+	job.Spec.Template.Spec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
 	return nil
 }
 

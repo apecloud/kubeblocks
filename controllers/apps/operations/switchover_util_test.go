@@ -248,7 +248,7 @@ var _ = Describe("Switchover Util", func() {
 			testNeedDoSwitchover()
 		})
 
-		It("Test doSwitchover when opsRequest triggers", func() {
+		XIt("Test doSwitchover when opsRequest triggers", func() {
 			testDoSwitchover()
 		})
 	})

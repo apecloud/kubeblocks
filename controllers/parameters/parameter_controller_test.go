@@ -163,7 +163,7 @@ var _ = Describe("Parameter Controller", func() {
 				By("create a sharding component: " + spec.Name)
 				comp, err := component.BuildComponent(clusterObj, spec, shardingLabels, nil)
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(k8sClient.Create(testCtx.Ctx, comp)).Should(Succeed())
+				Expect(testCtx.Create(testCtx.Ctx, comp)).Should(Succeed())
 
 				shardingCompParamKey := types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,

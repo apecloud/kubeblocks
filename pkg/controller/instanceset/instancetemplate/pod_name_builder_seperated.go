@@ -38,7 +38,6 @@ type seperatedPodNameBuilder struct {
 func (s *seperatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
 	instanceTemplateList := buildInstanceTemplateExts(s.itsExt)
 	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
-	var instanceNameList []string
 	for _, template := range instanceTemplateList {
 		ordinalList, err := GetOrdinalListByTemplateName(s.itsExt.InstanceSet, template.Name)
 		if err != nil {
@@ -48,19 +47,10 @@ func (s *seperatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*I
 		if err != nil {
 			return nil, err
 		}
-		instanceNameList = append(instanceNameList, instanceNames...)
 		for _, name := range instanceNames {
 			allNameTemplateMap[name] = template
 		}
 	}
-	// validate duplicate pod names
-	getNameFunc := func(n string) string {
-		return n
-	}
-	if err := validateDupInstanceNames(instanceNameList, getNameFunc); err != nil {
-		return nil, err
-	}
-
 	return allNameTemplateMap, nil
 }
 
@@ -69,7 +59,7 @@ func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	for _, template := range s.itsExt.InstanceTemplates {
 		replicas := template.GetReplicas()
 		ordinalList := ConvertOrdinalsToSortedList(template.GetOrdinals())
-		names, err := GenerateInstanceNamesFromTemplate(s.itsExt.InstanceSet.Name, template.GetName(), replicas, s.itsExt.InstanceSet.Spec.OfflineInstances, ordinalList)
+		names, err := generateInstanceNamesFromTemplate(s.itsExt.InstanceSet.Name, template.GetName(), replicas, s.itsExt.InstanceSet.Spec.OfflineInstances, ordinalList)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +74,30 @@ func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 }
 
 func (s *seperatedPodNameBuilder) Validate() error {
-	// TODO
+	instances, err := s.GenerateAllInstanceNames()
+	if err != nil {
+		return err
+	}
+
+	instanceNameCount := make(map[string]int)
+	for _, name := range instances {
+		count, exist := instanceNameCount[name]
+		if exist {
+			count++
+		} else {
+			count = 1
+		}
+		instanceNameCount[name] = count
+	}
+	dupNames := ""
+	for name, count := range instanceNameCount {
+		if count > 1 {
+			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
+		}
+	}
+	if len(dupNames) > 0 {
+		return fmt.Errorf("duplicate pod names: %s", dupNames)
+	}
 	return nil
 }
 
@@ -110,39 +123,6 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 		}
 		return ordinal1 > ordinal2
 	})
-}
-
-func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	instanceNames, err := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
-	return instanceNames, err
-}
-
-// GenerateInstanceNames generates instance names based on certain rules:
-// The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
-// The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
-func GenerateInstanceNames(parentName, templateName string,
-	replicas int32, ordinal int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	if len(ordinalList) > 0 {
-		return GenerateInstanceNamesWithOrdinalList(parentName, templateName, replicas, offlineInstances, ordinalList)
-	}
-	usedNames := sets.New(offlineInstances...)
-	var instanceNameList []string
-	for count := int32(0); count < replicas; count++ {
-		var name string
-		for {
-			if len(templateName) == 0 {
-				name = fmt.Sprintf("%s-%d", parentName, ordinal)
-			} else {
-				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
-			}
-			ordinal++
-			if !usedNames.Has(name) {
-				instanceNameList = append(instanceNameList, name)
-				break
-			}
-		}
-	}
-	return instanceNameList, nil
 }
 
 // GenerateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
@@ -263,28 +243,4 @@ func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 		return instanceNameList, fmt.Errorf("%s", errorMessage)
 	}
 	return instanceNameList, nil
-}
-
-func validateDupInstanceNames[T any](instances []T, getNameFunc func(item T) string) error {
-	instanceNameCount := make(map[string]int)
-	for _, r := range instances {
-		name := getNameFunc(r)
-		count, exist := instanceNameCount[name]
-		if exist {
-			count++
-		} else {
-			count = 1
-		}
-		instanceNameCount[name] = count
-	}
-	dupNames := ""
-	for name, count := range instanceNameCount {
-		if count > 1 {
-			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
-		}
-	}
-	if len(dupNames) > 0 {
-		return fmt.Errorf("duplicate pod names: %s", dupNames)
-	}
-	return nil
 }

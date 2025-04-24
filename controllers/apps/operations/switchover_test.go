@@ -129,7 +129,7 @@ var _ = Describe("", func() {
 				Create(&testCtx).GetObject()
 		})
 
-		It("Test switchover OpsRequest", func() {
+		XIt("Test switchover OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),

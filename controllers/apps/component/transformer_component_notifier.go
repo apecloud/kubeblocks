@@ -181,6 +181,10 @@ func (t *componentNotifierTransformer) notify(ctx context.Context, cli client.Re
 		fmt.Sprintf("%s@%s", synthesizedComp.Name, synthesizedComp.Generation)
 
 	graphCli.Patch(dag, comp, compCopy)
+	// patch the component object after the changes of other objects are submitted
+	for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}, &model.HaveDifferentTypeWithOption{}) {
+		graphCli.DependOn(dag, compCopy, obj)
+	}
 
 	return nil
 }

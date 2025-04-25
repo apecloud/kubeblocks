@@ -23,28 +23,39 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
-const schemaFieldDelim = "."
+const (
+	SchemaFieldDelim      = "."
+	SchemaMapFieldKeyName = "*"
+)
 
 // FlattenSchema flattens the given schema to a single level.
 func FlattenSchema(src apiextv1.JSONSchemaProps) apiextv1.JSONSchemaProps {
 	flattenMap := make(map[string]apiextv1.JSONSchemaProps)
-	return apiextv1.JSONSchemaProps{
-		Properties: flattenSchemaProps(flattenMap, src, "", schemaFieldDelim),
-	}
+	flattenSchemaProps(flattenMap, src, "", SchemaFieldDelim)
+	return apiextv1.JSONSchemaProps{Properties: flattenMap}
 }
 
-func flattenSchemaProps(shadow map[string]apiextv1.JSONSchemaProps, m apiextv1.JSONSchemaProps, prefix string, delim string) map[string]apiextv1.JSONSchemaProps {
+func genFieldPrefix(prefix, delim, key string) string {
 	if prefix != "" {
 		prefix += delim
 	}
-	for k, val := range m.Properties {
-		fullKey := prefix + k
-		if val.Properties != nil {
-			// recursively merge to shadow map
-			shadow = flattenSchemaProps(shadow, val, fullKey, delim)
-		} else {
-			shadow[fullKey] = val
-		}
+	return prefix + key
+}
+
+func flattenSchemaAdditionalProps(flattenProps map[string]apiextv1.JSONSchemaProps, m apiextv1.JSONSchemaProps, prefix string, delim string) {
+	if m.AdditionalProperties != nil && m.AdditionalProperties.Schema != nil {
+		flattenSchemaProps(flattenProps, *m.AdditionalProperties.Schema, genFieldPrefix(prefix, delim, SchemaMapFieldKeyName), delim)
 	}
-	return shadow
+}
+
+func flattenSchemaProps(flattenProps map[string]apiextv1.JSONSchemaProps, m apiextv1.JSONSchemaProps, prefix string, delim string) {
+	if m.Type != SchemaStructType && m.Type != "" {
+		flattenProps[prefix] = m
+		return
+	}
+
+	flattenSchemaAdditionalProps(flattenProps, m, prefix, delim)
+	for k, val := range m.Properties {
+		flattenSchemaProps(flattenProps, val, genFieldPrefix(prefix, delim, k), delim)
+	}
 }

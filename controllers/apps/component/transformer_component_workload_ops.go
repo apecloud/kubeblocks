@@ -248,6 +248,25 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 }
 
 func (r *componentWorkloadOps) scaleOut() error {
+	if err := r.buildDataReplicationTask(); err != nil {
+		return err
+	}
+
+	// replicas to be created
+	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
+	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
+}
+
+func (r *componentWorkloadOps) buildDataReplicationTask() error {
+	_, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
+	if !hasDataActionDefined {
+		return nil
+	}
+
+	// replicas to be created
+	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+
 	// replicas in provisioning that the data has not been loaded
 	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
 		return s.DataLoaded != nil && !*s.DataLoaded
@@ -256,43 +275,29 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return err
 	}
 
-	// replicas to be created
-	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
-
-	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
-
-	// build and assign data replication tasks
-	if err := func() error {
-		if !hasDataActionDefined {
-			return nil
-		}
-
-		source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump)
-		if err != nil {
-			return err
-		}
-
-		replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
-		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
-		if err != nil {
-			return err
-		}
-		// apply the updated env to the env CM
-		transCtx := &componentTransformContext{
-			Context:             r.transCtx.Context,
-			Client:              model.NewGraphClient(r.cli),
-			SynthesizeComponent: r.synthesizeComp,
-			Component:           r.component,
-		}
-		if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters); err != nil {
-			return err
-		}
+	replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
+	if len(replicas) == 0 {
 		return nil
-	}(); err != nil {
+	}
+
+	// the source replica
+	source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump)
+	if err != nil {
 		return err
 	}
 
-	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
+	parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
+	if err != nil {
+		return err
+	}
+	// apply the updated env to the env CM
+	transCtx := &componentTransformContext{
+		Context:             r.transCtx.Context,
+		Client:              model.NewGraphClient(r.cli),
+		SynthesizeComponent: r.synthesizeComp,
+		Component:           r.component,
+	}
+	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
@@ -317,6 +322,16 @@ func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.P
 }
 
 func (r *componentWorkloadOps) postHorizontalScale() error {
+	if err := r.postScaleOut(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) postScaleOut() error {
+	if err := r.buildDataReplicationTask(); err != nil {
+		return err
+	}
 	if err := r.joinMember4ScaleOut(); err != nil {
 		return err
 	}

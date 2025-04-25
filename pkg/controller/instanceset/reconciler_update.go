@@ -143,7 +143,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		if isPodPending(pod) && updatePolicy != NoOpsPolicy {
 			err = tree.Delete(pod)
-			// wait another reconcilation, so that the following update process won't be confused
+			// wait another reconciliation, so that the following update process won't be confused
 			return kubebuilderx.Continue, err
 		}
 	}

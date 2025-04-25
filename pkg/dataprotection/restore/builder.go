@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -33,9 +34,11 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type restoreJobBuilder struct {
@@ -407,7 +410,12 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
-	// 3. inject datasafed if needed
+	// 3. inject restore manager
+	if r.stage == dpv1alpha1.PrepareData {
+		r.InjectRestoreManagerContainer(&job.Spec.Template.Spec)
+	}
+
+	// 4. inject datasafed if needed
 	if r.buildWithRepo {
 		mountPath := "/backupdata"
 		kopiaRepoPath := r.backupSet.Backup.Status.KopiaRepoPath
@@ -422,4 +430,66 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 		}
 	}
 	return job
+}
+
+func (r *restoreJobBuilder) InjectRestoreManagerContainer(podSpec *corev1.PodSpec) {
+	container := corev1.Container{
+		Name:            restoreManagerContainerName,
+		Image:           viper.GetString(constant.KBToolsImage),
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
+		Resources:       corev1.ResourceRequirements{Limits: nil, Requests: nil},
+		Command:         []string{"sh", "-c"},
+	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+
+	checkIntervalSeconds := int32(1)
+	volumeName := "downward-volume"
+	mountPath := "/dp_downward"
+	fileName := "stop_restore_manager"
+
+	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			DownwardAPI: &corev1.DownwardAPIVolumeSource{
+				Items: []corev1.DownwardAPIVolumeFile{
+					{
+						Path: fileName,
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: fmt.Sprintf("metadata.annotations['%s']", DataProtectionStopRestoreManagerAnnotationKey),
+						},
+					},
+				},
+			},
+		},
+	})
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      volumeName,
+		MountPath: mountPath,
+	})
+
+	buildSyncProgressCommand := func() string {
+		return fmt.Sprintf(`
+set -o errexit
+set -o nounset
+
+sleep_seconds="%d"
+signal_file="${%s}"
+
+if [ "$sleep_seconds" -le 0 ]; then
+  sleep_seconds=2
+fi
+
+while true; do
+  if [ -f "$signal_file" && $(cat "$signal_file") == "true" ]; then
+    break
+  fi
+  echo "waiting for other restore workloads, sleep ${sleep_seconds}s"
+  sleep "$sleep_seconds"
+done
+
+echo "restore done"
+`, checkIntervalSeconds, filepath.Join(mountPath, fileName))
+	}
+	container.Args = []string{buildSyncProgressCommand()}
+	podSpec.Containers = append(podSpec.Containers, container)
 }

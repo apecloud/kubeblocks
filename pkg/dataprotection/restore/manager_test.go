@@ -141,7 +141,7 @@ var _ = Describe("RestoreManager Test", func() {
 			restore := restoreFactory.Create(&testCtx).Get()
 
 			By("create restore manager")
-			restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme())
+			restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
 			backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, backup.Name, testCtx.DefaultNamespace)
 			Expect(err).ShouldNot(HaveOccurred())
 			return restoreMGR, backupSet

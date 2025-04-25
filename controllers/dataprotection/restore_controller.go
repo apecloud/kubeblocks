@@ -250,7 +250,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		restore.Status.Phase = dpv1alpha1.RestorePhaseAsDataSource
 	} else {
 		// check if restore CR is legal
-		err := r.validateAndBuildMGR(reqCtx, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
+		err := r.validateAndBuildMGR(reqCtx, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client))
 		switch {
 		case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
 			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
@@ -271,7 +271,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 }
 
 func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
-	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
+	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	// validate if the restore.spec is valid and build restore manager.
 	err := r.validateAndBuildMGR(reqCtx, restoreMgr)
 	if err == nil {

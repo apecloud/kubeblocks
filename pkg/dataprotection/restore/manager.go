@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -45,6 +46,10 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+const (
+	restoreManagerContainerName = "restore-manager"
+)
+
 type BackupActionSet struct {
 	Backup *dpv1alpha1.Backup
 	// set it when the backup relies on incremental backups, such as Incremental backup
@@ -62,10 +67,11 @@ type RestoreManager struct {
 	PostReadyBackupSets   []BackupActionSet
 	Schema                *runtime.Scheme
 	Recorder              record.EventRecorder
+	Client                client.Client
 	WorkerServiceAccount  string
 }
 
-func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorder, schema *runtime.Scheme) *RestoreManager {
+func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorder, schema *runtime.Scheme, client client.Client) *RestoreManager {
 	return &RestoreManager{
 		OriginalRestore:       restore.DeepCopy(),
 		Restore:               restore,
@@ -73,6 +79,7 @@ func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorde
 		PostReadyBackupSets:   []BackupActionSet{},
 		Schema:                schema,
 		Recorder:              recorder,
+		Client:                client,
 	}
 }
 
@@ -799,6 +806,21 @@ func (r *RestoreManager) CheckJobsDone(
 		}
 	}
 	return allJobFinished, existFailedJob
+}
+
+func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (bool, error) {
+	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return false, err
+	}
+	for _, pod := range podList.Items {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name == Restore {
+				return containerStatus.State.Terminated != nil, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 // Recalculation whether all actions have been completed.

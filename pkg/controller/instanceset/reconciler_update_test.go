@@ -83,6 +83,7 @@ var _ = Describe("update reconciler test", func() {
 		pods := tree.List(&corev1.Pod{})
 		Expect(pods).Should(HaveLen(int(replicas) - len(names)))
 		for _, name := range names {
+			// name should be deleted
 			Expect(slices.IndexFunc(pods, func(object client.Object) bool {
 				return object.GetName() == name
 			})).Should(BeNumerically("<", 0))
@@ -90,6 +91,14 @@ var _ = Describe("update reconciler test", func() {
 	}
 
 	Context("PreCondition & Reconcile", func() {
+		getPodReadyCondition := func() corev1.PodCondition {
+			return corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			}
+		}
+
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1
@@ -125,15 +134,10 @@ var _ = Describe("update reconciler test", func() {
 				Status:             corev1.ConditionTrue,
 				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
 			}
-			readyCondition := corev1.PodCondition{
-				Type:               corev1.PodReady,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
-			}
 			makePodAvailableWithOldRevision := func(pod *corev1.Pod) {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition, containersReadyCondition)
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition(), containersReadyCondition)
 			}
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
@@ -268,11 +272,6 @@ var _ = Describe("update reconciler test", func() {
 			pods := tree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
 			lastPod := pods[len(pods)-1]
-			readyCondition := corev1.PodCondition{
-				Type:               corev1.PodReady,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
-			}
 			for i, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
@@ -284,7 +283,7 @@ var _ = Describe("update reconciler test", func() {
 				}
 				// mark first two pods available
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 			}
 
 			reconciler = NewUpdateReconciler()
@@ -292,6 +291,65 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(tree, []string{lastPod.GetName()})
+		})
+
+		It("respects maxUnavailable with pending pods", func() {
+			// update order: bar-2, bar-1, bar-0
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(3))
+			for _, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				// mark the all pods with old revision and available
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-2"})
+
+			// still, only bar-2 is deleted
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-2"})
+
+			// mark pod-2 as pending
+			prepareForUpdate(tree)
+			pod2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
+			object, err := tree.Get(pod2)
+			Expect(err).Should(BeNil())
+			pod2, ok := object.(*corev1.Pod)
+			Expect(ok).Should(BeTrue())
+			pod2.Status.Phase = corev1.PodPending
+			Expect(tree.Update(pod2)).Should(BeNil())
+
+			// no pods updated
+			reconciler = NewUpdateReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{})
+
+			// mark pod-2 as available
+			pod2.Status.Phase = corev1.PodRunning
+			pod2.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+
+			reconciler = NewUpdateReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-1"})
 		})
 	})
 })

@@ -411,8 +411,8 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
 	// 3. inject restore manager
-	if r.stage == dpv1alpha1.PrepareData {
-		r.InjectRestoreManagerContainer(&job.Spec.Template.Spec)
+	if r.stage == dpv1alpha1.PrepareData && !r.restore.Spec.PrepareDataConfig.IsSerialPolicy() {
+		r.InjectManagerContainer(&job.Spec.Template.Spec)
 	}
 
 	// 4. inject datasafed if needed
@@ -432,7 +432,7 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	return job
 }
 
-func (r *restoreJobBuilder) InjectRestoreManagerContainer(podSpec *corev1.PodSpec) {
+func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) {
 	container := corev1.Container{
 		Name:            restoreManagerContainerName,
 		Image:           viper.GetString(constant.KBToolsImage),

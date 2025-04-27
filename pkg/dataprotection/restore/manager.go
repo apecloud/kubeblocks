@@ -774,7 +774,7 @@ func (r *RestoreManager) CheckJobsDone(
 	stage dpv1alpha1.RestoreStage,
 	actionName string,
 	backupSet BackupActionSet,
-	fetchedJobs []*batchv1.Job) (bool, bool) {
+	fetchedJobs []*batchv1.Job) (bool, bool, error) {
 	var (
 		allJobFinished = true
 		existFailedJob bool
@@ -783,6 +783,7 @@ func (r *RestoreManager) CheckJobsDone(
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = &r.Restore.Status.Actions.PostReady
 	}
+	containerTerminatedNum := 0
 	for i := range fetchedJobs {
 		statusAction := dpv1alpha1.RestoreStatusAction{
 			Name:       actionName,
@@ -803,24 +804,76 @@ func (r *RestoreManager) CheckJobsDone(
 			allJobFinished = false
 			statusAction.Status = dpv1alpha1.RestoreActionProcessing
 			SetRestoreStatusAction(restoreActions, statusAction)
-		}
-	}
-	return allJobFinished, existFailedJob
-}
-
-func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (bool, error) {
-	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
-	if err != nil {
-		return false, err
-	}
-	for _, pod := range podList.Items {
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.Name == Restore {
-				return containerStatus.State.Terminated != nil, nil
+			containerTerminated, containerFailed, err := r.CheckIfRestoreContainerTerminated(fetchedJobs[i])
+			if err != nil {
+				return false, false, err
+			}
+			if containerFailed {
+				err = r.StopManagerContainer(fetchedJobs[i])
+				if err != nil {
+					return false, false, err
+				}
+			} else if containerTerminated {
+				containerTerminatedNum++
 			}
 		}
 	}
-	return false, nil
+	if containerTerminatedNum == len(fetchedJobs) {
+		for i := range fetchedJobs {
+			err := r.StopManagerContainer(fetchedJobs[i])
+			if err != nil {
+				return false, false, err
+			}
+		}
+	}
+	return allJobFinished, existFailedJob, nil
+}
+
+func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (terminated, failed bool, err error) {
+	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return false, false, err
+	}
+	if len(podList.Items) == 0 {
+		return false, false, nil
+	}
+	terminatedNum := 0
+	failedNum := 0
+	for _, pod := range podList.Items {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name == Restore {
+				terminatedState := containerStatus.State.Terminated
+				if terminatedState != nil {
+					if terminatedState.ExitCode == 0 {
+						failedNum++
+					}
+					terminatedNum++
+				}
+			}
+		}
+	}
+	return terminatedNum == len(podList.Items), failedNum > 0, nil
+}
+
+func (r *RestoreManager) StopManagerContainer(job *batchv1.Job) error {
+	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		modified := pod.DeepCopy()
+		if modified.Annotations == nil {
+			modified.Annotations = map[string]string{}
+		}
+		if val, ok := modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey]; ok && val == "true" {
+			continue
+		}
+		modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey] = "true"
+		if err := r.Client.Patch(context.Background(), modified, client.MergeFrom(&pod)); err != nil {
+			return client.IgnoreAlreadyExists(err)
+		}
+	}
+	return nil
 }
 
 // Recalculation whether all actions have been completed.

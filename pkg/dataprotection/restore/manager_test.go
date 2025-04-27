@@ -251,7 +251,8 @@ var _ = Describe("RestoreManager Test", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				By("test CheckJobsDone function and jobs is running")
-				allJobsFinished, existFailedJob := restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				allJobsFinished, existFailedJob, err := restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				Expect(err).ShouldNot(HaveOccurred())
 				Expect(allJobsFinished).Should(BeFalse())
 
 				By("mock jobs are completed")
@@ -261,7 +262,8 @@ var _ = Describe("RestoreManager Test", func() {
 				}
 
 				By("test CheckJobsDone function and jobs are finished")
-				allJobsFinished, existFailedJob = restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				allJobsFinished, existFailedJob, err = restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				Expect(err).ShouldNot(HaveOccurred())
 				Expect(allJobsFinished).Should(BeTrue())
 
 				By("test Recalculation function, allJobFinished should be false because it only restored one pvc.")

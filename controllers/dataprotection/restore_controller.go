@@ -477,7 +477,10 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// 4. check if jobs are finished.
-	allActionsFinished, existFailedAction = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)
+	allActionsFinished, existFailedAction, err = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)
+	if err != nil {
+		return false, err
+	}
 	if stage == dpv1alpha1.PrepareData {
 		// recalculation whether all actions have been completed.
 		restoreMgr.Recalculation(backupSet.Backup.Name, actionName, &allActionsFinished, &existFailedAction)

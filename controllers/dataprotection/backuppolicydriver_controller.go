@@ -240,6 +240,9 @@ func (r *backupPolicyAndScheduleBuilder) transformBackupSchedule(bp *dpv1alpha1.
 	// build a new backup schedule from the backup policy template.
 	if len(backupSchedule.Name) == 0 {
 		backupSchedule = r.buildBackupSchedule(scheduleName, bp)
+		if backupSchedule == nil {
+			return nil
+		}
 		if err := controllerutil.SetControllerReference(r.Cluster, backupSchedule, r.schema); err != nil {
 			return err
 		}

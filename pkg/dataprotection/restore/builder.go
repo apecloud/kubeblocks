@@ -411,9 +411,7 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
 	// 3. inject restore manager
-	if r.stage == dpv1alpha1.PrepareData && !r.restore.Spec.PrepareDataConfig.IsSerialPolicy() {
-		r.InjectManagerContainer(&job.Spec.Template.Spec)
-	}
+	r.InjectManagerContainer(&job.Spec.Template.Spec)
 
 	// 4. inject datasafed if needed
 	if r.buildWithRepo {
@@ -473,21 +471,21 @@ set -o errexit
 set -o nounset
 
 sleep_seconds="%d"
-signal_file="${%s}"
+signal_file="%s"
 
 if [ "$sleep_seconds" -le 0 ]; then
   sleep_seconds=2
 fi
 
 while true; do
-  if [ -f "$signal_file" && $(cat "$signal_file") == "true" ]; then
+  if [ -f "$signal_file" ] && [ "$(cat "$signal_file")" = "true" ]; then
     break
   fi
   echo "waiting for other restore workloads, sleep ${sleep_seconds}s"
   sleep "$sleep_seconds"
 done
 
-echo "restore done"
+echo "restore manager stopped"
 `, checkIntervalSeconds, filepath.Join(mountPath, fileName))
 	}
 	container.Args = []string{buildSyncProgressCommand()}

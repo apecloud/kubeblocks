@@ -783,7 +783,9 @@ func (r *RestoreManager) CheckJobsDone(
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = &r.Restore.Status.Actions.PostReady
 	}
-	containerTerminatedNum := 0
+	// count the number of jobs that are completed, failed,
+	// or have the normally terminated `restore` container
+	finishedCount := 0
 	for i := range fetchedJobs {
 		statusAction := dpv1alpha1.RestoreStatusAction{
 			Name:       actionName,
@@ -797,30 +799,28 @@ func (r *RestoreManager) CheckJobsDone(
 			statusAction.Status = dpv1alpha1.RestoreActionFailed
 			statusAction.Message = errMsg
 			SetRestoreStatusAction(restoreActions, statusAction)
+			finishedCount++
 		case done:
 			statusAction.Status = dpv1alpha1.RestoreActionCompleted
 			SetRestoreStatusAction(restoreActions, statusAction)
+			finishedCount++
 		default:
 			allJobFinished = false
 			statusAction.Status = dpv1alpha1.RestoreActionProcessing
 			SetRestoreStatusAction(restoreActions, statusAction)
-			containerTerminated, containerFailed, err := r.CheckIfRestoreContainerTerminated(fetchedJobs[i])
+			normalTerminated, err := r.CheckIfRestoreContainerTerminated(fetchedJobs[i])
 			if err != nil {
 				return false, false, err
 			}
-			if containerFailed {
-				err = r.StopManagerContainer(fetchedJobs[i])
-				if err != nil {
-					return false, false, err
-				}
-			} else if containerTerminated {
-				containerTerminatedNum++
+			if normalTerminated {
+				finishedCount++
 			}
 		}
 	}
-	if containerTerminatedNum == len(fetchedJobs) {
+	// wait until all `restore` containers are terminated normally
+	if finishedCount == len(fetchedJobs) {
 		for i := range fetchedJobs {
-			err := r.StopManagerContainer(fetchedJobs[i])
+			err := r.StopManagerContainerByJob(fetchedJobs[i])
 			if err != nil {
 				return false, false, err
 			}
@@ -829,49 +829,64 @@ func (r *RestoreManager) CheckJobsDone(
 	return allJobFinished, existFailedJob, nil
 }
 
-func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (terminated, failed bool, err error) {
+// CheckIfRestoreContainerTerminated checks if the `restore` container is terminated.
+// If the `restore` container is terminated abnormally, stop the `restore manager` container.
+func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (normalTerminated bool, err error) {
 	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 	if len(podList.Items) == 0 {
-		return false, false, nil
+		return false, nil
 	}
-	terminatedNum := 0
-	failedNum := 0
-	for _, pod := range podList.Items {
+	for i, pod := range podList.Items {
 		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.Name == Restore {
-				terminatedState := containerStatus.State.Terminated
-				if terminatedState != nil {
-					if terminatedState.ExitCode == 0 {
-						failedNum++
+			if containerStatus.Name != Restore {
+				continue
+			}
+			terminatedState := containerStatus.State.Terminated
+			if terminatedState != nil {
+				if terminatedState.ExitCode != 0 {
+					// stop `restore manager` container if the `restore` container is terminated abnormally
+					if err := r.StopManagerContainer(&podList.Items[i]); err != nil {
+						return false, err
 					}
-					terminatedNum++
+				} else {
+					normalTerminated = true
 				}
 			}
 		}
 	}
-	return terminatedNum == len(podList.Items), failedNum > 0, nil
+	return normalTerminated, nil
 }
 
-func (r *RestoreManager) StopManagerContainer(job *batchv1.Job) error {
+// StopManagerContainerByJob stops the `restore manager` containers by the job.
+func (r *RestoreManager) StopManagerContainerByJob(job *batchv1.Job) error {
 	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
 	if err != nil {
 		return err
 	}
-	for _, pod := range podList.Items {
-		modified := pod.DeepCopy()
-		if modified.Annotations == nil {
-			modified.Annotations = map[string]string{}
+	for i := range podList.Items {
+		err := r.StopManagerContainer(&podList.Items[i])
+		if err != nil {
+			return err
 		}
-		if val, ok := modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey]; ok && val == "true" {
-			continue
-		}
-		modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey] = "true"
-		if err := r.Client.Patch(context.Background(), modified, client.MergeFrom(&pod)); err != nil {
-			return client.IgnoreAlreadyExists(err)
-		}
+	}
+	return nil
+}
+
+// StopManagerContainer stops the `restore manager` container.
+func (r *RestoreManager) StopManagerContainer(pod *corev1.Pod) error {
+	modified := pod.DeepCopy()
+	if modified.Annotations == nil {
+		modified.Annotations = map[string]string{}
+	}
+	if val, ok := modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey]; ok && val == "true" {
+		return nil
+	}
+	modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey] = "true"
+	if err := r.Client.Patch(context.Background(), modified, client.MergeFrom(pod)); err != nil {
+		return client.IgnoreAlreadyExists(err)
 	}
 	return nil
 }

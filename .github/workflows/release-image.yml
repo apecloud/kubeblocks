@@ -220,7 +220,7 @@ jobs:
       matrix:
         test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|elasticsearch|oceanbase-ent|rabbitmq|gaussdb|damengdb|kingbase,
                      mysqlscale|smartengine|weaviate|polardbx|orioledb|vanilla-pg|redis-cluster|opengauss|mogdb|vastbase|rocketmq|goldendb,
-                     pulsar|qdrant|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|oracle-mysql|openldap|opensearch,
+                     pulsar|qdrant|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|oracle-mysql|openldap|opensearch|tdsql,
                      vllm|tdengine|milvus|clickhouse|ggml|zookeeper|mariadb|tidb|xinference|oracle|influxdb,
                      flink|solr|doris|loki|victoria-metrics|halo|starrocks-ent|yashandb|dmdb|minio|orchestrator ]
     with:

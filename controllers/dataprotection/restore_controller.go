@@ -106,6 +106,8 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseRestoreJob)).
+		// to watch the `restore` container if it is terminated
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parseRestorePod)).
 		Complete(r)
 }
 
@@ -118,6 +120,21 @@ func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.O
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: restoreNamespace,
+				Name:      restoreName,
+			},
+		})
+	}
+	return requests
+}
+
+func (r *RestoreReconciler) parseRestorePod(ctx context.Context, object client.Object) []reconcile.Request {
+	pod := object.(*corev1.Pod)
+	var requests []reconcile.Request
+	restoreName := pod.Labels[dprestore.DataProtectionRestoreLabelKey]
+	if restoreName != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: pod.Namespace,
 				Name:      restoreName,
 			},
 		})

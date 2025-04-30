@@ -241,6 +241,7 @@ var _ = Describe("RestoreManager Test", func() {
 			actionSetName := "preparedata-0"
 			testSerialCreateJob := func(expectRestoreFinished bool) {
 				By("test BuildPrepareDataJobs function, expect for 1 job")
+				viper.Set(constant.KBToolsImage, "kubeblocks-tools")
 				target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 				jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, target, actionSetName)
 				Expect(err).ShouldNot(HaveOccurred())

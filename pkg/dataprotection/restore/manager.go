@@ -817,7 +817,7 @@ func (r *RestoreManager) CheckJobsDone(
 			}
 		}
 	}
-	// wait until all `restore` containers are terminated normally
+	// wait until all `restore` containers are terminated normally or jobs are completed or failed
 	if finishedCount == len(fetchedJobs) {
 		for i := range fetchedJobs {
 			err := r.StopManagerContainerByJob(fetchedJobs[i])
@@ -884,9 +884,10 @@ func (r *RestoreManager) StopManagerContainer(pod *corev1.Pod) error {
 	if val, ok := modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey]; ok && val == "true" {
 		return nil
 	}
+	// `restore manager` container will read this annotation to stop
 	modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey] = "true"
 	if err := r.Client.Patch(context.Background(), modified, client.MergeFrom(pod)); err != nil {
-		return client.IgnoreAlreadyExists(err)
+		return client.IgnoreNotFound(err)
 	}
 	return nil
 }

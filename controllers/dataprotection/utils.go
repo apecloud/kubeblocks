@@ -166,7 +166,10 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 				pod = dputils.GetFirstIndexRunningPod(pods)
 			} else {
 				// if already selected target pods and backupType is not Continuous, we should re-use them.
-				pod = dputils.GetPodByName(pods, selectedPodNames[0])
+				pod = &corev1.Pod{}
+				if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: selectedPodNames[0], Namespace: reqCtx.Req.Namespace}, pod); err != nil {
+					return nil, err
+				}
 			}
 			if pod != nil {
 				targetPods = append(targetPods, pod)

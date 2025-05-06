@@ -53,7 +53,7 @@ func BuildInstanceName2TemplateMap(itsExt *InstanceSetExt) (map[string]*instance
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		ordinalList, err := GetOrdinalListByTemplateName(itsExt.Its, template.Name)
+		ordinalList, err := getOrdinalListByTemplateName(itsExt.Its, template.Name)
 		if err != nil {
 			return nil, err
 		}

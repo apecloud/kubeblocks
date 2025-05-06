@@ -282,8 +282,12 @@ func BuildJobSchdulingPolicy(job *batchv1.Job, comp *appsv1alpha1.Component, clu
 	job.Spec.Template.Spec.NodeSelector = schedulingPolicy.NodeSelector
 	job.Spec.Template.Spec.NodeName = schedulingPolicy.NodeName
 	job.Spec.Template.Spec.Affinity = schedulingPolicy.Affinity
+	// anti-affinity can lead to a pending pod if there's very few node matching the topology domain.
+	// On the other hand, job is auxiliary, so anti-affinity doesn't make much sense (so is TopologySpreadConstraints)
+	if job.Spec.Template.Spec.Affinity != nil {
+		job.Spec.Template.Spec.Affinity.PodAntiAffinity = nil
+	}
 	job.Spec.Template.Spec.Tolerations = schedulingPolicy.Tolerations
-	job.Spec.Template.Spec.TopologySpreadConstraints = schedulingPolicy.TopologySpreadConstraints
 	return nil
 }
 

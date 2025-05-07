@@ -85,8 +85,26 @@ func syncReconfiguringPhase(rctx *ReconcileContext, status *parametersv1alpha1.C
 	updateStatus()
 }
 
-func mergeWithOverride(dst, src interface{}) error {
-	return mergo.Merge(dst, src, mergo.WithOverride)
+func mergeWithOverride(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile) error {
+	if item.ConfigFileParams == nil {
+		item.ConfigFileParams = updatedParameters
+		return nil
+	}
+	for key, parameters := range updatedParameters {
+		if _, ok := item.ConfigFileParams[key]; !ok {
+			item.ConfigFileParams[key] = parameters
+			continue
+		}
+		merged := item.ConfigFileParams[key]
+		if parameters.Content != nil {
+			merged.Content = parameters.Content
+		}
+		if err := mergo.Merge(&merged.Parameters, parameters.Parameters, mergo.WithOverride); err != nil {
+			return err
+		}
+		item.ConfigFileParams[key] = merged
+	}
+	return nil
 }
 
 func updateParameters(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
@@ -104,7 +122,7 @@ func updateParameters(rctx *ReconcileContext, parameter *parametersv1alpha1.Para
 			status.Phase = parametersv1alpha1.CMergeFailedPhase
 			continue
 		}
-		if err := mergeWithOverride(&item.ConfigFileParams, status.UpdatedParameters); err != nil {
+		if err := mergeWithOverride(item, status.UpdatedParameters); err != nil {
 			status.Phase = parametersv1alpha1.CMergeFailedPhase
 			return err
 		}

@@ -1,14 +1,14 @@
 * @apecloud/kb-reviewers
 
 # Cluster APIs
-apis/**/cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-apis/**/component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-apis/**/service*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-controllers/apps/cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-controllers/apps/transformer_cluster*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-controllers/apps/component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-controllers/apps/transformer_component*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
-controllers/apps/service*.go @leon-inf @Y-Rookie @apecloud/kb-reviewers
+apis/**/cluster*.go @leon-inf @apecloud/kb-reviewers
+apis/**/component*.go @leon-inf @apecloud/kb-reviewers
+apis/**/service*.go @leon-inf @apecloud/kb-reviewers
+controllers/apps/cluster*.go @leon-inf @apecloud/kb-reviewers
+controllers/apps/transformer_cluster*.go @leon-inf @apecloud/kb-reviewers
+controllers/apps/component*.go @leon-inf @apecloud/kb-reviewers
+controllers/apps/transformer_component*.go @leon-inf @apecloud/kb-reviewers
+controllers/apps/service*.go @leon-inf @apecloud/kb-reviewers
 
 # OpsRequest API
 apis/**/opsrequest*.go @wangyelei @apecloud/kb-reviewers
@@ -27,20 +27,20 @@ controllers/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
 pkg/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
 
 # Experimental APIs
-apis/experimental/ @free6om @apecloud/kb-reviewers
-controllers/experimental/ @free6om @apecloud/kb-reviewers
+apis/experimental/ @apecloud/kb-reviewers
+controllers/experimental/ @apecloud/kb-reviewers
 
 # Extensions APIs
 apis/extensions/ @ldming @apecloud/kb-reviewers
 controllers/extensions/ @ldming @apecloud/kb-reviewers
 
 # Workloads APIs
-apis/workloads/ @free6om @apecloud/kb-reviewers
-controllers/workloads/ @free6om @apecloud/kb-reviewers
+apis/workloads/ @apecloud/kb-reviewers
+controllers/workloads/ @apecloud/kb-reviewers
 
 # Docs
-docs/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
-i18n/ @michelle-0808 @shanshanying @apecloud/kb-reviewers
+docs/ @shanshanying @apecloud/kb-reviewers
+i18n/ @shanshanying @apecloud/kb-reviewers
 docs/developer_docs/api-reference/
 
 # Examples

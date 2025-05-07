@@ -89,7 +89,8 @@ func TestIsOwnedByInstanceSet(t *testing.T) {
 
 func TestGetRestoreSystemAccountPassword(t *testing.T) {
 	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	encryptedPwd, _ := encryptor.Encrypt([]byte("test-password"))
+	pwd := []byte("test-password")
+	encryptedPwd, _ := encryptor.Encrypt(pwd)
 
 	tests := []struct {
 		name        string
@@ -116,7 +117,7 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			},
 			component: "comp1",
 			account:   "account1",
-			wantPwd:   []byte("test-password"),
+			wantPwd:   pwd,
 			wantErr:   false,
 		},
 		{
@@ -218,6 +219,25 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			component: "comp1",
 			account:   "account1",
 			wantPwd:   nil,
+			wantErr:   false,
+		},
+		{
+			name: "accounts stored in another component's backup cr",
+			annotations: map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"another-comp":{"name":"backup1","namespace":"default"}}`,
+			},
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"comp1":{"account1":"%s"}}`, encryptedPwd),
+					},
+				},
+			},
+			component: "comp1",
+			account:   "account1",
+			wantPwd:   pwd,
 			wantErr:   false,
 		},
 	}

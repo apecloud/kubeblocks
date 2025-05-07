@@ -141,7 +141,7 @@ var _ = Describe("RestoreManager Test", func() {
 			restore := restoreFactory.Create(&testCtx).Get()
 
 			By("create restore manager")
-			restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme())
+			restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
 			backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, backup.Name, testCtx.DefaultNamespace)
 			Expect(err).ShouldNot(HaveOccurred())
 			return restoreMGR, backupSet
@@ -241,6 +241,7 @@ var _ = Describe("RestoreManager Test", func() {
 			actionSetName := "preparedata-0"
 			testSerialCreateJob := func(expectRestoreFinished bool) {
 				By("test BuildPrepareDataJobs function, expect for 1 job")
+				viper.Set(constant.KBToolsImage, "kubeblocks-tools")
 				target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 				jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, target, actionSetName)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -251,7 +252,8 @@ var _ = Describe("RestoreManager Test", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				By("test CheckJobsDone function and jobs is running")
-				allJobsFinished, existFailedJob := restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				allJobsFinished, existFailedJob, err := restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				Expect(err).ShouldNot(HaveOccurred())
 				Expect(allJobsFinished).Should(BeFalse())
 
 				By("mock jobs are completed")
@@ -261,7 +263,8 @@ var _ = Describe("RestoreManager Test", func() {
 				}
 
 				By("test CheckJobsDone function and jobs are finished")
-				allJobsFinished, existFailedJob = restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				allJobsFinished, existFailedJob, err = restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+				Expect(err).ShouldNot(HaveOccurred())
 				Expect(allJobsFinished).Should(BeTrue())
 
 				By("test Recalculation function, allJobFinished should be false because it only restored one pvc.")

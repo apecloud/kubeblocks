@@ -411,6 +411,14 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
 	// 3. inject restore manager
+	// `restore manager` container waits until all restore containers from every restore job have finished,
+	// by monitoring an `dataprotection.kubeblocks.io/stop-restore-manager` annotation signal added by
+	// the restore controller after all restore containers finish.
+	//
+	// To guarantee that the recovered PVCs/PVs and pods are scheduled correctly, we specify the same
+	// scheduling policy for job pods. However, the scheduler might not consider the restore job pod
+	// when scheduling other pods if it is completed too quickly, which may lead to incorrect scheduling.
+	// This container ensures that all job pods are considered by the scheduler.
 	r.InjectManagerContainer(&job.Spec.Template.Spec)
 
 	// 4. inject datasafed if needed

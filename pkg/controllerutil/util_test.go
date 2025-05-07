@@ -25,10 +25,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -108,4 +112,58 @@ func TestRequestCtxMisc(t *testing.T) {
 		Ctx:      context.Background(),
 		Recorder: record.NewFakeRecorder(100),
 	})
+}
+
+func TestGetKubeVersion(t *testing.T) {
+	tests := []struct {
+		name        string
+		versionInfo interface{}
+		expected    string
+		withError   bool
+	}{
+		{
+			name:        "valid version info",
+			versionInfo: version.Info{GitVersion: "v1.20"},
+			expected:    "v1.20",
+			withError:   false,
+		},
+		{
+			name:        "invalid version info",
+			versionInfo: "invalid",
+			expected:    "",
+			withError:   true,
+		},
+		{
+			name:        "invalid major version",
+			versionInfo: version.Info{GitVersion: "vmajor.20"},
+			expected:    "",
+			withError:   true,
+		},
+		{
+			name:        "invalid minor version",
+			versionInfo: version.Info{GitVersion: "v1.minor"},
+			expected:    "",
+			withError:   true,
+		},
+		{
+			name:        "version with suffix",
+			versionInfo: version.Info{GitVersion: "v1.20.0-rc1"},
+			expected:    "v1.20",
+			withError:   false,
+		},
+	}
+
+	defer viper.Set(constant.CfgKeyServerInfo, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Set(constant.CfgKeyServerInfo, tt.versionInfo)
+			ver, err := GetKubeVersion()
+			assert.Equal(t, tt.expected, ver)
+			if tt.withError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

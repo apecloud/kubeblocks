@@ -36,9 +36,9 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 func getVolumesByNames(pod *corev1.Pod, volumeNames []string) []corev1.Volume {
@@ -315,7 +315,7 @@ func SetExpirationTime(backup *dpv1alpha1.Backup) error {
 // The kube-controller-manager interprets schedules relative to its local time zone.
 func BuildCronJobSchedule(cronExpression string) (*string, string) {
 	timeZone := "UTC"
-	ver, err := dputils.GetKubeVersion()
+	ver, err := intctrlutil.GetKubeVersion()
 	if err != nil {
 		return nil, cronExpression
 	}

@@ -177,6 +177,7 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 			newObj := newSnapshot[name]
 			if !equality.Semantic.DeepEqual(oldObj, newObj) {
 				// if object is pod and using InPlacePodVerticalScaling, it may need to use a /resize subresource. Update the sub resource if needed.
+				useResizeSubResource := false
 				if oldPod, ok := oldObj.(*corev1.Pod); ok {
 					newPod := newObj.(*corev1.Pod)
 					equal := true
@@ -196,11 +197,16 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 						if ok {
 							v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource("resize"))
 							findAndAppend(v)
+							useResizeSubResource = true
 						}
 					}
 				}
-				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
-				findAndAppend(v)
+				// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
+				// Another reconciliation will be triggered since pod status will be updated.
+				if !useResizeSubResource {
+					v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
+					findAndAppend(v)
+				}
 			}
 		}
 	}
@@ -293,30 +299,36 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	var err error
+	var reason string
 	if vertex.SubResource != "" {
 		err = b.cli.SubResource(vertex.SubResource).Update(ctx, vertex.Obj, clientOption(vertex))
+		reason = "SuccessfulUpdateSubResource"
 	} else {
 		err = b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
+		reason = "SuccessfulUpdate"
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	b.emitEvent(vertex.Obj, "SuccessfulUpdate", model.UPDATE)
+	b.emitEvent(vertex.Obj, reason, model.UPDATE)
 	return nil
 }
 
 func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	var err error
+	var reason string
 	patch := client.MergeFrom(vertex.OriObj)
 	if vertex.SubResource != "" {
 		err = b.cli.SubResource(vertex.SubResource).Patch(ctx, vertex.Obj, patch, clientOption(vertex))
+		reason = "SuccessfulPatchSubResource"
 	} else {
 		err = b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
+		reason = "SuccessfulPatch"
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	b.emitEvent(vertex.Obj, "SuccessfulPatch", model.PATCH)
+	b.emitEvent(vertex.Obj, reason, model.PATCH)
 	return nil
 }
 

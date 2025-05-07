@@ -84,6 +84,9 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if targetName, ok := v.Annotations[constant.BackupSourceTargetAnnotationKey]; ok {
 				compName := v.Labels[constant.KBAppComponentLabelKey]
 				allocateTargetMap[targetName] = compName
+				if c.annotations[compName] == nil {
+					c.annotations[compName] = map[string]string{}
+				}
 				c.annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
 			}
 		}
@@ -101,6 +104,9 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			for _, compSpec := range c.shardingComps[spec.Name] {
 				if _, ok = c.annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
 					continue
+				}
+				if c.annotations[compSpec.Name] == nil {
+					c.annotations[compSpec.Name] = map[string]string{}
 				}
 				c.annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
 				break

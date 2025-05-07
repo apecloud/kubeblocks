@@ -28,6 +28,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -37,6 +38,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type transformContext struct {
@@ -93,7 +95,7 @@ func (b *PlanBuilder) AddTransformer(_ ...graph.Transformer) graph.PlanBuilder {
 }
 
 func (b *PlanBuilder) Build() (graph.Plan, error) {
-	vertices := buildOrderedVertices(b.transCtx.GetContext(), b.currentTree, b.desiredTree)
+	vertices := buildOrderedVertices(b.transCtx, b.currentTree, b.desiredTree)
 	plan := &Plan{
 		walkFunc: b.defaultWalkFunc,
 		vertices: vertices,
@@ -101,7 +103,8 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 	return plan, nil
 }
 
-func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
+func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
+	ctx := transCtx.GetContext()
 	getStatusField := func(obj client.Object) interface{} {
 		objValue := reflect.ValueOf(obj)
 		if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
@@ -172,7 +175,30 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 		for name := range updateSet {
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
-			if !reflect.DeepEqual(oldObj, newObj) {
+			if !equality.Semantic.DeepEqual(oldObj, newObj) {
+				// if object is pod and using InPlacePodVerticalScaling, it may need to use a /resize subresource. Update the sub resource if needed.
+				if oldPod, ok := oldObj.(*corev1.Pod); ok {
+					newPod := newObj.(*corev1.Pod)
+					equal := true
+					for i, c := range oldPod.Spec.Containers {
+						newC := newPod.Spec.Containers[i]
+						if !equality.Semantic.DeepEqual(c.Resources, newC.Resources) {
+							equal = false
+							break
+						}
+					}
+					if !equal {
+						ok, err := intctrlutil.SupportResizeSubResource()
+						if err != nil {
+							transCtx.logger.Error(err, "check support resize sub resource error")
+							continue
+						}
+						if ok {
+							v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource("resize"))
+							findAndAppend(v)
+						}
+					}
+				}
 				v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
 				findAndAppend(v)
 			}
@@ -266,7 +292,12 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
+	var err error
+	if vertex.SubResource != "" {
+		err = b.cli.SubResource(vertex.SubResource).Update(ctx, vertex.Obj, clientOption(vertex))
+	} else {
+		err = b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
+	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -275,12 +306,17 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 }
 
 func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVertex) error {
+	var err error
 	patch := client.MergeFrom(vertex.OriObj)
-	err := b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
+	if vertex.SubResource != "" {
+		err = b.cli.SubResource(vertex.SubResource).Patch(ctx, vertex.Obj, patch, clientOption(vertex))
+	} else {
+		err = b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
+	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	b.emitEvent(vertex.Obj, "SuccessfulUpdate", model.UPDATE)
+	b.emitEvent(vertex.Obj, "SuccessfulPatch", model.PATCH)
 	return nil
 }
 

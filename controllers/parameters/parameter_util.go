@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -279,8 +280,15 @@ func handleClusterDeleted(reqCtx intctrlutil.RequestCtx, cli client.Client, para
 }
 
 func updateOwnerReference(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, parameter *parametersv1alpha1.Parameter) (*ctrl.Result, error) {
+	hasValidateOwnershop := func(obj client.Object) bool {
+		// Check if the `parameter` object has a controller reference(Operation CR) or if the `cluster` is its owner.
+		// If neither condition is true, attempt to set the `cluster` as the owner of the `parameter`.
+		// This ensures proper ownership and garbage collection behavior in Kubernetes.
+		return controllerutil.HasControllerReference(obj) || model.IsOwnerOf(cluster, obj)
+	}
+
 	clusterName := parameter.Labels[constant.AppInstanceLabelKey]
-	if clusterName == parameter.Spec.ClusterName && model.IsOwnerOf(cluster, parameter) {
+	if clusterName == parameter.Spec.ClusterName && hasValidateOwnershop(parameter) {
 		return nil, nil
 	}
 
@@ -288,7 +296,7 @@ func updateOwnerReference(reqCtx intctrlutil.RequestCtx, cli client.Client, clus
 	if parameter.Labels == nil {
 		parameter.Labels = make(map[string]string)
 	}
-	if !model.IsOwnerOf(cluster, parameter) {
+	if !hasValidateOwnershop(parameter) {
 		if err := intctrlutil.SetOwnerReference(cluster, parameter); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}

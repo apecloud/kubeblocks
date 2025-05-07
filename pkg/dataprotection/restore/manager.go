@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -45,6 +46,10 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+const (
+	restoreManagerContainerName = "restore-manager"
+)
+
 type BackupActionSet struct {
 	Backup *dpv1alpha1.Backup
 	// set it when the backup relies on incremental backups, such as Incremental backup
@@ -62,10 +67,11 @@ type RestoreManager struct {
 	PostReadyBackupSets   []BackupActionSet
 	Schema                *runtime.Scheme
 	Recorder              record.EventRecorder
+	Client                client.Client
 	WorkerServiceAccount  string
 }
 
-func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorder, schema *runtime.Scheme) *RestoreManager {
+func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorder, schema *runtime.Scheme, client client.Client) *RestoreManager {
 	return &RestoreManager{
 		OriginalRestore:       restore.DeepCopy(),
 		Restore:               restore,
@@ -73,6 +79,7 @@ func NewRestoreManager(restore *dpv1alpha1.Restore, recorder record.EventRecorde
 		PostReadyBackupSets:   []BackupActionSet{},
 		Schema:                schema,
 		Recorder:              recorder,
+		Client:                client,
 	}
 }
 
@@ -793,7 +800,7 @@ func (r *RestoreManager) CheckJobsDone(
 	stage dpv1alpha1.RestoreStage,
 	actionName string,
 	backupSet BackupActionSet,
-	fetchedJobs []*batchv1.Job) (bool, bool) {
+	fetchedJobs []*batchv1.Job) (bool, bool, error) {
 	var (
 		allJobFinished = true
 		existFailedJob bool
@@ -802,6 +809,9 @@ func (r *RestoreManager) CheckJobsDone(
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = &r.Restore.Status.Actions.PostReady
 	}
+	// count the number of jobs that are completed, failed,
+	// or have the normally terminated `restore` container
+	finishedCount := 0
 	for i := range fetchedJobs {
 		statusAction := dpv1alpha1.RestoreStatusAction{
 			Name:       actionName,
@@ -815,16 +825,97 @@ func (r *RestoreManager) CheckJobsDone(
 			statusAction.Status = dpv1alpha1.RestoreActionFailed
 			statusAction.Message = errMsg
 			SetRestoreStatusAction(restoreActions, statusAction)
+			finishedCount++
 		case done:
 			statusAction.Status = dpv1alpha1.RestoreActionCompleted
 			SetRestoreStatusAction(restoreActions, statusAction)
+			finishedCount++
 		default:
 			allJobFinished = false
 			statusAction.Status = dpv1alpha1.RestoreActionProcessing
 			SetRestoreStatusAction(restoreActions, statusAction)
+			normalTerminated, err := r.CheckIfRestoreContainerTerminated(fetchedJobs[i])
+			if err != nil {
+				return false, false, err
+			}
+			if normalTerminated {
+				finishedCount++
+			}
 		}
 	}
-	return allJobFinished, existFailedJob
+	// wait until all `restore` containers are terminated normally or jobs are completed or failed
+	if finishedCount == len(fetchedJobs) {
+		for i := range fetchedJobs {
+			err := r.StopManagerContainerByJob(fetchedJobs[i])
+			if err != nil {
+				return false, false, err
+			}
+		}
+	}
+	return allJobFinished, existFailedJob, nil
+}
+
+// CheckIfRestoreContainerTerminated checks if the `restore` container is terminated.
+// If the `restore` container is terminated abnormally, stop the `restore manager` container.
+func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (normalTerminated bool, err error) {
+	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return false, err
+	}
+	if len(podList.Items) == 0 {
+		return false, nil
+	}
+	for i, pod := range podList.Items {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name != Restore {
+				continue
+			}
+			terminatedState := containerStatus.State.Terminated
+			if terminatedState != nil {
+				if terminatedState.ExitCode != 0 {
+					// stop `restore manager` container if the `restore` container is terminated abnormally
+					if err := r.StopManagerContainer(&podList.Items[i]); err != nil {
+						return false, err
+					}
+				} else {
+					normalTerminated = true
+				}
+			}
+		}
+	}
+	return normalTerminated, nil
+}
+
+// StopManagerContainerByJob stops the `restore manager` containers by the job.
+func (r *RestoreManager) StopManagerContainerByJob(job *batchv1.Job) error {
+	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return err
+	}
+	for i := range podList.Items {
+		err := r.StopManagerContainer(&podList.Items[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StopManagerContainer stops the `restore manager` container.
+func (r *RestoreManager) StopManagerContainer(pod *corev1.Pod) error {
+	modified := pod.DeepCopy()
+	if modified.Annotations == nil {
+		modified.Annotations = map[string]string{}
+	}
+	if val, ok := modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey]; ok && val == "true" {
+		return nil
+	}
+	// `restore manager` container will read this annotation to stop
+	modified.Annotations[DataProtectionStopRestoreManagerAnnotationKey] = "true"
+	if err := r.Client.Patch(context.Background(), modified, client.MergeFrom(pod)); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	return nil
 }
 
 // Recalculation whether all actions have been completed.

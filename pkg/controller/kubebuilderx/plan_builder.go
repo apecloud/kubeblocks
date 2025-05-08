@@ -180,15 +180,19 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 				useResizeSubResource := false
 				if oldPod, ok := oldObj.(*corev1.Pod); ok {
 					newPod := newObj.(*corev1.Pod)
-					equal := true
+					if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
+						transCtx.logger.Error(errors.New("pod containers length not equal"), "skipping updating, this may be a bug of kubeblocks")
+						continue
+					}
+					resEqual := true
 					for i, c := range oldPod.Spec.Containers {
 						newC := newPod.Spec.Containers[i]
 						if !equality.Semantic.DeepEqual(c.Resources, newC.Resources) {
-							equal = false
+							resEqual = false
 							break
 						}
 					}
-					if !equal {
+					if !resEqual {
 						ok, err := intctrlutil.SupportResizeSubResource()
 						if err != nil {
 							transCtx.logger.Error(err, "check support resize sub resource error")

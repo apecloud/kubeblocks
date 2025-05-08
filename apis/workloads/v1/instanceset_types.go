@@ -399,6 +399,13 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// TODO: corev1.Container
+	// +optional
+	Images map[string]string `json:"images,omitempty"`
+
+	// +optional
+	InitImages map[string]string `json:"initImages,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {

@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -109,6 +110,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		TLSConfig:                        comp.Spec.TLSConfig,
 		ServiceAccountName:               comp.Spec.ServiceAccountName,
 		Instances:                        comp.Spec.Instances,
+		InstancesExt:                     getInstanceTemplates(comp.Spec.Instances),
 		OfflineInstances:                 comp.Spec.OfflineInstances,
 		DisableExporter:                  comp.Spec.DisableExporter,
 		Stop:                             comp.Spec.Stop,
@@ -227,6 +229,28 @@ func buildCompDef2CompCount(ctx context.Context, cli client.Reader, namespace, c
 		add(spec.Template.ComponentDef, spec.Shards)
 	}
 	return result, nil
+}
+
+func getInstanceTemplates(instances []appsv1.InstanceTemplate) []workloads.InstanceTemplate {
+	if instances == nil {
+		return nil
+	}
+	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
+	for i := range instances {
+		instanceTemplates[i] = workloads.InstanceTemplate{
+			Name:             instances[i].Name,
+			Replicas:         instances[i].Replicas,
+			Ordinals:         instances[i].Ordinals,
+			Annotations:      instances[i].Annotations,
+			Labels:           instances[i].Labels,
+			SchedulingPolicy: instances[i].SchedulingPolicy,
+			Resources:        instances[i].Resources,
+			Env:              instances[i].Env,
+			Images:           make(map[string]string),
+			InitImages:       make(map[string]string),
+		}
+	}
+	return instanceTemplates
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

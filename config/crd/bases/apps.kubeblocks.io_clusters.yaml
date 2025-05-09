@@ -3943,6 +3943,13 @@ spec:
 
                               The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
                             type: string
+                          persistentVolumeClaimName:
+                            description: |-
+                              Specifies the prefix of the PVC name for the volume.
+
+
+                              For each replica, the final name of the PVC will be in format: <PersistentVolumeClaimName>-<ordinal>
+                            type: string
                           spec:
                             description: |-
                               Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
@@ -11238,6 +11245,13 @@ spec:
 
 
                                   The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
+                                type: string
+                              persistentVolumeClaimName:
+                                description: |-
+                                  Specifies the prefix of the PVC name for the volume.
+
+
+                                  For each replica, the final name of the PVC will be in format: <PersistentVolumeClaimName>-<ordinal>
                                 type: string
                               spec:
                                 description: |-

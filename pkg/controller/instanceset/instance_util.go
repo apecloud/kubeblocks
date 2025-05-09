@@ -537,7 +537,7 @@ func buildInstancePodByTemplate(name string, template *instanceTemplateExt, pare
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := composePVCName(pod.GetName(), claimTemplate.Name)
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, pod.GetName())
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
 
@@ -566,7 +566,7 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(parent.Name)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := composePVCName(name, claimTemplate.Name)
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, name)
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(labels).
 			AddLabelsInMap(template.Labels).
@@ -587,10 +587,6 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 		}
 	}
 	return pvcs, nil
-}
-
-func composePVCName(podName, claimTemplateName string) string {
-	return fmt.Sprintf("%s-%s", claimTemplateName, podName)
 }
 
 // copyAndMerge merges two objects for updating:

@@ -3350,6 +3350,19 @@ string
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the prefix of the PVC name for the volume.</p>
+<p>For each replica, the final name of the PVC will be in format: <PersistentVolumeClaimName>-<ordinal></p>
+</td>
+</tr>
+<tr>
+<td>
 <code>labels</code><br/>
 <em>
 map[string]string

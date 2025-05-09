@@ -193,6 +193,13 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies the prefix of the PVC name for the volume.
+	//
+	// For each replica, the final name of the PVC will be in format: <PersistentVolumeClaimName>-<ordinal>
+	//
+	// +optional
+	PersistentVolumeClaimName *string `json:"persistentVolumeClaimName,omitempty"`
+
 	// Specifies the labels for the PVC of the volume.
 	//
 	// +optional

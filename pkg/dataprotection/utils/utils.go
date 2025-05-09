@@ -105,9 +105,8 @@ func RemoveDataProtectionFinalizer(ctx context.Context, cli client.Client, obj c
 	if !controllerutil.ContainsFinalizer(obj, dptypes.DataProtectionFinalizerName) {
 		return nil
 	}
-	patch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
 	controllerutil.RemoveFinalizer(obj, dptypes.DataProtectionFinalizerName)
-	return cli.Patch(ctx, obj, patch)
+	return cli.Update(ctx, obj)
 }
 
 // GetActionSetByName gets the ActionSet by name.

@@ -2370,6 +2370,11 @@ func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec
 		*out = make([]corev1.PersistentVolumeAccessMode, len(*in))
 		copy(*out, *in)
 	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.StorageClassName != nil {
 		in, out := &in.StorageClassName, &out.StorageClassName

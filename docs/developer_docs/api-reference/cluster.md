@@ -3344,7 +3344,6 @@ string
 <p>Refers to the name of a volumeMount defined in either:</p>
 <ul>
 <li><code>componentDefinition.spec.runtime.containers[*].volumeMounts</code></li>
-<li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
 </ul>
 <p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
 </td>
@@ -3408,6 +3407,20 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 </tr>
 <tr>
 <td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>selector is a label query over volumes to consider for binding.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
@@ -3421,6 +3434,18 @@ Kubernetes core/v1.VolumeResourceRequirements
 If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
 are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
 More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeName is the binding reference to the PersistentVolume backing this claim.</p>
 </td>
 </tr>
 <tr>
@@ -8657,6 +8682,20 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 </tr>
 <tr>
 <td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>selector is a label query over volumes to consider for binding.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>resources</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumeresourcerequirements-v1-core">
@@ -8670,6 +8709,18 @@ Kubernetes core/v1.VolumeResourceRequirements
 If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
 are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
 More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeName is the binding reference to the PersistentVolume backing this claim.</p>
 </td>
 </tr>
 <tr>

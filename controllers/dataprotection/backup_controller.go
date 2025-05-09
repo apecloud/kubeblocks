@@ -268,6 +268,12 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 		return intctrlutil.Reconciled()
 	}
 
+	if cleaned, err := r.waitForBackupPodsDeleted(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	} else if !cleaned {
+		return intctrlutil.Reconciled()
+	}
+
 	if err := r.deleteVolumeSnapshots(reqCtx, backup); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -749,6 +755,20 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 		Client:     r.Client,
 	}
 	return deleter.DeleteVolumeSnapshots(backup)
+}
+
+func (r *BackupReconciler) waitForBackupPodsDeleted(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
+	podList := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(backup.Namespace),
+		client.MatchingLabels(map[string]string{
+			dptypes.BackupNameLabelKey: backup.Name,
+		})); err != nil {
+		return false, err
+	}
+	if len(podList.Items) == 0 {
+		return true, nil
+	}
+	return false, nil
 }
 
 // deleteExternalResources deletes the external workloads that execute backup.

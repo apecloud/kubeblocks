@@ -263,14 +263,14 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if cleaned, err := r.waitForBackupPodsDeleted(reqCtx, backup); err != nil {
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-	} else if !cleaned {
+	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the backup if deletionPolicy is Retain")
 		return intctrlutil.Reconciled()
 	}
 
-	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the backup if deletionPolicy is Retain")
+	if cleaned, err := r.waitForBackupPodsDeleted(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	} else if !cleaned {
 		return intctrlutil.Reconciled()
 	}
 

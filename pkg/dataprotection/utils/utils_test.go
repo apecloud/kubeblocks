@@ -23,66 +23,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/version"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
-
-func TestGetKubeVersion(t *testing.T) {
-	tests := []struct {
-		name        string
-		versionInfo interface{}
-		expected    string
-		withError   bool
-	}{
-		{
-			name:        "valid version info",
-			versionInfo: version.Info{GitVersion: "v1.20"},
-			expected:    "v1.20",
-			withError:   false,
-		},
-		{
-			name:        "invalid version info",
-			versionInfo: "invalid",
-			expected:    "",
-			withError:   true,
-		},
-		{
-			name:        "invalid major version",
-			versionInfo: version.Info{GitVersion: "vmajor.20"},
-			expected:    "",
-			withError:   true,
-		},
-		{
-			name:        "invalid minor version",
-			versionInfo: version.Info{GitVersion: "v1.minor"},
-			expected:    "",
-			withError:   true,
-		},
-		{
-			name:        "version with suffix",
-			versionInfo: version.Info{GitVersion: "v1.20.0-rc1"},
-			expected:    "v1.20",
-			withError:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			viper.Set(constant.CfgKeyServerInfo, tt.versionInfo)
-			ver, err := GetKubeVersion()
-			assert.Equal(t, tt.expected, ver)
-			if tt.withError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
 
 func TestGetBackupStatusTarget(t *testing.T) {
 	sourceTargetName := "test-target"

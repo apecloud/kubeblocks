@@ -42,6 +42,7 @@ var (
 	k8sMock        *mocks.MockClient
 	ctx            context.Context
 	logger         logr.Logger
+	transCtx       *transformContext
 )
 
 func init() {
@@ -57,6 +58,11 @@ var _ = BeforeSuite(func() {
 	mockController, k8sMock = testutil.SetupK8sMock()
 	ctx = context.Background()
 	logger = logf.FromContext(ctx).WithValues("kubebuilderx-test", "foo")
+	transCtx = &transformContext{
+		ctx:    ctx,
+		cli:    k8sMock,
+		logger: logger,
+	}
 
 	go func() {
 		defer GinkgoRecover()

@@ -198,15 +198,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 		if updatePolicy == InPlaceUpdatePolicy {
-			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			newPod := copyAndMerge(pod, newInstance.pod)
-			if err = r.switchover(tree, its, newPod.(*corev1.Pod)); err != nil {
+			newMergedPod := copyAndMerge(pod, newPod)
+			if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
 				return kubebuilderx.Continue, err
 			}
-			if err = tree.Update(newPod); err != nil {
+			if err = tree.Update(newMergedPod); err != nil {
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++

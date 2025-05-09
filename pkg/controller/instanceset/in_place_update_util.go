@@ -310,11 +310,11 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 	if index < 0 {
 		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", pod.Name)
 	}
-	inst, err := buildInstanceByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
+	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	basicUpdate := !equalBasicInPlaceFields(pod, inst.pod)
+	basicUpdate := !equalBasicInPlaceFields(pod, newPod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
 			return InPlaceUpdatePolicy, nil
@@ -322,7 +322,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return NoOpsPolicy, nil
 	}
 
-	resourceUpdate := !equalResourcesInPlaceFields(pod, inst.pod)
+	resourceUpdate := !equalResourcesInPlaceFields(pod, newPod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
 			return InPlaceUpdatePolicy, nil

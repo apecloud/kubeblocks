@@ -418,19 +418,19 @@ func (r *componentWorkloadOps) expandVolume() error {
 		if proto == nil {
 			continue
 		}
-		if err := r.expandVolumes(vct.Name, proto); err != nil {
+		if err := r.expandVolumes(vct, proto); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for _, pod := range r.runningItsPodNames {
+func (r *componentWorkloadOps) expandVolumes(vct corev1.PersistentVolumeClaim, proto *corev1.PersistentVolumeClaimTemplate) error {
+	for _, podName := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.synthesizeComp.Namespace,
-			Name:      fmt.Sprintf("%s-%s", vctName, pod),
+			Name:      intctrlutil.ComposePVCName(vct, podName),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.transCtx.Context, pvcKey, pvc, appsutil.InDataContext4C()); err != nil {

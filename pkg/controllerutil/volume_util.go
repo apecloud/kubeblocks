@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -59,7 +62,9 @@ func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.Pe
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:               v.Spec.AccessModes,
+				Selector:                  v.Spec.Selector,
 				Resources:                 v.Spec.Resources,
+				VolumeName:                v.Spec.VolumeName,
 				StorageClassName:          storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
 				VolumeMode:                v.Spec.VolumeMode,
 				VolumeAttributesClassName: v.Spec.VolumeAttributesClassName,
@@ -82,4 +87,17 @@ func ToCoreV1PVCTs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.P
 		pvcts = append(pvcts, pvct(i))
 	}
 	return pvcts
+}
+
+func ComposePVCName(template corev1.PersistentVolumeClaim, podName string) string {
+	if template.Annotations != nil {
+		prefix, ok := template.Annotations[constant.PVCNamePrefixAnnotationKey]
+		if ok {
+			// TODO: pvc name, flat ordinal
+			tokens := strings.Split(podName, "-")
+			ordinal := tokens[len(tokens)-1]
+			return fmt.Sprintf("%s-%s", prefix, ordinal)
+		}
+	}
+	return fmt.Sprintf("%s-%s", template.Name, podName)
 }

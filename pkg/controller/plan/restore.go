@@ -173,6 +173,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {
 			continue
 		}
+		// TODO: pvc name
 		name := fmt.Sprintf("%s-%s-%s", v.Name, r.Cluster.Name, comp.Name)
 		if templateName != "" {
 			name += "-" + templateName

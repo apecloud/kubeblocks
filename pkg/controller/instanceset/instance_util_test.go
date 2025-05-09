@@ -159,7 +159,7 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("buildInstanceByTemplate", func() {
+	Context("buildInstancePodByTemplate", func() {
 		It("should work well", func() {
 			itsExt, err := buildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
@@ -169,25 +169,20 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			instance, err := buildInstanceByTemplate(name, template, its, "")
+			pod, err := buildInstancePodByTemplate(name, template, its, "")
 			Expect(err).Should(BeNil())
-			Expect(instance.pod).ShouldNot(BeNil())
-			Expect(instance.pvcs).ShouldNot(BeNil())
-			Expect(instance.pvcs).Should(HaveLen(1))
-			Expect(instance.pod.Name).Should(Equal(name))
-			Expect(instance.pod.Namespace).Should(Equal(its.Namespace))
-			Expect(instance.pod.Spec.Volumes).Should(HaveLen(1))
-			Expect(instance.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
+			Expect(pod).ShouldNot(BeNil())
+			Expect(pod.Name).Should(Equal(name))
+			Expect(pod.Namespace).Should(Equal(its.Namespace))
+			Expect(pod.Spec.Volumes).Should(HaveLen(1))
+			Expect(pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
 			expectedTemplate := its.Spec.Template.DeepCopy()
-			Expect(instance.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
+			Expect(pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
-			instance.pod.Spec.Volumes = nil
-			instance.pod.Spec.Hostname = ""
-			instance.pod.Spec.Subdomain = ""
-			Expect(instance.pod.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(instance.pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, instance.pod.Name)))
-			Expect(instance.pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
-			Expect(instance.pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
+			pod.Spec.Volumes = nil
+			pod.Spec.Hostname = ""
+			pod.Spec.Subdomain = ""
+			Expect(pod.Spec).Should(Equal(expectedTemplate.Spec))
 		})
 
 		It("adds nodeSelector according to annotation", func() {
@@ -201,9 +196,9 @@ var _ = Describe("instance util test", func() {
 
 			node := "test-node-1"
 			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})).To(Succeed())
-			instance, err := buildInstanceByTemplate(name, template, its, "")
+			pod, err := buildInstancePodByTemplate(name, template, its, "")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
+			Expect(pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
 
 			By("test with an already existing annotation")
 			delete(its.Annotations, constant.NodeSelectorOnceAnnotationKey)
@@ -213,9 +208,9 @@ var _ = Describe("instance util test", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(mapping).To(HaveKeyWithValue("other-pod", "other-node"))
 			Expect(mapping).To(HaveKeyWithValue(name, node))
-			instance, err = buildInstanceByTemplate(name, template, its, "")
+			pod, err = buildInstancePodByTemplate(name, template, its, "")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
+			Expect(pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
 		})
 	})
 
@@ -229,7 +224,8 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			pvcs := buildInstancePVCByTemplate(name, template, its)
+			pvcs, err := buildInstancePVCByTemplate(name, template, its)
+			Expect(err).Should(BeNil())
 			Expect(pvcs).Should(HaveLen(1))
 			Expect(pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, name)))
 			Expect(pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))

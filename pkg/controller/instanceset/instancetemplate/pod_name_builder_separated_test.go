@@ -33,7 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
-var _ = Describe("Seperated Name builder tests", func() {
+var _ = Describe("Separated Name builder tests", func() {
 	DescribeTable("generates instance ordinals",
 		// expected doesn't need its name prefix
 		func(its *workloads.InstanceSet, expected []string, expectError bool) {
@@ -135,7 +135,7 @@ var _ = Describe("Seperated Name builder tests", func() {
 						Replicas: ptr.To[int32](1),
 					},
 				},
-				PodNamingRule: workloads.PodNamingRuleSeperated,
+				PodNamingRule: workloads.PodNamingRuleSeparated,
 			},
 		}
 
@@ -160,7 +160,7 @@ var _ = Describe("Seperated Name builder tests", func() {
 				SetReplicas(3).
 				SetTemplate(template).
 				SetVolumeClaimTemplates(volumeClaimTemplates...).
-				SetPodNamingRule(workloads.PodNamingRuleSeperated).
+				SetPodNamingRule(workloads.PodNamingRuleSeparated).
 				GetObject()
 		})
 

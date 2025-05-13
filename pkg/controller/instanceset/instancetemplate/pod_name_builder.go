@@ -45,9 +45,9 @@ func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNam
 		return &combinedPodNameBuilder{
 			itsExt: itsExt,
 		}, nil
-	// default to seperated naming rule, since it's the old behavior
+	// default to separated naming rule, since it's the old behavior
 	default:
-		return &seperatedPodNameBuilder{
+		return &separatedPodNameBuilder{
 			itsExt: itsExt,
 		}, nil
 	}

@@ -31,11 +31,11 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-type seperatedPodNameBuilder struct {
+type separatedPodNameBuilder struct {
 	itsExt *InstanceSetExt
 }
 
-func (s *seperatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
+func (s *separatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
 	instanceTemplateList := buildInstanceTemplateExts(s.itsExt)
 	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
 	for _, template := range instanceTemplateList {
@@ -54,7 +54,7 @@ func (s *seperatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*I
 	return allNameTemplateMap, nil
 }
 
-func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
+func (s *separatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	instanceNameList := make([]string, 0)
 	for _, template := range s.itsExt.InstanceTemplates {
 		replicas := template.GetReplicas()
@@ -73,7 +73,7 @@ func (s *seperatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	return instanceNameList, nil
 }
 
-func (s *seperatedPodNameBuilder) Validate() error {
+func (s *separatedPodNameBuilder) Validate() error {
 	instances, err := s.GenerateAllInstanceNames()
 	if err != nil {
 		return err

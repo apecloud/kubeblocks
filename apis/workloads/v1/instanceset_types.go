@@ -133,8 +133,8 @@ type InstanceSetSpec struct {
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// +optional
-	// +kubebuilder:default=Seperated
-	// +kubebuilder:validation:Enum={Seperated,Sequential}
+	// +kubebuilder:default=Separated
+	// +kubebuilder:validation:Enum={Separated,Sequential}
 	PodNamingRule PodNamingRule `json:"podNamingRule,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.
@@ -562,7 +562,7 @@ type InstanceTemplateStatus struct {
 type PodNamingRule string
 
 const (
-	PodNamingRuleSeperated PodNamingRule = "Seperated"
+	PodNamingRuleSeparated PodNamingRule = "Separated"
 	PodNamingRuleCombined  PodNamingRule = "Combined"
 )
 

@@ -430,7 +430,7 @@ func (r *componentWorkloadOps) expandVolumes(vct corev1.PersistentVolumeClaim, p
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.synthesizeComp.Namespace,
-			Name:      intctrlutil.ComposePVCName(vct, podName),
+			Name:      intctrlutil.ComposePVCName(vct, r.synthesizeComp.Name, podName),
 		}
 		pvcNotFound := false
 		if err := r.cli.Get(r.transCtx.Context, pvcKey, pvc, appsutil.InDataContext4C()); err != nil {

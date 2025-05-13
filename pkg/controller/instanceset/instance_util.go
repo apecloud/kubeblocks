@@ -537,7 +537,7 @@ func buildInstancePodByTemplate(name string, template *instanceTemplateExt, pare
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, pod.GetName())
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, pod.GetName())
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
 
@@ -566,7 +566,7 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(parent.Name)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, name)
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, name)
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(labels).
 			AddLabelsInMap(template.Labels).

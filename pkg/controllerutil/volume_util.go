@@ -89,14 +89,12 @@ func ToCoreV1PVCTs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.P
 	return pvcts
 }
 
-func ComposePVCName(template corev1.PersistentVolumeClaim, podName string) string {
+func ComposePVCName(template corev1.PersistentVolumeClaim, itsName, podName string) string {
 	if template.Annotations != nil {
 		prefix, ok := template.Annotations[constant.PVCNamePrefixAnnotationKey]
 		if ok {
-			// TODO: pvc name, flat ordinal
-			tokens := strings.Split(podName, "-")
-			ordinal := tokens[len(tokens)-1]
-			return fmt.Sprintf("%s-%s", prefix, ordinal)
+			suffix, _ := strings.CutPrefix(podName, fmt.Sprintf("%s-", itsName))
+			return fmt.Sprintf("%s-%s", prefix, suffix)
 		}
 	}
 	return fmt.Sprintf("%s-%s", template.Name, podName)

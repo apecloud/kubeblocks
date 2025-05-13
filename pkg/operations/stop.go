@@ -28,7 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -129,10 +131,60 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return expectProgressCount, completedCount, nil
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
+
+	phase, duration, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
+
+	// 新增逻辑：当集群进入停止状态时暂停相关备份
+	if opsRes.Cluster.Status.Phase == appsv1.StoppingClusterPhase || opsRes.Cluster.Status.Phase == appsv1.StoppedClusterPhase {
+		if err := pauseRelatedBackups(reqCtx, cli, opsRes.Cluster); err != nil {
+			return opsv1alpha1.OpsFailedPhase, 0, err
+		}
+	}
+
+	return phase, duration, err
+	//return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	return nil
+}
+
+// pauseRelatedBackups 暂停与集群关联的所有运行中的备份
+func pauseRelatedBackups(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster) error {
+	// 1. 通过标签获取关联的所有Backup资源
+	backupList := &dpv1alpha1.BackupList{}
+	labels := client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name, // 假设Backup使用该标签关联Cluster
+	}
+	if err := cli.List(reqCtx.Ctx, backupList, client.InNamespace(cluster.Namespace), labels); err != nil {
+		return err
+	}
+
+	// 2. 过滤出需要暂停的备份
+	var needUpdateBackups []*dpv1alpha1.Backup
+	for i := range backupList.Items {
+		backup := &backupList.Items[i]
+		if backup.Status.Phase == dpv1alpha1.BackupPhaseRunning {
+			needUpdateBackups = append(needUpdateBackups, backup)
+		}
+	}
+
+	// 3. 批量更新备份状态为Paused
+	for _, backup := range needUpdateBackups {
+		patch := client.MergeFrom(backup.DeepCopy())
+		backup.Status.Phase = dpv1alpha1.BackupPhasePaused
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if backup.Status.StartTimestamp != nil {
+			duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+			backup.Status.Duration = &metav1.Duration{Duration: duration}
+		}
+		if err := cli.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
+			return err
+		}
+		reqCtx.Log.Info("paused backup due to cluster stopping",
+			"backup", client.ObjectKeyFromObject(backup),
+			"cluster", cluster.Name)
+	}
 	return nil
 }

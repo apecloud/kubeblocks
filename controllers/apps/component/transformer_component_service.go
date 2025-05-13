@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -58,6 +57,7 @@ var _ graph.Transformer = &componentServiceTransformer{}
 
 func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	runningITS := transCtx.RunningWorkload.(*workloads.InstanceSet)
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
@@ -78,7 +78,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service)
+		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, runningITS)
 		if err != nil {
 			return err
 		}
@@ -113,13 +113,13 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 }
 
 func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS *workloads.InstanceSet) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(comp, synthesizeComp, service)
+		return t.buildPodService(comp, synthesizeComp, service, runningITS)
 	}
 	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
@@ -129,8 +129,8 @@ func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentServ
 }
 
 func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
-	pods, err := t.podsNameNSuffix(synthesizeComp)
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS *workloads.InstanceSet) ([]*corev1.Service, error) {
+	pods, err := t.podsNameNSuffix(synthesizeComp, runningITS)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +153,8 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 	return t.buildServices(comp, synthesizeComp, services)
 }
 
-func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent) (map[string]string, error) {
-	podNames, err := generatePodNames(synthesizeComp)
+func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, runningITS *workloads.InstanceSet) (map[string]string, error) {
+	podNames, err := component.GeneratePodNamesByITS(runningITS)
 	if err != nil {
 		return nil, err
 	}
@@ -333,17 +333,4 @@ func skipImmutableCheckForComponentService(svc *corev1.Service) bool {
 	}
 	skip, ok := svc.Annotations[constant.SkipImmutableCheckAnnotationKey]
 	return ok && strings.ToLower(skip) == "true"
-}
-
-func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {
-	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
-		synthesizeComp.OfflineInstances, synthesizeComp.FullCompName)
-}
-
-func generatePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
-	var templates []instanceset.InstanceTemplate
-	for i := range its.Spec.Instances {
-		templates = append(templates, &its.Spec.Instances[i])
-	}
-	return instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, templates, its.Spec.OfflineInstances, appsv1.Ordinals{})
 }

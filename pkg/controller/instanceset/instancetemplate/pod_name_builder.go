@@ -27,6 +27,8 @@ import (
 )
 
 type PodNameBuilderOpts struct {
+	// when useing combinedPodNameBuilder, status field is necessary to build correct names.
+	// use this carefully
 	AllowEmptyStatus bool
 }
 

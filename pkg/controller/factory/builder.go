@@ -91,15 +91,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	itsObj := itsBuilder.GetObject()
 
-	// update its.spec.volumeClaimTemplates[].metadata.labels
-	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
-	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
-		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name, "")
-			itsObj.Spec.VolumeClaimTemplates[index] = vct
-		}
-	}
-
 	setDefaultResourceLimits(itsObj)
 
 	return itsObj, nil

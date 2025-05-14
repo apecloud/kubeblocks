@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -82,4 +85,18 @@ func ToCoreV1PVCTs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.P
 		pvcts = append(pvcts, pvct(i))
 	}
 	return pvcts
+}
+
+func ComposePVCName(template corev1.PersistentVolumeClaim, itsName, podName string) string {
+	if template.Annotations != nil {
+		prefix, ok := template.Annotations[constant.PVCNamePrefixAnnotationKey]
+		if ok {
+			suffix, found := strings.CutPrefix(podName, fmt.Sprintf("%s-", itsName))
+			if found {
+				return fmt.Sprintf("%s-%s", prefix, suffix)
+			}
+			return prefix
+		}
+	}
+	return fmt.Sprintf("%s-%s", template.Name, podName)
 }

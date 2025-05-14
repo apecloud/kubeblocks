@@ -4213,10 +4213,16 @@ spec:
 
 
                         - `componentDefinition.spec.runtime.containers[*].volumeMounts`
-                        - `clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts` (deprecated)
 
 
                         The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
+                      type: string
+                    persistentVolumeClaimName:
+                      description: |-
+                        Specifies the prefix of the PVC name for the volume.
+
+
+                        For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal>
                       type: string
                     spec:
                       description: |-

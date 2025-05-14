@@ -186,12 +186,18 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// Refers to the name of a volumeMount defined in either:
 	//
 	// - `componentDefinition.spec.runtime.containers[*].volumeMounts`
-	// - `clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts` (deprecated)
 	//
 	// The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// Specifies the prefix of the PVC name for the volume.
+	//
+	// For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal>
+	//
+	// +optional
+	PersistentVolumeClaimName *string `json:"persistentVolumeClaimName,omitempty"`
 
 	// Specifies the labels for the PVC of the volume.
 	//
@@ -219,7 +225,7 @@ type PersistentVolumeClaimSpec struct {
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 
 	// Represents the minimum resources the volume should have.
 	// If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
@@ -228,18 +234,18 @@ type PersistentVolumeClaimSpec struct {
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 
 	// The name of the StorageClass required by the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
 	//
 	// +optional
-	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
+	StorageClassName *string `json:"storageClassName,omitempty"`
 
 	// Defines what type of volume is required by the claim, either Block or Filesystem.
 	//
 	// +optional
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
 
 	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
 	//

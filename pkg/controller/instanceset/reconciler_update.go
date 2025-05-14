@@ -198,11 +198,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 		if updatePolicy == InPlaceUpdatePolicy {
-			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			newPod := copyAndMerge(pod, newInstance.pod)
+			newMergedPod := copyAndMerge(pod, newPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
@@ -211,13 +211,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 			// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
 			// Another reconciliation will be triggered since pod status will be updated.
-			if !equalResourcesInPlaceFields(pod, newInstance.pod) && supportResizeSubResource {
-				err = tree.Update(newPod, kubebuilderx.WithSubResource("resize"))
+			if !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource {
+				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
 			} else {
-				if err = r.switchover(tree, its, newPod.(*corev1.Pod)); err != nil {
+				if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
 					return kubebuilderx.Continue, err
 				}
-				err = tree.Update(newPod)
+				err = tree.Update(newMergedPod)
 			}
 			if err != nil {
 				return kubebuilderx.Continue, err

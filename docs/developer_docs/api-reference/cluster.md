@@ -3344,9 +3344,21 @@ string
 <p>Refers to the name of a volumeMount defined in either:</p>
 <ul>
 <li><code>componentDefinition.spec.runtime.containers[*].volumeMounts</code></li>
-<li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
 </ul>
 <p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the prefix of the PVC name for the volume.</p>
+<p>For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal></p>
 </td>
 </tr>
 <tr>

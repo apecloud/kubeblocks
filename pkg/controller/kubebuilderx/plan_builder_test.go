@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	mockclient "github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
@@ -248,7 +247,7 @@ var _ = Describe("plan builder test", func() {
 				}
 			})
 
-			It("should append a vertex with subresource 'resize' when Pod resource has the corresponding options", func() {
+			It("should append a vertex with subresource when Pod resource has the corresponding options", func() {
 				// Setup: two pods with different container resources
 				oldPod := builder.NewPodBuilder("ns", "pod").
 					AddContainer(corev1.Container{
@@ -265,25 +264,21 @@ var _ = Describe("plan builder test", func() {
 				newPod := oldPod.DeepCopy()
 				newPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("200m")
 
-				// Mock intctrlutil.SupportResizeSubResource to return (true, nil)
-				origSupportResize := intctrlutil.SupportResizeSubResource
-				intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
-				defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
-
 				// Setup trees
+				subResource := "foo"
 				currentTree := NewObjectTree()
 				desiredTree := NewObjectTree()
 				currentTree.SetRoot(builder.NewInstanceSetBuilder("ns", "root").GetObject())
 				desiredTree.SetRoot(currentTree.GetRoot())
 				Expect(currentTree.Add(oldPod)).Should(Succeed())
-				Expect(desiredTree.Update(newPod, WithSubResource("resize"))).Should(Succeed())
+				Expect(desiredTree.Update(newPod, WithSubResource(subResource))).Should(Succeed())
 
 				vertices := buildOrderedVertices(transCtx, currentTree, desiredTree)
 
-				// Find the vertex with subresource "resize"
+				// Find the vertex with subresource
 				found := false
 				for _, v := range vertices {
-					if pod, ok := v.Obj.(*corev1.Pod); ok && pod.Name == "pod" && v.SubResource == "resize" {
+					if pod, ok := v.Obj.(*corev1.Pod); ok && pod.Name == "pod" && v.SubResource == subResource {
 						found = true
 						Expect(*v.Action).To(Equal(model.UPDATE))
 					}

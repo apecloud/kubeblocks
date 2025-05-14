@@ -26,6 +26,7 @@ type GraphOptions struct {
 	haveDifferentTypeWith bool
 	clientOpt             any
 	propagationPolicy     client.PropagationPolicy
+	subResource           string
 }
 
 type GraphOption interface {
@@ -80,5 +81,21 @@ var _ GraphOption = &propagationPolicyOption{}
 func WithPropagationPolicy(policy client.PropagationPolicy) GraphOption {
 	return &propagationPolicyOption{
 		propagationPolicy: policy,
+	}
+}
+
+type subResourceOption struct {
+	subResource string
+}
+
+func (o *subResourceOption) ApplyTo(opts *GraphOptions) {
+	opts.subResource = o.subResource
+}
+
+var _ GraphOption = &subResourceOption{}
+
+func WithSubResource(subResource string) GraphOption {
+	return &subResourceOption{
+		subResource: subResource,
 	}
 }

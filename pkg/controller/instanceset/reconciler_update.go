@@ -199,7 +199,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 			newPod := copyAndMerge(pod, newInstance.pod)
-			if err = tree.Update(newPod); err != nil {
+			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
+			if err != nil {
+				tree.Logger.Error(err, "check support resize sub resource error")
+				return kubebuilderx.Continue, err
+			}
+
+			// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
+			// Another reconciliation will be triggered since pod status will be updated.
+			if !equalResourcesInPlaceFields(pod, newInstance.pod) && supportResizeSubResource {
+				err = tree.Update(newPod, kubebuilderx.WithSubResource("resize"))
+			} else {
+				err = tree.Update(newPod)
+			}
+			if err != nil {
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++

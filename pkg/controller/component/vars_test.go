@@ -1914,9 +1914,9 @@ var _ = Describe("vars", func() {
 				}
 				// pod names and FQDNs are calculated from the spec, and names and FQDNs for specific roles are obtained from runtime resources.
 				mockInstanceList := []string{
-					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
-					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
-					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 2),
+					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 0),
+					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 1),
+					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 2),
 				}
 				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())

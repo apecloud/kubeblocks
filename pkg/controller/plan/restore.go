@@ -173,14 +173,14 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {
 			continue
 		}
-		// TODO: pvc name
-		name := fmt.Sprintf("%s-%s-%s", v.Name, r.Cluster.Name, comp.Name)
+		itsName := constant.GenerateWorkloadNamePattern(r.Cluster.Name, comp.Name)
+		hackPodName := itsName
 		if templateName != "" {
-			name += "-" + templateName
+			hackPodName += "-" + templateName
 		}
 		pvc := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   name,
+				Name:   intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: v.ObjectMeta}, itsName, hackPodName),
 				Labels: pvcLabels,
 			},
 		}

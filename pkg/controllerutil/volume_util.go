@@ -93,8 +93,11 @@ func ComposePVCName(template corev1.PersistentVolumeClaim, itsName, podName stri
 	if template.Annotations != nil {
 		prefix, ok := template.Annotations[constant.PVCNamePrefixAnnotationKey]
 		if ok {
-			suffix, _ := strings.CutPrefix(podName, fmt.Sprintf("%s-", itsName))
-			return fmt.Sprintf("%s-%s", prefix, suffix)
+			suffix, found := strings.CutPrefix(podName, fmt.Sprintf("%s-", itsName))
+			if found {
+				return fmt.Sprintf("%s-%s", prefix, suffix)
+			}
+			return prefix
 		}
 	}
 	return fmt.Sprintf("%s-%s", template.Name, podName)

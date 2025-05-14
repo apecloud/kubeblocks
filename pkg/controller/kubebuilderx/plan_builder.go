@@ -38,7 +38,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type transformContext struct {
@@ -176,41 +175,19 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
 			if !equality.Semantic.DeepEqual(oldObj, newObj) {
-				// if object is pod and using InPlacePodVerticalScaling, it may need to use a /resize subresource. Update the sub resource if needed.
-				useResizeSubResource := false
-				if oldPod, ok := oldObj.(*corev1.Pod); ok {
-					newPod := newObj.(*corev1.Pod)
-					if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
-						transCtx.logger.Error(errors.New("pod containers length not equal"), "skipping updating, this may be a bug of kubeblocks")
-						continue
-					}
-					resEqual := true
-					for i, c := range oldPod.Spec.Containers {
-						newC := newPod.Spec.Containers[i]
-						if !equality.Semantic.DeepEqual(c.Resources, newC.Resources) {
-							resEqual = false
-							break
-						}
-					}
-					if !resEqual {
-						ok, err := intctrlutil.SupportResizeSubResource()
-						if err != nil {
-							transCtx.logger.Error(err, "check support resize sub resource error")
-							continue
-						}
-						if ok {
-							v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource("resize"))
-							findAndAppend(v)
-							useResizeSubResource = true
-						}
-					}
+				name, err := model.GetGVKName(newObj)
+				if err != nil {
+					transCtx.logger.Error(err, "can't get GVKName from object", "object", newObj.GetName())
+					return
 				}
-				// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
-				// Another reconciliation will be triggered since pod status will be updated.
-				if !useResizeSubResource {
-					v := model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
-					findAndAppend(v)
+				var v *model.ObjectVertex
+				subResource := desiredTree.childrenOptions[*name].SubResource
+				if subResource != "" {
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource(subResource))
+				} else {
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
 				}
+				findAndAppend(v)
 			}
 		}
 	}

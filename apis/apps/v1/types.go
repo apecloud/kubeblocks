@@ -18,7 +18,6 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -195,7 +194,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 
 	// Specifies the prefix of the PVC name for the volume.
 	//
-	// For each replica, the final name of the PVC will be in format: <PersistentVolumeClaimName>-<ordinal>
+	// For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal>
 	//
 	// +optional
 	PersistentVolumeClaimName *string `json:"persistentVolumeClaimName,omitempty"`
@@ -228,10 +227,6 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 
-	// selector is a label query over volumes to consider for binding.
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
-
 	// Represents the minimum resources the volume should have.
 	// If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
 	// are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
@@ -240,10 +235,6 @@ type PersistentVolumeClaimSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
-
-	// volumeName is the binding reference to the PersistentVolume backing this claim.
-	// +optional
-	VolumeName string `json:"volumeName,omitempty"`
 
 	// The name of the StorageClass required by the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.

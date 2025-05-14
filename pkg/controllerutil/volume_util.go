@@ -62,9 +62,7 @@ func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.Pe
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:               v.Spec.AccessModes,
-				Selector:                  v.Spec.Selector,
 				Resources:                 v.Spec.Resources,
-				VolumeName:                v.Spec.VolumeName,
 				StorageClassName:          storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
 				VolumeMode:                v.Spec.VolumeMode,
 				VolumeAttributesClassName: v.Spec.VolumeAttributesClassName,

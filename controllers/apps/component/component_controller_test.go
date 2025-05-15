@@ -620,7 +620,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("updating data PVC storage size")
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			expandVolume := func(vcts []kbappsv1.ClusterComponentVolumeClaimTemplate, quantity resource.Quantity) {
+			expandVolume := func(vcts []kbappsv1.PersistentVolumeClaimTemplate, quantity resource.Quantity) {
 				for i, vct := range vcts {
 					if vct.Name == testapps.DataVolumeName {
 						vcts[i].Spec.Resources.Requests[corev1.ResourceStorage] = quantity

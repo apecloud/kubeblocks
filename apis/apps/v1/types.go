@@ -182,7 +182,7 @@ type ServiceRefCredentialSelector struct {
 	Name string `json:"name"`
 }
 
-type ClusterComponentVolumeClaimTemplate struct {
+type PersistentVolumeClaimTemplate struct {
 	// Refers to the name of a volumeMount defined in either:
 	//
 	// - `componentDefinition.spec.runtime.containers[*].volumeMounts`

@@ -121,7 +121,7 @@ func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1.Issuer
 	return builder
 }
 
-func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1.ClusterComponentVolumeClaimTemplate) *ComponentBuilder {
+func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1.PersistentVolumeClaimTemplate) *ComponentBuilder {
 	builder.get().Spec.VolumeClaimTemplates = volumeClaimTemplates
 	return builder
 }

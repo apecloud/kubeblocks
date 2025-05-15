@@ -1712,7 +1712,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 		It("should detect VolumeClaimTemplate changes", func() {
 			// Add a volume claim template
-			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{
+			newCompObj.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{
 				{
 					Name: "app-data",
 					Spec: corev1.PersistentVolumeClaimSpec{
@@ -1783,7 +1783,7 @@ var _ = Describe("cluster component transformer test", func() {
 		})
 
 		It("should detect changes in VolumeClaimTemplate storage requests", func() {
-			vct := appsv1.ClusterComponentVolumeClaimTemplate{
+			vct := appsv1.PersistentVolumeClaimTemplate{
 				Name: "app-data",
 				Spec: corev1.PersistentVolumeClaimSpec{
 					Resources: corev1.VolumeResourceRequirements{
@@ -1794,8 +1794,8 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 			}
 
-			oldCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{vct}
-			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{*vct.DeepCopy()}
+			oldCompObj.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{vct}
+			newCompObj.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{*vct.DeepCopy()}
 			newCompObj.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] =
 				resource.MustParse("2Gi")
 			// Change storage request
@@ -1806,7 +1806,7 @@ var _ = Describe("cluster component transformer test", func() {
 		})
 
 		It("should normalize storage resources in VolumeClaimTemplates", func() {
-			vct := appsv1.ClusterComponentVolumeClaimTemplate{
+			vct := appsv1.PersistentVolumeClaimTemplate{
 				Name: "app-data",
 				Spec: corev1.PersistentVolumeClaimSpec{
 					Resources: corev1.VolumeResourceRequirements{
@@ -1816,8 +1816,8 @@ var _ = Describe("cluster component transformer test", func() {
 					},
 				},
 			}
-			oldCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{vct}
-			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{*vct.DeepCopy()}
+			oldCompObj.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{vct}
+			newCompObj.Spec.VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{*vct.DeepCopy()}
 
 			// 1536Mi is equivalent to 1.5Gi
 			oldCompObj.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] =

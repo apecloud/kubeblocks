@@ -42,7 +42,7 @@ func CreateVolumeIfNotExist(volumes []corev1.Volume, volumeName string, createFn
 	return append(volumes, createFn(volumeName))
 }
 
-func ToCoreV1PVCTs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
+func ToCoreV1PVCTs(vcts []appsv1.PersistentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
 	storageClassName := func(spec corev1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
 		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
 			return spec.StorageClassName

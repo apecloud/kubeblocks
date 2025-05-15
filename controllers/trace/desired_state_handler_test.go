@@ -155,7 +155,7 @@ var _ = Describe("desired_state_handler test", func() {
 								corev1.ResourceMemory: resource.MustParse("2Gi"),
 							},
 						},
-						VolumeClaimTemplates: []kbappsv1.ClusterComponentVolumeClaimTemplate{{
+						VolumeClaimTemplates: []kbappsv1.PersistentVolumeClaimTemplate{{
 							Name: name,
 							Spec: corev1.PersistentVolumeClaimSpec{
 								Resources: corev1.VolumeResourceRequirements{

@@ -82,7 +82,7 @@ func (factory *MockComponentFactory) SetTLSConfig(enable bool, issuer *appsv1.Is
 }
 
 func (factory *MockComponentFactory) AddVolumeClaimTemplate(volumeName string, spec corev1.PersistentVolumeClaimSpec) *MockComponentFactory {
-	factory.Get().Spec.VolumeClaimTemplates = append(factory.Get().Spec.VolumeClaimTemplates, appsv1.ClusterComponentVolumeClaimTemplate{
+	factory.Get().Spec.VolumeClaimTemplates = append(factory.Get().Spec.VolumeClaimTemplates, appsv1.PersistentVolumeClaimTemplate{
 		Name: volumeName,
 		Spec: spec,
 	})

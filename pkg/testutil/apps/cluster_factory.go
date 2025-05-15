@@ -177,7 +177,7 @@ func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequire
 func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string, spec corev1.PersistentVolumeClaimSpec) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.VolumeClaimTemplates = append(comp.VolumeClaimTemplates,
-			appsv1.ClusterComponentVolumeClaimTemplate{
+			appsv1.PersistentVolumeClaimTemplate{
 				Name: volumeName,
 				Spec: spec,
 			})

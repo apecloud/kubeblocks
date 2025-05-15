@@ -878,6 +878,10 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 	}
 
 	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
+
+	if len(template.VolumeClaimTemplates) > 0 {
+		templateExt.VolumeClaimTemplates = template.VolumeClaimTemplates
+	}
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

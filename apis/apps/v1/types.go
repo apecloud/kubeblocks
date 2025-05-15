@@ -212,47 +212,8 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
 	// with the mount name specified in the `name` field.
 	//
-	// When a Pod is created for this ClusterComponent, a new PVC will be created based on the specification
-	// defined in the `spec` field. The PVC will be associated with the volume mount specified by the `name` field.
-	//
 	// +optional
-	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
-}
-
-type PersistentVolumeClaimSpec struct {
-	// Contains the desired access modes the volume should have.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
-
-	// Represents the minimum resources the volume should have.
-	// If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
-	// are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
-
-	// The name of the StorageClass required by the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
-	//
-	// +optional
-	StorageClassName *string `json:"storageClassName,omitempty"`
-
-	// Defines what type of volume is required by the claim, either Block or Filesystem.
-	//
-	// +optional
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
-
-	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
-	//
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
-	//
-	// +optional
-	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty"`
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 
 // PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.

@@ -159,7 +159,7 @@ var _ = Describe("dry_run_handler test", func() {
 						},
 						VolumeClaimTemplates: []kbappsv1.ClusterComponentVolumeClaimTemplate{{
 							Name: name,
-							Spec: kbappsv1.PersistentVolumeClaimSpec{
+							Spec: corev1.PersistentVolumeClaimSpec{
 								Resources: corev1.VolumeResourceRequirements{
 									Requests: corev1.ResourceList{
 										corev1.ResourceStorage: resource.MustParse("20Gi"),

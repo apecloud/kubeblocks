@@ -596,9 +596,7 @@ var _ = Describe("Component Controller", func() {
 							constant.AppInstanceLabelKey:    clusterKey.Name,
 							constant.KBAppComponentLabelKey: compName,
 						}},
-					Spec: func() corev1.PersistentVolumeClaimSpec {
-						return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
-					}(),
+					Spec: pvcSpec,
 				}
 				Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
 				patch := client.MergeFrom(pvc.DeepCopy())
@@ -711,9 +709,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
-			tmpSpec := func() corev1.PersistentVolumeClaimSpec {
-				return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
-			}()
+			tmpSpec := pvcSpec
 			tmpSpec.VolumeName = getPVCName(testapps.DataVolumeName, compName, i)
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{

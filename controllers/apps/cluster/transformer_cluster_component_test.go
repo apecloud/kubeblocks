@@ -1715,7 +1715,7 @@ var _ = Describe("cluster component transformer test", func() {
 			newCompObj.Spec.VolumeClaimTemplates = []appsv1.ClusterComponentVolumeClaimTemplate{
 				{
 					Name: "app-data",
-					Spec: appsv1.PersistentVolumeClaimSpec{
+					Spec: corev1.PersistentVolumeClaimSpec{
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -1785,7 +1785,7 @@ var _ = Describe("cluster component transformer test", func() {
 		It("should detect changes in VolumeClaimTemplate storage requests", func() {
 			vct := appsv1.ClusterComponentVolumeClaimTemplate{
 				Name: "app-data",
-				Spec: appsv1.PersistentVolumeClaimSpec{
+				Spec: corev1.PersistentVolumeClaimSpec{
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -1808,7 +1808,7 @@ var _ = Describe("cluster component transformer test", func() {
 		It("should normalize storage resources in VolumeClaimTemplates", func() {
 			vct := appsv1.ClusterComponentVolumeClaimTemplate{
 				Name: "app-data",
-				Spec: appsv1.PersistentVolumeClaimSpec{
+				Spec: corev1.PersistentVolumeClaimSpec{
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),

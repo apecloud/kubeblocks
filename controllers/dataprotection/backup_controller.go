@@ -755,7 +755,14 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 // Currently, it only supports two types of workloads: job, statefulSet
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	labels := dpbackup.BuildBackupWorkloadLabels(backup)
+	labels := map[string]string{
+		dptypes.BackupNameLabelKey:    backup.Name,
+		constant.AppManagedByLabelKey: dptypes.AppName,
+	}
+
+	if clusterUID, ok := backup.Labels[dptypes.ClusterUIDLabelKey]; ok {
+		labels[dptypes.ClusterUIDLabelKey] = clusterUID
+	}
 
 	// use map to avoid duplicate deletion of the same namespace.
 	namespaces := map[string]sets.Empty{

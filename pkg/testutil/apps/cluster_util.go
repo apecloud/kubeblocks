@@ -93,9 +93,8 @@ func ClusterReconciled(testCtx *testutil.TestContext, clusterKey types.Namespace
 	}
 }
 
-// NewPVCSpec creates appsv1alpha1.PersistentVolumeClaimSpec.
-func NewPVCSpec(size string) appsv1.PersistentVolumeClaimSpec {
-	return appsv1.PersistentVolumeClaimSpec{
+func NewPVCSpec(size string) corev1.PersistentVolumeClaimSpec {
+	return corev1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 		Resources: corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{

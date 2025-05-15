@@ -1673,10 +1673,10 @@ var _ = Describe("vars", func() {
 										corev1.ResourceMemory: resource.MustParse("2Gi"),
 									},
 								},
-								VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{
+								VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{
 									{
 										Name: "data",
-										Spec: appsv1.PersistentVolumeClaimSpec{
+										Spec: corev1.PersistentVolumeClaimSpec{
 											Resources: corev1.VolumeResourceRequirements{
 												Requests: corev1.ResourceList{
 													corev1.ResourceStorage: resource.MustParse("10Gi"),

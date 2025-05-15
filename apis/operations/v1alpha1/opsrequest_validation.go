@@ -620,7 +620,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	for _, comp := range r.Spec.VolumeExpansionList {
 		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
 	}
-	fillVol := func(vct appsv1.ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
+	fillVol := func(vct appsv1.PersistentVolumeClaimTemplate, key string, isShardingComp bool) {
 		e, ok := vols[key][vct.Name]
 		if !ok {
 			return

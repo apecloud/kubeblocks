@@ -411,6 +411,12 @@ spec:
                               - Any
                               - All
                               type: string
+                            useParentSelectedPods:
+                              description: |-
+                                UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+                                If set to true, the backup will use the same pods selected by the parent.
+                                And only takes effect when the 'strategy' is set to 'Any'.
+                              type: boolean
                           type: object
                           x-kubernetes-map-type: atomic
                         resources:
@@ -689,6 +695,12 @@ spec:
                                 - Any
                                 - All
                                 type: string
+                              useParentSelectedPods:
+                                description: |-
+                                  UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+                                  If set to true, the backup will use the same pods selected by the parent.
+                                  And only takes effect when the 'strategy' is set to 'Any'.
+                                type: boolean
                             type: object
                             x-kubernetes-map-type: atomic
                           resources:
@@ -971,6 +983,12 @@ spec:
                         - Any
                         - All
                         type: string
+                      useParentSelectedPods:
+                        description: |-
+                          UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+                          If set to true, the backup will use the same pods selected by the parent.
+                          And only takes effect when the 'strategy' is set to 'Any'.
+                        type: boolean
                     type: object
                     x-kubernetes-map-type: atomic
                   resources:
@@ -1191,6 +1209,12 @@ spec:
                           - Any
                           - All
                           type: string
+                        useParentSelectedPods:
+                          description: |-
+                            UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+                            If set to true, the backup will use the same pods selected by the parent.
+                            And only takes effect when the 'strategy' is set to 'Any'.
+                          type: boolean
                       type: object
                       x-kubernetes-map-type: atomic
                     resources:

@@ -552,6 +552,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: r.buildTargetPodLabels(targetTpl.Role, comp),
 			},
+			UseParentSelectedPods: targetTpl.UseParentSelectedPods,
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",

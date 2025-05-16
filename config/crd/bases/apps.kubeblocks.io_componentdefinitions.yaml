@@ -4290,6 +4290,14 @@ spec:
                   It serves as a quick reference for users to understand the Component's role and characteristics.
                 maxLength: 256
                 type: string
+              disableDefaultHeadlessService:
+                default: false
+                description: |-
+                  Specifies whether to create the default headless service.
+
+
+                  This field is immutable.
+                type: boolean
               exporter:
                 description: Defines the built-in metrics exporter container.
                 properties:

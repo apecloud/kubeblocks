@@ -48,15 +48,18 @@ func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 }
 
 func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	var (
+		objects []client.Object
+		its, _  = tree.GetRoot().(*workloads.InstanceSet)
+	)
 
 	// generate objects by current spec
-	labels := getMatchLabels(its.Name)
-	headlessSelectors := getHeadlessSvcSelector(its)
-
-	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
-	var objects []client.Object
-	objects = append(objects, headLessSvc)
+	if !its.Spec.DisableDefaultHeadlessService {
+		labels := getMatchLabels(its.Name)
+		headlessSelectors := getHeadlessSvcSelector(its)
+		headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
+		objects = append(objects, headLessSvc)
+	}
 	for _, object := range objects {
 		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
 			return kubebuilderx.Continue, err

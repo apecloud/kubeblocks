@@ -1272,6 +1272,19 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
+<code>disableDefaultHeadlessService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to create the default headless service.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
@@ -4962,6 +4975,19 @@ Each Service entry in this list can include properties such as ports, type, and 
 <code>componentDefinition.spec.vars[*].valueFrom.serviceRefVarRef</code>,
 and bind Services at Cluster creation time with <code>clusterComponentSpec.ServiceRef[*].clusterServiceSelector</code>.</li>
 </ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>disableDefaultHeadlessService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to create the default headless service.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -29666,6 +29692,18 @@ bool
 <p>Describe the configs to be reconfigured.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>disableDefaultHeadlessService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to create the default headless service.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -30159,6 +30197,18 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Describe the configs to be reconfigured.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>disableDefaultHeadlessService</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to create the default headless service.</p>
 </td>
 </tr>
 </tbody>

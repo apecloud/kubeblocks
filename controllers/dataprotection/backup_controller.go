@@ -462,8 +462,7 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	if backupStatusTarget != nil {
 		selectedPods = backupStatusTarget.SelectedTargetPods
 	}
-	if request.ParentBackup != nil && len(selectedPods) == 0 {
-		// incremental backups should have the same target pods as the parent backup
+	if request.ParentBackup != nil && target.PodSelector.UseParentSelectedPods && len(selectedPods) == 0 {
 		parentBackupStatusTarget := dputils.GetBackupStatusTarget(request.ParentBackup, target.Name)
 		if parentBackupStatusTarget != nil && len(parentBackupStatusTarget.SelectedTargetPods) > 0 {
 			selectedPods = parentBackupStatusTarget.SelectedTargetPods

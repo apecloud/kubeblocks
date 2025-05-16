@@ -277,6 +277,12 @@ type TargetInstance struct {
 	// +optional
 	Strategy dpv1alpha1.PodSelectionStrategy `json:"strategy,omitempty"`
 
+	// UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+	// If set to true, the backup will use the same pods selected by the parent.
+	// And only takes effect when the 'strategy' is set to 'Any'.
+	// +optional
+	UseParentSelectedPods bool `json:"useParentSelectedPods,omitempty"`
+
 	// Specifies the keys of the connection credential secret defined in `clusterDefinition.spec.ConnectionCredential`.
 	// It will be ignored when the `account` is set.
 	//

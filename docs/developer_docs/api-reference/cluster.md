@@ -21920,6 +21920,20 @@ Valid values are:</p>
 </tr>
 <tr>
 <td>
+<code>useParentSelectedPods</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+If set to true, the backup will use the same pods selected by the parent.
+And only takes effect when the &lsquo;strategy&rsquo; is set to &lsquo;Any&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>connectionCredentialKey</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ConnectionCredentialKey">

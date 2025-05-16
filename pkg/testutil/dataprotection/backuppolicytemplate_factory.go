@@ -105,6 +105,11 @@ func (f *MockBackupPolicyTemplateFactory) SetTargetRole(role string) *MockBackup
 	return f
 }
 
+func (f *MockBackupPolicyTemplateFactory) SetUseParentSelectedPods(useParentSelectedPods bool) *MockBackupPolicyTemplateFactory {
+	f.Get().Spec.Target.UseParentSelectedPods = useParentSelectedPods
+	return f
+}
+
 func (f *MockBackupPolicyTemplateFactory) SetLabels(labels map[string]string) *MockBackupPolicyTemplateFactory {
 	f.Get().SetLabels(labels)
 	return f

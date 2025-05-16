@@ -70,10 +70,10 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetTemplate(getTemplate(synthesizedComp)).
 		SetSelectorMatchLabel(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
-		SetVolumeClaimTemplates(getVolumeClaimTemplates(synthesizedComp)...).
+		SetVolumeClaimTemplates(defaultVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
-		SetInstances(getInstanceTemplates(synthesizedComp.Instances)).
+		SetInstances(getInstanceTemplates(synthesizedComp)).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).
 		SetRoles(synthesizedComp.Roles).
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
@@ -110,41 +110,46 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 	}
 }
 
-func getVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {
+func defaultVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {
+	return toPersistentVolumeClaims(synthesizedComp, synthesizedComp.VolumeClaimTemplates)
+}
+
+func toPersistentVolumeClaims(synthesizedComp *component.SynthesizedComponent, vcts []corev1.PersistentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
 	pvc := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
 			Spec:       vct.Spec,
 		}
 	}
-
-	var vcts []corev1.PersistentVolumeClaim
-	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, vct := range vcts {
 		// priority: static < dynamic < built-in
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.StaticLabels, &vct.ObjectMeta.Labels)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.StaticAnnotations, &vct.ObjectMeta.Annotations)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
-		vcts = append(vcts, pvc(vct))
+		pvcs = append(pvcs, pvc(vct))
 	}
-	return vcts
+	return pvcs
 }
 
-func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.InstanceTemplate {
+func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []workloads.InstanceTemplate {
+	instances := synthesizedComp.Instances
 	if instances == nil {
 		return nil
 	}
 	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
 	for i := range instances {
 		instanceTemplates[i] = workloads.InstanceTemplate{
-			Name:             instances[i].Name,
-			Replicas:         instances[i].Replicas,
-			Ordinals:         instances[i].Ordinals,
-			Annotations:      instances[i].Annotations,
-			Labels:           instances[i].Labels,
-			SchedulingPolicy: instances[i].SchedulingPolicy,
-			Resources:        instances[i].Resources,
-			Env:              instances[i].Env,
+			Name:                 instances[i].Name,
+			Replicas:             instances[i].Replicas,
+			Ordinals:             instances[i].Ordinals,
+			Annotations:          instances[i].Annotations,
+			Labels:               instances[i].Labels,
+			SchedulingPolicy:     instances[i].SchedulingPolicy,
+			Resources:            instances[i].Resources,
+			Env:                  instances[i].Env,
+			VolumeClaimTemplates: toPersistentVolumeClaims(synthesizedComp, intctrlutil.ToCoreV1PVCTs(instances[i].VolumeClaimTemplates)),
 		}
 	}
 	return instanceTemplates

@@ -752,7 +752,7 @@ func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
 		return &instanceTemplateExt{
 			Name:                 templateName,
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
-			VolumeClaimTemplates: claims,
+			VolumeClaimTemplates: claims, // default claims
 		}
 	}
 
@@ -878,6 +878,21 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 	}
 
 	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
+
+	// override by instance template
+	for _, tpl1 := range template.VolumeClaimTemplates {
+		found := false
+		for i, tpl2 := range templateExt.VolumeClaimTemplates {
+			if tpl1.Name == tpl2.Name {
+				templateExt.VolumeClaimTemplates[i] = *tpl1.DeepCopy()
+				found = true
+				break
+			}
+		}
+		if !found {
+			templateExt.VolumeClaimTemplates = append(templateExt.VolumeClaimTemplates, *tpl1.DeepCopy())
+		}
+	}
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

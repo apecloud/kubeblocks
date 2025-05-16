@@ -116,6 +116,7 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 				g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
 				g.Expect(policy.Spec.Targets).Should(HaveLen(0))
 				g.Expect(policy.Spec.Target).ShouldNot(BeNil())
+				g.Expect(policy.Spec.Target.PodSelector.UseParentSelectedPods).Should(BeTrue())
 				g.Expect(policy.Spec.Target.Name).Should(BeEmpty())
 			})).Should(Succeed())
 

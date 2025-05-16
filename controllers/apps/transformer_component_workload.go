@@ -327,6 +327,13 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
+	if reflect.DeepEqual(oldITS.Spec.UpdateStrategy, &workloads.InstanceUpdateStrategy{}) &&
+		!reflect.DeepEqual(oldITS.Spec.UpdateStrategy, itsObjCopy.Spec.UpdateStrategy) {
+		// Due to changes in the definition of the UpdateStrategy field,
+		// differences in these values are ignored for compatibility purposes.
+		oldITS.Spec.UpdateStrategy = itsObjCopy.Spec.UpdateStrategy
+	}
+
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	if isSpecUpdated {
 		UpdateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)

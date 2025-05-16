@@ -328,7 +328,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	DelayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
 	if reflect.DeepEqual(oldITS.Spec.UpdateStrategy, &workloads.InstanceUpdateStrategy{}) &&
-		!reflect.DeepEqual(&oldITS.Spec.UpdateStrategy, &itsObjCopy.Spec.UpdateStrategy) {
+		!reflect.DeepEqual(oldITS.Spec.UpdateStrategy, itsObjCopy.Spec.UpdateStrategy) {
 		// Due to changes in the definition of the UpdateStrategy field,
 		// differences in these values are ignored for compatibility purposes.
 		oldITS.Spec.UpdateStrategy = itsObjCopy.Spec.UpdateStrategy

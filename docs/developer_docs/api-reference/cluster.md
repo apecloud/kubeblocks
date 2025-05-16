@@ -7975,6 +7975,18 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 Add new or override existing envs.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+[]invalid type
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the storage requirements of the instances.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy
@@ -30574,6 +30586,20 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 <em>(Optional)</em>
 <p>Defines Env to override.
 Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the storage requirements of the instances.</p>
 </td>
 </tr>
 </tbody>

@@ -375,7 +375,7 @@ func (r *clusterBackupPolicyTransformer) syncBackupPolicy(comp componentItem, ba
 	r.syncBackupMethods(backupPolicy, comp)
 }
 
-func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentItem, target *dpv1alpha1.BackupTarget, role, alternateRole string) {
+func (r *clusterBackupPolicyTransformer) syncRoleLabelSelectorWhenReplicaChanges(comp componentItem, target *dpv1alpha1.BackupTarget, role, alternateRole string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -388,7 +388,7 @@ func (r *clusterBackupPolicyTransformer) syncRoleLabelSelector(comp componentIte
 		if podSelector.FallbackLabelSelector != nil && podSelector.FallbackLabelSelector.MatchLabels != nil {
 			delete(podSelector.FallbackLabelSelector.MatchLabels, constant.RoleLabelKey)
 		}
-	} else {
+	} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 		if len(alternateRole) > 0 {
 			if podSelector.FallbackLabelSelector == nil || podSelector.FallbackLabelSelector.MatchLabels == nil {
@@ -538,8 +538,7 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 	comp componentItem,
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
-		// if the target already exists, only sync the role by component replicas automatically.
-		r.syncRoleLabelSelector(comp, oldTarget, targetTpl.Role, targetTpl.FallbackRole)
+		r.syncRoleLabelSelectorWhenReplicaChanges(comp, oldTarget, targetTpl.Role, targetTpl.FallbackRole)
 		return oldTarget
 	}
 	clusterName := r.OrigCluster.Name

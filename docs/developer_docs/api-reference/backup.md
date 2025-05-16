@@ -4768,6 +4768,20 @@ will be stored in a subdirectory named after the pod.</li>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>useParentSelectedPods</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+If set to true, the backup will use the same pods selected by the parent.
+And only takes effect when the &lsquo;strategy&rsquo; is set to &lsquo;Any&rsquo;.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig
@@ -6472,6 +6486,20 @@ Valid values are:</p>
 <li>Any: Selects any one pod that matches the labelsSelector.</li>
 <li>All: Selects all pods that match the labelsSelector.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>useParentSelectedPods</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UseParentSelectedPods indicates whether to use the pods selected by the parent for backup.
+If set to true, the backup will use the same pods selected by the parent.
+And only takes effect when the &lsquo;strategy&rsquo; is set to &lsquo;Any&rsquo;.</p>
 </td>
 </tr>
 <tr>

@@ -45,7 +45,7 @@ import (
 )
 
 // BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		compDefName = synthesizedComp.CompDefName
 		namespace   = synthesizedComp.Namespace
@@ -66,7 +66,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
+		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, compDef)).
 		SetTemplate(getTemplate(synthesizedComp)).
 		SetSelectorMatchLabel(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
@@ -83,6 +83,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars)
+	if compDef != nil {
+		itsBuilder.SetDisableDefaultHeadlessService(compDef.Spec.DisableDefaultHeadlessService)
+	}
 
 	if common.IsCompactMode(synthesizedComp.Annotations) {
 		itsBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,

@@ -396,6 +396,10 @@ spec:
                       type: object
                     type: array
                 type: object
+              disableDefaultHeadlessService:
+                default: false
+                description: Specifies whether to create the default headless service.
+                type: boolean
               instanceUpdateStrategy:
                 description: Provides fine-grained control over the spec update process
                   of all instances.

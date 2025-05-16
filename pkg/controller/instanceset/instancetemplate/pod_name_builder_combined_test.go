@@ -320,6 +320,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should validate ordinals successfully", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name: "template1",
@@ -330,14 +331,17 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
-			err := builder.Validate()
+			itsExt, err := BuildInstanceSetExt(its, nil)
+			Expect(err).NotTo(HaveOccurred())
+			builder := combinedPodNameBuilder{itsExt: itsExt}
+			err = builder.Validate()
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should fail validation for negative ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name: "template1",
@@ -348,8 +352,10 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
-			err := builder.Validate()
+			itsExt, err := BuildInstanceSetExt(its, nil)
+			Expect(err).NotTo(HaveOccurred())
+			builder := combinedPodNameBuilder{itsExt: itsExt}
+			err = builder.Validate()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("ordinal(-1) must >= 0"))
 		})
@@ -357,6 +363,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should fail validation for duplicate ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
 					DefaultTemplateOrdinals: kbappsv1.Ordinals{
 						Discrete: []int32{1},
 					},
@@ -370,8 +377,10 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
-			err := builder.Validate()
+			itsExt, err := BuildInstanceSetExt(its, nil)
+			Expect(err).NotTo(HaveOccurred())
+			builder := combinedPodNameBuilder{itsExt: itsExt}
+			err = builder.Validate()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("duplicate ordinal(1)"))
 		})
@@ -379,6 +388,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should take offlineInstances into consideration", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
 					DefaultTemplateOrdinals: kbappsv1.Ordinals{
 						Discrete: []int32{2},
 					},
@@ -393,8 +403,10 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			builder := combinedPodNameBuilder{itsExt: &InstanceSetExt{InstanceSet: its}}
-			err := builder.Validate()
+			itsExt, err := BuildInstanceSetExt(its, nil)
+			Expect(err).NotTo(HaveOccurred())
+			builder := combinedPodNameBuilder{itsExt: itsExt}
+			err = builder.Validate()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("ordinal(1) exists in offlineInstances"))
 		})

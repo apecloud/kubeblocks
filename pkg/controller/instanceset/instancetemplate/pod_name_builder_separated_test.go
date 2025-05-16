@@ -36,21 +36,21 @@ import (
 var _ = Describe("Separated Name builder tests", func() {
 	DescribeTable("generates instance ordinals",
 		// expected doesn't need its name prefix
-		func(its *workloads.InstanceSet, expected []string, expectError bool) {
+		func(its *workloads.InstanceSet, expected []string, expectValidationError bool) {
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
 			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(builder.Validate()).To(Succeed())
-			instanceNames, err := builder.GenerateAllInstanceNames()
-			expectedFull := make([]string, len(expected))
-			for i, name := range expected {
-				expectedFull[i] = its.Name + name
-			}
-			if expectError {
-				Expect(err).To(HaveOccurred())
+			if expectValidationError {
+				Expect(builder.Validate()).NotTo(Succeed())
 			} else {
+				Expect(builder.Validate()).To(Succeed())
+				instanceNames, err := builder.GenerateAllInstanceNames()
 				Expect(err).NotTo(HaveOccurred())
+				expectedFull := make([]string, len(expected))
+				for i, name := range expected {
+					expectedFull[i] = its.Name + name
+				}
 				Expect(instanceNames).To(Equal(expectedFull))
 			}
 		},
@@ -115,6 +115,88 @@ var _ = Describe("Separated Name builder tests", func() {
 				OfflineInstances: []string{"foo-1"},
 			},
 		}, []string{"-0", "-2", "-t1-0", "-t1-1"}, false),
+
+		Entry("with ordinal and offline instances", &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "default",
+			},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				DefaultTemplateOrdinals: kbappsv1.Ordinals{
+					Ranges: []kbappsv1.Range{
+						{
+							Start: 1,
+							End:   2,
+						},
+					},
+				},
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "foo",
+						Replicas: ptr.To[int32](1),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{0},
+						},
+					},
+					{
+						Name:     "bar",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+				OfflineInstances: []string{"foo-bar-1", "foo-0", "foo-bar-3"},
+			},
+		}, []string{"-1", "-2", "-bar-0", "-bar-2", "-foo-0"}, false),
+
+		Entry("with ordinal and offline instances, replicas error", &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: "default",
+			},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				DefaultTemplateOrdinals: kbappsv1.Ordinals{
+					Ranges: []kbappsv1.Range{
+						{
+							Start: 1,
+							End:   2,
+						},
+					},
+				},
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "foo",
+						Replicas: ptr.To[int32](1),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{0},
+						},
+					},
+					{
+						Name:     "bar",
+						Replicas: ptr.To[int32](3),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+				OfflineInstances: []string{"foo-bar-1", "foo-0", "foo-bar-3"},
+			},
+		}, nil, true),
 	)
 
 	It("generates instance names", func() {

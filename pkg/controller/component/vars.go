@@ -38,9 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -1238,12 +1238,19 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		// TODO: what if the component is being deleted?
 	}
 
-	var templates []instanceset.InstanceTemplate
-	for i := range comp.Spec.Instances {
-		templates = append(templates, &comp.Spec.Instances[i])
+	itsName, err := GetInstanceSetName(comp)
+	if err != nil {
+		return "", err
 	}
-	// FIXME(jiacheng): use new api
-	names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, appsv1.Ordinals{})
+	its := &workloadsv1.InstanceSet{}
+	if err := cli.Get(ctx, types.NamespacedName{
+		Namespace: namespace,
+		Name:      itsName,
+	}, its, inDataContext()); err != nil {
+		return "", err
+	}
+
+	names, err := GeneratePodNamesByITS(its)
 	if err != nil {
 		return "", err
 	}

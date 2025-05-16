@@ -199,42 +199,6 @@ var _ = Describe("Separated Name builder tests", func() {
 		}, nil, true),
 	)
 
-	It("generates instance names", func() {
-		its := &workloads.InstanceSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "default",
-			},
-			Spec: workloads.InstanceSetSpec{
-				Replicas: ptr.To[int32](5),
-				Instances: []workloads.InstanceTemplate{
-					{
-						Name:     "t1",
-						Replicas: ptr.To[int32](2),
-					},
-					{
-						Name:     "t2",
-						Replicas: ptr.To[int32](1),
-					},
-				},
-				PodNamingRule: workloads.PodNamingRuleSeparated,
-			},
-		}
-
-		itsExt, err := BuildInstanceSetExt(its, nil)
-		Expect(err).NotTo(HaveOccurred())
-		builder, err := NewPodNameBuilder(itsExt, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names, err := builder.GenerateAllInstanceNames()
-		Expect(err).NotTo(HaveOccurred())
-		expected := []string{"-0", "-1", "-t1-0", "-t1-1", "-t2-0"}
-		expectedFull := make([]string, len(expected))
-		for i, name := range expected {
-			expectedFull[i] = its.Name + name
-		}
-		Expect(names).To(Equal(expectedFull))
-	})
-
 	Context("buildInstanceName2TemplateMap", func() {
 		var its *workloads.InstanceSet
 		BeforeEach(func() {

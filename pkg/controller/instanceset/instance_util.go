@@ -276,41 +276,6 @@ func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) str
 	return nil
 }
 
-// Deprecated: should use instancetemplate.PodNameBuilder
-func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals kbappsv1.Ordinals) ([]string, error) {
-	totalReplicas := int32(0)
-	instanceNameList := make([]string, 0)
-	for _, template := range templates {
-		replicas := template.GetReplicas()
-		ordinalList, err := convertOrdinalsToSortedList(template.GetOrdinals())
-		if err != nil {
-			return nil, err
-		}
-		names, err := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances, ordinalList)
-		if err != nil {
-			return nil, err
-		}
-		instanceNameList = append(instanceNameList, names...)
-		totalReplicas += replicas
-	}
-	if totalReplicas < replicas {
-		ordinalList, err := convertOrdinalsToSortedList(defaultTemplateOrdinals)
-		if err != nil {
-			return nil, err
-		}
-		names, err := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances, ordinalList)
-		if err != nil {
-			return nil, err
-		}
-		instanceNameList = append(instanceNameList, names...)
-	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(instanceNameList[i])
-	}
-	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
-	return instanceNameList, nil
-}
-
 func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
 	instanceNames, err := generateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
 	return instanceNames, err
@@ -371,14 +336,6 @@ func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 		return instanceNameList, fmt.Errorf("%s", errorMessage)
 	}
 	return instanceNameList, nil
-}
-
-func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
-	ordinals, err := getOrdinalsByTemplateName(its, templateName)
-	if err != nil {
-		return nil, err
-	}
-	return convertOrdinalsToSortedList(ordinals)
 }
 
 func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {

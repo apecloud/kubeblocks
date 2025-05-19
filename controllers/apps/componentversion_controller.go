@@ -254,7 +254,7 @@ func (r *ComponentVersionReconciler) status(cli client.Client, rctx intctrlutil.
 func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv1.ComponentVersion) string {
 	versionSet := sets.New[string]()
 	for _, release := range compVersion.Spec.Releases {
-		if len(release.ServiceVersion) > 0 {
+		if err := validateServiceVersion(release.ServiceVersion); err == nil {
 			versionSet.Insert(release.ServiceVersion)
 		}
 	}
@@ -401,14 +401,8 @@ func serviceVersionComparator(a, b string) int {
 	if len(b) == 0 {
 		return 1
 	}
-	v, err1 := version.ParseSemantic(a)
-	if err1 != nil {
-		panic(fmt.Sprintf("runtime error - invalid service version in comparator: %s", err1.Error()))
-	}
-	ret, err2 := v.Compare(b)
-	if err2 != nil {
-		panic(fmt.Sprintf("runtime error - invalid service version in comparator: %s", err2.Error()))
-	}
+	v, _ := version.ParseSemantic(a)
+	ret, _ := v.Compare(b)
 	return ret
 }
 

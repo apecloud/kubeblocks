@@ -238,6 +238,12 @@ type InstanceSetSpec struct {
 	//
 	// +optional
 	Configs []ConfigTemplate `json:"configs,omitempty"`
+
+	// Specifies whether to create the default headless service.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	DisableDefaultHeadlessService bool `json:"disableDefaultHeadlessService,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet

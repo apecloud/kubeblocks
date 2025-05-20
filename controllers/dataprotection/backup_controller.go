@@ -1016,10 +1016,10 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 		request.Backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] = *secretMapString
 	}
 	outdatedSecretMapString, err := getObjectString(outdatedSecretMap)
-	if err!= nil {
+	if err != nil {
 		return err
 	}
-	if outdatedSecretMapString!= nil && *outdatedSecretMapString!= "" {
+	if outdatedSecretMapString != nil && *outdatedSecretMapString != "" {
 		request.Backup.Annotations[constant.OutdatedSystemAccountAnnotationKey] = *outdatedSecretMapString
 	}
 	return nil

@@ -178,7 +178,7 @@ func (t *clusterSharedAccountTransformer) buildAccountSecretWithPassword(cluster
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
-		SetImmutable(true).
+		// SetImmutable(true).
 		GetObject()
 	return secret, nil
 }

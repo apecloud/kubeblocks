@@ -177,6 +177,6 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeC
 		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
-		SetImmutable(true).
+		// SetImmutable(true).
 		GetObject()
 }

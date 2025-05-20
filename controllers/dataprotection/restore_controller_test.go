@@ -251,6 +251,9 @@ var _ = Describe("Restore Controller test", func() {
 			for _, job := range jobList.Items {
 				Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
 				for _, c := range job.Spec.Template.Spec.Containers {
+					if c.Name != dprestore.Restore {
+						continue
+					}
 					count := 0
 					for _, env := range c.Env {
 						for _, param := range testdp.TestParameters {

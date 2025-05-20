@@ -79,11 +79,6 @@ func init() {
 	runtime.Must(err)
 }
 
-type instance struct {
-	pod  *corev1.Pod
-	pvcs []*corev1.PersistentVolumeClaim
-}
-
 // ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
 func ParseParentNameAndOrdinal(s string) (string, int) {
@@ -505,7 +500,7 @@ func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMappin
 	return nil
 }
 
-func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
+func buildInstancePodByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*corev1.Pod, error) {
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
@@ -540,29 +535,16 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	}
 
 	// 2. build pvcs from template
-	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
-		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
-			AddLabelsInMap(template.Labels).
-			AddLabelsInMap(labels).
-			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
-			SetSpec(*claimTemplate.Spec.DeepCopy()).
-			GetObject()
-		if template.Name != "" {
-			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
-		}
-		pvcMap[pvcName] = pvc
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, pod.GetName())
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
 
 	// 3. update pod volumes
-	var pvcs []*corev1.PersistentVolumeClaim
 	var volumeList []corev1.Volume
-	for pvcName, pvc := range pvcMap {
-		pvcs = append(pvcs, pvc)
-		volume := builder.NewVolumeBuilder(pvcNameMap[pvcName]).
+	for pvcName, claimTemplateName := range pvcNameMap {
+		volume := builder.NewVolumeBuilder(claimTemplateName).
 			SetVolumeSource(corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
 			}).GetObject()
@@ -577,24 +559,14 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
-	for _, pvc := range pvcs {
-		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
-			return nil, err
-		}
-	}
-	inst := &instance{
-		pod:  pod,
-		pvcs: pvcs,
-	}
-	return inst, nil
+	return pod, nil
 }
 
-func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
-	// 2. build pvcs from template
+func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(parent.Name)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, name)
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(labels).
 			AddLabelsInMap(template.Labels).
@@ -609,8 +581,12 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 		}
 		pvcs = append(pvcs, pvc)
 	}
-
-	return pvcs
+	for _, pvc := range pvcs {
+		if err := controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+			return nil, err
+		}
+	}
+	return pvcs, nil
 }
 
 // copyAndMerge merges two objects for updating:
@@ -776,7 +752,7 @@ func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
 		return &instanceTemplateExt{
 			Name:                 templateName,
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
-			VolumeClaimTemplates: claims,
+			VolumeClaimTemplates: claims, // default claims
 		}
 	}
 
@@ -908,10 +884,25 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 			}
 		}
 	}
-	updateImage(templateExt.Spec.InitContainers, template.InitImages)
+	updateImage(templateExt.Spec.InitContainers, template.Images)
 	updateImage(templateExt.Spec.Containers, template.Images)
 
 	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
+
+	// override by instance template
+	for _, tpl1 := range template.VolumeClaimTemplates {
+		found := false
+		for i, tpl2 := range templateExt.VolumeClaimTemplates {
+			if tpl1.Name == tpl2.Name {
+				templateExt.VolumeClaimTemplates[i] = *tpl1.DeepCopy()
+				found = true
+				break
+			}
+		}
+		if !found {
+			templateExt.VolumeClaimTemplates = append(templateExt.VolumeClaimTemplates, *tpl1.DeepCopy())
+		}
+	}
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

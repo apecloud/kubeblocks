@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -77,11 +78,40 @@ var _ = Describe("Parameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 				g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
 				g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-			}), time.Second*10).Should(Succeed())
+			})).Should(Succeed())
 
 			By("check parameter status")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
 				g.Expect(parameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			By("check component parameters cr")
+			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
+				item := intctrlutil.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				Expect(item).ShouldNot(BeNil())
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
+			})).Should(Succeed())
+
+			By("the second update parameters")
+			key = testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
+			parameterObj = testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
+				AddParameters("max_connections", "2000").
+				AddParameters("gtid_mode", "OFF").
+				Create(&testCtx).
+				GetObject()
+
+			By("check parameter status")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
+				g.Expect(parameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			By("check component parameter")
+			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
+				item := intctrlutil.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				Expect(item).ShouldNot(BeNil())
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("2000")))
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("gtid_mode", pointer.String("OFF")))
 			})).Should(Succeed())
 		})
 

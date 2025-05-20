@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
@@ -102,15 +101,15 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 }
 
 func UpdateInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, serviceVersion string, tpl *workloads.InstanceTemplate) error {
+	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(compVersions) == 0 {
-		return nil
+		return nil, nil
 	}
-	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion, tpl)
+	return resolveImagesWithCompVersions4Template(compDef, compVersions, serviceVersion)
 }
 
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
@@ -172,17 +171,17 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 }
 
 func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
-	compVersions []*appsv1.ComponentVersion, serviceVersion string, tpl *workloads.InstanceTemplate) error {
+	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
 	appsInDef := covertImagesFromCompDefinition(compDef)
 	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	images := make(map[string]string)
 	apps := checkNMergeImages(serviceVersion, appsInDef, appsInVer)
-
 	if err = func() error {
-		checkNUpdateImage := func(name, image string, images map[string]string) error {
+		checkNUpdateImage := func(name, image string) error {
 			var err error
 			app, ok := apps[name]
 			switch {
@@ -198,18 +197,18 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 			return err
 		}
 		for _, c := range compDef.Spec.Runtime.InitContainers {
-			if err := checkNUpdateImage(c.Name, c.Image, tpl.InitImages); err != nil {
+			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
 				return err
 			}
 		}
 		for _, c := range compDef.Spec.Runtime.Containers {
-			if err := checkNUpdateImage(c.Name, c.Image, tpl.Images); err != nil {
+			if err := checkNUpdateImage(c.Name, c.Image); err != nil {
 				return err
 			}
 		}
 		return nil
 	}(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = func() error {
@@ -225,10 +224,10 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 		}
 		return nil
 	}(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return images, nil
 }
 
 func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {

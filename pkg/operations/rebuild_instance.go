@@ -566,8 +566,8 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: rebuildInstance.BackupName, Namespace: opsRes.Cluster.Namespace}, backup); err != nil {
 			return nil, err
 		}
-		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeFull) {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" is not a Full backup`, rebuildInstance.BackupName))
+		if !slices.Contains([]string{string(dpv1alpha1.BackupTypeFull), string(dpv1alpha1.BackupTypeIncremental)}, backup.Labels[dptypes.BackupTypeLabelKey]) {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" is not a Full or Incremental backup`, rebuildInstance.BackupName))
 		}
 		if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" phase is not Completed`, rebuildInstance.BackupName))

@@ -602,7 +602,7 @@ var _ = Describe("service references", func() {
 					&corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: namespace,
-							Name:      constant.GeneratePodName(etcdCluster, etcdComponent, 0),
+							Name:      fmt.Sprintf("%s-%s-%d", etcdCluster, etcdComponent, 0),
 							Labels: map[string]string{
 								constant.AppManagedByLabelKey:   constant.AppName,
 								constant.AppInstanceLabelKey:    etcdCluster,
@@ -615,7 +615,7 @@ var _ = Describe("service references", func() {
 					&corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: namespace,
-							Name:      constant.GeneratePodName(etcdCluster, etcdComponent, 1),
+							Name:      fmt.Sprintf("%s-%s-%d", etcdCluster, etcdComponent, 1),
 							Labels: map[string]string{
 								constant.AppManagedByLabelKey:   constant.AppName,
 								constant.AppInstanceLabelKey:    etcdCluster,

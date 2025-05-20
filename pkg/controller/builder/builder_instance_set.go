@@ -154,3 +154,8 @@ func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string
 	builder.get().Spec.OfflineInstances = offlineInstances
 	return builder
 }
+
+func (builder *InstanceSetBuilder) SetDisableDefaultHeadlessService(disable bool) *InstanceSetBuilder {
+	builder.get().Spec.DisableDefaultHeadlessService = disable
+	return builder
+}

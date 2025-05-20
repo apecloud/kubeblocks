@@ -337,15 +337,15 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Images != nil {
-		in, out := &in.Images, &out.Images
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]corev1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.InitImages != nil {
-		in, out := &in.InitImages, &out.InitImages
+	if in.Images != nil {
+		in, out := &in.Images, &out.Images
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

@@ -76,7 +76,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	applyVolumeExpansion := func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		setVolumeStorage := func(volumeExpansionVCTs []opsv1alpha1.OpsRequestVolumeClaimTemplate,
-			targetVCTs []appsv1.ClusterComponentVolumeClaimTemplate) {
+			targetVCTs []appsv1.PersistentVolumeClaimTemplate) {
 			for _, v := range volumeExpansionVCTs {
 				for i, vct := range targetVCTs {
 					if vct.Name != v.Name {
@@ -213,8 +213,8 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 	compOpsHelper := newComponentOpsHelper(opsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		getLastVCTs := func(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []appsv1.ClusterComponentVolumeClaimTemplate {
-			lastVCTs := make([]appsv1.ClusterComponentVolumeClaimTemplate, 0)
+		getLastVCTs := func(vcts []appsv1.PersistentVolumeClaimTemplate) []appsv1.PersistentVolumeClaimTemplate {
+			lastVCTs := make([]appsv1.PersistentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
 				key := getComponentVCTKey(comOps.GetComponentName(), vct.Name)
 				if _, ok := storageMap[key]; !ok {

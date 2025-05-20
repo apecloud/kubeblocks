@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -110,7 +109,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		TLSConfig:                        comp.Spec.TLSConfig,
 		ServiceAccountName:               comp.Spec.ServiceAccountName,
 		Instances:                        comp.Spec.Instances,
-		InstancesExt:                     getInstanceTemplates(comp.Spec.Instances),
+		InstanceImages:                   make(map[string]map[string]string),
 		OfflineInstances:                 comp.Spec.OfflineInstances,
 		DisableExporter:                  comp.Spec.DisableExporter,
 		Stop:                             comp.Spec.Stop,
@@ -231,28 +230,6 @@ func buildCompDef2CompCount(ctx context.Context, cli client.Reader, namespace, c
 	return result, nil
 }
 
-func getInstanceTemplates(instances []appsv1.InstanceTemplate) []workloads.InstanceTemplate {
-	if instances == nil {
-		return nil
-	}
-	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
-	for i := range instances {
-		instanceTemplates[i] = workloads.InstanceTemplate{
-			Name:             instances[i].Name,
-			Replicas:         instances[i].Replicas,
-			Ordinals:         instances[i].Ordinals,
-			Annotations:      instances[i].Annotations,
-			Labels:           instances[i].Labels,
-			SchedulingPolicy: instances[i].SchedulingPolicy,
-			Resources:        instances[i].Resources,
-			Env:              instances[i].Env,
-			Images:           make(map[string]string),
-			InitImages:       make(map[string]string),
-		}
-	}
-	return instanceTemplates
-}
-
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil || len(comp.Spec.Env) == 0 {
 		return nil
@@ -278,6 +255,15 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = intctrlutil.ToCoreV1PVCTs(comp.Spec.VolumeClaimTemplates)
+		for i := range synthesizeComp.VolumeClaimTemplates {
+			vct := comp.Spec.VolumeClaimTemplates[i]
+			if vct.PersistentVolumeClaimName != nil && len(*vct.PersistentVolumeClaimName) > 0 {
+				if synthesizeComp.VolumeClaimTemplates[i].Annotations == nil {
+					synthesizeComp.VolumeClaimTemplates[i].Annotations = map[string]string{}
+				}
+				synthesizeComp.VolumeClaimTemplates[i].Annotations[constant.PVCNamePrefixAnnotationKey] = *vct.PersistentVolumeClaimName
+			}
+		}
 	}
 	if comp.Spec.PersistentVolumeClaimRetentionPolicy != nil {
 		synthesizeComp.PVCRetentionPolicy = *comp.Spec.PersistentVolumeClaimRetentionPolicy

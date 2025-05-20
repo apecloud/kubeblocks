@@ -370,7 +370,7 @@ func (r *backupPolicyAndScheduleBuilder) setDefaultEncryptionConfig(backupPolicy
 	}
 }
 
-func (r *backupPolicyAndScheduleBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role, alternateRole, compName string) {
+func (r *backupPolicyAndScheduleBuilder) syncRoleLabelSelectorWhenReplicaChanges(target *dpv1alpha1.BackupTarget, role, alternateRole, compName string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -383,7 +383,7 @@ func (r *backupPolicyAndScheduleBuilder) syncRoleLabelSelector(target *dpv1alpha
 		if podSelector.FallbackLabelSelector != nil && podSelector.FallbackLabelSelector.MatchLabels != nil {
 			delete(podSelector.FallbackLabelSelector.MatchLabels, constant.RoleLabelKey)
 		}
-	} else {
+	} else if podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] == "" {
 		podSelector.LabelSelector.MatchLabels[constant.RoleLabelKey] = role
 		if len(alternateRole) > 0 {
 			if podSelector.FallbackLabelSelector == nil || podSelector.FallbackLabelSelector.MatchLabels == nil {
@@ -479,7 +479,7 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupTarget(
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
 		// if the target already exists, only sync the role by component replicas automatically.
-		r.syncRoleLabelSelector(oldTarget, targetTpl.Role, targetTpl.FallbackRole, compName)
+		r.syncRoleLabelSelectorWhenReplicaChanges(oldTarget, targetTpl.Role, targetTpl.FallbackRole, compName)
 		return oldTarget
 	}
 	clusterName := r.Cluster.Name
@@ -492,6 +492,7 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupTarget(
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: r.buildTargetPodLabels(targetTpl.Role, compName),
 			},
+			UseParentSelectedPods: targetTpl.UseParentSelectedPods,
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
 		ServiceAccountName: "",

@@ -1673,10 +1673,10 @@ var _ = Describe("vars", func() {
 										corev1.ResourceMemory: resource.MustParse("2Gi"),
 									},
 								},
-								VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{
+								VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{
 									{
 										Name: "data",
-										Spec: appsv1.PersistentVolumeClaimSpec{
+										Spec: corev1.PersistentVolumeClaimSpec{
 											Resources: corev1.VolumeResourceRequirements{
 												Requests: corev1.ResourceList{
 													corev1.ResourceStorage: resource.MustParse("10Gi"),
@@ -1914,9 +1914,9 @@ var _ = Describe("vars", func() {
 				}
 				// pod names and FQDNs are calculated from the spec, and names and FQDNs for specific roles are obtained from runtime resources.
 				mockInstanceList := []string{
-					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 0),
-					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 1),
-					constant.GeneratePodName(synthesizedComp.ClusterName, synthesizedComp.Name, 2),
+					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 0),
+					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 1),
+					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 2),
 				}
 				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())

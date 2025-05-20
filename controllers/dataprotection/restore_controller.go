@@ -106,6 +106,8 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseRestoreJob)).
+		// to watch the `restore` container if it is terminated
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parseRestorePod)).
 		Complete(r)
 }
 
@@ -118,6 +120,21 @@ func (r *RestoreReconciler) parseRestoreJob(ctx context.Context, object client.O
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: restoreNamespace,
+				Name:      restoreName,
+			},
+		})
+	}
+	return requests
+}
+
+func (r *RestoreReconciler) parseRestorePod(ctx context.Context, object client.Object) []reconcile.Request {
+	pod := object.(*corev1.Pod)
+	var requests []reconcile.Request
+	restoreName := pod.Labels[dprestore.DataProtectionRestoreLabelKey]
+	if restoreName != "" {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: pod.Namespace,
 				Name:      restoreName,
 			},
 		})
@@ -250,7 +267,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 		restore.Status.Phase = dpv1alpha1.RestorePhaseAsDataSource
 	} else {
 		// check if restore CR is legal
-		err := r.validateAndBuildMGR(reqCtx, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme))
+		err := r.validateAndBuildMGR(reqCtx, dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client))
 		switch {
 		case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
 			restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
@@ -271,7 +288,7 @@ func (r *RestoreReconciler) newAction(reqCtx intctrlutil.RequestCtx, restore *dp
 }
 
 func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, restore *dpv1alpha1.Restore) (ctrl.Result, error) {
-	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme)
+	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	// validate if the restore.spec is valid and build restore manager.
 	err := r.validateAndBuildMGR(reqCtx, restoreMgr)
 	if err == nil {
@@ -477,7 +494,10 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// 4. check if jobs are finished.
-	allActionsFinished, existFailedAction = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)
+	allActionsFinished, existFailedAction, err = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)
+	if err != nil {
+		return false, err
+	}
 	if stage == dpv1alpha1.PrepareData {
 		// recalculation whether all actions have been completed.
 		restoreMgr.Recalculation(backupSet.Backup.Name, actionName, &allActionsFinished, &existFailedAction)

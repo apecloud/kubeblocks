@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -324,7 +325,7 @@ func resolveInitParametersFromParameterCR(parameterCRs []parametersv1alpha1.Para
 	for _, pcr := range parameterCRs {
 		for _, compParams := range pcr.Spec.ComponentParameters {
 			if compParams.ComponentName == compName {
-				if err := mergeWithOverride(&initParams, compParams.Parameters); err != nil {
+				if err := mergo.Merge(&initParams, compParams.Parameters); err != nil {
 					return nil, err
 				}
 			}

@@ -61,16 +61,8 @@ const (
 )
 
 const (
-	KBPrefix                = "KB"
-	KBLowerPrefix           = "kb"
-	SlashScalingLowerSuffix = "scaling"
-)
-
-const (
-	KubeblocksAPIConversionTypeAnnotationName = "api.kubeblocks.io/converted"
-	SourceAPIVersionAnnotationName            = "api.kubeblocks.io/source"
-
-	MigratedAPIVersion = "migrated"
+	KBPrefix      = "KB"
+	KBLowerPrefix = "kb"
 )
 
 const InvalidContainerPort int32 = 0

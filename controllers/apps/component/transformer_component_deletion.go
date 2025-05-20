@@ -113,7 +113,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		}
 		// wait for the workloads to be deleted to trigger the next reconcile
 		transCtx.Logger.Info(fmt.Sprintf("wait for the workloads to be deleted: %v", workloads))
-		return nil
+		return graph.ErrPrematureStop
 	}
 
 	// secondly, delete the other sub-resources owned by the component

@@ -142,6 +142,9 @@ const (
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	EncryptedSystemAccountsAnnotationKey        = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
+	OutdatedSystemAccountAnnotationKey          = "kubeblocks.io/outdated-system-accounts"  // OutdateSystemAccountAnnotationKey saves the outdate system accounts.
+	SystemAccountOutdatedAnnotationKey          = "kubeblocks.io/secret-outdated"           // if user update the system account by other way, the annotation should be set to true by user yourself.
+	SystemAccountLastUpdateTimeKey              = "kubeblocks.io/secret-last-update-time"   // SystemAccountLastUpdateTimeKey saves the last update time of system account.
 	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
 	RestartAnnotationKey                        = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestoreFromBackupAnnotationKey              = "kubeblocks.io/restore-from-backup"

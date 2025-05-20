@@ -951,6 +951,17 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 		password := secret.Data[passwordKey]
 		return username != nil && password != nil
 	}
+	// isOutdatedSystemAccountSecret checks if the account's password defined in system secret is modefied by user.
+	isOutdatedSystemAccountSecret := func(secret *corev1.Secret) bool {
+		annotations := secret.Annotations
+		if annotations == nil {
+			return false
+		}
+		if val, ok := annotations[constant.SystemAccountOutdatedAnnotationKey]; ok && val == trueVal {
+			return true
+		}
+		return false
+	}
 	// fetch secret objects
 	objectList, err := listObjectsOfCluster(request.Ctx, request.Client, cluster, &corev1.SecretList{})
 	if err != nil {
@@ -959,8 +970,19 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 	secretList := objectList.(*corev1.SecretList)
 	// store the data of secrets in a map data structure, which contains the name of component, the username, and the encrypted password.
 	secretMap := map[string]map[string]string{}
+	outdatedSecretMap := map[string]map[string]string{}
 	for i := range secretList.Items {
 		if !isSystemAccountSecret(&secretList.Items[i]) {
+			continue
+		}
+		if isOutdatedSystemAccountSecret(&secretList.Items[i]) {
+			outdatedInfo := map[string]string{
+				constant.SystemAccountOutdatedAnnotationKey: trueVal,
+			}
+			if val, ok := secretList.Items[i].Annotations[constant.SystemAccountLastUpdateTimeKey]; ok {
+				outdatedInfo[constant.SystemAccountLastUpdateTimeKey] = val
+			}
+			outdatedSecretMap[secretList.Items[i].Name] = outdatedInfo
 			continue
 		}
 		componentName := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
@@ -992,6 +1014,13 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 	}
 	if secretMapString != nil && *secretMapString != "" {
 		request.Backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] = *secretMapString
+	}
+	outdatedSecretMapString, err := getObjectString(outdatedSecretMap)
+	if err!= nil {
+		return err
+	}
+	if outdatedSecretMapString!= nil && *outdatedSecretMapString!= "" {
+		request.Backup.Annotations[constant.OutdatedSystemAccountAnnotationKey] = *outdatedSecretMapString
 	}
 	return nil
 }

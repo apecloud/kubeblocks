@@ -117,7 +117,11 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 			return nil, err
 		}
 	}
-	return t.buildAccountSecretWithPassword(synthesizeComp, account, password), nil
+	outdatedAnnatation, err := factory.GetBackUpOutdatedSecretAnnotations(ctx.Context, ctx.Client, ctx.SynthesizeComponent.Annotations, account.Name)
+	if err != nil {
+		return nil, err
+	}
+	return t.buildAccountSecretWithPassword(ctx, synthesizeComp, account, password, outdatedAnnatation), nil
 }
 
 func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account appsv1alpha1.SystemAccount) ([]byte, error) {
@@ -166,8 +170,7 @@ func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.Syst
 	return []byte(passwd)
 }
 
-func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeComp *component.SynthesizedComponent,
-	account appsv1alpha1.SystemAccount, password []byte) *corev1.Secret {
+func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext, synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount, password []byte, originAnnation map[string]string) *corev1.Secret {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
 	labels := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
@@ -175,6 +178,7 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(synthesizeC
 		AddLabelsInMap(synthesizeComp.UserDefinedLabels).
 		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
+		AddAnnotationsInMap(originAnnation).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).

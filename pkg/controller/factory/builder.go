@@ -348,36 +348,8 @@ func GetRestoreSystemAccountPassword(
 	componentName,
 	accountName string,
 ) ([]byte, error) {
-	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
-	if len(valueString) == 0 {
-		return nil, nil
-	}
-	backupMap := map[string]map[string]string{}
-	err := json.Unmarshal([]byte(valueString), &backupMap)
+	backup, err := getBackUpObjectByAnnotation(ctx, cli, annotations)
 	if err != nil {
-		return nil, err
-	}
-	var backupSource map[string]string
-	for _, v := range backupMap {
-		backupSource = v
-		break
-	}
-	if backupSource == nil {
-		return nil, nil
-	}
-	name, ok := backupSource[constant.BackupNameKeyForRestore]
-	if !ok || len(name) == 0 {
-		return nil, fmt.Errorf("backup name not found in restore annotation")
-	}
-	namespace, ok := backupSource[constant.BackupNamespaceKeyForRestore]
-	if !ok || len(namespace) == 0 {
-		return nil, fmt.Errorf("backup namespace not found in restore annotation")
-	}
-	backup := &dpv1alpha1.Backup{}
-	if err := cli.Get(ctx, client.ObjectKey{
-		Name:      name,
-		Namespace: namespace,
-	}, backup); err != nil {
 		return nil, err
 	}
 	systemAccountsMap := map[string]string{}
@@ -617,4 +589,59 @@ func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbac
 			Name:      saName,
 		}).
 		GetObject()
+}
+
+func GetBackUpOutdatedSecretAnnotations(ctx context.Context, cli client.Reader, annotations map[string]string, accountName string) (map[string]string, error) {
+	backup, err := getBackUpObjectByAnnotation(ctx, cli, annotations)
+	if err != nil {
+		return nil, err
+	}
+	outdatedSystemAccountsString := backup.Annotations[constant.OutdatedSystemAccountAnnotationKey]
+	if outdatedSystemAccountsString != "" {
+		outdatedSystemAccountsMap := map[string]map[string]string{}
+		if err = json.Unmarshal([]byte(outdatedSystemAccountsString), &outdatedSystemAccountsMap); err != nil {
+			return nil, err
+		}
+		if outdatedSystemAccountsMap[accountName] == nil {
+			return nil, nil
+		}
+		return outdatedSystemAccountsMap[accountName], nil
+	}
+	return nil, nil
+}
+
+func getBackUpObjectByAnnotation(ctx context.Context, cli client.Reader, annotations map[string]string) (*dpv1alpha1.Backup, error) {
+	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return nil, nil
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return nil, err
+	}
+	var backupSource map[string]string
+	for _, v := range backupMap {
+		backupSource = v
+		break
+	}
+	if backupSource == nil {
+		return nil, nil
+	}
+	name, ok := backupSource[constant.BackupNameKeyForRestore]
+	if !ok || len(name) == 0 {
+		return nil, fmt.Errorf("backup name not found in restore annotation")
+	}
+	namespace, ok := backupSource[constant.BackupNamespaceKeyForRestore]
+	if !ok || len(namespace) == 0 {
+		return nil, fmt.Errorf("backup namespace not found in restore annotation")
+	}
+	backup := &dpv1alpha1.Backup{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, backup); err != nil {
+		return nil, err
+	}
+	return backup, nil
 }

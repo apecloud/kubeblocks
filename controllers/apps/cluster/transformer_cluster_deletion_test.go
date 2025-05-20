@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"errors"
 	"slices"
 	"time"
 
@@ -121,7 +122,8 @@ var _ = Describe("clusterDeletionTransformer", func() {
 
 		transformer := &clusterDeletionTransformer{}
 		err := transformer.Transform(transCtx, dag)
-		Expect(err).Should(BeNil())
+		Expect(err).ShouldNot(BeNil())
+		Expect(errors.Is(err, graph.ErrPrematureStop)).Should(BeTrue())
 		Expect(dag.Vertices()).Should(HaveLen(1 + 3))
 	})
 
@@ -149,7 +151,8 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		})
 		dag = newDag(transCtx.Client.(model.GraphClient))
 		err = transformer.Transform(transCtx, dag)
-		Expect(err).Should(BeNil())
+		Expect(err).ShouldNot(BeNil())
+		Expect(errors.Is(err, graph.ErrPrematureStop)).Should(BeTrue())
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 3

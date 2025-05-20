@@ -80,7 +80,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if len(deleteSet) > 0 {
 		// wait for the components to be deleted to trigger the next reconcile
 		transCtx.Logger.Info(fmt.Sprintf("wait for the components and shardings to be deleted: %v", deleteSet))
-		return nil
+		return graph.ErrPrematureStop
 	}
 
 	// then list all the others objects owned by this cluster in cache, and delete them all

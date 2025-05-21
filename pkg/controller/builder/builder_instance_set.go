@@ -155,6 +155,11 @@ func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetPodNamingRule(namingRule workloads.PodNamingRule) *InstanceSetBuilder {
+	builder.get().Spec.PodNamingRule = namingRule
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetDisableDefaultHeadlessService(disable bool) *InstanceSetBuilder {
 	builder.get().Spec.DisableDefaultHeadlessService = disable
 	return builder

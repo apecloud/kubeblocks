@@ -367,6 +367,7 @@ spec:
                 description: |-
                   Specifies the desired Ordinals of the default template.
                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+                  If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 
 
                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
@@ -381,7 +382,7 @@ spec:
                   ranges:
                     items:
                       description: |-
-                        Range represents a range with a start and an end value.
+                        Range represents a range with a start and an end value. Both start and end are included.
                         It is used to define a continuous segment.
                       properties:
                         end:
@@ -623,7 +624,7 @@ spec:
                         ranges:
                           items:
                             description: |-
-                              Range represents a range with a start and an end value.
+                              Range represents a range with a start and an end value. Both start and end are included.
                               It is used to define a continuous segment.
                             properties:
                               end:
@@ -2674,6 +2675,12 @@ spec:
 
 
                   Note: This field will be removed in future version.
+                type: string
+              podNamingRule:
+                default: Separated
+                enum:
+                - Separated
+                - Sequential
                 type: string
               podUpdatePolicy:
                 description: |-
@@ -10859,8 +10866,7 @@ spec:
                 format: int32
                 type: integer
               instanceStatus:
-                description: Provides the status of each instance in the ITS.
-                items:
+                additionalProperties:
                   properties:
                     configs:
                       description: The status of configs.
@@ -10878,14 +10884,18 @@ spec:
                         - name
                         type: object
                       type: array
-                    podName:
-                      default: Unknown
-                      description: Represents the name of the pod.
+                    templateName:
+                      default: ""
+                      description: Represents the instance template the pod uses.
+                        Default template name is empty string.
                       type: string
                   required:
-                  - podName
+                  - templateName
                   type: object
-                type: array
+                description: |-
+                  Provides the status of each instance in the ITS.
+                  key is pod name.
+                type: object
               membersStatus:
                 description: Provides the status of each member in the cluster.
                 items:

@@ -29,8 +29,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -57,6 +59,7 @@ var _ = Describe("Available", func() {
 			compDef             *appsv1.ComponentDefinition
 			comp                *appsv1.Component
 			availableTimeWindow = int32(10)
+			its                 *workloads.InstanceSet
 		)
 
 		BeforeEach(func() {
@@ -120,6 +123,17 @@ var _ = Describe("Available", func() {
 				},
 				Status: appsv1.ComponentStatus{},
 			}
+			its = &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-comp",
+				},
+				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
+				},
+				Status: workloads.InstanceSetStatus{
+					ObservedGeneration: 1,
+				},
+			}
 		})
 
 		reqCtx := func() intctrlutil.RequestCtx {
@@ -175,7 +189,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"),
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 		})
@@ -184,7 +198,7 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			event := probeEvent{}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeFalse())
 		})
@@ -218,7 +232,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"), // duplicate event
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 		})
@@ -252,7 +266,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"),
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeFalse())
 		})
@@ -286,7 +300,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"), // new event
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 		})
@@ -312,7 +326,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"),
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 
@@ -363,7 +377,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"),
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeFalse())
 
@@ -374,7 +388,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"),
 			}
-			available, _, err = h.handleEvent(event, comp, compDef)
+			available, _, err = h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 		})
@@ -408,7 +422,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte("follower"),
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 		})
@@ -436,7 +450,7 @@ var _ = Describe("Available", func() {
 				Code:      0,
 				Stdout:    []byte(""), // has no role
 			}
-			available, _, err := h.handleEvent(event, comp, compDef)
+			available, _, err := h.handleEvent(event, comp, compDef, its)
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeFalse())
 		})

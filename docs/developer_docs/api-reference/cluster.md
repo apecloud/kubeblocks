@@ -7726,7 +7726,7 @@ string
 <p>Name specifies the unique name of the instance Pod created using this InstanceTemplate.
 This name is constructed by concatenating the Component&rsquo;s name, the template&rsquo;s name, and the instance&rsquo;s ordinal
 using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-The specified name overrides any default naming conventions or patterns.</p>
+The name can&rsquo;t be empty.</p>
 </td>
 </tr>
 <tr>
@@ -7755,7 +7755,8 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under this InstanceTemplate would be
 $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
@@ -9006,7 +9007,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Ordinals">Ordinals</a>)
 </p>
 <div>
-<p>Range represents a range with a start and an end value.
+<p>Range represents a range with a start and an end value. Both start and end are included.
 It is used to define a continuous segment.</p>
 </div>
 <table>
@@ -29402,7 +29403,8 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
@@ -29473,6 +29475,19 @@ By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNamingRule</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.PodNamingRule">
+PodNamingRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 <tr>
@@ -29909,7 +29924,8 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
@@ -29980,6 +29996,19 @@ By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNamingRule</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.PodNamingRule">
+PodNamingRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 <tr>
@@ -30386,13 +30415,14 @@ Used only when spec.roles set.</p>
 <code>instanceStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceStatus">
-[]InstanceStatus
+map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.InstanceStatus
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides the status of each instance in the ITS.</p>
+<p>Provides the status of each instance in the ITS.
+key is pod name.</p>
 </td>
 </tr>
 <tr>
@@ -30454,13 +30484,13 @@ key is the pod name, value is the revision.</p>
 <tbody>
 <tr>
 <td>
-<code>podName</code><br/>
+<code>templateName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Represents the name of the pod.</p>
+<p>Represents the instance template the pod uses. Default template name is empty string.</p>
 </td>
 </tr>
 <tr>
@@ -30813,6 +30843,26 @@ Action
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.PodNamingRule">PodNamingRule
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Combined&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Separated&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

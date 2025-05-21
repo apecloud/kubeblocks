@@ -72,7 +72,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	}
 	for _, tpl := range comp.Spec.Instances {
 		if len(tpl.ServiceVersion) > 0 {
-			images, err := component.UpdateInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion)
+			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion)
 			if err != nil {
 				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}

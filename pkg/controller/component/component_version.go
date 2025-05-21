@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 // CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
@@ -100,7 +101,7 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 
-func UpdateInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
+func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, serviceVersion string) (map[string]string, error) {
 	compVersions, err := CompatibleCompVersions4Definition(ctx, cli, compDef)
 	if err != nil {
@@ -180,6 +181,7 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 
 	images := make(map[string]string)
 	apps := checkNMergeImages(serviceVersion, appsInDef, appsInVer)
+
 	if err = func() error {
 		checkNUpdateImage := func(name, image string) error {
 			var err error
@@ -218,7 +220,8 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					if app.err != nil {
 						return app.err
 					}
-					action.Exec.Image = app.image
+					images[kbagent.ContainerName] = app.image
+					images[kbagent.ContainerName4Worker] = app.image
 				}
 			}
 		}

@@ -730,6 +730,11 @@ type InstanceTemplate struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
+	// Indicate whether the instances belonging to this template are canary instances.
+	//
+	// +optional
+	Canary *bool `json:"canary,omitempty"`
+
 	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
 	// This field allows setting how many replicated instances of the Component,
 	// with the specific overrides in the InstanceTemplate, are created.

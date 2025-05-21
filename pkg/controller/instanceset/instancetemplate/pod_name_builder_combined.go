@@ -73,12 +73,14 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	for templateName, ordinals := range itsExt.InstanceSet.Status.CurrentInstances {
-		template2OrdinalSetMap[templateName].Insert(ordinals...)
-		for _, ordinal := range ordinals {
-			allOrdinalSet.Insert(ordinal)
-			ordinalToTemplateMap[ordinal] = templateName
+	for podName, status := range itsExt.InstanceSet.Status.InstanceStatus {
+		ordinal, err := GetOrdinal(podName)
+		if err != nil {
+			return nil, err
 		}
+		template2OrdinalSetMap[status.TemplateName].Insert(ordinal)
+		allOrdinalSet.Insert(ordinal)
+		ordinalToTemplateMap[ordinal] = status.TemplateName
 	}
 
 	// 1. handle those who have ordinals specified
@@ -227,19 +229,17 @@ func (c *combinedPodNameBuilder) Validate() error {
 	return nil
 }
 
-// PodsToCurrentInstances converts pods to instanceset's .status.currentInstances
-func PodsToCurrentInstances(pods []*corev1.Pod, its *workloads.InstanceSet) (workloads.CurrentInstances, error) {
-	currentInstances := make(workloads.CurrentInstances)
+// SetInstanceStatus sets template name in InstanceStatus
+// TODO: add to interface, and use it
+func SetInstanceStatus(pods []*corev1.Pod, instanceStatus map[string]workloads.InstanceStatus) error {
 	for _, pod := range pods {
 		templateName, ok := pod.Labels[TemplateNameLabelKey]
 		if !ok {
-			return nil, fmt.Errorf("unknown pod %v", klog.KObj(pod))
+			return fmt.Errorf("unknown pod %v", klog.KObj(pod))
 		}
-		ordinal, err := GetOrdinal(pod.Name)
-		if err != nil {
-			return nil, err
-		}
-		currentInstances[templateName] = append(currentInstances[templateName], ordinal)
+		status := instanceStatus[pod.Name]
+		status.TemplateName = templateName
+		instanceStatus[pod.Name] = status
 	}
-	return currentInstances, nil
+	return nil
 }

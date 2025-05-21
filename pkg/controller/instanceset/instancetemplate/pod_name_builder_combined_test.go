@@ -88,9 +88,11 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				CurrentInstances: workloads.CurrentInstances{
-					"":   []int32{0, 1},
-					"t1": []int32{2, 4},
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0": {},
+					"-1": {},
+					"-2": {TemplateName: "t1"},
+					"-4": {TemplateName: "t1"},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -114,9 +116,12 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				CurrentInstances: workloads.CurrentInstances{
-					"":   []int32{0, 1},
-					"t1": []int32{2, 3, 4},
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0": {},
+					"-1": {},
+					"-2": {TemplateName: "t1"},
+					"-3": {TemplateName: "t1"},
+					"-4": {TemplateName: "t1"},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -175,8 +180,10 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				CurrentInstances: workloads.CurrentInstances{
-					"": []int32{0, 1, 2},
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0": {},
+					"-1": {},
+					"-2": {},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -196,9 +203,11 @@ var _ = Describe("Combined Name builder tests", func() {
 				OfflineInstances: []string{"foo-2"},
 			},
 			Status: workloads.InstanceSetStatus{
-				CurrentInstances: workloads.CurrentInstances{
-					"":   []int32{0, 1, 2},
-					"t1": []int32{3},
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0": {},
+					"-1": {},
+					"-2": {},
+					"-3": {TemplateName: "t1"},
 				},
 			},
 		}, map[string]sets.Set[int32]{

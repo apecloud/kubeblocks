@@ -29844,17 +29844,6 @@ map[string]string
 </tr>
 </tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.CurrentInstances">CurrentInstances
-(<code>map[string][]int32</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
-</p>
-<div>
-<p>CurrentInstances maps templates to current pods
-key is template name (default template has empty name), value is a list of pod ordinals
-store ordinals only to save some space.
-the list is always sorted by ordinal</p>
-</div>
 <h3 id="workloads.kubeblocks.io/v1.InstanceConfigStatus">InstanceConfigStatus
 </h3>
 <p>
@@ -30354,18 +30343,6 @@ string
 </tr>
 <tr>
 <td>
-<code>currentInstances</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.CurrentInstances">
-CurrentInstances
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
 <code>conditions</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
@@ -30438,13 +30415,14 @@ Used only when spec.roles set.</p>
 <code>instanceStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceStatus">
-[]InstanceStatus
+map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.InstanceStatus
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides the status of each instance in the ITS.</p>
+<p>Provides the status of each instance in the ITS.
+key is pod name.</p>
 </td>
 </tr>
 <tr>
@@ -30506,13 +30484,13 @@ key is the pod name, value is the revision.</p>
 <tbody>
 <tr>
 <td>
-<code>podName</code><br/>
+<code>templateName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Represents the name of the pod.</p>
+<p>Represents the instance template the pod uses. Default template name is empty string.</p>
 </td>
 </tr>
 <tr>

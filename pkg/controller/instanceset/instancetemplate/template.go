@@ -48,7 +48,7 @@ func buildInstanceTemplatesMap(its *workloads.InstanceSet, instancesCompressed *
 	return rtn
 }
 
-// BuildInstanceTemplates builds a complate instance template list,
+// BuildInstanceTemplates builds a complete instance template list,
 // i.e. append a pseudo template (which equals to `.spec.template`)
 // to the end of the list, to fill up the replica count.
 // And also if there is any compressed template, add them too.

@@ -335,10 +335,7 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	// compose new instance status
 	newInstanceStatus := make(map[string]workloads.InstanceStatus)
 	for _, pod := range pods {
-		instanceStatus := workloads.InstanceStatus{
-			PodName: pod.Name,
-		}
-		newInstanceStatus[pod.Name] = instanceStatus
+		newInstanceStatus[pod.Name] = workloads.InstanceStatus{}
 	}
 
 	syncInstanceConfigStatus(its, newInstanceStatus)
@@ -366,9 +363,9 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus map[str
 		for _, config := range its.Spec.Configs {
 			configs.Insert(config.Name)
 		}
-		for podName, newStatus := range instanceStatus {
-			for _, status := range its.Status.InstanceStatus {
-				if status.PodName == newStatus.PodName {
+		for newStatusPod, newStatus := range instanceStatus {
+			for statusPod, status := range its.Status.InstanceStatus {
+				if newStatusPod == statusPod {
 					if newStatus.Configs == nil {
 						newStatus.Configs = make([]workloads.InstanceConfigStatus, 0)
 					}
@@ -377,7 +374,7 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus map[str
 							newStatus.Configs = append(newStatus.Configs, status.Configs[j])
 						}
 					}
-					instanceStatus[podName] = newStatus
+					instanceStatus[newStatusPod] = newStatus
 					break
 				}
 			}

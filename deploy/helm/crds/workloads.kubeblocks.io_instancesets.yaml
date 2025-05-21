@@ -10840,14 +10840,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              currentInstances:
-                additionalProperties:
-                  items:
-                    format: int32
-                    type: integer
-                  type: array
-                description: 'FIXME: unify with InstanceStatus?'
-                type: object
               currentReplicas:
                 description: |-
                   currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
@@ -10892,12 +10884,13 @@ spec:
                         - name
                         type: object
                       type: array
-                    podName:
-                      default: Unknown
-                      description: Represents the name of the pod.
+                    templateName:
+                      default: ""
+                      description: Represents the instance template the pod uses.
+                        Default template name is empty string.
                       type: string
                   required:
-                  - podName
+                  - templateName
                   type: object
                 description: |-
                   Provides the status of each instance in the ITS.

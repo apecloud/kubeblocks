@@ -361,11 +361,8 @@ func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, p
 	if its.Status.InstanceStatus == nil {
 		its.Status.InstanceStatus = make(map[string]workloads.InstanceStatus)
 	}
-	status, ok := its.Status.InstanceStatus[pod.Name]
+	status := its.Status.InstanceStatus[pod.Name]
 	defer func() { its.Status.InstanceStatus[pod.Name] = status }()
-	if !ok {
-		status.PodName = pod.Name
-	}
 
 	if status.Configs == nil {
 		status.Configs = make([]workloads.InstanceConfigStatus, 0)

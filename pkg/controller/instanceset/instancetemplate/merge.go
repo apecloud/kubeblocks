@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
-	"reflect"
-
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -71,20 +69,21 @@ func buildInstanceTemplateExt(template *workloads.InstanceTemplate, its *workloa
 		}
 	}
 
-	if template.SchedulingPolicy != nil {
-		intctrlutil.MergeList(&template.SchedulingPolicy.Tolerations, &templateExt.Spec.Tolerations,
-			func(item corev1.Toleration) func(corev1.Toleration) bool {
-				return func(t corev1.Toleration) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-		intctrlutil.MergeList(&template.SchedulingPolicy.TopologySpreadConstraints, &templateExt.Spec.TopologySpreadConstraints,
-			func(item corev1.TopologySpreadConstraint) func(corev1.TopologySpreadConstraint) bool {
-				return func(t corev1.TopologySpreadConstraint) bool {
-					return reflect.DeepEqual(item, t)
-				}
-			})
-		templateExt.Spec.Affinity = scheduling.MergeAffinity(template.SchedulingPolicy.Affinity, templateExt.Spec.Affinity)
+	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
+
+	// override by instance template
+	for _, tpl1 := range template.VolumeClaimTemplates {
+		found := false
+		for i, tpl2 := range templateExt.VolumeClaimTemplates {
+			if tpl1.Name == tpl2.Name {
+				templateExt.VolumeClaimTemplates[i] = *tpl1.DeepCopy()
+				found = true
+				break
+			}
+		}
+		if !found {
+			templateExt.VolumeClaimTemplates = append(templateExt.VolumeClaimTemplates, *tpl1.DeepCopy())
+		}
 	}
 
 	return templateExt

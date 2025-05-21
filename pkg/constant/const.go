@@ -78,3 +78,8 @@ const DryRunContextKey Key = "dry-run"
 const (
 	APIVersionSupported = "api-version-supported"
 )
+
+const (
+	ReleasePhaseStable string = "stable"
+	ReleasePhaseCanary string = "canary"
+)

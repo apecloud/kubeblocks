@@ -30882,7 +30882,7 @@ Action
 </thead>
 <tbody><tr><td><p>&#34;Combined&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;Seperated&#34;</p></td>
+</tr><tr><td><p>&#34;Separated&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

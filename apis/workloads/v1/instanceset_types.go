@@ -320,9 +320,10 @@ type InstanceSetStatus struct {
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
 	// Provides the status of each instance in the ITS.
+	// key is pod name.
 	//
 	// +optional
-	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
+	InstanceStatus map[string]InstanceStatus `json:"instanceStatus,omitempty"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.

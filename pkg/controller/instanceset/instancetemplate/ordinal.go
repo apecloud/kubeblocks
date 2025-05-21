@@ -73,9 +73,9 @@ func GetInstanceName(its *workloads.InstanceSet, ordinal int32) string {
 	return fmt.Sprintf("%v-%v", its.Name, ordinal)
 }
 
-// TODO: Merge this to GetOrdinal
 // ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
+// TODO: Merge this to GetOrdinal
 func ParseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1

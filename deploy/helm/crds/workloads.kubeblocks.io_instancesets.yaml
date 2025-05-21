@@ -10874,8 +10874,7 @@ spec:
                 format: int32
                 type: integer
               instanceStatus:
-                description: Provides the status of each instance in the ITS.
-                items:
+                additionalProperties:
                   properties:
                     configs:
                       description: The status of configs.
@@ -10900,7 +10899,10 @@ spec:
                   required:
                   - podName
                   type: object
-                type: array
+                description: |-
+                  Provides the status of each instance in the ITS.
+                  key is pod name.
+                type: object
               membersStatus:
                 description: Provides the status of each member in the cluster.
                 items:

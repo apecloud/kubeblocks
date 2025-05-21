@@ -33,14 +33,11 @@ import (
 
 var (
 	reader *zstd.Decoder
-	writer *zstd.Encoder
 )
 
 func init() {
 	var err error
 	reader, err = zstd.NewReader(nil)
-	runtime.Must(err)
-	writer, err = zstd.NewWriter(nil)
 	runtime.Must(err)
 }
 

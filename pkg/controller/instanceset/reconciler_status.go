@@ -333,21 +333,20 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 
 func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	// compose new instance status
-	newInstanceStatus := make([]workloads.InstanceStatus, 0)
+	newInstanceStatus := make(map[string]workloads.InstanceStatus)
 	for _, pod := range pods {
 		instanceStatus := workloads.InstanceStatus{
 			PodName: pod.Name,
 		}
-		newInstanceStatus = append(newInstanceStatus, instanceStatus)
+		newInstanceStatus[pod.Name] = instanceStatus
 	}
 
 	syncInstanceConfigStatus(its, newInstanceStatus)
 
-	sortInstanceStatus(newInstanceStatus)
 	its.Status.InstanceStatus = newInstanceStatus
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus map[string]workloads.InstanceStatus) {
 	if its.Status.InstanceStatus == nil {
 		// initialize
 		configs := make([]workloads.InstanceConfigStatus, 0)
@@ -357,8 +356,9 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 				Generation: config.Generation,
 			})
 		}
-		for i := range instanceStatus {
-			instanceStatus[i].Configs = configs
+		for podName, status := range instanceStatus {
+			status.Configs = configs
+			instanceStatus[podName] = status
 		}
 	} else {
 		// HACK: copy the existing config status from the current its.status.instanceStatus
@@ -366,27 +366,21 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 		for _, config := range its.Spec.Configs {
 			configs.Insert(config.Name)
 		}
-		for i, newStatus := range instanceStatus {
+		for podName, newStatus := range instanceStatus {
 			for _, status := range its.Status.InstanceStatus {
 				if status.PodName == newStatus.PodName {
-					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
+					if newStatus.Configs == nil {
+						newStatus.Configs = make([]workloads.InstanceConfigStatus, 0)
 					}
 					for j, config := range status.Configs {
 						if configs.Has(config.Name) {
-							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
+							newStatus.Configs = append(newStatus.Configs, status.Configs[j])
 						}
 					}
+					instanceStatus[podName] = newStatus
 					break
 				}
 			}
 		}
 	}
-}
-
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(instanceStatus[i].PodName)
-	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

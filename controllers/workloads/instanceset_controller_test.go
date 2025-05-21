@@ -309,9 +309,10 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("check instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				podName := fmt.Sprintf("%s-0", itsObj.Name)
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+				g.Expect(its.Status.InstanceStatus[podName]).Should(Equal(workloads.InstanceStatus{
+					PodName: podName,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
@@ -380,9 +381,10 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				podName := fmt.Sprintf("%s-0", itsObj.Name)
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+				g.Expect(its.Status.InstanceStatus[podName]).Should(Equal(workloads.InstanceStatus{
+					PodName: podName,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
@@ -412,9 +414,10 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				podName := fmt.Sprintf("%s-0", itsObj.Name)
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+				g.Expect(its.Status.InstanceStatus[podName]).Should(Equal(workloads.InstanceStatus{
+					PodName: podName,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
@@ -494,9 +497,10 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				podName := fmt.Sprintf("%s-0", itsObj.Name)
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+				g.Expect(its.Status.InstanceStatus[podName]).Should(Equal(workloads.InstanceStatus{
+					PodName: podName,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
@@ -526,9 +530,10 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				podName := fmt.Sprintf("%s-0", itsObj.Name)
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+				g.Expect(its.Status.InstanceStatus[podName]).Should(Equal(workloads.InstanceStatus{
+					PodName: podName,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",

@@ -287,9 +287,9 @@ func (in *InstanceSetStatus) DeepCopyInto(out *InstanceSetStatus) {
 	}
 	if in.InstanceStatus != nil {
 		in, out := &in.InstanceStatus, &out.InstanceStatus
-		*out = make([]InstanceStatus, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+		*out = make(map[string]InstanceStatus, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	if in.CurrentRevisions != nil {

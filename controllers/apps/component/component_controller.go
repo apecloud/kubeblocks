@@ -149,6 +149,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentMonitorContainerTransformer{},
 			// allocate ports for host-network component
 			&componentHostNetworkTransformer{},
+			// handle component services
+			&componentServiceTransformer{},
 			// handle component system accounts
 			&componentAccountTransformer{},
 			// handle the TLS
@@ -165,8 +167,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentRestoreTransformer{Client: r.Client},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
-			// handle component services. Should be after workload transformer, since it relies on its to generate pod names
-			&componentServiceTransformer{},
 			// handle RBAC for component workloads
 			&componentRBACTransformer{},
 			// handle component postProvision lifecycle action

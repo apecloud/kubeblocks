@@ -41,6 +41,7 @@ func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNam
 	switch itsExt.InstanceSet.Spec.PodNamingRule {
 	case workloads.PodNamingRuleCombined:
 		// validate status is not empty
+		// FIXME: is the constraint not necessary?
 		if !opts.AllowEmptyStatus && reflect.ValueOf(itsExt.InstanceSet.Status).IsZero() {
 			return nil, errors.New("instanceset status is empty")
 		}

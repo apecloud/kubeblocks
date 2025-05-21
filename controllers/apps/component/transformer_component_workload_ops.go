@@ -61,8 +61,6 @@ type componentWorkloadOps struct {
 	runningITS *workloads.InstanceSet
 	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
 	protoITS              *workloads.InstanceSet
-	desiredCompPodNames   []string
-	runningItsPodNames    []string
 	desiredCompPodNameSet sets.Set[string]
 	runningItsPodNameSet  sets.Set[string]
 }
@@ -418,6 +416,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 		if proto == nil {
 			continue
 		}
+		r.transCtx.Logger.Info("run expandVolumes", "VolumeClaimTemplates", vct, "runningItsPodNames", r.runningItsPodNameSet.UnsortedList())
 		if err := r.expandVolumes(vct, proto); err != nil {
 			return err
 		}
@@ -426,7 +425,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 }
 
 func (r *componentWorkloadOps) expandVolumes(vct corev1.PersistentVolumeClaim, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for _, podName := range r.runningItsPodNames {
+	for podName := range r.runningItsPodNameSet {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
 			Namespace: r.synthesizeComp.Namespace,

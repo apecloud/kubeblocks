@@ -54,4 +54,6 @@ type PodNameBuilder interface {
 	GenerateAllInstanceNames() ([]string, error)
 	// different strategy may have different validation rules
 	Validate() error
+	// PodNameBuilder may save some states in InstanceStatus
+	SetInstanceStatus(pods []*corev1.Pod) error
 }

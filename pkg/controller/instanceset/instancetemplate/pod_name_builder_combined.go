@@ -230,8 +230,8 @@ func (c *combinedPodNameBuilder) Validate() error {
 }
 
 // SetInstanceStatus sets template name in InstanceStatus
-// TODO: add to interface, and use it
-func SetInstanceStatus(pods []*corev1.Pod, instanceStatus map[string]workloads.InstanceStatus) error {
+func (c *combinedPodNameBuilder) SetInstanceStatus(pods []*corev1.Pod) error {
+	instanceStatus := c.itsExt.InstanceSet.Status.InstanceStatus
 	for _, pod := range pods {
 		templateName, ok := pod.Labels[TemplateNameLabelKey]
 		if !ok {

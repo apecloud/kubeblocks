@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -98,6 +99,11 @@ func (s *separatedPodNameBuilder) Validate() error {
 	if len(dupNames) > 0 {
 		return fmt.Errorf("duplicate pod names: %s", dupNames)
 	}
+	return nil
+}
+
+func (s *separatedPodNameBuilder) SetInstanceStatus(pods []*corev1.Pod) error {
+	// separatedPodNameBuilder does not need to set InstanceStatus
 	return nil
 }
 

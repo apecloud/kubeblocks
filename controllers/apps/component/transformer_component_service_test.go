@@ -132,7 +132,7 @@ var _ = Describe("component service transformer test", func() {
 		return svc
 	}
 
-	FContext("pod service", func() {
+	Context("pod service", func() {
 		BeforeEach(func() {
 			// set as pod service
 			transCtx.SynthesizeComponent.ComponentServices[0].PodService = truep()

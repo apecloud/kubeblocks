@@ -1238,10 +1238,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		// TODO: what if the component is being deleted?
 	}
 
-	itsName, err := GetInstanceSetName(comp)
-	if err != nil {
-		return "", err
-	}
+	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	its := &workloadsv1.InstanceSet{}
 	if err := cli.Get(ctx, types.NamespacedName{
 		Namespace: namespace,

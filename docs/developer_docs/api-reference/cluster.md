@@ -7756,7 +7756,7 @@ Ordinals
 <td>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
-If Ordinals are defined, their number must match the corresponding replicas.</p>
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under this InstanceTemplate would be
 $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
@@ -29404,7 +29404,7 @@ Ordinals
 <td>
 <p>Specifies the desired Ordinals of the default template.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-If Ordinals are defined, their number must match the corresponding replicas.</p>
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
@@ -29936,7 +29936,7 @@ Ordinals
 <td>
 <p>Specifies the desired Ordinals of the default template.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-If Ordinals are defined, their number must match the corresponding replicas.</p>
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
@@ -32098,8 +32098,7 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
-If Ordinals are defined, their number must match the corresponding replicas.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under this InstanceTemplate would be
 $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and

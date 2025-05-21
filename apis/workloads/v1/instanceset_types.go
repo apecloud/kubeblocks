@@ -117,8 +117,6 @@ type InstanceSetSpec struct {
 	// The InstanceTemplate provides a way to override values in the default template,
 	// allowing the InstanceSet to manage instances from different templates.
 	//
-	// The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-	// The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
 	// By default, the ordinal starts from 0 for each InstanceTemplate.
 	// It is important to ensure that the Name of each InstanceTemplate is unique.
 	//
@@ -135,7 +133,7 @@ type InstanceSetSpec struct {
 	// +optional
 	// +kubebuilder:default=Separated
 	// +kubebuilder:validation:Enum={Separated,Sequential}
-	PodNamingRule PodNamingRule `json:"podNamingRule,omitempty"`
+	PodNamingRule kbappsv1.PodNamingRule `json:"podNamingRule,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.
 	//
@@ -561,13 +559,6 @@ type InstanceTemplateStatus struct {
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 }
-
-type PodNamingRule string
-
-const (
-	PodNamingRuleSeparated PodNamingRule = "Separated"
-	PodNamingRuleCombined  PodNamingRule = "Combined"
-)
 
 type ConditionType string
 

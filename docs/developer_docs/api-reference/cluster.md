@@ -821,6 +821,19 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>podNamingRule</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodNamingRule">
+PodNamingRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>offlineInstances</code><br/>
 <em>
 []string
@@ -3230,6 +3243,19 @@ starting with an ordinal of 0.
 It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of replicas specified for the Component.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podNamingRule</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodNamingRule">
+PodNamingRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 <tr>
@@ -6324,6 +6350,19 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>podNamingRule</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodNamingRule">
+PodNamingRule
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>offlineInstances</code><br/>
 <em>
 []string
@@ -8791,6 +8830,33 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 </td>
 </tr><tr><td><p>&#34;Unavailable&#34;</p></td>
 <td><p>UnavailablePhase indicates that a CR is in an unavailable state.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PodNamingRule">PodNamingRule
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>PodNamingRule defines the naming convention for instances (pods).</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Combined&#34;</p></td>
+<td><p>PodNamingRuleCombined constructs pod name based on the InstanceSet Name and ordinal.
+Ordinals are unique globally.
+The constructed instance name follows the pattern: $(instance_set.name)-$(ordinal).</p>
+</td>
+</tr><tr><td><p>&#34;Separated&#34;</p></td>
+<td><p>PodNamingRuleSeparated constructs pod name based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+Ordinals are unique within the template.
+The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).</p>
 </td>
 </tr></tbody>
 </table>
@@ -29469,9 +29535,7 @@ An InstanceSet manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the InstanceSet to manage instances from different templates.</p>
-<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
-By default, the ordinal starts from 0 for each InstanceTemplate.
+<p>By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
@@ -29481,7 +29545,7 @@ Any remaining replicas will be generated using the default template and will fol
 <td>
 <code>podNamingRule</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodNamingRule">
+<a href="#apps.kubeblocks.io/v1.PodNamingRule">
 PodNamingRule
 </a>
 </em>
@@ -29990,9 +30054,7 @@ An InstanceSet manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the InstanceSet to manage instances from different templates.</p>
-<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
-By default, the ordinal starts from 0 for each InstanceTemplate.
+<p>By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
@@ -30002,7 +30064,7 @@ Any remaining replicas will be generated using the default template and will fol
 <td>
 <code>podNamingRule</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodNamingRule">
+<a href="#apps.kubeblocks.io/v1.PodNamingRule">
 PodNamingRule
 </a>
 </em>
@@ -30843,26 +30905,6 @@ Action
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.PodNamingRule">PodNamingRule
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Combined&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Separated&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

@@ -454,8 +454,6 @@ spec:
                   allowing the InstanceSet to manage instances from different templates.
 
 
-                  The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-                  The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
                   By default, the ordinal starts from 0 for each InstanceTemplate.
                   It is important to ensure that the Name of each InstanceTemplate is unique.
 
@@ -2678,6 +2676,8 @@ spec:
                 type: string
               podNamingRule:
                 default: Separated
+                description: PodNamingRule defines the naming convention for instances
+                  (pods).
                 enum:
                 - Separated
                 - Sequential

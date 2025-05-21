@@ -264,6 +264,11 @@ type ComponentSpec struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// +optional
+	// +kubebuilder:default=Separated
+	// +kubebuilder:validation:Enum={Separated,Sequential}
+	PodNamingRule PodNamingRule `json:"podNamingRule,omitempty"`
+
 	// Specifies the names of instances to be transitioned to offline status.
 	//
 	// Marking an instance as offline results in the following:

@@ -61,6 +61,7 @@ type SynthesizedComponent struct {
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
+	PodNamingRule                    kbappsv1.PodNamingRule                 `json:"podNamingRule,omitempty"`
 	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
 	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`

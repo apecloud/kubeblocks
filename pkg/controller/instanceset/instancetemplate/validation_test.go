@@ -47,7 +47,7 @@ var _ = Describe("Validation", func() {
 							},
 						},
 					},
-					PodNamingRule: workloads.PodNamingRuleSeparated,
+					PodNamingRule: kbappsv1.PodNamingRuleSeparated,
 				},
 			}
 			tree := &kubebuilderx.ObjectTree{}

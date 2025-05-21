@@ -206,7 +206,7 @@ var _ = Describe("Separated Name builder tests", func() {
 				SetReplicas(3).
 				SetTemplate(template).
 				SetVolumeClaimTemplates(volumeClaimTemplates...).
-				SetPodNamingRule(workloads.PodNamingRuleSeparated).
+				SetPodNamingRule(kbappsv1.PodNamingRuleSeparated).
 				GetObject()
 		})
 

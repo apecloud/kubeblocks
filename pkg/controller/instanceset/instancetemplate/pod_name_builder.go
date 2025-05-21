@@ -23,7 +23,7 @@ import (
 	"errors"
 	"reflect"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type PodNameBuilderOpts struct {
@@ -39,7 +39,7 @@ func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNam
 		opts = &PodNameBuilderOpts{}
 	}
 	switch itsExt.InstanceSet.Spec.PodNamingRule {
-	case workloads.PodNamingRuleCombined:
+	case kbappsv1.PodNamingRuleCombined:
 		// validate status is not empty
 		// FIXME: is the constraint not necessary?
 		if !opts.AllowEmptyStatus && reflect.ValueOf(itsExt.InstanceSet.Status).IsZero() {

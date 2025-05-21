@@ -37,7 +37,7 @@ import (
 var _ = Describe("Combined Name builder tests", func() {
 	DescribeTable("generates instance ordinals",
 		func(its *workloads.InstanceSet, expected map[string]sets.Set[int32], expectError bool) {
-			its.Spec.PodNamingRule = workloads.PodNamingRuleCombined
+			its.Spec.PodNamingRule = kbappsv1.PodNamingRuleCombined
 			// FIXME
 			its.Status.ObservedGeneration = 1
 			itsExt, err := BuildInstanceSetExt(its, nil)
@@ -234,7 +234,7 @@ var _ = Describe("Combined Name builder tests", func() {
 						Replicas: ptr.To[int32](1),
 					},
 				},
-				PodNamingRule: workloads.PodNamingRuleCombined,
+				PodNamingRule: kbappsv1.PodNamingRuleCombined,
 			},
 			// FIXME
 			Status: workloads.InstanceSetStatus{
@@ -258,7 +258,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				SetReplicas(3).
 				SetTemplate(template).
 				SetVolumeClaimTemplates(volumeClaimTemplates...).
-				SetPodNamingRule(workloads.PodNamingRuleCombined).
+				SetPodNamingRule(kbappsv1.PodNamingRuleCombined).
 				GetObject()
 			// FIXME
 			its.Status.ObservedGeneration = 1

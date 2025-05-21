@@ -155,7 +155,7 @@ func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetPodNamingRule(namingRule workloads.PodNamingRule) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetPodNamingRule(namingRule kbappsv1.PodNamingRule) *InstanceSetBuilder {
 	builder.get().Spec.PodNamingRule = namingRule
 	return builder
 }

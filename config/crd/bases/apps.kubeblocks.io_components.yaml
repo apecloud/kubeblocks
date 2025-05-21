@@ -2355,6 +2355,14 @@ spec:
                     - Delete
                     type: string
                 type: object
+              podNamingRule:
+                default: Separated
+                description: PodNamingRule defines the naming convention for instances
+                  (pods).
+                enum:
+                - Separated
+                - Sequential
+                type: string
               podUpdatePolicy:
                 description: |-
                   PodUpdatePolicy indicates how pods should be updated

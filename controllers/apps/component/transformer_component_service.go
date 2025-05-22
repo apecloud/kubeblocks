@@ -228,6 +228,7 @@ func (t *componentServiceTransformer) builtinSelector(comp *appsv1.Component) ma
 		constant.AppManagedByLabelKey:   "",
 		constant.AppInstanceLabelKey:    "",
 		constant.KBAppComponentLabelKey: "",
+		constant.KBAppReleasePhaseKey:   constant.ReleasePhaseStable,
 	}
 	for _, key := range maps.Keys(selectors) {
 		if val, ok := comp.Labels[key]; ok {

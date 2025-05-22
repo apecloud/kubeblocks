@@ -115,7 +115,7 @@ func ResolveInstanceTemplateImages4ServiceVersion(ctx context.Context, cli clien
 
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) error {
-	appsInDef := covertImagesFromCompDefinition(compDef)
+	appsInDef := convertImagesFromCompDefinition(compDef)
 	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 
 func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]string, error) {
-	appsInDef := covertImagesFromCompDefinition(compDef)
+	appsInDef := convertImagesFromCompDefinition(compDef)
 	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	return images, nil
 }
 
-func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
+func convertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
 
 	// containers

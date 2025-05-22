@@ -40,8 +40,7 @@ var _ = Describe("Combined Name builder tests", func() {
 			its.Spec.PodNamingRule = kbappsv1.PodNamingRuleCombined
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
-			builder := combinedPodNameBuilder{itsExt: itsExt}
-			err = builder.Validate()
+			err = ValidateInstanceTemplates(its, nil)
 			if expectError {
 				Expect(err).To(HaveOccurred())
 			} else {

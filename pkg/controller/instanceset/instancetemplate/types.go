@@ -52,7 +52,8 @@ type InstanceTemplateExt struct {
 type PodNameBuilder interface {
 	BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error)
 	GenerateAllInstanceNames() ([]string, error)
-	// different strategy may have different validation rules
+	// Validate will check nameBuilder-specific validation rules
+	// Rules that apply to all nameBuilders will be checked in ValidateInstanceTemplates
 	Validate() error
 	// PodNameBuilder may save some states in InstanceStatus
 	SetInstanceStatus(pods []*corev1.Pod) error

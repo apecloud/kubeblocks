@@ -64,8 +64,22 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 	if err := nameBuilder.Validate(); err != nil {
 		return fmt.Errorf("failed to validate instanceset spec: %w", err)
 	}
-	if _, err := nameBuilder.GenerateAllInstanceNames(); err != nil {
+	instances, err := nameBuilder.GenerateAllInstanceNames()
+	if err != nil {
 		return err
+	}
+	// check duplicates
+	instanceNameSet := sets.New[string]()
+	dupNames := ""
+	for _, name := range instances {
+		if instanceNameSet.Has(name) {
+			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
+		} else {
+			instanceNameSet.Insert(name)
+		}
+	}
+	if len(dupNames) > 0 {
+		return fmt.Errorf("duplicate pod names: %s", dupNames)
 	}
 	return nil
 }

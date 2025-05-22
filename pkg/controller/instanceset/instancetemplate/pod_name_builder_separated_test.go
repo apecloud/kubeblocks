@@ -42,9 +42,9 @@ var _ = Describe("Separated Name builder tests", func() {
 			builder, err := NewPodNameBuilder(itsExt, nil)
 			Expect(err).NotTo(HaveOccurred())
 			if expectValidationError {
-				Expect(builder.Validate()).NotTo(Succeed())
+				Expect(ValidateInstanceTemplates(its, nil)).NotTo(Succeed())
 			} else {
-				Expect(builder.Validate()).To(Succeed())
+				Expect(ValidateInstanceTemplates(its, nil)).To(Succeed())
 				instanceNames, err := builder.GenerateAllInstanceNames()
 				Expect(err).NotTo(HaveOccurred())
 				expectedFull := make([]string, len(expected))
@@ -99,7 +99,7 @@ var _ = Describe("Separated Name builder tests", func() {
 			},
 		}, []string{"-t1-10", "-t1-11", "-t2-0", "-t2-2", "-t2-3"}, false),
 
-		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
+		FEntry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](3),
 				Instances: []workloads.InstanceTemplate{

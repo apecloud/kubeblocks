@@ -75,23 +75,7 @@ func (s *separatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 }
 
 func (s *separatedPodNameBuilder) Validate() error {
-	instances, err := s.GenerateAllInstanceNames()
-	if err != nil {
-		return err
-	}
-
-	instanceNameSet := sets.New[string]()
-	dupNames := ""
-	for _, name := range instances {
-		if instanceNameSet.Has(name) {
-			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
-		} else {
-			instanceNameSet.Insert(name)
-		}
-	}
-	if len(dupNames) > 0 {
-		return fmt.Errorf("duplicate pod names: %s", dupNames)
-	}
+	// no specific rules needed
 	return nil
 }
 

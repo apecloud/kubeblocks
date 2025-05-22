@@ -144,10 +144,10 @@ func GetMatchLabels(name string) map[string]string {
 
 func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
 	selectors := make(map[string]string)
-
 	for k, v := range its.Spec.Selector.MatchLabels {
 		selectors[k] = v
 	}
+	selectors[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
 	return selectors
 }
 

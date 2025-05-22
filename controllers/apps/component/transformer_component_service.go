@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -58,9 +59,14 @@ var _ graph.Transformer = &componentServiceTransformer{}
 
 func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	var runningITS *workloadsv1.InstanceSet
+	protoITS, err := factory.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
+	if err != nil {
+		return err
+	}
+	// if there exists an instanceset, use its status field to replace protoITS', so that podNameBuilder can work correctly
 	if transCtx.RunningWorkload != nil {
-		runningITS = transCtx.RunningWorkload.(*workloadsv1.InstanceSet)
+		runningITS := transCtx.RunningWorkload.(*workloadsv1.InstanceSet)
+		protoITS.Status = runningITS.Status
 	}
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
@@ -82,7 +88,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		services, err := t.buildCompService(transCtx.Logger, transCtx.Component, synthesizeComp, &service, runningITS)
+		services, err := t.buildCompService(transCtx.Logger, transCtx.Component, synthesizeComp, &service, protoITS)
 		if err != nil {
 			return err
 		}
@@ -117,13 +123,13 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 }
 
 func (t *componentServiceTransformer) buildCompService(logger logr.Logger, comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(logger, comp, synthesizeComp, service, runningITS)
+		return t.buildPodService(logger, comp, synthesizeComp, service, protoITS)
 	}
 	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
@@ -133,12 +139,8 @@ func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentServ
 }
 
 func (t *componentServiceTransformer) buildPodService(logger logr.Logger, comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
-	if runningITS == nil {
-		logger.Info("instanceset not found, skip reconciling pod service")
-		return nil, nil
-	}
-	pods, err := t.podsNameNSuffix(synthesizeComp, runningITS)
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
+	pods, err := t.podsNameNSuffix(synthesizeComp, protoITS)
 	if err != nil {
 		return nil, err
 	}
@@ -161,8 +163,8 @@ func (t *componentServiceTransformer) buildPodService(logger logr.Logger, comp *
 	return t.buildServices(comp, synthesizeComp, services)
 }
 
-func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, runningITS *workloadsv1.InstanceSet) (map[string]string, error) {
-	podNames, err := component.GeneratePodNamesByITS(runningITS)
+func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, protoITS *workloadsv1.InstanceSet) (map[string]string, error) {
+	podNames, err := component.GeneratePodNamesByITS(protoITS)
 	if err != nil {
 		return nil, err
 	}

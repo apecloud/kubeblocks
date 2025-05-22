@@ -877,6 +877,16 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		}
 	}
 
+	updateImage := func(containers []corev1.Container, images map[string]string) {
+		for i, c := range containers {
+			if image, ok := images[c.Name]; ok {
+				containers[i].Image = image
+			}
+		}
+	}
+	updateImage(templateExt.Spec.InitContainers, template.Images)
+	updateImage(templateExt.Spec.Containers, template.Images)
+
 	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
 
 	// override by instance template

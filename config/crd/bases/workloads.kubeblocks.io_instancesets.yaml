@@ -588,6 +588,11 @@ spec:
                         - name
                         type: object
                       type: array
+                    images:
+                      additionalProperties:
+                        type: string
+                      description: Images for the containers of the instance template.
+                      type: object
                     labels:
                       additionalProperties:
                         type: string

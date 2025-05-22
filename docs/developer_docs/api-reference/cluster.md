@@ -7731,6 +7731,19 @@ The specified name overrides any default naming conventions or patterns.</p>
 </tr>
 <tr>
 <td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this InstanceTemplate.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -30624,6 +30637,18 @@ Add new or override existing envs.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies an override for the storage requirements of the instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>images</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Images for the containers of the instance template.</p>
 </td>
 </tr>
 </tbody>

@@ -410,6 +410,11 @@ type InstanceTemplate struct {
 	//
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+
+	// Images for the containers of the instance template.
+	//
+	// +optional
+	Images map[string]string `json:"images,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {

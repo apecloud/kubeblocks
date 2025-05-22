@@ -2048,6 +2048,12 @@ spec:
                             type: object
                           type: array
                       type: object
+                    serviceVersion:
+                      description: |-
+                        ServiceVersion specifies the version of the Service expected to be provisioned by this InstanceTemplate.
+                        The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+                      maxLength: 32
+                      type: string
                     volumeClaimTemplates:
                       description: Specifies an override for the storage requirements
                         of the instances.

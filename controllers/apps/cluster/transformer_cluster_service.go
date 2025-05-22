@@ -162,6 +162,7 @@ func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1.Cluster) map
 	selectors := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppInstanceLabelKey:  cluster.Name,
+		constant.KBAppReleasePhaseKey: constant.ReleasePhaseStable,
 	}
 	return selectors
 }

@@ -792,6 +792,9 @@ type Ordinals struct {
 }
 
 // PodNamingRule defines the naming convention for instances (pods).
+// The field is immutable once set.
+//
+// +kubebuilder:validation:Enum={Separated,Combined}
 type PodNamingRule string
 
 const (

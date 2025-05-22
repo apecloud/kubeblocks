@@ -2676,11 +2676,12 @@ spec:
                 type: string
               podNamingRule:
                 default: Separated
-                description: PodNamingRule defines the naming convention for instances
-                  (pods).
+                description: |-
+                  PodNamingRule defines the naming convention for instances (pods).
+                  The field is immutable once set.
                 enum:
                 - Separated
-                - Sequential
+                - Combined
                 type: string
               podUpdatePolicy:
                 description: |-

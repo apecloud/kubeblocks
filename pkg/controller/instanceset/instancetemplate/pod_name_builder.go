@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
-	"errors"
-	"reflect"
-
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
@@ -42,9 +39,9 @@ func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNam
 	case kbappsv1.PodNamingRuleCombined:
 		// validate status is not empty
 		// FIXME: is the constraint not necessary?
-		if !opts.AllowEmptyStatus && reflect.ValueOf(itsExt.InstanceSet.Status).IsZero() {
-			return nil, errors.New("instanceset status is empty")
-		}
+		// if !opts.AllowEmptyStatus && reflect.ValueOf(itsExt.InstanceSet.Status).IsZero() {
+		// 	return nil, errors.New("instanceset status is empty")
+		// }
 		return &combinedPodNameBuilder{
 			itsExt: itsExt,
 		}, nil

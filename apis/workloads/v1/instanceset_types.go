@@ -132,7 +132,6 @@ type InstanceSetSpec struct {
 
 	// +optional
 	// +kubebuilder:default=Separated
-	// +kubebuilder:validation:Enum={Separated,Sequential}
 	PodNamingRule kbappsv1.PodNamingRule `json:"podNamingRule,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.

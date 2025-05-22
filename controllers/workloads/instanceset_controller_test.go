@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,6 +102,35 @@ var _ = Describe("InstanceSet Controller", func() {
 			g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 		}),
 		).Should(Succeed())
+	}
+
+	mockPodReady := func(podNames ...string) {
+		By("mock pods ready")
+		for _, podName := range podNames {
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      podName,
+			}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{
+					{
+						Type:               corev1.PodReady,
+						Status:             corev1.ConditionTrue,
+						LastTransitionTime: metav1.Now(),
+					},
+				}
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name: pod.Spec.Containers[0].Name,
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{},
+						},
+						Image: pod.Spec.Containers[0].Image,
+					},
+				}
+			})()).Should(Succeed())
+		}
 	}
 
 	Context("reconciliation", func() {
@@ -467,30 +497,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				}...)
 			})
 
-			By("mock pods running and available")
-			podKey := types.NamespacedName{
-				Namespace: itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-0", itsObj.Name),
-			}
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
-				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = []corev1.PodCondition{
-					{
-						Type:               corev1.PodReady,
-						Status:             corev1.ConditionTrue,
-						LastTransitionTime: metav1.Now(),
-					},
-				}
-				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-					{
-						Name: pod.Spec.Containers[0].Name,
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{},
-						},
-						Image: pod.Spec.Containers[0].Image,
-					},
-				}
-			})()).ShouldNot(HaveOccurred())
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -548,6 +555,54 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(parameters).ShouldNot(BeNil())
 				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
 			}).Should(Succeed())
+		})
+	})
+
+	Context("pod naming rule", func() {
+		checkPodOrdinal := func(ordinals []int, exist bool) {
+			for _, ordinal := range ordinals {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%v-%v", itsObj.Name, ordinal),
+				}
+				if exist {
+					Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+				} else {
+					Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+				}
+			}
+		}
+
+		FIt("works with PodNamingRuleCombined", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetPodNamingRule(kbappsv1.PodNamingRuleCombined)
+				f.SetPodManagementPolicy(appsv1.ParallelPodManagement)
+				f.SetReplicas(3)
+			})
+
+			checkPodOrdinal([]int{0, 1, 2}, true)
+			mockPodReady(itsObj.Name+"-0", itsObj.Name+"-1", itsObj.Name+"-2")
+
+			// offline one instance
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](2)
+				its.Spec.OfflineInstances = []string{itsObj.Name + "-1"}
+			})).Should(Succeed())
+			checkPodOrdinal([]int{1}, false)
+
+			// scale up
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](4)
+			})).Should(Succeed())
+			checkPodOrdinal([]int{0, 2, 3, 4}, true)
+			mockPodReady(itsObj.Name+"-3", itsObj.Name+"-4")
+
+			// delete OfflineInstances will not affect running instance
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.OfflineInstances = []string{}
+			})).Should(Succeed())
+			checkPodOrdinal([]int{0, 2, 3, 4}, true)
+			checkPodOrdinal([]int{1}, false)
 		})
 	})
 })

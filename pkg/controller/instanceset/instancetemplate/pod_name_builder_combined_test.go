@@ -38,8 +38,6 @@ var _ = Describe("Combined Name builder tests", func() {
 	DescribeTable("generates instance ordinals",
 		func(its *workloads.InstanceSet, expected map[string]sets.Set[int32], expectError bool) {
 			its.Spec.PodNamingRule = kbappsv1.PodNamingRuleCombined
-			// FIXME
-			its.Status.ObservedGeneration = 1
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
 			builder := combinedPodNameBuilder{itsExt: itsExt}
@@ -193,14 +191,14 @@ var _ = Describe("Combined Name builder tests", func() {
 
 		Entry("with offline instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
-				Replicas: ptr.To[int32](4),
+				Replicas: ptr.To[int32](5),
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
 					},
 				},
-				OfflineInstances: []string{"foo-2"},
+				OfflineInstances: []string{"-2"},
 			},
 			Status: workloads.InstanceSetStatus{
 				InstanceStatus: map[string]workloads.InstanceStatus{
@@ -211,8 +209,8 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1),
-			"t1": sets.New[int32](3, 4),
+			"":   sets.New[int32](0, 1, 4),
+			"t1": sets.New[int32](3, 5),
 		}, false),
 	)
 
@@ -236,10 +234,6 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 				PodNamingRule: kbappsv1.PodNamingRuleCombined,
 			},
-			// FIXME
-			Status: workloads.InstanceSetStatus{
-				ObservedGeneration: 1,
-			},
 		}
 
 		itsExt, err := BuildInstanceSetExt(its, nil)
@@ -260,8 +254,6 @@ var _ = Describe("Combined Name builder tests", func() {
 				SetVolumeClaimTemplates(volumeClaimTemplates...).
 				SetPodNamingRule(kbappsv1.PodNamingRuleCombined).
 				GetObject()
-			// FIXME
-			its.Status.ObservedGeneration = 1
 		})
 
 		It("build an its with default template only", func() {

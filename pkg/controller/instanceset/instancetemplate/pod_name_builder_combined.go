@@ -138,17 +138,15 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 	var cur int32 = 0
 	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinals := template2OrdinalSetMap[instanceTemplate.Name]
-		if int(*instanceTemplate.Replicas) > len(currentOrdinals) {
-			for i := len(currentOrdinals); i < int(*instanceTemplate.Replicas); i++ {
-				// find the next available ordinal
-				for {
-					if !allOrdinalSet.Has(cur) && !offlineOrdinals.Has(cur) {
-						allOrdinalSet.Insert(cur)
-						template2OrdinalSetMap[instanceTemplate.Name].Insert(cur)
-						break
-					}
-					cur++
+		for i := len(currentOrdinals); i < int(*instanceTemplate.Replicas); i++ {
+			// find the next available ordinal
+			for {
+				if !allOrdinalSet.Has(cur) && !offlineOrdinals.Has(cur) {
+					allOrdinalSet.Insert(cur)
+					template2OrdinalSetMap[instanceTemplate.Name].Insert(cur)
+					break
 				}
+				cur++
 			}
 		}
 	}

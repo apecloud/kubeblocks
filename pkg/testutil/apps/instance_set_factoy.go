@@ -126,12 +126,12 @@ func (factory *MockInstanceSetFactory) SetInstanceUpdateStrategy(instanceUpdateS
 	return factory
 }
 
-func (builder *MockInstanceSetFactory) SetPodNamingRule(namingRule kbappsv1.PodNamingRule) *MockInstanceSetFactory {
-	builder.Get().Spec.PodNamingRule = namingRule
-	return builder
+func (factory *MockInstanceSetFactory) SetPodNamingRule(namingRule kbappsv1.PodNamingRule) *MockInstanceSetFactory {
+	factory.Get().Spec.PodNamingRule = namingRule
+	return factory
 }
 
-func (builder *MockInstanceSetFactory) SetPodManagementPolicy(podManagementPolicy appsv1.PodManagementPolicyType) *MockInstanceSetFactory {
-	builder.Get().Spec.PodManagementPolicy = podManagementPolicy
-	return builder
+func (factory *MockInstanceSetFactory) SetPodManagementPolicy(podManagementPolicy appsv1.PodManagementPolicyType) *MockInstanceSetFactory {
+	factory.Get().Spec.PodManagementPolicy = podManagementPolicy
+	return factory
 }

@@ -24,24 +24,14 @@ import (
 )
 
 type PodNameBuilderOpts struct {
-	// when using combinedPodNameBuilder, status field is necessary to build correct names.
-	// use this carefully
-	AllowEmptyStatus bool
+	// empty for now
 }
 
 // NewPodNameBuilder returns a PodNameBuilder based on the InstanceSet's PodNamingRule.
 // When the PodNamingRule is Combined, it should be a instanceset returned by kubernetes (i.e. with status field included)
 func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNameBuilder, error) {
-	if opts == nil {
-		opts = &PodNameBuilderOpts{}
-	}
 	switch itsExt.InstanceSet.Spec.PodNamingRule {
 	case kbappsv1.PodNamingRuleCombined:
-		// validate status is not empty
-		// FIXME: is the constraint not necessary?
-		// if !opts.AllowEmptyStatus && reflect.ValueOf(itsExt.InstanceSet.Status).IsZero() {
-		// 	return nil, errors.New("instanceset status is empty")
-		// }
 		return &combinedPodNameBuilder{
 			itsExt: itsExt,
 		}, nil

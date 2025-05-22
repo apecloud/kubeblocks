@@ -8839,7 +8839,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
-<p>PodNamingRule defines the naming convention for instances (pods).</p>
+<p>PodNamingRule defines the naming convention for instances (pods).
+The field is immutable once set.</p>
 </div>
 <table>
 <thead>

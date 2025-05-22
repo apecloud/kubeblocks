@@ -40,7 +40,7 @@ func (s *separatedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*I
 	instanceTemplateList := buildInstanceTemplateExts(s.itsExt)
 	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
 	for _, template := range instanceTemplateList {
-		ordinalList, err := GetOrdinalListByTemplateName(s.itsExt.InstanceSet, template.Name)
+		ordinalList, err := getOrdinalListByTemplateName(s.itsExt.InstanceSet, template.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -80,20 +80,13 @@ func (s *separatedPodNameBuilder) Validate() error {
 		return err
 	}
 
-	instanceNameCount := make(map[string]int)
-	for _, name := range instances {
-		count, exist := instanceNameCount[name]
-		if exist {
-			count++
-		} else {
-			count = 1
-		}
-		instanceNameCount[name] = count
-	}
+	instanceNameSet := sets.New[string]()
 	dupNames := ""
-	for name, count := range instanceNameCount {
-		if count > 1 {
+	for _, name := range instances {
+		if instanceNameSet.Has(name) {
 			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
+		} else {
+			instanceNameSet.Insert(name)
 		}
 	}
 	if len(dupNames) > 0 {
@@ -140,15 +133,15 @@ func buildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {
 	return InstanceTemplateExtList
 }
 
-func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
-	ordinals, err := GetOrdinalsByTemplateName(its, templateName)
+func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
+	ordinals, err := getOrdinalsByTemplateName(its, templateName)
 	if err != nil {
 		return nil, err
 	}
 	return ConvertOrdinalsToSortedList(ordinals), nil
 }
 
-func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
+func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
 	if templateName == "" {
 		return its.Spec.DefaultTemplateOrdinals, nil
 	}

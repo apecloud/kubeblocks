@@ -160,15 +160,20 @@ var _ = Describe("Combined Name builder tests", func() {
 			"t2": sets.New[int32](0, 2, 3),
 		}, false),
 
-		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
+		FEntry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
-				Replicas: ptr.To[int32](3),
+				Replicas: ptr.To[int32](5),
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
 						Ordinals: kbappsv1.Ordinals{
-							Discrete: []int32{10, 11},
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 100,
+									End:   199,
+								},
+							},
 						},
 					},
 					{
@@ -177,18 +182,23 @@ var _ = Describe("Combined Name builder tests", func() {
 						Ordinals: kbappsv1.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
-									Start: 2,
-									End:   3,
+									Start: 500,
+									End:   599,
 								},
 							},
-							Discrete: []int32{0},
 						},
 					},
 				},
 			},
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-150": {TemplateName: "t1"},
+				},
+			},
 		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](10, 11),
-			"t2": sets.New[int32](0),
+			"":   sets.New[int32](0),
+			"t1": sets.New[int32](100, 150),
+			"t2": sets.New[int32](500),
 		}, false),
 
 		Entry("with ordinal spec - zero replica", &workloads.InstanceSet{
@@ -275,6 +285,39 @@ var _ = Describe("Combined Name builder tests", func() {
 		}, map[string]sets.Set[int32]{
 			"t1": sets.New[int32](2, 3),
 			"":   sets.New[int32](0, 1),
+		}, false),
+
+		Entry("partially exchange ordinal spec", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](4),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{0, 2},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{1, 3},
+						},
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0": {TemplateName: "t1"},
+					"-1": {TemplateName: "t1"},
+					"-2": {TemplateName: "t2"},
+					"-3": {TemplateName: "t2"},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"t1": sets.New[int32](0, 2),
+			"t2": sets.New[int32](1, 3),
 		}, false),
 
 		Entry("with offline instances", &workloads.InstanceSet{

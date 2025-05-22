@@ -181,9 +181,6 @@ func (c *combinedPodNameBuilder) Validate() error {
 		if err != nil {
 			return err
 		}
-		if offlineOrdinals.Has(ordinal) {
-			return fmt.Errorf("duplicate offlineInstance: %v", name)
-		}
 		offlineOrdinals.Insert(ordinal)
 	}
 	for _, tmpl := range c.itsExt.InstanceTemplates {
@@ -195,9 +192,6 @@ func (c *combinedPodNameBuilder) Validate() error {
 			}
 			if ordinalSet.Has(item) {
 				return fmt.Errorf("duplicate ordinal(%v)", item)
-			}
-			if offlineOrdinals.Has(item) {
-				return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
 			}
 			ordinalSet.Insert(item)
 			tmplOrdinalSet.Insert(item)
@@ -218,9 +212,6 @@ func (c *combinedPodNameBuilder) Validate() error {
 			for ordinal := start; ordinal <= end; ordinal++ {
 				if ordinalSet.Has(ordinal) {
 					return fmt.Errorf("duplicate ordinal(%v)", item)
-				}
-				if offlineOrdinals.Has(ordinal) {
-					return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
 				}
 				ordinalSet.Insert(ordinal)
 				tmplOrdinalSet.Insert(ordinal)

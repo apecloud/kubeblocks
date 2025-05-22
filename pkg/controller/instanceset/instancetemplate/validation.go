@@ -57,7 +57,7 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 	}
 
 	// try to generate all pod names
-	nameBuilder, err := NewPodNameBuilder(itsExt, &PodNameBuilderOpts{AllowEmptyStatus: true})
+	nameBuilder, err := NewPodNameBuilder(itsExt, nil)
 	if err != nil {
 		return err
 	}

@@ -573,7 +573,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 		}
 
-		FIt("works with PodNamingRuleCombined", func() {
+		It("works with PodNamingRuleCombined", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetPodNamingRule(kbappsv1.PodNamingRuleCombined)
 				f.SetPodManagementPolicy(appsv1.ParallelPodManagement)

@@ -131,35 +131,6 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-// GenerateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
-func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
-	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	var instanceNameList []string
-	usedNames := sets.New(offlineInstances...)
-	slices.Sort(ordinalList)
-	for _, ordinal := range ordinalList {
-		var name string
-		if len(templateName) == 0 {
-			name = fmt.Sprintf("%s-%d", parentName, ordinal)
-		} else {
-			name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
-		}
-		if usedNames.Has(name) {
-			continue
-		}
-		instanceNameList = append(instanceNameList, name)
-		if len(instanceNameList) == int(replicas) {
-			break
-		}
-	}
-	if int32(len(instanceNameList)) != replicas {
-		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
-			templateName, replicas, len(instanceNameList), strings.Join(instanceNameList, ", "))
-		return instanceNameList, fmt.Errorf("%s", errorMessage)
-	}
-	return instanceNameList, nil
-}
-
 func buildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {
 	var InstanceTemplateExtList []*InstanceTemplateExt
 	for _, template := range itsExt.InstanceTemplates {
@@ -229,6 +200,9 @@ func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 	usedNames := sets.New(offlineInstances...)
 	slices.Sort(ordinalList)
 	for _, ordinal := range ordinalList {
+		if len(instanceNameList) >= int(replicas) {
+			break
+		}
 		var name string
 		if len(templateName) == 0 {
 			name = fmt.Sprintf("%s-%d", parentName, ordinal)
@@ -239,9 +213,6 @@ func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 			continue
 		}
 		instanceNameList = append(instanceNameList, name)
-		if len(instanceNameList) == int(replicas) {
-			break
-		}
 	}
 	if int32(len(instanceNameList)) != replicas {
 		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",

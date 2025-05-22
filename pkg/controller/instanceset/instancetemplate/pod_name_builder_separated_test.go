@@ -99,6 +99,90 @@ var _ = Describe("Separated Name builder tests", func() {
 			},
 		}, []string{"-t1-10", "-t1-11", "-t2-0", "-t2-2", "-t2-3"}, false),
 
+		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](3),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{10, 11},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](1),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+			},
+		}, []string{"-t1-10", "-t1-11", "-t2-0"}, false),
+
+		Entry("with ordinal spec - zero replica", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](0),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](0),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{10, 11},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](0),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+			},
+		}, []string{}, false),
+
+		Entry("with ordinal spec - replicas > length of ordinals range", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](6),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{10, 11},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](4),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+			},
+		}, nil, true),
+
 		Entry("with offline instances", &workloads.InstanceSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",

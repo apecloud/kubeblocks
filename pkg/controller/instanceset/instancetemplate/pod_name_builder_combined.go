@@ -188,6 +188,7 @@ func (c *combinedPodNameBuilder) Validate() error {
 	}
 	for _, tmpl := range c.itsExt.InstanceTemplates {
 		ordinals := tmpl.Ordinals
+		tmplOrdinalSet := sets.New[int32]()
 		for _, item := range ordinals.Discrete {
 			if item < 0 {
 				return fmt.Errorf("ordinal(%v) must >= 0", item)
@@ -199,6 +200,7 @@ func (c *combinedPodNameBuilder) Validate() error {
 				return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
 			}
 			ordinalSet.Insert(item)
+			tmplOrdinalSet.Insert(item)
 		}
 
 		for _, item := range ordinals.Ranges {
@@ -221,10 +223,15 @@ func (c *combinedPodNameBuilder) Validate() error {
 					return fmt.Errorf("ordinal(%v) exists in offlineInstances", item)
 				}
 				ordinalSet.Insert(ordinal)
+				tmplOrdinalSet.Insert(ordinal)
 			}
 		}
+		if (ordinals.Ranges != nil || ordinals.Discrete != nil) && tmplOrdinalSet.Len() < int(*tmpl.Replicas) {
+			return fmt.Errorf("template(%v) has length of ordinals < replicas", tmpl.Name)
+		}
 	}
-	return nil
+	_, err := c.GenerateAllInstanceNames()
+	return err
 }
 
 // SetInstanceStatus sets template name in InstanceStatus

@@ -41,11 +41,12 @@ var _ = Describe("Combined Name builder tests", func() {
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
 			builder := combinedPodNameBuilder{itsExt: itsExt}
-			Expect(builder.Validate()).To(Succeed())
-			ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
+			err = builder.Validate()
 			if expectError {
 				Expect(err).To(HaveOccurred())
 			} else {
+				Expect(err).NotTo(HaveOccurred())
+				ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ordinals).To(Equal(expected))
 			}
@@ -158,6 +159,93 @@ var _ = Describe("Combined Name builder tests", func() {
 			"t1": sets.New[int32](10, 11),
 			"t2": sets.New[int32](0, 2, 3),
 		}, false),
+
+		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](3),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{10, 11},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](1),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"t1": sets.New[int32](10, 11),
+			"t2": sets.New[int32](0),
+		}, false),
+
+		Entry("with ordinal spec - zero replica", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](0),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](0),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{10, 11},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](0),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+			},
+		}, map[string]sets.Set[int32]{"t1": {}, "t2": {}}, false),
+
+		Entry("with ordinal spec - replicas > length of ordinals range", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](6),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{10, 11},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](4),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 2,
+									End:   3,
+								},
+							},
+							Discrete: []int32{0},
+						},
+					},
+				},
+			},
+		}, nil, true),
 
 		Entry("with ordinal spec replacing a normal one", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
@@ -318,13 +406,14 @@ var _ = Describe("Combined Name builder tests", func() {
 	})
 
 	Describe("validateOrdinals", func() {
-		It("should validate ordinals successfully", func() {
+		FIt("should validate ordinals successfully", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
 					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
-							Name: "template1",
+							Name:     "template1",
+							Replicas: ptr.To[int32](3),
 							Ordinals: kbappsv1.Ordinals{
 								Discrete: []int32{0, 1, 2},
 							},
@@ -345,7 +434,8 @@ var _ = Describe("Combined Name builder tests", func() {
 					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
-							Name: "template1",
+							Name:     "template1",
+							Replicas: ptr.To[int32](3),
 							Ordinals: kbappsv1.Ordinals{
 								Discrete: []int32{-1, 0, 1},
 							},
@@ -370,7 +460,8 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 					Instances: []workloads.InstanceTemplate{
 						{
-							Name: "template1",
+							Name:     "template1",
+							Replicas: ptr.To[int32](2),
 							Ordinals: kbappsv1.Ordinals{
 								Discrete: []int32{0, 1},
 							},

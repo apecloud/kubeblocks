@@ -61,16 +61,8 @@ const (
 )
 
 const (
-	KBPrefix                = "KB"
-	KBLowerPrefix           = "kb"
-	SlashScalingLowerSuffix = "scaling"
-)
-
-const (
-	KubeblocksAPIConversionTypeAnnotationName = "api.kubeblocks.io/converted"
-	SourceAPIVersionAnnotationName            = "api.kubeblocks.io/source"
-
-	MigratedAPIVersion = "migrated"
+	KBPrefix      = "KB"
+	KBLowerPrefix = "kb"
 )
 
 const InvalidContainerPort int32 = 0
@@ -85,4 +77,9 @@ const DryRunContextKey Key = "dry-run"
 // APIVersionSupported specifies the API version supported by the operator.
 const (
 	APIVersionSupported = "api-version-supported"
+)
+
+const (
+	ReleasePhaseStable string = "stable"
+	ReleasePhaseCanary string = "canary"
 )

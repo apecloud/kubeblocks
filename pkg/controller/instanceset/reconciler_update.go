@@ -110,7 +110,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	currentUnavailable := 0
 	for _, pod := range oldPodList {
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) && !isPodPending(pod) {
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			currentUnavailable++
 		}
 	}
@@ -134,11 +134,21 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	needRetry := false
 	sortObjects(oldPodList, priorities, false)
 
-	canBeUpdated := func(pod *corev1.Pod) bool {
-		// pending pod can be updated because there's no consequence of deleting it
-		if isPodPending(pod) {
-			return true
+	// treat old and Pending pod as a special case, as they can be updated without a consequence
+	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
+	for _, pod := range oldPodList {
+		updatePolicy, err := getPodUpdatePolicy(its, pod)
+		if err != nil {
+			return kubebuilderx.Continue, err
 		}
+		if isPodPending(pod) && updatePolicy != NoOpsPolicy {
+			err = tree.Delete(pod)
+			// wait another reconciliation, so that the following update process won't be confused
+			return kubebuilderx.Continue, err
+		}
+	}
+
+	canBeUpdated := func(pod *corev1.Pod) bool {
 		if !isImageMatched(pod) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
 			return false
@@ -188,15 +198,28 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 		if updatePolicy == InPlaceUpdatePolicy {
-			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			newPod := copyAndMerge(pod, newInstance.pod)
-			if err = r.switchover(tree, its, newPod.(*corev1.Pod)); err != nil {
+			newMergedPod := copyAndMerge(pod, newPod)
+			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
+			if err != nil {
+				tree.Logger.Error(err, "check support resize sub resource error")
 				return kubebuilderx.Continue, err
 			}
-			if err = tree.Update(newPod); err != nil {
+
+			// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
+			// Another reconciliation will be triggered since pod status will be updated.
+			if !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource {
+				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
+			} else {
+				if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
+					return kubebuilderx.Continue, err
+				}
+				err = tree.Update(newMergedPod)
+			}
+			if err != nil {
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++

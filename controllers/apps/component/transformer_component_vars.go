@@ -78,7 +78,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	envVars2, envData := buildEnvVarsNData(envVars)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
 
-	if err := createOrUpdateEnvConfigMap(ctx, dag, nil, envData); err != nil {
+	if err := createOrUpdateEnvConfigMap(transCtx, dag, envData); err != nil {
 		return err
 	}
 	return nil
@@ -121,11 +121,8 @@ func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {
 	}
 }
 
-// TODO: remove the deleted env vars from the ConfigMap
-func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
-	data map[string]string, patches ...map[string]string) error {
+func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.DAG, data map[string]string) error {
 	var (
-		transCtx, _     = ctx.(*componentTransformContext)
 		synthesizedComp = transCtx.SynthesizeComponent
 		envKey          = types.NamespacedName{
 			Namespace: synthesizedComp.Namespace,
@@ -157,22 +154,12 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 	}
 
 	newData := func() map[string]string {
-		mergeWith := func(m map[string]string) map[string]string {
-			if m == nil {
-				m = make(map[string]string)
-			}
-			for _, patch := range patches {
-				maps.Copy(m, patch)
-			}
-			return m
+		if envObjVertex == nil {
+			return data
 		}
-		if data != nil {
-			return mergeWith(data)
-		}
-		if envObj != nil {
-			return mergeWith(maps.Clone(envObj.Data))
-		}
-		return mergeWith(nil)
+		merged := maps.Clone(envObj.Data)
+		maps.Copy(merged, data)
+		return merged
 	}()
 
 	if envObj == nil {

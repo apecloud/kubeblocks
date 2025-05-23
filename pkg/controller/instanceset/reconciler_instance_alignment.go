@@ -133,11 +133,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
 			break
 		}
-		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
+		newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.Add(inst.pod); err != nil {
+		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
@@ -150,7 +150,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// create PVCs
 	for _, name := range currentAlignedNameList {
-		pvcs := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
+		pvcs, err := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
 		for _, pvc := range pvcs {
 			switch oldPvc, err := tree.Get(pvc); {
 			case err != nil:

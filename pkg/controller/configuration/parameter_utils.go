@@ -21,12 +21,15 @@ package configuration
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -112,6 +115,24 @@ func updateConfigParameter(paramKey string,
 	parametersMap map[string]*intctrlutil.ParameterMeta,
 	classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile) error {
 
+	genMatchRegex := func(key string) string {
+		key = strings.ReplaceAll(key, ".", `\.`)
+		key = strings.ReplaceAll(key, "*", `.*`)
+		return "^" + key + "$"
+	}
+	matchParamFromSchema := func(key string) *intctrlutil.ParameterMeta {
+		if meta, ok := parametersMap[key]; ok {
+			return meta
+		}
+		for param, meta := range parametersMap {
+			if strings.Contains(param, openapi.SchemaMapFieldKeyName) {
+				if matched, _ := regexp.MatchString(genMatchRegex(param), key); matched {
+					return meta
+				}
+			}
+		}
+		return nil
+	}
 	deRefParamInTemplate := func(name string) map[string]*parametersv1alpha1.ParametersInFile {
 		if _, ok := classifyParams[name]; !ok {
 			classifyParams[name] = make(map[string]*parametersv1alpha1.ParametersInFile)
@@ -128,8 +149,8 @@ func updateConfigParameter(paramKey string,
 		return v[fileName]
 	}
 
-	parameterMeta, ok := parametersMap[paramKey]
-	if !ok {
+	parameterMeta := matchParamFromSchema(paramKey)
+	if parameterMeta == nil {
 		return fmt.Errorf("parameter %s not found in parameters schema", paramKey)
 	}
 	deRefParamInFile(parameterMeta.ConfigTemplateName, parameterMeta.FileName).Parameters[paramKey] = paramValue

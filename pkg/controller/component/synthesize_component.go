@@ -109,6 +109,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		TLSConfig:                        comp.Spec.TLSConfig,
 		ServiceAccountName:               comp.Spec.ServiceAccountName,
 		Instances:                        comp.Spec.Instances,
+		InstanceImages:                   make(map[string]map[string]string),
 		OfflineInstances:                 comp.Spec.OfflineInstances,
 		DisableExporter:                  comp.Spec.DisableExporter,
 		Stop:                             comp.Spec.Stop,
@@ -254,6 +255,15 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = intctrlutil.ToCoreV1PVCTs(comp.Spec.VolumeClaimTemplates)
+		for i := range synthesizeComp.VolumeClaimTemplates {
+			vct := comp.Spec.VolumeClaimTemplates[i]
+			if vct.PersistentVolumeClaimName != nil && len(*vct.PersistentVolumeClaimName) > 0 {
+				if synthesizeComp.VolumeClaimTemplates[i].Annotations == nil {
+					synthesizeComp.VolumeClaimTemplates[i].Annotations = map[string]string{}
+				}
+				synthesizeComp.VolumeClaimTemplates[i].Annotations[constant.PVCNamePrefixAnnotationKey] = *vct.PersistentVolumeClaimName
+			}
+		}
 	}
 	if comp.Spec.PersistentVolumeClaimRetentionPolicy != nil {
 		synthesizeComp.PVCRetentionPolicy = *comp.Spec.PersistentVolumeClaimRetentionPolicy

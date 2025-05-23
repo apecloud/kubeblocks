@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -39,8 +42,8 @@ func CreateVolumeIfNotExist(volumes []corev1.Volume, volumeName string, createFn
 	return append(volumes, createFn(volumeName))
 }
 
-func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
-	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
+func ToCoreV1PVCTs(vcts []appsv1.PersistentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
+	storageClassName := func(spec corev1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
 		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
 			return spec.StorageClassName
 		}
@@ -49,37 +52,32 @@ func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.Pe
 		}
 		return nil
 	}
-	var pvcs []corev1.PersistentVolumeClaim
+	var pvcts []corev1.PersistentVolumeClaimTemplate
 	for _, v := range vcts {
-		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
+		pvct := corev1.PersistentVolumeClaimTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        v.Name,
 				Labels:      v.Labels,
 				Annotations: v.Annotations,
 			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes:               v.Spec.AccessModes,
-				Resources:                 v.Spec.Resources,
-				StorageClassName:          storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
-				VolumeMode:                v.Spec.VolumeMode,
-				VolumeAttributesClassName: v.Spec.VolumeAttributesClassName,
-			},
-		})
-	}
-	return pvcs
-}
-
-func ToCoreV1PVCTs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	pvcs := ToCoreV1PVCs(vcts)
-	pvct := func(i int) corev1.PersistentVolumeClaimTemplate {
-		return corev1.PersistentVolumeClaimTemplate{
-			ObjectMeta: pvcs[i].ObjectMeta,
-			Spec:       pvcs[i].Spec,
+			Spec: v.Spec,
 		}
-	}
-	var pvcts []corev1.PersistentVolumeClaimTemplate
-	for i := range pvcs {
-		pvcts = append(pvcts, pvct(i))
+		pvct.Spec.StorageClassName = storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass))
+		pvcts = append(pvcts, pvct)
 	}
 	return pvcts
+}
+
+func ComposePVCName(template corev1.PersistentVolumeClaim, itsName, podName string) string {
+	if template.Annotations != nil {
+		prefix, ok := template.Annotations[constant.PVCNamePrefixAnnotationKey]
+		if ok {
+			suffix, found := strings.CutPrefix(podName, fmt.Sprintf("%s-", itsName))
+			if found {
+				return fmt.Sprintf("%s-%s", prefix, suffix)
+			}
+			return prefix
+		}
+	}
+	return fmt.Sprintf("%s-%s", template.Name, podName)
 }

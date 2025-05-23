@@ -301,6 +301,14 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
+	// Specifies whether to create the default headless service.
+	//
+	// This field is immutable.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	DisableDefaultHeadlessService bool `json:"disableDefaultHeadlessService,omitempty"`
+
 	// Specifies the config file templates and volume mount parameters used by the Component.
 	//
 	// This field specifies a list of templates that will be rendered into Component containers' config files.

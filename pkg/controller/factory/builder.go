@@ -45,7 +45,7 @@ import (
 )
 
 // BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		compDefName = synthesizedComp.CompDefName
 		namespace   = synthesizedComp.Namespace
@@ -66,14 +66,14 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
+		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, compDef)).
 		SetTemplate(getTemplate(synthesizedComp)).
 		SetSelectorMatchLabel(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
-		SetVolumeClaimTemplates(getVolumeClaimTemplates(synthesizedComp)...).
+		SetVolumeClaimTemplates(defaultVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
-		SetInstances(getInstanceTemplates(synthesizedComp.Instances)).
+		SetInstances(getInstanceTemplates(synthesizedComp)).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).
 		SetRoles(synthesizedComp.Roles).
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
@@ -83,6 +83,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars)
+	if compDef != nil {
+		itsBuilder.SetDisableDefaultHeadlessService(compDef.Spec.DisableDefaultHeadlessService)
+	}
 
 	if common.IsCompactMode(synthesizedComp.Annotations) {
 		itsBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
@@ -90,15 +93,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	}
 
 	itsObj := itsBuilder.GetObject()
-
-	// update its.spec.volumeClaimTemplates[].metadata.labels
-	// TODO(xingran): synthesizedComp.VolumeTypes has been removed, and the following code needs to be refactored.
-	if len(itsObj.Spec.VolumeClaimTemplates) > 0 && len(itsObj.GetLabels()) > 0 {
-		for index, vct := range itsObj.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(synthesizedComp, &vct, vct.Name, "")
-			itsObj.Spec.VolumeClaimTemplates[index] = vct
-		}
-	}
 
 	setDefaultResourceLimits(itsObj)
 
@@ -111,6 +105,7 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Labels)).
+		AddLabels(constant.KBAppReleasePhaseKey, constant.ReleasePhaseStable).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations)
 	return corev1.PodTemplateSpec{
@@ -119,41 +114,53 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 	}
 }
 
-func getVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {
+func defaultVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {
+	return toPersistentVolumeClaims(synthesizedComp, synthesizedComp.VolumeClaimTemplates)
+}
+
+func toPersistentVolumeClaims(synthesizedComp *component.SynthesizedComponent, vcts []corev1.PersistentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
 	pvc := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
 			Spec:       vct.Spec,
 		}
 	}
-
-	var vcts []corev1.PersistentVolumeClaim
-	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, vct := range vcts {
 		// priority: static < dynamic < built-in
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.StaticLabels, &vct.ObjectMeta.Labels)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.StaticAnnotations, &vct.ObjectMeta.Annotations)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
-		vcts = append(vcts, pvc(vct))
+		pvcs = append(pvcs, pvc(vct))
 	}
-	return vcts
+	return pvcs
 }
 
-func getInstanceTemplates(instances []kbappsv1.InstanceTemplate) []workloads.InstanceTemplate {
+func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []workloads.InstanceTemplate {
+	instances := synthesizedComp.Instances
 	if instances == nil {
 		return nil
 	}
 	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
-	for i := range instances {
+	for i, tpl := range instances {
 		instanceTemplates[i] = workloads.InstanceTemplate{
-			Name:             instances[i].Name,
-			Replicas:         instances[i].Replicas,
-			Ordinals:         instances[i].Ordinals,
-			Annotations:      instances[i].Annotations,
-			Labels:           instances[i].Labels,
-			SchedulingPolicy: instances[i].SchedulingPolicy,
-			Resources:        instances[i].Resources,
-			Env:              instances[i].Env,
+			Name:                 instances[i].Name,
+			Replicas:             instances[i].Replicas,
+			Ordinals:             instances[i].Ordinals,
+			Annotations:          instances[i].Annotations,
+			Labels:               instances[i].Labels,
+			SchedulingPolicy:     instances[i].SchedulingPolicy,
+			Resources:            instances[i].Resources,
+			Env:                  instances[i].Env,
+			VolumeClaimTemplates: toPersistentVolumeClaims(synthesizedComp, intctrlutil.ToCoreV1PVCTs(instances[i].VolumeClaimTemplates)),
+			Images:               synthesizedComp.InstanceImages[instances[i].Name],
+		}
+		if ptr.Deref(tpl.Canary, false) {
+			if instanceTemplates[i].Labels == nil {
+				instanceTemplates[i].Labels = map[string]string{}
+			}
+			instanceTemplates[i].Labels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseCanary
 		}
 	}
 	return instanceTemplates

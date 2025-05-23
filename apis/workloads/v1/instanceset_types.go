@@ -238,6 +238,12 @@ type InstanceSetSpec struct {
 	//
 	// +optional
 	Configs []ConfigTemplate `json:"configs,omitempty"`
+
+	// Specifies whether to create the default headless service.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	DisableDefaultHeadlessService bool `json:"disableDefaultHeadlessService,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet
@@ -399,6 +405,16 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies an override for the storage requirements of the instances.
+	//
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+
+	// Images for the containers of the instance template.
+	//
+	// +optional
+	Images map[string]string `json:"images,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {

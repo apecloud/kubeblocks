@@ -182,16 +182,22 @@ type ServiceRefCredentialSelector struct {
 	Name string `json:"name"`
 }
 
-type ClusterComponentVolumeClaimTemplate struct {
+type PersistentVolumeClaimTemplate struct {
 	// Refers to the name of a volumeMount defined in either:
 	//
 	// - `componentDefinition.spec.runtime.containers[*].volumeMounts`
-	// - `clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts` (deprecated)
 	//
 	// The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// Specifies the prefix of the PVC name for the volume.
+	//
+	// For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal>
+	//
+	// +optional
+	PersistentVolumeClaimName *string `json:"persistentVolumeClaimName,omitempty"`
 
 	// Specifies the labels for the PVC of the volume.
 	//
@@ -206,47 +212,8 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
 	// with the mount name specified in the `name` field.
 	//
-	// When a Pod is created for this ClusterComponent, a new PVC will be created based on the specification
-	// defined in the `spec` field. The PVC will be associated with the volume mount specified by the `name` field.
-	//
 	// +optional
-	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
-}
-
-type PersistentVolumeClaimSpec struct {
-	// Contains the desired access modes the volume should have.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
-
-	// Represents the minimum resources the volume should have.
-	// If the RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that
-	// are lower than the previous value but must still be higher than the capacity recorded in the status field of the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-
-	// The name of the StorageClass required by the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
-	//
-	// +optional
-	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
-
-	// Defines what type of volume is required by the claim, either Block or Filesystem.
-	//
-	// +optional
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
-
-	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
-	//
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
-	//
-	// +optional
-	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty"`
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 
 // PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.
@@ -768,6 +735,11 @@ type InstanceTemplate struct {
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 
+	// Indicate whether the instances belonging to this template are canary instances.
+	//
+	// +optional
+	Canary *bool `json:"canary,omitempty"`
+
 	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
 	// This field allows setting how many replicated instances of the Component,
 	// with the specific overrides in the InstanceTemplate, are created.
@@ -815,6 +787,11 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies an override for the storage requirements of the instances.
+	//
+	// +optional
+	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // Range represents a range with a start and an end value.

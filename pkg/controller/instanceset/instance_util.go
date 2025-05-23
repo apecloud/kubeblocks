@@ -79,11 +79,6 @@ func init() {
 	runtime.Must(err)
 }
 
-type instance struct {
-	pod  *corev1.Pod
-	pvcs []*corev1.PersistentVolumeClaim
-}
-
 // ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
 func ParseParentNameAndOrdinal(s string) (string, int) {
@@ -291,7 +286,7 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	allNameTemplateMap := make(map[string]*instanceTemplateExt)
 	var instanceNameList []string
 	for _, template := range instanceTemplateList {
-		ordinalList, err := GetOrdinalListByTemplateName(itsExt.its, template.Name)
+		ordinalList, err := getOrdinalListByTemplateName(itsExt.its, template.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +315,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
 		replicas := template.GetReplicas()
-		ordinalList, err := ConvertOrdinalsToSortedList(template.GetOrdinals())
+		ordinalList, err := convertOrdinalsToSortedList(template.GetOrdinals())
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +327,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 		totalReplicas += replicas
 	}
 	if totalReplicas < replicas {
-		ordinalList, err := ConvertOrdinalsToSortedList(defaultTemplateOrdinals)
+		ordinalList, err := convertOrdinalsToSortedList(defaultTemplateOrdinals)
 		if err != nil {
 			return nil, err
 		}
@@ -350,17 +345,17 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 }
 
 func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	instanceNames, err := GenerateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
+	instanceNames, err := generateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
 	return instanceNames, err
 }
 
-// GenerateInstanceNames generates instance names based on certain rules:
+// generateInstanceNames generates instance names based on certain rules:
 // The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
 // The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
-func GenerateInstanceNames(parentName, templateName string,
+func generateInstanceNames(parentName, templateName string,
 	replicas int32, ordinal int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
 	if len(ordinalList) > 0 {
-		return GenerateInstanceNamesWithOrdinalList(parentName, templateName, replicas, offlineInstances, ordinalList)
+		return generateInstanceNamesWithOrdinalList(parentName, templateName, replicas, offlineInstances, ordinalList)
 	}
 	usedNames := sets.New(offlineInstances...)
 	var instanceNameList []string
@@ -382,13 +377,16 @@ func GenerateInstanceNames(parentName, templateName string,
 	return instanceNameList, nil
 }
 
-// GenerateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
-func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
+// generateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
+func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
 	var instanceNameList []string
 	usedNames := sets.New(offlineInstances...)
 	slices.Sort(ordinalList)
 	for _, ordinal := range ordinalList {
+		if len(instanceNameList) >= int(replicas) {
+			break
+		}
 		var name string
 		if len(templateName) == 0 {
 			name = fmt.Sprintf("%s-%d", parentName, ordinal)
@@ -399,9 +397,6 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 			continue
 		}
 		instanceNameList = append(instanceNameList, name)
-		if len(instanceNameList) == int(replicas) {
-			break
-		}
 	}
 	if int32(len(instanceNameList)) != replicas {
 		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
@@ -411,15 +406,15 @@ func GenerateInstanceNamesWithOrdinalList(parentName, templateName string,
 	return instanceNameList, nil
 }
 
-func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
-	ordinals, err := GetOrdinalsByTemplateName(its, templateName)
+func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
+	ordinals, err := getOrdinalsByTemplateName(its, templateName)
 	if err != nil {
 		return nil, err
 	}
-	return ConvertOrdinalsToSortedList(ordinals)
+	return convertOrdinalsToSortedList(ordinals)
 }
 
-func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
+func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
 	if templateName == "" {
 		return its.Spec.DefaultTemplateOrdinals, nil
 	}
@@ -431,7 +426,7 @@ func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) 
 	return kbappsv1.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
-func ConvertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
+func convertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
 	ordinalList := sets.New(ordinals.Discrete...)
 	for _, item := range ordinals.Ranges {
 		start := item.Start
@@ -505,7 +500,7 @@ func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMappin
 	return nil
 }
 
-func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
+func buildInstancePodByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*corev1.Pod, error) {
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
@@ -540,29 +535,16 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	}
 
 	// 2. build pvcs from template
-	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, pod.GetName())
-		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
-			AddLabelsInMap(template.Labels).
-			AddLabelsInMap(labels).
-			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
-			SetSpec(*claimTemplate.Spec.DeepCopy()).
-			GetObject()
-		if template.Name != "" {
-			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
-		}
-		pvcMap[pvcName] = pvc
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, pod.GetName())
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
 
 	// 3. update pod volumes
-	var pvcs []*corev1.PersistentVolumeClaim
 	var volumeList []corev1.Volume
-	for pvcName, pvc := range pvcMap {
-		pvcs = append(pvcs, pvc)
-		volume := builder.NewVolumeBuilder(pvcNameMap[pvcName]).
+	for pvcName, claimTemplateName := range pvcNameMap {
+		volume := builder.NewVolumeBuilder(claimTemplateName).
 			SetVolumeSource(corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
 			}).GetObject()
@@ -577,24 +559,14 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
-	for _, pvc := range pvcs {
-		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
-			return nil, err
-		}
-	}
-	inst := &instance{
-		pod:  pod,
-		pvcs: pvcs,
-	}
-	return inst, nil
+	return pod, nil
 }
 
-func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
-	// 2. build pvcs from template
+func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(parent.Name)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, name)
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
 			AddLabelsInMap(labels).
 			AddLabelsInMap(template.Labels).
@@ -609,8 +581,12 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 		}
 		pvcs = append(pvcs, pvc)
 	}
-
-	return pvcs
+	for _, pvc := range pvcs {
+		if err := controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+			return nil, err
+		}
+	}
+	return pvcs, nil
 }
 
 // copyAndMerge merges two objects for updating:
@@ -776,7 +752,7 @@ func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
 		return &instanceTemplateExt{
 			Name:                 templateName,
 			PodTemplateSpec:      *defaultTemplate.DeepCopy(),
-			VolumeClaimTemplates: claims,
+			VolumeClaimTemplates: claims, // default claims
 		}
 	}
 
@@ -901,7 +877,32 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		}
 	}
 
+	updateImage := func(containers []corev1.Container, images map[string]string) {
+		for i, c := range containers {
+			if image, ok := images[c.Name]; ok {
+				containers[i].Image = image
+			}
+		}
+	}
+	updateImage(templateExt.Spec.InitContainers, template.Images)
+	updateImage(templateExt.Spec.Containers, template.Images)
+
 	scheduling.ApplySchedulingPolicyToPodSpec(&templateExt.Spec, template.SchedulingPolicy)
+
+	// override by instance template
+	for _, tpl1 := range template.VolumeClaimTemplates {
+		found := false
+		for i, tpl2 := range templateExt.VolumeClaimTemplates {
+			if tpl1.Name == tpl2.Name {
+				templateExt.VolumeClaimTemplates[i] = *tpl1.DeepCopy()
+				found = true
+				break
+			}
+		}
+		if !found {
+			templateExt.VolumeClaimTemplates = append(templateExt.VolumeClaimTemplates, *tpl1.DeepCopy())
+		}
+	}
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

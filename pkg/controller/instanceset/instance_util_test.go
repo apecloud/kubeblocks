@@ -159,7 +159,7 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("buildInstanceByTemplate", func() {
+	Context("buildInstancePodByTemplate", func() {
 		It("should work well", func() {
 			itsExt, err := buildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
@@ -169,25 +169,20 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			instance, err := buildInstanceByTemplate(name, template, its, "")
+			pod, err := buildInstancePodByTemplate(name, template, its, "")
 			Expect(err).Should(BeNil())
-			Expect(instance.pod).ShouldNot(BeNil())
-			Expect(instance.pvcs).ShouldNot(BeNil())
-			Expect(instance.pvcs).Should(HaveLen(1))
-			Expect(instance.pod.Name).Should(Equal(name))
-			Expect(instance.pod.Namespace).Should(Equal(its.Namespace))
-			Expect(instance.pod.Spec.Volumes).Should(HaveLen(1))
-			Expect(instance.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
+			Expect(pod).ShouldNot(BeNil())
+			Expect(pod.Name).Should(Equal(name))
+			Expect(pod.Namespace).Should(Equal(its.Namespace))
+			Expect(pod.Spec.Volumes).Should(HaveLen(1))
+			Expect(pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
 			expectedTemplate := its.Spec.Template.DeepCopy()
-			Expect(instance.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
+			Expect(pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
-			instance.pod.Spec.Volumes = nil
-			instance.pod.Spec.Hostname = ""
-			instance.pod.Spec.Subdomain = ""
-			Expect(instance.pod.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(instance.pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, instance.pod.Name)))
-			Expect(instance.pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
-			Expect(instance.pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
+			pod.Spec.Volumes = nil
+			pod.Spec.Hostname = ""
+			pod.Spec.Subdomain = ""
+			Expect(pod.Spec).Should(Equal(expectedTemplate.Spec))
 		})
 
 		It("adds nodeSelector according to annotation", func() {
@@ -201,9 +196,9 @@ var _ = Describe("instance util test", func() {
 
 			node := "test-node-1"
 			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})).To(Succeed())
-			instance, err := buildInstanceByTemplate(name, template, its, "")
+			pod, err := buildInstancePodByTemplate(name, template, its, "")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
+			Expect(pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
 
 			By("test with an already existing annotation")
 			delete(its.Annotations, constant.NodeSelectorOnceAnnotationKey)
@@ -213,9 +208,9 @@ var _ = Describe("instance util test", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(mapping).To(HaveKeyWithValue("other-pod", "other-node"))
 			Expect(mapping).To(HaveKeyWithValue(name, node))
-			instance, err = buildInstanceByTemplate(name, template, its, "")
+			pod, err = buildInstancePodByTemplate(name, template, its, "")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(instance.pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
+			Expect(pod.Spec.NodeSelector[corev1.LabelHostname]).To(Equal(node))
 		})
 	})
 
@@ -229,7 +224,8 @@ var _ = Describe("instance util test", func() {
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
 			template := nameTemplate[name]
-			pvcs := buildInstancePVCByTemplate(name, template, its)
+			pvcs, err := buildInstancePVCByTemplate(name, template, its)
+			Expect(err).Should(BeNil())
 			Expect(pvcs).Should(HaveLen(1))
 			Expect(pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, name)))
 			Expect(pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
@@ -428,6 +424,7 @@ var _ = Describe("instance util test", func() {
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
+
 		It("without OfflineInstances, should work well", func() {
 			parentName := "foo"
 			templateName := "bar"
@@ -459,6 +456,7 @@ var _ = Describe("instance util test", func() {
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
+
 		It("with OfflineInstances, should work well", func() {
 			parentName := "foo"
 			templateName := "bar"
@@ -491,6 +489,34 @@ var _ = Describe("instance util test", func() {
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
+
+		It("w/ ordinals, unmatched replicas", func() {
+			parentName := "foo"
+			templateName := "bar"
+			template := &instanceTemplateExt{
+				Replicas: 5,
+				Name:     templateName,
+			}
+			template2OrdinalList := []int32{0, 1, 2}
+
+			_, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, nil, template2OrdinalList)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("expected 5 instance names but generated 3"))
+		})
+
+		It("w/ ordinals, zero replicas", func() {
+			parentName := "foo"
+			templateName := "bar"
+			template := &instanceTemplateExt{
+				Replicas: 0,
+				Name:     templateName,
+			}
+			template2OrdinalList := []int32{0, 1, 2}
+
+			instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, nil, template2OrdinalList)
+			Expect(err).Should(BeNil())
+			Expect(instanceNames).Should(BeEmpty())
+		})
 	})
 
 	Context("GenerateAllInstanceNames", func() {
@@ -513,6 +539,7 @@ var _ = Describe("instance util test", func() {
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
+
 		It("with Ordinals, without offlineInstances", func() {
 			parentName := "foo"
 			defaultTemplateOrdinals := kbappsv1.Ordinals{
@@ -551,6 +578,7 @@ var _ = Describe("instance util test", func() {
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-bar-3", "foo-foo-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
+
 		It("with templatesOrdinals, with offlineInstances", func() {
 			parentName := "foo"
 			defaultTemplateOrdinals := kbappsv1.Ordinals{
@@ -590,6 +618,7 @@ var _ = Describe("instance util test", func() {
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
 			Expect(instanceNameList).Should(Equal(podNamesExpected))
 		})
+
 		It("with templatesOrdinals, with offlineInstances, replicas error", func() {
 			parentName := "foo"
 			defaultTemplateOrdinals := kbappsv1.Ordinals{
@@ -668,6 +697,12 @@ var _ = Describe("instance util test", func() {
 		errExpected := fmt.Errorf("for template '%s', expected %d instance names but generated %d: [%s]",
 			templateFoo.Name, *templateFoo.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", "))
 		Expect(err).Should(Equal(errExpected))
+
+		By("zero replicas")
+		templateFoo.Replicas = pointer.Int32(0)
+		instanceNameList, err = GenerateAllInstanceNames(parentName, 0, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
+		Expect(err).Should(BeNil())
+		Expect(len(instanceNameList)).Should(Equal(0))
 	})
 
 	Context("GetOrdinalListByTemplateName", func() {
@@ -709,22 +744,22 @@ var _ = Describe("instance util test", func() {
 			templateNameBar := "bar"
 			templateNameNotFound := "foobar"
 
-			ordinalListDefault, err := GetOrdinalListByTemplateName(its, templateNameDefault)
+			ordinalListDefault, err := getOrdinalListByTemplateName(its, templateNameDefault)
 			Expect(err).Should(BeNil())
 			ordinalListDefaultExpected := []int32{1, 2}
 			Expect(ordinalListDefault).Should(Equal(ordinalListDefaultExpected))
 
-			ordinalListFoo, err := GetOrdinalListByTemplateName(its, templateNameFoo)
+			ordinalListFoo, err := getOrdinalListByTemplateName(its, templateNameFoo)
 			Expect(err).Should(BeNil())
 			ordinalListFooExpected := []int32{0}
 			Expect(ordinalListFoo).Should(Equal(ordinalListFooExpected))
 
-			ordinalListBar, err := GetOrdinalListByTemplateName(its, templateNameBar)
+			ordinalListBar, err := getOrdinalListByTemplateName(its, templateNameBar)
 			Expect(err).Should(BeNil())
 			ordinalListBarExpected := []int32{0, 2, 3}
 			Expect(ordinalListBar).Should(Equal(ordinalListBarExpected))
 
-			ordinalListNotFound, err := GetOrdinalListByTemplateName(its, templateNameNotFound)
+			ordinalListNotFound, err := getOrdinalListByTemplateName(its, templateNameNotFound)
 			Expect(ordinalListNotFound).Should(BeNil())
 			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
 			Expect(err).Should(Equal(errExpected))
@@ -770,7 +805,7 @@ var _ = Describe("instance util test", func() {
 			templateNameBar := "bar"
 			templateNameNotFound := "foobar"
 
-			ordinalsDefault, err := GetOrdinalsByTemplateName(its, templateNameDefault)
+			ordinalsDefault, err := getOrdinalsByTemplateName(its, templateNameDefault)
 			Expect(err).Should(BeNil())
 			ordinalsDefaultExpected := kbappsv1.Ordinals{
 				Ranges: []kbappsv1.Range{
@@ -782,14 +817,14 @@ var _ = Describe("instance util test", func() {
 			}
 			Expect(ordinalsDefault).Should(Equal(ordinalsDefaultExpected))
 
-			ordinalsFoo, err := GetOrdinalsByTemplateName(its, templateNameFoo)
+			ordinalsFoo, err := getOrdinalsByTemplateName(its, templateNameFoo)
 			Expect(err).Should(BeNil())
 			ordinalsFooExpected := kbappsv1.Ordinals{
 				Discrete: []int32{0},
 			}
 			Expect(ordinalsFoo).Should(Equal(ordinalsFooExpected))
 
-			ordinalsBar, err := GetOrdinalsByTemplateName(its, templateNameBar)
+			ordinalsBar, err := getOrdinalsByTemplateName(its, templateNameBar)
 			Expect(err).Should(BeNil())
 			ordinalsBarExpected := kbappsv1.Ordinals{
 				Ranges: []kbappsv1.Range{
@@ -802,7 +837,7 @@ var _ = Describe("instance util test", func() {
 			}
 			Expect(ordinalsBar).Should(Equal(ordinalsBarExpected))
 
-			ordinalsNotFound, err := GetOrdinalsByTemplateName(its, templateNameNotFound)
+			ordinalsNotFound, err := getOrdinalsByTemplateName(its, templateNameNotFound)
 			Expect(ordinalsNotFound).Should(Equal(kbappsv1.Ordinals{}))
 			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
 			Expect(err).Should(Equal(errExpected))
@@ -820,10 +855,11 @@ var _ = Describe("instance util test", func() {
 				},
 				Discrete: []int32{0, 6},
 			}
-			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
+			ordinalList, err := convertOrdinalsToSortedList(ordinals)
 			Expect(err).Should(BeNil())
 			sets.New(ordinalList...).Equal(sets.New[int32](0, 2, 3, 4, 6))
 		})
+
 		It("rightNumber must >= leftNumber", func() {
 			ordinals := kbappsv1.Ordinals{
 				Ranges: []kbappsv1.Range{
@@ -834,7 +870,7 @@ var _ = Describe("instance util test", func() {
 				},
 				Discrete: []int32{0},
 			}
-			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
+			ordinalList, err := convertOrdinalsToSortedList(ordinals)
 			errExpected := fmt.Errorf("range's end(%v) must >= start(%v)", 2, 4)
 			Expect(err).Should(Equal(errExpected))
 			Expect(ordinalList).Should(BeNil())

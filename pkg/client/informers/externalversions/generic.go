@@ -122,7 +122,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case extensionsv1alpha1.SchemeGroupVersion.WithResource("addons"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1alpha1().Addons().Informer()}, nil
 
-		// Group=operations, Version=v1alpha1
+		// Group=operations.kubeblocks.io, Version=v1alpha1
 	case operationsv1alpha1.SchemeGroupVersion.WithResource("opsdefinitions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operations().V1alpha1().OpsDefinitions().Informer()}, nil
 	case operationsv1alpha1.SchemeGroupVersion.WithResource("opsrequests"):

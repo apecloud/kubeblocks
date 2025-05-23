@@ -93,11 +93,6 @@ func GenerateWorkloadNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
-// GeneratePodName generates the connection credential name for component.
-func GeneratePodName(clusterName, compName string, ordinal int) string {
-	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
-}
-
 // GenerateShardingNamePrefix generates sharding name prefix.
 func GenerateShardingNamePrefix(shardingName string) string {
 	return fmt.Sprintf("%s-", shardingName)

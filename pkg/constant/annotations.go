@@ -49,6 +49,8 @@ const (
 
 	// NodeSelectorOnceAnnotationKey adds nodeSelector in podSpec for one pod exactly once
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
+
+	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 )
 
 // annotations for multi-cluster

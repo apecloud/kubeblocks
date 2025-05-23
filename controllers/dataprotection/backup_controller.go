@@ -268,6 +268,12 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 		return intctrlutil.Reconciled()
 	}
 
+	if cleaned, err := r.waitForBackupPodsDeleted(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	} else if !cleaned {
+		return intctrlutil.Reconciled()
+	}
+
 	if err := r.deleteVolumeSnapshots(reqCtx, backup); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -458,8 +464,7 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	if backupStatusTarget != nil {
 		selectedPods = backupStatusTarget.SelectedTargetPods
 	}
-	if request.ParentBackup != nil && len(selectedPods) == 0 {
-		// incremental backups should have the same target pods as the parent backup
+	if request.ParentBackup != nil && target.PodSelector.UseParentSelectedPods && len(selectedPods) == 0 {
 		parentBackupStatusTarget := dputils.GetBackupStatusTarget(request.ParentBackup, target.Name)
 		if parentBackupStatusTarget != nil && len(parentBackupStatusTarget.SelectedTargetPods) > 0 {
 			selectedPods = parentBackupStatusTarget.SelectedTargetPods
@@ -751,11 +756,32 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	return deleter.DeleteVolumeSnapshots(backup)
 }
 
+func (r *BackupReconciler) waitForBackupPodsDeleted(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
+	podList := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(backup.Namespace),
+		client.MatchingLabels(map[string]string{
+			dptypes.BackupNameLabelKey: backup.Name,
+		})); err != nil {
+		return false, err
+	}
+	if len(podList.Items) == 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 // deleteExternalResources deletes the external workloads that execute backup.
 // Currently, it only supports two types of workloads: job, statefulSet
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	labels := dpbackup.BuildBackupWorkloadLabels(backup)
+	labels := map[string]string{
+		dptypes.BackupNameLabelKey:    backup.Name,
+		constant.AppManagedByLabelKey: dptypes.AppName,
+	}
+
+	if clusterUID, ok := backup.Labels[dptypes.ClusterUIDLabelKey]; ok {
+		labels[dptypes.ClusterUIDLabelKey] = clusterUID
+	}
 
 	// use map to avoid duplicate deletion of the same namespace.
 	namespaces := map[string]sets.Empty{

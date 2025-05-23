@@ -28,14 +28,19 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("update reconciler test", func() {
@@ -47,7 +52,7 @@ var _ = Describe("update reconciler test", func() {
 			SetUID(uid).
 			SetReplicas(replicas).
 			SetSelectorMatchLabel(selectors).
-			SetTemplate(template).
+			SetTemplate(*template.DeepCopy()).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetMinReadySeconds(minReadySeconds).
 			GetObject()
@@ -83,6 +88,7 @@ var _ = Describe("update reconciler test", func() {
 		pods := tree.List(&corev1.Pod{})
 		Expect(pods).Should(HaveLen(int(replicas) - len(names)))
 		for _, name := range names {
+			// name should be deleted
 			Expect(slices.IndexFunc(pods, func(object client.Object) bool {
 				return object.GetName() == name
 			})).Should(BeNumerically("<", 0))
@@ -90,6 +96,14 @@ var _ = Describe("update reconciler test", func() {
 	}
 
 	Context("PreCondition & Reconcile", func() {
+		getPodReadyCondition := func() corev1.PodCondition {
+			return corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			}
+		}
+
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1
@@ -125,15 +139,10 @@ var _ = Describe("update reconciler test", func() {
 				Status:             corev1.ConditionTrue,
 				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
 			}
-			readyCondition := corev1.PodCondition{
-				Type:               corev1.PodReady,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
-			}
 			makePodAvailableWithOldRevision := func(pod *corev1.Pod) {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition, containersReadyCondition)
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition(), containersReadyCondition)
 			}
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)
@@ -268,11 +277,6 @@ var _ = Describe("update reconciler test", func() {
 			pods := tree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(3))
 			lastPod := pods[len(pods)-1]
-			readyCondition := corev1.PodCondition{
-				Type:               corev1.PodReady,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
-			}
 			for i, object := range pods {
 				pod, ok := object.(*corev1.Pod)
 				Expect(ok).Should(BeTrue())
@@ -284,7 +288,7 @@ var _ = Describe("update reconciler test", func() {
 				}
 				// mark first two pods available
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 			}
 
 			reconciler = NewUpdateReconciler()
@@ -292,6 +296,119 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(tree, []string{lastPod.GetName()})
+		})
+
+		It("respects maxUnavailable with pending pods", func() {
+			// update order: bar-2, bar-1, bar-0
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(3))
+			for _, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				// mark the all pods with old revision and available
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-2"})
+
+			// still, only bar-2 is deleted
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-2"})
+
+			// mark pod-2 as pending
+			prepareForUpdate(tree)
+			pod2 := builder.NewPodBuilder(namespace, "bar-2").GetObject()
+			object, err := tree.Get(pod2)
+			Expect(err).Should(BeNil())
+			pod2, ok := object.(*corev1.Pod)
+			Expect(ok).Should(BeTrue())
+			pod2.Status.Phase = corev1.PodPending
+			Expect(tree.Update(pod2)).Should(BeNil())
+
+			// no pods updated
+			reconciler = NewUpdateReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{})
+
+			// mark pod-2 as available
+			pod2.Status.Phase = corev1.PodRunning
+			pod2.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+
+			reconciler = NewUpdateReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-1"})
+		})
+
+		testInplacePodVerticalScaling := func(useSubResource bool) {
+			oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
+			defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
+			viper.Set(constant.FeatureGateInPlacePodVerticalScaling, true)
+
+			// Mock intctrlutil.SupportResizeSubResource
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			if useSubResource {
+				intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+			} else {
+				intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			}
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = ptr.To[int32](1)
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			pod := pods[0].(*corev1.Pod)
+			// mark available
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+
+			its.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1")
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			pods = tree.List(&corev1.Pod{})
+			pod = pods[0].(*corev1.Pod)
+			Expect(pod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).
+				Should(Equal(resource.MustParse("1")))
+			_, option, err := tree.GetWithOption(pod)
+			Expect(err).NotTo(HaveOccurred())
+			if useSubResource {
+				Expect(option.SubResource).Should(Equal("resize"))
+			} else {
+				Expect(option.SubResource).Should(BeEmpty())
+			}
+		}
+
+		It("inplace updates pod resource", func() {
+			testInplacePodVerticalScaling(false)
+		})
+
+		It("inplace updates pod resource using resize subresource", func() {
+			testInplacePodVerticalScaling(true)
 		})
 	})
 })

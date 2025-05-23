@@ -57,19 +57,18 @@ func init() {
 
 // RolloutSpec defines the desired state of Rollout
 type RolloutSpec struct {
+	// Specifies the target cluster of the Rollout.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=64
 	ClusterName string `json:"clusterName"`
 
+	// Specifies the target components to be rolled out.
+	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Components []RolloutComponent `json:"components,omitempty"`
-
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=128
-	// +optional
-	Shardings []RolloutSharding `json:"shardings,omitempty"`
 }
 
 // RolloutStatus defines the observed state of Rollout
@@ -94,13 +93,15 @@ type RolloutStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// Records the status information of all component within the Rollout.
+	// Records the status information of all components within the Rollout.
 	//
 	// +optional
 	Components []RolloutComponentStatus `json:"components,omitempty"`
 }
 
 type RolloutComponent struct {
+	// Specifies the name of the component.
+	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
@@ -118,53 +119,74 @@ type RolloutComponent struct {
 	// +optional
 	CompDef string `json:"compDef"`
 
+	// Specifies the rollout strategy for the component.
+	//
 	// +kubebuilder:validation:Required
 	Strategy RolloutStrategy `json:"strategy"`
 
+	// Specifies the number of instances to be rolled out.
+	//
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
 
-	// +optional
-	Promotion *RolloutPromotion `json:"promotion,omitempty"`
-
+	// Additional metadata for the instances.
+	//
 	// +optional
 	Metadata *RolloutMetadata `json:"metadata,omitempty"`
 
+	// Specifies the promotion strategy for the component.
+	//
 	// +optional
-	Services []*corev1.Service `json:"services,omitempty"`
-}
-
-type RolloutSharding struct {
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=15
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
+	Promotion *RolloutPromotion `json:"promotion,omitempty"`
 }
 
 type RolloutStrategy struct {
+	// In-place rollout strategy.
+	//
+	// If specified, the rollout will be performed in-place (delete and then create).
+	//
 	// +optional
 	Inplace *RolloutStrategyInplace `json:"inplace,omitempty"`
 
+	// Replace rollout strategy.
+	//
+	// If specified, the rollout will be performed by replacing the old instances with new instances (create and then delete).
+	//
 	// +optional
 	Replace *RolloutStrategyReplace `json:"replace,omitempty"`
 
+	// Create rollout strategy.
+	//
+	// If specified, the rollout will be performed by creating new instances.
+	//
 	// +optional
 	Create *RolloutStrategyCreate `json:"create,omitempty"`
 }
 
 type RolloutStrategyInplace struct {
+	// The selector to select the instances to be rolled out in-place.
+	//
 	// +optional
 	Selector *RolloutPodSelector `json:"selector,omitempty"`
 }
 
 type RolloutStrategyReplace struct {
+	// The selector to select the instances to be rolled out by replacing.
+	//
 	// +optional
 	Selector *RolloutPodSelector `json:"selector,omitempty"`
+
+	// Specifies the affinity for the new instances.
+	//
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
 type RolloutStrategyCreate struct {
+	// Specifies the affinity for the new instances.
+	//
 	// +optional
-	AntiAffinity *corev1.PodAntiAffinity `json:"podAntiAffinity,omitempty"`
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
 type RolloutPodSelector struct {
@@ -175,35 +197,55 @@ type RolloutPodSelector struct {
 }
 
 type RolloutPromotion struct {
+	// Specifies whether to automatically promote the new instances.
+	//
 	// +optional
 	Auto *bool `json:"auto,omitempty"`
 
+	// The delay time (in seconds) before promoting the new instances.
+	//
 	// +kubebuilder:default=30
 	// +optional
 	DelaySeconds *int32 `json:"delaySeconds,omitempty"`
 
+	// The condition for promoting the new instances.
+	//
 	// +optional
-	Condition *RolloutPromotionCondition `json:"condition,omitempty"`
+	Condition *RolloutPromoteCondition `json:"condition,omitempty"`
 
+	// The delay time (in seconds) before scaling down the old instances.
+	//
 	// +kubebuilder:default=30
 	// +optional
 	ScaleDownDelaySeconds *int32 `json:"scaleDownDelaySeconds,omitempty"`
 }
 
-type RolloutPromotionCondition struct {
+type RolloutPromoteCondition struct {
+	// The condition before promoting the new instances.
+	//
+	// If specified, the new instances will be promoted only when the condition is met.
+	//
 	// +optional
 	Prev *appsv1.Action `json:"prev,omitempty"`
 
+	// The condition after promoting the new instances successfully.
+	//
 	// +optional
 	Post *appsv1.Action `json:"post,omitempty"`
+
+	// TODO: variables to be used in the conditions.
 }
 
 type RolloutMetadata struct {
+	// Metadata added to the old instances.
+	//
 	// +optional
 	Stable *Metadata `json:"stable,omitempty"`
 
+	// Metadata added to the new instances.
+	//
 	// +optional
-	Preview *Metadata `json:"preview,omitempty"`
+	Canary *Metadata `json:"canary,omitempty"`
 }
 
 type Metadata struct {
@@ -222,15 +264,19 @@ type RolloutPhase string
 
 const (
 	PendingRolloutPhase RolloutPhase = "Pending"
-
 	RunningRolloutPhase RolloutPhase = "Running"
-
 	SucceedRolloutPhase RolloutPhase = "Succeed"
-
-	FailedRolloutPhase RolloutPhase = "Failed"
+	FailedRolloutPhase  RolloutPhase = "Failed"
 )
 
 type RolloutComponentStatus struct {
-	Name     string `json:"name"`
-	Replicas int32  `json:"replicas"`
+	// Specifies the name of the component.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the number of replicas has been rolled out.
+	//
+	// +kubebuilder:validation:Required
+	Replicas int32 `json:"replicas"`
 }

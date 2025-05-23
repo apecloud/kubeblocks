@@ -2244,7 +2244,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotionCondition">RolloutPromotionCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -14702,6 +14702,7 @@ string
 </em>
 </td>
 <td>
+<p>Specifies the target cluster of the Rollout.</p>
 </td>
 </tr>
 <tr>
@@ -14715,19 +14716,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>shardings</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutSharding">
-[]RolloutSharding
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
+<p>Specifies the target components to be rolled out.</p>
 </td>
 </tr>
 </table>
@@ -25355,6 +25344,7 @@ string
 </em>
 </td>
 <td>
+<p>Specifies the name of the component.</p>
 </td>
 </tr>
 <tr>
@@ -25391,6 +25381,7 @@ RolloutStrategy
 </em>
 </td>
 <td>
+<p>Specifies the rollout strategy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -25404,19 +25395,7 @@ Kubernetes api utils intstr.IntOrString
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>promotion</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">
-RolloutPromotion
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
+<p>Specifies the number of instances to be rolled out.</p>
 </td>
 </tr>
 <tr>
@@ -25430,19 +25409,21 @@ RolloutMetadata
 </td>
 <td>
 <em>(Optional)</em>
+<p>Additional metadata for the instances.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>services</code><br/>
+<code>promotion</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-[]Kubernetes core/v1.Service
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">
+RolloutPromotion
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the promotion strategy for the component.</p>
 </td>
 </tr>
 </tbody>
@@ -25470,6 +25451,7 @@ string
 </em>
 </td>
 <td>
+<p>Specifies the name of the component.</p>
 </td>
 </tr>
 <tr>
@@ -25480,6 +25462,7 @@ int32
 </em>
 </td>
 <td>
+<p>Specifies the number of replicas has been rolled out.</p>
 </td>
 </tr>
 </tbody>
@@ -25510,11 +25493,12 @@ Metadata
 </td>
 <td>
 <em>(Optional)</em>
+<p>Metadata added to the old instances.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>preview</code><br/>
+<code>canary</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.Metadata">
 Metadata
@@ -25523,6 +25507,7 @@ Metadata
 </td>
 <td>
 <em>(Optional)</em>
+<p>Metadata added to the new instances.</p>
 </td>
 </tr>
 </tbody>
@@ -25582,70 +25567,7 @@ Kubernetes meta/v1.LabelSelector
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromotion">RolloutPromotion
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>auto</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>delaySeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>condition</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotionCondition">
-RolloutPromotionCondition
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>scaleDownDelaySeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromotionCondition">RolloutPromotionCondition
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">RolloutPromotion</a>)
@@ -25671,6 +25593,8 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
+<p>The condition before promoting the new instances.</p>
+<p>If specified, the new instances will be promoted only when the condition is met.</p>
 </td>
 </tr>
 <tr>
@@ -25684,14 +25608,15 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
+<p>The condition after promoting the new instances successfully.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RolloutSharding">RolloutSharding
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromotion">RolloutPromotion
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutSpec">RolloutSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
 </p>
 <div>
 </div>
@@ -25705,12 +25630,52 @@ Action
 <tbody>
 <tr>
 <td>
-<code>name</code><br/>
+<code>auto</code><br/>
 <em>
-string
+bool
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Specifies whether to automatically promote the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>delaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The delay time (in seconds) before promoting the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>condition</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">
+RolloutPromoteCondition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The condition for promoting the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The delay time (in seconds) before scaling down the old instances.</p>
 </td>
 </tr>
 </tbody>
@@ -25739,6 +25704,7 @@ string
 </em>
 </td>
 <td>
+<p>Specifies the target cluster of the Rollout.</p>
 </td>
 </tr>
 <tr>
@@ -25752,19 +25718,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>shardings</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutSharding">
-[]RolloutSharding
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
+<p>Specifies the target components to be rolled out.</p>
 </td>
 </tr>
 </tbody>
@@ -25848,7 +25802,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the status information of all component within the Rollout.</p>
+<p>Records the status information of all components within the Rollout.</p>
 </td>
 </tr>
 </tbody>
@@ -25879,6 +25833,8 @@ RolloutStrategyInplace
 </td>
 <td>
 <em>(Optional)</em>
+<p>In-place rollout strategy.</p>
+<p>If specified, the rollout will be performed in-place (delete and then create).</p>
 </td>
 </tr>
 <tr>
@@ -25892,6 +25848,8 @@ RolloutStrategyReplace
 </td>
 <td>
 <em>(Optional)</em>
+<p>Replace rollout strategy.</p>
+<p>If specified, the rollout will be performed by replacing the old instances with new instances (create and then delete).</p>
 </td>
 </tr>
 <tr>
@@ -25905,6 +25863,8 @@ RolloutStrategyCreate
 </td>
 <td>
 <em>(Optional)</em>
+<p>Create rollout strategy.</p>
+<p>If specified, the rollout will be performed by creating new instances.</p>
 </td>
 </tr>
 </tbody>
@@ -25926,15 +25886,16 @@ RolloutStrategyCreate
 <tbody>
 <tr>
 <td>
-<code>podAntiAffinity</code><br/>
+<code>affinity</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podantiaffinity-v1-core">
-Kubernetes core/v1.PodAntiAffinity
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the affinity for the new instances.</p>
 </td>
 </tr>
 </tbody>
@@ -25965,6 +25926,7 @@ RolloutPodSelector
 </td>
 <td>
 <em>(Optional)</em>
+<p>The selector to select the instances to be rolled out in-place.</p>
 </td>
 </tr>
 </tbody>
@@ -25995,6 +25957,21 @@ RolloutPodSelector
 </td>
 <td>
 <em>(Optional)</em>
+<p>The selector to select the instances to be rolled out by replacing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affinity</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
+Kubernetes core/v1.Affinity
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the affinity for the new instances.</p>
 </td>
 </tr>
 </tbody>

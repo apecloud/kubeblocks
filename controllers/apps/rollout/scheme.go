@@ -31,10 +31,4 @@ func init() {
 	model.AddScheme(clientgoscheme.AddToScheme)
 	model.AddScheme(appsv1alpha1.AddToScheme)
 	model.AddScheme(appsv1.AddToScheme)
-	// model.AddScheme(dpv1alpha1.AddToScheme)
-	// model.AddScheme(snapshotv1.AddToScheme)
-	// model.AddScheme(snapshotv1beta1.AddToScheme)
-	// model.AddScheme(extensionsv1alpha1.AddToScheme)
-	// model.AddScheme(workloadsv1.AddToScheme)
-	// model.AddScheme(batchv1.AddToScheme)
 }

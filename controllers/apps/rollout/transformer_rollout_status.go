@@ -78,14 +78,5 @@ func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext, 
 		})
 	}()
 
-	replicas, targetReplicas, err := t.replicas(rollout, comp, spec)
-	if err != nil {
-		return err
-	}
-
-	if (replicas + targetReplicas) > spec.Replicas {
-		return t.rolling(transCtx, comp, spec, replicas, targetReplicas)
-	}
-
-	return t.promote(transCtx, comp, spec, replicas, targetReplicas)
+	return nil
 }

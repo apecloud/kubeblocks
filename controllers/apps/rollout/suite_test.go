@@ -21,7 +21,6 @@ package rollout
 
 import (
 	"context"
-	"fmt"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -30,7 +29,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -43,8 +41,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -56,11 +52,6 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-const (
-	testDataPlaneNodeAffinityKey = "testDataPlaneNodeAffinityKey"
-	testDataPlaneTolerationKey   = "testDataPlaneTolerationKey"
-)
-
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -71,7 +62,6 @@ var logger logr.Logger
 
 func init() {
 	viper.AutomaticEnv()
-	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
 func TestAPIs(t *testing.T) {
@@ -90,10 +80,6 @@ var _ = BeforeSuite(func() {
 	}
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 10)
-	viper.Set(constant.CfgKeyDataPlaneTolerations,
-		fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", testDataPlaneTolerationKey))
-	viper.Set(constant.CfgKeyDataPlaneAffinity,
-		fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", testDataPlaneNodeAffinityKey))
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()
@@ -120,21 +106,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(appsv1alpha1.AddToScheme)
 
-	err = appsv1beta1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(appsv1beta1.AddToScheme)
-
 	err = appsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(appsv1.AddToScheme)
-
-	err = dpv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(dpv1alpha1.AddToScheme)
-
-	err = snapshotv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(snapshotv1.AddToScheme)
 
 	// +kubebuilder:scaffold:rscheme
 

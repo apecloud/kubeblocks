@@ -123,9 +123,9 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1, 3),
+			"":   sets.New[int32](0, 1, 5),
 			"t1": sets.New[int32](2),
-			"t2": sets.New[int32](4),
+			"t2": sets.New[int32](3),
 		}, false),
 
 		Entry("with ordinal spec", &workloads.InstanceSet{
@@ -159,7 +159,7 @@ var _ = Describe("Combined Name builder tests", func() {
 			"t2": sets.New[int32](0, 2, 3),
 		}, false),
 
-		FEntry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
+		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
 				Instances: []workloads.InstanceTemplate{
@@ -195,7 +195,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0),
+			"":   sets.New[int32](0, 1),
 			"t1": sets.New[int32](100, 150),
 			"t2": sets.New[int32](500),
 		}, false),
@@ -314,10 +314,9 @@ var _ = Describe("Combined Name builder tests", func() {
 					"-3": {TemplateName: "t2"},
 				},
 			},
-		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](0, 2),
-			"t2": sets.New[int32](1, 3),
-		}, false),
+		}, nil,
+			// this case is not supported, user who wants to do partially exchange must first shrink ordinals than expand it
+			true),
 
 		Entry("with offline instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
@@ -342,6 +341,25 @@ var _ = Describe("Combined Name builder tests", func() {
 			"":   sets.New[int32](0, 1, 4),
 			"t1": sets.New[int32](3, 5),
 		}, false),
+
+		Entry("with offline instances conflicts template ordinals", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](3),
+				DefaultTemplateOrdinals: kbappsv1.Ordinals{
+					Discrete: []int32{2},
+				},
+				OfflineInstances: []string{"instance-1"},
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{0, 1},
+						},
+					},
+				},
+			},
+		}, nil, true),
 	)
 
 	It("generates instance names", func() {
@@ -448,10 +466,11 @@ var _ = Describe("Combined Name builder tests", func() {
 	})
 
 	Describe("validateOrdinals", func() {
-		FIt("should validate ordinals successfully", func() {
+		It("should validate ordinals successfully", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					Replicas: ptr.To[int32](3),
+					PodNamingRule: kbappsv1.PodNamingRuleCombined,
+					Replicas:      ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name:     "template1",
@@ -463,17 +482,15 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			itsExt, err := BuildInstanceSetExt(its, nil)
-			Expect(err).NotTo(HaveOccurred())
-			builder := combinedPodNameBuilder{itsExt: itsExt}
-			err = builder.Validate()
+			err := ValidateInstanceTemplates(its, nil)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should fail validation for negative ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					Replicas: ptr.To[int32](3),
+					PodNamingRule: kbappsv1.PodNamingRuleCombined,
+					Replicas:      ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name:     "template1",
@@ -485,10 +502,7 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			itsExt, err := BuildInstanceSetExt(its, nil)
-			Expect(err).NotTo(HaveOccurred())
-			builder := combinedPodNameBuilder{itsExt: itsExt}
-			err = builder.Validate()
+			err := ValidateInstanceTemplates(its, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("ordinal(-1) must >= 0"))
 		})
@@ -496,7 +510,8 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should fail validation for duplicate ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					Replicas: ptr.To[int32](3),
+					PodNamingRule: kbappsv1.PodNamingRuleCombined,
+					Replicas:      ptr.To[int32](3),
 					DefaultTemplateOrdinals: kbappsv1.Ordinals{
 						Discrete: []int32{1},
 					},
@@ -511,38 +526,9 @@ var _ = Describe("Combined Name builder tests", func() {
 					},
 				},
 			}
-			itsExt, err := BuildInstanceSetExt(its, nil)
-			Expect(err).NotTo(HaveOccurred())
-			builder := combinedPodNameBuilder{itsExt: itsExt}
-			err = builder.Validate()
+			err := ValidateInstanceTemplates(its, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("duplicate ordinal(1)"))
-		})
-
-		It("should take offlineInstances into consideration", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					Replicas: ptr.To[int32](3),
-					DefaultTemplateOrdinals: kbappsv1.Ordinals{
-						Discrete: []int32{2},
-					},
-					OfflineInstances: []string{"instance-1"},
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "template1",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{0, 1},
-							},
-						},
-					},
-				},
-			}
-			itsExt, err := BuildInstanceSetExt(its, nil)
-			Expect(err).NotTo(HaveOccurred())
-			builder := combinedPodNameBuilder{itsExt: itsExt}
-			err = builder.Validate()
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("ordinal(1) exists in offlineInstances"))
 		})
 	})
 })

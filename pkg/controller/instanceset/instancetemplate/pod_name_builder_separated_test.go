@@ -99,7 +99,7 @@ var _ = Describe("Separated Name builder tests", func() {
 			},
 		}, []string{"-t1-10", "-t1-11", "-t2-0", "-t2-2", "-t2-3"}, false),
 
-		FEntry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
+		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](3),
 				Instances: []workloads.InstanceTemplate{

@@ -30,8 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type rolloutInplaceTransformer struct {
-}
+type rolloutInplaceTransformer struct{}
 
 var _ graph.Transformer = &rolloutInplaceTransformer{}
 
@@ -80,15 +79,17 @@ func (t *rolloutInplaceTransformer) component(transCtx *rolloutTransformContext,
 			return errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
 		}
 	}
-
-	if replicas == 0 || replicas == int(spec.Replicas) {
-		if len(comp.ServiceVersion) > 0 && comp.ServiceVersion != spec.ServiceVersion {
-			spec.ServiceVersion = comp.ServiceVersion
-			spec.ComponentDef = comp.CompDef
-		}
-		if len(comp.CompDef) > 0 && comp.CompDef != spec.ComponentDef {
-			spec.ComponentDef = comp.CompDef
-		}
+	if replicas != 0 && replicas != int(spec.Replicas) {
+		return fmt.Errorf("partially rollout with the inplace strategy not supported, component: %s", comp.Name)
 	}
-	return fmt.Errorf("partially rollout with the inplace strategy not supported, component: %s", comp.Name)
+
+	if len(comp.ServiceVersion) > 0 && comp.ServiceVersion != spec.ServiceVersion {
+		spec.ServiceVersion = comp.ServiceVersion
+		spec.ComponentDef = comp.CompDef
+	}
+	// the case that only upgrade the component definition
+	if len(comp.CompDef) > 0 && comp.CompDef != spec.ComponentDef {
+		spec.ComponentDef = comp.CompDef
+	}
+	return nil
 }

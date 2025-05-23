@@ -32,8 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type rolloutLoadTransformer struct {
-}
+type rolloutLoadTransformer struct{}
 
 var _ graph.Transformer = &rolloutLoadTransformer{}
 

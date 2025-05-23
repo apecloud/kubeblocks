@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"reflect"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type rolloutUpdateTransformer struct {
-}
+type rolloutUpdateTransformer struct{}
 
 var _ graph.Transformer = &rolloutUpdateTransformer{}
 
@@ -33,6 +34,11 @@ func (t *rolloutUpdateTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx, _ := ctx.(*rolloutTransformContext)
 	if model.IsObjectDeleting(transCtx.RolloutOrig) {
 		return nil
+	}
+
+	if !reflect.DeepEqual(transCtx.ClusterOrig.Spec, transCtx.Cluster.Spec) {
+		graphCli, _ := transCtx.Client.(model.GraphClient)
+		graphCli.Update(dag, transCtx.ClusterOrig, transCtx.Cluster)
 	}
 
 	return nil

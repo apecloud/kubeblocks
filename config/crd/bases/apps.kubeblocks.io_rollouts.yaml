@@ -17,7 +17,19 @@ spec:
     singular: rollout
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The target cluster to be rolled out.
+      jsonPath: .spec.clusterName
+      name: CLUSTER
+      type: string
+    - description: The rollout status.
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Rollout is the Schema for the rollouts API

@@ -34,8 +34,11 @@ func (t *rolloutDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return nil
 	}
 
-	// graphCli, _ := transCtx.Client.(model.GraphClient)
-	// rollout := transCtx.Rollout
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	rollout := transCtx.Rollout
 
-	return nil // TODO
+	// TODO: impl
+	graphCli.Delete(dag, rollout)
+
+	return nil
 }

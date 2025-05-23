@@ -655,6 +655,10 @@ spec:
                                   Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
                                   Existing keys will have their values overwritten, while new keys will be added to the annotations.
                                 type: object
+                              canary:
+                                description: Indicate whether the instances belonging
+                                  to this template are canary instances.
+                                type: boolean
                               env:
                                 description: |-
                                   Defines Env to override.
@@ -3478,6 +3482,10 @@ spec:
                                   Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
                                   Existing keys will have their values overwritten, while new keys will be added to the annotations.
                                 type: object
+                              canary:
+                                description: Indicate whether the instances belonging
+                                  to this template are canary instances.
+                                type: boolean
                               env:
                                 description: |-
                                   Defines Env to override.

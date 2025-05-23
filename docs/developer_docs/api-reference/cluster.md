@@ -7750,6 +7750,18 @@ The version should follow the syntax and semantics of the &ldquo;Semantic Versio
 </tr>
 <tr>
 <td>
+<code>canary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicate whether the instances belonging to this template are canary instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32

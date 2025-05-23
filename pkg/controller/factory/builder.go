@@ -143,7 +143,7 @@ func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []wor
 		return nil
 	}
 	instanceTemplates := make([]workloads.InstanceTemplate, len(instances))
-	for i := range instances {
+	for i, tpl := range instances {
 		instanceTemplates[i] = workloads.InstanceTemplate{
 			Name:                 instances[i].Name,
 			Replicas:             instances[i].Replicas,
@@ -155,6 +155,12 @@ func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []wor
 			Env:                  instances[i].Env,
 			VolumeClaimTemplates: toPersistentVolumeClaims(synthesizedComp, intctrlutil.ToCoreV1PVCTs(instances[i].VolumeClaimTemplates)),
 			Images:               synthesizedComp.InstanceImages[instances[i].Name],
+		}
+		if ptr.Deref(tpl.Canary, false) {
+			if instanceTemplates[i].Labels == nil {
+				instanceTemplates[i].Labels = map[string]string{}
+			}
+			instanceTemplates[i].Labels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseCanary
 		}
 	}
 	return instanceTemplates

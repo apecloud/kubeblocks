@@ -66,7 +66,9 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	// if there exists an instanceset, use its status field to replace protoITS', so that podNameBuilder can work correctly
 	if transCtx.RunningWorkload != nil {
 		runningITS := transCtx.RunningWorkload.(*workloadsv1.InstanceSet)
-		protoITS.Status = runningITS.Status
+		if runningITS != nil {
+			protoITS.Status = runningITS.Status
+		}
 	}
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil

@@ -117,6 +117,13 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 				currentOrdinalSet.Delete(ordinal)
 				allOrdinalSet.Delete(ordinal)
 			}
+		} else {
+			// delete any ordinal that is taken by an template with ordinals defined
+			toDelete := currentOrdinalSet.Intersection(defaultTemplateUnavailableOrdinalSet)
+			for _, ordinal := range toDelete.UnsortedList() {
+				currentOrdinalSet.Delete(ordinal)
+				allOrdinalSet.Delete(ordinal)
+			}
 		}
 
 		// delete any offlined ordinals, delete a non-exist item does nothing

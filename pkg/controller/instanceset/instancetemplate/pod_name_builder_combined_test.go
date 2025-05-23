@@ -159,6 +159,30 @@ var _ = Describe("Combined Name builder tests", func() {
 			"t2": sets.New[int32](0, 2, 3),
 		}, false),
 
+		Entry("with ordinal spec - a newly defined ordinal spec takes an ordinal of the default template", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Discrete: []int32{1, 2},
+						},
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0": {},
+					"-1": {},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"":   sets.New[int32](0, 3, 4),
+			"t1": sets.New[int32](1, 2),
+		}, false),
+
 		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),

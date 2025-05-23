@@ -62,7 +62,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	// 1. build desired name to template map
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(
+		itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder},
+	)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

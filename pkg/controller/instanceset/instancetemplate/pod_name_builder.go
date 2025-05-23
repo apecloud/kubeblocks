@@ -20,20 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
+	"k8s.io/client-go/tools/record"
+
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type PodNameBuilderOpts struct {
-	// empty for now
+	EventLogger record.EventRecorder
 }
 
 // NewPodNameBuilder returns a PodNameBuilder based on the InstanceSet's PodNamingRule.
 // When the PodNamingRule is Combined, it should be a instanceset returned by kubernetes (i.e. with status field included)
 func NewPodNameBuilder(itsExt *InstanceSetExt, opts *PodNameBuilderOpts) (PodNameBuilder, error) {
+	if opts == nil {
+		opts = &PodNameBuilderOpts{}
+	}
 	switch itsExt.InstanceSet.Spec.PodNamingRule {
 	case kbappsv1.PodNamingRuleCombined:
 		return &combinedPodNameBuilder{
-			itsExt: itsExt,
+			itsExt:      itsExt,
+			eventLogger: opts.EventLogger,
 		}, nil
 	// default to separated naming rule, since it's the old behavior
 	default:

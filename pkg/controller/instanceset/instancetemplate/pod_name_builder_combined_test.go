@@ -125,7 +125,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		}, map[string]sets.Set[int32]{
 			"":   sets.New[int32](0, 1, 5),
 			"t1": sets.New[int32](2),
-			"t2": sets.New[int32](3),
+			"t2": sets.New[int32](6),
 		}, false),
 
 		Entry("with ordinal spec", &workloads.InstanceSet{
@@ -368,10 +368,7 @@ var _ = Describe("Combined Name builder tests", func() {
 					"-3": {TemplateName: "t2"},
 				},
 			},
-		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](0, 2),
-			"t2": sets.New[int32](1, 3),
-		}, false),
+		}, nil, true),
 
 		Entry("with offline instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{

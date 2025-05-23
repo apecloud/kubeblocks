@@ -20,25 +20,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancetemplate
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type combinedPodNameBuilder struct {
-	itsExt *InstanceSetExt
+	itsExt      *InstanceSetExt
+	eventLogger record.EventRecorder
 }
 
 func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
 	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(c.itsExt)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, ErrOrdinalsNotEnough) {
+			if c.eventLogger != nil {
+				c.eventLogger.Event(c.itsExt.InstanceSet, corev1.EventTypeWarning, "OrdinalsNotEnough", err.Error())
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	allNameTemplateMap := make(map[string]*InstanceTemplateExt)
@@ -55,6 +64,9 @@ func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*In
 	return allNameTemplateMap, nil
 }
 
+// ErrOrdinalsNotEnough is considered temporary, e.g. some old ordinals are being deleted
+var ErrOrdinalsNotEnough = errors.New("available ordinals are not enough")
+
 // GenerateTemplateName2OrdinalMap returns a map from template name to sorted ordinals
 // it rely on the instanceset's status to generate desired pod names
 // it may not be updated, but it should converge eventually
@@ -62,7 +74,9 @@ func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*In
 // template ordianls are assumed to be valid at this time
 func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
 	// initialize variables
-	allOrdinalSet := sets.New[int32]()
+
+	// globalUsedOrdinalSet won't decrease, so that one ordinal couldn't suddenly change its template
+	globalUsedOrdinalSet := sets.New[int32]()
 	defaultTemplateUnavailableOrdinalSet := sets.New[int32]()
 	template2OrdinalSetMap := map[string]sets.Set[int32]{}
 	ordinalToTemplateMap := map[int32]string{}
@@ -96,11 +110,12 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			return nil, err
 		}
 		template2OrdinalSetMap[status.TemplateName].Insert(ordinal)
-		allOrdinalSet.Insert(ordinal)
+		globalUsedOrdinalSet.Insert(ordinal)
 		ordinalToTemplateMap[ordinal] = status.TemplateName
 	}
 
 	// main calculation
+
 	// ordinals amount instance templates are guaranteed not to overlap
 	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinalSet := template2OrdinalSetMap[instanceTemplate.Name]
@@ -115,7 +130,6 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			toDelete := currentOrdinalSet.Difference(availableOrdinalSet)
 			for _, ordinal := range toDelete.UnsortedList() {
 				currentOrdinalSet.Delete(ordinal)
-				allOrdinalSet.Delete(ordinal)
 			}
 
 			// availableOrdinalSet should delete those in currentOrdinalSet
@@ -125,7 +139,6 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			toDelete := currentOrdinalSet.Intersection(defaultTemplateUnavailableOrdinalSet)
 			for _, ordinal := range toDelete.UnsortedList() {
 				currentOrdinalSet.Delete(ordinal)
-				allOrdinalSet.Delete(ordinal)
 			}
 		}
 
@@ -133,7 +146,6 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		for _, ordinal := range offlineOrdinals.UnsortedList() {
 			currentOrdinalSet.Delete(ordinal)
 			availableOrdinalSet.Delete(ordinal)
-			allOrdinalSet.Delete(ordinal)
 		}
 
 		// if currentOrdinalSet is too much, delete some
@@ -142,7 +154,6 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			l := convertOrdinalSetToSortedList(currentOrdinalSet)
 			for i := len(currentOrdinalSet) - 1; i >= int(*instanceTemplate.Replicas); i-- {
 				currentOrdinalSet.Delete(l[i])
-				allOrdinalSet.Delete(l[i])
 			}
 			continue
 		}
@@ -152,12 +163,19 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		// for those who define ordinals, use it
 		if ordinalsDefined {
 			available := convertOrdinalSetToSortedList(availableOrdinalSet)
-			if len(available) < addNum {
-				return nil, fmt.Errorf("available ordinals (len:%v) are too little (target len: %v)", len(available), addNum)
-			}
+			cur := 0
 			for i := 0; i < addNum; i++ {
-				currentOrdinalSet.Insert(available[i])
-				allOrdinalSet.Insert(available[i])
+				for {
+					if cur >= len(available) {
+						return nil, ErrOrdinalsNotEnough
+					}
+					if !globalUsedOrdinalSet.Has(available[cur]) {
+						globalUsedOrdinalSet.Insert(available[i])
+						currentOrdinalSet.Insert(available[i])
+						break
+					}
+					cur++
+				}
 			}
 		} else {
 			// for those who do not define ordinals, use a virtual ordinal set which does not overlap with any other templates' ordinals
@@ -165,9 +183,9 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			for i := 0; i < addNum; i++ {
 				// find the next available ordinal
 				for {
-					if !allOrdinalSet.Has(cur) && !defaultTemplateUnavailableOrdinalSet.Has(cur) {
+					if !globalUsedOrdinalSet.Has(cur) && !defaultTemplateUnavailableOrdinalSet.Has(cur) {
 						currentOrdinalSet.Insert(cur)
-						allOrdinalSet.Insert(cur)
+						globalUsedOrdinalSet.Insert(cur)
 						break
 					}
 					cur++
@@ -186,8 +204,15 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(c.itsExt)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, ErrOrdinalsNotEnough) {
+			if c.eventLogger != nil {
+				c.eventLogger.Event(c.itsExt.InstanceSet, corev1.EventTypeWarning, "OrdinalsNotEnough", err.Error())
+			}
+		} else {
+			return nil, err
+		}
 	}
+
 	allOrdinalSet := sets.New[int32]()
 	for _, ordinalSet := range template2OrdinalSetMap {
 		allOrdinalSet = allOrdinalSet.Union(ordinalSet)

@@ -159,6 +159,36 @@ var _ = Describe("Combined Name builder tests", func() {
 			"t2": sets.New[int32](0, 2, 3),
 		}, false),
 
+		Entry("with ordinal spec - deal with scale out", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](4),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](2),
+						Ordinals: kbappsv1.Ordinals{
+							Ranges: []kbappsv1.Range{
+								{
+									Start: 100,
+									End:   199,
+								},
+							},
+						},
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: map[string]workloads.InstanceStatus{
+					"-0":   {},
+					"-1":   {},
+					"-100": {TemplateName: "t1"},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"":   sets.New[int32](0, 1),
+			"t1": sets.New[int32](100, 101),
+		}, false),
+
 		Entry("with ordinal spec - a newly defined ordinal spec takes an ordinal of the default template", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
@@ -338,9 +368,10 @@ var _ = Describe("Combined Name builder tests", func() {
 					"-3": {TemplateName: "t2"},
 				},
 			},
-		}, nil,
-			// this case is not supported, user who wants to do partially exchange must first shrink ordinals than expand it
-			true),
+		}, map[string]sets.Set[int32]{
+			"t1": sets.New[int32](0, 2),
+			"t2": sets.New[int32](1, 3),
+		}, false),
 
 		Entry("with offline instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{

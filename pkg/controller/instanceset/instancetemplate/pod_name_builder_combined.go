@@ -117,6 +117,9 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 				currentOrdinalSet.Delete(ordinal)
 				allOrdinalSet.Delete(ordinal)
 			}
+
+			// availableOrdinalSet should delete those in currentOrdinalSet
+			availableOrdinalSet = availableOrdinalSet.Difference(currentOrdinalSet)
 		} else {
 			// delete any ordinal that is taken by an template with ordinals defined
 			toDelete := currentOrdinalSet.Intersection(defaultTemplateUnavailableOrdinalSet)

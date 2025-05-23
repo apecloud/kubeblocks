@@ -95,6 +95,7 @@ var _ = Describe("component service transformer test", func() {
 						},
 					},
 				},
+				PodSpec:      &corev1.PodSpec{},
 				Replicas:     3,
 				FullCompName: constant.GenerateClusterComponentName(clusterName, compName),
 			},

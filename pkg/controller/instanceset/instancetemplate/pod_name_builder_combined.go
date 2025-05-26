@@ -79,7 +79,6 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 	globalUsedOrdinalSet := sets.New[int32]()
 	defaultTemplateUnavailableOrdinalSet := sets.New[int32]()
 	template2OrdinalSetMap := map[string]sets.Set[int32]{}
-	ordinalToTemplateMap := map[int32]string{}
 	instanceTemplatesList := make([]*workloads.InstanceTemplate, 0, len(itsExt.InstanceTemplates))
 	for _, instanceTemplate := range itsExt.InstanceTemplates {
 		instanceTemplatesList = append(instanceTemplatesList, instanceTemplate)
@@ -89,16 +88,16 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	offlineOrdinals := sets.New[int32]()
+	offlineOrdinalSet := sets.New[int32]()
 	for _, instance := range itsExt.InstanceSet.Spec.OfflineInstances {
 		ordinal, err := GetOrdinal(instance)
 		if err != nil {
 			return nil, err
 		}
-		offlineOrdinals.Insert(ordinal)
+		offlineOrdinalSet.Insert(ordinal)
 	}
 
-	defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(offlineOrdinals)
+	defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(offlineOrdinalSet)
 	for _, instanceTemplate := range instanceTemplatesList {
 		availableOrdinalSet := ConvertOrdinalsToSet(instanceTemplate.Ordinals)
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
@@ -111,94 +110,114 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		}
 		template2OrdinalSetMap[status.TemplateName].Insert(ordinal)
 		globalUsedOrdinalSet.Insert(ordinal)
-		ordinalToTemplateMap[ordinal] = status.TemplateName
 	}
 
 	// main calculation
 
+	generateWithOrdinalsDefined := func(
+		current, available sets.Set[int32], instanceTemplate *workloads.InstanceTemplate,
+	) (sets.Set[int32], error) {
+		// delete any ordinal that doesn't in the available
+		current = current.Intersection(available)
+
+		// delete any offlined ordinals
+		current = current.Difference(offlineOrdinalSet)
+		available = available.Difference(offlineOrdinalSet)
+
+		diff := int(*instanceTemplate.Replicas) - len(current)
+		if diff < 0 {
+			// delete from high to low
+			l := convertOrdinalSetToSortedList(current)
+			for i := len(current) - 1; i >= int(*instanceTemplate.Replicas); i-- {
+				current.Delete(l[i])
+			}
+			return current, nil
+		}
+
+		// if current is too little, add some
+		availableWithoutCurrent := available.Difference(current)
+		availableList := convertOrdinalSetToSortedList(availableWithoutCurrent)
+		cur := 0
+		for i := 0; i < diff; i++ {
+			for {
+				if cur >= len(availableWithoutCurrent) {
+					return current, ErrOrdinalsNotEnough
+				}
+				if !globalUsedOrdinalSet.Has(availableList[cur]) {
+					globalUsedOrdinalSet.Insert(availableList[i])
+					current.Insert(availableList[i])
+					break
+				}
+				cur++
+			}
+		}
+		return current, nil
+	}
+
+	generateWithoutOrdinalsDefined := func(
+		current sets.Set[int32], instanceTemplate *workloads.InstanceTemplate,
+	) (sets.Set[int32], error) {
+		// delete any ordinal that is taken by an template with ordinals defined
+		current = current.Difference(defaultTemplateUnavailableOrdinalSet)
+		// delete any offlined ordinals
+		current = current.Difference(offlineOrdinalSet)
+
+		diff := int(*instanceTemplate.Replicas) - len(current)
+		if diff < 0 {
+			// delete from high to low
+			l := convertOrdinalSetToSortedList(current)
+			for i := len(current) - 1; i >= int(*instanceTemplate.Replicas); i-- {
+				current.Delete(l[i])
+			}
+			return current, nil
+		}
+
+		// for those who do not define ordinals, use a virtual ordinal set which does not overlap with any other templates' ordinals
+		var cur int32 = 0
+		for i := 0; i < diff; i++ {
+			// find the next available ordinal
+			for {
+				if !globalUsedOrdinalSet.Has(cur) && !defaultTemplateUnavailableOrdinalSet.Has(cur) {
+					current.Insert(cur)
+					globalUsedOrdinalSet.Insert(cur)
+					break
+				}
+				cur++
+			}
+		}
+
+		return current, nil
+	}
+
 	// ordinals amount instance templates are guaranteed not to overlap
+	hasErrOrdinalsNotEnough := false
 	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinalSet := template2OrdinalSetMap[instanceTemplate.Name]
 		availableOrdinalSet := ConvertOrdinalsToSet(instanceTemplate.Ordinals)
-		ordinalsDefined := false
+		var err error
 		if availableOrdinalSet.Len() > 0 {
-			ordinalsDefined = true
-		}
-
-		if ordinalsDefined {
-			// delete any ordinal that doesn't in the availableOrdinalSet
-			toDelete := currentOrdinalSet.Difference(availableOrdinalSet)
-			for _, ordinal := range toDelete.UnsortedList() {
-				currentOrdinalSet.Delete(ordinal)
-			}
-
-			// availableOrdinalSet should delete those in currentOrdinalSet
-			availableOrdinalSet = availableOrdinalSet.Difference(currentOrdinalSet)
+			currentOrdinalSet, err = generateWithOrdinalsDefined(currentOrdinalSet, availableOrdinalSet, instanceTemplate)
 		} else {
-			// delete any ordinal that is taken by an template with ordinals defined
-			toDelete := currentOrdinalSet.Intersection(defaultTemplateUnavailableOrdinalSet)
-			for _, ordinal := range toDelete.UnsortedList() {
-				currentOrdinalSet.Delete(ordinal)
+			currentOrdinalSet, err = generateWithoutOrdinalsDefined(currentOrdinalSet, instanceTemplate)
+		}
+
+		// ignore ErrOrdinalsNotEnough
+		if err != nil {
+			if errors.Is(err, ErrOrdinalsNotEnough) {
+				hasErrOrdinalsNotEnough = true
+			} else {
+				return nil, err
 			}
 		}
 
-		// delete any offlined ordinals, delete a non-exist item does nothing
-		for _, ordinal := range offlineOrdinals.UnsortedList() {
-			currentOrdinalSet.Delete(ordinal)
-			availableOrdinalSet.Delete(ordinal)
-		}
-
-		// if currentOrdinalSet is too much, delete some
-		if int(*instanceTemplate.Replicas) < len(currentOrdinalSet) {
-			// delete from high to low
-			l := convertOrdinalSetToSortedList(currentOrdinalSet)
-			for i := len(currentOrdinalSet) - 1; i >= int(*instanceTemplate.Replicas); i-- {
-				currentOrdinalSet.Delete(l[i])
-			}
-			continue
-		}
-
-		// if currentOrdinalSet is too little, add some
-		addNum := int(*instanceTemplate.Replicas) - len(currentOrdinalSet)
-		// for those who define ordinals, use it
-		if ordinalsDefined {
-			available := convertOrdinalSetToSortedList(availableOrdinalSet)
-			cur := 0
-			for i := 0; i < addNum; i++ {
-				for {
-					if cur >= len(available) {
-						return nil, ErrOrdinalsNotEnough
-					}
-					if !globalUsedOrdinalSet.Has(available[cur]) {
-						globalUsedOrdinalSet.Insert(available[i])
-						currentOrdinalSet.Insert(available[i])
-						break
-					}
-					cur++
-				}
-			}
-		} else {
-			// for those who do not define ordinals, use a virtual ordinal set which does not overlap with any other templates' ordinals
-			var cur int32 = 0
-			for i := 0; i < addNum; i++ {
-				// find the next available ordinal
-				for {
-					if !globalUsedOrdinalSet.Has(cur) && !defaultTemplateUnavailableOrdinalSet.Has(cur) {
-						currentOrdinalSet.Insert(cur)
-						globalUsedOrdinalSet.Insert(cur)
-						break
-					}
-					cur++
-				}
-			}
-		}
-
-		if currentOrdinalSet.Len() != int(*instanceTemplate.Replicas) {
-			return nil, fmt.Errorf("generated ordinals' length (%v) is not equal to template replicas (%v)", currentOrdinalSet.Len(), int(*instanceTemplate.Replicas))
-		}
+		template2OrdinalSetMap[instanceTemplate.Name] = currentOrdinalSet
 	}
 
-	return template2OrdinalSetMap, nil
+	var err error
+	if hasErrOrdinalsNotEnough {
+		err = ErrOrdinalsNotEnough
+	}
+	return template2OrdinalSetMap, err
 }
 
 func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
@@ -229,6 +248,15 @@ func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 // Ordinals should be unique globally.
 func (c *combinedPodNameBuilder) Validate() error {
 	ordinalSet := sets.New[int32]()
+	offlineOrdinalSet := sets.New[int32]()
+	for _, instance := range c.itsExt.InstanceSet.Spec.OfflineInstances {
+		ordinal, err := GetOrdinal(instance)
+		if err != nil {
+			return err
+		}
+		offlineOrdinalSet.Insert(ordinal)
+	}
+
 	for _, tmpl := range c.itsExt.InstanceTemplates {
 		ordinals := tmpl.Ordinals
 		tmplOrdinalSet := sets.New[int32]()
@@ -266,6 +294,10 @@ func (c *combinedPodNameBuilder) Validate() error {
 		if (ordinals.Ranges != nil || ordinals.Discrete != nil) && tmplOrdinalSet.Len() < int(*tmpl.Replicas) {
 			return fmt.Errorf("template(%v) has length of ordinals < replicas", tmpl.Name)
 		}
+	}
+	offlined := ordinalSet.Intersection(offlineOrdinalSet)
+	if offlined.Len() != 0 {
+		return fmt.Errorf("ordinal(s) %v exists in offline instances", convertOrdinalSetToSortedList(offlined))
 	}
 	return nil
 }

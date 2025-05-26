@@ -46,7 +46,7 @@ var _ = Describe("Combined Name builder tests", func() {
 			} else {
 				Expect(err).NotTo(HaveOccurred())
 				ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).Should(Or(BeNil(), Equal(ErrOrdinalsNotEnough)))
 				Expect(ordinals).To(Equal(expected))
 			}
 		},
@@ -368,7 +368,10 @@ var _ = Describe("Combined Name builder tests", func() {
 					"-3": {TemplateName: "t2"},
 				},
 			},
-		}, nil, true),
+		}, map[string]sets.Set[int32]{
+			"t1": sets.New[int32](0),
+			"t2": sets.New[int32](3),
+		}, false),
 
 		Entry("with offline instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
@@ -400,7 +403,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				DefaultTemplateOrdinals: kbappsv1.Ordinals{
 					Discrete: []int32{2},
 				},
-				OfflineInstances: []string{"instance-1"},
+				OfflineInstances: []string{"-1"},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",

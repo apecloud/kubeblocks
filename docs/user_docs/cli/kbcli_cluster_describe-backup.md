@@ -11,8 +11,11 @@ kbcli cluster describe-backup BACKUP-NAME [flags]
 ### Examples
 
 ```
+  # describe backups of the cluster
+  kbcli cluster describe-backup <clusterName>
+  
   # describe a backup
-  kbcli cluster describe-backup backup-default-mycluster-20230616190023
+  kbcli cluster describe-backup --names <backupName>
 ```
 
 ### Options

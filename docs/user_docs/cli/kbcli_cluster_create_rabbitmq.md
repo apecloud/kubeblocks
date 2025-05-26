@@ -38,7 +38,7 @@ kbcli cluster create rabbitmq NAME [flags]
       --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Delete, WipeOut]. (default "Delete")
       --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
-      --version string                 Cluster version. Legal values [3.13.7, 3.13.2, 3.12.14, 3.11.28, 3.10.25, 3.9.29, 3.8.14]. (default "3.13.7")
+      --version string                 Cluster version. Legal values [4.0.9, 3.13.7, 3.13.2, 3.12.14, 3.11.28, 3.10.25, 3.9.29, 3.8.14]. (default "3.13.7")
 ```
 
 ### Options inherited from parent commands

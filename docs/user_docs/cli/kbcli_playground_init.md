@@ -31,7 +31,8 @@ kbcli playground init [flags]
   kbcli cluster describe mycluster
   
   # connect to database
-  kbcli cluster connect mycluster
+  kbcli exec -it mycluster-mysql-0 bash
+  mysql -h 127.1 -u root -p$MYSQL_ROOT_PASSWORD
   
   # view the Grafana
   kbcli dashboard open kubeblocks-grafana
@@ -45,7 +46,7 @@ kbcli playground init [flags]
 ```
       --auto-approve             Skip interactive approval during the initialization of playground
       --cloud-provider string    Cloud provider type, one of [local aws] (default "local")
-      --cluster-type string      Specify the cluster type to create, use 'kbcli cluster create --help' to get the available cluster type. (default "apecloud-mysql")
+      --cluster-type string      Specify the cluster type to create, use 'kbcli cluster create --help' to get the available cluster type. (default "mysql")
   -h, --help                     help for init
       --k3d-proxy-image string   Specify k3d proxy image if you want to init playground locally (default "docker.io/apecloud/k3d-proxy:5.4.4")
       --k3s-image string         Specify k3s image that you want to use for the nodes if you want to init playground locally (default "rancher/k3s:v1.23.8-k3s1")

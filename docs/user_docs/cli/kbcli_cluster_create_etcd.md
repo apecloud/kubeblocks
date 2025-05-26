@@ -21,6 +21,9 @@ kbcli cluster create etcd NAME [flags]
 ### Options
 
 ```
+      --client-service.node-port int   Optional, if clientService type is NodePort, by default and for convenience, the Kubernetes control plane will allocate a port from a range (default: 30000-32767).
+      --client-service.port int        The port on which the service will listen. (default 2379)
+      --client-service.role string     Role of the service within the cluster. (default "leader")
       --cpu float                      CPU cores. Value range [0.5, 64]. (default 0.5)
       --disable-exporter               Enable or disable monitor. (default true)
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
@@ -29,8 +32,6 @@ kbcli cluster create etcd NAME [flags]
       --memory float                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --peer-service.enabled           Enable peer service (no need to enable for single cluster).
-      --peer-service.type string       Service type for etcd peers, default peer service for single cluster use headless ClusterIP. Valid option is LoadBalancer, will support NodePort in the future. Legal values [ClusterIP, LoadBalancer]. (default "LoadBalancer")
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --replicas int                   The number of replicas, the default replicas is 3. Value range [1, 5]. (default 3)
       --storage float                  Data Storage size, the unit is Gi. Value range [1, 10000]. (default 10)

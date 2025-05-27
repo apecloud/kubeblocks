@@ -207,7 +207,7 @@ jobs:
       fail-fast: false
       matrix:
         test-type: [ apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|asmysql-proxy|asmysql-orc|asmysql-orc-proxy,
-                     elasticsearch|oceanbase|starrocks|mysqlscale|weaviate|qdrant|smartengine|greptimedb|nebula|risingwave,
+                     elasticsearch|oceanbase|starrocks|weaviate|qdrant|greptimedb|nebula|risingwave,
                      zookeeper|etcd|orioledb|vanilla-pg|polardbx|opensearch|tdengine|milvus|clickhouse,
                      mariadb|tidb|influxdb|mogdb|yashandb|redis-cluster|minio|orchestrator|rabbitmq ]
     with:

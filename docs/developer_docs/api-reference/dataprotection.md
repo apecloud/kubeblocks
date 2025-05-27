@@ -1,9 +1,9 @@
 ---
-title: Backup API Reference
-description: Backup API Reference
-keywords: [backup, api]
+title: Dataprotection API Reference
+description: Dataprotection API Reference
+keywords: [dataprotection, api]
 sidebar_position: 4
-sidebar_label: Backup
+sidebar_label: Dataprotection
 ---
 <br />
 <p>Packages:</p>

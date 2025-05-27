@@ -37,7 +37,9 @@
         <br/>
         <br/>
         <table>
+            <tbody>
             {{ template "members" .Type }}
+            </tbody>
         </table>
     {{ end }}
     </td>

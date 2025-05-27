@@ -723,6 +723,18 @@ type InstanceTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// ServiceVersion specifies the version of the Service expected to be provisioned by this InstanceTemplate.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// Indicate whether the instances belonging to this template are canary instances.
+	//
+	// +optional
+	Canary *bool `json:"canary,omitempty"`
+
 	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
 	// This field allows setting how many replicated instances of the Component,
 	// with the specific overrides in the InstanceTemplate, are created.

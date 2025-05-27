@@ -51,6 +51,7 @@ const (
 
 	RoleLabelKey           = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
 	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"
+	KBAppReleasePhaseKey   = "apps.kubeblocks.io/release-phase" // TODO: release or service phase?
 )
 
 func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {

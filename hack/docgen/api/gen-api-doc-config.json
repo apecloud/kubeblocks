@@ -38,7 +38,12 @@
     "packageGroups": [
         {
             "groupName": "cluster",
-            "packages": ["apps.kubeblocks.io", "workloads.kubeblocks.io"],
+            "packages": [
+                "apps.kubeblocks.io",
+                "workloads.kubeblocks.io",
+                "parameters.kubeblocks.io",
+                "operations.kubeblocks.io"
+            ],
             "order": 1
         },
         {

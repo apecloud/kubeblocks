@@ -655,6 +655,10 @@ spec:
                                   Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
                                   Existing keys will have their values overwritten, while new keys will be added to the annotations.
                                 type: object
+                              canary:
+                                description: Indicate whether the instances belonging
+                                  to this template are canary instances.
+                                type: boolean
                               env:
                                 description: |-
                                   Defines Env to override.
@@ -2085,6 +2089,12 @@ spec:
                                       type: object
                                     type: array
                                 type: object
+                              serviceVersion:
+                                description: |-
+                                  ServiceVersion specifies the version of the Service expected to be provisioned by this InstanceTemplate.
+                                  The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+                                maxLength: 32
+                                type: string
                               volumeClaimTemplates:
                                 description: Specifies an override for the storage
                                   requirements of the instances.
@@ -3473,6 +3483,10 @@ spec:
                                   Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
                                   Existing keys will have their values overwritten, while new keys will be added to the annotations.
                                 type: object
+                              canary:
+                                description: Indicate whether the instances belonging
+                                  to this template are canary instances.
+                                type: boolean
                               env:
                                 description: |-
                                   Defines Env to override.
@@ -4903,6 +4917,12 @@ spec:
                                       type: object
                                     type: array
                                 type: object
+                              serviceVersion:
+                                description: |-
+                                  ServiceVersion specifies the version of the Service expected to be provisioned by this InstanceTemplate.
+                                  The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+                                maxLength: 32
+                                type: string
                               volumeClaimTemplates:
                                 description: Specifies an override for the storage
                                   requirements of the instances.

@@ -40,21 +40,33 @@
             "groupName": "cluster",
             "packages": [
                 "apps.kubeblocks.io",
-                "workloads.kubeblocks.io",
-                "parameters.kubeblocks.io",
-                "operations.kubeblocks.io"
+                "workloads.kubeblocks.io"
             ],
             "order": 1
         },
         {
-            "groupName": "backup",
-            "packages": ["dataprotection.kubeblocks.io"],
+            "groupName": "operations",
+            "packages": [
+                "operations.kubeblocks.io"
+            ],
             "order": 2
+        },
+        {
+            "groupName": "parameters",
+            "packages": [
+                "parameters.kubeblocks.io"
+            ],
+            "order": 3
+        },
+        {
+            "groupName": "dataprotection",
+            "packages": ["dataprotection.kubeblocks.io"],
+            "order": 4
         },
         {
             "groupName": "add-on",
             "packages": ["extensions.kubeblocks.io"],
-            "order": 3
+            "order": 5
         }
     ],
     "markdownDisabled": false

@@ -1,9 +1,9 @@
 ---
-title: Backup API Reference
-description: Backup API Reference
-keywords: [backup, api]
-sidebar_position: 2
-sidebar_label: Backup
+title: Dataprotection API Reference
+description: Dataprotection API Reference
+keywords: [dataprotection, api]
+sidebar_position: 4
+sidebar_label: Dataprotection
 ---
 <br />
 <p>Packages:</p>
@@ -86,6 +86,7 @@ ActionSetSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>backupType</code><br/>
@@ -182,6 +183,7 @@ RestoreActionSpec
 <p>Specifies the restore action.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -254,6 +256,7 @@ BackupSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>backupPolicyName</code><br/>
@@ -350,6 +353,7 @@ string
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -422,6 +426,7 @@ BackupPolicySpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>backupRepoName</code><br/>
@@ -549,6 +554,7 @@ BackupPolicyRetentionPolicy
 <p>Specifies the backup retention policy. This has a precedence over <code>backup.spec.retentionPeriod</code>.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -621,6 +627,7 @@ BackupRepoSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>storageProviderRef</code><br/>
@@ -711,6 +718,7 @@ string
 <p>Specifies the prefix of the path for storing backup data.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -783,6 +791,7 @@ BackupScheduleSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>backupPolicyName</code><br/>
@@ -820,6 +829,7 @@ misses its scheduled time for any reason.</p>
 <p>Defines the list of backup schedules.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -892,6 +902,7 @@ RestoreSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>backup</code><br/>
@@ -1035,6 +1046,7 @@ int32
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -1111,6 +1123,7 @@ StorageProviderSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>csiDriverName</code><br/>
@@ -1199,6 +1212,7 @@ The parameters defined here can be referenced in the above templates,
 and <code>kbcli</code> uses this definition for dynamic command-line parameter parsing.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>
@@ -2488,6 +2502,7 @@ BackupPolicyTemplateSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>serviceKind</code><br/>
@@ -2594,6 +2609,7 @@ BackupPolicyRetentionPolicy
 <p>Defines the backup retention policy to be used.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>

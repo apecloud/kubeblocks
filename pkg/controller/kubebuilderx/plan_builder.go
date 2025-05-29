@@ -208,7 +208,7 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 }
 
 func keepFinalizer(object client.Object, finalizer string) {
-	var finalizers []string
+	finalizers := object.GetFinalizers()
 	if len(finalizer) > 0 {
 		finalizers = append(finalizers, finalizer)
 	}
@@ -217,7 +217,7 @@ func keepFinalizer(object client.Object, finalizer string) {
 
 func getRemainingFinalizer(obj client.Object) string {
 	if len(obj.GetFinalizers()) > 0 {
-		return obj.GetFinalizers()[0]
+		return obj.GetFinalizers()[len(obj.GetFinalizers())-1]
 	}
 	return ""
 }

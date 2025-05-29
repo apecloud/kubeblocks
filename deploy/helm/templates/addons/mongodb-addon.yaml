@@ -4,7 +4,7 @@
   "kbVersion" ">=1.0.0"
   "selectorLabels" $selectorLabels
   "name" "mongodb"
-  "version" "1.0.0-alpha.0"
+  "version" "1.0.0"
   "model" "document"
   "provider" "community"
   "description" "MongoDB is a document database designed for ease of application development and scaling."

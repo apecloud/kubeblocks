@@ -4,7 +4,7 @@
   "kbVersion" ">=1.0.0"
   "selectorLabels" $selectorLabels
   "name" "kafka"
-  "version" "1.0.0-alpha.0"
+  "version" "1.0.0"
   "model" "streaming"
   "provider" "community"
   "description" "Apache Kafka is a distributed streaming platform designed to build real-time pipelines and can be used as a message broker or as a replacement for a log aggregation solution for big data applications."

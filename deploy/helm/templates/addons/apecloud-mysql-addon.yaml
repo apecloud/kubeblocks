@@ -4,7 +4,7 @@
   "kbVersion" ">=1.0.0"
   "selectorLabels" $selectorLabels
   "name" "apecloud-mysql"
-  "version" "1.0.0-alpha.0"
+  "version" "1.0.0"
   "model" "RDBMS"
   "provider" "community"
   "description" "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol."

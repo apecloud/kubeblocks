@@ -4,7 +4,7 @@
   "kbVersion" ">=0.9.0"
   "selectorLabels" $selectorLabels
   "name" "etcd"
-  "version" "1.0.0-alpha.0"
+  "version" "1.0.0"
   "model" "key-value"
   "provider" "community"
   "description" "etcd is a strongly consistent, distributed key-value store that provides a reliable way to store data that needs to be accessed by a distributed system or cluster of machines."

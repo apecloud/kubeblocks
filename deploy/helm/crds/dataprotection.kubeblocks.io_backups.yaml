@@ -1137,6 +1137,7 @@ spec:
                 - Completed
                 - Failed
                 - Deleting
+                - Paused
                 type: string
               startTimestamp:
                 description: |-

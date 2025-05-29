@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -317,8 +318,13 @@ func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, re
 		err = r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))
 	}
 	if err != nil {
-		r.Recorder.Event(restore, corev1.EventTypeWarning, corev1.EventTypeWarning, err.Error())
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		if errors.Is(err, ErrWaitClusterRunning) {
+			r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonWaitForClusterRunning, err.Error())
+			return intctrlutil.Requeue(reqCtx.Log, err.Error())
+		} else {
+			r.Recorder.Event(restore, corev1.EventTypeWarning, corev1.EventTypeWarning, err.Error())
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
 	}
 	return intctrlutil.Reconciled()
 }
@@ -436,6 +442,8 @@ func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr 
 	return true, nil
 }
 
+var ErrWaitClusterRunning = errors.New("wait for cluster entering running phase")
+
 func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	restoreMgr *dprestore.RestoreManager,
 	backupSet dprestore.BackupActionSet,
@@ -484,8 +492,7 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 			return false, err
 		}
 		if cluster.Status.Phase != kbappsv1.RunningClusterPhase {
-			reqCtx.Recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, dprestore.ReasonWaitForClusterRunning, "wait for cluster entering running phase")
-			return false, nil
+			return false, ErrWaitClusterRunning
 		}
 		return true, nil
 	}

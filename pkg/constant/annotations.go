@@ -59,6 +59,14 @@ const (
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
 )
 
+// annotations for data protection
+const (
+	// DoReadyRestoreAfterClusterRunningAnnotationKey is an experimental api to delay postReady restore job after cluster is running
+	// It should be set to "true" in actionset cr.
+	// This api may later added to action spec and replace the old api which is in cluster restore annotaion (kubeblocks.io/restore-from-backup)
+	DoReadyRestoreAfterClusterRunningAnnotationKey = "dataprotection.kubeblocks.io/do-ready-restore-after-cluster-running"
+)
+
 func InheritedAnnotations() []string {
 	return []string{
 		RestoreFromBackupAnnotationKey,

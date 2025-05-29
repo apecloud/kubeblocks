@@ -41,6 +41,7 @@ const (
 	ReasonProcessing                  = "Processing"
 	ReasonFailed                      = "Failed"
 	ReasonSucceed                     = "Succeed"
+	ReasonWaitForClusterRunning       = "WaitForClusterRunning"
 	reasonCreateRestoreJob            = "CreateRestoreJob"
 	reasonCreateRestorePVC            = "CreateRestorePVC"
 )

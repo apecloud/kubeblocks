@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -468,6 +469,28 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 		return isCompleted, err
 	}
 
+	checkClusterRunning := func() (pass bool, err error) {
+		v, ok := backupSet.ActionSet.Annotations[constant.DoReadyRestoreAfterClusterRunningAnnotationKey]
+		if !ok || v != "true" {
+			return true, nil
+		}
+		cluster := &kbappsv1.Cluster{}
+		clusterName, ok := restoreMgr.Restore.Labels[constant.AppInstanceLabelKey]
+		if !ok {
+			reqCtx.Log.V(2).Info("restore cr missing AppInstanceLabel")
+			return true, nil
+		}
+		if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: clusterName, Namespace: restoreMgr.Restore.Namespace}, cluster); err != nil {
+			return false, err
+		}
+		if cluster.Status.Phase != kbappsv1.RunningClusterPhase {
+			reqCtx.Recorder.Event(restoreMgr.Restore, corev1.EventTypeWarning, dprestore.ReasonWaitForClusterRunning, "wait for cluster entering running phase")
+			return false, nil
+		}
+		return true, nil
+	}
+
+	// 2. build jobs
 	var jobs []*batchv1.Job
 	switch stage {
 	case dpv1alpha1.PrepareData:
@@ -478,7 +501,13 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 		}
 		jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, target, actionName)
 	case dpv1alpha1.PostReady:
-		// 2. build jobs for postReady action
+		// check if need to delay job creation until cluster running
+		var pass bool
+		pass, err = checkClusterRunning()
+		if err != nil || !pass {
+			return false, err
+		}
+
 		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, target, step)
 	}
 	if err != nil {

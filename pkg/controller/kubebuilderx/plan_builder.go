@@ -182,11 +182,9 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 			}
 		}
 	}
-	finalizer := currentTree.GetFinalizer()
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
 			object := oldSnapshot[name]
-			keepFinalizer(object, finalizer)
 			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
@@ -205,21 +203,6 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 	// handle object dependencies
 	handleDependencies()
 	return vertices
-}
-
-func keepFinalizer(object client.Object, finalizer string) {
-	finalizers := object.GetFinalizers()
-	if len(finalizer) > 0 {
-		finalizers = append(finalizers, finalizer)
-	}
-	object.SetFinalizers(finalizers)
-}
-
-func getRemainingFinalizer(obj client.Object) string {
-	if len(obj.GetFinalizers()) > 0 {
-		return obj.GetFinalizers()[len(obj.GetFinalizers())-1]
-	}
-	return ""
 }
 
 // Plan implementation
@@ -289,7 +272,10 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 }
 
 func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	finalizer := getRemainingFinalizer(vertex.Obj)
+	var finalizer string
+	if b.currentTree != nil {
+		finalizer = b.currentTree.GetFinalizer()
+	}
 	if len(finalizer) > 0 && controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		if err != nil && !apierrors.IsNotFound(err) {

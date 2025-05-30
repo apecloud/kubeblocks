@@ -53,6 +53,12 @@ const (
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 )
 
+const (
+	// UnifyFullAndContinuousRestoreAnnotationKey is an experimental api to unify full and continuous restore job
+	// If this annotaion is set to "true", then only one job will be created during restore.
+	UnifyFullAndContinuousRestoreAnnotationKey = "dataprotection.kubeblocks.io/unify-full-and-continuous-restore"
+)
+
 // annotations for multi-cluster
 const (
 	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"

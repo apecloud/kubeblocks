@@ -301,7 +301,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				Expect(ok).Should(BeTrue())
 			}
 
-			By("mock specified pods deleted")
+			By("mock specified pods deleted or created")
 			mockHScale(podList)
 			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, consensusComp)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
@@ -392,6 +392,30 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect replicas to 4")
 			compSpec := opsRes.Cluster.Spec.GetComponentByName(consensusComp)
 			Expect(compSpec.Replicas).Should(BeEquivalentTo(4))
+			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(2))
+		})
+
+		It("test online the boundary ordinal the specified pod of the instance template and auto-sync replicaChanges", func() {
+			offlineInstanceName := fmt.Sprintf("%s-%s-%s-1", clusterName, consensusComp, insTplName)
+			offlineInstanceName2 := fmt.Sprintf("%s-%s-2", clusterName, consensusComp)
+			offlineInstances := []string{offlineInstanceName, offlineInstanceName2}
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1alpha1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1alpha1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, offlineInstances)
+			}, appsv1alpha1.HorizontalScaling{
+				ScaleOut: &appsv1alpha1.ScaleOut{
+					OfflineInstancesToOnline: offlineInstances,
+				},
+			}, []string{}, func(podList []*corev1.Pod) {
+				By("create the specified pod " + offlineInstanceName)
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, offlineInstanceName, "follower", "Readonly")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, offlineInstanceName2, "follower", "Readonly")
+			})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			By("expect replicas to 4")
+			compSpec := opsRes.Cluster.Spec.GetComponentByName(consensusComp)
+			Expect(compSpec.Replicas).Should(BeEquivalentTo(5))
 			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(2))
 		})
 

@@ -22,6 +22,8 @@ package operations
 import (
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -350,6 +352,15 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 		expectOfflineInstances, nil
 }
 
+func (hs horizontalScalingOpsHandler) isShardingComponent(opsRes *OpsResource, compName string) bool {
+	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
+		if v.Name == compName {
+			return true
+		}
+	}
+	return false
+}
+
 // autoSyncReplicaChanges auto-sync the replicaChanges of the component and instance templates.
 func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	opsRes *OpsResource,
@@ -357,6 +368,10 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	compReplicas int32,
 	compInstanceTpls []appsv1alpha1.InstanceTemplate,
 	compExpectOfflineInstances []string) error {
+	if hs.isShardingComponent(opsRes, horizontalScaling.ComponentName) {
+		// sharding component does not need to sync the replicaChanges.
+		return nil
+	}
 	// sync the replicaChanges for component and instance template.
 	getSyncedInstancesAndReplicaChanges := func(offlineOrOnlineInsCountMap map[string]int32,
 		replicaChanger appsv1alpha1.ReplicaChanger,
@@ -401,7 +416,7 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 		}
 		onlineInsCountMap := map[string]int32{}
 		for _, insName := range scaleOut.OfflineInstancesToOnline {
-			if _, ok := podSet[insName]; !ok {
+			if _, ok := podSet[insName]; !ok && !hs.onlineBoundaryOrdinalOfflinePod(opsRes, horizontalScaling, podSet, insName) {
 				//  if the specified instance will not be created, continue
 				continue
 			}
@@ -411,6 +426,31 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 		scaleOut.Instances, scaleOut.ReplicaChanges = getSyncedInstancesAndReplicaChanges(onlineInsCountMap, scaleOut.ReplicaChanger, scaleOut.NewInstances)
 	}
 	return nil
+}
+
+// onlineBoundaryOrdinalOfflinePod If the Pod at the boundary ordinal comes online,
+// and this does not lead to unintended instance creation, then replicaChanges can be safely incremented by 1.
+func (hs horizontalScalingOpsHandler) onlineBoundaryOrdinalOfflinePod(
+	opsRes *OpsResource,
+	horizontalScaling appsv1alpha1.HorizontalScaling,
+	podSet map[string]string,
+	offlineInstanceName string) bool {
+	lastIndex := strings.LastIndex(offlineInstanceName, "-")
+	podPrefix := offlineInstanceName[:lastIndex]
+	ordinal := offlineInstanceName[lastIndex+1:]
+	ordinalInt, err := strconv.Atoi(ordinal)
+	if err != nil {
+		return false
+	}
+	if ordinalInt == 0 {
+		return true
+	}
+	lastOrdinal := ordinalInt - 1
+	if _, ok := podSet[fmt.Sprintf("%s-%d", podPrefix, lastOrdinal)]; ok {
+		podSet[offlineInstanceName] = appsv1alpha1.GetInstanceTemplateName(opsRes.Cluster.Name, horizontalScaling.ComponentName, offlineInstanceName)
+		return true
+	}
+	return false
 }
 
 // getCompExpectReplicas gets the expected replicas for the component.

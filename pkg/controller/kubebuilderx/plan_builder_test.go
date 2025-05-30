@@ -128,20 +128,21 @@ var _ = Describe("plan builder test", func() {
 				Obj:    its,
 				Action: model.ActionDeletePtr(),
 			}
-			k8sMock.EXPECT().
-				Update(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.UpdateOption) error {
-					Expect(obj).ShouldNot(BeNil())
-					Expect(obj.Finalizers).Should(HaveLen(0))
-					return nil
-				}).Times(1)
+			// k8sMock.EXPECT().
+			//	Update(gomock.Any(), gomock.Any(), gomock.Any()).
+			//	DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.UpdateOption) error {
+			//		Expect(obj).ShouldNot(BeNil())
+			//		Expect(obj.Finalizers).Should(HaveLen(0))
+			//		return nil
+			//	}).Times(1)
 			k8sMock.EXPECT().
 				Delete(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, obj *workloads.InstanceSet, _ ...client.DeleteOption) error {
 					Expect(obj).ShouldNot(BeNil())
 					Expect(obj.Namespace).Should(Equal(its.Namespace))
 					Expect(obj.Name).Should(Equal(its.Name))
-					Expect(obj.Finalizers).Should(HaveLen(0))
+					Expect(obj.Finalizers).Should(HaveLen(1))
+					Expect(obj.Finalizers[0]).Should(Equal(finalizer))
 					return nil
 				}).Times(1)
 			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())

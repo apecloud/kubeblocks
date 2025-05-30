@@ -1,6 +1,6 @@
 ---
 # Source: etcd-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: etcd-cluster
@@ -15,7 +15,7 @@ spec:
   clusterVersionRef: etcd-v3.5.6
   terminationPolicy: Halt
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: etcd
@@ -26,7 +26,7 @@ spec:
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:

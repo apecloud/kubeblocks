@@ -98,12 +98,12 @@ mycluster   demo        postgresql           postgresql-14.8.0   Delete         
 
 <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-1. Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. 
+1. Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
    `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster

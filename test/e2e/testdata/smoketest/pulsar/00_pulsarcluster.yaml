@@ -1,11 +1,11 @@
 ---
 # Source: pulsar-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: pulsar-cluster
   namespace: default
-  labels: 
+  labels:
     helm.sh/chart: pulsar-cluster-0.7.0-alpha.0
     app.kubernetes.io/version: "2.11.2"
     app.kubernetes.io/instance: pulsar-cluster
@@ -16,7 +16,7 @@ spec:
   clusterVersionRef: pulsar-2.11.2
   terminationPolicy: WipeOut
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: broker
@@ -25,7 +25,7 @@ spec:
       replicas: 3
       resources:
         limits:
-          cpu: 
+          cpu:
           memory: "512Mi"
         requests:
           cpu: "200m"
@@ -36,7 +36,7 @@ spec:
       replicas: 4
       resources:
         limits:
-          cpu: 
+          cpu:
           memory: "512Mi"
         requests:
           cpu: "200m"
@@ -62,7 +62,7 @@ spec:
       replicas: 3
       resources:
         limits:
-          cpu: 
+          cpu:
           memory: "512Mi"
         requests:
           cpu: "100m"

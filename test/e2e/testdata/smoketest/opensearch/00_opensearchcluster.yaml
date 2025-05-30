@@ -1,10 +1,10 @@
 ---
 # Source: opensearch-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: opensearch-cluster
-  labels: 
+  labels:
     helm.sh/chart: opensearch-cluster-0.1.0
     app.kubernetes.io/name: opensearch-cluster
     app.kubernetes.io/instance: opensearch-cluster
@@ -15,7 +15,7 @@ spec:
   clusterVersionRef: opensearch-2.7.0 # ref clusterversion.name
   terminationPolicy: Delete
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: opensearch # user-defined
@@ -25,7 +25,7 @@ spec:
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:

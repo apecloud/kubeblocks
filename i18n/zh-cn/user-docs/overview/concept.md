@@ -26,7 +26,7 @@ sidebar_position: 2
 以下是通过 `clusterDefinitionRef` 和 `topology` 创建 Redis 集群的示例：
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: test-redis-use-topology

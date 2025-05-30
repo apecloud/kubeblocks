@@ -53,7 +53,7 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 
      ```bash
      kubectl apply -f - <<-'EOF'
-     apiVersion: apps.kubeblocks.io/v1alpha1
+     apiVersion: apps.kubeblocks.io/v1
      kind: Cluster
      metadata:
        name: myrestore

@@ -1,4 +1,4 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: pulsar-cluster
@@ -50,7 +50,7 @@ spec:
   # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
   # ClusterComponentSpec defines the specifications for a Component in a Cluster.
   componentSpecs:
-    # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. 
+    # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule.
   - name: pulsar-broker
     componentDef: pulsar-broker
     disableExporter: true

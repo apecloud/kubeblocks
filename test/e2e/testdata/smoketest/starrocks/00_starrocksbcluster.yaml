@@ -1,10 +1,10 @@
 ---
 # Source: starrocks-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: starrocks-cluster
-  labels: 
+  labels:
     helm.sh/chart: starrocks-cluster-0.1.0
     app.kubernetes.io/name: starrocks-cluster
     app.kubernetes.io/instance: starrocks-cluster
@@ -15,7 +15,7 @@ spec:
   clusterVersionRef: starrocks-3.1.1 # ref clusterversion.name
   terminationPolicy: Delete
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: fe
@@ -27,7 +27,7 @@ spec:
       volumeClaimTemplates:
         - name: be-storage # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:

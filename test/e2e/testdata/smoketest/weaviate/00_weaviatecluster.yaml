@@ -1,10 +1,10 @@
 ---
 # Source: weaviate-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: weaviate-cluster
-  labels: 
+  labels:
     helm.sh/chart: weaviate-cluster-0.7.0-alpha.0
     app.kubernetes.io/name: weaviate-cluster
     app.kubernetes.io/instance: weaviate-cluster
@@ -23,7 +23,7 @@ spec:
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:

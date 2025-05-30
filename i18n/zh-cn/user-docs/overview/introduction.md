@@ -50,7 +50,7 @@ KubeBlocks 提供了插件（Addon）API，支持集成各种数据库。例如�
 以下是使用 KubeBlocks Cluster API 编写 YAML 文件并创建一个 MySQL 三副本集群的示例。
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: test-mysql

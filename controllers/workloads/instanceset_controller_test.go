@@ -197,7 +197,9 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("delete the ITS object")
 			Expect(k8sClient.Delete(ctx, itsObj)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, itsKey, &workloads.InstanceSet{}, false)).Should(Succeed())
+
+			By("check its object NOT deleted")
+			Consistently(testapps.CheckObjExists(&testCtx, itsKey, &workloads.InstanceSet{}, true)).Should(Succeed())
 
 			By("check pods deleted")
 			podKey := types.NamespacedName{
@@ -206,12 +208,16 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
 
-			By("check PVCs deleted")
+			By("check PVCs deleted, but the pvc-protection finalizer prevent the pvc to be deleted physically")
 			pvcKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, false)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+				g.Expect(pvc.Finalizers).To(HaveLen(1))
+				g.Expect(pvc.Finalizers[0]).To(Equal("kubernetes.io/pvc-protection"))
+			})).Should(Succeed())
 		})
 
 		It("when deleted - retain", func() {
@@ -233,12 +239,14 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
 
-			By("check PVCs retained")
+			By("check PVCs retained and not deleted")
 			pvcKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+			})).Should(Succeed())
 		})
 
 		It("when scaled - delete", func() {
@@ -261,12 +269,16 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
 
-			By("check PVCs deleted")
+			By("check PVCs deleted, but the pvc-protection finalizer prevent the pvc to be deleted physically")
 			pvcKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, false)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+				g.Expect(pvc.Finalizers).To(HaveLen(1))
+				g.Expect(pvc.Finalizers[0]).To(Equal("kubernetes.io/pvc-protection"))
+			})).Should(Succeed())
 		})
 
 		It("when scaled - retain", func() {
@@ -289,12 +301,14 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
 
-			By("check PVCs retained")
+			By("check PVCs retained and not deleted")
 			pvcKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
 			}
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+			})).Should(Succeed())
 		})
 	})
 

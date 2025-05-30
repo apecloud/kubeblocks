@@ -200,6 +200,7 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		r.SetBackupSets(continuousBackupSet)
 	} else {
 		if unifyFullAndContinuousRestore {
+			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, "UnifyFullAndContinuousRestore", "full and continuous job is unified")
 			r.SetBackupSets(continuousBackupSet)
 		} else {
 			r.SetBackupSets(*baseBackupSet, continuousBackupSet)

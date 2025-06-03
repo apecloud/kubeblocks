@@ -404,8 +404,16 @@ func (hs horizontalScalingOpsHandler) getToOnlineInsCountMap(
 	slices.Sort(horizontalScaling.ScaleOut.OfflineInstancesToOnline)
 	// 1. Automatically synchronize replicaChanges based on the specified OfflineInstancesToOnline
 	offlineInsMap := map[string][]string{}
+	instanceTplChangesMap := map[string]int32{}
+	for _, tplChange := range horizontalScaling.ScaleOut.ReplicaChanger.Instances {
+		instanceTplChangesMap[tplChange.Name] = tplChange.ReplicaChanges
+	}
 	for _, insName := range horizontalScaling.ScaleOut.OfflineInstancesToOnline {
 		insTplName := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, horizontalScaling.ComponentName, insName)
+		if _, ok := instanceTplChangesMap[insTplName]; ok {
+			// Ignore the template instance that has already been specified in the replica changes.
+			continue
+		}
 		offlineInsMap[insTplName] = append(offlineInsMap[insTplName], insName)
 		compReplicas += 1
 	}

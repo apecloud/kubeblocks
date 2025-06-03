@@ -22,8 +22,6 @@ package operations
 import (
 	"fmt"
 	"slices"
-	"strconv"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -345,15 +343,6 @@ func filterHorizontalScalingSpec(
 
 }
 
-func (hs horizontalScalingOpsHandler) isShardingComponent(opsRes *OpsResource, compName string) bool {
-	for _, v := range opsRes.Cluster.Spec.Shardings {
-		if v.Name == compName {
-			return true
-		}
-	}
-	return false
-}
-
 // autoSyncReplicaChanges auto-sync the replicaChanges of the component and instance templates.
 func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	opsRes *OpsResource,
@@ -361,10 +350,6 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	compReplicas int32,
 	compInstanceTpls []appsv1.InstanceTemplate,
 	compExpectOfflineInstances []string) error {
-	if hs.isShardingComponent(opsRes, horizontalScaling.ComponentName) {
-		// sharding component does not need to sync the replicaChanges.
-		return nil
-	}
 	// sync the replicaChanges for component and instance template.
 	getSyncedInstancesAndReplicaChanges := func(offlineOrOnlineInsCountMap map[string]int32,
 		replicaChanger opsv1alpha1.ReplicaChanger,
@@ -381,6 +366,7 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 				continue
 			}
 			if _, ok := insTplMap[k]; !ok {
+				// auto sync the replicaChanges for the instance template if the replicaChanges is not specified.
 				replicaChanger.Instances = append(replicaChanger.Instances, opsv1alpha1.InstanceReplicasTemplate{Name: k, ReplicaChanges: v})
 				allReplicaChanges += v
 			}
@@ -401,51 +387,58 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 	}
 	scaleOut := horizontalScaling.ScaleOut
 	if scaleOut != nil {
-		// get the pod set when removing the specified instances from offlineInstances slice
-		podSet, err := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTpls, compExpectOfflineInstances,
-			opsRes.Cluster.Name, horizontalScaling.ComponentName)
+		onlineInsCountMap, err := hs.getToOnlineInsCountMap(opsRes, horizontalScaling, compReplicas, compInstanceTpls, compExpectOfflineInstances)
 		if err != nil {
 			return err
-		}
-		onlineInsCountMap := map[string]int32{}
-		slices.Sort(scaleOut.OfflineInstancesToOnline)
-		for _, insName := range scaleOut.OfflineInstancesToOnline {
-			_, ok := podSet[insName]
-			if !ok && !hs.onlineBoundaryOrdinalOfflinePod(opsRes, horizontalScaling, podSet, insName) {
-				//  if the specified instance will not be created, continue
-				continue
-			}
-			insTplName := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, horizontalScaling.ComponentName, insName)
-			onlineInsCountMap[insTplName]++
 		}
 		scaleOut.Instances, scaleOut.ReplicaChanges = getSyncedInstancesAndReplicaChanges(onlineInsCountMap, scaleOut.ReplicaChanger, scaleOut.NewInstances)
 	}
 	return nil
 }
 
-// onlineBoundaryOrdinalOfflinePod If the Pod at the boundary ordinal comes online,
-// and this does not lead to unintended instance creation, then replicaChanges can be safely incremented by 1.
-func (hs horizontalScalingOpsHandler) onlineBoundaryOrdinalOfflinePod(
+func (hs horizontalScalingOpsHandler) getToOnlineInsCountMap(
 	opsRes *OpsResource,
 	horizontalScaling opsv1alpha1.HorizontalScaling,
-	podSet map[string]string,
-	offlineInstanceName string) bool {
-	lastIndex := strings.LastIndex(offlineInstanceName, "-")
-	podPrefix := offlineInstanceName[:lastIndex]
-	ordinal := offlineInstanceName[lastIndex+1:]
-	ordinalInt, err := strconv.Atoi(ordinal)
+	compReplicas int32,
+	compInstanceTpls []appsv1.InstanceTemplate,
+	compExpectOfflineInstances []string) (map[string]int32, error) {
+	if horizontalScaling.ScaleOut.ReplicaChanges != nil || len(horizontalScaling.ScaleOut.OfflineInstancesToOnline) == 0 {
+		return nil, nil
+	}
+	compInstanceTplsClone := slices.Clone(compInstanceTpls)
+	slices.Sort(horizontalScaling.ScaleOut.OfflineInstancesToOnline)
+	// 1. Automatically synchronize replicaChanges based on the specified OfflineInstancesToOnline
+	offlineInsMap := map[string][]string{}
+	for _, insName := range horizontalScaling.ScaleOut.OfflineInstancesToOnline {
+		insTplName := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, horizontalScaling.ComponentName, insName)
+		offlineInsMap[insTplName] = append(offlineInsMap[insTplName], insName)
+		compReplicas += 1
+	}
+	for i := range compInstanceTplsClone {
+		tplName := compInstanceTplsClone[i].Name
+		if insNames, ok := offlineInsMap[tplName]; ok {
+			compInstanceTplsClone[i].Replicas = pointer.Int32(compInstanceTplsClone[i].GetReplicas() + int32(len(insNames)))
+		}
+	}
+	// 2. obtain the updated Pod set after synchronization replicas.
+	podSet, err := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTplsClone, compExpectOfflineInstances,
+		opsRes.Cluster.Name, horizontalScaling.ComponentName)
 	if err != nil {
-		return false
+		return nil, err
 	}
-	if ordinalInt == 0 {
-		return true
+	// 3. count the number of online instances for each instance template.
+	onlineInsCountMap := map[string]int32{}
+	for insTplName, insNames := range offlineInsMap {
+		for _, insName := range insNames {
+			// Once replica synchronization is complete, sequentially process each instance in the toOnline list to confirm its successful creation.
+			// If any instance fails to come online, break it.
+			if _, ok := podSet[insName]; !ok {
+				break
+			}
+			onlineInsCountMap[insTplName]++
+		}
 	}
-	lastOrdinal := ordinalInt - 1
-	if _, ok := podSet[fmt.Sprintf("%s-%d", podPrefix, lastOrdinal)]; ok {
-		podSet[offlineInstanceName] = appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, horizontalScaling.ComponentName, offlineInstanceName)
-		return true
-	}
-	return false
+	return onlineInsCountMap, nil
 }
 
 // getCompExpectReplicas gets the expected replicas for the component.

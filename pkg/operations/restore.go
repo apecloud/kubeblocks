@@ -248,6 +248,9 @@ func (r RestoreOpsHandler) normalizeSchedulePolicy(cluster *appsv1.Cluster, sche
 		return
 	}
 	updateLabelSelector := func(selector *metav1.LabelSelector) {
+		if selector == nil {
+			return
+		}
 		if _, ok := selector.MatchLabels[constant.AppInstanceLabelKey]; ok {
 			selector.MatchLabels[constant.AppInstanceLabelKey] = cluster.Name
 		}

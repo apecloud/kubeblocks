@@ -15,10 +15,10 @@ spec:
           valueFrom:
             envRef:
               envName: KB_POD_IP
-        - name: LORRY_HTTP_PORT
+        - name: SYNCER_SERVICE_PORT
           valueFrom:
             envRef:
-              envName: LORRY_HTTP_PORT
+              envName: SYNCER_SERVICE_PORT
   parametersSchema:
     openAPIV3Schema:
       properties:
@@ -56,7 +56,8 @@ spec:
                 - |
                   set -e
                   # do switchover
-                  url="http://${TARGET_POD_IP}:${LORRY_HTTP_PORT}/v1.0/switchover" 
+                  port=${SYNCER_SERVICE_PORT:-3601}
+                  url="http://${TARGET_POD_IP}:${port}/v1.0/switchover" 
                   metadata=${metadata}
                   if [ -z ${metadata} ]; then
                     params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}}"

@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -38,39 +39,64 @@ const (
 
 func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 	cluster *appsv1.Cluster, sharding *appsv1.ClusterSharding) ([]*appsv1.ClusterComponentSpec, error) {
-	compSpecList := make([]*appsv1.ClusterComponentSpec, 0)
+	shards := make([]*appsv1.ClusterComponentSpec, 0)
+
+	offline := make([]string, 0)
+	if sharding != nil && len(sharding.Offline) > 0 {
+		for _, name := range sharding.Offline {
+			shortName, err := parseCompShortName(cluster.Name, name)
+			if err != nil {
+				return nil, err
+			}
+			offline = append(offline, shortName)
+		}
+	}
+
 	// list undeleted sharding component specs, the deleting ones are not included
 	undeletedShardingCompSpecs, err := listUndeletedShardingCompSpecs(ctx, cli, cluster, sharding)
 	if err != nil {
 		return nil, err
 	}
-	compSpecList = append(compSpecList, undeletedShardingCompSpecs...)
-	compNameMap := make(map[string]string)
+	shards = append(shards, removeOfflineShards(undeletedShardingCompSpecs, offline)...)
+
+	shardNames := sets.Set[string]{}
 	for _, existShardingCompSpec := range undeletedShardingCompSpecs {
-		compNameMap[existShardingCompSpec.Name] = existShardingCompSpec.Name
+		shardNames.Insert(existShardingCompSpec.Name)
 	}
+	shardNames.Insert(offline...) // exclude offline shard names
+
 	shardTpl := sharding.Template
 	switch {
-	case len(undeletedShardingCompSpecs) == int(sharding.Shards):
-		return undeletedShardingCompSpecs, err
-	case len(undeletedShardingCompSpecs) < int(sharding.Shards):
-		for i := len(undeletedShardingCompSpecs); i < int(sharding.Shards); i++ {
-			shardClusterCompSpec := shardTpl.DeepCopy()
-			genCompName, err := genRandomShardName(sharding.Name, compNameMap)
+	case len(shards) == int(sharding.Shards):
+		return shards, nil
+	case len(shards) < int(sharding.Shards):
+		for i := len(shards); i < int(sharding.Shards); i++ {
+			name, err := genRandomShardName(sharding.Name, shardNames)
 			if err != nil {
 				return nil, err
 			}
-			shardClusterCompSpec.Name = genCompName
-			compSpecList = append(compSpecList, shardClusterCompSpec)
-			compNameMap[genCompName] = genCompName
+			spec := shardTpl.DeepCopy()
+			spec.Name = name
+			shards = append(shards, spec)
+			shardNames.Insert(name)
 		}
-	case len(undeletedShardingCompSpecs) > int(sharding.Shards):
-		slices.SortFunc(compSpecList, func(a, b *appsv1.ClusterComponentSpec) int {
+	case len(shards) > int(sharding.Shards):
+		slices.SortFunc(shards, func(a, b *appsv1.ClusterComponentSpec) int {
 			return strings.Compare(a.Name, b.Name)
 		})
-		compSpecList = compSpecList[:int(sharding.Shards)]
+		shards = shards[:int(sharding.Shards)]
 	}
-	return compSpecList, nil
+	return shards, nil
+}
+
+func removeOfflineShards(shards []*appsv1.ClusterComponentSpec, offline []string) []*appsv1.ClusterComponentSpec {
+	if len(offline) > 0 {
+		s := sets.New(offline...)
+		return slices.DeleteFunc(shards, func(shard *appsv1.ClusterComponentSpec) bool {
+			return s.Has(shard.Name)
+		})
+	}
+	return shards
 }
 
 // listNCheckShardingComponents lists sharding components and checks if the sharding components are correct. It returns undeleted and deleting sharding components.
@@ -167,13 +193,12 @@ func listShardingCompSpecs(ctx context.Context, cli client.Reader,
 	return compSpecList, nil
 }
 
-// genRandomShardName generates a random name for sharding component.
-func genRandomShardName(shardingName string, existShardNamesMap map[string]string) (string, error) {
+func genRandomShardName(shardingName string, shardNames sets.Set[string]) (string, error) {
 	shardingNamePrefix := constant.GenerateShardingNamePrefix(shardingName)
 	for i := 0; i < GenerateNameMaxRetryTimes; i++ {
-		genName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
-		if _, ok := existShardNamesMap[genName]; !ok {
-			return genName, nil
+		name := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+		if !shardNames.Has(name) {
+			return name, nil
 		}
 	}
 	return "", fmt.Errorf("failed to generate a unique random name for sharding component: %s after %d retries", shardingName, GenerateNameMaxRetryTimes)

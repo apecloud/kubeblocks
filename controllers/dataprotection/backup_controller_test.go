@@ -295,7 +295,7 @@ var _ = Describe("Backup Controller test", func() {
 								MatchLabels: map[string]string{
 									constant.AppInstanceLabelKey:    testdp.ClusterName,
 									constant.KBAppComponentLabelKey: testdp.ComponentName,
-									constant.RoleLabelKey:           constant.Follower,
+									constant.RoleLabelKey:           testapps.Follower,
 								},
 							},
 						},
@@ -1155,7 +1155,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("mock target pod exists")
 				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
-					clusterInfo.TargetPod.Labels[constant.RoleLabelKey] = constant.Leader
+					clusterInfo.TargetPod.Labels[constant.RoleLabelKey] = testapps.Leader
 				})).Should(Succeed())
 
 				By("expect the replicas of statefulSet is 1")

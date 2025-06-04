@@ -17,7 +17,6 @@ limitations under the License.
 package constant
 
 const (
-	TPLRenderToolPath     = "/bin/config_render"
 	ConfigManagerToolPath = "/bin/reloader"
 
 	// ConfigurationTplLabelPrefixKey clusterdefinition using tpl
@@ -38,15 +37,12 @@ const (
 )
 
 const (
-	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
-	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
+	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec" // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
 	CMTemplateNameLabelKey                 = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
-	CMInsCurrentConfigurationHashLabelKey  = "config.kubeblocks.io/update-config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-	CMConfigurationTemplateVersion         = "config.kubeblocks.io/config-template-version"
 
 	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
 	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
@@ -55,7 +51,6 @@ const (
 const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
-	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
@@ -68,12 +63,10 @@ const (
 	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
-	ConfigTemplateType    = "tpl"
 	ConfigInstanceType    = "instance"
 
-	ReconfigureManagerSource  = "manager"
-	ReconfigureUserSource     = "ops"
-	ReconfigureTemplateSource = "external-template"
+	ReconfigureManagerSource = "manager"
+	ReconfigureUserSource    = "ops"
 
 	ConfigManagerPortName = "config-manager"
 )

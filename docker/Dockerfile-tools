@@ -50,12 +50,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    go env && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/killer cmd/reloader/container_killer/killer.go
-
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/reloader cmd/reloader/main.go
 
 RUN --mount=type=bind,target=. \
@@ -75,7 +69,6 @@ RUN apk add --no-cache kubectl helm jq --allow-untrusted \
 
 # copy kubeblocks tools
 COPY config/crd/bases /kubeblocks/crd
-COPY --from=builder /out/killer /bin
 COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/kbagent /bin
 

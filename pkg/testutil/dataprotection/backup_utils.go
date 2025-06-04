@@ -62,7 +62,7 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 		SetBackupRepoName(BackupRepoName).
 		SetTarget(constant.AppInstanceLabelKey, ClusterName,
 			constant.KBAppComponentLabelKey, ComponentName,
-			constant.RoleLabelKey, constant.Leader).
+			constant.RoleLabelKey, testapps.Leader).
 		SetPathPrefix(BackupPathPrefix).
 		SetTargetConnectionCredential(ClusterName).
 		AddBackupMethod(BackupMethodName, false, ActionSetName).

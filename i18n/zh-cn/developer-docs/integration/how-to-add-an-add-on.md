@@ -24,7 +24,7 @@ sidebar_label: 添加数据库引擎
 - 每个组件是什么形态：
   - 有状态/无状态。
   - 单机版/主备版/集群版。
-  
+
 本文档要部署的集群只包含一个组件，该组件是有状态的，且只有一个节点。Table 1. 中展示了部署集群所需要的基本信息。
 
 部署一个 MySQL 8.0 单机版集群。
@@ -54,7 +54,7 @@ sidebar_label: 添加数据库引擎
 ├── templates         # 模板目录，赋值后将生成有效的 Kubernetes 清单文件
 │   ├── NOTES.txt     # 可选：纯文本文件，包含简短的使用说明
 │   ├── _helpers.tpl  # 放置 helpers 的位置，可以在整个 chart 中重复使用
-│   ├── clusterdefinition.yaml  
+│   ├── clusterdefinition.yaml
 │   └── clusterversion.yaml
 └── values.yaml       # 该 chart 的默认配置值
 
@@ -152,7 +152,7 @@ sidebar_label: 添加数据库引擎
 
     它定义如何为该组件创建一个 Service，暴露哪些端口。
 
-    还记得 `connectionCredential` 中介绍的，集群对外暴露的 port 和 endpoint 吗？ 
+    还记得 `connectionCredential` 中介绍的，集群对外暴露的 port 和 endpoint 吗？
 
     通过 `$(SVC_PORT_mysql)$` 来选择端口，`mysql` 就是这里的 `service.ports[0].name` mysql。
 
@@ -324,11 +324,11 @@ metadata:
 spec:
   description: 'MySQL is a widely used, open-source....'
   type: Helm
-  helm:                                     
+  helm:
     chartsImage: registry-of-your-helm-chart
   installable:
     autoInstall: false
-    
+
   defaultInstallValues:
     - enabled: true
 ```
@@ -402,7 +402,7 @@ spec:
 为了解决这个问题，你可以用一个 Helm chart 来渲染集群，或者通过 `cluster.yaml` 文件来创建，例如：
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
@@ -413,7 +413,7 @@ spec:
   componentSpecs:                           # 枚举要用的组件
   - componentDefRef: mysql-compdef          # 第一个组件, 它的组件类型为 mysql-compdef
     name: mysql-comp                        # 第一个组件, 名为 mysql-comp
-    replicas: 1 
+    replicas: 1
     resources:                              # 指定 CPU 和内存大小
       limits:
         cpu: "1"

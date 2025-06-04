@@ -1,11 +1,11 @@
 ---
 # Source: polardbx-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: pxc
   labels:
-    
+
     helm.sh/chart: polardbx-cluster-0.1.0
     app.kubernetes.io/name: pxc
     app.kubernetes.io/instance: pxc

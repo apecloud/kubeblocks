@@ -85,7 +85,7 @@ kubectl apply -f redis-cluster-example.yaml
 **Example 1: Redis Cluster without NodePort enabled**
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: redisc
@@ -214,7 +214,7 @@ Configure each Pod's HostIP and the corresponding NodePort.
 
 ```bash
 # 172.18.0.3 is the host IP of redisc-shard-qst-0 node, and 32269 is the NodePort mapped to the Redis 6379 server port.
-172.18.0.3:32269 
+172.18.0.3:32269
 172.18.0.4:32051
 172.18.0.5:32650
 172.18.0.6:30151
@@ -353,12 +353,12 @@ spec:
   clusterName: redisc
   verticalScaling:
   - componentName: shard
-    limits: 
+    limits:
       cpu: 2
       memory: 4Gi
     requests:
       cpu: 2
-      memory: 4Gi  
+      memory: 4Gi
   type: VerticalScaling
 ```
 

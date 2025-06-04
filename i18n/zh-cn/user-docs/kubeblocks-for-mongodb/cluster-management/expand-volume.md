@@ -103,7 +103,7 @@ mycluster        demo             mongodb               mongodb-5.0        Delet
 1. 更改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
@@ -112,7 +112,7 @@ mycluster        demo             mongodb               mongodb-5.0        Delet
      clusterDefinitionRef: mongodb
      clusterVersionRef: mongodb-5.0
      componentSpecs:
-     - name: mongodb 
+     - name: mongodb
        componentDefRef: mongodb
        replicas: 1
        volumeClaimTemplates:

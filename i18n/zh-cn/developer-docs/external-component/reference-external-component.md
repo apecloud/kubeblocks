@@ -174,7 +174,7 @@ KubeBlocks 中的引用外部组件指的是，在一个 KubeBlocks 集群中，
    如下所示，创建一个引用外部 ZooKeeper 服务的 Pulsar 集群。
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: pulsar

@@ -69,7 +69,7 @@ KubeBlocks 支持从备份集中恢复数据。
 
     ```bash
     kubectl apply -f - <<-'EOF'
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: apps.kubeblocks.io/v1
     kind: Cluster
     metadata:
       name: myrestore

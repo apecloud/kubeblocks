@@ -1,9 +1,9 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: acmysql-cluster
   namespace: default
-  labels: 
+  labels:
     auditLogEnabled: "false"
 spec:
   # Specifies the behavior when a Cluster is deleted.

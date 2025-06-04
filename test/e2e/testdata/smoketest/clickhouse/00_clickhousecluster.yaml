@@ -1,10 +1,10 @@
 ---
 # Source: clickhouse-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: test-clickhouse-cluster
-  labels: 
+  labels:
     helm.sh/chart: clickhouse-cluster-0.7.0-alpha.0
     app.kubernetes.io/name: clickhouse-cluster
     app.kubernetes.io/instance: test
@@ -15,7 +15,7 @@ spec:
   clusterVersionRef: clickhouse-22.9.4 # ref clusterversion.name
   terminationPolicy: Halt
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: shard-0

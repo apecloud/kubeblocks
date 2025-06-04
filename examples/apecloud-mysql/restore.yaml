@@ -1,9 +1,9 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: acmysql-cluster-restore
   namespace: default
-  labels: 
+  labels:
     auditLogEnabled: "false"
   annotations:
     kubeblocks.io/restore-from-backup: '{"mysql":{"connectionPassword":"<backup-connection-password>","name":"acmysql-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'

@@ -1,11 +1,11 @@
 ---
 # Source: nebula-cluster/templates/cluster.yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: nebula-cluster
   labels:
-        
+
     app.kubernetes.io/version: "v3.5.0"
     app.kubernetes.io/managed-by: Helm
     helm.sh/chart: nebula-cluster-0.5.1-beta.0
@@ -37,7 +37,7 @@ spec:
       volumeClaimTemplates:
         - name: logs # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:
@@ -56,7 +56,7 @@ spec:
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:
@@ -64,7 +64,7 @@ spec:
                 storage: 1Gi
         - name: logs # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:
@@ -83,7 +83,7 @@ spec:
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:
@@ -91,7 +91,7 @@ spec:
                 storage: 1Gi
         - name: logs # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:

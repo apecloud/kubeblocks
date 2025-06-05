@@ -182,7 +182,7 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 			SetData(data).
 			GetObject()
 		graphCli.Create(dag, obj, inDataContext4G())
-	} else if !reflect.DeepEqual(envObj.Data, data) {
+	} else if !reflect.DeepEqual(envObj.Data, data) || !model.IsOwnerOf(transCtx.Component, envObj) {
 		envObjCopy := envObj.DeepCopy()
 		envObjCopy.Data = data
 		graphCli.Update(dag, envObj, envObjCopy, inDataContext4G())

@@ -421,13 +421,8 @@ func (r *BackupReconciler) prepareBackupRequest(
 
 	// check encryption config
 	if backupPolicy.Spec.EncryptionConfig != nil {
-		secretKeyRef := backupPolicy.Spec.EncryptionConfig.PassPhraseSecretKeyRef
-		if secretKeyRef == nil {
-			return nil, fmt.Errorf("encryptionConfig.passPhraseSecretKeyRef if empty")
-		}
-		err := checkSecretKeyRef(reqCtx, r.Client, request.Namespace, secretKeyRef)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check encryption key reference: %w", err)
+		if err := checkEncryptionConfig(reqCtx.Ctx, backupPolicy.Spec.EncryptionConfig, r.Client, backupPolicy.Namespace); err != nil {
+			return nil, fmt.Errorf("failed to validate backupPolicy's encryption config: %w", err)
 		}
 	}
 
@@ -523,7 +518,10 @@ func (r *BackupReconciler) patchBackupStatus(
 		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(
 			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
 	}
-	if request.BackupPolicy.Spec.EncryptionConfig != nil {
+	if request.ParentBackup != nil {
+		// inherit encryption config from parent backup
+		request.Status.EncryptionConfig = request.ParentBackup.Status.EncryptionConfig
+	} else if request.BackupPolicy.Spec.EncryptionConfig != nil {
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
 	// init action status

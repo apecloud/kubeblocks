@@ -523,7 +523,10 @@ func (r *BackupReconciler) patchBackupStatus(
 		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(
 			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
 	}
-	if request.BackupPolicy.Spec.EncryptionConfig != nil {
+	if request.ParentBackup != nil {
+		// inherit encryption config from parent backup
+		request.Status.EncryptionConfig = request.ParentBackup.Status.EncryptionConfig
+	} else if request.BackupPolicy.Spec.EncryptionConfig != nil {
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
 	// init action status

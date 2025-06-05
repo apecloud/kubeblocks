@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"time"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -41,7 +43,7 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	// delete secondary objects first
 	if len(tree.GetSecondaryObjects()) > 0 {
 		tree.DeleteSecondaryObjects()
-		return kubebuilderx.Continue, nil
+		return kubebuilderx.RetryAfter(time.Second * 3), nil
 	}
 
 	// delete root object

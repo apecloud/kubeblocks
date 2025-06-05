@@ -421,13 +421,8 @@ func (r *BackupReconciler) prepareBackupRequest(
 
 	// check encryption config
 	if backupPolicy.Spec.EncryptionConfig != nil {
-		secretKeyRef := backupPolicy.Spec.EncryptionConfig.PassPhraseSecretKeyRef
-		if secretKeyRef == nil {
-			return nil, fmt.Errorf("encryptionConfig.passPhraseSecretKeyRef if empty")
-		}
-		err := checkSecretKeyRef(reqCtx, r.Client, request.Namespace, secretKeyRef)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check encryption key reference: %w", err)
+		if err := checkEncryptionConfig(reqCtx.Ctx, backupPolicy.Spec.EncryptionConfig, r.Client, backupPolicy.Namespace); err != nil {
+			return nil, fmt.Errorf("failed to validate backupPolicy's encryption config: %w", err)
 		}
 	}
 

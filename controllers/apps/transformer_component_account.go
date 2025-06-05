@@ -77,7 +77,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		existSecretCopy := existSecret.DeepCopy()
 		ctrlutil.MergeMetadataMapInplace(secret.Labels, &existSecretCopy.Labels)
 		ctrlutil.MergeMetadataMapInplace(secret.Annotations, &existSecretCopy.Annotations)
-		if !reflect.DeepEqual(existSecret, existSecretCopy) || !model.IsOwnerOf(transCtx.Component, existSecret) {
+		if !reflect.DeepEqual(existSecret, existSecretCopy) || !model.IsOwnerOf(transCtx.ComponentOrig, existSecret) {
 			graphCli.Update(dag, existSecret, existSecretCopy, inUniversalContext4G())
 		}
 	}

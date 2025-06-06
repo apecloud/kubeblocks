@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-helpers/storage/volume"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -45,7 +45,7 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, compName, vct
 					constant.VolumeClaimTemplateNameLabelKey: vctName,
 				},
 				Annotations: map[string]string{
-					kube.KubeAnnBindCompleted: "yes",
+					volume.AnnBindCompleted: "yes",
 				},
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{

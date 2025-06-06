@@ -29,8 +29,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	proto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	gomock "github.com/golang/mock/gomock"
+
+	proto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 // MockClient is a mock of Client interface.

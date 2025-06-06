@@ -231,7 +231,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 				},
 			},
 		}
-		if err := BuildJobSchdulingPolicy(jobObj, actionCtx.component, actionCtx.cluster); err != nil {
+		if err := BuildJobSchdulingPolicy(jobObj, actionCtx.component.DeepCopy(), actionCtx.cluster); err != nil {
 			return nil, err
 		}
 		for i := range jobObj.Spec.Template.Spec.Containers {

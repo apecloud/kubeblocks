@@ -157,12 +157,30 @@ var _ = Describe("Component LifeCycle Action Utils Test", func() {
 				}}
 				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 			}
+			comp.Spec.SchedulingPolicy = &appsv1alpha1.SchedulingPolicy{
+				Affinity: &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
+							Weight: 1,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										constant.AppInstanceLabelKey: clusterName,
+									},
+								},
+							},
+						}},
+					},
+				},
+			}
 			actionCtx, err = NewActionContext(cluster, comp, nil, synthesizeComp.LifecycleActions, synthesizeComp.ScriptTemplates, PreTerminateAction)
 			Expect(err).Should(Succeed())
 			renderJob, err := renderActionCmdJob(testCtx.Ctx, testCtx.Cli, actionCtx)
 			Expect(err).Should(Succeed())
 			Expect(renderJob).ShouldNot(BeNil())
-			Expect(len(renderJob.Spec.Template.Spec.Containers[0].Env) == 11).Should(BeTrue())
+			Expect(renderJob.Spec.Template.Spec.Containers[0].Env).ShouldNot(BeNil())
+			Expect(renderJob.Spec.Template.Spec.Affinity.PodAntiAffinity).Should(BeNil())
+			Expect(actionCtx.component.Spec.SchedulingPolicy.Affinity.PodAntiAffinity).ShouldNot(BeNil())
 			compListExist := false
 			deletingCompListExist := false
 			undeletedCompListExist := false

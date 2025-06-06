@@ -713,7 +713,7 @@ func resolveServiceLoadBalancerRef(ctx context.Context, cli client.Reader, synth
 		}
 		return &corev1.EnvVar{Name: defineKey, Value: *points}, nil, nil
 	}
-	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveLoadBalancer)
+	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.LoadBalancer, resolveLoadBalancer)
 }
 
 func composeLoadBalancerValueFromServices(obj any) *string {

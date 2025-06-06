@@ -573,6 +573,9 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
+	if err = r.syncContinuousBackupEncryptionConfig(reqCtx, backup, request.BackupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync continuous backup encryption config failed")
+	}
 	var (
 		existFailedAction bool
 		waiting           bool
@@ -655,6 +658,17 @@ func (r *BackupReconciler) handleRunningPhase(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupReconciler) syncContinuousBackupEncryptionConfig(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, backupPolicy *dpv1alpha1.BackupPolicy) error {
+	if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
+		return nil
+	}
+	if !reflect.DeepEqual(backup.Status.EncryptionConfig, backupPolicy.Spec.EncryptionConfig) {
+		backup.Status.EncryptionConfig = backupPolicy.Spec.EncryptionConfig
+		return r.Client.Status().Update(reqCtx.Ctx, backup)
+	}
+	return nil
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

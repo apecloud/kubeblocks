@@ -97,7 +97,7 @@ var _ = Describe("Scheduler Test", func() {
 				SetPathPrefix(testdp.BackupPathPrefix).
 				SetTarget(constant.AppInstanceLabelKey, testdp.ClusterName,
 					constant.KBAppComponentLabelKey, testdp.ComponentName,
-					constant.RoleLabelKey, constant.Leader).
+					constant.RoleLabelKey, testapps.Leader).
 				AddBackupMethod(testdp.BackupMethodName, false, actionSet.Name).
 				AddBackupMethod(testdp.VSBackupMethodName, true, "").
 				Create(&testCtx).GetObject()

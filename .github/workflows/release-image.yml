@@ -104,7 +104,7 @@ jobs:
     secrets: inherit
 
   release-charts-image:
-    if: ${{ github.event_name  == 'workflow_dispatch' && (inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile-charts') }}
+    if: ${{ inputs.dockerfile == '' || inputs.dockerfile == 'Dockerfile-charts' }}
     needs: release-version
     uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
     with:

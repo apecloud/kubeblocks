@@ -1,9 +1,9 @@
 # Build the manager binary
 ARG DIST_IMG=gcr.io/distroless/static:nonroot
 
-ARG GO_VERSION=1.21-alpine
+ARG GO_VERSION=1.23.10-alpine
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 
 ## docker buildx build injected build-args:
 #BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
@@ -62,7 +62,7 @@ RUN --mount=type=bind,target=. \
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM ${DIST_IMG} as dist
+FROM ${DIST_IMG} AS dist
 
 WORKDIR /
 COPY --from=builder /out/manager .

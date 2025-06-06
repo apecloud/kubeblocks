@@ -96,11 +96,7 @@ func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {
 	if !hasHostNetworkCapability(synthesizedComp, nil) {
 		return false
 	}
-	// legacy definition, ignore the cluster annotations
-	if synthesizedComp.PodSpec.HostNetwork {
-		return true
-	}
-	return hasHostNetworkEnabled(synthesizedComp.Annotations, synthesizedComp.Name)
+	return hasHostNetworkEnabled(synthesizedComp, nil, synthesizedComp.Annotations, synthesizedComp.Name)
 }
 
 func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compName string) (bool, error) {
@@ -118,7 +114,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 	if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
 		return false, err
 	}
-	if !hasHostNetworkEnabled(comp.Annotations, compName) {
+	if !hasHostNetworkEnabled(nil, comp, comp.Annotations, compName) {
 		return false, nil
 	}
 
@@ -145,7 +141,14 @@ func hasHostNetworkCapability(synthesizedComp *SynthesizedComponent, compDef *ap
 	return false
 }
 
-func hasHostNetworkEnabled(annotations map[string]string, compName string) bool {
+func hasHostNetworkEnabled(synthesizedComp *SynthesizedComponent,
+	comp *appsv1.Component, annotations map[string]string, compName string) bool {
+	if synthesizedComp != nil && synthesizedComp.PodSpec.HostNetwork {
+		return true
+	}
+	if comp != nil && comp.Spec.Network != nil && comp.Spec.Network.HostNetwork {
+		return true
+	}
 	if annotations == nil {
 		return false
 	}

@@ -141,6 +141,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		return nil, err
 	}
 
+	mergeNetworkSetting(synthesizeComp, comp)
+
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
 	// override componentService
@@ -342,6 +344,23 @@ func buildVolumeMounts(synthesizedComp *SynthesizedComponent) {
 		podSpec.Volumes = volumes
 	}
 	synthesizedComp.PodSpec = podSpec
+}
+
+func mergeNetworkSetting(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) {
+	if comp.Spec.Network != nil {
+		synthesizedComp.PodSpec.HostNetwork = comp.Spec.Network.HostNetwork
+		synthesizedComp.PodSpec.HostAliases = comp.Spec.Network.HostAliases
+		if comp.Spec.Network.DNSPolicy == nil {
+			if synthesizedComp.PodSpec.HostNetwork {
+				synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+			} else {
+				synthesizedComp.PodSpec.DNSPolicy = corev1.DNSClusterFirst
+			}
+		} else {
+			synthesizedComp.PodSpec.DNSPolicy = *comp.Spec.Network.DNSPolicy
+		}
+		synthesizedComp.PodSpec.DNSConfig = comp.Spec.Network.DNSConfig
+	}
 }
 
 // limitSharedMemoryVolumeSize limits the shared memory volume size to memory requests/limits.

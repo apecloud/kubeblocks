@@ -265,6 +265,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.PersistentVolumeClaimRetentionPolicy = compProto.Spec.PersistentVolumeClaimRetentionPolicy
 	compObjCopy.Spec.Volumes = compProto.Spec.Volumes
+	compObjCopy.Spec.Network = compProto.Spec.Network
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas

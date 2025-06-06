@@ -257,7 +257,10 @@ goimports: goimportstool ## Run goimports against code.
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
-	$(GO) run ./hack/docgen/api/main.go -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
+	# The api doc generation program only works when it was compiled with go1.20,
+	# due to the underlay k8s.io/gengo package can't properly handle aliased types in newer golang.
+	CURR_DIR=$$(pwd) && cd hack/docgen/api && GOTOOLCHAIN=go1.20 go build -o $${CURR_DIR}/bin/docgen-api ./main.go
+	bin/docgen-api -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
 
 .PHONY: doc
 doc: api-doc ## generate all documents.

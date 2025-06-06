@@ -51,9 +51,9 @@ var _ = Describe("", func() {
 	)
 
 	defaultRole := func(index int32) string {
-		role := constant.Follower
+		role := testapps.Follower
 		if index == 0 {
-			role = constant.Leader
+			role = testapps.Leader
 		}
 		return role
 	}

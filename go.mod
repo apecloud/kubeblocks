@@ -48,7 +48,6 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/sykesm/zap-logfmt v0.0.4
 	github.com/valyala/fasthttp v1.50.0
-	github.com/vmware-tanzu/velero v1.13.2
 	go.uber.org/automaxprocs v1.5.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.39.0
@@ -150,7 +149,6 @@ require (
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

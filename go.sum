@@ -345,8 +345,6 @@ github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0 h1:OYDCOjVcx/5wN
 github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0/go.mod h1:Q7VUue/CIrKbtpBdF04a1yjGGgsMaDws1HUxtjzgnEY=
 github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0 h1:cMM5AB37e9aRGjErygVT6EuBPB6s5a+l95OPERmSlVM=
 github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0/go.mod h1:VQVLCPGDX5l6V5PezjlDXLa+SpCbWSVU7B16cFWVVeE=
-github.com/kubernetes-csi/external-snapshotter/client/v7 v7.0.0 h1:j3YK74myEQRxR/srciTpOrm221SAvz6J5OVWbyfeXFo=
-github.com/kubernetes-csi/external-snapshotter/client/v7 v7.0.0/go.mod h1:FlyYFe32mPxKEPaRXKNxfX576d1AoCzstYDoOOnyMA4=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
@@ -512,8 +510,6 @@ github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6Kllzaw
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.50.0 h1:H7fweIlBm0rXLs2q0XbalvJ6r0CUPFWK3/bB4N13e9M=
 github.com/valyala/fasthttp v1.50.0/go.mod h1:k2zXd82h/7UZc3VOdJ2WaUqt1uZ/XpXAfE9i+HBC3lA=
-github.com/vmware-tanzu/velero v1.13.2 h1:72Rw+11HJB6XUYfH9/M/jle6duSLyGhMisMMYFr/1qs=
-github.com/vmware-tanzu/velero v1.13.2/go.mod h1:yHFPyr+iwpKRf66xJ88MriAHiX58tTnKmQXY2FQZClM=
 github.com/xlab/treeprint v1.2.0 h1:HzHnuAF1plUN2zGlAFHbSQP2qJ0ZAD3XF5XD7OesXRQ=
 github.com/xlab/treeprint v1.2.0/go.mod h1:gj5Gd3gPdKtR1ikdDK6fnFLdmIS0X30kTTuNd/WEJu0=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

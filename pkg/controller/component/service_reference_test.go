@@ -28,11 +28,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -559,14 +560,23 @@ var _ = Describe("service references", func() {
 							Replicas: 2,
 						},
 					},
+					&workloadsv1.InstanceSet{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      constant.GenerateWorkloadNamePattern(etcdCluster, etcdComponent),
+						},
+						Spec: workloadsv1.InstanceSetSpec{
+							Replicas: ptr.To[int32](2),
+						},
+					},
 				},
 			}
 
 			etcdComp := reader.objs[0].(*appsv1.Component)
-			podNames, _ := instanceset.GenerateAllInstanceNames(etcdComp.Name, etcdComp.Spec.Replicas, nil, nil, appsv1.Ordinals{})
+			podNamePrefix := constant.GenerateWorkloadNamePattern(etcdCluster, etcdComponent) + "-"
 			expectedPodFQDNs := strings.Join([]string{
-				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNames[0]),
-				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNames[1]),
+				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNamePrefix+"0"),
+				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNamePrefix+"1"),
 			}, ",")
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)

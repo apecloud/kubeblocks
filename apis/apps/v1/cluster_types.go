@@ -480,6 +480,10 @@ type ClusterComponentSpec struct {
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// +optional
+	// +kubebuilder:default=Separated
+	PodNamingRule PodNamingRule `json:"podNamingRule,omitempty"`
+
 	// Specifies the names of instances to be transitioned to offline status.
 	//
 	// Marking an instance as offline results in the following:

@@ -22,7 +22,6 @@ package instanceset
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +33,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -57,22 +57,22 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.ConditionUnsatisfiedWithError(err)
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := buildInstanceSetExt(its, tree)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildInstanceName2TemplateMap(itsExt)
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -359,30 +359,25 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 
 func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
 	if its.Status.InstanceStatus == nil {
-		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
+		its.Status.InstanceStatus = make(map[string]workloads.InstanceStatus)
 	}
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-		return instance.PodName == pod.Name
-	})
-	if idx < 0 {
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
-		idx = len(its.Status.InstanceStatus) - 1
-	}
+	status := its.Status.InstanceStatus[pod.Name]
+	defer func() { its.Status.InstanceStatus[pod.Name] = status }()
 
-	if its.Status.InstanceStatus[idx].Configs == nil {
-		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
+	if status.Configs == nil {
+		status.Configs = make([]workloads.InstanceConfigStatus, 0)
 	}
-	status := workloads.InstanceConfigStatus{
+	newConfigStatus := workloads.InstanceConfigStatus{
 		Name:       config.Name,
 		Generation: config.Generation,
 	}
-	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
+	for i, configStatus := range status.Configs {
 		if configStatus.Name == config.Name {
-			its.Status.InstanceStatus[idx].Configs[i] = status
+			status.Configs[i] = newConfigStatus
 			return
 		}
 	}
-	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
+	status.Configs = append(status.Configs, newConfigStatus)
 }
 
 func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
@@ -402,13 +397,11 @@ func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod 
 }
 
 func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-		return instance.PodName == pod.Name
-	})
-	if idx < 0 {
+	status, ok := its.Status.InstanceStatus[pod.Name]
+	if !ok {
 		return true // new pod provisioned
 	}
-	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
+	for _, configStatus := range status.Configs {
 		if configStatus.Name == config.Name {
 			return config.Generation <= configStatus.Generation
 		}

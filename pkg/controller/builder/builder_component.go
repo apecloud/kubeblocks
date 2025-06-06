@@ -175,6 +175,11 @@ func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) 
 	return builder
 }
 
+func (builder *ComponentBuilder) SetPodNamingRule(namingRule appsv1.PodNamingRule) *ComponentBuilder {
+	builder.get().Spec.PodNamingRule = namingRule
+	return builder
+}
+
 func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName *string) *ComponentBuilder {
 	if runtimeClassName != nil {
 		className := *runtimeClassName

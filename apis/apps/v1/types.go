@@ -716,7 +716,7 @@ type InstanceTemplate struct {
 	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
 	// This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal
 	// using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-	// The specified name overrides any default naming conventions or patterns.
+	// The name can't be empty.
 	//
 	// +kubebuilder:validation:MaxLength=54
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -747,6 +747,7 @@ type InstanceTemplate struct {
 
 	// Specifies the desired Ordinals of this InstanceTemplate.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 	//
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under this InstanceTemplate would be
@@ -789,7 +790,7 @@ type InstanceTemplate struct {
 	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
-// Range represents a range with a start and an end value.
+// Range represents a range with a start and an end value. Both start and end are included.
 // It is used to define a continuous segment.
 type Range struct {
 	Start int32 `json:"start"`
@@ -801,3 +802,21 @@ type Ordinals struct {
 	Ranges   []Range `json:"ranges,omitempty"`
 	Discrete []int32 `json:"discrete,omitempty"`
 }
+
+// PodNamingRule defines the naming convention for instances (pods).
+// The field is immutable once set.
+//
+// +kubebuilder:validation:Enum={Separated,Combined}
+type PodNamingRule string
+
+const (
+	// PodNamingRuleSeparated constructs pod name based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
+	// Ordinals are unique within the template.
+	// The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
+	PodNamingRuleSeparated PodNamingRule = "Separated"
+
+	// PodNamingRuleCombined constructs pod name based on the InstanceSet Name and ordinal.
+	// Ordinals are unique globally.
+	// The constructed instance name follows the pattern: $(instance_set.name)-$(ordinal).
+	PodNamingRuleCombined PodNamingRule = "Combined"
+)

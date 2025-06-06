@@ -367,6 +367,7 @@ spec:
                 description: |-
                   Specifies the desired Ordinals of the default template.
                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+                  If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 
 
                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
@@ -381,7 +382,7 @@ spec:
                   ranges:
                     items:
                       description: |-
-                        Range represents a range with a start and an end value.
+                        Range represents a range with a start and an end value. Both start and end are included.
                         It is used to define a continuous segment.
                       properties:
                         end:
@@ -453,8 +454,6 @@ spec:
                   allowing the InstanceSet to manage instances from different templates.
 
 
-                  The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-                  The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
                   By default, the ordinal starts from 0 for each InstanceTemplate.
                   It is important to ensure that the Name of each InstanceTemplate is unique.
 
@@ -628,7 +627,7 @@ spec:
                         ranges:
                           items:
                             description: |-
-                              Range represents a range with a start and an end value.
+                              Range represents a range with a start and an end value. Both start and end are included.
                               It is used to define a continuous segment.
                             properties:
                               end:
@@ -2679,6 +2678,15 @@ spec:
 
 
                   Note: This field will be removed in future version.
+                type: string
+              podNamingRule:
+                default: Separated
+                description: |-
+                  PodNamingRule defines the naming convention for instances (pods).
+                  The field is immutable once set.
+                enum:
+                - Separated
+                - Combined
                 type: string
               podUpdatePolicy:
                 description: |-
@@ -10864,8 +10872,7 @@ spec:
                 format: int32
                 type: integer
               instanceStatus:
-                description: Provides the status of each instance in the ITS.
-                items:
+                additionalProperties:
                   properties:
                     configs:
                       description: The status of configs.
@@ -10883,14 +10890,18 @@ spec:
                         - name
                         type: object
                       type: array
-                    podName:
-                      default: Unknown
-                      description: Represents the name of the pod.
+                    templateName:
+                      default: ""
+                      description: Represents the instance template the pod uses.
+                        Default template name is empty string.
                       type: string
                   required:
-                  - podName
+                  - templateName
                   type: object
-                type: array
+                description: |-
+                  Provides the status of each instance in the ITS.
+                  key is pod name.
+                type: object
               membersStatus:
                 description: Provides the status of each member in the cluster.
                 items:

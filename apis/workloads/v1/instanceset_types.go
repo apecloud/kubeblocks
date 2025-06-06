@@ -86,6 +86,7 @@ type InstanceSetSpec struct {
 
 	// Specifies the desired Ordinals of the default template.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 	//
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under the default template would be
@@ -116,8 +117,6 @@ type InstanceSetSpec struct {
 	// The InstanceTemplate provides a way to override values in the default template,
 	// allowing the InstanceSet to manage instances from different templates.
 	//
-	// The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-	// The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
 	// By default, the ordinal starts from 0 for each InstanceTemplate.
 	// It is important to ensure that the Name of each InstanceTemplate is unique.
 	//
@@ -130,6 +129,10 @@ type InstanceSetSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// +optional
+	// +kubebuilder:default=Separated
+	PodNamingRule kbappsv1.PodNamingRule `json:"podNamingRule,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.
 	//
@@ -311,9 +314,10 @@ type InstanceSetStatus struct {
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
 	// Provides the status of each instance in the ITS.
+	// key is pod name.
 	//
 	// +optional
-	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
+	InstanceStatus map[string]InstanceStatus `json:"instanceStatus,omitempty"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
@@ -509,11 +513,11 @@ type MemberStatus struct {
 }
 
 type InstanceStatus struct {
-	// Represents the name of the pod.
+	// Represents the instance template the pod uses. Default template name is empty string.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	PodName string `json:"podName"`
+	// +kubebuilder:default=""
+	TemplateName string `json:"templateName"`
 
 	// The status of configs.
 	//

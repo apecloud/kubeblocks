@@ -126,6 +126,8 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 }
 
 // GenerateAllPodNames generate all pod names for a component.
+//
+// Deprecated: should use instancetemplate.PodNameBuilder
 func GenerateAllPodNames(
 	compReplicas int32,
 	instances []appsv1.InstanceTemplate,
@@ -144,6 +146,8 @@ func GenerateAllPodNames(
 
 // GenerateAllPodNamesToSet generate all pod names for a component
 // and return a set which key is the pod name and value is a template name.
+//
+// Deprecated: should use instancetemplate.PodNameBuilder
 func GenerateAllPodNamesToSet(
 	compReplicas int32,
 	instances []appsv1.InstanceTemplate,

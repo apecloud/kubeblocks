@@ -196,6 +196,14 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 	if r.backupSet.BaseBackup != nil {
 		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBaseBackupName, Value: r.backupSet.BaseBackup.Name})
 	}
+	if backup.Status.EncryptionConfig != nil {
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPDatasafedEncryptionAlgorithm, Value: backup.Status.EncryptionConfig.Algorithm})
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPDatasafedEncryptionPassPhrase,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: backup.Status.EncryptionConfig.PassPhraseSecretKeyRef,
+			},
+		})
+	}
 	if len(r.backupSet.AncestorIncrementalBackups) > 0 {
 		ancestorIncrementalBackupNames := []string{}
 		for _, backup := range r.backupSet.AncestorIncrementalBackups {

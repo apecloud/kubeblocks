@@ -49,7 +49,7 @@ var _ = Describe("deletion reconciler test", func() {
 			Expect(tree.Add(pod)).Should(Succeed())
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.RetryAfter(time.Second * 3)))
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(tree.GetRoot()).Should(Equal(its))
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())

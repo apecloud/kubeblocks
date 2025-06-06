@@ -771,8 +771,7 @@ func (r *BackupReconciler) waitForBackupPodsDeleted(reqCtx intctrlutil.RequestCt
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	labels := map[string]string{
-		dptypes.BackupNameLabelKey:    backup.Name,
-		constant.AppManagedByLabelKey: dptypes.AppName,
+		dptypes.BackupNameLabelKey: backup.Name,
 	}
 
 	if clusterUID, ok := backup.Labels[dptypes.ClusterUIDLabelKey]; ok {

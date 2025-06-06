@@ -666,9 +666,7 @@ func (r *BackupReconciler) syncContinuousBackupEncryptionConfig(reqCtx intctrlut
 	}
 	if !reflect.DeepEqual(backup.Status.EncryptionConfig, backupPolicy.Spec.EncryptionConfig) {
 		backup.Status.EncryptionConfig = backupPolicy.Spec.EncryptionConfig
-		if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
-			return err
-		}
+		return r.Client.Status().Update(reqCtx.Ctx, backup)
 	}
 	return nil
 }

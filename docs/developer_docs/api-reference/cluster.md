@@ -3708,6 +3708,18 @@ Resources and data associated with the corresponding Component will also be dele
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>offline</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of shards (components) to be transitioned to offline status.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec

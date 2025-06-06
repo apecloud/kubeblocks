@@ -266,7 +266,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
 	//
@@ -618,6 +618,11 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Maximum=2048
 	// +kubebuilder:validation:Required
 	Shards int32 `json:"shards,omitempty"`
+
+	// Specifies the names of shards (components) to be transitioned to offline status.
+	//
+	// +optional
+	Offline []string `json:"offline,omitempty"`
 }
 
 // ClusterService defines a service that is exposed externally, allowing entities outside the cluster to access it.

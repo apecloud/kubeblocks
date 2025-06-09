@@ -16,6 +16,7 @@ spec:
             envRef:
               envName: KB_POD_IP
         - name: SYNCER_SERVICE_PORT
+          optional: true
           valueFrom:
             envRef:
               envName: SYNCER_SERVICE_PORT

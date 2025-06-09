@@ -7688,6 +7688,9 @@ spec:
                               Specifies the name of the environment variable to be injected into Pods executing OpsActions.
                               It must conform to the C_IDENTIFIER format, which includes only alphanumeric characters and underscores, and cannot begin with a digit.
                             type: string
+                          optional:
+                            description: Specify whether the ENV must be defined.
+                            type: boolean
                           valueFrom:
                             description: Specifies the source of the environment variable's
                               value.

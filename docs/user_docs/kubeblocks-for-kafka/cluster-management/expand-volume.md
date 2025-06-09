@@ -103,16 +103,16 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: demo 
+     namespace: demo
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2
      componentSpecs:
-     - name: kafka 
+     - name: kafka
        componentDefRef: kafka
        volumeClaimTemplates:
        - name: data
@@ -148,7 +148,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 1. Configure the resources according to your needs and run the command to expand the volume.
 
    ```bash
-   kbcli cluster volume-expand mycluster -n demo --storage=30Gi --components=kafka --volume-claim-templates=data 
+   kbcli cluster volume-expand mycluster -n demo --storage=30Gi --components=kafka --volume-claim-templates=data
    ```
 
    - `--components` describes the component name for volume expansion.

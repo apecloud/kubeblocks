@@ -48,7 +48,7 @@ The unified API makes KubeBlocks an excellent choice if you need to run multiple
 Here is an example of how to use KubeBlocks' Cluster API to write a YAML file and create a MySQL Cluster with three replicas.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: test-mysql
@@ -208,12 +208,12 @@ This means that managing multiple databases on Kubernetes becomes simple, effici
   - Some databases support access through a so-called Smart Client, which redirects requests to other nodes or handles read-write separation based on the node addresses returned by the server. Databases that with the Smart Client access mode include Redis, MongoDB, and Kafka. Additionally, some databases, such as etcd, have clients that implement automatic failover between replicas. For these databases, KubeBlocks supports assigning a service address to each Pod (Pod Service).
 - Supports a Wide Range of Day-2 Operations:
   - Horizontal scaling (increasing and decreasing the number of replicas)
-  - Vertical scaling (adjusting CPU and memory resources for each replica) 
+  - Vertical scaling (adjusting CPU and memory resources for each replica)
   - PVC Volume capacity expansion
   - Backup and restore capabilities
   - Configuration changes (and hot reload, if possible)
   - Parameter modification
-  - Switchover 
+  - Switchover
   - Rolling upgrades
   - Decommission a specific replica
   - Minor version upgrades

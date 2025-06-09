@@ -61,7 +61,7 @@ spec:
 After adding an instance template to the [cluster resources](https://github.com/apecloud/kubeblocks-addons/blob/main/addons-cluster/risingwave/templates/cluster.yaml):
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: {{ include "risingwave-cluster.name" . }}

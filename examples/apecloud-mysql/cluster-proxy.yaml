@@ -1,11 +1,11 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: acmysql-cluster
   namespace: default
   annotations:
     kubeblocks.io/extra-env: '{"KB_PROXY_ENABLED":"on","ETCDCTL_API": "3"}'
-  labels: 
+  labels:
     auditLogEnabled: "false"
 spec:
   # Specifies the behavior when a Cluster is deleted.

@@ -2,7 +2,7 @@
 title: Add-On API Reference
 description: Add-On API Reference
 keywords: [add-on, api]
-sidebar_position: 3
+sidebar_position: 5
 sidebar_label: Add-On
 ---
 <br />
@@ -74,6 +74,7 @@ AddonSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>description</code><br/>
@@ -194,6 +195,7 @@ the selector and auto-install settings.</p>
 <p>Specifies the CLI plugin installation specifications.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>

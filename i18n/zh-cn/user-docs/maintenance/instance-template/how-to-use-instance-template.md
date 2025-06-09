@@ -61,7 +61,7 @@ spec:
 在 [Cluster 资源](https://github.com/apecloud/kubeblocks-addons/blob/main/addons-cluster/risingwave/templates/cluster.yaml)中添加实例模板后如下：
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: {{ include "risingwave-cluster.name" . }}

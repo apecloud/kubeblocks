@@ -24,7 +24,7 @@ Components serve as the building blocks of a Cluster. Actually Addon developers 
 Here is an example that creates a Redis Cluster with `clusterDefinitionRef` and `topology`:
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: test-redis-use-topology
@@ -143,7 +143,7 @@ Key aspects that can be defined in a ComponentDefinition include:
 - Storage volumes: Specify the storage volumes and their configurations for the Component.
 - Pod roles: Outlines various roles of Pods within the Component along with their capabilities.
 - Exposed Kubernetes Services: Specify the Services that need to be exposed by the Component.
-- System accounts: Define the system accounts required for the Component. 
+- System accounts: Define the system accounts required for the Component.
 
 ComponentDefinitions also enable defining reactive behaviors of the Component in response to events, such as member join/leave, Component addition/deletion, role changes, switch over, and more. This allows for automatic event handling, thus encapsulating complex behaviors within the Component.
 

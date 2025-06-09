@@ -2526,6 +2526,76 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    network:
+                      description: Defines the network configuration for the Component.
+                      properties:
+                        dnsConfig:
+                          description: Specifies the DNS parameters of a pod.
+                          properties:
+                            nameservers:
+                              description: |-
+                                A list of DNS name server IP addresses.
+                                This will be appended to the base nameservers generated from DNSPolicy.
+                                Duplicated nameservers will be removed.
+                              items:
+                                type: string
+                              type: array
+                            options:
+                              description: |-
+                                A list of DNS resolver options.
+                                This will be merged with the base options generated from DNSPolicy.
+                                Duplicated entries will be removed. Resolution options given in Options
+                                will override those that appear in the base DNSPolicy.
+                              items:
+                                description: PodDNSConfigOption defines DNS resolver
+                                  options of a pod.
+                                properties:
+                                  name:
+                                    description: Required.
+                                    type: string
+                                  value:
+                                    type: string
+                                type: object
+                              type: array
+                            searches:
+                              description: |-
+                                A list of DNS search domains for host-name lookup.
+                                This will be appended to the base search paths generated from DNSPolicy.
+                                Duplicated search paths will be removed.
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        dnsPolicy:
+                          description: |-
+                            Set DNS policy for the pod.
+                            Defaults to "ClusterFirst". If the hostNetwork is enabled, the default policy will be set to "ClusterFirstWithHostNet".
+                          type: string
+                        hostAliases:
+                          description: |-
+                            HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.
+                            This is only valid for non-hostNetwork pods.
+                          items:
+                            description: |-
+                              HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+                              pod's hosts file.
+                            properties:
+                              hostnames:
+                                description: Hostnames for the above IP address.
+                                items:
+                                  type: string
+                                type: array
+                              ip:
+                                description: IP address of the host file entry.
+                                type: string
+                            type: object
+                          type: array
+                        hostNetwork:
+                          default: false
+                          description: Host networking requested for this pod. Use
+                            the host's network namespace.
+                          type: boolean
+                      type: object
                     offlineInstances:
                       description: |-
                         Specifies the names of instances to be transitioned to offline status.
@@ -10155,6 +10225,76 @@ spec:
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
+                        network:
+                          description: Defines the network configuration for the Component.
+                          properties:
+                            dnsConfig:
+                              description: Specifies the DNS parameters of a pod.
+                              properties:
+                                nameservers:
+                                  description: |-
+                                    A list of DNS name server IP addresses.
+                                    This will be appended to the base nameservers generated from DNSPolicy.
+                                    Duplicated nameservers will be removed.
+                                  items:
+                                    type: string
+                                  type: array
+                                options:
+                                  description: |-
+                                    A list of DNS resolver options.
+                                    This will be merged with the base options generated from DNSPolicy.
+                                    Duplicated entries will be removed. Resolution options given in Options
+                                    will override those that appear in the base DNSPolicy.
+                                  items:
+                                    description: PodDNSConfigOption defines DNS resolver
+                                      options of a pod.
+                                    properties:
+                                      name:
+                                        description: Required.
+                                        type: string
+                                      value:
+                                        type: string
+                                    type: object
+                                  type: array
+                                searches:
+                                  description: |-
+                                    A list of DNS search domains for host-name lookup.
+                                    This will be appended to the base search paths generated from DNSPolicy.
+                                    Duplicated search paths will be removed.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            dnsPolicy:
+                              description: |-
+                                Set DNS policy for the pod.
+                                Defaults to "ClusterFirst". If the hostNetwork is enabled, the default policy will be set to "ClusterFirstWithHostNet".
+                              type: string
+                            hostAliases:
+                              description: |-
+                                HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.
+                                This is only valid for non-hostNetwork pods.
+                              items:
+                                description: |-
+                                  HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+                                  pod's hosts file.
+                                properties:
+                                  hostnames:
+                                    description: Hostnames for the above IP address.
+                                    items:
+                                      type: string
+                                    type: array
+                                  ip:
+                                    description: IP address of the host file entry.
+                                    type: string
+                                type: object
+                              type: array
+                            hostNetwork:
+                              default: false
+                              description: Host networking requested for this pod.
+                                Use the host's network namespace.
+                              type: boolean
+                          type: object
                         offlineInstances:
                           description: |-
                             Specifies the names of instances to be transitioned to offline status.

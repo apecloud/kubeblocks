@@ -107,15 +107,14 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		}
 	case viper.IsSet("HOST_NETWORK_ENABLED") || viper.IsSet("REDIS_ADVERTISED_PORT"):
 		mgr.currentRedisHost = viper.GetString("KB_HOST_IP")
-		if viper.IsSet("REDIS_ADVERTISED_PORT") {
-			port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))
-			if err != nil {
-				return nil, err
-			}
-			mgr.currentRedisPort = port
-		}
 	}
-
+	if viper.IsSet("REDIS_ADVERTISED_PORT") {
+		port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))
+		if err != nil {
+			return nil, err
+		}
+		mgr.currentRedisPort = port
+	}
 	majorVersion, err := getRedisMajorVersion()
 	if err != nil {
 		return nil, err

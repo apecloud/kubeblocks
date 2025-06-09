@@ -176,7 +176,10 @@ func buildEnvVars(reqCtx intctrlutil.RequestCtx,
 			envVar, err = buildVarWithFieldPath(targetPod, vars[i].ValueFrom.FieldRef.FieldPath)
 		}
 		if envVar == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.TargetContainerName))
+			if vars[i].Optional != nil && !*vars[i].Optional {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.TargetContainerName))
+			}
+			continue
 		}
 		envVar.Name = vars[i].Name
 		envVars = append(envVars, *envVar)

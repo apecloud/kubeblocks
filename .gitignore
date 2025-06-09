@@ -67,10 +67,6 @@ deploy/**/charts
 # cli embed chart directory
 pkg/cli/cluster/charts/
 
-# ignore test result
-test/e2e/report.json
-test/e2e/*.txt
-
 # ignore mirrord
 .mirrord
 

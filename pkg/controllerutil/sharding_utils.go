@@ -39,8 +39,6 @@ const (
 
 func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 	cluster *appsv1.Cluster, sharding *appsv1.ClusterSharding) ([]*appsv1.ClusterComponentSpec, error) {
-	shards := make([]*appsv1.ClusterComponentSpec, 0)
-
 	offline := make([]string, 0)
 	if sharding != nil && len(sharding.Offline) > 0 {
 		for _, name := range sharding.Offline {
@@ -57,7 +55,7 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 	if err != nil {
 		return nil, err
 	}
-	shards = append(shards, removeOfflineShards(undeletedShardingCompSpecs, offline)...)
+	shards := removeOfflineShards(undeletedShardingCompSpecs, offline)
 
 	shardNames := sets.Set[string]{}
 	for _, existShardingCompSpec := range undeletedShardingCompSpecs {

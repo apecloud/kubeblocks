@@ -7811,6 +7811,12 @@ spec:
                       x-kubernetes-validations:
                       - message: name is immutable
                         rule: self == oldSelf
+                    offline:
+                      description: Specifies the names of shards (components) to be
+                        transitioned to offline status.
+                      items:
+                        type: string
+                      type: array
                     shardingDef:
                       description: |-
                         Specifies the ShardingDefinition custom resource (CR) that defines the sharding's characteristics and behavior.

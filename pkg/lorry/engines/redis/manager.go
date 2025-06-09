@@ -95,17 +95,26 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 			return nil, err
 		}
 		mgr.currentRedisHost = fixPodIP
+	case viper.IsSet("LOAD_BALANCER_ENABLED"):
+		lbHostInfo := viper.GetString("REDIS_ADVERTISED_LB_HOST")
+		svcHosts := strings.Split(lbHostInfo, ",")
+		for _, v := range svcHosts {
+			items := strings.Split(v, ":")
+			if getIndex(items[0]) == getIndex(mgr.CurrentMemberName) {
+				mgr.currentRedisHost = items[1]
+				break
+			}
+		}
 	case viper.IsSet("HOST_NETWORK_ENABLED") || viper.IsSet("REDIS_ADVERTISED_PORT"):
 		mgr.currentRedisHost = viper.GetString("KB_HOST_IP")
-		if viper.IsSet("REDIS_ADVERTISED_PORT") {
-			port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))
-			if err != nil {
-				return nil, err
-			}
-			mgr.currentRedisPort = port
-		}
 	}
-
+	if viper.IsSet("REDIS_ADVERTISED_PORT") {
+		port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))
+		if err != nil {
+			return nil, err
+		}
+		mgr.currentRedisPort = port
+	}
 	majorVersion, err := getRedisMajorVersion()
 	if err != nil {
 		return nil, err
@@ -198,15 +207,14 @@ func getFixedPodIP(podFQDN string) (string, error) {
 	return "", fmt.Errorf("failed to get IP address for %s", podFQDN)
 }
 
+func getIndex(name string) string {
+	items := strings.Split(name, "-")
+	return items[len(items)-1]
+}
+
 func (mgr *Manager) getAdvertisedPort(redisAdvertisedPort string) (string, error) {
 	// redisAdvertisedPort: pod1Svc:advertisedPort1,pod2Svc:advertisedPort2,...
 	addrList := strings.Split(redisAdvertisedPort, ",")
-
-	getIndex := func(name string) string {
-		items := strings.Split(name, "-")
-		return items[len(items)-1]
-	}
-
 	for _, addr := range addrList {
 		host := strings.Split(addr, ":")[0]
 		port := strings.Split(addr, ":")[1]

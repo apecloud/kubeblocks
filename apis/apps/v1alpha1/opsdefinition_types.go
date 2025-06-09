@@ -158,6 +158,11 @@ type OpsEnvVar struct {
 	//
 	// +kubebuilder:validation:Required
 	ValueFrom *OpsVarSource `json:"valueFrom"`
+
+	// Specify whether the ENV must be defined.
+	//
+	// +optional
+	Optional *bool `json:"optional,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="has(self.envRef) || has(self.fieldPath)", message="either fieldPath and envRef."

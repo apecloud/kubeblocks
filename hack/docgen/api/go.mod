@@ -1,4 +1,4 @@
-module k8s.io/gengo/v2
+module docgen-api
 
 go 1.20
 

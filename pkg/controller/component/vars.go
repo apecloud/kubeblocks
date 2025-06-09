@@ -559,8 +559,7 @@ func resolveServicePortRef(ctx context.Context, cli client.Reader, synthesizedCo
 
 func composePortValueFromServices(obj any, targetPortName string) *string {
 	hasNodePort := func(svc *corev1.Service, svcPort corev1.ServicePort) bool {
-		return svc.Spec.Type == corev1.ServiceTypeNodePort ||
-			svc.Spec.Type == corev1.ServiceTypeLoadBalancer && svc.Spec.AllocateLoadBalancerNodePorts != nil && *svc.Spec.AllocateLoadBalancerNodePorts
+		return svc.Spec.Type == corev1.ServiceTypeNodePort
 	}
 
 	selector := func(services []*corev1.Service) map[string]string {

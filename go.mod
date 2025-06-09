@@ -38,7 +38,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/replicatedhq/troubleshoot v0.57.0
-	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/shirou/gopsutil/v3 v3.23.6
 	github.com/spf13/cast v1.5.1
@@ -66,8 +65,6 @@ require (
 	k8s.io/code-generator v0.29.14
 	k8s.io/component-helpers v0.29.14
 	k8s.io/cri-api v0.29.14
-	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
-	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
 	k8s.io/kubectl v0.29.0
@@ -185,6 +182,7 @@ require (
 	k8s.io/apiserver v0.29.14 // indirect
 	k8s.io/cli-runtime v0.29.14 // indirect
 	k8s.io/component-base v0.29.14 // indirect
+	k8s.io/gengo v0.0.0-20250604051438-85fd79dbfd9f // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 // indirect

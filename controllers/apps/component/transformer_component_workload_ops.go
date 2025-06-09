@@ -416,7 +416,6 @@ func (r *componentWorkloadOps) expandVolume() error {
 		if proto == nil {
 			continue
 		}
-		r.transCtx.Logger.Info("run expandVolumes", "VolumeClaimTemplates", vct, "runningItsPodNames", r.runningItsPodNameSet.UnsortedList())
 		if err := r.expandVolumes(vct, proto); err != nil {
 			return err
 		}

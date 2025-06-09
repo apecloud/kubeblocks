@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -90,7 +89,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		services, err := t.buildCompService(transCtx.Logger, transCtx.Component, synthesizeComp, &service, protoITS)
+		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, protoITS)
 		if err != nil {
 			return err
 		}
@@ -124,14 +123,14 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 	return owned, nil
 }
 
-func (t *componentServiceTransformer) buildCompService(logger logr.Logger, comp *appsv1.Component,
+func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
 	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(logger, comp, synthesizeComp, service, protoITS)
+		return t.buildPodService(comp, synthesizeComp, service, protoITS)
 	}
 	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
@@ -140,7 +139,7 @@ func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentServ
 	return service.PodService != nil && *service.PodService
 }
 
-func (t *componentServiceTransformer) buildPodService(logger logr.Logger, comp *appsv1.Component,
+func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
 	pods, err := t.podsNameNSuffix(synthesizeComp, protoITS)
 	if err != nil {
@@ -175,7 +174,7 @@ func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.
 	for _, podName := range podNames {
 		suffix, found := strings.CutPrefix(podName, prefix)
 		if !found || len(suffix) == 0 {
-			return nil, fmt.Errorf("invalid pod name when building pod services: %s, FullCompName: %s", podName, synthesizeComp.FullCompName)
+			return nil, fmt.Errorf("invalid pod name when building pod services: %s", podName)
 		}
 		pods[podName] = suffix
 	}

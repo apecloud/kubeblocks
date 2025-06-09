@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -137,7 +136,6 @@ var _ = Describe("component hostnetwork transformer test", func() {
 		It("disabled", func() {
 			transformer := &componentServiceTransformer{}
 			err := transformer.Transform(transCtx, dag)
-			transCtx.RunningWorkload = &workloadsv1.InstanceSet{}
 			Expect(err).Should(BeNil())
 
 			// check the container ports in the synthesized component

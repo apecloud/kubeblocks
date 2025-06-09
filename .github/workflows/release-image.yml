@@ -70,7 +70,7 @@ jobs:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
-      GO_VERSION: "1.21"
+      GO_VERSION: "1.23"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile"
       BUILDX_ARGS: |
@@ -87,7 +87,7 @@ jobs:
       MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
-      GO_VERSION: "1.21"
+      GO_VERSION: "1.23"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
@@ -111,7 +111,7 @@ jobs:
       MAKE_OPS_PRE: "helm-package VERSION=${{ needs.release-version.outputs.release-version-bump }}"
       IMG: "apecloud/kubeblocks-charts"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
-      GO_VERSION: "1.21"
+      GO_VERSION: "1.23"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit

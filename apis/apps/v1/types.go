@@ -251,6 +251,31 @@ const (
 	DeletePersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Delete"
 )
 
+type ComponentNetwork struct {
+	// Host networking requested for this pod. Use the host's network namespace.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	HostNetwork bool `json:"hostNetwork,omitempty"`
+
+	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.
+	// This is only valid for non-hostNetwork pods.
+	//
+	// +optional
+	HostAliases []corev1.HostAlias `json:"hostAliases,omitempty"`
+
+	// Set DNS policy for the pod.
+	// Defaults to "ClusterFirst". If the hostNetwork is enabled, the default policy will be set to "ClusterFirstWithHostNet".
+	//
+	// +optional
+	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+
+	// Specifies the DNS parameters of a pod.
+	//
+	// +optional
+	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
+}
+
 type Service struct {
 	// Name defines the name of the service.
 	// otherwise, it indicates the name of the service.

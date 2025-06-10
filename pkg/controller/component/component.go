@@ -109,6 +109,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetPVCRetentionPolicy(compSpec.PersistentVolumeClaimRetentionPolicy).
 		SetVolumes(compSpec.Volumes).
+		SetNetwork(compSpec.Network).
 		SetServices(compSpec.Services).
 		SetConfigs(compSpec.Configs).
 		SetServiceRefs(compSpec.ServiceRefs).

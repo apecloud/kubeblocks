@@ -98,7 +98,7 @@ all: manager dataprotection kbagent ## Make all cmd binaries.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
 	@$(MAKE) label-crds --no-print-directory
 	@cp config/crd/bases/* $(CHART_PATH)/crds

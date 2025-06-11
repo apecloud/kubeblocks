@@ -585,5 +585,27 @@ var _ = Describe("Combined Name builder tests", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("duplicate ordinal(1)"))
 		})
+
+		It("has not enough available ordinals", func() {
+			its := &workloads.InstanceSet{
+				Spec: workloads.InstanceSetSpec{
+					PodNamingRule: kbappsv1.PodNamingRuleCombined,
+					Replicas:      ptr.To[int32](3),
+					Instances: []workloads.InstanceTemplate{
+						{
+							Name:     "template1",
+							Replicas: ptr.To[int32](3),
+							Ordinals: kbappsv1.Ordinals{
+								Discrete: []int32{0, 1, 2},
+							},
+						},
+					},
+					OfflineInstances: []string{"pod-0"},
+				},
+			}
+			err := ValidateInstanceTemplates(its, nil)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("available ordinals less than replicas"))
+		})
 	})
 })

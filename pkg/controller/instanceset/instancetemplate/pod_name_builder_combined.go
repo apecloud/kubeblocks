@@ -247,57 +247,52 @@ func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 // Validate checks if the instanceset spec is valid
 // Ordinals should be unique globally.
 func (c *combinedPodNameBuilder) Validate() error {
-	ordinalSet := sets.New[int32]()
-	offlineOrdinalSet := sets.New[int32]()
+	ordinals := sets.New[int32]()
+	offlineOrdinals := sets.New[int32]()
 	for _, instance := range c.itsExt.InstanceSet.Spec.OfflineInstances {
 		ordinal, err := GetOrdinal(instance)
 		if err != nil {
 			return err
 		}
-		offlineOrdinalSet.Insert(ordinal)
+		offlineOrdinals.Insert(ordinal)
 	}
 
-	for _, tmpl := range c.itsExt.InstanceTemplates {
-		ordinals := tmpl.Ordinals
-		tmplOrdinalSet := sets.New[int32]()
-		for _, item := range ordinals.Discrete {
+	for _, tpl := range c.itsExt.InstanceTemplates {
+		tplOrdinals := sets.New[int32]()
+		check := func(ordinal int32) error {
+			if ordinals.Has(ordinal) && !tplOrdinals.Has(ordinal) {
+				return fmt.Errorf("duplicate ordinal(%v)", ordinal)
+			}
+			ordinals.Insert(ordinal)
+			tplOrdinals.Insert(ordinal)
+			return nil
+		}
+		for _, item := range tpl.Ordinals.Discrete {
 			if item < 0 {
 				return fmt.Errorf("ordinal(%v) must >= 0", item)
 			}
-			if ordinalSet.Has(item) {
-				return fmt.Errorf("duplicate ordinal(%v)", item)
+			if err := check(item); err != nil {
+				return err
 			}
-			ordinalSet.Insert(item)
-			tmplOrdinalSet.Insert(item)
 		}
-
-		for _, item := range ordinals.Ranges {
-			start := item.Start
-			end := item.End
-
+		for _, item := range tpl.Ordinals.Ranges {
+			start, end := item.Start, item.End
 			if start < 0 {
 				return fmt.Errorf("ordinal's start(%v) must >= 0", start)
 			}
-
 			if start > end {
 				return fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
 			}
-
 			for ordinal := start; ordinal <= end; ordinal++ {
-				if ordinalSet.Has(ordinal) {
-					return fmt.Errorf("duplicate ordinal(%v)", item)
+				if err := check(ordinal); err != nil {
+					return err
 				}
-				ordinalSet.Insert(ordinal)
-				tmplOrdinalSet.Insert(ordinal)
 			}
 		}
-		if (ordinals.Ranges != nil || ordinals.Discrete != nil) && tmplOrdinalSet.Len() < int(*tmpl.Replicas) {
-			return fmt.Errorf("template(%v) has length of ordinals < replicas", tmpl.Name)
+		available := tplOrdinals.Difference(offlineOrdinals)
+		if (tpl.Ordinals.Ranges != nil || tpl.Ordinals.Discrete != nil) && available.Len() < int(*tpl.Replicas) {
+			return fmt.Errorf("template(%v) has available ordinals less than replicas", tpl.Name)
 		}
-	}
-	offlined := ordinalSet.Intersection(offlineOrdinalSet)
-	if offlined.Len() != 0 {
-		return fmt.Errorf("ordinal(s) %v exists in offline instances", convertOrdinalSetToSortedList(offlined))
 	}
 	return nil
 }

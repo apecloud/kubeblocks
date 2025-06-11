@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -1871,15 +1870,6 @@ var _ = Describe("vars", func() {
 							Spec: appsv1.ComponentSpec{
 								CompDef:  synthesizedComp.CompDefName,
 								Replicas: 3,
-							},
-						},
-						&workloadsv1.InstanceSet{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: testCtx.DefaultNamespace,
-								Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
-							},
-							Spec: workloadsv1.InstanceSetSpec{
-								Replicas: ptr.To[int32](3),
 							},
 						},
 						&corev1.Pod{

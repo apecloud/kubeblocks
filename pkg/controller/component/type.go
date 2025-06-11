@@ -61,23 +61,23 @@ type SynthesizedComponent struct {
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
-	PodNamingRule                    kbappsv1.PodNamingRule                 `json:"podNamingRule,omitempty"`
-	InstanceImages                   map[string]map[string]string           `json:"instanceImages,omitempty"`
-	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
-	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
-	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`
-	ParallelPodManagementConcurrency *intstr.IntOrString                    `json:"parallelPodManagementConcurrency,omitempty"`
-	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType          `json:"podUpdatePolicy,omitempty"`
-	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
-	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy       `json:"instanceUpdateStrategy,omitempty"`
-	PolicyRules                      []rbacv1.PolicyRule                    `json:"policyRules,omitempty"`
-	LifecycleActions                 *kbappsv1.ComponentLifecycleActions    `json:"lifecycleActions,omitempty"`
-	SystemAccounts                   []kbappsv1.SystemAccount               `json:"systemAccounts,omitempty"`
-	Volumes                          []kbappsv1.ComponentVolume             `json:"volumes,omitempty"`
-	HostNetwork                      *kbappsv1.HostNetwork                  `json:"hostNetwork,omitempty"`
-	ComponentServices                []kbappsv1.ComponentService            `json:"componentServices,omitempty"`
-	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
-	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
+	PodNamingRule                    kbappsv1.PodNamingRule
+	InstanceImages                   map[string]map[string]string        `json:"instanceImages,omitempty"`
+	OfflineInstances                 []string                            `json:"offlineInstances,omitempty"`
+	Roles                            []kbappsv1.ReplicaRole              `json:"roles,omitempty"`
+	PodManagementPolicy              *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
+	ParallelPodManagementConcurrency *intstr.IntOrString                 `json:"parallelPodManagementConcurrency,omitempty"`
+	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType       `json:"podUpdatePolicy,omitempty"`
+	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy    `json:"instanceUpdateStrategy,omitempty"`
+	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
+	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
+	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
+	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
+	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
+	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
+	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
 	Stop                             *bool
 }
 

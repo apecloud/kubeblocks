@@ -75,13 +75,9 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 		return err
 	}
 
-	itsName, err := GetInstanceSetName(comp)
-	if err != nil {
-		return err
-	}
 	itsKey := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
-		Name:      itsName,
+		Name:      comp.Name,
 	}
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(reqCtx.Ctx, itsKey, its); err != nil {

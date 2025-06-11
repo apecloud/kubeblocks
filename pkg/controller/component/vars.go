@@ -1238,19 +1238,26 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		// TODO: what if the component is being deleted?
 	}
 
-	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	its := &workloadsv1.InstanceSet{}
-	if err := cli.Get(ctx, types.NamespacedName{
+	itsKey := types.NamespacedName{
 		Namespace: namespace,
-		Name:      itsName,
-	}, its, inDataContext()); err != nil {
+		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
+	}
+	err := cli.Get(ctx, itsKey, its, inDataContext())
+	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 
-	names, err := GeneratePodNamesByITS(its)
+	var names []string
+	if err == nil {
+		names, err = GeneratePodNamesByITS(its)
+	} else {
+		names, err = GeneratePodNamesByComp(comp)
+	}
 	if err != nil {
 		return "", err
 	}
+
 	if fqdn {
 		for i := range names {
 			names[i] = intctrlutil.PodFQDN(namespace, comp.Name, names[i])

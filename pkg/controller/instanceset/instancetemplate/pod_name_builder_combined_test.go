@@ -45,7 +45,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				Expect(err).To(HaveOccurred())
 			} else {
 				Expect(err).NotTo(HaveOccurred())
-				ordinals, err := GenerateTemplateName2OrdinalMap(itsExt)
+				ordinals, err := generateTemplateName2OrdinalMap(itsExt)
 				Expect(err).Should(Or(BeNil(), Equal(ErrOrdinalsNotEnough)))
 				Expect(ordinals).To(Equal(expected))
 			}

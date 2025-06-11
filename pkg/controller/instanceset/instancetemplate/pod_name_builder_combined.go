@@ -33,13 +33,16 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
+// ErrOrdinalsNotEnough is considered temporary, e.g. some old ordinals are being deleted
+var ErrOrdinalsNotEnough = errors.New("available ordinals are not enough")
+
 type combinedPodNameBuilder struct {
 	itsExt      *InstanceSetExt
 	eventLogger record.EventRecorder
 }
 
 func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
-	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(c.itsExt)
+	template2OrdinalSetMap, err := generateTemplateName2OrdinalMap(c.itsExt)
 	if err != nil {
 		if errors.Is(err, ErrOrdinalsNotEnough) {
 			if c.eventLogger != nil {
@@ -64,15 +67,104 @@ func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*In
 	return allNameTemplateMap, nil
 }
 
-// ErrOrdinalsNotEnough is considered temporary, e.g. some old ordinals are being deleted
-var ErrOrdinalsNotEnough = errors.New("available ordinals are not enough")
+func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
+	template2OrdinalSetMap, err := generateTemplateName2OrdinalMap(c.itsExt)
+	if err != nil {
+		if errors.Is(err, ErrOrdinalsNotEnough) {
+			if c.eventLogger != nil {
+				c.eventLogger.Event(c.itsExt.InstanceSet, corev1.EventTypeWarning, "OrdinalsNotEnough", err.Error())
+			}
+		} else {
+			return nil, err
+		}
+	}
 
-// GenerateTemplateName2OrdinalMap returns a map from template name to sorted ordinals
+	allOrdinalSet := sets.New[int32]()
+	for _, ordinalSet := range template2OrdinalSetMap {
+		allOrdinalSet = allOrdinalSet.Union(ordinalSet)
+	}
+	instanceNames := make([]string, 0, len(allOrdinalSet))
+	allOrdinalList := convertOrdinalSetToSortedList(allOrdinalSet)
+	for _, ordinal := range allOrdinalList {
+		instanceNames = append(instanceNames, fmt.Sprintf("%v-%v", c.itsExt.InstanceSet.Name, ordinal))
+	}
+	return instanceNames, nil
+}
+
+// Validate checks if the instanceset spec is valid
+// Ordinals should be unique globally.
+func (c *combinedPodNameBuilder) Validate() error {
+	ordinals := sets.New[int32]()
+	offlineOrdinals := sets.New[int32]()
+	for _, instance := range c.itsExt.InstanceSet.Spec.OfflineInstances {
+		ordinal, err := getOrdinal(instance)
+		if err != nil {
+			return err
+		}
+		offlineOrdinals.Insert(ordinal)
+	}
+
+	for _, tpl := range c.itsExt.InstanceTemplates {
+		tplOrdinals := sets.New[int32]()
+		check := func(ordinal int32) error {
+			if ordinals.Has(ordinal) && !tplOrdinals.Has(ordinal) {
+				return fmt.Errorf("duplicate ordinal(%v)", ordinal)
+			}
+			ordinals.Insert(ordinal)
+			tplOrdinals.Insert(ordinal)
+			return nil
+		}
+		for _, item := range tpl.Ordinals.Discrete {
+			if item < 0 {
+				return fmt.Errorf("ordinal(%v) must >= 0", item)
+			}
+			if err := check(item); err != nil {
+				return err
+			}
+		}
+		for _, item := range tpl.Ordinals.Ranges {
+			start, end := item.Start, item.End
+			if start < 0 {
+				return fmt.Errorf("ordinal's start(%v) must >= 0", start)
+			}
+			if start > end {
+				return fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
+			}
+			for ordinal := start; ordinal <= end; ordinal++ {
+				if err := check(ordinal); err != nil {
+					return err
+				}
+			}
+		}
+		available := tplOrdinals.Difference(offlineOrdinals)
+		if (tpl.Ordinals.Ranges != nil || tpl.Ordinals.Discrete != nil) && available.Len() < int(*tpl.Replicas) {
+			return fmt.Errorf("template(%v) has available ordinals less than replicas", tpl.Name)
+		}
+	}
+	return nil
+}
+
+// SetInstanceStatus sets template name in InstanceStatus
+func (c *combinedPodNameBuilder) SetInstanceStatus(pods []*corev1.Pod) error {
+	instanceStatus := c.itsExt.InstanceSet.Status.InstanceStatus
+	for _, pod := range pods {
+		templateName, ok := pod.Labels[TemplateNameLabelKey]
+		if !ok {
+			return fmt.Errorf("unknown pod %v", klog.KObj(pod))
+		}
+		status := instanceStatus[pod.Name]
+		status.TemplateName = templateName
+		instanceStatus[pod.Name] = status
+	}
+	return nil
+}
+
+// generateTemplateName2OrdinalMap returns a map from template name to sorted ordinals
 // it rely on the instanceset's status to generate desired pod names
 // it may not be updated, but it should converge eventually
 //
 // template ordianls are assumed to be valid at this time
-func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
+func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
 	// initialize variables
 
 	// globalUsedOrdinalSet won't decrease, so that one ordinal couldn't suddenly change its template
@@ -90,7 +182,7 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 
 	offlineOrdinalSet := sets.New[int32]()
 	for _, instance := range itsExt.InstanceSet.Spec.OfflineInstances {
-		ordinal, err := GetOrdinal(instance)
+		ordinal, err := getOrdinal(instance)
 		if err != nil {
 			return nil, err
 		}
@@ -99,12 +191,12 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 
 	defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(offlineOrdinalSet)
 	for _, instanceTemplate := range instanceTemplatesList {
-		availableOrdinalSet := ConvertOrdinalsToSet(instanceTemplate.Ordinals)
+		availableOrdinalSet := convertOrdinalsToSet(instanceTemplate.Ordinals)
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
 	}
 
 	for podName, status := range itsExt.InstanceSet.Status.InstanceStatus {
-		ordinal, err := GetOrdinal(podName)
+		ordinal, err := getOrdinal(podName)
 		if err != nil {
 			return nil, err
 		}
@@ -193,7 +285,7 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 	hasErrOrdinalsNotEnough := false
 	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinalSet := template2OrdinalSetMap[instanceTemplate.Name]
-		availableOrdinalSet := ConvertOrdinalsToSet(instanceTemplate.Ordinals)
+		availableOrdinalSet := convertOrdinalsToSet(instanceTemplate.Ordinals)
 		var err error
 		if availableOrdinalSet.Len() > 0 {
 			currentOrdinalSet, err = generateWithOrdinalsDefined(currentOrdinalSet, availableOrdinalSet, instanceTemplate)
@@ -218,96 +310,4 @@ func GenerateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		err = ErrOrdinalsNotEnough
 	}
 	return template2OrdinalSetMap, err
-}
-
-func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
-	template2OrdinalSetMap, err := GenerateTemplateName2OrdinalMap(c.itsExt)
-	if err != nil {
-		if errors.Is(err, ErrOrdinalsNotEnough) {
-			if c.eventLogger != nil {
-				c.eventLogger.Event(c.itsExt.InstanceSet, corev1.EventTypeWarning, "OrdinalsNotEnough", err.Error())
-			}
-		} else {
-			return nil, err
-		}
-	}
-
-	allOrdinalSet := sets.New[int32]()
-	for _, ordinalSet := range template2OrdinalSetMap {
-		allOrdinalSet = allOrdinalSet.Union(ordinalSet)
-	}
-	instanceNames := make([]string, 0, len(allOrdinalSet))
-	allOrdinalList := convertOrdinalSetToSortedList(allOrdinalSet)
-	for _, ordinal := range allOrdinalList {
-		instanceNames = append(instanceNames, fmt.Sprintf("%v-%v", c.itsExt.InstanceSet.Name, ordinal))
-	}
-	return instanceNames, nil
-}
-
-// Validate checks if the instanceset spec is valid
-// Ordinals should be unique globally.
-func (c *combinedPodNameBuilder) Validate() error {
-	ordinals := sets.New[int32]()
-	offlineOrdinals := sets.New[int32]()
-	for _, instance := range c.itsExt.InstanceSet.Spec.OfflineInstances {
-		ordinal, err := GetOrdinal(instance)
-		if err != nil {
-			return err
-		}
-		offlineOrdinals.Insert(ordinal)
-	}
-
-	for _, tpl := range c.itsExt.InstanceTemplates {
-		tplOrdinals := sets.New[int32]()
-		check := func(ordinal int32) error {
-			if ordinals.Has(ordinal) && !tplOrdinals.Has(ordinal) {
-				return fmt.Errorf("duplicate ordinal(%v)", ordinal)
-			}
-			ordinals.Insert(ordinal)
-			tplOrdinals.Insert(ordinal)
-			return nil
-		}
-		for _, item := range tpl.Ordinals.Discrete {
-			if item < 0 {
-				return fmt.Errorf("ordinal(%v) must >= 0", item)
-			}
-			if err := check(item); err != nil {
-				return err
-			}
-		}
-		for _, item := range tpl.Ordinals.Ranges {
-			start, end := item.Start, item.End
-			if start < 0 {
-				return fmt.Errorf("ordinal's start(%v) must >= 0", start)
-			}
-			if start > end {
-				return fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
-			}
-			for ordinal := start; ordinal <= end; ordinal++ {
-				if err := check(ordinal); err != nil {
-					return err
-				}
-			}
-		}
-		available := tplOrdinals.Difference(offlineOrdinals)
-		if (tpl.Ordinals.Ranges != nil || tpl.Ordinals.Discrete != nil) && available.Len() < int(*tpl.Replicas) {
-			return fmt.Errorf("template(%v) has available ordinals less than replicas", tpl.Name)
-		}
-	}
-	return nil
-}
-
-// SetInstanceStatus sets template name in InstanceStatus
-func (c *combinedPodNameBuilder) SetInstanceStatus(pods []*corev1.Pod) error {
-	instanceStatus := c.itsExt.InstanceSet.Status.InstanceStatus
-	for _, pod := range pods {
-		templateName, ok := pod.Labels[TemplateNameLabelKey]
-		if !ok {
-			return fmt.Errorf("unknown pod %v", klog.KObj(pod))
-		}
-		status := instanceStatus[pod.Name]
-		status.TemplateName = templateName
-		instanceStatus[pod.Name] = status
-	}
-	return nil
 }

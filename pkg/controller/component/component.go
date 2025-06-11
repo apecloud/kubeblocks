@@ -56,19 +56,25 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
 
-func GetInstanceSetName(comp *appsv1.Component) (string, error) {
-	compName, err := getCompLabelValue(comp, constant.KBAppComponentLabelKey)
+func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	clusterName, err := GetClusterName(comp)
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return constant.GenerateWorkloadNamePattern(clusterName, compName), nil
+	return nameBuilder.GenerateAllInstanceNames()
 }
 
-func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
+func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
+	its := &workloads.InstanceSet{
+		Spec: workloads.InstanceSetSpec{
+			Replicas: &comp.Spec.Replicas,
+			// Instances: comp.Spec.Instances, // TODO
+		},
+	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
 		return nil, err

@@ -28,11 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// ConvertOrdinalsToSet assumes oridnals are valid
-func ConvertOrdinalsToSet(ordinals kbappsv1.Ordinals) sets.Set[int32] {
+func convertOrdinalsToSet(ordinals kbappsv1.Ordinals) sets.Set[int32] {
 	ordinalSet := sets.New(ordinals.Discrete...)
 	for _, item := range ordinals.Ranges {
 		for ordinal := item.Start; ordinal <= item.End; ordinal++ {
@@ -42,9 +40,8 @@ func ConvertOrdinalsToSet(ordinals kbappsv1.Ordinals) sets.Set[int32] {
 	return ordinalSet
 }
 
-// ConvertOrdinalsToSortedList assumes oridnals are valid
-func ConvertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) []int32 {
-	ordinalSet := ConvertOrdinalsToSet(ordinals)
+func convertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) []int32 {
+	ordinalSet := convertOrdinalsToSet(ordinals)
 	sortedOrdinalList := ordinalSet.UnsortedList()
 	slices.Sort(sortedOrdinalList)
 	return sortedOrdinalList
@@ -56,7 +53,7 @@ func convertOrdinalSetToSortedList(ordinalSet sets.Set[int32]) []int32 {
 	return sortedOrdinalList
 }
 
-func GetOrdinal(podName string) (int32, error) {
+func getOrdinal(podName string) (int32, error) {
 	index := strings.LastIndex(podName, "-")
 	if index < 0 {
 		return -1, fmt.Errorf("failed to get ordinal from pod %v", podName)
@@ -69,14 +66,9 @@ func GetOrdinal(podName string) (int32, error) {
 	return int32(ordinal), nil
 }
 
-func GetInstanceName(its *workloads.InstanceSet, ordinal int32) string {
-	return fmt.Sprintf("%v-%v", its.Name, ordinal)
-}
-
-// ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
+// parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
-// TODO: Merge this to GetOrdinal
-func ParseParentNameAndOrdinal(s string) (string, int) {
+func parseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1
 

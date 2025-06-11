@@ -299,7 +299,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	templateList := instancetemplate.BuildInstanceTemplateExts(itsExt)
+	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
 	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
 	templateName, _ := strings.CutPrefix(parentName, its.Name)
 	if len(templateName) > 0 {

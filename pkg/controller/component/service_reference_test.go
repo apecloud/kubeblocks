@@ -28,11 +28,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -558,15 +556,6 @@ var _ = Describe("service references", func() {
 						},
 						Spec: appsv1.ComponentSpec{
 							Replicas: 2,
-						},
-					},
-					&workloadsv1.InstanceSet{
-						ObjectMeta: metav1.ObjectMeta{
-							Namespace: namespace,
-							Name:      constant.GenerateWorkloadNamePattern(etcdCluster, etcdComponent),
-						},
-						Spec: workloadsv1.InstanceSetSpec{
-							Replicas: ptr.To[int32](2),
 						},
 					},
 				},

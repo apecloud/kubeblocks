@@ -59,7 +59,7 @@ func (s *separatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	instanceNameList := make([]string, 0)
 	for _, template := range s.itsExt.InstanceTemplates {
 		replicas := template.GetReplicas()
-		ordinalList := ConvertOrdinalsToSortedList(template.GetOrdinals())
+		ordinalList := convertOrdinalsToSortedList(template.GetOrdinals())
 		names, err := generateInstanceNamesFromTemplate(s.itsExt.InstanceSet.Name, template.GetName(), replicas, s.itsExt.InstanceSet.Spec.OfflineInstances, ordinalList)
 		if err != nil {
 			return nil, err
@@ -67,7 +67,7 @@ func (s *separatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 		instanceNameList = append(instanceNameList, names...)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(instanceNameList[i])
+		return parseParentNameAndOrdinal(instanceNameList[i])
 	}
 	// first sort with template name, then with ordinal
 	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
@@ -122,7 +122,7 @@ func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName strin
 	if err != nil {
 		return nil, err
 	}
-	return ConvertOrdinalsToSortedList(ordinals), nil
+	return convertOrdinalsToSortedList(ordinals), nil
 }
 
 func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {

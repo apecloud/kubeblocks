@@ -44,7 +44,7 @@ import (
 	"github.com/russross/blackfriday/v2"
 	"k8s.io/gengo/parser"
 	"k8s.io/gengo/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

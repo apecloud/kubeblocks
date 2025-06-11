@@ -176,7 +176,7 @@ Based on the above example, when creating a Pulsar cluster, the ZooKeeper compon
    The following example shows how to create a Pulsar cluster referencing the external ZooKeeper component mentioned above.
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: pulsar

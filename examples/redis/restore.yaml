@@ -1,4 +1,4 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: redis-cluster-restore
@@ -12,7 +12,7 @@ spec:
   # - `standalone`: single redis instance
   # - `replication`: primary-secondary replication with redis sentinel, refer: https://redis.io/docs/management/sentinel
   # - `replication-twemproxy`: primary-secondary replication with sentinel and twemproxy, it is just a demo for how to use twemproxy with redis, not recommended for production
-  topology: replication  
+  topology: replication
   # Specifies the behavior when a Cluster is deleted.
   # Specifies the behavior when a Cluster is deleted.
   # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.

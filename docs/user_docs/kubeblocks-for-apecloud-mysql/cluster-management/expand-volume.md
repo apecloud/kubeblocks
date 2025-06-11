@@ -106,7 +106,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster

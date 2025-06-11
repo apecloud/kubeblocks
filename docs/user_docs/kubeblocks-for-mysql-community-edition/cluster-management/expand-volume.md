@@ -103,7 +103,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster

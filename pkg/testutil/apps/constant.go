@@ -46,6 +46,9 @@ const (
 	DefaultMySQLContainerName = "mysql"
 
 	NginxImage = "nginx"
+
+	Leader   = "leader"
+	Follower = "follower"
 )
 
 var (

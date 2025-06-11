@@ -460,13 +460,13 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 	return saName, nil
 }
 
-func checkSecretKeyRef(reqCtx intctrlutil.RequestCtx, cli client.Client,
+func checkSecretKeyRef(ctx context.Context, cli client.Client,
 	namespace string, ref *corev1.SecretKeySelector) error {
 	if ref == nil {
 		return fmt.Errorf("ref is nil")
 	}
 	secret := &corev1.Secret{}
-	err := cli.Get(reqCtx.Ctx, client.ObjectKey{
+	err := cli.Get(ctx, client.ObjectKey{
 		Namespace: namespace,
 		Name:      ref.Name,
 	}, secret)
@@ -616,7 +616,7 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 		}, parentBackup); err != nil {
 			return nil, err
 		}
-		if err := ValidateParentBackup(backup, parentBackup, backupMethod, backupRepoName); err != nil {
+		if err := ValidateParentBackup(ctx, cli, backup, parentBackup, backupMethod, backupRepoName); err != nil {
 			return nil, fmt.Errorf("failed to validate parent backup %s: %w", parentBackupName, err)
 		}
 		return parentBackup, nil
@@ -655,7 +655,7 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 			client.MatchingLabels(labels)); err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		filteredbackupList := FilterParentBackups(backupList, backup, backupMethod, incremental, backupRepoName)
+		filteredbackupList := FilterParentBackups(ctx, cli, backupList, backup, backupMethod, incremental, backupRepoName)
 		return getLatestBackup(filteredbackupList), nil
 	}
 
@@ -700,14 +700,14 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 }
 
 // FilterParentBackups filters the parent backups by backup phase, backup method and end time.
-func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1alpha1.Backup,
+func FilterParentBackups(ctx context.Context, cli client.Client, backupList *dpv1alpha1.BackupList, targetBackup *dpv1alpha1.Backup,
 	backupMethod *dpv1alpha1.BackupMethod, incremental bool, backupRepoName string) []*dpv1alpha1.Backup {
 	var res []*dpv1alpha1.Backup
 	if backupList == nil || len(backupList.Items) == 0 {
 		return res
 	}
 	for i, backup := range backupList.Items {
-		if err := ValidateParentBackup(targetBackup, &backup, backupMethod, backupRepoName); err != nil {
+		if err := ValidateParentBackup(ctx, cli, targetBackup, &backup, backupMethod, backupRepoName); err != nil {
 			continue
 		}
 		// backups are listed by backup type label, validate if the backup method matches
@@ -727,7 +727,7 @@ func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1al
 }
 
 // ValidateParentBackup validates the parent backup.
-func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Backup,
+func ValidateParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Backup,
 	backupMethod *dpv1alpha1.BackupMethod, backupRepoName string) error {
 	// validate parent backup is completed
 	if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
@@ -752,6 +752,27 @@ func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Ba
 	if parentBackup.Status.BackupRepoName != backupRepoName {
 		return fmt.Errorf("parent backup %s/%s repo %s is not consistent with the backup repo %s",
 			parentBackup.Namespace, parentBackup.Name, parentBackup.Status.BackupRepoName, backupRepoName)
+	}
+	if parentBackup.Status.EncryptionConfig != nil {
+		if err := checkEncryptionConfig(ctx, parentBackup.Status.EncryptionConfig, cli, parentBackup.Namespace); err != nil {
+			return fmt.Errorf("parent backup %s/%s encryption config is invalid: %w",
+				parentBackup.Namespace, parentBackup.Name, err)
+		}
+	}
+	return nil
+}
+
+func checkEncryptionConfig(ctx context.Context, config *dpv1alpha1.EncryptionConfig, cli client.Client, namespace string) error {
+	if config == nil {
+		return nil
+	}
+	secretKeyRef := config.PassPhraseSecretKeyRef
+	if secretKeyRef == nil {
+		return fmt.Errorf("encryptionConfig.passPhraseSecretKeyRef if empty")
+	}
+	err := checkSecretKeyRef(ctx, cli, namespace, secretKeyRef)
+	if err != nil {
+		return fmt.Errorf("failed to check encryption key reference: %w", err)
 	}
 	return nil
 }

@@ -203,7 +203,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.21
+	$(GO) mod tidy -compat=1.23
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
@@ -256,8 +256,9 @@ goimports: goimportstool ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG) | grep -v $(GENERATED_DEEP_COPY_FILE))
 
 .PHONY: api-doc
-api-doc:  ## generate API reference manual.
-	$(GO) run ./hack/docgen/api/main.go -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
+api-doc: $(LOCALBIN) ## generate API reference manual.
+	cd hack/docgen/api && go build -o "$(LOCALBIN)/docgen-api" ./main.go
+	"$(LOCALBIN)/docgen-api" -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
 
 .PHONY: doc
 doc: api-doc ## generate all documents.
@@ -338,7 +339,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.21
+	$(GO) mod tidy -compat=1.23
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -516,202 +517,6 @@ ifeq (, $(shell which kubectl))
 endif
 KUBECTL=$(shell which kubectl)
 
-##@ End-to-end (E2E) tests
-.PHONY: render-smoke-testdata-manifests
-render-smoke-testdata-manifests: addonsPath=addons/addons
-render-smoke-testdata-manifests: fetch-addons ## Update E2E test dataset
-ifeq ($(TEST_TYPE), wesql)
-	$(HELM) dependency build $(addonsPath)/apecloud-mysql-cluster --skip-refresh
-	$(HELM) template mysql-cluster $(addonsPath)/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-else ifeq ($(TEST_TYPE), postgresql)
-	$(HELM) dependency build $(addonsPath)/postgresql-cluster --skip-refresh
-	$(HELM) template pg-cluster $(addonsPath)/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-else ifeq ($(TEST_TYPE), redis)
-	$(HELM) dependency build $(addonsPath)/redis-cluster --skip-refresh
-	$(HELM) template redis-cluster $(addonsPath)/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-else ifeq ($(TEST_TYPE), mongodb)
-	$(HELM) dependency build $(addonsPath)/mongodb-cluster --skip-refresh
-	$(HELM) template mongodb-cluster $(addonsPath)/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-else ifeq ($(TEST_TYPE), pulsar)
-	$(HELM) dependency build $(addonsPath)/pulsar-cluster --skip-refresh
-	$(HELM) template pulsar-cluster -s templates/cluster.yaml $(addonsPath)/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
-else ifeq ($(TEST_TYPE), nebula)
-	$(HELM) dependency build $(addonsPath)/nebula-cluster --skip-refresh
-	$(HELM) upgrade --install nebula $(addonsPath)/nebula
-	$(HELM) template nebula-cluster $(addonsPath)/nebula-cluster > test/e2e/testdata/smoketest/nebula/00_nebulacluster.yaml
-else ifeq ($(TEST_TYPE), greptimedb)
-	$(HELM) dependency build $(addonsPath)/greptimedb-cluster --skip-refresh
-	$(HELM) upgrade --install greptimedb $(addonsPath)/greptimedb
-	$(HELM) template greptimedb-cluster $(addonsPath)/greptimedb-cluster > test/e2e/testdata/smoketest/greptimedb/00_greptimedbcluster.yaml
-else ifeq ($(TEST_TYPE), starrocks)
-	$(HELM) dependency build $(addonsPath)/starrocks-cluster --skip-refresh
-	$(HELM) upgrade --install starrocks $(addonsPath)/starrocks
-	$(HELM) template starrocks-cluster $(addonsPath)/starrocks-cluster > test/e2e/testdata/smoketest/starrocks/00_starrocksbcluster.yaml
-else ifeq ($(TEST_TYPE), risingwave)
-	$(HELM) dependency build $(addonsPath)/risingwave-cluster --skip-refresh
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-	$(HELM) upgrade --install risingwave $(addonsPath)/risingwave
-	$(HELM) template risingwave-cluster $(addonsPath)/risingwave-cluster > test/e2e/testdata/smoketest/risingwave/00_risingwavecluster.yaml
-else ifeq ($(TEST_TYPE), etcd)
-	$(HELM) dependency build $(addonsPath)/etcd-cluster --skip-refresh
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-	$(HELM) template etcd-cluster -s templates/cluster.yaml $(addonsPath)/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
-else ifeq ($(TEST_TYPE), oracle)
-	$(HELM) dependency build $(addonsPath)/oracle-mysql-cluster --skip-refresh
-	$(HELM) upgrade --install oracle $(addonsPath)/oracle-mysql
-	$(HELM) template oracle-cluster $(addonsPath)/oracle-mysql-cluster > test/e2e/testdata/smoketest/oracle/00_oraclecluster.yaml
-else ifeq ($(TEST_TYPE), kafka)
-	$(HELM) dependency build $(addonsPath)/kafka-cluster --skip-refresh
-	$(HELM) upgrade --install kafka $(addonsPath)/kafka
-	$(HELM) template kafka-cluster $(addonsPath)/kafka-cluster > test/e2e/testdata/smoketest/kafka/00_kafkacluster.yaml
-else ifeq ($(TEST_TYPE), foxlake)
-	$(HELM) dependency build $(addonsPath)/foxlake-cluster --skip-refresh
-	$(HELM) upgrade --install foxlake $(addonsPath)/foxlake
-	$(HELM) template foxlake-cluster $(addonsPath)/foxlake-cluster > test/e2e/testdata/smoketest/foxlake/00_foxlakecluster.yaml
-else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) dependency build $(addonsPath)/oceanbase-cluster --skip-refresh
-	$(HELM) upgrade --install oceanbase $(addonsPath)/oceanbase
-	$(HELM) template oceanbase-cluster $(addonsPath)/oceanbase-cluster > test/e2e/testdata/smoketest/oceanbase/00_oceanbasecluster.yaml
-else ifeq ($(TEST_TYPE), vanilla-postgresql)
-	$(HELM) dependency build $(addonsPath)/vanilla-postgresql-cluster --skip-refresh
-	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
-	$(HELM) template vanilla-pg $(addonsPath)/vanilla-postgresql-cluster > test/e2e/testdata/smoketest/vanilla-postgresql/00_official_pgcluster.yaml
-else ifeq ($(TEST_TYPE), openldap)
-	$(HELM) dependency build $(addonsPath)/openldap-cluster --skip-refresh
-	$(HELM) upgrade --install openldap $(addonsPath)/openldap
-	$(HELM) template openldap-cluster $(addonsPath)/openldap-cluster > test/e2e/testdata/smoketest/openldap/00_openldapcluster.yaml
-else ifeq ($(TEST_TYPE), orioledb)
-	$(HELM) dependency build $(addonsPath)/orioledb-cluster --skip-refresh
-	$(HELM) upgrade --install orioledb $(addonsPath)/orioledb
-	$(HELM) template oriole-cluster $(addonsPath)/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
-else ifeq ($(TEST_TYPE), weaviate)
-	$(HELM) dependency build $(addonsPath)/weaviate-cluster --skip-refresh
-	$(HELM) upgrade --install weaviate $(addonsPath)/weaviate
-	$(HELM) template weaviate-cluster $(addonsPath)/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
-else ifeq ($(TEST_TYPE), mysql-80)
-	$(HELM) dependency build $(addonsPath)/mysql-cluster --skip-refresh
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-	$(HELM) template mysqlcluster $(addonsPath)/mysql-cluster > test/e2e/testdata/smoketest/mysql-80/00_mysqlcluster.yaml
-else ifeq ($(TEST_TYPE), mysql-57)
-	$(HELM) dependency build $(addonsPath)/mysql-cluster --skip-refresh
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-else ifeq ($(TEST_TYPE), polardbx)
-	$(HELM) dependency build $(addonsPath)/polardbx-cluster --skip-refresh
-	$(HELM) upgrade --install polardbx $(addonsPath)/polardbx
-	$(HELM) template pxc $(addonsPath)/polardbx-cluster > test/e2e/testdata/smoketest/polardbx/00_polardbxcluster.yaml
-else ifeq ($(TEST_TYPE), opensearch)
-	$(HELM) dependency build $(addonsPath)/opensearch-cluster --skip-refresh
-	$(HELM) upgrade --install opensearch $(addonsPath)/opensearch
-	$(HELM) template opensearch-cluster $(addonsPath)/opensearch-cluster > test/e2e/testdata/smoketest/opensearch/00_opensearchcluster.yaml
-else ifeq ($(TEST_TYPE), elasticsearch)
-	$(HELM) dependency build $(addonsPath)/elasticsearch-cluster --skip-refresh
-	$(HELM) upgrade --install elasticsearch $(addonsPath)/elasticsearch
-	$(HELM) template elasticsearch-cluster $(addonsPath)/elasticsearch-cluster > test/e2e/testdata/smoketest/elasticsearch/00_elasticsearchcluster.yaml
-else ifeq ($(TEST_TYPE), llm)
-	$(HELM) dependency build $(addonsPath)/llm-cluster --skip-refresh
-	$(HELM) upgrade --install llm $(addonsPath)/llm
-	$(HELM) template llm-cluster $(addonsPath)/llm-cluster > test/e2e/testdata/smoketest/llm/00_llmcluster.yaml
-else ifeq ($(TEST_TYPE), tdengine)
-	$(HELM) dependency build $(addonsPath)/tdengine-cluster --skip-refresh
-	$(HELM) upgrade --install tdengine $(addonsPath)/tdengine
-	$(HELM) template td-cluster $(addonsPath)/tdengine-cluster > test/e2e/testdata/smoketest/tdengine/00_tdenginecluster.yaml
-else ifeq ($(TEST_TYPE), milvus)
-	$(HELM) dependency build $(addonsPath)/milvus-cluster --skip-refresh
-	$(HELM) upgrade --install milvus $(addonsPath)/milvus
-	$(HELM) template milvus-cluster $(addonsPath)/milvus-cluster > test/e2e/testdata/smoketest/milvus/00_milvuscluster.yaml
-else ifeq ($(TEST_TYPE), clickhouse)
-	$(HELM) dependency build $(addonsPath)/clickhouse-cluster --skip-refresh
-	$(HELM) upgrade --install clickhouse $(addonsPath)/clickhouse
-	$(HELM) template test -s templates/cluster.yaml $(addonsPath)/clickhouse-cluster > test/e2e/testdata/smoketest/clickhouse/00_clickhousecluster.yaml
-else ifeq ($(TEST_TYPE), zookeeper)
-	$(HELM) dependency build $(addonsPath)/zookeeper-cluster --skip-refresh
-	$(HELM) upgrade --install zookeeper $(addonsPath)/zookeeper
-	$(HELM) template zk-cluster $(addonsPath)/zookeeper-cluster > test/e2e/testdata/smoketest/zookeeper/00_zookeepercluster.yaml
-else ifeq ($(TEST_TYPE), mariadb)
-	$(HELM) dependency build $(addonsPath)/mariadb-cluster --skip-refresh
-	$(HELM) upgrade --install mariadb $(addonsPath)/mariadb
-	$(HELM) template mariadb-cluster $(addonsPath)/mariadb-cluster > test/e2e/testdata/smoketest/mariadb/00_mariadbcluster.yaml
-else
-	$(error "test type does not exist")
-endif
-
-.PHONY: test-e2e
-test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
-
-.PHONY: render-smoke-testdata-manifests-local
-render-smoke-testdata-manifests-local: addonsPath=addons/addons## Helm Install CD And CV
-render-smoke-testdata-manifests-local: fetch-addons
-ifeq ($(TEST_TYPE), wesql)
-	$(HELM) upgrade --install wesql $(addonsPath)/apecloud-mysql
-else ifeq ($(TEST_TYPE), postgresql)
-	$(HELM) upgrade --install postgresql $(addonsPath)/postgresql
-else ifeq ($(TEST_TYPE), mongodb)
-	$(HELM) upgrade --install  mongodb $(addonsPath)/mongodb
-else ifeq ($(TEST_TYPE), redis)
-	$(HELM) upgrade --install redis $(addonsPath)/redis
-else ifeq ($(TEST_TYPE), pulsar)
-	$(HELM) upgrade --install pulsar $(addonsPath)/pulsar
-else ifeq ($(TEST_TYPE), nebula)
-	$(HELM) upgrade --install nebula $(addonsPath)/nebula
-else ifeq ($(TEST_TYPE), greptimedb)
-	$(HELM) upgrade --install greptimedb $(addonsPath)/greptimedb
-else ifeq ($(TEST_TYPE), starrocks)
-	$(HELM) upgrade --install starrocks $(addonsPath)/starrocks
-else ifeq ($(TEST_TYPE), risingwave)
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-	$(HELM) upgrade --install risingwave $(addonsPath)/risingwave
-else ifeq ($(TEST_TYPE), etcd)
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-else ifeq ($(TEST_TYPE), oracle)
-	$(HELM) upgrade --install oracle-mysql $(addonsPath)/oracle-mysql
-else ifeq ($(TEST_TYPE), kafka)
-	$(HELM) upgrade --install kafka $(addonsPath)/kafka
-else ifeq ($(TEST_TYPE), foxlake)
-	$(HELM) upgrade --install foxlake $(addonsPath)/foxlake
-else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) upgrade --install oceanbase $(addonsPath)/oceanbase
-else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
-else ifeq ($(TEST_TYPE), openldap)
-	$(HELM) upgrade --install openldap $(addonsPath)/openldap
-else ifeq ($(TEST_TYPE), weaviate)
-	$(HELM) upgrade --install weaviate $(addonsPath)/weaviate
-else ifeq ($(TEST_TYPE), mysql-80)
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-else ifeq ($(TEST_TYPE), mysql-57)
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-else ifeq ($(TEST_TYPE), polardbx)
-	$(HELM) upgrade --install polardbx $(addonsPath)/polardbx
-else ifeq ($(TEST_TYPE), opensearch)
-	$(HELM) upgrade --install opensearch $(addonsPath)/opensearch
-else ifeq ($(TEST_TYPE), elasticsearch)
-	$(HELM) upgrade --install elasticsearch $(addonsPath)/elasticsearch
-else ifeq ($(TEST_TYPE), llm)
-	$(HELM) upgrade --install llm $(addonsPath)/llm
-else ifeq ($(TEST_TYPE), milvus)
-	$(HELM) upgrade --install milvus $(addonsPath)/milvus
-else ifeq ($(TEST_TYPE), clickhouse)
-	$(HELM) upgrade --install clickhouse $(addonsPath)/clickhouse
-else ifeq ($(TEST_TYPE), zookeeper)
-	$(HELM) upgrade --install zookeeper $(addonsPath)/zookeeper
-else ifeq ($(TEST_TYPE), mariadb)
-	$(HELM) upgrade --install mariadb $(addonsPath)/mariadb
-else
-	$(error "test type does not exist")
-endif
-
-.PHONY: test-e2e-local
-test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
-	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
-
-.PHONY: generate-cluster-role
-generate-cluster-role:
-	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
-
-.PHONY: install-s3-csi-driver
-install-s3-csi-driver:
-	$(HELM) upgrade --install csi-s3 https://github.com/apecloud/helm-charts/releases/download/csi-s3-0.7.0/csi-s3-0.7.0.tgz
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

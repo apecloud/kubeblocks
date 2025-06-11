@@ -92,12 +92,3 @@ func withShardingNameLabel(labels map[string]string, extraLabels ...map[string]s
 	}
 	return labels
 }
-
-func GetConfigurationLabels(clusterName, compName, cmTplName string) map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey:   AppName,
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: compName,
-		CMTemplateNameLabelKey: cmTplName,
-	}
-}

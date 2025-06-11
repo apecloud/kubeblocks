@@ -165,6 +165,11 @@ type ComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
+	// Defines the network configuration for the Component.
+	//
+	// +optional
+	Network *ComponentNetwork `json:"network,omitempty"`
+
 	// Overrides Services defined in referenced ComponentDefinition.
 	//
 	// +optional

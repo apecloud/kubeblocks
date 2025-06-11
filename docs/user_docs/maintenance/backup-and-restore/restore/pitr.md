@@ -28,7 +28,7 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
      ```bash
      # 1. Get all backup objects for the current cluster
      kubectl get backup -l app.kubernetes.io/instance=pg-cluster
-    
+
      # 2. Get the backup time range for Continuous Backup
      kubectl get backup -l app.kubernetes.io/instance=pg-cluster -l dataprotection.kubeblocks.io/backup-type=Continuous -oyaml
      ...
@@ -49,7 +49,7 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
      >
      ...
      Data Protection:
-     BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME                                                
+     BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME
      minio         Enabled       */5 * * * *       archive-wal     8d                 May 07,2024 15:29:46 UTC+0800 ~ May 07,2024 15:48:47 UTC+0800
      ```
 
@@ -67,11 +67,12 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
 
      <TabItem value="kubectl" label="kubectl" default>
 
-     ```bash
-     apiVersion: apps.kubeblocks.io/v1alpha1
+     ```yaml
+     apiVersion: operations.kubeblocks.io/v1alpha1
      kind: OpsRequest
      metadata:
-     name:  pg-cluster-pitr
+        name:  pg-cluster-pitr
+        namespace: default
      spec:
      clusterName:  pg-cluster-pitr
      restore:

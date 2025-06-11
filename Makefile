@@ -36,8 +36,6 @@ SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
-
-
 # Go setup
 export GO111MODULE = auto
 export GOSUMDB = sum.golang.org
@@ -62,40 +60,17 @@ GOPROXY := https://proxy.golang.org
 endif
 export GOPROXY
 
-
 LD_FLAGS="-s -w \
 	-X github.com/apecloud/kubeblocks/version.Version=v${VERSION} \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
 	-X github.com/apecloud/kubeblocks/version.GitCommit=${GIT_COMMIT} \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=${GIT_VERSION}"
+
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
 # if it wasn't specified by the caller.
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
-
-TAG_LATEST ?= false
-BUILDX_ENABLED ?= ""
-ifeq ($(BUILDX_ENABLED), "")
-	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
-		BUILDX_ENABLED = true
-	else
-		BUILDX_ENABLED = false
-	endif
-endif
-BUILDX_BUILDER ?= "x-builder"
-
-define BUILDX_ERROR
-buildx not enabled, refusing to run this recipe
-endef
-
-DOCKER_BUILD_ARGS =
-DOCKER_NO_BUILD_CACHE ?= false
-
-ifeq ($(DOCKER_NO_BUILD_CACHE), true)
-	DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS) --no-cache
-endif
-
 
 .DEFAULT_GOAL := help
 
@@ -170,11 +145,6 @@ fmt: ## Run go fmt against code.
 vet: test-go-generate ## Run go vet against code.
 	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
 
-.PHONY: cue-fmt
-cue-fmt: cuetool ## Run cue fmt against code.
-	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
-	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
-
 .PHONY: lint-fast
 lint-fast: staticcheck vet golangci-lint # [INTERNAL] Run all lint job against code.
 
@@ -183,15 +153,15 @@ lint: test-go-generate generate ## Run default lint job against code.
 	$(MAKE) golangci-lint
 
 .PHONY: golangci-lint
-golangci-lint: golangci generate ## Run golangci-lint against code.
+golangci-lint: golangci-lint-bin generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
+staticcheck: staticcheck-bin test-go-generate generate ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports lint-fast ## Run build checks.
+build-checks: fmt vet goimports lint-fast ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -252,7 +222,7 @@ else
 endif
 
 .PHONY: goimports
-goimports: goimportstool ## Run goimports against code.
+goimports: goimports-bin ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG) | grep -v $(GENERATED_DEEP_COPY_FILE))
 
 .PHONY: api-doc
@@ -266,15 +236,15 @@ doc: api-doc ## generate all documents.
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
+manager: generate manager-go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 .PHONY: dataprotection
-dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
+dataprotection: generate build-checks ## Build dataprotection binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
 
 .PHONY: kbagent
-kbagent: generate test-go-generate build-checks
+kbagent: generate build-checks
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/kbagent ./cmd/kbagent/main.go
 
 .PHONY: helmhook
@@ -380,7 +350,7 @@ bump-chart-ver: \
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
-helm-package: bump-chart-ver ## Do helm package.
+helm-package: helmtool bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
@@ -390,106 +360,54 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-## Tool Binaries
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.1.1
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-CUE_VERSION ?= v0.4.3
+ENVTEST_VERSION ?= release-0.21
+
+## Tool Binaries
+KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
+ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
-	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
-endif
+kustomize: $(LOCALBIN) ## Download kustomize locally if necessary.
+	@[ -f $(KUSTOMIZE) ] || { \
+		echo "Installing kustomize with version $(KUSTOMIZE_VERSION)"; \
+		curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN) && \
+		mv "$(LOCALBIN)/kustomize" "$(KUSTOMIZE)"; \
+	}
 
 .PHONY: controller-gen
 controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
-	@{ \
-	set -e ;\
-	if [ ! -f "$(CONTROLLER_GEN)" ] || [ "$$($(CONTROLLER_GEN) --version 2>&1 | awk '{print $$NF}')" != "$(CONTROLLER_TOOLS_VERSION)" ]; then \
-        echo 'Installing controller-gen@$(CONTROLLER_TOOLS_VERSION)...' ;\
-        GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
-        echo 'Successfully installed' ;\
-    fi \
-	}
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240320141353-395cfc7486e6
-endif
+envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-.PHONY: install-docker-buildx
-install-docker-buildx: ## Create `docker buildx` builder.
-	@if ! docker buildx inspect $(BUILDX_BUILDER) > /dev/null; then \
-		echo "Buildx builder $(BUILDX_BUILDER) does not exist, creating..."; \
-		docker buildx create --name=$(BUILDX_BUILDER) --use --driver=docker-container --platform linux/amd64,linux/arm64; \
-	else \
-		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
-	fi
-
-.PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.64.5
-golangci: ## Download golangci-lint locally if necessary.
-ifneq ($(shell which golangci-lint),)
-	@echo golangci-lint is already installed
-GOLANGCILINT=$(shell which golangci-lint)
-else ifeq (, $(shell which $(GOBIN)/golangci-lint))
-	@{ \
-	set -e ;\
-	echo 'installing golangci-lint-$(GOLANGCILINT_VERSION)' ;\
-	curl -sSfL $(GITHUB_PROXY)https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCILINT_VERSION) ;\
-	echo 'Successfully installed' ;\
+GOLANGCILINT_VERSION = v1.64.8
+GOLANGCILINT = $(LOCALBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
+.PHONY: golangci-lint-bin
+golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
+	@[ -f $(GOLANGCILINT) ] || { \
+  		echo "Installing golangci-lint with version $(GOLANGCILINT_VERSION)"; \
+		curl -sSfL $(GITHUB_PROXY)https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(LOCALBIN) $(GOLANGCILINT_VERSION) && \
+		mv "$(LOCALBIN)/golangci-lint" "$(GOLANGCILINT)"; \
 	}
-GOLANGCILINT=$(GOBIN)/golangci-lint
-else
-	@echo golangci-lint is already installed
-GOLANGCILINT=$(GOBIN)/golangci-lint
-endif
 
-.PHONY: staticchecktool
-staticchecktool: ## Download staticcheck locally if necessary.
-ifeq (, $(shell which staticcheck))
-	@{ \
-	set -e ;\
-	echo 'installing honnef.co/go/tools/cmd/staticcheck' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@latest;\
-	}
-STATICCHECK=$(GOBIN)/staticcheck
-else
-STATICCHECK=$(shell which staticcheck)
-endif
+STATICCHECK_VERSION = v0.6.1
+STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
+.PHONY: staticcheck-bin
+staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.
+	$(call go-install-tool,$(STATICCHECK),honnef.co/go/tools/cmd/staticcheck,$(STATICCHECK_VERSION))
 
-.PHONY: goimportstool
-goimportstool: ## Download goimports locally if necessary.
-ifeq (, $(shell which goimports))
-	@{ \
-	set -e ;\
-	go install golang.org/x/tools/cmd/goimports@latest ;\
-	}
-GOIMPORTS=$(GOBIN)/goimports
-else
-GOIMPORTS=$(shell which goimports)
-endif
-
-.PHONY: cuetool
-cuetool: ## Download cue locally if necessary.
-ifeq (, $(shell which cue))
-	@{ \
-	set -e ;\
-	go install cuelang.org/go/cmd/cue@$(CUE_VERSION) ;\
-	}
-CUE=$(GOBIN)/cue
-else
-CUE=$(shell which cue)
-endif
+GOIMPORTS_VERSION = v0.34.0
+GOIMPORTS = $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)
+.PHONY: goimports-bin
+goimports-bin: $(LOCALBIN) ## Download goimports locally if necessary.
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 .PHONY: helmtool
 helmtool: ## Download helm locally if necessary.
@@ -497,10 +415,11 @@ ifeq (, $(shell which helm))
 	@{ \
 	set -e ;\
 	echo 'installing helm' ;\
-	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
+	curl $(GITHUB_PROXY)https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
 	echo 'Successfully installed' ;\
 	}
-HELM=$(GOBIN)/helm
+# Hopefully the command will be installed in PATH
+HELM=helm
 else
 HELM=$(shell which helm)
 endif
@@ -514,9 +433,25 @@ ifeq (, $(shell which kubectl))
 	curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(GOOS)/$(GOARCH)/kubectl" && chmod +x kubectl && sudo mv kubectl /usr/local/bin ;\
 	echo 'Successfully installed' ;\
 	}
-endif
+# Hopefully the command will be installed in PATH
+KUBECTL=kubectl
+else
 KUBECTL=$(shell which kubectl)
+endif
 
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary (ideally with version)
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Installing $${package}" ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+}
+endef
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

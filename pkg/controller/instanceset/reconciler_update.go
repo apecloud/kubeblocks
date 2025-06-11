@@ -22,6 +22,7 @@ package instanceset
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -359,25 +360,30 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 
 func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
 	if its.Status.InstanceStatus == nil {
-		its.Status.InstanceStatus = make(map[string]workloads.InstanceStatus)
+		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
 	}
-	status := its.Status.InstanceStatus[pod.Name]
-	defer func() { its.Status.InstanceStatus[pod.Name] = status }()
+	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+		return instance.PodName == pod.Name
+	})
+	if idx < 0 {
+		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
+		idx = len(its.Status.InstanceStatus) - 1
+	}
 
-	if status.Configs == nil {
-		status.Configs = make([]workloads.InstanceConfigStatus, 0)
+	if its.Status.InstanceStatus[idx].Configs == nil {
+		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
 	}
-	newConfigStatus := workloads.InstanceConfigStatus{
+	status := workloads.InstanceConfigStatus{
 		Name:       config.Name,
 		Generation: config.Generation,
 	}
-	for i, configStatus := range status.Configs {
+	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
 		if configStatus.Name == config.Name {
-			status.Configs[i] = newConfigStatus
+			its.Status.InstanceStatus[idx].Configs[i] = status
 			return
 		}
 	}
-	status.Configs = append(status.Configs, newConfigStatus)
+	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
 }
 
 func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
@@ -397,11 +403,13 @@ func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod 
 }
 
 func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
-	status, ok := its.Status.InstanceStatus[pod.Name]
-	if !ok {
+	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+		return instance.PodName == pod.Name
+	})
+	if idx < 0 {
 		return true // new pod provisioned
 	}
-	for _, configStatus := range status.Configs {
+	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
 		if configStatus.Name == config.Name {
 			return config.Generation <= configStatus.Generation
 		}

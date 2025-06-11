@@ -10872,7 +10872,8 @@ spec:
                 format: int32
                 type: integer
               instanceStatus:
-                additionalProperties:
+                description: Provides the status of each instance in the ITS.
+                items:
                   properties:
                     configs:
                       description: The status of configs.
@@ -10890,18 +10891,14 @@ spec:
                         - name
                         type: object
                       type: array
-                    templateName:
-                      default: ""
-                      description: Represents the instance template the pod uses.
-                        Default template name is empty string.
+                    podName:
+                      default: Unknown
+                      description: Represents the name of the pod.
                       type: string
                   required:
-                  - templateName
+                  - podName
                   type: object
-                description: |-
-                  Provides the status of each instance in the ITS.
-                  key is pod name.
-                type: object
+                type: array
               membersStatus:
                 description: Provides the status of each member in the cluster.
                 items:
@@ -10978,6 +10975,13 @@ spec:
                   InstanceSet's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              ordinals:
+                description: Ordinals is the ordinals used by the instances of the
+                  InstanceSet.
+                items:
+                  format: int32
+                  type: integer
+                type: array
               readyInitReplicas:
                 description: |-
                   Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
@@ -11016,6 +11020,13 @@ spec:
                     name:
                       description: Name, the name of the InstanceTemplate.
                       type: string
+                    ordinals:
+                      description: Ordinals is the ordinals used by the instances
+                        of the InstanceTemplate.
+                      items:
+                        format: int32
+                        type: integer
+                      type: array
                     readyReplicas:
                       description: ReadyReplicas is the number of Pods that have a
                         Ready Condition.

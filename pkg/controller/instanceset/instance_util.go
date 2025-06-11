@@ -159,7 +159,9 @@ func isTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
-func isPodPending(pod *corev1.Pod) bool { return pod.Status.Phase == corev1.PodPending }
+func isPodPending(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodPending
+}
 
 // isImageMatched returns true if all container statuses have same image as defined in pod spec
 func isImageMatched(pod *corev1.Pod) bool {

@@ -25,7 +25,6 @@ import (
 	"sort"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -76,11 +75,6 @@ func (s *separatedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 
 func (s *separatedPodNameBuilder) Validate() error {
 	// no specific rules needed
-	return nil
-}
-
-func (s *separatedPodNameBuilder) SetInstanceStatus(pods []*corev1.Pod) error {
-	// separatedPodNameBuilder does not need to set InstanceStatus
 	return nil
 }
 

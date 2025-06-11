@@ -55,6 +55,4 @@ type PodNameBuilder interface {
 	// Validate will check nameBuilder-specific validation rules.
 	// Rules that apply to all nameBuilders will be checked in ValidateInstanceTemplates.
 	Validate() error
-	// SetInstanceStatus may save some states in status of InstanceSet
-	SetInstanceStatus(pods []*corev1.Pod) error
 }

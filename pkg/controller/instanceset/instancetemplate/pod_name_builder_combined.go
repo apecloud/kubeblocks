@@ -25,12 +25,10 @@ import (
 	"slices"
 	"strings"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // ErrOrdinalsNotEnough is considered temporary, e.g. some old ordinals are being deleted
@@ -144,21 +142,6 @@ func (c *combinedPodNameBuilder) Validate() error {
 	return nil
 }
 
-// SetInstanceStatus sets template name in InstanceStatus
-func (c *combinedPodNameBuilder) SetInstanceStatus(pods []*corev1.Pod) error {
-	instanceStatus := c.itsExt.InstanceSet.Status.InstanceStatus
-	for _, pod := range pods {
-		templateName, ok := pod.Labels[TemplateNameLabelKey]
-		if !ok {
-			return fmt.Errorf("unknown pod %v", klog.KObj(pod))
-		}
-		status := instanceStatus[pod.Name]
-		status.TemplateName = templateName
-		instanceStatus[pod.Name] = status
-	}
-	return nil
-}
-
 // generateTemplateName2OrdinalMap returns a map from template name to sorted ordinals
 // it rely on the instanceset's status to generate desired pod names
 // it may not be updated, but it should converge eventually
@@ -195,13 +178,15 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
 	}
 
-	for podName, status := range itsExt.InstanceSet.Status.InstanceStatus {
-		ordinal, err := getOrdinal(podName)
-		if err != nil {
-			return nil, err
+	if _, ok := template2OrdinalSetMap[""]; ok {
+		template2OrdinalSetMap[""].Insert(itsExt.InstanceSet.Status.Ordinals...)
+	}
+	globalUsedOrdinalSet.Insert(itsExt.InstanceSet.Status.Ordinals...)
+	for _, status := range itsExt.InstanceSet.Status.TemplatesStatus {
+		if _, ok := template2OrdinalSetMap[status.Name]; ok {
+			template2OrdinalSetMap[status.Name].Insert(status.Ordinals...)
 		}
-		template2OrdinalSetMap[status.TemplateName].Insert(ordinal)
-		globalUsedOrdinalSet.Insert(ordinal)
+		globalUsedOrdinalSet.Insert(status.Ordinals...)
 	}
 
 	// main calculation

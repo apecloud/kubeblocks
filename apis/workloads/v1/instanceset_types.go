@@ -260,6 +260,10 @@ type InstanceSetStatus struct {
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
 
+	// Ordinals is the ordinals used by the instances of the InstanceSet.
+	// +optional
+	Ordinals []int32 `json:"ordinals,omitempty"`
+
 	// readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 
@@ -314,10 +318,9 @@ type InstanceSetStatus struct {
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
 	// Provides the status of each instance in the ITS.
-	// key is pod name.
 	//
 	// +optional
-	InstanceStatus map[string]InstanceStatus `json:"instanceStatus,omitempty"`
+	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
@@ -513,11 +516,11 @@ type MemberStatus struct {
 }
 
 type InstanceStatus struct {
-	// Represents the instance template the pod uses. Default template name is empty string.
+	// Represents the name of the pod.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=""
-	TemplateName string `json:"templateName"`
+	// +kubebuilder:default=Unknown
+	PodName string `json:"podName"`
 
 	// The status of configs.
 	//
@@ -545,6 +548,10 @@ type InstanceTemplateStatus struct {
 	// Replicas is the number of replicas of the InstanceTemplate.
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
+
+	// Ordinals is the ordinals used by the instances of the InstanceTemplate.
+	// +optional
+	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// ReadyReplicas is the number of Pods that have a Ready Condition.
 	// +optional

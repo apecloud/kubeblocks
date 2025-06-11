@@ -22,7 +22,6 @@ package instanceset
 import (
 	"encoding/json"
 	"sort"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,11 +54,6 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []*corev1.Pod
@@ -73,6 +67,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	replicas := int32(0)
+	ordinals := make([]int32, 0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
@@ -95,21 +90,23 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, pod := range podList {
-		parentName, _ := ParseParentNameAndOrdinal(pod.Name)
-		templateName, _ := strings.CutPrefix(parentName, its.Name)
-		if len(templateName) > 0 {
-			templateName, _ = strings.CutPrefix(templateName, "-")
-		}
+		_, ordinal := ParseParentNameAndOrdinal(pod.Name)
+		templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
-				Name: templateName,
+				Name:     templateName,
+				Ordinals: make([]int32, 0),
 			}
 		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
 			notReadyNames.Insert(pod.Name)
 			replicas++
+			if len(templateName) == 0 {
+				ordinals = append(ordinals, int32(ordinal))
+			}
 			template2TemplatesStatus[templateName].Replicas++
+			template2TemplatesStatus[templateName].Ordinals = append(template2TemplatesStatus[templateName].Ordinals, int32(ordinal))
 		}
 		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
 			readyReplicas++
@@ -147,6 +144,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 	its.Status.Replicas = replicas
+	its.Status.Ordinals = ordinals
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
@@ -196,9 +194,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	setMembersStatus(its, podList)
 
 	// 5. set instance status
-	if err := setInstanceStatus(itsExt, podList); err != nil {
-		return kubebuilderx.Continue, err
-	}
+	setInstanceStatus(its, podList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -339,26 +335,23 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }
 
-func setInstanceStatus(itsExt *instancetemplate.InstanceSetExt, pods []*corev1.Pod) error {
-	its := itsExt.InstanceSet
+func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	// compose new instance status
-	newInstanceStatus := make(map[string]workloads.InstanceStatus)
+	newInstanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, pod := range pods {
-		newInstanceStatus[pod.Name] = workloads.InstanceStatus{}
+		instanceStatus := workloads.InstanceStatus{
+			PodName: pod.Name,
+		}
+		newInstanceStatus = append(newInstanceStatus, instanceStatus)
 	}
 
 	syncInstanceConfigStatus(its, newInstanceStatus)
 
+	sortInstanceStatus(newInstanceStatus)
 	its.Status.InstanceStatus = newInstanceStatus
-
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return err
-	}
-	return nameBuilder.SetInstanceStatus(pods)
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus map[string]workloads.InstanceStatus) {
+func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
 	if its.Status.InstanceStatus == nil {
 		// initialize
 		configs := make([]workloads.InstanceConfigStatus, 0)
@@ -368,9 +361,8 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus map[str
 				Generation: config.Generation,
 			})
 		}
-		for podName, status := range instanceStatus {
-			status.Configs = configs
-			instanceStatus[podName] = status
+		for i := range instanceStatus {
+			instanceStatus[i].Configs = configs
 		}
 	} else {
 		// HACK: copy the existing config status from the current its.status.instanceStatus
@@ -378,21 +370,27 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus map[str
 		for _, config := range its.Spec.Configs {
 			configs.Insert(config.Name)
 		}
-		for newStatusPod, newStatus := range instanceStatus {
-			for statusPod, status := range its.Status.InstanceStatus {
-				if newStatusPod == statusPod {
-					if newStatus.Configs == nil {
-						newStatus.Configs = make([]workloads.InstanceConfigStatus, 0)
+		for i, newStatus := range instanceStatus {
+			for _, status := range its.Status.InstanceStatus {
+				if status.PodName == newStatus.PodName {
+					if instanceStatus[i].Configs == nil {
+						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
 					}
 					for j, config := range status.Configs {
 						if configs.Has(config.Name) {
-							newStatus.Configs = append(newStatus.Configs, status.Configs[j])
+							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
 						}
 					}
-					instanceStatus[newStatusPod] = newStatus
 					break
 				}
 			}
 		}
 	}
+}
+
+func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return ParseParentNameAndOrdinal(instanceStatus[i].PodName)
+	}
+	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

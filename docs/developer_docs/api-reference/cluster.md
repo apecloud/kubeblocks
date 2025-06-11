@@ -30543,6 +30543,18 @@ int32
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ordinals is the ordinals used by the instances of the InstanceSet.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>readyReplicas</code><br/>
 <em>
 int32
@@ -30674,14 +30686,13 @@ Used only when spec.roles set.</p>
 <code>instanceStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceStatus">
-map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.InstanceStatus
+[]InstanceStatus
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides the status of each instance in the ITS.
-key is pod name.</p>
+<p>Provides the status of each instance in the ITS.</p>
 </td>
 </tr>
 <tr>
@@ -30743,13 +30754,13 @@ key is the pod name, value is the revision.</p>
 <tbody>
 <tr>
 <td>
-<code>templateName</code><br/>
+<code>podName</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Represents the instance template the pod uses. Default template name is empty string.</p>
+<p>Represents the name of the pod.</p>
 </td>
 </tr>
 <tr>
@@ -30966,6 +30977,18 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Replicas is the number of replicas of the InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ordinals is the ordinals used by the instances of the InstanceTemplate.</p>
 </td>
 </tr>
 <tr>

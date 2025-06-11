@@ -86,11 +86,12 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0": {},
-					"-1": {},
-					"-2": {TemplateName: "t1"},
-					"-4": {TemplateName: "t1"},
+				Ordinals: []int32{0, 1},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{2, 4},
+					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -114,12 +115,12 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0": {},
-					"-1": {},
-					"-2": {TemplateName: "t1"},
-					"-3": {TemplateName: "t1"},
-					"-4": {TemplateName: "t1"},
+				Ordinals: []int32{0, 1},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{2, 3, 4},
+					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -178,10 +179,12 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0":   {},
-					"-1":   {},
-					"-100": {TemplateName: "t1"},
+				Ordinals: []int32{0, 1},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{100},
+					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -203,10 +206,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0": {},
-					"-1": {},
-				},
+				Ordinals: []int32{0, 1},
 			},
 		}, map[string]sets.Set[int32]{
 			"":   sets.New[int32](0, 3, 4),
@@ -244,8 +244,11 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-150": {TemplateName: "t1"},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{150},
+					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -329,11 +332,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0": {},
-					"-1": {},
-					"-2": {},
-				},
+				Ordinals: []int32{0, 1, 2},
 			},
 		}, map[string]sets.Set[int32]{
 			"t1": sets.New[int32](2, 3),
@@ -361,11 +360,15 @@ var _ = Describe("Combined Name builder tests", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0": {TemplateName: "t1"},
-					"-1": {TemplateName: "t1"},
-					"-2": {TemplateName: "t2"},
-					"-3": {TemplateName: "t2"},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{0, 1},
+					},
+					{
+						Name:     "t2",
+						Ordinals: []int32{2, 3},
+					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -385,11 +388,12 @@ var _ = Describe("Combined Name builder tests", func() {
 				OfflineInstances: []string{"-2"},
 			},
 			Status: workloads.InstanceSetStatus{
-				InstanceStatus: map[string]workloads.InstanceStatus{
-					"-0": {},
-					"-1": {},
-					"-2": {},
-					"-3": {TemplateName: "t1"},
+				Ordinals: []int32{0, 1, 2},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{3},
+					},
 				},
 			},
 		}, map[string]sets.Set[int32]{

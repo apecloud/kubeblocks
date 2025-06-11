@@ -17,6 +17,28 @@
 #along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+TAG_LATEST ?= false
+BUILDX_ENABLED ?= ""
+ifeq ($(BUILDX_ENABLED), "")
+	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
+		BUILDX_ENABLED = true
+	else
+		BUILDX_ENABLED = false
+	endif
+endif
+BUILDX_BUILDER ?= "x-builder"
+
+define BUILDX_ERROR
+buildx not enabled, refusing to run this recipe
+endef
+
+DOCKER_BUILD_ARGS =
+DOCKER_NO_BUILD_CACHE ?= false
+
+ifeq ($(DOCKER_NO_BUILD_CACHE), true)
+	DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS) --no-cache
+endif
+
 # To use buildx: https://github.com/docker/buildx#docker-ce
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
@@ -50,6 +72,16 @@ DOCKER_BUILD_ARGS ?=
 DOCKER_BUILD_ARGS += $(GO_BUILD_ARGS) $(BUILD_ARGS)
 
 ##@ Docker containers
+
+.PHONY: install-docker-buildx
+install-docker-buildx: ## Create `docker buildx` builder.
+	@if ! docker buildx inspect $(BUILDX_BUILDER) > /dev/null; then \
+		echo "Buildx builder $(BUILDX_BUILDER) does not exist, creating..."; \
+		docker buildx create --name=$(BUILDX_BUILDER) --use --driver=docker-container --platform linux/amd64,linux/arm64; \
+	else \
+		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
+	fi
+
 
 .PHONY: build-dev-container-image
 build-dev-container-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR)

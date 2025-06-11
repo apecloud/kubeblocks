@@ -424,7 +424,7 @@ var _ = Describe("RestoreManager Test", func() {
 					if actionset.Annotations == nil {
 						actionset.Annotations = make(map[string]string)
 					}
-					actionset.Annotations[constant.UnifyFullAndContinuousRestoreAnnotationKey] = "true"
+					actionset.Annotations[constant.SkipBaseBackupRestoreInPitrAnnotationKey] = "true"
 				})).Should(Succeed())
 
 				By("check length of backupsets")

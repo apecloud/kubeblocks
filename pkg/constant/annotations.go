@@ -54,10 +54,10 @@ const (
 )
 
 const (
-	// UnifyFullAndContinuousRestoreAnnotationKey is an experimental api to unify full and continuous restore job.
+	// SkipBaseBackupRestoreInPitrAnnotationKey is an experimental api to unify full and continuous restore job.
 	// It is set on the actionset CR.
 	// If this annotaion is set to "true", then only one job will be created during restore.
-	UnifyFullAndContinuousRestoreAnnotationKey = "dataprotection.kubeblocks.io/unify-full-and-continuous-restore"
+	SkipBaseBackupRestoreInPitrAnnotationKey = "dataprotection.kubeblocks.io/skip-base-backup-restore-in-pitr"
 )
 
 // annotations for multi-cluster

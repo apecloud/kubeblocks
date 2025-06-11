@@ -180,18 +180,17 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		return err
 	}
 
-	unifyFullAndContinuousRestore := false
+	skipBaseBackupRestoreInPitr := false
 	if continuousBackupSet.ActionSet.Annotations != nil {
-		v, ok := continuousBackupSet.ActionSet.Annotations[constant.UnifyFullAndContinuousRestoreAnnotationKey]
-		if ok && v == "true" {
-			unifyFullAndContinuousRestore = true
+		if continuousBackupSet.ActionSet.Annotations[constant.SkipBaseBackupRestoreInPitrAnnotationKey] == "true" {
+			skipBaseBackupRestoreInPitr = true
 		}
 	}
 
 	// set base backup
 	continuousBackupSet.BaseBackup = baseBackupSet.Backup
 	if baseBackupSet.ActionSet != nil && baseBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
-		if unifyFullAndContinuousRestore {
+		if skipBaseBackupRestoreInPitr {
 			return intctrlutil.NewFatalError("unify incremental and continuous restore job is not supported")
 		}
 		if err = r.BuildIncrementalBackupActionSet(reqCtx, cli, *baseBackupSet); err != nil {
@@ -199,8 +198,8 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		}
 		r.SetBackupSets(continuousBackupSet)
 	} else {
-		if unifyFullAndContinuousRestore {
-			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, "UnifyFullAndContinuousRestore", "full and continuous job is unified")
+		if skipBaseBackupRestoreInPitr {
+			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, "SkipBaseBackupRestoreInPitr", "base backup restore skipped")
 			r.SetBackupSets(continuousBackupSet)
 		} else {
 			r.SetBackupSets(*baseBackupSet, continuousBackupSet)

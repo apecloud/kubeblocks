@@ -1,0 +1,18 @@
+name: Cherry Pick Auto
+
+on:
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - main
+      - release-*
+
+env:
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  cherry-pick:
+    if: ${{ github.event.pull_request.merged == true && (github.base_ref == 'main' || startsWith(github.base_ref, 'release-')) }}
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-cherry-pick-auto.yml@v0.1.88
+    secrets: inherit

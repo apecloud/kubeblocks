@@ -1,0 +1,15 @@
+name: Cherry Pick Label Check
+
+on:
+  pull_request_target:
+    types: [ labeled, unlabeled, synchronize ]
+    branches:
+      - main
+      - release-*
+
+jobs:
+  pr-label-check:
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-label-check.yml@v0.1.88
+    with:
+      CHECK_LABEL: "pick"
+    secrets: inherit

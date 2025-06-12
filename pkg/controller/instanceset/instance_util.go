@@ -43,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -74,9 +73,9 @@ func init() {
 	runtime.Must(err)
 }
 
-// ParseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
+// parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
-func ParseParentNameAndOrdinal(s string) (string, int) {
+func parseParentNameAndOrdinal(s string) (string, int) {
 	parent := s
 	ordinal := -1
 
@@ -108,7 +107,7 @@ func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, r
 		if name, ok := namesCache[objects[i].GetName()]; ok {
 			return name, ordinalsCache[objects[i].GetName()]
 		}
-		name, ordinal := ParseParentNameAndOrdinal(objects[i].GetName())
+		name, ordinal := parseParentNameAndOrdinal(objects[i].GetName())
 		namesCache[objects[i].GetName()] = name
 		ordinalsCache[objects[i].GetName()] = ordinal
 		return name, ordinal
@@ -254,30 +253,6 @@ func getPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }
 
-func ValidateDupInstanceNames[T any](instances []T, getNameFunc func(item T) string) error {
-	instanceNameCount := make(map[string]int)
-	for _, r := range instances {
-		name := getNameFunc(r)
-		count, exist := instanceNameCount[name]
-		if exist {
-			count++
-		} else {
-			count = 1
-		}
-		instanceNameCount[name] = count
-	}
-	dupNames := ""
-	for name, count := range instanceNameCount {
-		if count > 1 {
-			dupNames = fmt.Sprintf("%s%s,", dupNames, name)
-		}
-	}
-	if len(dupNames) > 0 {
-		return fmt.Errorf("duplicate pod names: %s", dupNames)
-	}
-	return nil
-}
-
 // Deprecated: should use instancetemplate.PodNameBuilder
 func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals kbappsv1.Ordinals) ([]string, error) {
 	totalReplicas := int32(0)
@@ -307,7 +282,7 @@ func GenerateAllInstanceNames(parentName string, replicas int32, templates []Ins
 		instanceNameList = append(instanceNameList, names...)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(instanceNameList[i])
+		return parseParentNameAndOrdinal(instanceNameList[i])
 	}
 	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
 	return instanceNameList, nil
@@ -373,18 +348,6 @@ func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 		return instanceNameList, fmt.Errorf("%s", errorMessage)
 	}
 	return instanceNameList, nil
-}
-
-func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
-	if templateName == "" {
-		return its.Spec.DefaultTemplateOrdinals, nil
-	}
-	for _, template := range its.Spec.Instances {
-		if template.Name == templateName {
-			return template.Ordinals, nil
-		}
-	}
-	return kbappsv1.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
 func convertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
@@ -465,7 +428,7 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
-		revision, err = BuildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
+		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
 		if err != nil {
 			return nil, err
 		}
@@ -641,7 +604,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
+func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
 	podTemplate := filterInPlaceFields(template)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
@@ -670,52 +633,4 @@ func getInstanceTemplateMap(annotations map[string]string) (map[string]string, e
 		return nil, err
 	}
 	return templateMap, nil
-}
-
-func getInstanceTemplates(instances []workloads.InstanceTemplate, template *corev1.ConfigMap) []workloads.InstanceTemplate {
-	if template == nil {
-		return instances
-	}
-
-	// if template is found with incorrect format, try it as the whole templates is corrupted.
-	if template.BinaryData == nil {
-		return nil
-	}
-	templateData, ok := template.BinaryData[templateRefDataKey]
-	if !ok {
-		return nil
-	}
-	templateByte, err := reader.DecodeAll(templateData, nil)
-	if err != nil {
-		return nil
-	}
-	extraTemplates := make([]workloads.InstanceTemplate, 0)
-	err = json.Unmarshal(templateByte, &extraTemplates)
-	if err != nil {
-		return nil
-	}
-
-	return append(instances, extraTemplates...)
-}
-
-func findTemplateObject(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (*corev1.ConfigMap, error) {
-	templateMap, err := getInstanceTemplateMap(its.Annotations)
-	// error has been checked in prepare stage, there should be no error occurs
-	if err != nil {
-		return nil, nil
-	}
-	for name, templateName := range templateMap {
-		if name != its.Name {
-			continue
-		}
-		// find the compressed instance templates, parse them
-		template := builder.NewConfigMapBuilder(its.Namespace, templateName).GetObject()
-		templateObj, err := tree.Get(template)
-		if err != nil {
-			return nil, err
-		}
-		template, _ = templateObj.(*corev1.ConfigMap)
-		return template, nil
-	}
-	return nil, nil
 }

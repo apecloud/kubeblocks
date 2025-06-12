@@ -28,12 +28,14 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -125,23 +127,55 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	return objs, nil
 }
 
-// GenerateAllPodNames generate all pod names for a component.
-//
-// Deprecated: should use instancetemplate.PodNameBuilder
-func GenerateAllPodNames(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	fullCompName string) ([]string, error) {
-	var templates []instanceset.InstanceTemplate
-	for i := range instances {
-		templates = append(templates, &workloads.InstanceTemplate{
-			Name:     instances[i].Name,
-			Replicas: instances[i].Replicas,
-			Ordinals: instances[i].Ordinals,
-		})
+func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
 	}
-	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	return nameBuilder.GenerateAllInstanceNames()
+}
+
+func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
+	instanceTemplates := func() []workloads.InstanceTemplate {
+		if len(comp.Spec.Instances) == 0 {
+			return nil
+		}
+		templates := make([]workloads.InstanceTemplate, len(comp.Spec.Instances))
+		for i, tpl := range comp.Spec.Instances {
+			templates[i] = workloads.InstanceTemplate{
+				Name:     tpl.Name,
+				Replicas: tpl.Replicas,
+				Ordinals: tpl.Ordinals,
+			}
+		}
+		return templates
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   comp.Namespace,
+			Name:        comp.Name,
+			Annotations: comp.Annotations,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:         &comp.Spec.Replicas,
+			Instances:        instanceTemplates(),
+			PodNamingRule:    comp.Spec.PodNamingRule,
+			OfflineInstances: comp.Spec.OfflineInstances,
+		},
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	return nameBuilder.GenerateAllInstanceNames()
 }
 
 // GenerateAllPodNamesToSet generate all pod names for a component
@@ -155,7 +189,7 @@ func GenerateAllPodNamesToSet(
 	clusterName,
 	fullCompName string) (map[string]string, error) {
 	compName := constant.GenerateClusterComponentName(clusterName, fullCompName)
-	instanceNames, err := GenerateAllPodNames(compReplicas, instances, offlineInstances, compName)
+	instanceNames, err := generateAllPodNames(compReplicas, instances, offlineInstances, compName)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +199,22 @@ func GenerateAllPodNamesToSet(
 		podSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
 	}
 	return podSet, nil
+}
+
+func generateAllPodNames(
+	compReplicas int32,
+	instances []appsv1.InstanceTemplate,
+	offlineInstances []string,
+	fullCompName string) ([]string, error) {
+	var templates []instanceset.InstanceTemplate
+	for i := range instances {
+		templates = append(templates, &workloads.InstanceTemplate{
+			Name:     instances[i].Name,
+			Replicas: instances[i].Replicas,
+			Ordinals: instances[i].Ordinals,
+		})
+	}
+	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
 }
 
 func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {

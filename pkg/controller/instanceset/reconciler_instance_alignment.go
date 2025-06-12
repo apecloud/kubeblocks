@@ -106,7 +106,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// create new instances
 	newNameList := sets.List(newNameSet)
 	baseSort(newNameList, func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(newNameList[i])
+		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {

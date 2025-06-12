@@ -90,7 +90,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, pod := range podList {
-		_, ordinal := ParseParentNameAndOrdinal(pod.Name)
+		_, ordinal := parseParentNameAndOrdinal(pod.Name)
 		templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
@@ -204,7 +204,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
 	baseSort(podNames, func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(podNames[i])
+		return parseParentNameAndOrdinal(podNames[i])
 	}, nil, true)
 	return json.Marshal(podNames)
 }
@@ -330,7 +330,7 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 		return rolePriorityMap[role]
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(membersStatus[i].PodName)
+		return parseParentNameAndOrdinal(membersStatus[i].PodName)
 	}
 	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }
@@ -390,7 +390,7 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 
 func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(instanceStatus[i].PodName)
+		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
 	}
 	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

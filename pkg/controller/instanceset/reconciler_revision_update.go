@@ -66,7 +66,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 	for instanceName, templateExt := range nameMap {
-		revision, err := BuildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
+		revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}

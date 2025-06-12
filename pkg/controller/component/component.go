@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -69,10 +70,31 @@ func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
 }
 
 func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
+	instanceTemplates := func() []workloads.InstanceTemplate {
+		if len(comp.Spec.Instances) == 0 {
+			return nil
+		}
+		templates := make([]workloads.InstanceTemplate, len(comp.Spec.Instances))
+		for i, tpl := range comp.Spec.Instances {
+			templates[i] = workloads.InstanceTemplate{
+				Name:     tpl.Name,
+				Replicas: tpl.Replicas,
+				Ordinals: tpl.Ordinals,
+			}
+		}
+		return templates
+	}
 	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   comp.Namespace,
+			Name:        comp.Name,
+			Annotations: comp.Annotations,
+		},
 		Spec: workloads.InstanceSetSpec{
-			Replicas: &comp.Spec.Replicas,
-			// Instances: comp.Spec.Instances, // TODO
+			Replicas:         &comp.Spec.Replicas,
+			Instances:        instanceTemplates(),
+			PodNamingRule:    comp.Spec.PodNamingRule,
+			OfflineInstances: comp.Spec.OfflineInstances,
 		},
 	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)

@@ -1005,6 +1005,54 @@ var _ = Describe("Backup Controller test", func() {
 				checkBackupDeleting(incBackup1)
 			})
 		})
+
+		It("delays backup job when restore is in progress", func() {
+			By("setting restore annotation on cluster")
+			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *kbappsv1.Cluster) {
+				if cluster.Annotations == nil {
+					cluster.Annotations = make(map[string]string)
+				}
+				cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = "any-value"
+			})).Should(Succeed())
+
+			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			backupKey := client.ObjectKeyFromObject(backup)
+
+			By("check backup is delayed")
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+			})).Should(Succeed())
+
+			jobKey := client.ObjectKey{
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
+				Namespace: backup.Namespace,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
+
+			By("check event fired")
+			Eventually(func() bool {
+				eventList := &corev1.EventList{}
+				err := k8sClient.List(ctx, eventList, client.InNamespace(clusterInfo.Cluster.Namespace))
+				if err != nil {
+					return false
+				}
+				for _, e := range eventList.Items {
+					if e.Reason == "RestoreInProgress" && e.InvolvedObject.Name == backup.Name {
+						return true
+					}
+				}
+				return false
+			}).Should(BeTrue())
+
+			By("delete restore annotation")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
+				delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+			})).Should(Succeed())
+
+			By("check job is created")
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
+		})
 	})
 
 	When("with exceptional settings", func() {

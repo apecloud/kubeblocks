@@ -3,19 +3,37 @@ on:
   issue_comment:
     types: [created]
 
+env:
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
   cherry-pick:
-    name: Cherry Pick
     if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/cherry-pick')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.GH_TOKEN }}
           fetch-depth: 0
 
       - name: Automatic Cherry Pick
         uses: apecloud-inc/gha-cherry-pick@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
+
+  pick-meassge:
+    needs: [ cherry-pick ]
+    if: ${{ failure() || cancelled() }}
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.88
+    with:
+      TYPE: "5"
+      BOT_TYPE: "specify"
+      BOT_WEBHOOK: "${{ vars.CHERRY_PICK_BOT_WEBHOOK }}"
+      CONTENT: " ${{ github.repository }} ${{ github.event.comment.body }} error"
+      PR_NUMBER: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  label-pick:
+    if: ${{ github.event.issue.pull_request != '' && (contains(github.event.comment.body, '/pick') || contains(github.event.comment.body, '/nopick')) && ! contains(github.event.comment.body, 'Auto Cherry-pick Instructions') }}
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-label-pick.yml@v0.1.88
+    secrets: inherit

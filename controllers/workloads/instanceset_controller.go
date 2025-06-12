@@ -112,14 +112,14 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
 	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.InstanceSetKind, instanceset.WorkloadsInstanceLabelKey)
-	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
+	itsHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Watches(&corev1.Pod{}, podHandler).
-		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(&corev1.Pod{}, itsHandler).
+		Watches(&corev1.PersistentVolumeClaim{}, itsHandler).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).

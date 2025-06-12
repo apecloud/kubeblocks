@@ -1,0 +1,17 @@
+name: Cherry Pick Usage
+
+on:
+  pull_request_target:
+    types:
+      - opened
+    branches:
+      - main
+      - release-*
+
+env:
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  cherry-pick-usage:
+    uses: apecloud/apecloud-cd/.github/workflows/pull-request-cherry-pick-usage.yml@v0.1.88
+    secrets: inherit

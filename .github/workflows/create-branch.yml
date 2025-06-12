@@ -1,0 +1,17 @@
+name: Create Release Branch Message
+
+on:
+  create:
+
+run-name: Create Release Branch
+
+jobs:
+  create-branch:
+    if: startsWith(github.ref_name, 'release-')
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.94
+    with:
+      TYPE: "6"
+      BOT_TYPE: "specify"
+      BOT_WEBHOOK: "${{ vars.CHERRY_PICK_BOT_WEBHOOK }}"
+      CONTENT: "${{ github.repository }} release branch [ ${{ github.ref_name }} ] was created!"
+    secrets: inherit

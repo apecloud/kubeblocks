@@ -638,6 +638,20 @@ down.</p>
 </tr>
 <tr>
 <td>
+<code>network</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentNetwork">
+ComponentNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the network configuration for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentService">
@@ -3072,6 +3086,20 @@ down.</p>
 </tr>
 <tr>
 <td>
+<code>network</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentNetwork">
+ComponentNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the network configuration for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>services</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ClusterComponentService">
@@ -3706,6 +3734,18 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>offline</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of shards (components) to be transitioned to offline status.</p>
 </td>
 </tr>
 </tbody>
@@ -5831,6 +5871,79 @@ and other administrative tasks.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentNetwork">ComponentNetwork
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>hostNetwork</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Host networking requested for this pod. Use the host&rsquo;s network namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostAliases</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#hostalias-v1-core">
+[]Kubernetes core/v1.HostAlias
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>HostAliases is an optional list of hosts and IPs that will be injected into the pod&rsquo;s hosts file if specified.
+This is only valid for non-hostNetwork pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dnsPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#dnspolicy-v1-core">
+Kubernetes core/v1.DNSPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Set DNS policy for the pod.
+Defaults to &ldquo;ClusterFirst&rdquo;. If the hostNetwork is enabled, the default policy will be set to &ldquo;ClusterFirstWithHostNet&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dnsConfig</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#poddnsconfig-v1-core">
+Kubernetes core/v1.PodDNSConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the DNS parameters of a pod.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -6148,6 +6261,20 @@ down.</p>
 <td>
 <em>(Optional)</em>
 <p>List of volumes to override.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>network</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentNetwork">
+ComponentNetwork
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the network configuration for the Component.</p>
 </td>
 </tr>
 <tr>

@@ -56,7 +56,7 @@ import TabItem from '@theme/TabItem';
      componentSpecs:
      - name: kafka
        componentDefRef: kafka
-       disableExporter: true  
+       disableExporter: true
        replicas: 0 # 修改该参数值
    ...
    ```
@@ -96,7 +96,7 @@ import TabItem from '@theme/TabItem';
    </Tabs>
 
 ## 启动集群
-  
+
 1. 配置集群名称，并执行以下命令来启动该集群。
 
    <Tabs>
@@ -113,7 +113,7 @@ import TabItem from '@theme/TabItem';
    spec:
      clusterName: mycluster
      type: Start
-   EOF 
+   EOF
    ```
 
    </TabItem>
@@ -123,7 +123,7 @@ import TabItem from '@theme/TabItem';
    将 replicas 数值调整为停止集群前的数量，再次启动集群。
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
@@ -135,7 +135,7 @@ import TabItem from '@theme/TabItem';
      componentSpecs:
      - name: kafka
        componentDefRef: kafka
-       disableExporter: true   
+       disableExporter: true
        replicas: 1
        volumeClaimTemplates:
        - name: data

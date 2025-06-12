@@ -36,21 +36,3 @@ reloader: test-go-generate build-checks ## Build reloader related binaries
 .PHONY: clean-reloader
 clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
-
-## cue-helper cmd
-
-CUE_HELPER_LD_FLAGS = "-s -w"
-
-bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/main.go
-
-.PHONY: cue-helper
-cue-helper: OS=$(shell $(GO) env GOOS)
-cue-helper: ARCH=$(shell $(GO) env GOARCH)
-cue-helper: test-go-generate build-checks ## Build cue-helper related binaries
-	$(MAKE) bin/cue-helper.${OS}.${ARCH}
-	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
-
-.PHONY: clean-cue-helper
-clean-cue-helper: ## Clean bin/cue-helper.
-	rm -f bin/cue-helper

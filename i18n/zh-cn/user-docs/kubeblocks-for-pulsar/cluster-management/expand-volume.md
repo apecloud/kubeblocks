@@ -60,7 +60,7 @@ kbcli cluster list mycluster -n demo
        - name: ledgers
          storage: "200Gi"
        - name: journal
-         storage: "40Gi"      
+         storage: "40Gi"
    EOF
    ```
 
@@ -88,7 +88,7 @@ kbcli cluster list mycluster -n demo
 1. 更改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
@@ -144,7 +144,7 @@ kbcli cluster list mycluster -n demo
       - 扩展 `ledger` 卷。
 
         ```bash
-        kbcli cluster volume-expand mycluster --storage=200Gi --components=bookies -t ledgers -n demo 
+        kbcli cluster volume-expand mycluster --storage=200Gi --components=bookies -t ledgers -n demo
         ```
 
 2. 验证扩容操作是否成功。

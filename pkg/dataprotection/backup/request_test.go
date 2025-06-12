@@ -113,7 +113,7 @@ var _ = Describe("Request Test", func() {
 				SetPathPrefix(testdp.BackupPathPrefix).
 				SetTarget(constant.AppInstanceLabelKey, testdp.ClusterName,
 					constant.KBAppComponentLabelKey, testdp.ComponentName,
-					constant.RoleLabelKey, constant.Leader).
+					constant.RoleLabelKey, testapps.Leader).
 				AddBackupMethod(testdp.BackupMethodName, false, testdp.ActionSetName).
 				Create(&testCtx).GetObject()
 

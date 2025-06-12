@@ -1,5 +1,5 @@
 ---
-title: 连接到 Kafka 集群 
+title: 连接到 Kafka 集群
 description: 如何连接到 Kafka 集群
 keywords: [kafka, 连接 Kafka 集群, 连接, 网络]
 sidebar_position: 2
@@ -28,7 +28,7 @@ import TabItem from '@theme/TabItem';
 1. 获取 Kafka ClusterIP 服务的地址和端口号。
 
    ```bash
-   kubectl get svc 
+   kubectl get svc
    ```
 
    *示例:*
@@ -66,7 +66,7 @@ import TabItem from '@theme/TabItem';
    d. 创建 producer。
 
      ```bash
-     kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
+     kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092
      ```
 
    e. 输入：Hello, KubeBlocks，然后按 Enter 键。
@@ -99,7 +99,7 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
@@ -125,7 +125,7 @@ import TabItem from '@theme/TabItem';
            memory: 1Gi
        serviceAccountName: kb-sa-kafka
        services:
-       - annotations: 
+       - annotations:
            service.beta.kubernetes.io/aws-load-balancer-type: nlb
            service.beta.kubernetes.io/aws-load-balancer-internal: "true"
          name: vpc
@@ -209,7 +209,7 @@ import TabItem from '@theme/TabItem';
            memory: 1Gi
        serviceAccountName: kb-sa-kafka
        services:
-       - annotations: 
+       - annotations:
            service.beta.kubernetes.io/aws-load-balancer-type: nlb
            service.beta.kubernetes.io/aws-load-balancer-internal: "false"
          name: vpc

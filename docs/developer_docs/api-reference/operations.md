@@ -1881,6 +1881,18 @@ OpsVarSource
 <p>Specifies the source of the environment variable&rsquo;s value.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>optional</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specify whether the ENV must be defined.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.OpsExecAction">OpsExecAction

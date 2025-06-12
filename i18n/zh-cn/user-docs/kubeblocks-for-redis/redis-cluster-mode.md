@@ -86,7 +86,7 @@ kubectl apply -f redis-cluster-example.yaml
 **示例 1: 未开启 NodePort 的 Redis Cluster**
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: redisc
@@ -215,7 +215,7 @@ Configure each Pod's HostIP and the corresponding NodePort.
 
 ```bash
 # 例如 172.18.0.3 是 redisc-shard-qst-0 所在节点的主机 ip，32269 是 redis 6379 服务端口映射的 NodePort
-172.18.0.3:32269 
+172.18.0.3:32269
 172.18.0.4:32051
 172.18.0.5:32650
 172.18.0.6:30151
@@ -354,12 +354,12 @@ spec:
   clusterName: redisc
   verticalScaling:
   - componentName: shard
-    limits: 
+    limits:
       cpu: 2
       memory: 4Gi
     requests:
       cpu: 2
-      memory: 4Gi  
+      memory: 4Gi
   type: VerticalScaling
 ```
 

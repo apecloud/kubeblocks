@@ -45,7 +45,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     Configure replicas as 0 to delete pods.
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: apps.kubeblocks.io/v1
     kind: Cluster
     metadata:
       name: mycluster
@@ -57,7 +57,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
       componentSpecs:
       - name: mongodb
         componentDefRef: mongodb
-        disableExporter: true  
+        disableExporter: true
         replicas: 0
         volumeClaimTemplates:
         - name: data
@@ -105,7 +105,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     </Tabs>
 
 ## Start a cluster
-  
+
 1. Configure the name of your cluster and run the command below to start this cluster.
 
     <Tabs>
@@ -124,7 +124,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     spec:
       clusterName: mycluster
       type: Start
-    EOF 
+    EOF
     ```
 
     </TabItem>
@@ -146,7 +146,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
       componentSpecs:
       - name: mongodb
         componentDefRef: mongodb
-        disableExporter: true  
+        disableExporter: true
         replicas: 1
         volumeClaimTemplates:
         - name: data

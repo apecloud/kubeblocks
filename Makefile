@@ -36,8 +36,6 @@ SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
-
-
 # Go setup
 export GO111MODULE = auto
 export GOSUMDB = sum.golang.org
@@ -62,40 +60,17 @@ GOPROXY := https://proxy.golang.org
 endif
 export GOPROXY
 
-
 LD_FLAGS="-s -w \
 	-X github.com/apecloud/kubeblocks/version.Version=v${VERSION} \
 	-X github.com/apecloud/kubeblocks/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` \
 	-X github.com/apecloud/kubeblocks/version.GitCommit=${GIT_COMMIT} \
 	-X github.com/apecloud/kubeblocks/version.GitVersion=${GIT_VERSION}"
+
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
 # if it wasn't specified by the caller.
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
-
-TAG_LATEST ?= false
-BUILDX_ENABLED ?= ""
-ifeq ($(BUILDX_ENABLED), "")
-	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
-		BUILDX_ENABLED = true
-	else
-		BUILDX_ENABLED = false
-	endif
-endif
-BUILDX_BUILDER ?= "x-builder"
-
-define BUILDX_ERROR
-buildx not enabled, refusing to run this recipe
-endef
-
-DOCKER_BUILD_ARGS =
-DOCKER_NO_BUILD_CACHE ?= false
-
-ifeq ($(DOCKER_NO_BUILD_CACHE), true)
-	DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS) --no-cache
-endif
-
 
 .DEFAULT_GOAL := help
 
@@ -170,11 +145,6 @@ fmt: ## Run go fmt against code.
 vet: test-go-generate ## Run go vet against code.
 	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
 
-.PHONY: cue-fmt
-cue-fmt: cuetool ## Run cue fmt against code.
-	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
-	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
-
 .PHONY: lint-fast
 lint-fast: staticcheck vet golangci-lint # [INTERNAL] Run all lint job against code.
 
@@ -183,15 +153,15 @@ lint: test-go-generate generate ## Run default lint job against code.
 	$(MAKE) golangci-lint
 
 .PHONY: golangci-lint
-golangci-lint: golangci generate ## Run golangci-lint against code.
+golangci-lint: golangci-lint-bin generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
+staticcheck: staticcheck-bin test-go-generate generate ## Run staticcheck against code.
 	$(STATICCHECK) ./...
 
 .PHONY: build-checks
-build-checks: generate fmt vet goimports lint-fast ## Run build checks.
+build-checks: fmt vet goimports lint-fast ## Run build checks.
 
 .PHONY: mod-download
 mod-download: ## Run go mod download against go modules.
@@ -203,7 +173,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.21
+	$(GO) mod tidy -compat=1.23
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
@@ -252,12 +222,13 @@ else
 endif
 
 .PHONY: goimports
-goimports: goimportstool ## Run goimports against code.
+goimports: goimports-bin ## Run goimports against code.
 	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG) | grep -v $(GENERATED_DEEP_COPY_FILE))
 
 .PHONY: api-doc
-api-doc:  ## generate API reference manual.
-	$(GO) run ./hack/docgen/api/main.go -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
+api-doc: $(LOCALBIN) ## generate API reference manual.
+	cd hack/docgen/api && go build -o "$(LOCALBIN)/docgen-api" ./main.go
+	"$(LOCALBIN)/docgen-api" -api-dir github.com/apecloud/kubeblocks/apis -config ./hack/docgen/api/gen-api-doc-config.json -template-dir ./hack/docgen/api/template -out-dir ./docs/developer_docs/api-reference/
 
 .PHONY: doc
 doc: api-doc ## generate all documents.
@@ -265,15 +236,15 @@ doc: api-doc ## generate all documents.
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
+manager: generate manager-go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 .PHONY: dataprotection
-dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
+dataprotection: generate build-checks ## Build dataprotection binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
 
 .PHONY: kbagent
-kbagent: generate test-go-generate build-checks
+kbagent: generate build-checks
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/kbagent ./cmd/kbagent/main.go
 
 .PHONY: helmhook
@@ -338,7 +309,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.21
+	$(GO) mod tidy -compat=1.23
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -379,7 +350,7 @@ bump-chart-ver: \
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
-helm-package: bump-chart-ver ## Do helm package.
+helm-package: helmtool bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
@@ -389,106 +360,54 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
-## Tool Binaries
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.1.1
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-CUE_VERSION ?= v0.4.3
+ENVTEST_VERSION ?= release-0.21
+
+## Tool Binaries
+KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
+ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/kustomize 2>/dev/null))
-	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
-endif
+kustomize: $(LOCALBIN) ## Download kustomize locally if necessary.
+	@[ -f $(KUSTOMIZE) ] || { \
+		echo "Installing kustomize with version $(KUSTOMIZE_VERSION)"; \
+		curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN) && \
+		mv "$(LOCALBIN)/kustomize" "$(KUSTOMIZE)"; \
+	}
 
 .PHONY: controller-gen
 controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
-	@{ \
-	set -e ;\
-	if [ ! -f "$(CONTROLLER_GEN)" ] || [ "$$($(CONTROLLER_GEN) --version 2>&1 | awk '{print $$NF}')" != "$(CONTROLLER_TOOLS_VERSION)" ]; then \
-        echo 'Installing controller-gen@$(CONTROLLER_TOOLS_VERSION)...' ;\
-        GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) ;\
-        echo 'Successfully installed' ;\
-    fi \
-	}
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/setup-envtest 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240320141353-395cfc7486e6
-endif
+envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-.PHONY: install-docker-buildx
-install-docker-buildx: ## Create `docker buildx` builder.
-	@if ! docker buildx inspect $(BUILDX_BUILDER) > /dev/null; then \
-		echo "Buildx builder $(BUILDX_BUILDER) does not exist, creating..."; \
-		docker buildx create --name=$(BUILDX_BUILDER) --use --driver=docker-container --platform linux/amd64,linux/arm64; \
-	else \
-		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
-	fi
-
-.PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.64.5
-golangci: ## Download golangci-lint locally if necessary.
-ifneq ($(shell which golangci-lint),)
-	@echo golangci-lint is already installed
-GOLANGCILINT=$(shell which golangci-lint)
-else ifeq (, $(shell which $(GOBIN)/golangci-lint))
-	@{ \
-	set -e ;\
-	echo 'installing golangci-lint-$(GOLANGCILINT_VERSION)' ;\
-	curl -sSfL $(GITHUB_PROXY)https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCILINT_VERSION) ;\
-	echo 'Successfully installed' ;\
+GOLANGCILINT_VERSION = v1.64.8
+GOLANGCILINT = $(LOCALBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
+.PHONY: golangci-lint-bin
+golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
+	@[ -f $(GOLANGCILINT) ] || { \
+  		echo "Installing golangci-lint with version $(GOLANGCILINT_VERSION)"; \
+		curl -sSfL $(GITHUB_PROXY)https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(LOCALBIN) $(GOLANGCILINT_VERSION) && \
+		mv "$(LOCALBIN)/golangci-lint" "$(GOLANGCILINT)"; \
 	}
-GOLANGCILINT=$(GOBIN)/golangci-lint
-else
-	@echo golangci-lint is already installed
-GOLANGCILINT=$(GOBIN)/golangci-lint
-endif
 
-.PHONY: staticchecktool
-staticchecktool: ## Download staticcheck locally if necessary.
-ifeq (, $(shell which staticcheck))
-	@{ \
-	set -e ;\
-	echo 'installing honnef.co/go/tools/cmd/staticcheck' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@latest;\
-	}
-STATICCHECK=$(GOBIN)/staticcheck
-else
-STATICCHECK=$(shell which staticcheck)
-endif
+STATICCHECK_VERSION = v0.6.1
+STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
+.PHONY: staticcheck-bin
+staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.
+	$(call go-install-tool,$(STATICCHECK),honnef.co/go/tools/cmd/staticcheck,$(STATICCHECK_VERSION))
 
-.PHONY: goimportstool
-goimportstool: ## Download goimports locally if necessary.
-ifeq (, $(shell which goimports))
-	@{ \
-	set -e ;\
-	go install golang.org/x/tools/cmd/goimports@latest ;\
-	}
-GOIMPORTS=$(GOBIN)/goimports
-else
-GOIMPORTS=$(shell which goimports)
-endif
-
-.PHONY: cuetool
-cuetool: ## Download cue locally if necessary.
-ifeq (, $(shell which cue))
-	@{ \
-	set -e ;\
-	go install cuelang.org/go/cmd/cue@$(CUE_VERSION) ;\
-	}
-CUE=$(GOBIN)/cue
-else
-CUE=$(shell which cue)
-endif
+GOIMPORTS_VERSION = v0.34.0
+GOIMPORTS = $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)
+.PHONY: goimports-bin
+goimports-bin: $(LOCALBIN) ## Download goimports locally if necessary.
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 .PHONY: helmtool
 helmtool: ## Download helm locally if necessary.
@@ -496,10 +415,11 @@ ifeq (, $(shell which helm))
 	@{ \
 	set -e ;\
 	echo 'installing helm' ;\
-	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
+	curl $(GITHUB_PROXY)https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
 	echo 'Successfully installed' ;\
 	}
-HELM=$(GOBIN)/helm
+# Hopefully the command will be installed in PATH
+HELM=helm
 else
 HELM=$(shell which helm)
 endif
@@ -513,205 +433,25 @@ ifeq (, $(shell which kubectl))
 	curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(GOOS)/$(GOARCH)/kubectl" && chmod +x kubectl && sudo mv kubectl /usr/local/bin ;\
 	echo 'Successfully installed' ;\
 	}
-endif
+# Hopefully the command will be installed in PATH
+KUBECTL=kubectl
+else
 KUBECTL=$(shell which kubectl)
-
-##@ End-to-end (E2E) tests
-.PHONY: render-smoke-testdata-manifests
-render-smoke-testdata-manifests: addonsPath=addons/addons
-render-smoke-testdata-manifests: fetch-addons ## Update E2E test dataset
-ifeq ($(TEST_TYPE), wesql)
-	$(HELM) dependency build $(addonsPath)/apecloud-mysql-cluster --skip-refresh
-	$(HELM) template mysql-cluster $(addonsPath)/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-else ifeq ($(TEST_TYPE), postgresql)
-	$(HELM) dependency build $(addonsPath)/postgresql-cluster --skip-refresh
-	$(HELM) template pg-cluster $(addonsPath)/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-else ifeq ($(TEST_TYPE), redis)
-	$(HELM) dependency build $(addonsPath)/redis-cluster --skip-refresh
-	$(HELM) template redis-cluster $(addonsPath)/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-else ifeq ($(TEST_TYPE), mongodb)
-	$(HELM) dependency build $(addonsPath)/mongodb-cluster --skip-refresh
-	$(HELM) template mongodb-cluster $(addonsPath)/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-else ifeq ($(TEST_TYPE), pulsar)
-	$(HELM) dependency build $(addonsPath)/pulsar-cluster --skip-refresh
-	$(HELM) template pulsar-cluster -s templates/cluster.yaml $(addonsPath)/pulsar-cluster > test/e2e/testdata/smoketest/pulsar/00_pulsarcluster.yaml
-else ifeq ($(TEST_TYPE), nebula)
-	$(HELM) dependency build $(addonsPath)/nebula-cluster --skip-refresh
-	$(HELM) upgrade --install nebula $(addonsPath)/nebula
-	$(HELM) template nebula-cluster $(addonsPath)/nebula-cluster > test/e2e/testdata/smoketest/nebula/00_nebulacluster.yaml
-else ifeq ($(TEST_TYPE), greptimedb)
-	$(HELM) dependency build $(addonsPath)/greptimedb-cluster --skip-refresh
-	$(HELM) upgrade --install greptimedb $(addonsPath)/greptimedb
-	$(HELM) template greptimedb-cluster $(addonsPath)/greptimedb-cluster > test/e2e/testdata/smoketest/greptimedb/00_greptimedbcluster.yaml
-else ifeq ($(TEST_TYPE), starrocks)
-	$(HELM) dependency build $(addonsPath)/starrocks-cluster --skip-refresh
-	$(HELM) upgrade --install starrocks $(addonsPath)/starrocks
-	$(HELM) template starrocks-cluster $(addonsPath)/starrocks-cluster > test/e2e/testdata/smoketest/starrocks/00_starrocksbcluster.yaml
-else ifeq ($(TEST_TYPE), risingwave)
-	$(HELM) dependency build $(addonsPath)/risingwave-cluster --skip-refresh
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-	$(HELM) upgrade --install risingwave $(addonsPath)/risingwave
-	$(HELM) template risingwave-cluster $(addonsPath)/risingwave-cluster > test/e2e/testdata/smoketest/risingwave/00_risingwavecluster.yaml
-else ifeq ($(TEST_TYPE), etcd)
-	$(HELM) dependency build $(addonsPath)/etcd-cluster --skip-refresh
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-	$(HELM) template etcd-cluster -s templates/cluster.yaml $(addonsPath)/etcd-cluster > test/e2e/testdata/smoketest/etcd/00_etcdcluster.yaml
-else ifeq ($(TEST_TYPE), oracle)
-	$(HELM) dependency build $(addonsPath)/oracle-mysql-cluster --skip-refresh
-	$(HELM) upgrade --install oracle $(addonsPath)/oracle-mysql
-	$(HELM) template oracle-cluster $(addonsPath)/oracle-mysql-cluster > test/e2e/testdata/smoketest/oracle/00_oraclecluster.yaml
-else ifeq ($(TEST_TYPE), kafka)
-	$(HELM) dependency build $(addonsPath)/kafka-cluster --skip-refresh
-	$(HELM) upgrade --install kafka $(addonsPath)/kafka
-	$(HELM) template kafka-cluster $(addonsPath)/kafka-cluster > test/e2e/testdata/smoketest/kafka/00_kafkacluster.yaml
-else ifeq ($(TEST_TYPE), foxlake)
-	$(HELM) dependency build $(addonsPath)/foxlake-cluster --skip-refresh
-	$(HELM) upgrade --install foxlake $(addonsPath)/foxlake
-	$(HELM) template foxlake-cluster $(addonsPath)/foxlake-cluster > test/e2e/testdata/smoketest/foxlake/00_foxlakecluster.yaml
-else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) dependency build $(addonsPath)/oceanbase-cluster --skip-refresh
-	$(HELM) upgrade --install oceanbase $(addonsPath)/oceanbase
-	$(HELM) template oceanbase-cluster $(addonsPath)/oceanbase-cluster > test/e2e/testdata/smoketest/oceanbase/00_oceanbasecluster.yaml
-else ifeq ($(TEST_TYPE), vanilla-postgresql)
-	$(HELM) dependency build $(addonsPath)/vanilla-postgresql-cluster --skip-refresh
-	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
-	$(HELM) template vanilla-pg $(addonsPath)/vanilla-postgresql-cluster > test/e2e/testdata/smoketest/vanilla-postgresql/00_official_pgcluster.yaml
-else ifeq ($(TEST_TYPE), openldap)
-	$(HELM) dependency build $(addonsPath)/openldap-cluster --skip-refresh
-	$(HELM) upgrade --install openldap $(addonsPath)/openldap
-	$(HELM) template openldap-cluster $(addonsPath)/openldap-cluster > test/e2e/testdata/smoketest/openldap/00_openldapcluster.yaml
-else ifeq ($(TEST_TYPE), orioledb)
-	$(HELM) dependency build $(addonsPath)/orioledb-cluster --skip-refresh
-	$(HELM) upgrade --install orioledb $(addonsPath)/orioledb
-	$(HELM) template oriole-cluster $(addonsPath)/orioledb-cluster > test/e2e/testdata/smoketest/orioledb/00_orioledbcluster.yaml
-else ifeq ($(TEST_TYPE), weaviate)
-	$(HELM) dependency build $(addonsPath)/weaviate-cluster --skip-refresh
-	$(HELM) upgrade --install weaviate $(addonsPath)/weaviate
-	$(HELM) template weaviate-cluster $(addonsPath)/weaviate-cluster > test/e2e/testdata/smoketest/weaviate/00_weaviatecluster.yaml
-else ifeq ($(TEST_TYPE), mysql-80)
-	$(HELM) dependency build $(addonsPath)/mysql-cluster --skip-refresh
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-	$(HELM) template mysqlcluster $(addonsPath)/mysql-cluster > test/e2e/testdata/smoketest/mysql-80/00_mysqlcluster.yaml
-else ifeq ($(TEST_TYPE), mysql-57)
-	$(HELM) dependency build $(addonsPath)/mysql-cluster --skip-refresh
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-else ifeq ($(TEST_TYPE), polardbx)
-	$(HELM) dependency build $(addonsPath)/polardbx-cluster --skip-refresh
-	$(HELM) upgrade --install polardbx $(addonsPath)/polardbx
-	$(HELM) template pxc $(addonsPath)/polardbx-cluster > test/e2e/testdata/smoketest/polardbx/00_polardbxcluster.yaml
-else ifeq ($(TEST_TYPE), opensearch)
-	$(HELM) dependency build $(addonsPath)/opensearch-cluster --skip-refresh
-	$(HELM) upgrade --install opensearch $(addonsPath)/opensearch
-	$(HELM) template opensearch-cluster $(addonsPath)/opensearch-cluster > test/e2e/testdata/smoketest/opensearch/00_opensearchcluster.yaml
-else ifeq ($(TEST_TYPE), elasticsearch)
-	$(HELM) dependency build $(addonsPath)/elasticsearch-cluster --skip-refresh
-	$(HELM) upgrade --install elasticsearch $(addonsPath)/elasticsearch
-	$(HELM) template elasticsearch-cluster $(addonsPath)/elasticsearch-cluster > test/e2e/testdata/smoketest/elasticsearch/00_elasticsearchcluster.yaml
-else ifeq ($(TEST_TYPE), llm)
-	$(HELM) dependency build $(addonsPath)/llm-cluster --skip-refresh
-	$(HELM) upgrade --install llm $(addonsPath)/llm
-	$(HELM) template llm-cluster $(addonsPath)/llm-cluster > test/e2e/testdata/smoketest/llm/00_llmcluster.yaml
-else ifeq ($(TEST_TYPE), tdengine)
-	$(HELM) dependency build $(addonsPath)/tdengine-cluster --skip-refresh
-	$(HELM) upgrade --install tdengine $(addonsPath)/tdengine
-	$(HELM) template td-cluster $(addonsPath)/tdengine-cluster > test/e2e/testdata/smoketest/tdengine/00_tdenginecluster.yaml
-else ifeq ($(TEST_TYPE), milvus)
-	$(HELM) dependency build $(addonsPath)/milvus-cluster --skip-refresh
-	$(HELM) upgrade --install milvus $(addonsPath)/milvus
-	$(HELM) template milvus-cluster $(addonsPath)/milvus-cluster > test/e2e/testdata/smoketest/milvus/00_milvuscluster.yaml
-else ifeq ($(TEST_TYPE), clickhouse)
-	$(HELM) dependency build $(addonsPath)/clickhouse-cluster --skip-refresh
-	$(HELM) upgrade --install clickhouse $(addonsPath)/clickhouse
-	$(HELM) template test -s templates/cluster.yaml $(addonsPath)/clickhouse-cluster > test/e2e/testdata/smoketest/clickhouse/00_clickhousecluster.yaml
-else ifeq ($(TEST_TYPE), zookeeper)
-	$(HELM) dependency build $(addonsPath)/zookeeper-cluster --skip-refresh
-	$(HELM) upgrade --install zookeeper $(addonsPath)/zookeeper
-	$(HELM) template zk-cluster $(addonsPath)/zookeeper-cluster > test/e2e/testdata/smoketest/zookeeper/00_zookeepercluster.yaml
-else ifeq ($(TEST_TYPE), mariadb)
-	$(HELM) dependency build $(addonsPath)/mariadb-cluster --skip-refresh
-	$(HELM) upgrade --install mariadb $(addonsPath)/mariadb
-	$(HELM) template mariadb-cluster $(addonsPath)/mariadb-cluster > test/e2e/testdata/smoketest/mariadb/00_mariadbcluster.yaml
-else
-	$(error "test type does not exist")
 endif
 
-.PHONY: test-e2e
-test-e2e: helm-package install-s3-csi-driver render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) TEST_TYPE=$(TEST_TYPE) SKIP_CASE=$(SKIP_CASE) CONFIG_TYPE=$(CONFIG_TYPE) -C test/e2e run
-
-.PHONY: render-smoke-testdata-manifests-local
-render-smoke-testdata-manifests-local: addonsPath=addons/addons## Helm Install CD And CV
-render-smoke-testdata-manifests-local: fetch-addons
-ifeq ($(TEST_TYPE), wesql)
-	$(HELM) upgrade --install wesql $(addonsPath)/apecloud-mysql
-else ifeq ($(TEST_TYPE), postgresql)
-	$(HELM) upgrade --install postgresql $(addonsPath)/postgresql
-else ifeq ($(TEST_TYPE), mongodb)
-	$(HELM) upgrade --install  mongodb $(addonsPath)/mongodb
-else ifeq ($(TEST_TYPE), redis)
-	$(HELM) upgrade --install redis $(addonsPath)/redis
-else ifeq ($(TEST_TYPE), pulsar)
-	$(HELM) upgrade --install pulsar $(addonsPath)/pulsar
-else ifeq ($(TEST_TYPE), nebula)
-	$(HELM) upgrade --install nebula $(addonsPath)/nebula
-else ifeq ($(TEST_TYPE), greptimedb)
-	$(HELM) upgrade --install greptimedb $(addonsPath)/greptimedb
-else ifeq ($(TEST_TYPE), starrocks)
-	$(HELM) upgrade --install starrocks $(addonsPath)/starrocks
-else ifeq ($(TEST_TYPE), risingwave)
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-	$(HELM) upgrade --install risingwave $(addonsPath)/risingwave
-else ifeq ($(TEST_TYPE), etcd)
-	$(HELM) upgrade --install etcd $(addonsPath)/etcd
-else ifeq ($(TEST_TYPE), oracle)
-	$(HELM) upgrade --install oracle-mysql $(addonsPath)/oracle-mysql
-else ifeq ($(TEST_TYPE), kafka)
-	$(HELM) upgrade --install kafka $(addonsPath)/kafka
-else ifeq ($(TEST_TYPE), foxlake)
-	$(HELM) upgrade --install foxlake $(addonsPath)/foxlake
-else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) upgrade --install oceanbase $(addonsPath)/oceanbase
-else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
-else ifeq ($(TEST_TYPE), openldap)
-	$(HELM) upgrade --install openldap $(addonsPath)/openldap
-else ifeq ($(TEST_TYPE), weaviate)
-	$(HELM) upgrade --install weaviate $(addonsPath)/weaviate
-else ifeq ($(TEST_TYPE), mysql-80)
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-else ifeq ($(TEST_TYPE), mysql-57)
-	$(HELM) upgrade --install mysql $(addonsPath)/mysql
-else ifeq ($(TEST_TYPE), polardbx)
-	$(HELM) upgrade --install polardbx $(addonsPath)/polardbx
-else ifeq ($(TEST_TYPE), opensearch)
-	$(HELM) upgrade --install opensearch $(addonsPath)/opensearch
-else ifeq ($(TEST_TYPE), elasticsearch)
-	$(HELM) upgrade --install elasticsearch $(addonsPath)/elasticsearch
-else ifeq ($(TEST_TYPE), llm)
-	$(HELM) upgrade --install llm $(addonsPath)/llm
-else ifeq ($(TEST_TYPE), milvus)
-	$(HELM) upgrade --install milvus $(addonsPath)/milvus
-else ifeq ($(TEST_TYPE), clickhouse)
-	$(HELM) upgrade --install clickhouse $(addonsPath)/clickhouse
-else ifeq ($(TEST_TYPE), zookeeper)
-	$(HELM) upgrade --install zookeeper $(addonsPath)/zookeeper
-else ifeq ($(TEST_TYPE), mariadb)
-	$(HELM) upgrade --install mariadb $(addonsPath)/mariadb
-else
-	$(error "test type does not exist")
-endif
-
-.PHONY: test-e2e-local
-test-e2e-local: generate-cluster-role install-s3-csi-driver render-smoke-testdata-manifests-local render-smoke-testdata-manifests ## Run E2E tests on local.
-	$(MAKE) -e TEST_TYPE=$(TEST_TYPE) -C test/e2e run
-
-.PHONY: generate-cluster-role
-generate-cluster-role:
-	$(HELM) template -s templates/rbac/cluster_pod_required_role.yaml deploy/helm | kubectl apply -f -
-
-.PHONY: install-s3-csi-driver
-install-s3-csi-driver:
-	$(HELM) upgrade --install csi-s3 https://github.com/apecloud/helm-charts/releases/download/csi-s3-0.7.0/csi-s3-0.7.0.tgz
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary (ideally with version)
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Installing $${package}" ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+}
+endef
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

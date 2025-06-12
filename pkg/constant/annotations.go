@@ -51,6 +51,13 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 )
 
+const (
+	// SkipBaseBackupRestoreInPitrAnnotationKey is an experimental api to unify full and continuous restore job.
+	// It is set on the actionset CR.
+	// If this annotaion is set to "true", then only one job will be created during restore.
+	SkipBaseBackupRestoreInPitrAnnotationKey = "dataprotection.kubeblocks.io/skip-base-backup-restore-in-pitr"
+)
+
 // annotations for multi-cluster
 const (
 	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"

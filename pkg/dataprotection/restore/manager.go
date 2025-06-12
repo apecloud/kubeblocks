@@ -168,25 +168,41 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		}
 	}
 
-	backupSet, err := r.getBackupActionSetForContinuous(reqCtx, cli, continuousBackup, metav1.NewTime(restoreTime))
-	if err != nil || backupSet == nil {
+	baseBackupSet, err := r.getBaseBackupActionSetForContinuous(reqCtx, cli, continuousBackup, metav1.NewTime(restoreTime))
+	if err != nil || baseBackupSet == nil {
 		return err
 	}
+
+	skipBaseBackupRestoreInPitr := false
+	if continuousBackupSet.ActionSet.Annotations != nil {
+		if continuousBackupSet.ActionSet.Annotations[constant.SkipBaseBackupRestoreInPitrAnnotationKey] == "true" {
+			skipBaseBackupRestoreInPitr = true
+		}
+	}
+
 	// set base backup
-	continuousBackupSet.BaseBackup = backupSet.Backup
-	if backupSet.ActionSet != nil && backupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
-		if err = r.BuildIncrementalBackupActionSet(reqCtx, cli, *backupSet); err != nil {
+	continuousBackupSet.BaseBackup = baseBackupSet.Backup
+	if baseBackupSet.ActionSet != nil && baseBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+		if skipBaseBackupRestoreInPitr {
+			return intctrlutil.NewFatalError("unify incremental and continuous restore job is not supported")
+		}
+		if err = r.BuildIncrementalBackupActionSet(reqCtx, cli, *baseBackupSet); err != nil {
 			return err
 		}
 		r.SetBackupSets(continuousBackupSet)
 	} else {
-		r.SetBackupSets(*backupSet, continuousBackupSet)
+		if skipBaseBackupRestoreInPitr {
+			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, "SkipBaseBackupRestoreInPitr", "base backup restore skipped")
+			r.SetBackupSets(continuousBackupSet)
+		} else {
+			r.SetBackupSets(*baseBackupSet, continuousBackupSet)
+		}
 	}
 	return nil
 }
 
-// getBackupActionSetForContinuous gets full or incremental backup and actionSet for continuous.
-func (r *RestoreManager) getBackupActionSetForContinuous(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, restoreTime metav1.Time) (*BackupActionSet, error) {
+// getBaseBackupActionSetForContinuous gets full or incremental backup and actionSet for continuous.
+func (r *RestoreManager) getBaseBackupActionSetForContinuous(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, restoreTime metav1.Time) (*BackupActionSet, error) {
 	notFoundLatestBackup := func() (*BackupActionSet, error) {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found latest full or incremental backup based on backupPolicy "%s" and specified restoreTime "%s"`,
 			continuousBackup.Spec.BackupPolicyName, restoreTime))

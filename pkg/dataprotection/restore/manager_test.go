@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -409,7 +410,7 @@ var _ = Describe("RestoreManager Test", func() {
 
 				By("create restore manager")
 				reqCtx := getReqCtx()
-				restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+				restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme())
 				backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
 				Expect(err).ShouldNot(HaveOccurred())
 
@@ -425,7 +426,7 @@ var _ = Describe("RestoreManager Test", func() {
 				})).Should(Succeed())
 
 				By("check length of backupsets")
-				restoreMGR = NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+				restoreMGR = NewRestoreManager(restore, recorder, k8sClient.Scheme())
 				backupSet, err = restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
 				Expect(err).ShouldNot(HaveOccurred())
 

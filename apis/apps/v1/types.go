@@ -803,6 +803,11 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies an override for the storage requirements of the instances.
+	//
+	// +optional
+	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // Range represents a range with a start and an end value.

@@ -399,6 +399,11 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies an override for the storage requirements of the instances.
+	//
+	// +optional
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
 func (t *InstanceTemplate) GetName() string {

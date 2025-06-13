@@ -3337,7 +3337,7 @@ The keys are either podName, deployName, or statefulSetName, formatted as &lsquo
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 </div>
@@ -7979,7 +7979,9 @@ Add new or override existing envs.</p>
 <td>
 <code>volumeClaimTemplates</code><br/>
 <em>
-[]invalid type
+<a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">
+[]ClusterComponentVolumeClaimTemplate
+</a>
 </em>
 </td>
 <td>

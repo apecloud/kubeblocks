@@ -807,7 +807,7 @@ type InstanceTemplate struct {
 	// Specifies an override for the storage requirements of the instances.
 	//
 	// +optional
-	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // Range represents a range with a start and an end value.

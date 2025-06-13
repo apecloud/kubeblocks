@@ -28,7 +28,6 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -85,17 +84,14 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	}
 	resp, err := s.handleRequest(ctx, req)
 	result := string(resp)
-	if err != nil {
-		result = err.Error()
-	}
-	s.logger.Info("Action Executed", "action", req.Action, "result", result)
+	s.logger.Info("Action Executed", "action", req.Action, "result", result, "err", err)
 	return s.encode(resp, err), nil
 }
 
 func (s *actionService) decode(payload []byte) (*proto.ActionRequest, error) {
 	req := &proto.ActionRequest{}
 	if err := json.Unmarshal(payload, req); err != nil {
-		return nil, errors.Wrapf(proto.ErrBadRequest, "unmarshal action request error: %s", err.Error())
+		return nil, fmt.Errorf("%w: unmarshal action request error: %w", proto.ErrBadRequest, err)
 	}
 	return req, nil
 }
@@ -114,11 +110,11 @@ func (s *actionService) encode(out []byte, err error) []byte {
 
 func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
 	if _, ok := s.actions[req.Action]; !ok {
-		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
+		return nil, fmt.Errorf("%w: %s is not defined", proto.ErrNotDefined, req.Action)
 	}
 	action := s.actions[req.Action]
 	if action.Exec == nil {
-		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
+		return nil, fmt.Errorf("%w: only exec action is supported", proto.ErrNotImplemented)
 	}
 	// HACK: pre-check for the reconfigure action
 	if err := checkReconfigure(ctx, req); err != nil {
@@ -154,8 +150,5 @@ func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *pr
 		return nil, proto.ErrInProgress
 	}
 	delete(s.runningActions, req.Action)
-	if (*result).err != nil {
-		return nil, (*result).err
-	}
-	return (*result).stdout.Bytes(), nil
+	return (*result).stdout.Bytes(), wrapExecError((*result).err, (*result).stderr)
 }

@@ -22,14 +22,13 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
@@ -63,19 +62,15 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 		return nil, err
 	}
 	result := <-resultChan
-	err = result.err
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			errMsg := fmt.Sprintf("exit code: %d", exitErr.ExitCode())
-			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
-				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
-			}
-			return nil, errors.Wrapf(proto.ErrFailed, errMsg)
-		}
-		return nil, err
+	return result.stdout.Bytes(), wrapExecError(result.err, result.stderr)
+}
+
+func wrapExecError(err error, stderr *bytes.Buffer) error {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return fmt.Errorf("%w: exit code: %d, stderr: %s", proto.ErrFailed, exitErr.ExitCode(), stderr.String())
 	}
-	return result.stdout.Bytes(), nil
+	return err
 }
 
 func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (chan *commandResult, error) {
@@ -159,7 +154,7 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				errChan <- proto.ErrTimedOut
 			} else {
-				errChan <- errors.Wrapf(proto.ErrFailed, "failed to start command: %v", err)
+				errChan <- fmt.Errorf("%w: failed to start command: %w", proto.ErrFailed, err)
 			}
 			return
 		}

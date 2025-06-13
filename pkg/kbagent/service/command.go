@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -144,6 +145,11 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	cmd.Stdin = stdinReader
 	cmd.Stdout = stdoutWriter
 	cmd.Stderr = stderrWriter
+	cmd.WaitDelay = time.Second * 1
+	// gracefully terminate, go will kill it after waitDelay
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
 
 	errChan := make(chan error, 1)
 	go func() {

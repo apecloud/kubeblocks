@@ -221,8 +221,8 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 					return current, ErrOrdinalsNotEnough
 				}
 				if !globalUsedOrdinalSet.Has(availableList[cur]) {
-					globalUsedOrdinalSet.Insert(availableList[i])
-					current.Insert(availableList[i])
+					globalUsedOrdinalSet.Insert(availableList[cur])
+					current.Insert(availableList[cur])
 					break
 				}
 				cur++

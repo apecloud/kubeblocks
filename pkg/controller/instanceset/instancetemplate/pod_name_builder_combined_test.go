@@ -210,7 +210,7 @@ var _ = Describe("Combined Name builder tests", func() {
 			},
 		}, map[string]sets.Set[int32]{
 			"":   sets.New[int32](0, 3, 4),
-			"t1": sets.New[int32](1, 2),
+			"t1": sets.New[int32](2),
 		}, false),
 
 		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
@@ -335,7 +335,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				Ordinals: []int32{0, 1, 2},
 			},
 		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](2, 3),
+			"t1": sets.New[int32](3),
 			"":   sets.New[int32](0, 1),
 		}, false),
 

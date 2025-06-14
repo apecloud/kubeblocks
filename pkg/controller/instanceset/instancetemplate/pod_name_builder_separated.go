@@ -103,12 +103,12 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 }
 
 func buildInstanceTemplateExts(itsExt *InstanceSetExt) []*InstanceTemplateExt {
-	var InstanceTemplateExtList []*InstanceTemplateExt
+	var instanceTemplateExtList []*InstanceTemplateExt
 	for _, template := range itsExt.InstanceTemplates {
 		templateExt := buildInstanceTemplateExt(template, itsExt.InstanceSet)
-		InstanceTemplateExtList = append(InstanceTemplateExtList, templateExt)
+		instanceTemplateExtList = append(instanceTemplateExtList, templateExt)
 	}
-	return InstanceTemplateExtList
+	return instanceTemplateExtList
 }
 
 func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName string) ([]int32, error) {
@@ -186,9 +186,9 @@ func generateInstanceNamesWithOrdinalList(parentName, templateName string,
 		instanceNameList = append(instanceNameList, name)
 	}
 	if int32(len(instanceNameList)) != replicas {
-		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
+		err := fmt.Errorf("for template '%s', expected %d instance names but generated %d: [%s]",
 			templateName, replicas, len(instanceNameList), strings.Join(instanceNameList, ", "))
-		return instanceNameList, fmt.Errorf("%s", errorMessage)
+		return instanceNameList, err
 	}
 	return instanceNameList, nil
 }

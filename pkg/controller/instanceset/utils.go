@@ -58,7 +58,7 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 		return rolePriorityMap[role]
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(pods[i].GetName())
+		return parseParentNameAndOrdinal(pods[i].GetName())
 	}
 	baseSort(pods, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }

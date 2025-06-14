@@ -32,7 +32,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -563,10 +562,10 @@ var _ = Describe("service references", func() {
 			}
 
 			etcdComp := reader.objs[0].(*appsv1.Component)
-			podNames, _ := instanceset.GenerateAllInstanceNames(etcdComp.Name, etcdComp.Spec.Replicas, nil, nil, appsv1.Ordinals{})
+			podNamePrefix := constant.GenerateWorkloadNamePattern(etcdCluster, etcdComponent) + "-"
 			expectedPodFQDNs := strings.Join([]string{
-				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNames[0]),
-				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNames[1]),
+				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNamePrefix+"0"),
+				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNamePrefix+"1"),
 			}, ",")
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)

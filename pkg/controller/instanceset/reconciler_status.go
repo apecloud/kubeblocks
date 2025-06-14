@@ -22,7 +22,6 @@ package instanceset
 import (
 	"encoding/json"
 	"sort"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -67,6 +67,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	replicas := int32(0)
+	ordinals := make([]int32, 0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
@@ -89,21 +90,23 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, pod := range podList {
-		parentName, _ := ParseParentNameAndOrdinal(pod.Name)
-		templateName, _ := strings.CutPrefix(parentName, its.Name)
-		if len(templateName) > 0 {
-			templateName, _ = strings.CutPrefix(templateName, "-")
-		}
+		_, ordinal := parseParentNameAndOrdinal(pod.Name)
+		templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
-				Name: templateName,
+				Name:     templateName,
+				Ordinals: make([]int32, 0),
 			}
 		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
 			notReadyNames.Insert(pod.Name)
 			replicas++
+			if len(templateName) == 0 {
+				ordinals = append(ordinals, int32(ordinal))
+			}
 			template2TemplatesStatus[templateName].Replicas++
+			template2TemplatesStatus[templateName].Ordinals = append(template2TemplatesStatus[templateName].Ordinals, int32(ordinal))
 		}
 		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
 			readyReplicas++
@@ -141,6 +144,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 	its.Status.Replicas = replicas
+	its.Status.Ordinals = ordinals
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
@@ -200,7 +204,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
 	baseSort(podNames, func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(podNames[i])
+		return parseParentNameAndOrdinal(podNames[i])
 	}, nil, true)
 	return json.Marshal(podNames)
 }
@@ -326,7 +330,7 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 		return rolePriorityMap[role]
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(membersStatus[i].PodName)
+		return parseParentNameAndOrdinal(membersStatus[i].PodName)
 	}
 	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }
@@ -386,7 +390,7 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 
 func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(instanceStatus[i].PodName)
+		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
 	}
 	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

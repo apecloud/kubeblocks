@@ -27,6 +27,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -50,22 +51,24 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	if model.IsReconciliationPaused(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.ConditionUnsatisfiedWithError(err)
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := buildInstanceSetExt(its, tree)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 
 	// 1. build desired name to template map
-	nameToTemplateMap, err := buildInstanceName2TemplateMap(itsExt)
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(
+		itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder},
+	)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -103,7 +106,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	// create new instances
 	newNameList := sets.List(newNameSet)
 	baseSort(newNameList, func(i int) (string, int) {
-		return ParseParentNameAndOrdinal(newNameList[i])
+		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
 	getPredecessor := func(i int) *corev1.Pod {
 		if i <= 0 {

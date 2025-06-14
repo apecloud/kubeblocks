@@ -21,7 +21,6 @@ package instanceset
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,14 +30,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 )
 
 var _ = Describe("instance util test", func() {
@@ -85,85 +82,13 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("ValidateDupInstanceNames", func() {
-		It("should work well", func() {
-			By("build name list without duplication")
-			replicas := []string{"pod-0", "pod-1"}
-			Expect(ValidateDupInstanceNames(replicas, func(item string) string {
-				return item
-			})).Should(Succeed())
-
-			By("add a duplicate name")
-			replicas = append(replicas, "pod-0")
-			Expect(ValidateDupInstanceNames(replicas, func(item string) string {
-				return item
-			})).ShouldNot(Succeed())
-		})
-	})
-
-	Context("buildInstanceName2TemplateMap", func() {
-		It("build an its with default template only", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
-			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
-			Expect(err).Should(BeNil())
-			Expect(nameTemplate).Should(HaveLen(3))
-			name0 := its.Name + "-0"
-			Expect(nameTemplate).Should(HaveKey(name0))
-			Expect(nameTemplate).Should(HaveKey(its.Name + "-1"))
-			Expect(nameTemplate).Should(HaveKey(its.Name + "-2"))
-			nameTemplate[name0].PodTemplateSpec.Spec.Volumes = nil
-			defaultTemplate := its.Spec.Template.DeepCopy()
-			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(defaultTemplate.Spec))
-		})
-
-		It("build an its with one instance template override", func() {
-			nameOverride := "name-override"
-			nameOverride0 := its.Name + "-" + nameOverride + "-0"
-			annotationOverride := map[string]string{
-				"foo": "bar",
-			}
-			labelOverride := map[string]string{
-				"foo": "bar",
-			}
-			resources := corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU: resource.MustParse("600m"),
-				},
-			}
-			instance := workloads.InstanceTemplate{
-				Name:        nameOverride,
-				Annotations: annotationOverride,
-				Labels:      labelOverride,
-				Resources:   &resources,
-			}
-			its.Spec.Instances = append(its.Spec.Instances, instance)
-			itsExt, err := buildInstanceSetExt(its, nil)
-			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
-			Expect(err).Should(BeNil())
-			Expect(nameTemplate).Should(HaveLen(3))
-			name0 := its.Name + "-0"
-			name1 := its.Name + "-1"
-			Expect(nameTemplate).Should(HaveKey(name0))
-			Expect(nameTemplate).Should(HaveKey(name1))
-			Expect(nameTemplate).Should(HaveKey(nameOverride0))
-			expectedTemplate := its.Spec.Template.DeepCopy()
-			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Annotations).Should(Equal(annotationOverride))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Labels).Should(Equal(labelOverride))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resources.Limits[corev1.ResourceCPU]))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(its.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]))
-		})
-	})
-
 	Context("buildInstancePodByTemplate", func() {
 		It("should work well", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -186,9 +111,11 @@ var _ = Describe("instance util test", func() {
 		})
 
 		It("adds nodeSelector according to annotation", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			name := name + "-0"
 			Expect(nameTemplate).Should(HaveKey(name))
@@ -216,9 +143,11 @@ var _ = Describe("instance util test", func() {
 
 	Context("buildInstancePVCByTemplate", func() {
 		It("should work well", func() {
-			itsExt, err := buildInstanceSetExt(its, nil)
+			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 			Expect(err).Should(BeNil())
-			nameTemplate, err := buildInstanceName2TemplateMap(itsExt)
+			nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+			Expect(err).Should(BeNil())
+			nameTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
 			Expect(err).Should(BeNil())
 			Expect(nameTemplate).Should(HaveLen(3))
 			name := name + "-0"
@@ -230,26 +159,6 @@ var _ = Describe("instance util test", func() {
 			Expect(pvcs[0].Name).Should(Equal(fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, name)))
 			Expect(pvcs[0].Labels[constant.VolumeClaimTemplateNameLabelKey]).Should(Equal(volumeClaimTemplates[0].Name))
 			Expect(pvcs[0].Spec.Resources).Should(Equal(volumeClaimTemplates[0].Spec.Resources))
-		})
-	})
-
-	Context("validateSpec", func() {
-		It("should work well", func() {
-			By("a valid spec")
-			Expect(validateSpec(its, nil)).Should(Succeed())
-
-			By("sum of replicas in instance exceeds spec.replicas")
-			its2 := its.DeepCopy()
-			replicas := int32(4)
-			name := "barrrrr"
-			instance := workloads.InstanceTemplate{
-				Name:     name,
-				Replicas: &replicas,
-			}
-			its2.Spec.Instances = append(its2.Spec.Instances, instance)
-			err := validateSpec(its2, nil)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("should not greater than replicas in spec"))
 		})
 	})
 
@@ -353,48 +262,6 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("getInstanceTemplates", func() {
-		It("should work well", func() {
-			By("prepare objects")
-			templateObj, annotation, err := mockCompressedInstanceTemplates(namespace, name)
-			Expect(err).Should(BeNil())
-			instances := []workloads.InstanceTemplate{
-				{
-					Name:     "hello",
-					Replicas: func() *int32 { r := int32(2); return &r }(),
-				},
-				{
-					Name:     "world",
-					Replicas: func() *int32 { r := int32(1); return &r }(),
-				},
-			}
-			its := builder.NewInstanceSetBuilder(namespace, name).
-				AddAnnotations(templateRefAnnotationKey, annotation).
-				SetInstances(instances).
-				GetObject()
-			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(its)
-			Expect(tree.Add(templateObj)).Should(Succeed())
-
-			By("parse instance templates")
-			template, err := findTemplateObject(its, tree)
-			Expect(err).Should(BeNil())
-			instanceTemplates := getInstanceTemplates(its.Spec.Instances, template)
-			// append templates from mock function
-			instances = append(instances, []workloads.InstanceTemplate{
-				{
-					Name:     "foo",
-					Replicas: func() *int32 { r := int32(2); return &r }(),
-				},
-				{
-					Name:     "bar0",
-					Replicas: func() *int32 { r := int32(1); return &r }(),
-				},
-			}...)
-			Expect(instanceTemplates).Should(Equal(instances))
-		})
-	})
-
 	Context("GenerateInstanceNamesFromTemplate", func() {
 		It("should work well", func() {
 			parentName := "foo"
@@ -418,7 +285,7 @@ var _ = Describe("instance util test", func() {
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {
-				return ParseParentNameAndOrdinal(instanceNameList[i])
+				return parseParentNameAndOrdinal(instanceNameList[i])
 			}
 			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
@@ -450,7 +317,7 @@ var _ = Describe("instance util test", func() {
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {
-				return ParseParentNameAndOrdinal(instanceNameList[i])
+				return parseParentNameAndOrdinal(instanceNameList[i])
 			}
 			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
@@ -483,7 +350,7 @@ var _ = Describe("instance util test", func() {
 				instanceNameList = append(instanceNameList, instanceNames...)
 			}
 			getNameNOrdinalFunc := func(i int) (string, int) {
-				return ParseParentNameAndOrdinal(instanceNameList[i])
+				return parseParentNameAndOrdinal(instanceNameList[i])
 			}
 			baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2"}
@@ -516,331 +383,6 @@ var _ = Describe("instance util test", func() {
 			instanceNames, err := GenerateInstanceNamesFromTemplate(parentName, template.Name, template.Replicas, nil, template2OrdinalList)
 			Expect(err).Should(BeNil())
 			Expect(instanceNames).Should(BeEmpty())
-		})
-	})
-
-	Context("GenerateAllInstanceNames", func() {
-		It("should work well", func() {
-			parentName := "foo"
-			templatesFoo := &workloads.InstanceTemplate{
-				Name:     "foo",
-				Replicas: pointer.Int32(1),
-			}
-			templateBar := &workloads.InstanceTemplate{
-				Name:     "bar",
-				Replicas: pointer.Int32(2),
-			}
-			var templates []InstanceTemplate
-			templates = append(templates, templatesFoo, templateBar)
-			offlineInstances := []string{"foo-bar-1", "foo-0"}
-			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, kbappsv1.Ordinals{})
-			Expect(err).Should(BeNil())
-
-			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
-			Expect(instanceNameList).Should(Equal(podNamesExpected))
-		})
-
-		It("with Ordinals, without offlineInstances", func() {
-			parentName := "foo"
-			defaultTemplateOrdinals := kbappsv1.Ordinals{
-				Ranges: []kbappsv1.Range{
-					{
-						Start: 1,
-						End:   2,
-					},
-				},
-			}
-			templatesFoo := &workloads.InstanceTemplate{
-				Name:     "foo",
-				Replicas: pointer.Int32(1),
-				Ordinals: kbappsv1.Ordinals{
-					Discrete: []int32{0},
-				},
-			}
-			templateBar := &workloads.InstanceTemplate{
-				Name:     "bar",
-				Replicas: pointer.Int32(3),
-				Ordinals: kbappsv1.Ordinals{
-					Ranges: []kbappsv1.Range{
-						{
-							Start: 2,
-							End:   3,
-						},
-					},
-					Discrete: []int32{0},
-				},
-			}
-			var templates []InstanceTemplate
-			templates = append(templates, templatesFoo, templateBar)
-			instanceNameList, err := GenerateAllInstanceNames(parentName, 6, templates, nil, defaultTemplateOrdinals)
-			Expect(err).Should(BeNil())
-
-			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-bar-3", "foo-foo-0"}
-			Expect(instanceNameList).Should(Equal(podNamesExpected))
-		})
-
-		It("with templatesOrdinals, with offlineInstances", func() {
-			parentName := "foo"
-			defaultTemplateOrdinals := kbappsv1.Ordinals{
-				Ranges: []kbappsv1.Range{
-					{
-						Start: 1,
-						End:   2,
-					},
-				},
-			}
-			templatesFoo := &workloads.InstanceTemplate{
-				Name:     "foo",
-				Replicas: pointer.Int32(1),
-				Ordinals: kbappsv1.Ordinals{
-					Discrete: []int32{0},
-				},
-			}
-			templateBar := &workloads.InstanceTemplate{
-				Name:     "bar",
-				Replicas: pointer.Int32(2),
-				Ordinals: kbappsv1.Ordinals{
-					Ranges: []kbappsv1.Range{
-						{
-							Start: 2,
-							End:   3,
-						},
-					},
-					Discrete: []int32{0},
-				},
-			}
-			var templates []InstanceTemplate
-			templates = append(templates, templatesFoo, templateBar)
-			offlineInstances := []string{"foo-bar-1", "foo-0", "foo-bar-3"}
-			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, defaultTemplateOrdinals)
-			Expect(err).Should(BeNil())
-
-			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
-			Expect(instanceNameList).Should(Equal(podNamesExpected))
-		})
-
-		It("with templatesOrdinals, with offlineInstances, replicas error", func() {
-			parentName := "foo"
-			defaultTemplateOrdinals := kbappsv1.Ordinals{
-				Ranges: []kbappsv1.Range{
-					{
-						Start: 1,
-						End:   2,
-					},
-				},
-			}
-			templatesFoo := &workloads.InstanceTemplate{
-				Name:     "foo",
-				Replicas: pointer.Int32(1),
-				Ordinals: kbappsv1.Ordinals{
-					Discrete: []int32{0},
-				},
-			}
-			templateBar := &workloads.InstanceTemplate{
-				Name:     "bar",
-				Replicas: pointer.Int32(3),
-				Ordinals: kbappsv1.Ordinals{
-					Ranges: []kbappsv1.Range{
-						{
-							Start: 2,
-							End:   3,
-						},
-					},
-					Discrete: []int32{0},
-				},
-			}
-			var templates []InstanceTemplate
-			templates = append(templates, templatesFoo, templateBar)
-			offlineInstances := []string{"foo-bar-1", "foo-0", "foo-bar-3"}
-			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, defaultTemplateOrdinals)
-			errInstanceNameListExpected := []string{"foo-bar-0", "foo-bar-2"}
-			errExpected := fmt.Errorf("for template '%s', expected %d instance names but generated %d: [%s]",
-				templateBar.Name, *templateBar.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", "))
-			Expect(instanceNameList).Should(BeNil())
-			Expect(err).Should(Equal(errExpected))
-		})
-	})
-
-	It("with templatesOrdinals range", func() {
-		By("replicas is equal to the length of ordinals ranges")
-		parentName := "test"
-		templateFoo := &workloads.InstanceTemplate{
-			Name:     "foo",
-			Replicas: pointer.Int32(3),
-			Ordinals: kbappsv1.Ordinals{
-				Ranges: []kbappsv1.Range{
-					{
-						Start: 1,
-						End:   2,
-					},
-					{
-						Start: 5,
-						End:   5,
-					},
-				},
-			},
-		}
-		instanceNameList, err := GenerateAllInstanceNames(parentName, 3, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
-		Expect(err).Should(BeNil())
-		Expect(len(instanceNameList)).Should(Equal(3))
-
-		By("replicas is less than the length of ordinals ranges")
-		templateFoo.Replicas = pointer.Int32(2)
-		instanceNameList, err = GenerateAllInstanceNames(parentName, 2, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
-		Expect(err).Should(BeNil())
-		Expect(len(instanceNameList)).Should(Equal(2))
-
-		By("replicas is greater than the length of ordinals ranges")
-		templateFoo.Replicas = pointer.Int32(4)
-		_, err = GenerateAllInstanceNames(parentName, 4, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
-		errInstanceNameListExpected := []string{"test-foo-1", "test-foo-2", "test-foo-5"}
-		errExpected := fmt.Errorf("for template '%s', expected %d instance names but generated %d: [%s]",
-			templateFoo.Name, *templateFoo.Replicas, len(errInstanceNameListExpected), strings.Join(errInstanceNameListExpected, ", "))
-		Expect(err).Should(Equal(errExpected))
-
-		By("zero replicas")
-		templateFoo.Replicas = pointer.Int32(0)
-		instanceNameList, err = GenerateAllInstanceNames(parentName, 0, []InstanceTemplate{templateFoo}, nil, kbappsv1.Ordinals{})
-		Expect(err).Should(BeNil())
-		Expect(len(instanceNameList)).Should(Equal(0))
-	})
-
-	Context("GetOrdinalListByTemplateName", func() {
-		It("should work well", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					DefaultTemplateOrdinals: kbappsv1.Ordinals{
-						Ranges: []kbappsv1.Range{
-							{
-								Start: 1,
-								End:   2,
-							},
-						},
-					},
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "foo",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{0},
-							},
-						},
-						{
-							Name: "bar",
-							Ordinals: kbappsv1.Ordinals{
-								Ranges: []kbappsv1.Range{
-									{
-										Start: 2,
-										End:   3,
-									},
-								},
-								Discrete: []int32{0},
-							},
-						},
-					},
-				},
-			}
-			templateNameDefault := ""
-			templateNameFoo := "foo"
-			templateNameBar := "bar"
-			templateNameNotFound := "foobar"
-
-			ordinalListDefault, err := getOrdinalListByTemplateName(its, templateNameDefault)
-			Expect(err).Should(BeNil())
-			ordinalListDefaultExpected := []int32{1, 2}
-			Expect(ordinalListDefault).Should(Equal(ordinalListDefaultExpected))
-
-			ordinalListFoo, err := getOrdinalListByTemplateName(its, templateNameFoo)
-			Expect(err).Should(BeNil())
-			ordinalListFooExpected := []int32{0}
-			Expect(ordinalListFoo).Should(Equal(ordinalListFooExpected))
-
-			ordinalListBar, err := getOrdinalListByTemplateName(its, templateNameBar)
-			Expect(err).Should(BeNil())
-			ordinalListBarExpected := []int32{0, 2, 3}
-			Expect(ordinalListBar).Should(Equal(ordinalListBarExpected))
-
-			ordinalListNotFound, err := getOrdinalListByTemplateName(its, templateNameNotFound)
-			Expect(ordinalListNotFound).Should(BeNil())
-			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
-			Expect(err).Should(Equal(errExpected))
-		})
-	})
-
-	Context("GetOrdinalsByTemplateName", func() {
-		It("should work well", func() {
-			its := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					DefaultTemplateOrdinals: kbappsv1.Ordinals{
-						Ranges: []kbappsv1.Range{
-							{
-								Start: 1,
-								End:   2,
-							},
-						},
-					},
-					Instances: []workloads.InstanceTemplate{
-						{
-							Name: "foo",
-							Ordinals: kbappsv1.Ordinals{
-								Discrete: []int32{0},
-							},
-						},
-						{
-							Name: "bar",
-							Ordinals: kbappsv1.Ordinals{
-								Ranges: []kbappsv1.Range{
-									{
-										Start: 2,
-										End:   3,
-									},
-								},
-								Discrete: []int32{0},
-							},
-						},
-					},
-				},
-			}
-			templateNameDefault := ""
-			templateNameFoo := "foo"
-			templateNameBar := "bar"
-			templateNameNotFound := "foobar"
-
-			ordinalsDefault, err := getOrdinalsByTemplateName(its, templateNameDefault)
-			Expect(err).Should(BeNil())
-			ordinalsDefaultExpected := kbappsv1.Ordinals{
-				Ranges: []kbappsv1.Range{
-					{
-						Start: 1,
-						End:   2,
-					},
-				},
-			}
-			Expect(ordinalsDefault).Should(Equal(ordinalsDefaultExpected))
-
-			ordinalsFoo, err := getOrdinalsByTemplateName(its, templateNameFoo)
-			Expect(err).Should(BeNil())
-			ordinalsFooExpected := kbappsv1.Ordinals{
-				Discrete: []int32{0},
-			}
-			Expect(ordinalsFoo).Should(Equal(ordinalsFooExpected))
-
-			ordinalsBar, err := getOrdinalsByTemplateName(its, templateNameBar)
-			Expect(err).Should(BeNil())
-			ordinalsBarExpected := kbappsv1.Ordinals{
-				Ranges: []kbappsv1.Range{
-					{
-						Start: 2,
-						End:   3,
-					},
-				},
-				Discrete: []int32{0},
-			}
-			Expect(ordinalsBar).Should(Equal(ordinalsBarExpected))
-
-			ordinalsNotFound, err := getOrdinalsByTemplateName(its, templateNameNotFound)
-			Expect(ordinalsNotFound).Should(Equal(kbappsv1.Ordinals{}))
-			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
-			Expect(err).Should(Equal(errExpected))
 		})
 	})
 
@@ -877,18 +419,18 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
-	Context("ParseParentNameAndOrdinal", func() {
+	Context("parseParentNameAndOrdinal", func() {
 		It("Benchmark", Serial, Label("measurement"), func() {
-			experiment := gmeasure.NewExperiment("ParseParentNameAndOrdinal Benchmark")
+			experiment := gmeasure.NewExperiment("parseParentNameAndOrdinal Benchmark")
 			AddReportEntry(experiment.Name, experiment)
 
 			experiment.Sample(func(idx int) {
-				experiment.MeasureDuration("ParseParentNameAndOrdinal", func() {
-					_, _ = ParseParentNameAndOrdinal("foo-bar-666")
+				experiment.MeasureDuration("parseParentNameAndOrdinal", func() {
+					_, _ = parseParentNameAndOrdinal("foo-bar-666")
 				})
 			}, gmeasure.SamplingConfig{N: 100, Duration: time.Second})
 
-			parsingStats := experiment.GetStats("ParseParentNameAndOrdinal")
+			parsingStats := experiment.GetStats("parseParentNameAndOrdinal")
 			medianDuration := parsingStats.DurationFor(gmeasure.StatMedian)
 			Expect(medianDuration).To(BeNumerically("<", time.Millisecond))
 		})

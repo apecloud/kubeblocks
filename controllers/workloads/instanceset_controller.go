@@ -84,6 +84,7 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewAPIVersionReconciler()).
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
+		Do(instanceset.NewValidationReconciler()).
 		Do(instanceset.NewStatusReconciler()).
 		Do(instanceset.NewRevisionUpdateReconciler()).
 		Do(instanceset.NewAssistantObjectReconciler()).

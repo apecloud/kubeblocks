@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -79,7 +78,7 @@ var _ = Describe("", func() {
 						{
 							Name:         testapps.ServiceVPCName,
 							ServiceType:  corev1.ServiceTypeLoadBalancer,
-							RoleSelector: constant.Leader,
+							RoleSelector: testapps.Leader,
 						},
 					},
 				},

@@ -713,6 +713,15 @@ spec:
                         - name
                         type: object
                       type: array
+                    flatInstanceOrdinal:
+                      default: false
+                      description: |-
+                        flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+                        globally uniquely ordinal scheme, regardless of the instance template.
+
+
+                        Defaults to false.
+                      type: boolean
                     instanceUpdateStrategy:
                       description: Provides fine-grained control over the spec update
                         process of all instances.
@@ -925,7 +934,7 @@ spec:
                               Name specifies the unique name of the instance Pod created using this InstanceTemplate.
                               This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal
                               using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-                              The specified name overrides any default naming conventions or patterns.
+                              The name can't be empty.
                             maxLength: 54
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
@@ -933,6 +942,7 @@ spec:
                             description: |-
                               Specifies the desired Ordinals of this InstanceTemplate.
                               The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+                              If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 
 
                               For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
@@ -948,7 +958,7 @@ spec:
                               ranges:
                                 items:
                                   description: |-
-                                    Range represents a range with a start and an end value.
+                                    Range represents a range with a start and an end value. Both start and end are included.
                                     It is used to define a continuous segment.
                                   properties:
                                     end:
@@ -2531,6 +2541,76 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    network:
+                      description: Defines the network configuration for the Component.
+                      properties:
+                        dnsConfig:
+                          description: Specifies the DNS parameters of a pod.
+                          properties:
+                            nameservers:
+                              description: |-
+                                A list of DNS name server IP addresses.
+                                This will be appended to the base nameservers generated from DNSPolicy.
+                                Duplicated nameservers will be removed.
+                              items:
+                                type: string
+                              type: array
+                            options:
+                              description: |-
+                                A list of DNS resolver options.
+                                This will be merged with the base options generated from DNSPolicy.
+                                Duplicated entries will be removed. Resolution options given in Options
+                                will override those that appear in the base DNSPolicy.
+                              items:
+                                description: PodDNSConfigOption defines DNS resolver
+                                  options of a pod.
+                                properties:
+                                  name:
+                                    description: Required.
+                                    type: string
+                                  value:
+                                    type: string
+                                type: object
+                              type: array
+                            searches:
+                              description: |-
+                                A list of DNS search domains for host-name lookup.
+                                This will be appended to the base search paths generated from DNSPolicy.
+                                Duplicated search paths will be removed.
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        dnsPolicy:
+                          description: |-
+                            Set DNS policy for the pod.
+                            Defaults to "ClusterFirst". If the hostNetwork is enabled, the default policy will be set to "ClusterFirstWithHostNet".
+                          type: string
+                        hostAliases:
+                          description: |-
+                            HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.
+                            This is only valid for non-hostNetwork pods.
+                          items:
+                            description: |-
+                              HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+                              pod's hosts file.
+                            properties:
+                              hostnames:
+                                description: Hostnames for the above IP address.
+                                items:
+                                  type: string
+                                type: array
+                              ip:
+                                description: IP address of the host file entry.
+                                type: string
+                            type: object
+                          type: array
+                        hostNetwork:
+                          default: false
+                          description: Host networking requested for this pod. Use
+                            the host's network namespace.
+                          type: boolean
+                      type: object
                     offlineInstances:
                       description: |-
                         Specifies the names of instances to be transitioned to offline status.
@@ -7746,6 +7826,12 @@ spec:
                       x-kubernetes-validations:
                       - message: name is immutable
                         rule: self == oldSelf
+                    offline:
+                      description: Specifies the names of shards (components) to be
+                        transitioned to offline status.
+                      items:
+                        type: string
+                      type: array
                     shardingDef:
                       description: |-
                         Specifies the ShardingDefinition custom resource (CR) that defines the sharding's characteristics and behavior.
@@ -8320,6 +8406,15 @@ spec:
                             - name
                             type: object
                           type: array
+                        flatInstanceOrdinal:
+                          default: false
+                          description: |-
+                            flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+                            globally uniquely ordinal scheme, regardless of the instance template.
+
+
+                            Defaults to false.
+                          type: boolean
                         instanceUpdateStrategy:
                           description: Provides fine-grained control over the spec
                             update process of all instances.
@@ -8536,7 +8631,7 @@ spec:
                                   Name specifies the unique name of the instance Pod created using this InstanceTemplate.
                                   This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal
                                   using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-                                  The specified name overrides any default naming conventions or patterns.
+                                  The name can't be empty.
                                 maxLength: 54
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
@@ -8544,6 +8639,7 @@ spec:
                                 description: |-
                                   Specifies the desired Ordinals of this InstanceTemplate.
                                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+                                  If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 
 
                                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
@@ -8559,7 +8655,7 @@ spec:
                                   ranges:
                                     items:
                                       description: |-
-                                        Range represents a range with a start and an end value.
+                                        Range represents a range with a start and an end value. Both start and end are included.
                                         It is used to define a continuous segment.
                                       properties:
                                         end:
@@ -10160,6 +10256,76 @@ spec:
                           maxLength: 22
                           pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                           type: string
+                        network:
+                          description: Defines the network configuration for the Component.
+                          properties:
+                            dnsConfig:
+                              description: Specifies the DNS parameters of a pod.
+                              properties:
+                                nameservers:
+                                  description: |-
+                                    A list of DNS name server IP addresses.
+                                    This will be appended to the base nameservers generated from DNSPolicy.
+                                    Duplicated nameservers will be removed.
+                                  items:
+                                    type: string
+                                  type: array
+                                options:
+                                  description: |-
+                                    A list of DNS resolver options.
+                                    This will be merged with the base options generated from DNSPolicy.
+                                    Duplicated entries will be removed. Resolution options given in Options
+                                    will override those that appear in the base DNSPolicy.
+                                  items:
+                                    description: PodDNSConfigOption defines DNS resolver
+                                      options of a pod.
+                                    properties:
+                                      name:
+                                        description: Required.
+                                        type: string
+                                      value:
+                                        type: string
+                                    type: object
+                                  type: array
+                                searches:
+                                  description: |-
+                                    A list of DNS search domains for host-name lookup.
+                                    This will be appended to the base search paths generated from DNSPolicy.
+                                    Duplicated search paths will be removed.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            dnsPolicy:
+                              description: |-
+                                Set DNS policy for the pod.
+                                Defaults to "ClusterFirst". If the hostNetwork is enabled, the default policy will be set to "ClusterFirstWithHostNet".
+                              type: string
+                            hostAliases:
+                              description: |-
+                                HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.
+                                This is only valid for non-hostNetwork pods.
+                              items:
+                                description: |-
+                                  HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
+                                  pod's hosts file.
+                                properties:
+                                  hostnames:
+                                    description: Hostnames for the above IP address.
+                                    items:
+                                      type: string
+                                    type: array
+                                  ip:
+                                    description: IP address of the host file entry.
+                                    type: string
+                                type: object
+                              type: array
+                            hostNetwork:
+                              default: false
+                              description: Host networking requested for this pod.
+                                Use the host's network namespace.
+                              type: boolean
+                          type: object
                         offlineInstances:
                           description: |-
                             Specifies the names of instances to be transitioned to offline status.

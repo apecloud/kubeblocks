@@ -136,6 +136,11 @@ func (builder *ComponentBuilder) SetVolumes(volumes []corev1.Volume) *ComponentB
 	return builder
 }
 
+func (builder *ComponentBuilder) SetNetwork(network *appsv1.ComponentNetwork) *ComponentBuilder {
+	builder.get().Spec.Network = network
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServices(services []appsv1.ClusterComponentService) *ComponentBuilder {
 	toCompService := func(svc appsv1.ClusterComponentService) appsv1.ComponentService {
 		return appsv1.ComponentService{
@@ -167,6 +172,10 @@ func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1.ServiceRef)
 
 func (builder *ComponentBuilder) SetInstances(instances []appsv1.InstanceTemplate) *ComponentBuilder {
 	builder.get().Spec.Instances = instances
+	return builder
+}
+func (builder *ComponentBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *ComponentBuilder {
+	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
 	return builder
 }
 

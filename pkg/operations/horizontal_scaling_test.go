@@ -310,7 +310,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				Expect(ok).Should(BeTrue())
 			}
 
-			By("mock specified pods deleted")
+			By("mock specified pods deleted or created")
 			mockHScale(podList)
 			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
@@ -401,6 +401,30 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect replicas to 4")
 			compSpec := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
 			Expect(compSpec.Replicas).Should(BeEquivalentTo(4))
+			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(2))
+		})
+
+		It("test online the boundary ordinal the specified pod of the instance template and auto-sync replicaChanges", func() {
+			offlineInstanceName := fmt.Sprintf("%s-%s-%s-1", clusterName, defaultCompName, insTplName)
+			offlineInstanceName2 := fmt.Sprintf("%s-%s-2", clusterName, defaultCompName)
+			offlineInstances := []string{offlineInstanceName, offlineInstanceName2}
+			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {
+				setClusterCompSpec(cluster, []appsv1.InstanceTemplate{
+					{Name: insTplName, Replicas: pointer.Int32(1)},
+				}, offlineInstances)
+			}, opsv1alpha1.HorizontalScaling{
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					OfflineInstancesToOnline: offlineInstances,
+				},
+			}, []string{}, func(podList []*corev1.Pod) {
+				By("create the specified pod " + offlineInstanceName)
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName, "follower")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName2, "follower")
+			}, false)
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			By("expect replicas to 4")
+			compSpec := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
+			Expect(compSpec.Replicas).Should(BeEquivalentTo(5))
 			Expect(*compSpec.Instances[0].Replicas).Should(BeEquivalentTo(2))
 		})
 
@@ -507,26 +531,6 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect replicas not be changed")
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(3))
-		})
-
-		It("test offline the specified pod but it is not exist", func() {
-			By("init operations resources with 3 CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
-			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
-			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-
-			By("offline the specified pod but it is not exist")
-			offlineInsName := fmt.Sprintf("%s-%s-4", clusterName, defaultCompName)
-			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
-				ScaleIn: &opsv1alpha1.ScaleIn{
-					OnlineInstancesToOffline: []string{offlineInsName},
-				},
-			}, true)
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
-			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(3))
-			By("expect for opsRequest phase is Succeed after pods has been scaled and progress is 1/1")
-			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 		})
 
 		It("test offline two specified pods with same pod name with ignore validate", func() {

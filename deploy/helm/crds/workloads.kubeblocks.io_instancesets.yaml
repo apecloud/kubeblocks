@@ -367,6 +367,7 @@ spec:
                 description: |-
                   Specifies the desired Ordinals of the default template.
                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+                  If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 
 
                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
@@ -381,7 +382,7 @@ spec:
                   ranges:
                     items:
                       description: |-
-                        Range represents a range with a start and an end value.
+                        Range represents a range with a start and an end value. Both start and end are included.
                         It is used to define a continuous segment.
                       properties:
                         end:
@@ -399,6 +400,15 @@ spec:
               disableDefaultHeadlessService:
                 default: false
                 description: Specifies whether to create the default headless service.
+                type: boolean
+              flatInstanceOrdinal:
+                default: false
+                description: |-
+                  flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+                  globally uniquely ordinal scheme, regardless of the instance template.
+
+
+                  Defaults to false.
                 type: boolean
               instanceUpdateStrategy:
                 description: Provides fine-grained control over the spec update process
@@ -453,8 +463,6 @@ spec:
                   allowing the InstanceSet to manage instances from different templates.
 
 
-                  The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-                  The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
                   By default, the ordinal starts from 0 for each InstanceTemplate.
                   It is important to ensure that the Name of each InstanceTemplate is unique.
 
@@ -628,7 +636,7 @@ spec:
                         ranges:
                           items:
                             description: |-
-                              Range represents a range with a start and an end value.
+                              Range represents a range with a start and an end value. Both start and end are included.
                               It is used to define a continuous segment.
                             properties:
                               end:
@@ -10967,6 +10975,13 @@ spec:
                   InstanceSet's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              ordinals:
+                description: Ordinals is the ordinals used by the instances of the
+                  InstanceSet except the template instances.
+                items:
+                  format: int32
+                  type: integer
+                type: array
               readyInitReplicas:
                 description: |-
                   Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
@@ -11005,6 +11020,13 @@ spec:
                     name:
                       description: Name, the name of the InstanceTemplate.
                       type: string
+                    ordinals:
+                      description: Ordinals is the ordinals used by the instances
+                        of the InstanceTemplate.
+                      items:
+                        format: int32
+                        type: integer
+                      type: array
                     readyReplicas:
                       description: ReadyReplicas is the number of Pods that have a
                         Ready Condition.

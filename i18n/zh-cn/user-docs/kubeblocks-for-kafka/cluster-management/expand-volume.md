@@ -105,16 +105,16 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    `spec.components.volumeClaimTemplates.spec.resources` 是 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: demo 
+     namespace: demo
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2
      componentSpecs:
-     - name: kafka 
+     - name: kafka
        componentDefRef: kafka
        volumeClaimTemplates:
        - name: data

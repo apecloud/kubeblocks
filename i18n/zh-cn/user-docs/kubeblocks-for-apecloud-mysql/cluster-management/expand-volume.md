@@ -100,7 +100,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster

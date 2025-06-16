@@ -29,9 +29,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -93,7 +95,18 @@ var _ = Describe("component service transformer test", func() {
 						},
 					},
 				},
-				Replicas: 3,
+				PodSpec:      &corev1.PodSpec{},
+				Replicas:     3,
+				FullCompName: constant.GenerateClusterComponentName(clusterName, compName),
+			},
+			RunningWorkload: &workloadsv1.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      constant.GenerateClusterComponentName(clusterName, compName),
+				},
+				Spec: workloadsv1.InstanceSetSpec{
+					Replicas: ptr.To[int32](3),
+				},
 			},
 		}
 	})
@@ -182,6 +195,7 @@ var _ = Describe("component service transformer test", func() {
 			// scale-in
 			replicas := transCtx.SynthesizeComponent.Replicas
 			transCtx.SynthesizeComponent.Replicas = 1
+			transCtx.RunningWorkload.(*workloadsv1.InstanceSet).Spec.Replicas = ptr.To[int32](1)
 			transformer := &componentServiceTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())

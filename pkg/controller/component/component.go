@@ -83,11 +83,13 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetPVCRetentionPolicy(compSpec.PersistentVolumeClaimRetentionPolicy).
 		SetVolumes(compSpec.Volumes).
+		SetNetwork(compSpec.Network).
 		SetServices(compSpec.Services).
 		SetConfigs(compSpec.Configs).
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
+		SetFlatInstanceOrdinal(compSpec.FlatInstanceOrdinal).
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
 		SetSystemAccounts(compSpec.SystemAccounts).

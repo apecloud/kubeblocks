@@ -1,5 +1,5 @@
 ---
-title: Connect to a Kafka cluster 
+title: Connect to a Kafka cluster
 description: Guide for cluster creation for kafka
 keywords: [kafka, cluster, connect, network]
 sidebar_position: 2
@@ -28,7 +28,7 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
 
    ```bash
    kubectl get svc -n demo
-   > 
+   >
    NAME                                      TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
    kubernetes                                ClusterIP   10.43.0.1     <none>        443/TCP                               9d
    mycluster-kafka-cluster-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
@@ -61,7 +61,7 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
    4. Create producer.
 
        ```bash
-       kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
+       kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092
        ```
 
    5. Enter："Hello, KubeBlocks" and press Enter.
@@ -94,7 +94,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
    ```bash
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
@@ -120,7 +120,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
            memory: 1Gi
        serviceAccountName: kb-sa-kafka
        services:
-       - annotations: 
+       - annotations:
            service.beta.kubernetes.io/aws-load-balancer-type: nlb
            service.beta.kubernetes.io/aws-load-balancer-internal: "true"
          name: vpc
@@ -206,7 +206,7 @@ The current version only supports Kafka broker with a single replica (combined: 
            memory: 1Gi
        serviceAccountName: kb-sa-kafka
        services:
-       - annotations: 
+       - annotations:
            service.beta.kubernetes.io/aws-load-balancer-type: nlb
            service.beta.kubernetes.io/aws-load-balancer-internal: "false"
          name: vpc

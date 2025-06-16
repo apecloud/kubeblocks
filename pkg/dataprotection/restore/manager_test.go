@@ -97,8 +97,23 @@ var _ = Describe("RestoreManager Test", func() {
 
 		})
 
-		mockBackupForRestore := func(testCtx *testutil.TestContext, actionSetName, backupPVCName string, mockBackupCompleted, useVolumeSnapshotBackup bool) *dpv1alpha1.Backup {
-			backup := testdp.NewFakeBackup(testCtx, nil)
+		mockBackupForRestore := func(
+			testCtx *testutil.TestContext, actionSetName, backupPVCName string,
+			mockBackupCompleted, useVolumeSnapshotBackup bool,
+			backupType dpv1alpha1.BackupType,
+			startTime, endTime string,
+			backupName string,
+		) *dpv1alpha1.Backup {
+			backup := testdp.NewFakeBackup(testCtx, func(backup *dpv1alpha1.Backup) {
+				if backup.Labels == nil {
+					backup.Labels = make(map[string]string)
+				}
+				backup.Labels[dptypes.BackupTypeLabelKey] = string(backupType)
+				backup.Labels[dptypes.BackupPolicyLabelKey] = testdp.BackupPolicyName
+				if backupName != "" {
+					backup.Name = backupName
+				}
+			})
 			if mockBackupCompleted {
 				// then mock backup to completed
 				backupMethodName := testdp.BackupMethodName
@@ -106,7 +121,16 @@ var _ = Describe("RestoreManager Test", func() {
 					backupMethodName = testdp.VSBackupMethodName
 				}
 				Expect(testapps.ChangeObjStatus(testCtx, backup, func() {
-					endTime, _ := time.Parse(time.RFC3339, "2023-01-01T10:00:00Z")
+					var end *metav1.Time
+					if endTime != "" {
+						endTime, _ := time.Parse(time.RFC3339, endTime)
+						end = &metav1.Time{Time: endTime}
+					}
+					var start *metav1.Time
+					if startTime != "" {
+						startTime, _ := time.Parse(time.RFC3339, startTime)
+						start = &metav1.Time{Time: startTime}
+					}
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 					backup.Status.PersistentVolumeClaimName = backupPVCName
 					testdp.MockBackupStatusTarget(backup, dpv1alpha1.PodSelectionStrategyAny)
@@ -115,7 +139,8 @@ var _ = Describe("RestoreManager Test", func() {
 					}
 					backup.Status.TimeRange = &dpv1alpha1.BackupTimeRange{
 						TimeZone: "+08:00",
-						End:      &metav1.Time{Time: endTime},
+						Start:    start,
+						End:      end,
 					}
 					testdp.MockBackupStatusMethod(backup, backupMethodName, testdp.DataVolumeName, actionSetName)
 				})).Should(Succeed())
@@ -125,7 +150,7 @@ var _ = Describe("RestoreManager Test", func() {
 
 		initResources := func(reqCtx intctrlutil.RequestCtx, _ int, useVolumeSnapshot bool, change func(f *testdp.MockRestoreFactory)) (*RestoreManager, *BackupActionSet) {
 			By("create a completed backup")
-			backup := mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, useVolumeSnapshot)
+			backup := mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, useVolumeSnapshot, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
 
 			schedulingSpec := dpv1alpha1.SchedulingSpec{
 				NodeName: nodeName,
@@ -360,6 +385,57 @@ var _ = Describe("RestoreManager Test", func() {
 				actionSet.Spec.Restore.PostReady[1].Job.RunOnTargetPodNode = &runTargetPodNode
 			})).Should(Succeed())
 			testPostReady(false)
+		})
+
+		Context("BuildContinuousRestoreManager", func() {
+			It("respects UnifyFullAndContinuousRestore annotation", func() {
+				By("create a continuous backup")
+				continuousBackup := mockBackupForRestore(
+					&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeContinuous,
+					"2023-01-01T09:00:00Z", "2023-01-01T12:00:00Z", "test-backup-continuous",
+				)
+
+				By("create a completed backup")
+				_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
+
+				schedulingSpec := dpv1alpha1.SchedulingSpec{
+					NodeName: nodeName,
+				}
+
+				By("create restore")
+				restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
+					SetBackup(continuousBackup.Name, testCtx.DefaultNamespace).
+					SetSchedulingSpec(schedulingSpec).
+					Create(&testCtx).
+					SetRestoreTime("2023-01-01T11:30:00Z").
+					Get()
+
+				By("create restore manager")
+				reqCtx := getReqCtx()
+				restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+				backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				Expect(restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)).Should(Succeed())
+				Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(2))
+
+				By("set UnifyFullAndContinuousRestore annotation")
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(actionSet), func(actionset *dpv1alpha1.ActionSet) {
+					if actionset.Annotations == nil {
+						actionset.Annotations = make(map[string]string)
+					}
+					actionset.Annotations[constant.SkipBaseBackupRestoreInPitrAnnotationKey] = "true"
+				})).Should(Succeed())
+
+				By("check length of backupsets")
+				restoreMGR = NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+				backupSet, err = restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				Expect(restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)).Should(Succeed())
+				Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(1))
+
+			})
 		})
 	})
 

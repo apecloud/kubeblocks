@@ -692,7 +692,7 @@ var _ = Describe("OpsRequest Controller", func() {
 							{
 								Name:         "svc1",
 								ServiceType:  corev1.ServiceTypeLoadBalancer,
-								RoleSelector: constant.Leader,
+								RoleSelector: testapps.Leader,
 								Ports: []corev1.ServicePort{
 									{Name: "port1", Port: 3306, TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "mysql"}},
 								},

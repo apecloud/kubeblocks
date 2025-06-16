@@ -474,7 +474,7 @@ var _ = Describe("Cluster Controller", func() {
 						Name:         service.Name,
 						ServiceName:  service.Name,
 						Spec:         service.Spec,
-						RoleSelector: constant.Follower,
+						RoleSelector: testapps.Follower,
 					},
 					ComponentSelector: compName,
 				})
@@ -489,7 +489,7 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, constant.Follower))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, testapps.Follower))
 			g.Expect(svc.Spec.ExternalTrafficPolicy).Should(BeEquivalentTo(corev1.ServiceExternalTrafficPolicyTypeLocal))
 		})).Should(Succeed())
 	}

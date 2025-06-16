@@ -54,7 +54,7 @@ It should contain the following information:
 ├── templates         # A directory of templates that, when combined with values, will generate valid Kubernetes manifest files.
 │   ├── NOTES.txt     # OPTIONAL: A plain text file containing short usage notes
 │   ├── _helpers.tpl  # A place to put template helpers that you can re-use throughout the chart
-│   ├── clusterdefinition.yaml  
+│   ├── clusterdefinition.yaml
 │   └── clusterversion.yaml
 └── values.yaml       # The default configuration values for this chart
 
@@ -327,11 +327,11 @@ metadata:
 spec:
   description: 'MySQL is a widely used, open-source....'
   type: Helm
-  helm:                                     
+  helm:
     chartsImage: registry-of-your-helm-chart
   installable:
     autoInstall: false
-    
+
   defaultInstallValues:
     - enabled: true
 ```
@@ -403,7 +403,7 @@ While kbcli provides a convenient and generic way to create clusters, it may not
 In that case, try to use a Helm chart to render the cluster, or create it through a cluster.yaml file.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
@@ -414,7 +414,7 @@ spec:
   componentSpecs:                           # List required components
   - componentDefRef: mysql-compdef          # The type of the first component: mysql-compdef
     name: mysql-comp                        # The name of the first component: mysql-comp
-    replicas: 1 
+    replicas: 1
     resources:                              # Specify CPU and memory size
       limits:
         cpu: "1"

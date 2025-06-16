@@ -266,7 +266,7 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:MaxLength=22
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
 	//
@@ -379,6 +379,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
+	// Defines the network configuration for the Component.
+	//
+	// +optional
+	Network *ComponentNetwork `json:"network,omitempty"`
+
 	// Overrides services defined in referenced ComponentDefinition.
 	//
 	// +optional
@@ -479,6 +484,15 @@ type ClusterComponentSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+	// globally uniquely ordinal scheme, regardless of the instance template.
+	//
+	// Defaults to false.
+	//
+	// +optional
+	// +kubebuilder:default=false
+	FlatInstanceOrdinal bool `json:"flatInstanceOrdinal,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.
 	//
@@ -618,6 +632,11 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Maximum=2048
 	// +kubebuilder:validation:Required
 	Shards int32 `json:"shards,omitempty"`
+
+	// Specifies the names of shards (components) to be transitioned to offline status.
+	//
+	// +optional
+	Offline []string `json:"offline,omitempty"`
 }
 
 // ClusterService defines a service that is exposed externally, allowing entities outside the cluster to access it.

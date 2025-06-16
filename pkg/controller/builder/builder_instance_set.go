@@ -150,13 +150,13 @@ func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTe
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string) *InstanceSetBuilder {
-	builder.get().Spec.OfflineInstances = offlineInstances
+func (builder *InstanceSetBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *InstanceSetBuilder {
+	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetPodNamingRule(namingRule kbappsv1.PodNamingRule) *InstanceSetBuilder {
-	builder.get().Spec.PodNamingRule = namingRule
+func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string) *InstanceSetBuilder {
+	builder.get().Spec.OfflineInstances = offlineInstances
 	return builder
 }
 

@@ -587,9 +587,9 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 		}
 
-		It("works with PodNamingRuleCombined", func() {
+		It("works with FlatInstanceOrdinal", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.SetPodNamingRule(kbappsv1.PodNamingRuleCombined)
+				f.SetFlatInstanceOrdinal(true)
 				f.SetPodManagementPolicy(appsv1.ParallelPodManagement)
 				f.SetReplicas(3)
 			})

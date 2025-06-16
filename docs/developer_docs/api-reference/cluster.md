@@ -840,15 +840,16 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
-<code>podNamingRule</code><br/>
+<code>flatInstanceOrdinal</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.PodNamingRule">
-PodNamingRule
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -3291,15 +3292,16 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
-<code>podNamingRule</code><br/>
+<code>flatInstanceOrdinal</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.PodNamingRule">
-PodNamingRule
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -6493,15 +6495,16 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
-<code>podNamingRule</code><br/>
+<code>flatInstanceOrdinal</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.PodNamingRule">
-PodNamingRule
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -9000,34 +9003,6 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 </td>
 </tr><tr><td><p>&#34;Unavailable&#34;</p></td>
 <td><p>UnavailablePhase indicates that a CR is in an unavailable state.</p>
-</td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.PodNamingRule">PodNamingRule
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-<p>PodNamingRule defines the naming convention for instances (pods).
-The field is immutable once set.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Combined&#34;</p></td>
-<td><p>PodNamingRuleCombined constructs pod name based on the InstanceSet Name and ordinal.
-Ordinals are unique globally.
-The constructed instance name follows the pattern: $(instance_set.name)-$(ordinal).</p>
-</td>
-</tr><tr><td><p>&#34;Separated&#34;</p></td>
-<td><p>PodNamingRuleSeparated constructs pod name based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-Ordinals are unique within the template.
-The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).</p>
 </td>
 </tr></tbody>
 </table>
@@ -29739,15 +29714,16 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
-<code>podNamingRule</code><br/>
+<code>flatInstanceOrdinal</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.PodNamingRule">
-PodNamingRule
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -30259,15 +30235,16 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
-<code>podNamingRule</code><br/>
+<code>flatInstanceOrdinal</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.PodNamingRule">
-PodNamingRule
-</a>
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -30550,7 +30527,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Ordinals is the ordinals used by the instances of the InstanceSet.</p>
+<p>Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.</p>
 </td>
 </tr>
 <tr>

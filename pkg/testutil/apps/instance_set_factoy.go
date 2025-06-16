@@ -126,8 +126,8 @@ func (factory *MockInstanceSetFactory) SetInstanceUpdateStrategy(instanceUpdateS
 	return factory
 }
 
-func (factory *MockInstanceSetFactory) SetPodNamingRule(namingRule kbappsv1.PodNamingRule) *MockInstanceSetFactory {
-	factory.Get().Spec.PodNamingRule = namingRule
+func (factory *MockInstanceSetFactory) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *MockInstanceSetFactory {
+	factory.Get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
 	return factory
 }
 

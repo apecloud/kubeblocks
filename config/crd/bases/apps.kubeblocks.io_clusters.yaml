@@ -713,6 +713,15 @@ spec:
                         - name
                         type: object
                       type: array
+                    flatInstanceOrdinal:
+                      default: false
+                      description: |-
+                        flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+                        globally uniquely ordinal scheme, regardless of the instance template.
+
+
+                        Defaults to false.
+                      type: boolean
                     instanceUpdateStrategy:
                       description: Provides fine-grained control over the spec update
                         process of all instances.
@@ -2653,15 +2662,6 @@ spec:
                           - Delete
                           type: string
                       type: object
-                    podNamingRule:
-                      default: Separated
-                      description: |-
-                        PodNamingRule defines the naming convention for instances (pods).
-                        The field is immutable once set.
-                      enum:
-                      - Separated
-                      - Combined
-                      type: string
                     podUpdatePolicy:
                       description: |-
                         PodUpdatePolicy indicates how pods should be updated
@@ -8401,6 +8401,15 @@ spec:
                             - name
                             type: object
                           type: array
+                        flatInstanceOrdinal:
+                          default: false
+                          description: |-
+                            flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+                            globally uniquely ordinal scheme, regardless of the instance template.
+
+
+                            Defaults to false.
+                          type: boolean
                         instanceUpdateStrategy:
                           description: Provides fine-grained control over the spec
                             update process of all instances.
@@ -10362,15 +10371,6 @@ spec:
                               - Delete
                               type: string
                           type: object
-                        podNamingRule:
-                          default: Separated
-                          description: |-
-                            PodNamingRule defines the naming convention for instances (pods).
-                            The field is immutable once set.
-                          enum:
-                          - Separated
-                          - Combined
-                          type: string
                         podUpdatePolicy:
                           description: |-
                             PodUpdatePolicy indicates how pods should be updated

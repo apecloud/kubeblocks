@@ -827,21 +827,3 @@ type Ordinals struct {
 	Ranges   []Range `json:"ranges,omitempty"`
 	Discrete []int32 `json:"discrete,omitempty"`
 }
-
-// PodNamingRule defines the naming convention for instances (pods).
-// The field is immutable once set.
-//
-// +kubebuilder:validation:Enum={Separated,Combined}
-type PodNamingRule string
-
-const (
-	// PodNamingRuleSeparated constructs pod name based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-	// Ordinals are unique within the template.
-	// The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
-	PodNamingRuleSeparated PodNamingRule = "Separated"
-
-	// PodNamingRuleCombined constructs pod name based on the InstanceSet Name and ordinal.
-	// Ordinals are unique globally.
-	// The constructed instance name follows the pattern: $(instance_set.name)-$(ordinal).
-	PodNamingRuleCombined PodNamingRule = "Combined"
-)

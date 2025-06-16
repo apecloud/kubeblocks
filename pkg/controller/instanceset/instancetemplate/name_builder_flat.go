@@ -25,21 +25,22 @@ import (
 	"slices"
 	"strings"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // ErrOrdinalsNotEnough is considered temporary, e.g. some old ordinals are being deleted
 var ErrOrdinalsNotEnough = errors.New("available ordinals are not enough")
 
-type combinedPodNameBuilder struct {
+type flatNameBuilder struct {
 	itsExt      *InstanceSetExt
 	eventLogger record.EventRecorder
 }
 
-func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
+func (c *flatNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error) {
 	template2OrdinalSetMap, err := generateTemplateName2OrdinalMap(c.itsExt)
 	if err != nil {
 		if errors.Is(err, ErrOrdinalsNotEnough) {
@@ -65,7 +66,7 @@ func (c *combinedPodNameBuilder) BuildInstanceName2TemplateMap() (map[string]*In
 	return allNameTemplateMap, nil
 }
 
-func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
+func (c *flatNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	template2OrdinalSetMap, err := generateTemplateName2OrdinalMap(c.itsExt)
 	if err != nil {
 		if errors.Is(err, ErrOrdinalsNotEnough) {
@@ -89,9 +90,9 @@ func (c *combinedPodNameBuilder) GenerateAllInstanceNames() ([]string, error) {
 	return instanceNames, nil
 }
 
-// Validate checks if the instanceset spec is valid
+// Validate checks if the instance set spec is valid
 // Ordinals should be unique globally.
-func (c *combinedPodNameBuilder) Validate() error {
+func (c *flatNameBuilder) Validate() error {
 	ordinals := sets.New[int32]()
 	offlineOrdinals := sets.New[int32]()
 	for _, instance := range c.itsExt.InstanceSet.Spec.OfflineInstances {
@@ -143,10 +144,10 @@ func (c *combinedPodNameBuilder) Validate() error {
 }
 
 // generateTemplateName2OrdinalMap returns a map from template name to sorted ordinals
-// it rely on the instanceset's status to generate desired pod names
+// it relies on the instance set's status to generate desired pod names
 // it may not be updated, but it should converge eventually
 //
-// template ordianls are assumed to be valid at this time
+// template ordinals are assumed to be valid at this time
 func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
 	// initialize variables
 
@@ -197,7 +198,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		// delete any ordinal that doesn't in the available
 		current = current.Intersection(available)
 
-		// delete any offlined ordinals
+		// delete any offline ordinals
 		current = current.Difference(offlineOrdinalSet)
 		available = available.Difference(offlineOrdinalSet)
 
@@ -236,7 +237,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 	) (sets.Set[int32], error) {
 		// delete any ordinal that is taken by an template with ordinals defined
 		current = current.Difference(defaultTemplateUnavailableOrdinalSet)
-		// delete any offlined ordinals
+		// delete any offline ordinals
 		current = current.Difference(offlineOrdinalSet)
 
 		diff := int(*instanceTemplate.Replicas) - len(current)

@@ -174,14 +174,13 @@ func (builder *ComponentBuilder) SetInstances(instances []appsv1.InstanceTemplat
 	builder.get().Spec.Instances = instances
 	return builder
 }
-
-func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) *ComponentBuilder {
-	builder.get().Spec.OfflineInstances = offlineInstances
+func (builder *ComponentBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *ComponentBuilder {
+	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
 	return builder
 }
 
-func (builder *ComponentBuilder) SetPodNamingRule(namingRule appsv1.PodNamingRule) *ComponentBuilder {
-	builder.get().Spec.PodNamingRule = namingRule
+func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) *ComponentBuilder {
+	builder.get().Spec.OfflineInstances = offlineInstances
 	return builder
 }
 

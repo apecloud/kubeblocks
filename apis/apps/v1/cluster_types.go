@@ -485,9 +485,14 @@ type ClusterComponentSpec struct {
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+	// globally uniquely ordinal scheme, regardless of the instance template.
+	//
+	// Defaults to false.
+	//
 	// +optional
-	// +kubebuilder:default=Separated
-	PodNamingRule PodNamingRule `json:"podNamingRule,omitempty"`
+	// +kubebuilder:default=false
+	FlatInstanceOrdinal bool `json:"flatInstanceOrdinal,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.
 	//

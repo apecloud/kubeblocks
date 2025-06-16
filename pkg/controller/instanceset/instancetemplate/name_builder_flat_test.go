@@ -34,10 +34,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
-var _ = Describe("Combined Name builder tests", func() {
+var _ = Describe("flat name builder tests", func() {
 	DescribeTable("generates instance ordinals",
 		func(its *workloads.InstanceSet, expected map[string]sets.Set[int32], expectError bool) {
-			its.Spec.PodNamingRule = kbappsv1.PodNamingRuleCombined
+			its.Spec.FlatInstanceOrdinal = true
 			itsExt, err := BuildInstanceSetExt(its, nil)
 			Expect(err).NotTo(HaveOccurred())
 			err = ValidateInstanceTemplates(its, nil)
@@ -439,7 +439,7 @@ var _ = Describe("Combined Name builder tests", func() {
 						Replicas: ptr.To[int32](1),
 					},
 				},
-				PodNamingRule: kbappsv1.PodNamingRuleCombined,
+				FlatInstanceOrdinal: true,
 			},
 		}
 
@@ -459,7 +459,7 @@ var _ = Describe("Combined Name builder tests", func() {
 				SetReplicas(3).
 				SetTemplate(template).
 				SetVolumeClaimTemplates(volumeClaimTemplates...).
-				SetPodNamingRule(kbappsv1.PodNamingRuleCombined).
+				SetFlatInstanceOrdinal(true).
 				GetObject()
 		})
 
@@ -528,8 +528,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should validate ordinals successfully", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					PodNamingRule: kbappsv1.PodNamingRuleCombined,
-					Replicas:      ptr.To[int32](3),
+					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name:     "template1",
@@ -539,6 +538,7 @@ var _ = Describe("Combined Name builder tests", func() {
 							},
 						},
 					},
+					FlatInstanceOrdinal: true,
 				},
 			}
 			err := ValidateInstanceTemplates(its, nil)
@@ -548,8 +548,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should fail validation for negative ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					PodNamingRule: kbappsv1.PodNamingRuleCombined,
-					Replicas:      ptr.To[int32](3),
+					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name:     "template1",
@@ -559,6 +558,7 @@ var _ = Describe("Combined Name builder tests", func() {
 							},
 						},
 					},
+					FlatInstanceOrdinal: true,
 				},
 			}
 			err := ValidateInstanceTemplates(its, nil)
@@ -569,8 +569,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("should fail validation for duplicate ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					PodNamingRule: kbappsv1.PodNamingRuleCombined,
-					Replicas:      ptr.To[int32](3),
+					Replicas: ptr.To[int32](3),
 					DefaultTemplateOrdinals: kbappsv1.Ordinals{
 						Discrete: []int32{1},
 					},
@@ -583,6 +582,7 @@ var _ = Describe("Combined Name builder tests", func() {
 							},
 						},
 					},
+					FlatInstanceOrdinal: true,
 				},
 			}
 			err := ValidateInstanceTemplates(its, nil)
@@ -593,8 +593,7 @@ var _ = Describe("Combined Name builder tests", func() {
 		It("has not enough available ordinals", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					PodNamingRule: kbappsv1.PodNamingRuleCombined,
-					Replicas:      ptr.To[int32](3),
+					Replicas: ptr.To[int32](3),
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name:     "template1",
@@ -604,7 +603,8 @@ var _ = Describe("Combined Name builder tests", func() {
 							},
 						},
 					},
-					OfflineInstances: []string{"pod-0"},
+					FlatInstanceOrdinal: true,
+					OfflineInstances:    []string{"pod-0"},
 				},
 			}
 			err := ValidateInstanceTemplates(its, nil)

@@ -401,6 +401,15 @@ spec:
                 default: false
                 description: Specifies whether to create the default headless service.
                 type: boolean
+              flatInstanceOrdinal:
+                default: false
+                description: |-
+                  flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+                  globally uniquely ordinal scheme, regardless of the instance template.
+
+
+                  Defaults to false.
+                type: boolean
               instanceUpdateStrategy:
                 description: Provides fine-grained control over the spec update process
                   of all instances.
@@ -2678,15 +2687,6 @@ spec:
 
 
                   Note: This field will be removed in future version.
-                type: string
-              podNamingRule:
-                default: Separated
-                description: |-
-                  PodNamingRule defines the naming convention for instances (pods).
-                  The field is immutable once set.
-                enum:
-                - Separated
-                - Combined
                 type: string
               podUpdatePolicy:
                 description: |-
@@ -10977,7 +10977,7 @@ spec:
                 type: integer
               ordinals:
                 description: Ordinals is the ordinals used by the instances of the
-                  InstanceSet.
+                  InstanceSet except the template instances.
                 items:
                   format: int32
                   type: integer

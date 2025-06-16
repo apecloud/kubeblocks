@@ -150,6 +150,11 @@ func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTe
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *InstanceSetBuilder {
+	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string) *InstanceSetBuilder {
 	builder.get().Spec.OfflineInstances = offlineInstances
 	return builder

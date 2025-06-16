@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -44,48 +45,32 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 	if tree.GetRoot() == nil || !model.IsObjectUpdating(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.ConditionUnsatisfiedWithError(err)
-	}
 	return kubebuilderx.ConditionSatisfied
 }
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := buildInstanceSetExt(its, tree)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 
-	// 1. build all templates by applying instance template overrides to default pod template
-	instanceTemplateList := buildInstanceTemplateExts(itsExt)
-
 	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
-	for _, template := range instanceTemplateList {
-		ordinalList, err := getOrdinalListByTemplateName(itsExt.its, template.Name)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		instanceNames, err := GenerateInstanceNamesFromTemplate(its.Name, template.Name, template.Replicas, itsExt.its.Spec.OfflineInstances, ordinalList)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		revision, err := BuildInstanceTemplateRevision(&template.PodTemplateSpec, its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		for _, name := range instanceNames {
-			instanceRevisionList = append(instanceRevisionList, instanceRevision{name: name, revision: revision})
-		}
-	}
-	// validate duplicate pod names
-	getNameFunc := func(r instanceRevision) string {
-		return r.name
-	}
-	if err := ValidateDupInstanceNames(instanceRevisionList, getNameFunc); err != nil {
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
 		return kubebuilderx.Continue, err
+	}
+	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	for instanceName, templateExt := range nameMap {
+		revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
 	}
 
 	updatedRevisions := make(map[string]string, len(instanceRevisionList))

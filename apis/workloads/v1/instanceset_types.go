@@ -86,6 +86,7 @@ type InstanceSetSpec struct {
 
 	// Specifies the desired Ordinals of the default template.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
 	//
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under the default template would be
@@ -116,8 +117,6 @@ type InstanceSetSpec struct {
 	// The InstanceTemplate provides a way to override values in the default template,
 	// allowing the InstanceSet to manage instances from different templates.
 	//
-	// The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-	// The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
 	// By default, the ordinal starts from 0 for each InstanceTemplate.
 	// It is important to ensure that the Name of each InstanceTemplate is unique.
 	//
@@ -130,6 +129,15 @@ type InstanceSetSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+	// globally uniquely ordinal scheme, regardless of the instance template.
+	//
+	// Defaults to false.
+	//
+	// +optional
+	// +kubebuilder:default=false
+	FlatInstanceOrdinal bool `json:"flatInstanceOrdinal,omitempty"`
 
 	// Specifies the names of instances to be transitioned to offline status.
 	//
@@ -256,6 +264,10 @@ type InstanceSetStatus struct {
 
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
+
+	// Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.
+	// +optional
+	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
@@ -541,6 +553,10 @@ type InstanceTemplateStatus struct {
 	// Replicas is the number of replicas of the InstanceTemplate.
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
+
+	// Ordinals is the ordinals used by the instances of the InstanceTemplate.
+	// +optional
+	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// ReadyReplicas is the number of Pods that have a Ready Condition.
 	// +optional

@@ -30,6 +30,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -294,17 +295,13 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return RecreatePolicy, nil
 	}
 
-	itsExt, err := buildInstanceSetExt(its, nil)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	templateList := buildInstanceTemplateExts(itsExt)
-	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
-	templateName, _ := strings.CutPrefix(parentName, its.Name)
-	if len(templateName) > 0 {
-		templateName, _ = strings.CutPrefix(templateName, "-")
-	}
-	index := slices.IndexFunc(templateList, func(templateExt *instanceTemplateExt) bool {
+	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
+	templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
+	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
 		return templateName == templateExt.Name
 	})
 	if index < 0 {

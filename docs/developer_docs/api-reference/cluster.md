@@ -840,6 +840,20 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>offlineInstances</code><br/>
 <em>
 []string
@@ -3274,6 +3288,20 @@ starting with an ordinal of 0.
 It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of replicas specified for the Component.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -6467,6 +6495,20 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>offlineInstances</code><br/>
 <em>
 []string
@@ -7869,7 +7911,7 @@ string
 <p>Name specifies the unique name of the instance Pod created using this InstanceTemplate.
 This name is constructed by concatenating the Component&rsquo;s name, the template&rsquo;s name, and the instance&rsquo;s ordinal
 using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-The specified name overrides any default naming conventions or patterns.</p>
+The name can&rsquo;t be empty.</p>
 </td>
 </tr>
 <tr>
@@ -7923,7 +7965,8 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under this InstanceTemplate would be
 $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
@@ -9176,7 +9219,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Ordinals">Ordinals</a>)
 </p>
 <div>
-<p>Range represents a range with a start and an end value.
+<p>Range represents a range with a start and an end value. Both start and end are included.
 It is used to define a continuous segment.</p>
 </div>
 <table>
@@ -29597,7 +29640,8 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
@@ -29662,12 +29706,24 @@ An InstanceSet manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the InstanceSet to manage instances from different templates.</p>
-<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
-By default, the ordinal starts from 0 for each InstanceTemplate.
+<p>By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -30105,7 +30161,8 @@ Ordinals
 </td>
 <td>
 <p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.</p>
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
@@ -30170,12 +30227,24 @@ An InstanceSet manages instances with a total count of Replicas,
 and by default, all these instances are generated from the same template.
 The InstanceTemplate provides a way to override values in the default template,
 allowing the InstanceSet to manage instances from different templates.</p>
-<p>The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
-The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
-By default, the ordinal starts from 0 for each InstanceTemplate.
+<p>By default, the ordinal starts from 0 for each InstanceTemplate.
 It is important to ensure that the Name of each InstanceTemplate is unique.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
+globally uniquely ordinal scheme, regardless of the instance template.</p>
+<p>Defaults to false.</p>
 </td>
 </tr>
 <tr>
@@ -30447,6 +30516,18 @@ int32
 </td>
 <td>
 <p>replicas is the number of instances created by the InstanceSet controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.</p>
 </td>
 </tr>
 <tr>
@@ -30873,6 +30954,18 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Replicas is the number of replicas of the InstanceTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ordinals is the ordinals used by the instances of the InstanceTemplate.</p>
 </td>
 </tr>
 <tr>

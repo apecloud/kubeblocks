@@ -174,6 +174,10 @@ func (builder *ComponentBuilder) SetInstances(instances []appsv1.InstanceTemplat
 	builder.get().Spec.Instances = instances
 	return builder
 }
+func (builder *ComponentBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *ComponentBuilder {
+	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
+	return builder
+}
 
 func (builder *ComponentBuilder) SetOfflineInstances(offlineInstances []string) *ComponentBuilder {
 	builder.get().Spec.OfflineInstances = offlineInstances

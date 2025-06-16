@@ -38,9 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -1238,14 +1238,26 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		// TODO: what if the component is being deleted?
 	}
 
-	var templates []instanceset.InstanceTemplate
-	for i := range comp.Spec.Instances {
-		templates = append(templates, &comp.Spec.Instances[i])
+	its := &workloadsv1.InstanceSet{}
+	itsKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
 	}
-	names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, appsv1.Ordinals{})
+	err := cli.Get(ctx, itsKey, its, inDataContext())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return "", err
+	}
+
+	var names []string
+	if err == nil {
+		names, err = GeneratePodNamesByITS(its)
+	} else {
+		names, err = GeneratePodNamesByComp(comp)
+	}
 	if err != nil {
 		return "", err
 	}
+
 	if fqdn {
 		for i := range names {
 			names[i] = intctrlutil.PodFQDN(namespace, comp.Name, names[i])

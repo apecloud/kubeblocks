@@ -21,49 +21,56 @@ package rollout
 
 import (
 	"fmt"
+	"reflect"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type rolloutStatusTransformer struct{}
+type rolloutSetupTransformer struct{}
 
-var _ graph.Transformer = &rolloutStatusTransformer{}
+var _ graph.Transformer = &rolloutSetupTransformer{}
 
-func (t *rolloutStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
 	if model.IsObjectDeleting(transCtx.RolloutOrig) {
 		return nil
 	}
 
-	if err := t.components(transCtx, dag); err != nil {
-		return err
-	}
-
-	// TODO: sharding
-
-	transCtx.Rollout.Status.ObservedGeneration = transCtx.Rollout.Generation
-
-	// TODO: phase & message, conditions
-
-	return nil
-}
-
-func (t *rolloutStatusTransformer) components(transCtx *rolloutTransformContext, dag *graph.DAG) error {
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
 		if err := t.component(transCtx, rollout, comp); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	if reflect.DeepEqual(transCtx.RolloutOrig.Status, rollout.Status) {
+		return nil
+	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	graphCli.Status(dag, transCtx.RolloutOrig, rollout)
+	return graph.ErrPrematureStop
 }
 
-func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext, rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+func (t *rolloutSetupTransformer) component(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
 	if spec == nil {
 		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
 	}
+
+	func() {
+		for _, status := range rollout.Status.Components {
+			if status.Name == comp.Name {
+				return
+			}
+		}
+		rollout.Status.Components = append(rollout.Status.Components, appsv1alpha1.RolloutComponentStatus{
+			Name:     comp.Name,
+			Replicas: spec.Replicas,
+		})
+	}()
+
 	return nil
 }

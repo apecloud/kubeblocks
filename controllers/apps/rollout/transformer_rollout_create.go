@@ -21,7 +21,6 @@ package rollout
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -34,8 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type rolloutCreateTransformer struct {
-}
+type rolloutCreateTransformer struct{}
 
 var _ graph.Transformer = &rolloutCreateTransformer{}
 
@@ -131,7 +129,7 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if !t.status(transCtx, comp) {
-		return controllerutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("component %s is not ready", comp.Name))
+		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("component %s is not ready", comp.Name))
 	}
 
 	tpl, err := t.instanceTemplate(transCtx, comp, spec)
@@ -145,8 +143,16 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 }
 
 func (t *rolloutCreateTransformer) status(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
-	status := transCtx.Cluster.Status.Components[comp.Name]
-	return status.Phase == appsv1.RunningComponentPhase
+	cluster := transCtx.Cluster
+	compStatus := cluster.Status.Components[comp.Name]
+	if cluster.Generation != cluster.Status.ObservedGeneration || compStatus.Phase != appsv1.RunningComponentPhase {
+		return false
+	}
+	compObj, ok := transCtx.Components[comp.Name]
+	if !ok || compObj == nil {
+		return false
+	}
+	return compObj.Generation == compObj.Status.ObservedGeneration && compObj.Status.Phase == appsv1.RunningComponentPhase
 }
 
 func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformContext,

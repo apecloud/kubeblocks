@@ -87,6 +87,8 @@ func (r *RolloutReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&rolloutDeletionTransformer{},
 			&rolloutMetaTransformer{},
 			&rolloutLoadTransformer{},
+			&rolloutSetupTransformer{},
+			&rolloutTearDownTransformer{},
 			&rolloutInplaceTransformer{},
 			&rolloutReplaceTransformer{},
 			&rolloutCreateTransformer{},

@@ -39,6 +39,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+const (
+	notReadyRequeueDuration = time.Second * 5
+)
+
 type rolloutReplaceTransformer struct{}
 
 var _ graph.Transformer = &rolloutReplaceTransformer{}
@@ -94,37 +98,7 @@ func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
 }
 
 func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
-	// the original replicas
-	replicas := spec.Replicas
-	for _, status := range rollout.Status.Components {
-		if status.Name == comp.Name {
-			replicas = status.Replicas
-			break
-		}
-	}
-
-	// the target replicas
-	target, err := func() (int32, error) {
-		if comp.Replicas != nil {
-			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(spec.Replicas), false)
-			if err != nil {
-				return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
-			}
-			return int32(replicas), nil
-		}
-		return 0, nil
-	}()
-	if err != nil {
-		return 0, 0, err
-	}
-	if target < 0 || target > replicas {
-		return 0, 0, errors.Errorf("the target replicas %d is out-of-range, component %s, replicas: %d", target, comp.Name, replicas)
-	}
-	if target > 0 && target < spec.Replicas {
-		return 0, 0, fmt.Errorf("partially rollout with the replace strategy not supported, component: %s", comp.Name)
-	}
-
-	return replicas, target, nil
+	return replaceReplicas(rollout, comp, spec)
 }
 
 func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
@@ -138,7 +112,7 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if !t.status(transCtx, comp) {
-		return controllerutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("component %s is not ready", comp.Name))
+		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("component %s is not ready", comp.Name))
 	}
 
 	if spec.Replicas == replicas {
@@ -149,29 +123,12 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 }
 
 func (t *rolloutReplaceTransformer) status(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
-	status := transCtx.Cluster.Status.Components[comp.Name]
-	return status.Phase == appsv1.RunningComponentPhase
+	return replaceStatus(transCtx, comp)
 }
 
 func (t *rolloutReplaceTransformer) instanceTemplate(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
-	name := string(transCtx.Rollout.UID[:8])
-	for i, tpl := range spec.Instances {
-		if tpl.Name == name {
-			return &spec.Instances[i], nil
-		}
-	}
-	if len(spec.Instances) > 0 && !spec.FlatInstanceOrdinal {
-		return nil, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
-	}
-	spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
-		Name:           name,
-		ServiceVersion: comp.ServiceVersion,
-		CompDef:        comp.CompDef,
-		Replicas:       ptr.To[int32](0),
-	})
-	spec.FlatInstanceOrdinal = true
-	return &spec.Instances[len(spec.Instances)-1], nil
+	return replaceInstanceTemplate(transCtx, comp, spec)
 }
 
 func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
@@ -232,7 +189,7 @@ func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(transCtx *rolloutTra
 		return "", nil, nil
 	}
 	tplName, ok := targetPod.Labels[constant.KBAppInstanceTemplateLabelKey]
-	if !ok {
+	if !ok || len(tplName) == 0 {
 		return targetPod.Name, nil, nil
 	}
 	for i, tpl := range spec.Instances {
@@ -241,4 +198,71 @@ func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(transCtx *rolloutTra
 		}
 	}
 	return "", nil, fmt.Errorf("the instance template %s has not been found", tplName)
+}
+
+func replaceReplicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
+	// the original replicas
+	replicas := spec.Replicas
+	for _, status := range rollout.Status.Components {
+		if status.Name == comp.Name {
+			replicas = status.Replicas
+			break
+		}
+	}
+
+	// the target replicas
+	target, err := func() (int32, error) {
+		if comp.Replicas != nil {
+			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(spec.Replicas), false)
+			if err != nil {
+				return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
+			}
+			return int32(replicas), nil
+		}
+		return 0, nil
+	}()
+	if err != nil {
+		return 0, 0, err
+	}
+	if target < 0 || target > replicas {
+		return 0, 0, errors.Errorf("the target replicas %d is out-of-range, component %s, replicas: %d", target, comp.Name, replicas)
+	}
+	if target > 0 && target < spec.Replicas {
+		return 0, 0, fmt.Errorf("partially rollout with the replace strategy not supported, component: %s", comp.Name)
+	}
+
+	return replicas, target, nil
+}
+
+func replaceInstanceTemplate(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
+	name := string(transCtx.Rollout.UID[:8])
+	for i, tpl := range spec.Instances {
+		if tpl.Name == name {
+			return &spec.Instances[i], nil
+		}
+	}
+	if len(spec.Instances) > 0 && !spec.FlatInstanceOrdinal {
+		return nil, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
+	}
+	spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
+		Name:           name,
+		ServiceVersion: comp.ServiceVersion,
+		CompDef:        comp.CompDef,
+		Replicas:       ptr.To[int32](0),
+	})
+	spec.FlatInstanceOrdinal = true
+	return &spec.Instances[len(spec.Instances)-1], nil
+}
+
+func replaceStatus(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
+	cluster := transCtx.Cluster
+	compStatus := cluster.Status.Components[comp.Name]
+	if cluster.Generation != cluster.Status.ObservedGeneration || compStatus.Phase != appsv1.RunningComponentPhase {
+		return false
+	}
+	compObj, ok := transCtx.Components[comp.Name]
+	if !ok || compObj == nil {
+		return false
+	}
+	return compObj.Generation == compObj.Status.ObservedGeneration && compObj.Status.Phase == appsv1.RunningComponentPhase
 }

@@ -134,8 +134,12 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 		return controllerutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("component %s is not ready", comp.Name))
 	}
 
-	t.instanceTemplate(transCtx, comp, spec, targetReplicas)
+	tpl, err := t.instanceTemplate(transCtx, comp, spec)
+	if err != nil {
+		return err
+	}
 	spec.Replicas += targetReplicas
+	tpl.Replicas = ptr.To(targetReplicas)
 
 	return nil
 }
@@ -146,20 +150,25 @@ func (t *rolloutCreateTransformer) status(transCtx *rolloutTransformContext, com
 }
 
 func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformContext,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas int32) *appsv1.InstanceTemplate {
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
 	name := string(transCtx.Rollout.UID[:8])
 	for i, tpl := range spec.Instances {
 		if tpl.Name == name {
-			return &spec.Instances[i]
+			return &spec.Instances[i], nil
 		}
+	}
+	if len(spec.Instances) > 0 && !spec.FlatInstanceOrdinal {
+		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
 	}
 	spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
 		Name:           name,
 		ServiceVersion: comp.ServiceVersion,
 		CompDef:        comp.CompDef,
-		Replicas:       ptr.To[int32](replicas),
+		Canary:         ptr.To(true),
+		Replicas:       ptr.To[int32](0),
 	})
-	return &spec.Instances[len(spec.Instances)-1]
+	spec.FlatInstanceOrdinal = true
+	return &spec.Instances[len(spec.Instances)-1], nil
 }
 
 func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,

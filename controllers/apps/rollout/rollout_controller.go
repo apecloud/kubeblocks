@@ -25,11 +25,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -103,5 +107,29 @@ func (r *RolloutReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *RolloutReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Rollout{}).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.cluster)).
 		Complete(r)
+}
+
+func (r *RolloutReconciler) cluster(ctx context.Context, obj client.Object) []reconcile.Request {
+	// TODO: it's too heavy to obtain the associated rollout for the cluster, refactor it later.
+	rolloutList := &appsv1alpha1.RolloutList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(obj.GetNamespace()),
+		client.MatchingLabels{
+			rolloutClusterNameLabel: obj.GetName(),
+		},
+	}
+	err := r.Client.List(ctx, rolloutList, listOpts...)
+	if err != nil || len(rolloutList.Items) == 0 {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      rolloutList.Items[0].Name,
+			},
+		},
+	}
 }

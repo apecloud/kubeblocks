@@ -29,6 +29,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+const (
+	rolloutClusterNameLabel = "rollout.kubeblocks.io/cluster-name"
+)
+
 type rolloutMetaTransformer struct{}
 
 var _ graph.Transformer = &rolloutMetaTransformer{}
@@ -42,6 +46,11 @@ func (t *rolloutMetaTransformer) Transform(ctx graph.TransformContext, dag *grap
 	if reflect.DeepEqual(transCtx.RolloutOrig.Finalizers, rollout.Finalizers) {
 		return nil
 	}
+
+	if rollout.Labels == nil {
+		rollout.Labels = map[string]string{}
+	}
+	rollout.Labels[rolloutClusterNameLabel] = rollout.Spec.ClusterName
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, transCtx.RolloutOrig, rollout)

@@ -2341,7 +2341,6 @@ spec:
                                   type: object
                                 type: array
                             required:
-                            - compDef
                             - name
                             type: object
                           type: array
@@ -5175,7 +5174,6 @@ spec:
                                   type: object
                                 type: array
                             required:
-                            - compDef
                             - name
                             type: object
                           type: array

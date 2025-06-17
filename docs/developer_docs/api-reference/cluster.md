@@ -14892,6 +14892,7 @@ RolloutSpec
 <br/>
 <br/>
 <table>
+<tbody>
 <tr>
 <td>
 <code>clusterName</code><br/>
@@ -14917,6 +14918,7 @@ string
 <p>Specifies the target components to be rolled out.</p>
 </td>
 </tr>
+</tbody>
 </table>
 </td>
 </tr>

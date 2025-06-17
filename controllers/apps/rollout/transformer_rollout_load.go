@@ -83,19 +83,6 @@ func (t *rolloutLoadTransformer) clusterCompNSharding(cluster *appsv1.Cluster) (
 	return comps, shardings
 }
 
-func (t *rolloutLoadTransformer) getNCheckComponent(ctx context.Context, cli client.Reader, rollout *appsv1alpha1.Rollout, compName string) (*appsv1.Component, error) {
-	compKey := types.NamespacedName{
-		Namespace: rollout.Namespace,
-		Name:      constant.GenerateClusterComponentName(rollout.Spec.ClusterName, compName),
-	}
-	comp := &appsv1.Component{}
-	if err := cli.Get(ctx, compKey, comp); err != nil {
-		return nil, err
-	}
-	// TODO: check component status
-	return comp, nil
-}
-
 func (t *rolloutLoadTransformer) getNCheckComponents(ctx context.Context, cli client.Reader, rollout *appsv1alpha1.Rollout) (map[string]*appsv1.Component, error) {
 	if len(rollout.Spec.Components) == 0 {
 		return nil, nil
@@ -109,4 +96,17 @@ func (t *rolloutLoadTransformer) getNCheckComponents(ctx context.Context, cli cl
 		components[comp.Name] = obj
 	}
 	return components, nil
+}
+
+func (t *rolloutLoadTransformer) getNCheckComponent(ctx context.Context, cli client.Reader, rollout *appsv1alpha1.Rollout, compName string) (*appsv1.Component, error) {
+	compKey := types.NamespacedName{
+		Namespace: rollout.Namespace,
+		Name:      constant.GenerateClusterComponentName(rollout.Spec.ClusterName, compName),
+	}
+	comp := &appsv1.Component{}
+	if err := cli.Get(ctx, compKey, comp); err != nil {
+		return nil, err
+	}
+	// TODO: check component status
+	return comp, nil
 }

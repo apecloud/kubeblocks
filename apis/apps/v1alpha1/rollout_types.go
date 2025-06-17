@@ -120,7 +120,7 @@ type RolloutComponent struct {
 	//
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
-	CompDef string `json:"compDef"`
+	CompDef string `json:"compDef,omitempty"`
 
 	// Specifies the rollout strategy for the component.
 	//
@@ -196,7 +196,7 @@ type RolloutPodSelector struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
-	// TODO: role, ordinal, or other selectors
+	// TODO: more selectors
 }
 
 type RolloutPromotion struct {

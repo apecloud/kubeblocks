@@ -21,21 +21,25 @@ package rollout
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type rolloutReplaceTransformer struct {
-}
+type rolloutReplaceTransformer struct{}
 
 var _ graph.Transformer = &rolloutReplaceTransformer{}
 
@@ -125,7 +129,10 @@ func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout, comp
 
 func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas int32) error {
-	tpl := t.instanceTemplate(transCtx, comp, spec)
+	tpl, err := t.instanceTemplate(transCtx, comp, spec)
+	if err != nil {
+		return err
+	}
 	if *tpl.Replicas == replicas && spec.Replicas == replicas {
 		return nil
 	}
@@ -135,11 +142,10 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if spec.Replicas == replicas {
-		t.up(spec, tpl)
+		return t.up(transCtx, spec, tpl)
 	} else {
-		t.down(spec, tpl)
+		return t.down(transCtx, spec, tpl)
 	}
-	return nil
 }
 
 func (t *rolloutReplaceTransformer) status(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
@@ -148,12 +154,15 @@ func (t *rolloutReplaceTransformer) status(transCtx *rolloutTransformContext, co
 }
 
 func (t *rolloutReplaceTransformer) instanceTemplate(transCtx *rolloutTransformContext,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) *appsv1.InstanceTemplate {
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
 	name := string(transCtx.Rollout.UID[:8])
 	for i, tpl := range spec.Instances {
 		if tpl.Name == name {
-			return &spec.Instances[i]
+			return &spec.Instances[i], nil
 		}
+	}
+	if len(spec.Instances) > 0 && !spec.FlatInstanceOrdinal {
+		return nil, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
 	spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
 		Name:           name,
@@ -161,22 +170,75 @@ func (t *rolloutReplaceTransformer) instanceTemplate(transCtx *rolloutTransformC
 		CompDef:        comp.CompDef,
 		Replicas:       ptr.To[int32](0),
 	})
-	return &spec.Instances[len(spec.Instances)-1]
+	spec.FlatInstanceOrdinal = true
+	return &spec.Instances[len(spec.Instances)-1], nil
 }
 
-func (t *rolloutReplaceTransformer) up(spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) {
+func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
+	spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
 	tpl.Replicas = ptr.To(*tpl.Replicas + 1)
 	spec.Replicas += 1
+	return nil
 }
 
-func (t *rolloutReplaceTransformer) down(spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) {
+func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
+	spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	instance, instTpl, err := t.pickInstanceToScaleDown(transCtx, spec, tpl)
+	if err != nil {
+		return err
+	}
+	if len(instance) == 0 {
+		return fmt.Errorf("the component %s hasn't been successfully rolled out, but already no instances to scale down", spec.Name)
+	}
 	spec.Replicas -= 1
+	if instTpl != nil {
+		if instTpl.Replicas == nil || *instTpl.Replicas == 0 {
+			return fmt.Errorf("the instance template %s still has instances, but the replicas is 0", instTpl.Name)
+		}
+		instTpl.Replicas = ptr.To(*instTpl.Replicas - 1)
+	}
 	if spec.OfflineInstances == nil {
 		spec.OfflineInstances = make([]string, 0)
 	}
-	spec.OfflineInstances = append(spec.OfflineInstances, t.pickInstanceToScaleDown(spec, tpl))
+	spec.OfflineInstances = append(spec.OfflineInstances, instance)
+	return nil
 }
 
-func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) string {
-	return "" // TODO
+func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(transCtx *rolloutTransformContext,
+	spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) (string, *appsv1.InstanceTemplate, error) {
+	matchingLabels := constant.GetCompLabels(transCtx.Cluster.Name, spec.Name)
+	matchingLabels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
+	pods := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(transCtx.Cluster.Namespace),
+		client.MatchingLabels(matchingLabels),
+	}
+	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
+		return "", nil, err
+	}
+
+	slices.SortFunc(pods.Items, func(a, b corev1.Pod) int {
+		return strings.Compare(a.Name, b.Name) * -1
+	})
+	var targetPod *corev1.Pod
+	for i, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil && pod.Labels[constant.KBAppInstanceTemplateLabelKey] != tpl.Name {
+			targetPod = &pods.Items[i]
+			break
+		}
+	}
+
+	if targetPod == nil {
+		return "", nil, nil
+	}
+	tplName, ok := targetPod.Labels[constant.KBAppInstanceTemplateLabelKey]
+	if !ok {
+		return targetPod.Name, nil, nil
+	}
+	for i, tpl := range spec.Instances {
+		if tpl.Name == tplName {
+			return targetPod.Name, &spec.Instances[i], nil
+		}
+	}
+	return "", nil, fmt.Errorf("the instance template %s has not been found", tplName)
 }

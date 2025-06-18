@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"slices"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -76,7 +78,14 @@ func (t *rolloutTearDownTransformer) replace(transCtx *rolloutTransformContext,
 	if *tpl.Replicas == replicas && spec.Replicas == replicas && replaceStatus(transCtx, comp) {
 		spec.ServiceVersion = tpl.ServiceVersion
 		spec.ComponentDef = tpl.CompDef
-		spec.OfflineInstances = nil // TODO: remove the offline instances added by the rollout
+		spec.OfflineInstances = slices.DeleteFunc(spec.OfflineInstances, func(instance string) bool {
+			for _, status := range rollout.Status.Components {
+				if status.Name == comp.Name {
+					return slices.Contains(status.ScaleDownInstances, instance)
+				}
+			}
+			return false
+		})
 	}
 	return nil
 }

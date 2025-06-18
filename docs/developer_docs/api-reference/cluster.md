@@ -25655,7 +25655,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the component.</p>
+<p>The name of the component.</p>
 </td>
 </tr>
 <tr>
@@ -25666,7 +25666,43 @@ int32
 </em>
 </td>
 <td>
-<p>Specifies the number of replicas has been rolled out.</p>
+<p>The replicas the component has before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rolledReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The replicas the component has been rolled out successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>canaryReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of canary replicas the component has.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The instances that are scaled down.</p>
 </td>
 </tr>
 </tbody>
@@ -25715,31 +25751,6 @@ Metadata
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPhase">RolloutPhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus</a>)
-</p>
-<div>
-<p>RolloutPhase defines the phase of the Rollout within the .status.phase field.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Failed&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Running&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Succeed&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutPodSelector">RolloutPodSelector
 </h3>
@@ -25927,6 +25938,31 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutState">RolloutState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus</a>)
+</p>
+<div>
+<p>RolloutState defines the state of the Rollout within the .status.state field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Error&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Rolling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Succeed&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus
 </h3>
 <p>
@@ -25957,16 +25993,16 @@ int64
 </tr>
 <tr>
 <td>
-<code>phase</code><br/>
+<code>state</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutPhase">
-RolloutPhase
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutState">
+RolloutState
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The current phase of the Rollout.</p>
+<p>The current state of the Rollout.</p>
 </td>
 </tr>
 <tr>

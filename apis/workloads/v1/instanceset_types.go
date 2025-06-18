@@ -38,9 +38,9 @@ const (
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks},shortName=its
-// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
 // +kubebuilder:printcolumn:name="DESIRED",type="string",JSONPath=".spec.replicas",description="desired replicas."
 // +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.updatedReplicas",description="updated replicas."
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
 // +kubebuilder:printcolumn:name="AVAILABLE",type="string",JSONPath=".status.availableReplicas",description="available replicas, which are ready for at least minReadySeconds."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -270,7 +270,7 @@ type InstanceSetStatus struct {
 	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.
-	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+	ReadyReplicas int32 `json:"readyReplicas"`
 
 	// currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version
 	// indicated by CurrentRevisions.

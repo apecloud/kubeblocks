@@ -21,8 +21,15 @@ package rollout
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -37,33 +44,161 @@ func (t *rolloutStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
-	if err := t.components(transCtx, dag); err != nil {
+	rollout := transCtx.Rollout
+	state, err := t.components(transCtx, rollout)
+	if err != nil {
 		return err
 	}
 
 	// TODO: sharding
 
-	transCtx.Rollout.Status.ObservedGeneration = transCtx.Rollout.Generation
+	rollout.Status.ObservedGeneration = transCtx.Rollout.Generation
+	rollout.Status.State = state
 
-	// TODO: phase & message, conditions
+	// TODO: error message, conditions
 
 	return nil
 }
 
-func (t *rolloutStatusTransformer) components(transCtx *rolloutTransformContext, dag *graph.DAG) error {
-	rollout := transCtx.Rollout
+func (t *rolloutStatusTransformer) components(transCtx *rolloutTransformContext, rollout *appsv1alpha1.Rollout) (appsv1alpha1.RolloutState, error) {
+	states := make([]appsv1alpha1.RolloutState, 0)
 	for _, comp := range rollout.Spec.Components {
-		if err := t.component(transCtx, rollout, comp); err != nil {
-			return err
+		state, err := t.component(transCtx, rollout, comp)
+		if err != nil {
+			return "", err
+		}
+		states = append(states, state)
+	}
+
+	var (
+		hasError   = false
+		hasRolling = false
+		hasSucceed = false
+		hasPending = false
+		allSucceed = true
+	)
+	for _, state := range states {
+		switch state {
+		case appsv1alpha1.RollingRolloutState:
+			hasRolling = true
+			allSucceed = false
+		case appsv1alpha1.ErrorRolloutState:
+			hasError = true
+			allSucceed = false
+		case appsv1alpha1.SucceedRolloutState:
+			hasSucceed = true
+		case appsv1alpha1.PendingRolloutState:
+			hasPending = true
+			allSucceed = false
+		default:
+			allSucceed = false
 		}
 	}
-	return nil
+	switch {
+	case hasError:
+		return appsv1alpha1.ErrorRolloutState, nil
+	case hasRolling:
+		return appsv1alpha1.RollingRolloutState, nil
+	case allSucceed:
+		return appsv1alpha1.SucceedRolloutState, nil
+	case hasSucceed:
+		return appsv1alpha1.RollingRolloutState, nil
+	case hasPending:
+		return appsv1alpha1.PendingRolloutState, nil
+	default:
+		return "", nil
+	}
 }
 
-func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext, rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
+	if comp.Strategy.Inplace != nil {
+		return t.inplace(transCtx, rollout, comp)
+	}
+	if comp.Strategy.Replace != nil {
+		return t.replace(transCtx, rollout, comp)
+	}
+	if comp.Strategy.Create != nil {
+		return t.create(transCtx, rollout, comp)
+	}
+	return "", nil
+}
+
+func (t *rolloutStatusTransformer) inplace(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
 	spec := transCtx.ClusterComps[comp.Name]
 	if spec == nil {
-		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
+		return "", fmt.Errorf("the component %s is not found in cluster", comp.Name)
 	}
-	return nil
+	if len(comp.ServiceVersion) > 0 {
+		if comp.ServiceVersion == spec.ServiceVersion {
+			return appsv1alpha1.RollingRolloutState, nil
+		}
+		return appsv1alpha1.PendingRolloutState, nil
+	}
+	if len(comp.CompDef) > 0 {
+		if strings.HasPrefix(spec.ComponentDef, comp.CompDef) { // TODO: comp-def match
+			return appsv1alpha1.RollingRolloutState, nil
+		}
+		return appsv1alpha1.PendingRolloutState, nil
+	}
+
+	// TODO: check cluster & comp status
+	// TODO: check pods
+
+	return "", nil
+}
+
+func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
+	spec := transCtx.ClusterComps[comp.Name]
+	if spec == nil {
+		return "", fmt.Errorf("the component %s is not found in cluster", comp.Name)
+	}
+
+	var rollingTpl *appsv1.InstanceTemplate
+	tplName := string(rollout.UID[:8])
+	for i, tpl := range spec.Instances {
+		if tpl.Name == tplName {
+			rollingTpl = &spec.Instances[i]
+		}
+	}
+	if rollingTpl == nil {
+		return appsv1alpha1.PendingRolloutState, nil
+	}
+
+	pods := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(rollout.Namespace),
+		client.MatchingLabels(constant.GetCompLabels(rollout.Spec.ClusterName, comp.Name)),
+	}
+	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
+		return "", err
+	}
+	allPodCnt := int32(len(pods.Items))
+	newPodCnt := int32(len(slices.DeleteFunc(pods.Items, func(pod corev1.Pod) bool {
+		if pod.Labels != nil {
+			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] != tplName
+		}
+		return true
+	})))
+	for i, status := range rollout.Status.Components {
+		if status.Name == comp.Name {
+			rollout.Status.Components[i].RolledReplicas = newPodCnt - (allPodCnt - status.Replicas)
+			break
+		}
+	}
+
+	if !replaceStatus(transCtx, comp) || spec.Replicas != *rollingTpl.Replicas {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if allPodCnt != spec.Replicas {
+		return appsv1alpha1.RollingRolloutState, nil // scaling down
+	}
+	return appsv1alpha1.SucceedRolloutState, nil
+}
+
+func (t *rolloutStatusTransformer) create(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
+	return "", nil
 }

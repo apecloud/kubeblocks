@@ -22,9 +22,21 @@ spec:
       jsonPath: .spec.clusterName
       name: CLUSTER
       type: string
-    - description: The rollout status.
-      jsonPath: .status.phase
-      name: STATUS
+    - description: The replicas before rollout.
+      jsonPath: .status.components[0].replicas
+      name: REPLICAS
+      type: string
+    - description: The rolled out replicas.
+      jsonPath: .status.components[0].rolledReplicas
+      name: ROLLED-OUT
+      type: string
+    - description: The canary replicas.
+      jsonPath: .status.components[0].canaryReplicas
+      name: CANARY
+      type: string
+    - description: The rollout state.
+      jsonPath: .status.state
+      name: STATE
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
@@ -2658,14 +2670,27 @@ spec:
                   the Rollout.
                 items:
                   properties:
-                    name:
-                      description: Specifies the name of the component.
-                      type: string
-                    replicas:
-                      description: Specifies the number of replicas has been rolled
-                        out.
+                    canaryReplicas:
+                      description: The number of canary replicas the component has.
                       format: int32
                       type: integer
+                    name:
+                      description: The name of the component.
+                      type: string
+                    replicas:
+                      description: The replicas the component has before the rollout.
+                      format: int32
+                      type: integer
+                    rolledReplicas:
+                      description: The replicas the component has been rolled out
+                        successfully.
+                      format: int32
+                      type: integer
+                    scaleDownInstances:
+                      description: The instances that are scaled down.
+                      items:
+                        type: string
+                      type: array
                   required:
                   - name
                   - replicas
@@ -2749,13 +2774,13 @@ spec:
                   that has been observed by the controller.
                 format: int64
                 type: integer
-              phase:
-                description: The current phase of the Rollout.
+              state:
+                description: The current state of the Rollout.
                 enum:
                 - Pending
-                - Running
+                - Rolling
                 - Succeed
-                - Failed
+                - Error
                 type: string
             type: object
         type: object

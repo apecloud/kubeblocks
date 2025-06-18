@@ -129,7 +129,7 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if !t.status(transCtx, comp) {
-		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("component %s is not ready", comp.Name))
+		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
 	tpl, err := t.instanceTemplate(transCtx, comp, spec)

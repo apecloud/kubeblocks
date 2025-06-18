@@ -20,10 +20,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: ready replicas.
-      jsonPath: .status.readyReplicas
-      name: READY
-      type: string
     - description: desired replicas.
       jsonPath: .spec.replicas
       name: DESIRED
@@ -31,6 +27,10 @@ spec:
     - description: updated replicas.
       jsonPath: .status.updatedReplicas
       name: UP-TO-DATE
+      type: string
+    - description: ready replicas.
+      jsonPath: .status.readyReplicas
+      name: READY
       type: string
     - description: available replicas, which are ready for at least minReadySeconds.
       jsonPath: .status.availableReplicas
@@ -11065,6 +11065,7 @@ spec:
                 format: int32
                 type: integer
             required:
+            - readyReplicas
             - replicas
             type: object
         type: object

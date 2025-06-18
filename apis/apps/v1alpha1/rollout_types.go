@@ -33,7 +33,10 @@ import (
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks}
 // +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="The target cluster to be rolled out."
-// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="The rollout status."
+// +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.components[0].replicas",description="The replicas before rollout."
+// +kubebuilder:printcolumn:name="ROLLED-OUT",type="string",JSONPath=".status.components[0].rolledReplicas",description="The rolled out replicas."
+// +kubebuilder:printcolumn:name="CANARY",type="string",JSONPath=".status.components[0].canaryReplicas",description="The canary replicas."
+// +kubebuilder:printcolumn:name="STATE",type="string",JSONPath=".status.state",description="The rollout state."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Rollout is the Schema for the rollouts API
@@ -81,10 +84,10 @@ type RolloutStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// The current phase of the Rollout.
+	// The current state of the Rollout.
 	//
 	// +optional
-	Phase RolloutPhase `json:"phase,omitempty"`
+	State RolloutState `json:"state,omitempty"`
 
 	// Provides additional information about the phase.
 	//
@@ -259,27 +262,42 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// RolloutPhase defines the phase of the Rollout within the .status.phase field.
+// RolloutState defines the state of the Rollout within the .status.state field.
 //
 // +enum
-// +kubebuilder:validation:Enum={Pending,Running,Succeed,Failed}
-type RolloutPhase string
+// +kubebuilder:validation:Enum={Pending,Rolling,Succeed,Error}
+type RolloutState string
 
 const (
-	PendingRolloutPhase RolloutPhase = "Pending"
-	RunningRolloutPhase RolloutPhase = "Running"
-	SucceedRolloutPhase RolloutPhase = "Succeed"
-	FailedRolloutPhase  RolloutPhase = "Failed"
+	PendingRolloutState RolloutState = "Pending"
+	RollingRolloutState RolloutState = "Rolling"
+	SucceedRolloutState RolloutState = "Succeed"
+	ErrorRolloutState   RolloutState = "Error"
 )
 
 type RolloutComponentStatus struct {
-	// Specifies the name of the component.
+	// The name of the component.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Specifies the number of replicas has been rolled out.
+	// The replicas the component has before the rollout.
 	//
 	// +kubebuilder:validation:Required
 	Replicas int32 `json:"replicas"`
+
+	// The replicas the component has been rolled out successfully.
+	//
+	// +optional
+	RolledReplicas int32 `json:"rolledReplicas"`
+
+	// The number of canary replicas the component has.
+	//
+	// +optional
+	CanaryReplicas int32 `json:"canaryReplicas"`
+
+	// The instances that are scaled down.
+	//
+	// +optional
+	ScaleDownInstances []string `json:"scaleDownInstances,omitempty"`
 }

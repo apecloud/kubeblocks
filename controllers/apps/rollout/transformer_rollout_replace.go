@@ -52,7 +52,6 @@ func (t *rolloutReplaceTransformer) Transform(ctx graph.TransformContext, dag *g
 	if model.IsObjectDeleting(transCtx.RolloutOrig) {
 		return nil
 	}
-
 	return t.rollout(transCtx, dag)
 }
 
@@ -94,7 +93,7 @@ func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
 		return err
 	}
 
-	return t.rolling(transCtx, comp, spec, replicas)
+	return t.rolling(transCtx, rollout, comp, spec, replicas)
 }
 
 func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
@@ -102,7 +101,7 @@ func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout, comp
 }
 
 func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas int32) error {
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas int32) error {
 	tpl, err := t.instanceTemplate(transCtx, comp, spec)
 	if err != nil {
 		return err
@@ -112,13 +111,13 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if !t.status(transCtx, comp) {
-		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("component %s is not ready", comp.Name))
+		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
 	if spec.Replicas == replicas {
-		return t.up(transCtx, spec, tpl)
+		return t.up(transCtx, rollout, spec, tpl)
 	} else {
-		return t.down(transCtx, spec, tpl)
+		return t.down(transCtx, rollout, spec, tpl)
 	}
 }
 
@@ -132,14 +131,14 @@ func (t *rolloutReplaceTransformer) instanceTemplate(transCtx *rolloutTransformC
 }
 
 func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
-	spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
 	tpl.Replicas = ptr.To(*tpl.Replicas + 1)
 	spec.Replicas += 1
 	return nil
 }
 
 func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
-	spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
 	instance, instTpl, err := t.pickInstanceToScaleDown(transCtx, spec, tpl)
 	if err != nil {
 		return err
@@ -147,6 +146,7 @@ func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
 	if len(instance) == 0 {
 		return fmt.Errorf("the component %s hasn't been successfully rolled out, but already no instances to scale down", spec.Name)
 	}
+
 	spec.Replicas -= 1
 	if instTpl != nil {
 		if instTpl.Replicas == nil || *instTpl.Replicas == 0 {
@@ -158,6 +158,14 @@ func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
 		spec.OfflineInstances = make([]string, 0)
 	}
 	spec.OfflineInstances = append(spec.OfflineInstances, instance)
+
+	for i, status := range rollout.Status.Components {
+		if status.Name == spec.Name {
+			rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
+			break
+		}
+	}
+
 	return nil
 }
 

@@ -36,13 +36,13 @@ var _ = Describe("Rollout Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		// non-namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ComponentDefinitionSignature, true, ml)
-
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.RolloutSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.RolloutSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {

@@ -266,10 +266,13 @@ type InstanceSetStatus struct {
 	Replicas int32 `json:"replicas"`
 
 	// Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.
+	//
 	// +optional
 	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.
+	//
+	// +optional
 	ReadyReplicas int32 `json:"readyReplicas"`
 
 	// currentReplicas is the number of instances created by the InstanceSet controller from the InstanceSet version

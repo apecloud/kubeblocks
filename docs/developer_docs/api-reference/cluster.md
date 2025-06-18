@@ -7975,6 +7975,7 @@ Ordinals
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
 If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
@@ -25616,20 +25617,6 @@ RolloutMetadata
 <p>Additional metadata for the instances.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>promotion</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">
-RolloutPromotion
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the promotion strategy for the component.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutComponentStatus">RolloutComponentStatus
@@ -25831,7 +25818,7 @@ Action
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromotion">RolloutPromotion
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyCreate">RolloutStrategyCreate</a>)
 </p>
 <div>
 </div>
@@ -25864,7 +25851,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The delay time (in seconds) before promoting the new instances.</p>
+<p>The delay seconds before promoting the new instances.</p>
 </td>
 </tr>
 <tr>
@@ -25890,7 +25877,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The delay time (in seconds) before scaling down the old instances.</p>
+<p>The delay seconds before scaling down the old instances.</p>
 </td>
 </tr>
 </tbody>
@@ -26136,6 +26123,20 @@ Kubernetes core/v1.Affinity
 <td>
 <em>(Optional)</em>
 <p>Specifies the affinity for the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>promotion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">
+RolloutPromotion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the promotion strategy for the component.</p>
 </td>
 </tr>
 </tbody>
@@ -31380,6 +31381,7 @@ int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.</p>
 </td>
 </tr>

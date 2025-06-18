@@ -11065,7 +11065,6 @@ spec:
                 format: int32
                 type: integer
             required:
-            - readyReplicas
             - replicas
             type: object
         type: object

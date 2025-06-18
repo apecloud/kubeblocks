@@ -28,6 +28,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+const (
+	rolloutNameClusterLabel = "apps.kubeblocks.io/rollout-name"
+)
+
 type rolloutSetupTransformer struct{}
 
 var _ graph.Transformer = &rolloutSetupTransformer{}
@@ -38,19 +42,41 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return nil
 	}
 
-	rollout := transCtx.Rollout
+	var (
+		graphCli, _ = transCtx.Client.(model.GraphClient)
+		cluster     = transCtx.Cluster
+		rollout     = transCtx.Rollout
+	)
+
+	// check and add the rollout label to the cluster
+	if cluster.Labels == nil {
+		cluster.Labels = make(map[string]string)
+	}
+	rolloutName, ok := cluster.Labels[rolloutNameClusterLabel]
+	if ok && rolloutName != rollout.Name {
+		return fmt.Errorf("the cluster %s is already bound to rollout %s", cluster.Name, rolloutName)
+	}
+	if !ok {
+		cluster.Labels[rolloutNameClusterLabel] = rollout.Name
+	}
+	if !reflect.DeepEqual(transCtx.ClusterOrig.Labels, cluster.Labels) {
+		graphCli.Update(dag, transCtx.ClusterOrig, cluster)
+		return graph.ErrPrematureStop
+	}
+
+	// init the rollout component status
 	for _, comp := range rollout.Spec.Components {
 		if err := t.component(transCtx, rollout, comp); err != nil {
 			return err
 		}
 	}
-
-	if reflect.DeepEqual(transCtx.RolloutOrig.Status, rollout.Status) {
-		return nil
+	if !reflect.DeepEqual(transCtx.RolloutOrig.Status, rollout.Status) {
+		rollout.Status.ObservedGeneration = rollout.Generation
+		rollout.Status.State = appsv1alpha1.PendingRolloutState
+		graphCli.Status(dag, transCtx.RolloutOrig, rollout)
+		return graph.ErrPrematureStop
 	}
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	graphCli.Status(dag, transCtx.RolloutOrig, rollout)
-	return graph.ErrPrematureStop
+	return nil
 }
 
 func (t *rolloutSetupTransformer) component(transCtx *rolloutTransformContext,

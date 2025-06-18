@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -49,10 +48,9 @@ func (t *rolloutStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if err != nil {
 		return err
 	}
-
 	// TODO: sharding
 
-	rollout.Status.ObservedGeneration = transCtx.Rollout.Generation
+	rollout.Status.ObservedGeneration = rollout.Generation
 	rollout.Status.State = state
 
 	// TODO: error message, conditions
@@ -127,9 +125,6 @@ func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext,
 func (t *rolloutStatusTransformer) inplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
 	spec := transCtx.ClusterComps[comp.Name]
-	if spec == nil {
-		return "", fmt.Errorf("the component %s is not found in cluster", comp.Name)
-	}
 	if len(comp.ServiceVersion) > 0 {
 		if comp.ServiceVersion == spec.ServiceVersion {
 			return appsv1alpha1.RollingRolloutState, nil
@@ -151,12 +146,8 @@ func (t *rolloutStatusTransformer) inplace(transCtx *rolloutTransformContext,
 
 func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
-	spec := transCtx.ClusterComps[comp.Name]
-	if spec == nil {
-		return "", fmt.Errorf("the component %s is not found in cluster", comp.Name)
-	}
-
 	var rollingTpl *appsv1.InstanceTemplate
+	spec := transCtx.ClusterComps[comp.Name]
 	tplName := string(rollout.UID[:8])
 	for i, tpl := range spec.Instances {
 		if tpl.Name == tplName {

@@ -52,18 +52,18 @@ func (t *rolloutReplaceTransformer) Transform(ctx graph.TransformContext, dag *g
 	if model.IsObjectDeleting(transCtx.RolloutOrig) {
 		return nil
 	}
-	return t.rollout(transCtx, dag)
+	return t.rollout(transCtx)
 }
 
-func (t *rolloutReplaceTransformer) rollout(transCtx *rolloutTransformContext, dag *graph.DAG) error {
-	if err := t.components(transCtx, dag); err != nil {
+func (t *rolloutReplaceTransformer) rollout(transCtx *rolloutTransformContext) error {
+	if err := t.components(transCtx); err != nil {
 		return err
 	}
 	// TODO: sharding
 	return nil
 }
 
-func (t *rolloutReplaceTransformer) components(transCtx *rolloutTransformContext, dag *graph.DAG) error {
+func (t *rolloutReplaceTransformer) components(transCtx *rolloutTransformContext) error {
 	var delayedError error
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
@@ -82,21 +82,18 @@ func (t *rolloutReplaceTransformer) components(transCtx *rolloutTransformContext
 	return delayedError
 }
 
-func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext, rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
-	if spec == nil {
-		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
-	}
-
 	replicas, _, err := t.replicas(rollout, comp, spec)
 	if err != nil {
 		return err
 	}
-
 	return t.rolling(transCtx, rollout, comp, spec, replicas)
 }
 
-func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
+func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout,
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
 	return replaceReplicas(rollout, comp, spec)
 }
 
@@ -208,7 +205,8 @@ func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(transCtx *rolloutTra
 	return "", nil, fmt.Errorf("the instance template %s has not been found", tplName)
 }
 
-func replaceReplicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
+func replaceReplicas(rollout *appsv1alpha1.Rollout,
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
 	// the original replicas
 	replicas := spec.Replicas
 	for _, status := range rollout.Status.Components {
@@ -242,7 +240,8 @@ func replaceReplicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutCom
 	return replicas, target, nil
 }
 
-func replaceInstanceTemplate(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
+func replaceInstanceTemplate(transCtx *rolloutTransformContext,
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
 	name := string(transCtx.Rollout.UID[:8])
 	for i, tpl := range spec.Instances {
 		if tpl.Name == name {

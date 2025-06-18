@@ -75,6 +75,8 @@ type RolloutSpec struct {
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Components []RolloutComponent `json:"components,omitempty"`
+
+	// TODO: auto-reclaim the successful rollouts.
 }
 
 // RolloutStatus defines the observed state of Rollout
@@ -139,11 +141,6 @@ type RolloutComponent struct {
 	//
 	// +optional
 	Metadata *RolloutMetadata `json:"metadata,omitempty"`
-
-	// Specifies the promotion strategy for the component.
-	//
-	// +optional
-	Promotion *RolloutPromotion `json:"promotion,omitempty"`
 }
 
 type RolloutStrategy struct {
@@ -186,6 +183,8 @@ type RolloutStrategyReplace struct {
 	//
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// TODO: policy to scale-down the old instances and retain the PVCs.
 }
 
 type RolloutStrategyCreate struct {
@@ -193,6 +192,11 @@ type RolloutStrategyCreate struct {
 	//
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Specifies the promotion strategy for the component.
+	//
+	// +optional
+	Promotion *RolloutPromotion `json:"promotion,omitempty"`
 }
 
 type RolloutPodSelector struct {
@@ -208,7 +212,7 @@ type RolloutPromotion struct {
 	// +optional
 	Auto *bool `json:"auto,omitempty"`
 
-	// The delay time (in seconds) before promoting the new instances.
+	// The delay seconds before promoting the new instances.
 	//
 	// +kubebuilder:default=30
 	// +optional
@@ -219,11 +223,13 @@ type RolloutPromotion struct {
 	// +optional
 	Condition *RolloutPromoteCondition `json:"condition,omitempty"`
 
-	// The delay time (in seconds) before scaling down the old instances.
+	// The delay seconds before scaling down the old instances.
 	//
 	// +kubebuilder:default=30
 	// +optional
 	ScaleDownDelaySeconds *int32 `json:"scaleDownDelaySeconds,omitempty"`
+
+	// TODO: policy to retain the PVCs of old instances.
 }
 
 type RolloutPromoteCondition struct {
@@ -239,7 +245,7 @@ type RolloutPromoteCondition struct {
 	// +optional
 	Post *appsv1.Action `json:"post,omitempty"`
 
-	// TODO: variables to be used in the conditions.
+	// TODO: variables can be used in the conditions.
 }
 
 type RolloutMetadata struct {

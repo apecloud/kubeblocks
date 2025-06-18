@@ -40,6 +40,5 @@ func (t *rolloutUpdateTransformer) Transform(ctx graph.TransformContext, dag *gr
 		graphCli, _ := transCtx.Client.(model.GraphClient)
 		graphCli.Update(dag, transCtx.ClusterOrig, transCtx.Cluster)
 	}
-
 	return nil
 }

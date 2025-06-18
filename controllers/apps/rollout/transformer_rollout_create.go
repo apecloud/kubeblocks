@@ -43,18 +43,18 @@ func (t *rolloutCreateTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
-	return t.rollout(transCtx, dag)
+	return t.rollout(transCtx)
 }
 
-func (t *rolloutCreateTransformer) rollout(transCtx *rolloutTransformContext, dag *graph.DAG) error {
-	if err := t.components(transCtx, dag); err != nil {
+func (t *rolloutCreateTransformer) rollout(transCtx *rolloutTransformContext) error {
+	if err := t.components(transCtx); err != nil {
 		return err
 	}
 	// TODO: sharding
 	return nil
 }
 
-func (t *rolloutCreateTransformer) components(transCtx *rolloutTransformContext, dag *graph.DAG) error {
+func (t *rolloutCreateTransformer) components(transCtx *rolloutTransformContext) error {
 	var delayedError error
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
@@ -73,12 +73,9 @@ func (t *rolloutCreateTransformer) components(transCtx *rolloutTransformContext,
 	return delayedError
 }
 
-func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext, rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
-	if spec == nil {
-		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
-	}
-
 	replicas, targetReplicas, err := t.replicas(rollout, comp, spec)
 	if err != nil {
 		return err
@@ -91,7 +88,8 @@ func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext, 
 	return t.promote(transCtx, comp, spec, replicas, targetReplicas)
 }
 
-func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
+func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
 	// the original replicas
 	replicas := spec.Replicas
 	for _, status := range rollout.Status.Components {
@@ -179,7 +177,7 @@ func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformCo
 
 func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas, targetReplicas int32) error {
-	if comp.Promotion == nil || !ptr.Deref(comp.Promotion.Auto, false) {
+	if comp.Strategy.Create.Promotion == nil || !ptr.Deref(comp.Strategy.Create.Promotion.Auto, false) {
 		return nil
 	}
 

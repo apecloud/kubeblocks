@@ -42,18 +42,18 @@ func (t *rolloutInplaceTransformer) Transform(ctx graph.TransformContext, dag *g
 	if !model.IsObjectUpdating(transCtx.RolloutOrig) {
 		return nil
 	}
-	return t.rollout(transCtx, dag)
+	return t.rollout(transCtx)
 }
 
-func (t *rolloutInplaceTransformer) rollout(transCtx *rolloutTransformContext, dag *graph.DAG) error {
-	if err := t.components(transCtx, dag); err != nil {
+func (t *rolloutInplaceTransformer) rollout(transCtx *rolloutTransformContext) error {
+	if err := t.components(transCtx); err != nil {
 		return err
 	}
 	// TODO: sharding
 	return nil
 }
 
-func (t *rolloutInplaceTransformer) components(transCtx *rolloutTransformContext, dag *graph.DAG) error {
+func (t *rolloutInplaceTransformer) components(transCtx *rolloutTransformContext) error {
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
 		if comp.Strategy.Inplace != nil {
@@ -66,13 +66,9 @@ func (t *rolloutInplaceTransformer) components(transCtx *rolloutTransformContext
 }
 
 func (t *rolloutInplaceTransformer) component(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) error {
-	spec := transCtx.ClusterComps[comp.Name]
-	if spec == nil {
-		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
-	}
-
 	var replicas int
 	var err error
+	spec := transCtx.ClusterComps[comp.Name]
 	if comp.Replicas != nil {
 		replicas, err = intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(spec.Replicas), false)
 		if err != nil {

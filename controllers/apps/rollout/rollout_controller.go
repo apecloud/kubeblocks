@@ -114,23 +114,19 @@ func (r *RolloutReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *RolloutReconciler) cluster(ctx context.Context, obj client.Object) []reconcile.Request {
-	// TODO: it's too heavy to obtain the associated rollout for the cluster, refactor it later.
-	rolloutList := &appsv1alpha1.RolloutList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(obj.GetNamespace()),
-		client.MatchingLabels{
-			rolloutClusterNameLabel: obj.GetName(),
-		},
+	labels := obj.GetLabels()
+	if labels == nil {
+		return []reconcile.Request{}
 	}
-	err := r.Client.List(ctx, rolloutList, listOpts...)
-	if err != nil || len(rolloutList.Items) == 0 {
+	rolloutName, ok := labels[rolloutNameClusterLabel]
+	if !ok {
 		return []reconcile.Request{}
 	}
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
-				Name:      rolloutList.Items[0].Name,
+				Name:      rolloutName,
 			},
 		},
 	}

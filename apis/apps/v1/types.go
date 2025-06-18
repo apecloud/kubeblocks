@@ -783,6 +783,8 @@ type InstanceTemplate struct {
 	// then the instance names generated under this InstanceTemplate would be
 	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
 	// $(cluster.name)-$(component.name)-$(template.name)-7
+	//
+	// +optional
 	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.

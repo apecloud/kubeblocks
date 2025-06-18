@@ -21,7 +21,6 @@ package rollout
 
 import (
 	"context"
-	"go/build"
 	"path/filepath"
 	"testing"
 
@@ -39,9 +38,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	// +kubebuilder:scaffold:imports
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -87,12 +87,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases"),
-			// use dependent external CRDs.
-			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.2.0", "config", "crd"),
-		},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -110,7 +105,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(appsv1.AddToScheme)
 
-	// +kubebuilder:scaffold:rscheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
@@ -120,11 +115,6 @@ var _ = BeforeSuite(func() {
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:  scheme.Scheme,
 		Metrics: server.Options{BindAddress: "0"},
-		Client: client.Options{
-			Cache: &client.CacheOptions{
-				DisableFor: intctrlutil.GetUncachedObjects(),
-			},
-		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -135,27 +125,6 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault(constant.EnableRBACManager, true)
 
 	err = intctrlutil.InitHostPortManager(k8sClient)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&apps.ClusterDefinitionReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cluster-definition-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&apps.ComponentDefinitionReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("component-definition-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&apps.ComponentVersionReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("component-version-controller"),
-	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&RolloutReconciler{

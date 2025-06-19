@@ -38,7 +38,7 @@ var _ graph.Transformer = &rolloutSetupTransformer{}
 
 func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 
@@ -54,6 +54,8 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 	rolloutName, ok := cluster.Labels[rolloutNameClusterLabel]
 	if ok && rolloutName != rollout.Name {
+		rollout.Status.State = appsv1alpha1.ErrorRolloutState
+		graphCli.Status(dag, transCtx.RolloutOrig, rollout)
 		return fmt.Errorf("the cluster %s is already bound to rollout %s", cluster.Name, rolloutName)
 	}
 	if !ok {
@@ -71,8 +73,6 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 		}
 	}
 	if !reflect.DeepEqual(transCtx.RolloutOrig.Status, rollout.Status) {
-		rollout.Status.ObservedGeneration = rollout.Generation
-		rollout.Status.State = appsv1alpha1.PendingRolloutState
 		graphCli.Status(dag, transCtx.RolloutOrig, rollout)
 		return graph.ErrPrematureStop
 	}

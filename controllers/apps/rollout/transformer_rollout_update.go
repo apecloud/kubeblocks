@@ -32,7 +32,7 @@ var _ graph.Transformer = &rolloutUpdateTransformer{}
 
 func (t *rolloutUpdateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 
@@ -40,5 +40,6 @@ func (t *rolloutUpdateTransformer) Transform(ctx graph.TransformContext, dag *gr
 		graphCli, _ := transCtx.Client.(model.GraphClient)
 		graphCli.Update(dag, transCtx.ClusterOrig, transCtx.Cluster)
 	}
+
 	return nil
 }

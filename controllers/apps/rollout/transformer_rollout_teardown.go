@@ -33,7 +33,7 @@ var _ graph.Transformer = &rolloutTearDownTransformer{}
 
 func (t *rolloutTearDownTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 	return t.tearDown(transCtx)
@@ -50,6 +50,11 @@ func (t *rolloutTearDownTransformer) tearDown(transCtx *rolloutTransformContext)
 func (t *rolloutTearDownTransformer) components(transCtx *rolloutTransformContext) error {
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
+		if comp.Strategy.Inplace != nil {
+			if err := t.inplace(transCtx, rollout, comp); err != nil {
+				return err
+			}
+		}
 		if comp.Strategy.Replace != nil {
 			if err := t.replace(transCtx, rollout, comp); err != nil {
 				return err
@@ -64,6 +69,11 @@ func (t *rolloutTearDownTransformer) components(transCtx *rolloutTransformContex
 	return nil
 }
 
+func (t *rolloutTearDownTransformer) inplace(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+	return nil // do nothing
+}
+
 func (t *rolloutTearDownTransformer) replace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
@@ -71,11 +81,11 @@ func (t *rolloutTearDownTransformer) replace(transCtx *rolloutTransformContext,
 	if err != nil {
 		return err
 	}
-	tpl, err := replaceInstanceTemplate(transCtx, comp, spec)
+	tpl, _, err := replaceInstanceTemplate(transCtx, comp, spec)
 	if err != nil {
 		return err
 	}
-	if *tpl.Replicas == replicas && spec.Replicas == replicas && replaceStatus(transCtx, comp) {
+	if *tpl.Replicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
 		spec.ServiceVersion = tpl.ServiceVersion
 		spec.ComponentDef = tpl.CompDef
 		spec.OfflineInstances = slices.DeleteFunc(spec.OfflineInstances, func(instance string) bool {

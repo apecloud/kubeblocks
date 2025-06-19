@@ -39,7 +39,7 @@ var _ graph.Transformer = &rolloutStatusTransformer{}
 
 func (t *rolloutStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 
@@ -124,30 +124,32 @@ func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext,
 
 func (t *rolloutStatusTransformer) inplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
-	spec := transCtx.ClusterComps[comp.Name]
+	succeed := func() appsv1alpha1.RolloutState {
+		if checkClusterNCompRunning(transCtx, comp.Name) {
+			return appsv1alpha1.SucceedRolloutState
+		}
+		return appsv1alpha1.RollingRolloutState
+	}
+	spec := t.compSpec(transCtx, comp.Name)
 	if len(comp.ServiceVersion) > 0 {
 		if comp.ServiceVersion == spec.ServiceVersion {
-			return appsv1alpha1.RollingRolloutState, nil
+			return succeed(), nil
 		}
 		return appsv1alpha1.PendingRolloutState, nil
 	}
 	if len(comp.CompDef) > 0 {
 		if strings.HasPrefix(spec.ComponentDef, comp.CompDef) { // TODO: comp-def match
-			return appsv1alpha1.RollingRolloutState, nil
+			return succeed(), nil
 		}
 		return appsv1alpha1.PendingRolloutState, nil
 	}
-
-	// TODO: check cluster & comp status
-	// TODO: check pods
-
-	return "", nil
+	return "", nil // ???
 }
 
 func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
 	var rollingTpl *appsv1.InstanceTemplate
-	spec := transCtx.ClusterComps[comp.Name]
+	spec := t.compSpec(transCtx, comp.Name)
 	tplName := string(rollout.UID[:8])
 	for i, tpl := range spec.Instances {
 		if tpl.Name == tplName {
@@ -180,7 +182,7 @@ func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
 		}
 	}
 
-	if !replaceStatus(transCtx, comp) || spec.Replicas != *rollingTpl.Replicas {
+	if !checkClusterNCompRunning(transCtx, comp.Name) || spec.Replicas != *rollingTpl.Replicas {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 	if allPodCnt != spec.Replicas {
@@ -191,5 +193,21 @@ func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
 
 func (t *rolloutStatusTransformer) create(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
+	// TODO: impl
 	return "", nil
+}
+
+func (t *rolloutStatusTransformer) compSpec(transCtx *rolloutTransformContext, compName string) *appsv1.ClusterComponentSpec {
+	// use the original cluster spec
+	cluster := transCtx.ClusterOrig
+	for i, comp := range cluster.Spec.ComponentSpecs {
+		if comp.Name == compName {
+			return &cluster.Spec.ComponentSpecs[i]
+		}
+	}
+	return nil
+}
+
+func isRolloutSucceed(rollout *appsv1alpha1.Rollout) bool {
+	return rollout.Status.State == appsv1alpha1.SucceedRolloutState
 }

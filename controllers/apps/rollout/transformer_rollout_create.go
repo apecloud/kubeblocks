@@ -39,10 +39,9 @@ var _ graph.Transformer = &rolloutCreateTransformer{}
 
 func (t *rolloutCreateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
-
 	return t.rollout(transCtx)
 }
 
@@ -55,22 +54,15 @@ func (t *rolloutCreateTransformer) rollout(transCtx *rolloutTransformContext) er
 }
 
 func (t *rolloutCreateTransformer) components(transCtx *rolloutTransformContext) error {
-	var delayedError error
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
 		if comp.Strategy.Create != nil {
 			if err := t.component(transCtx, rollout, comp); err != nil {
-				if controllerutil.IsDelayedRequeueError(err) {
-					if delayedError == nil {
-						delayedError = err
-					}
-					continue
-				}
 				return err
 			}
 		}
 	}
-	return delayedError
+	return nil
 }
 
 func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext,
@@ -102,7 +94,7 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 	// the target replicas
 	target, err := func() (int32, error) {
 		if comp.Replicas != nil {
-			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(spec.Replicas), false)
+			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(replicas), false)
 			if err != nil {
 				return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
 			}
@@ -126,8 +118,8 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 		return nil
 	}
 
-	if !t.status(transCtx, comp) {
-		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
+	if !checkClusterNCompRunning(transCtx, comp.Name) {
+		return controllerutil.NewDelayedRequeueError(clusterNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
 	tpl, err := t.instanceTemplate(transCtx, comp, spec)
@@ -138,19 +130,6 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 	tpl.Replicas = ptr.To(targetReplicas)
 
 	return nil
-}
-
-func (t *rolloutCreateTransformer) status(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
-	cluster := transCtx.Cluster
-	compStatus := cluster.Status.Components[comp.Name]
-	if cluster.Generation != cluster.Status.ObservedGeneration || compStatus.Phase != appsv1.RunningComponentPhase {
-		return false
-	}
-	compObj, ok := transCtx.Components[comp.Name]
-	if !ok || compObj == nil {
-		return false
-	}
-	return compObj.Generation == compObj.Status.ObservedGeneration && compObj.Status.Phase == appsv1.RunningComponentPhase
 }
 
 func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformContext,

@@ -21,6 +21,7 @@ package rollout
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,13 +33,17 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+const (
+	clusterNotReadyRequeueDuration = time.Second * 10
+)
+
 type rolloutLoadTransformer struct{}
 
 var _ graph.Transformer = &rolloutLoadTransformer{}
 
 func (t *rolloutLoadTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 
@@ -109,4 +114,17 @@ func (t *rolloutLoadTransformer) getNCheckComponent(ctx context.Context, cli cli
 	}
 	// TODO: check component status
 	return comp, nil
+}
+
+func checkClusterNCompRunning(transCtx *rolloutTransformContext, compName string) bool {
+	cluster := transCtx.ClusterOrig
+	compStatus := cluster.Status.Components[compName]
+	if cluster.Generation != cluster.Status.ObservedGeneration || compStatus.Phase != appsv1.RunningComponentPhase {
+		return false
+	}
+	compObj, ok := transCtx.Components[compName]
+	if !ok || compObj == nil {
+		return false
+	}
+	return compObj.Generation == compObj.Status.ObservedGeneration && compObj.Status.Phase == appsv1.RunningComponentPhase
 }

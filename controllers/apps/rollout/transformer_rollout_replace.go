@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -39,17 +38,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const (
-	notReadyRequeueDuration = time.Second * 5
-)
-
 type rolloutReplaceTransformer struct{}
 
 var _ graph.Transformer = &rolloutReplaceTransformer{}
 
 func (t *rolloutReplaceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rolloutTransformContext)
-	if model.IsObjectDeleting(transCtx.RolloutOrig) {
+	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 	return t.rollout(transCtx)
@@ -64,22 +59,15 @@ func (t *rolloutReplaceTransformer) rollout(transCtx *rolloutTransformContext) e
 }
 
 func (t *rolloutReplaceTransformer) components(transCtx *rolloutTransformContext) error {
-	var delayedError error
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
 		if comp.Strategy.Replace != nil {
 			if err := t.component(transCtx, rollout, comp); err != nil {
-				if controllerutil.IsDelayedRequeueError(err) {
-					if delayedError == nil {
-						delayedError = err
-					}
-					continue
-				}
 				return err
 			}
 		}
 	}
-	return delayedError
+	return nil
 }
 
 func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
@@ -99,7 +87,7 @@ func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout,
 
 func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas int32) error {
-	tpl, err := t.instanceTemplate(transCtx, comp, spec)
+	tpl, exist, err := replaceInstanceTemplate(transCtx, comp, spec)
 	if err != nil {
 		return err
 	}
@@ -107,8 +95,15 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 		return nil
 	}
 
-	if !t.status(transCtx, comp) {
-		return controllerutil.NewDelayedRequeueError(notReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
+	if !checkClusterNCompRunning(transCtx, comp.Name) {
+		return controllerutil.NewDelayedRequeueError(clusterNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
+	}
+
+	// update cluster spec after the cluster and component are ready
+	if !exist {
+		spec.Instances = append(spec.Instances, *tpl)
+		spec.FlatInstanceOrdinal = true
+		tpl = &spec.Instances[len(spec.Instances)-1]
 	}
 
 	if spec.Replicas == replicas {
@@ -116,15 +111,6 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	} else {
 		return t.down(transCtx, rollout, spec, tpl)
 	}
-}
-
-func (t *rolloutReplaceTransformer) status(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
-	return replaceStatus(transCtx, comp)
-}
-
-func (t *rolloutReplaceTransformer) instanceTemplate(transCtx *rolloutTransformContext,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
-	return replaceInstanceTemplate(transCtx, comp, spec)
 }
 
 func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
@@ -219,7 +205,7 @@ func replaceReplicas(rollout *appsv1alpha1.Rollout,
 	// the target replicas
 	target, err := func() (int32, error) {
 		if comp.Replicas != nil {
-			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(spec.Replicas), false)
+			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(replicas), false)
 			if err != nil {
 				return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
 			}
@@ -233,7 +219,7 @@ func replaceReplicas(rollout *appsv1alpha1.Rollout,
 	if target < 0 || target > replicas {
 		return 0, 0, errors.Errorf("the target replicas %d is out-of-range, component %s, replicas: %d", target, comp.Name, replicas)
 	}
-	if target > 0 && target < spec.Replicas {
+	if target > 0 && target < replicas {
 		return 0, 0, fmt.Errorf("partially rollout with the replace strategy not supported, component: %s", comp.Name)
 	}
 
@@ -241,35 +227,29 @@ func replaceReplicas(rollout *appsv1alpha1.Rollout,
 }
 
 func replaceInstanceTemplate(transCtx *rolloutTransformContext,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
+	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, bool, error) {
 	name := string(transCtx.Rollout.UID[:8])
 	for i, tpl := range spec.Instances {
 		if tpl.Name == name {
-			return &spec.Instances[i], nil
+			return &spec.Instances[i], true, nil
 		}
 	}
 	if len(spec.Instances) > 0 && !spec.FlatInstanceOrdinal {
-		return nil, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
+		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
-	spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
+	tpl := &appsv1.InstanceTemplate{
 		Name:           name,
 		ServiceVersion: comp.ServiceVersion,
 		CompDef:        comp.CompDef,
 		Replicas:       ptr.To[int32](0),
-	})
-	spec.FlatInstanceOrdinal = true
-	return &spec.Instances[len(spec.Instances)-1], nil
-}
-
-func replaceStatus(transCtx *rolloutTransformContext, comp appsv1alpha1.RolloutComponent) bool {
-	cluster := transCtx.Cluster
-	compStatus := cluster.Status.Components[comp.Name]
-	if cluster.Generation != cluster.Status.ObservedGeneration || compStatus.Phase != appsv1.RunningComponentPhase {
-		return false
 	}
-	compObj, ok := transCtx.Components[comp.Name]
-	if !ok || compObj == nil {
-		return false
-	}
-	return compObj.Generation == compObj.Status.ObservedGeneration && compObj.Status.Phase == appsv1.RunningComponentPhase
+	return tpl, false, nil
+	// spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
+	//	Name:           name,
+	//	ServiceVersion: comp.ServiceVersion,
+	//	CompDef:        comp.CompDef,
+	//	Replicas:       ptr.To[int32](0),
+	// })
+	// spec.FlatInstanceOrdinal = true
+	// return &spec.Instances[len(spec.Instances)-1], nil
 }

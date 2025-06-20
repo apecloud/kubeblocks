@@ -38,7 +38,7 @@ func IsHAAvailable(characterType, workloadType string) bool {
 	case models.MySQL:
 		return false
 	case models.WeSQL:
-		return true
+		return false
 	case models.PostgreSQL:
 		if strings.EqualFold(workloadType, Consensus) {
 			return true

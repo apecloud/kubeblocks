@@ -49,6 +49,7 @@ spec:
     endpoint = {{ `{{ $endpoint }}` }}
     root = {{ `{{ index .Parameters "bucket" }}` }}
     no_check_certificate = {{ `{{ index .Parameters "insecure" }}` }}
+    no_check_bucket = {{ `{{ index .Parameters "noCheckBucket" }}` }}
     chunk_size = 50Mi
 
   parametersSchema:
@@ -85,6 +86,10 @@ spec:
           type: boolean
           default: false
           description: "Do not verify the server SSL certificate"
+        noCheckBucket:
+          type: boolean
+          default: false
+          description: "Do not check if the bucket exists, and do not try to create it"
 
       required:
         - bucket

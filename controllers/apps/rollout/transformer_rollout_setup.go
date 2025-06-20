@@ -54,9 +54,11 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 	rolloutName, ok := cluster.Labels[rolloutNameClusterLabel]
 	if ok && rolloutName != rollout.Name {
+		errorMsg := fmt.Sprintf("the cluster %s is already bound to rollout %s", cluster.Name, rolloutName)
 		rollout.Status.State = appsv1alpha1.ErrorRolloutState
+		rollout.Status.Message = errorMsg
 		graphCli.Status(dag, transCtx.RolloutOrig, rollout)
-		return fmt.Errorf("the cluster %s is already bound to rollout %s", cluster.Name, rolloutName)
+		return fmt.Errorf("%s", errorMsg)
 	}
 	if !ok {
 		cluster.Labels[rolloutNameClusterLabel] = rollout.Name

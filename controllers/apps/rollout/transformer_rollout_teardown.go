@@ -103,5 +103,5 @@ func (t *rolloutTearDownTransformer) replace(transCtx *rolloutTransformContext,
 func (t *rolloutTearDownTransformer) create(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	// TODO: impl
-	return nil
+	return createStrategyNotSupportedError
 }

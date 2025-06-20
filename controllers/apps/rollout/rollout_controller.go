@@ -91,7 +91,7 @@ func (r *RolloutReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&rolloutTearDownTransformer{},
 			&rolloutInplaceTransformer{},
 			&rolloutReplaceTransformer{},
-			&rolloutCreateTransformer{},
+			// &rolloutCreateTransformer{},
 			&rolloutUpdateTransformer{},
 			&rolloutStatusTransformer{},
 		).Build()

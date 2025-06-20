@@ -243,13 +243,16 @@ func replaceInstanceTemplate(transCtx *rolloutTransformContext,
 		CompDef:        comp.CompDef,
 		Replicas:       ptr.To[int32](0),
 	}
+	if comp.Strategy.Replace.SchedulingPolicy != nil {
+		policy := comp.Strategy.Replace.SchedulingPolicy
+		tpl.SchedulingPolicy = &appsv1.SchedulingPolicy{
+			SchedulerName:             policy.SchedulerName,
+			NodeSelector:              policy.NodeSelector,
+			NodeName:                  policy.NodeName,
+			Affinity:                  policy.Affinity,
+			Tolerations:               policy.Tolerations,
+			TopologySpreadConstraints: policy.TopologySpreadConstraints,
+		}
+	}
 	return tpl, false, nil
-	// spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
-	//	Name:           name,
-	//	ServiceVersion: comp.ServiceVersion,
-	//	CompDef:        comp.CompDef,
-	//	Replicas:       ptr.To[int32](0),
-	// })
-	// spec.FlatInstanceOrdinal = true
-	// return &spec.Instances[len(spec.Instances)-1], nil
 }

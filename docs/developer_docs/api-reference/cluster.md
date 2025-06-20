@@ -25741,9 +25741,6 @@ Metadata
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutPodSelector">RolloutPodSelector
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyInplace">RolloutStrategyInplace</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyReplace">RolloutStrategyReplace</a>)
-</p>
 <div>
 </div>
 <table>
@@ -26076,7 +26073,7 @@ RolloutStrategyReplace
 <td>
 <em>(Optional)</em>
 <p>Replace rollout strategy.</p>
-<p>If specified, the rollout will be performed by replacing the old instances with new instances (create and then delete).</p>
+<p>If specified, the rollout will be performed by replacing the old instances with new instances one by one (create and then delete).</p>
 </td>
 </tr>
 <tr>
@@ -26113,16 +26110,16 @@ RolloutStrategyCreate
 <tbody>
 <tr>
 <td>
-<code>affinity</code><br/>
+<code>schedulingPolicy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
-Kubernetes core/v1.Affinity
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the affinity for the new instances.</p>
+<p>Specifies the scheduling policy for the new instance.</p>
 </td>
 </tr>
 <tr>
@@ -26148,30 +26145,6 @@ RolloutPromotion
 </p>
 <div>
 </div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>selector</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutPodSelector">
-RolloutPodSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The selector to select the instances to be rolled out in-place.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutStrategyReplace">RolloutStrategyReplace
 </h3>
 <p>
@@ -26189,30 +26162,40 @@ RolloutPodSelector
 <tbody>
 <tr>
 <td>
-<code>selector</code><br/>
+<code>schedulingPolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutPodSelector">
-RolloutPodSelector
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The selector to select the instances to be rolled out by replacing.</p>
+<p>Specifies the scheduling policy for the new instance.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>affinity</code><br/>
+<code>perInstanceIntervalSeconds</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
-Kubernetes core/v1.Affinity
-</a>
+int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the affinity for the new instances.</p>
+<p>The number of seconds to wait between rolling out two instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of seconds to wait before scaling down an old instance, after the new instance becomes ready.</p>
 </td>
 </tr>
 </tbody>
@@ -26220,7 +26203,7 @@ Kubernetes core/v1.Affinity
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyCreate">RolloutStrategyCreate</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyReplace">RolloutStrategyReplace</a>)
 </p>
 <div>
 </div>

@@ -106,7 +106,7 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 		return 0, 0, err
 	}
 	if target < 0 {
-		return 0, 0, errors.Errorf("invalid target %d for component %s", target, comp.Name)
+		return 0, 0, errors.Errorf("invalid target replicas %d for component %s", target, comp.Name)
 	}
 
 	return replicas, target, nil
@@ -114,10 +114,6 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 
 func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas, targetReplicas int32) error {
-	if (replicas + targetReplicas) == spec.Replicas {
-		return nil
-	}
-
 	if !checkClusterNCompRunning(transCtx, comp.Name) {
 		return controllerutil.NewDelayedRequeueError(clusterNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}

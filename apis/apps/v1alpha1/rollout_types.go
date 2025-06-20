@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -153,7 +152,7 @@ type RolloutStrategy struct {
 
 	// Replace rollout strategy.
 	//
-	// If specified, the rollout will be performed by replacing the old instances with new instances (create and then delete).
+	// If specified, the rollout will be performed by replacing the old instances with new instances one by one (create and then delete).
 	//
 	// +optional
 	Replace *RolloutStrategyReplace `json:"replace,omitempty"`
@@ -166,32 +165,32 @@ type RolloutStrategy struct {
 	Create *RolloutStrategyCreate `json:"create,omitempty"`
 }
 
-type RolloutStrategyInplace struct {
-	// The selector to select the instances to be rolled out in-place.
-	//
-	// +optional
-	Selector *RolloutPodSelector `json:"selector,omitempty"`
-}
+type RolloutStrategyInplace struct{}
 
 type RolloutStrategyReplace struct {
-	// The selector to select the instances to be rolled out by replacing.
+	// Specifies the scheduling policy for the new instance.
 	//
 	// +optional
-	Selector *RolloutPodSelector `json:"selector,omitempty"`
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
-	// Specifies the affinity for the new instances.
+	// The number of seconds to wait between rolling out two instances.
 	//
 	// +optional
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+	PerInstanceIntervalSeconds *int32 `json:"perInstanceIntervalSeconds,omitempty"`
+
+	// The number of seconds to wait before scaling down an old instance, after the new instance becomes ready.
+	//
+	// +optional
+	ScaleDownDelaySeconds *int32 `json:"scaleDownDelaySeconds,omitempty"`
 
 	// TODO: policy to scale-down the old instances and retain the PVCs.
 }
 
 type RolloutStrategyCreate struct {
-	// Specifies the affinity for the new instances.
+	// Specifies the scheduling policy for the new instance.
 	//
 	// +optional
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies the promotion strategy for the component.
 	//

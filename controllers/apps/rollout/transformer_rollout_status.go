@@ -194,7 +194,7 @@ func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
 func (t *rolloutStatusTransformer) create(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
 	// TODO: impl
-	return "", nil
+	return "", createStrategyNotSupportedError
 }
 
 func (t *rolloutStatusTransformer) compSpec(transCtx *rolloutTransformContext, compName string) *appsv1.ClusterComponentSpec {

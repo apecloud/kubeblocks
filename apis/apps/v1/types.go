@@ -755,6 +755,11 @@ type InstanceTemplate struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
+	// Specifies the name of the referenced ComponentDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	CompDef string `json:"compDef,omitempty"`
+
 	// Indicate whether the instances belonging to this template are canary instances.
 	//
 	// +optional

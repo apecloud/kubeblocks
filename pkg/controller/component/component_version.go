@@ -220,8 +220,12 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					if app.err != nil {
 						return app.err
 					}
-					images[kbagent.ContainerName] = app.image
-					images[kbagent.ContainerName4Worker] = app.image
+					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
+						images[kbagent.ContainerName] = app.image
+					}
+					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
+						images[kbagent.ContainerName4Worker] = app.image
+					}
 				}
 			}
 		}

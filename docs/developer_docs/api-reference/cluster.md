@@ -7929,6 +7929,17 @@ The version should follow the syntax and semantics of the &ldquo;Semantic Versio
 </tr>
 <tr>
 <td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>canary</code><br/>
 <em>
 bool

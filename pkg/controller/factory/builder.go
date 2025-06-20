@@ -250,7 +250,7 @@ func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent,
 	}
 	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
 	if templateName != "" {
-		pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = templateName
+		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = templateName
 	}
 }
 

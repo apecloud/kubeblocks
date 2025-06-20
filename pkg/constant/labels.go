@@ -44,10 +44,10 @@ const (
 	KBAppComponentLabelKey    = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey = "apps.kubeblocks.io/sharding-name"
 
-	KBAppComponentInstanceTemplateLabelKey = "apps.kubeblocks.io/instance-template"
-	PVCNameLabelKey                        = "apps.kubeblocks.io/pvc-name"
-	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
-	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
+	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
+	PVCNameLabelKey                 = "apps.kubeblocks.io/pvc-name"
+	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
+	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
 
 	RoleLabelKey           = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
 	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"

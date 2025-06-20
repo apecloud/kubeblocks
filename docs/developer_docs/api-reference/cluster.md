@@ -7964,6 +7964,7 @@ Ordinals
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
 If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
@@ -30538,6 +30539,7 @@ int32
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.</p>
 </td>
 </tr>

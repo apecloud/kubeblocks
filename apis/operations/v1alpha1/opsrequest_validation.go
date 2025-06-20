@@ -747,7 +747,7 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	}
 	var pvc *corev1.PersistentVolumeClaim
 	for _, pvcItem := range pvcList.Items {
-		if targetInsTPLName == pvcItem.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
+		if targetInsTPLName == pvcItem.Labels[constant.KBAppInstanceTemplateLabelKey] {
 			pvc = &pvcItem
 			break
 		}

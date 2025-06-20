@@ -62,7 +62,6 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	if err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
-	compDefCopy := compDef.DeepCopy()
 
 	if err = component.UpdateCompDefinitionImages4ServiceVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
@@ -76,7 +75,12 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	}
 	for _, tpl := range comp.Spec.Instances {
 		if len(tpl.ServiceVersion) > 0 {
-			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, compDefCopy, tpl.ServiceVersion)
+			// TODO: comp defs?
+			compDef, err = getNCheckCompDefinition(ctx, cli, tpl.CompDef)
+			if err != nil {
+				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+			}
+			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion)
 			if err != nil {
 				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}

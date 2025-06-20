@@ -26,4 +26,5 @@ const (
 	ConfigFinalizerName            = "config.kubeblocks.io/finalizer"
 	ServiceDescriptorFinalizerName = "servicedescriptor.kubeblocks.io/finalizer"
 	OpsRequestFinalizerName        = "opsrequest.kubeblocks.io/finalizer"
+	RolloutFinalizerName           = "rollout.kubeblocks.io/finalizer"
 )

@@ -359,4 +359,13 @@ resources:
   kind: ParamConfigRenderer
   path: github.com/apecloud/kubeblocks/apis/parameters/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Rollout
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
 version: "3"

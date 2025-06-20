@@ -659,6 +659,11 @@ spec:
                                 description: Indicate whether the instances belonging
                                   to this template are canary instances.
                                 type: boolean
+                              compDef:
+                                description: Specifies the name of the referenced
+                                  ComponentDefinition.
+                                maxLength: 64
+                                type: string
                               env:
                                 description: |-
                                   Defines Env to override.
@@ -3487,6 +3492,11 @@ spec:
                                 description: Indicate whether the instances belonging
                                   to this template are canary instances.
                                 type: boolean
+                              compDef:
+                                description: Specifies the name of the referenced
+                                  ComponentDefinition.
+                                maxLength: 64
+                                type: string
                               env:
                                 description: |-
                                   Defines Env to override.

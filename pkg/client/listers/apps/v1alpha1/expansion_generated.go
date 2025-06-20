@@ -50,6 +50,14 @@ type ComponentVersionListerExpansion interface{}
 // ConfigConstraintLister.
 type ConfigConstraintListerExpansion interface{}
 
+// RolloutListerExpansion allows custom methods to be added to
+// RolloutLister.
+type RolloutListerExpansion interface{}
+
+// RolloutNamespaceListerExpansion allows custom methods to be added to
+// RolloutNamespaceLister.
+type RolloutNamespaceListerExpansion interface{}
+
 // ServiceDescriptorListerExpansion allows custom methods to be added to
 // ServiceDescriptorLister.
 type ServiceDescriptorListerExpansion interface{}

@@ -210,7 +210,7 @@ var _ = Describe("flat name builder tests", func() {
 			},
 		}, map[string]sets.Set[int32]{
 			"":   sets.New[int32](0, 3, 4),
-			"t1": sets.New[int32](2),
+			"t1": sets.New[int32](1, 2),
 		}, false),
 
 		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
@@ -335,7 +335,7 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: []int32{0, 1, 2},
 			},
 		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](3),
+			"t1": sets.New[int32](2, 3),
 			"":   sets.New[int32](0, 1),
 		}, false),
 
@@ -419,6 +419,147 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, nil, true),
+
+		Entry("move replicas into instance templates", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](1),
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](1),
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2, 3, 4},
+			},
+		}, map[string]sets.Set[int32]{
+			"":   sets.New[int32](0, 1, 2),
+			"t1": sets.New[int32](5),
+			"t2": sets.New[int32](6),
+		}, false),
+
+		Entry("move replicas into instance templates - take over", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{3},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{4},
+						},
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2, 3, 4},
+			},
+		}, map[string]sets.Set[int32]{
+			"":   sets.New[int32](0, 1, 2),
+			"t1": sets.New[int32](3),
+			"t2": sets.New[int32](4),
+		}, false),
+
+		Entry("move replicas into instance templates - mixed", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](1),
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{4},
+						},
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2, 3, 4},
+			},
+		}, map[string]sets.Set[int32]{
+			"":   sets.New[int32](0, 1, 2),
+			"t1": sets.New[int32](5),
+			"t2": sets.New[int32](4),
+		}, false),
+
+		Entry("move replicas out of instance templates", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{3},
+					},
+					{
+						Name:     "t2",
+						Ordinals: []int32{4},
+					},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"": sets.New[int32](0, 1, 2, 5, 6),
+		}, false),
+
+		PEntry("move replicas out of instance templates - taken over instances", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{3},
+					},
+					{
+						Name:     "t2",
+						Ordinals: []int32{4},
+					},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"": sets.New[int32](0, 1, 2, 3, 4),
+		}, false),
+
+		PEntry("move replicas out of instance templates - mixed", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2},
+				TemplatesStatus: []workloads.InstanceTemplateStatus{
+					{
+						Name:     "t1",
+						Ordinals: []int32{3},
+					},
+					{
+						Name:     "t2",
+						Ordinals: []int32{4},
+					},
+				},
+			},
+		}, map[string]sets.Set[int32]{
+			"": sets.New[int32](0, 1, 2, 5, 4),
+		}, false),
 	)
 
 	It("generates instance names", func() {

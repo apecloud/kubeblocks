@@ -87,18 +87,14 @@ func (t *rolloutSetupTransformer) component(transCtx *rolloutTransformContext,
 	if spec == nil {
 		return fmt.Errorf("the component %s is not found in cluster", comp.Name)
 	}
-
-	func() {
-		for _, status := range rollout.Status.Components {
-			if status.Name == comp.Name {
-				return
-			}
+	for _, status := range rollout.Status.Components {
+		if status.Name == comp.Name {
+			return nil // has been initialized
 		}
-		rollout.Status.Components = append(rollout.Status.Components, appsv1alpha1.RolloutComponentStatus{
-			Name:     comp.Name,
-			Replicas: spec.Replicas,
-		})
-	}()
-
+	}
+	rollout.Status.Components = append(rollout.Status.Components, appsv1alpha1.RolloutComponentStatus{
+		Name:     comp.Name,
+		Replicas: spec.Replicas,
+	})
 	return nil
 }

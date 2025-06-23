@@ -137,11 +137,9 @@ func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
 		}
 		instTpl.Replicas = ptr.To(*instTpl.Replicas - 1)
 	}
-	if spec.OfflineInstances == nil {
-		spec.OfflineInstances = make([]string, 0)
-	}
 	spec.OfflineInstances = append(spec.OfflineInstances, instance)
 
+	// add the scale down instance to the rollout status
 	for i, status := range rollout.Status.Components {
 		if status.Name == spec.Name {
 			rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)

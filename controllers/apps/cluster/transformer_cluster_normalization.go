@@ -345,7 +345,7 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4Component(transCtx 
 	compSpec.ServiceVersion = serviceVersion
 
 	for i, tpl := range compSpec.Instances {
-		if len(tpl.ServiceVersion) == 0 {
+		if len(tpl.ServiceVersion) == 0 && len(tpl.CompDef) == 0 {
 			continue
 		}
 		compDef, serviceVersion, err = t.resolveCompDefinitionNServiceVersionWithTemplate(transCtx, compSpec, comp, &tpl)
@@ -353,7 +353,8 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4Component(transCtx 
 			return nil, err
 		}
 		compDefs = append(compDefs, compDef)
-		// set the serviceVersion as resolved
+		// set the componentDef and serviceVersion as resolved
+		compSpec.Instances[i].CompDef = compDef.Name
 		compSpec.Instances[i].ServiceVersion = serviceVersion
 	}
 	return compDefs, nil
@@ -386,19 +387,27 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 			}
 		}
 	}
-	if comp == nil || runningTpl == nil || t.checkTemplateUpgrade(compSpec, comp, protoTpl, runningTpl) {
-		return resolveCompDefinitionNServiceVersion(ctx, cli, compSpec.ComponentDef, protoTpl.ServiceVersion)
+
+	serviceVersion := compSpec.ServiceVersion
+	if len(protoTpl.ServiceVersion) > 0 {
+		serviceVersion = protoTpl.ServiceVersion
 	}
-	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, runningTpl.ServiceVersion)
+	compDefName := compSpec.ComponentDef
+	if len(protoTpl.CompDef) > 0 {
+		compDefName = protoTpl.CompDef
+	}
+	if comp == nil || runningTpl == nil || t.checkTemplateUpgrade(serviceVersion, compDefName, runningTpl) {
+		return resolveCompDefinitionNServiceVersion(ctx, cli, compDefName, serviceVersion)
+	}
+	return resolveCompDefinitionNServiceVersion(ctx, cli, runningTpl.CompDef, runningTpl.ServiceVersion)
 }
 
 func (t *clusterNormalizationTransformer) checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
 	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
 }
 
-func (t *clusterNormalizationTransformer) checkTemplateUpgrade(compSpec *appsv1.ClusterComponentSpec,
-	comp *appsv1.Component, protoTpl, runningTpl *appsv1.InstanceTemplate) bool {
-	return protoTpl.ServiceVersion != runningTpl.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
+func (t *clusterNormalizationTransformer) checkTemplateUpgrade(serviceVersion, compDefName string, runningTpl *appsv1.InstanceTemplate) bool {
+	return serviceVersion != runningTpl.ServiceVersion || compDefName != runningTpl.CompDef
 }
 
 func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, error) {

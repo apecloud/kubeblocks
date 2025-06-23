@@ -502,7 +502,7 @@ func buildInstancePVCByTemplate(name string, template *instancetemplate.Instance
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
 		if template.Name != "" {
-			pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = template.Name
+			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
 		}
 		pvcs = append(pvcs, pvc)
 	}

@@ -85,7 +85,6 @@ func (r *ShardingDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if err := r.validate(r.Client, reqCtx, shardingDef); err != nil {
-		fmt.Printf("error: %v\n", err)
 		if err1 := r.unavailable(reqCtx, shardingDef, err); err1 != nil {
 			return intctrlutil.CheckedRequeueWithError(err1, reqCtx.Log, "")
 		}

@@ -149,8 +149,6 @@ func (c *flatNameBuilder) Validate() error {
 //
 // template ordinals are assumed to be valid at this time
 func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
-	// initialize variables
-
 	// globalUsedOrdinalSet won't decrease, so that one ordinal couldn't suddenly change its template
 	globalUsedOrdinalSet := sets.New[int32]()
 	defaultTemplateUnavailableOrdinalSet := sets.New[int32]()
@@ -190,8 +188,6 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		globalUsedOrdinalSet.Insert(status.Ordinals...)
 	}
 
-	// main calculation
-
 	generateWithOrdinalsDefined := func(
 		current, available sets.Set[int32], instanceTemplate *workloads.InstanceTemplate,
 	) (sets.Set[int32], error) {
@@ -221,9 +217,10 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 				if cur >= len(availableWithoutCurrent) {
 					return current, ErrOrdinalsNotEnough
 				}
-				if !globalUsedOrdinalSet.Has(availableList[cur]) {
-					globalUsedOrdinalSet.Insert(availableList[cur])
-					current.Insert(availableList[cur])
+				ordinal := availableList[cur]
+				if !globalUsedOrdinalSet.Has(ordinal) || (!current.Has(ordinal) && template2OrdinalSetMap[""].Has(ordinal)) {
+					globalUsedOrdinalSet.Insert(ordinal)
+					current.Insert(ordinal)
 					break
 				}
 				cur++
@@ -269,6 +266,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 
 	// ordinals amount instance templates are guaranteed not to overlap
 	hasErrOrdinalsNotEnough := false
+	template2Ordinals := map[string]sets.Set[int32]{}
 	for _, instanceTemplate := range instanceTemplatesList {
 		currentOrdinalSet := template2OrdinalSetMap[instanceTemplate.Name]
 		availableOrdinalSet := convertOrdinalsToSet(instanceTemplate.Ordinals)
@@ -288,12 +286,12 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			}
 		}
 
-		template2OrdinalSetMap[instanceTemplate.Name] = currentOrdinalSet
+		template2Ordinals[instanceTemplate.Name] = currentOrdinalSet
 	}
 
 	var err error
 	if hasErrOrdinalsNotEnough {
 		err = ErrOrdinalsNotEnough
 	}
-	return template2OrdinalSetMap, err
+	return template2Ordinals, err
 }

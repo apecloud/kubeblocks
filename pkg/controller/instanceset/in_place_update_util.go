@@ -300,7 +300,10 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return NoOpsPolicy, err
 	}
 	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
-	templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
+	templateName, err := getTemplateNameByPod(itsExt, pod)
+	if err != nil {
+		return NoOpsPolicy, err
+	}
 	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
 		return templateName == templateExt.Name
 	})
@@ -331,6 +334,18 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return InPlaceUpdatePolicy, nil
 	}
 	return NoOpsPolicy, nil
+}
+
+func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.Pod) (string, error) {
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return "", err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return "", err
+	}
+	return nameToTemplateMap[pod.Name].Name, nil
 }
 
 // IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.

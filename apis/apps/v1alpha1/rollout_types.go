@@ -33,7 +33,7 @@ import (
 // +kubebuilder:resource:categories={kubeblocks}
 // +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="The target cluster to be rolled out."
 // +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.components[0].replicas",description="The replicas before rollout."
-// +kubebuilder:printcolumn:name="ROLLED-OUT",type="string",JSONPath=".status.components[0].rolledReplicas",description="The rolled out replicas."
+// +kubebuilder:printcolumn:name="ROLLED-OUT",type="string",JSONPath=".status.components[0].rolledOutReplicas",description="The rolled out replicas."
 // +kubebuilder:printcolumn:name="CANARY",type="string",JSONPath=".status.components[0].canaryReplicas",description="The canary replicas."
 // +kubebuilder:printcolumn:name="STATE",type="string",JSONPath=".status.state",description="The rollout state."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
@@ -136,10 +136,10 @@ type RolloutComponent struct {
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
 
-	// Additional metadata for the instances.
+	// Additional meta for the instances.
 	//
 	// +optional
-	Metadata *RolloutMetadata `json:"metadata,omitempty"`
+	InstanceMeta *RolloutInstanceMeta `json:"instanceMeta,omitempty"`
 }
 
 type RolloutStrategy struct {
@@ -187,6 +187,11 @@ type RolloutStrategyReplace struct {
 }
 
 type RolloutStrategyCreate struct {
+	// Whether to decorate the new instances as canary instances.
+	//
+	// +optional
+	Canary *bool `json:"canary,omitempty"`
+
 	// Specifies the scheduling policy for the new instance.
 	//
 	// +optional
@@ -196,13 +201,6 @@ type RolloutStrategyCreate struct {
 	//
 	// +optional
 	Promotion *RolloutPromotion `json:"promotion,omitempty"`
-}
-
-type RolloutPodSelector struct {
-	// +optional
-	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
-
-	// TODO: more selectors
 }
 
 type RolloutPromotion struct {
@@ -247,19 +245,19 @@ type RolloutPromoteCondition struct {
 	// TODO: variables can be used in the conditions.
 }
 
-type RolloutMetadata struct {
-	// Metadata added to the old instances.
-	//
-	// +optional
-	Stable *Metadata `json:"stable,omitempty"`
+type RolloutInstanceMeta struct {
+	//// Meta added to the old instances.
+	////
+	//// +optional
+	// Stable *InstanceMeta `json:"stable,omitempty"`
 
-	// Metadata added to the new instances.
+	// Meta added to the new instances.
 	//
 	// +optional
-	Canary *Metadata `json:"canary,omitempty"`
+	Canary *InstanceMeta `json:"canary,omitempty"`
 }
 
-type Metadata struct {
+type InstanceMeta struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
@@ -291,10 +289,15 @@ type RolloutComponentStatus struct {
 	// +kubebuilder:validation:Required
 	Replicas int32 `json:"replicas"`
 
+	// The new replicas the component has been created successfully.
+	//
+	// +optional
+	NewReplicas int32 `json:"newReplicas"`
+
 	// The replicas the component has been rolled out successfully.
 	//
 	// +optional
-	RolledReplicas int32 `json:"rolledReplicas"`
+	RolledOutReplicas int32 `json:"rolledOutReplicas"`
 
 	// The number of canary replicas the component has.
 	//
@@ -305,4 +308,14 @@ type RolloutComponentStatus struct {
 	//
 	// +optional
 	ScaleDownInstances []string `json:"scaleDownInstances,omitempty"`
+
+	// The last time a component replica was scaled up successfully.
+	//
+	// +optional
+	LastScaleUpTimestamp metav1.Time `json:"lastScaleUpTimestamp,omitempty"`
+
+	// The last time a component replica was scaled down successfully.
+	//
+	// +optional
+	LastScaleDownTimestamp metav1.Time `json:"lastScaleDownTimestamp,omitempty"`
 }

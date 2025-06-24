@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
-	"slices"
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -31,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type rolloutStatusTransformer struct{}
@@ -143,7 +145,8 @@ func (t *rolloutStatusTransformer) inplace(transCtx *rolloutTransformContext,
 		}
 		return appsv1alpha1.PendingRolloutState, nil
 	}
-	return "", nil // ???
+	return appsv1alpha1.ErrorRolloutState,
+		fmt.Errorf("neither the service version nor the component definition is defined, component: %s", comp.Name)
 }
 
 func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
@@ -168,16 +171,30 @@ func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,
 	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
 		return "", err
 	}
+
 	allPodCnt := int32(len(pods.Items))
-	newPodCnt := int32(len(slices.DeleteFunc(pods.Items, func(pod corev1.Pod) bool {
+	newPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
 		if pod.Labels != nil {
-			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] != tplName
+			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] == tplName
 		}
-		return true
-	})))
+		return false
+	}))
 	for i, status := range rollout.Status.Components {
 		if status.Name == comp.Name {
-			rollout.Status.Components[i].RolledReplicas = newPodCnt - (allPodCnt - status.Replicas)
+			if checkClusterNCompRunning(transCtx, comp.Name) {
+				newReplicas, rolledOutReplicas := newPodCnt, newPodCnt-(allPodCnt-status.Replicas)
+				if rolledOutReplicas == newReplicas {
+					if status.RolledOutReplicas < rolledOutReplicas {
+						rollout.Status.Components[i].LastScaleDownTimestamp = metav1.Now()
+					}
+				} else {
+					if status.NewReplicas < newReplicas {
+						rollout.Status.Components[i].LastScaleUpTimestamp = metav1.Now()
+					}
+				}
+				rollout.Status.Components[i].NewReplicas = newReplicas
+				rollout.Status.Components[i].RolledOutReplicas = rolledOutReplicas
+			}
 			break
 		}
 	}

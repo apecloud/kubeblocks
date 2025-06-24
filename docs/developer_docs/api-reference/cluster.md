@@ -23376,6 +23376,45 @@ ContainerVars
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceMeta">InstanceMeta
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">RolloutInstanceMeta</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
@@ -23895,45 +23934,6 @@ This field allows the system to locate and manage log files effectively.</p>
 </tr><tr><td><p>&#34;replace&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.Metadata">Metadata
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutMetadata">RolloutMetadata</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>labels</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>annotations</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.MonitorConfig">MonitorConfig
 </h3>
@@ -25605,16 +25605,16 @@ Kubernetes api utils intstr.IntOrString
 </tr>
 <tr>
 <td>
-<code>metadata</code><br/>
+<code>instanceMeta</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.RolloutMetadata">
-RolloutMetadata
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">
+RolloutInstanceMeta
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Additional metadata for the instances.</p>
+<p>Additional meta for the instances.</p>
 </td>
 </tr>
 </tbody>
@@ -25658,7 +25658,19 @@ int32
 </tr>
 <tr>
 <td>
-<code>rolledReplicas</code><br/>
+<code>newReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The new replicas the component has been created successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rolledOutReplicas</code><br/>
 <em>
 int32
 </em>
@@ -25692,9 +25704,37 @@ int32
 <p>The instances that are scaled down.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>lastScaleUpTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The last time a component replica was scaled up successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastScaleDownTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The last time a component replica was scaled down successfully.</p>
+</td>
+</tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RolloutMetadata">RolloutMetadata
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">RolloutInstanceMeta
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
@@ -25711,57 +25751,16 @@ int32
 <tbody>
 <tr>
 <td>
-<code>stable</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.Metadata">
-Metadata
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Metadata added to the old instances.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>canary</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.Metadata">
-Metadata
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceMeta">
+InstanceMeta
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Metadata added to the new instances.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPodSelector">RolloutPodSelector
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>labelSelector</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
-Kubernetes meta/v1.LabelSelector
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
+<p>Meta added to the new instances.</p>
 </td>
 </tr>
 </tbody>
@@ -26108,6 +26107,18 @@ RolloutStrategyCreate
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>canary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether to decorate the new instances as canary instances.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>schedulingPolicy</code><br/>

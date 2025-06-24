@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	clusterNotReadyRequeueDuration = time.Second * 10
+	componentNotReadyRequeueDuration = 10 * time.Second
+	infiniteDelayRequeueDuration     = 3600 * time.Second
 )
 
 type rolloutLoadTransformer struct{}

@@ -48,6 +48,26 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 		rollout     = transCtx.Rollout
 	)
 
+	// pre-check the rollout strategy
+	for _, comp := range rollout.Spec.Components {
+		cnt := 0
+		if comp.Strategy.Inplace != nil {
+			cnt++
+		}
+		if comp.Strategy.Replace != nil {
+			cnt++
+		}
+		if comp.Strategy.Create != nil {
+			cnt++
+		}
+		if cnt == 0 {
+			return fmt.Errorf("the rollout strategy of component %s is not defined", comp.Name)
+		}
+		if cnt > 1 {
+			return fmt.Errorf("more than one rollout strategy is defined for component %s", comp.Name)
+		}
+	}
+
 	// check and add the rollout label to the cluster
 	if cluster.Labels == nil {
 		cluster.Labels = make(map[string]string)

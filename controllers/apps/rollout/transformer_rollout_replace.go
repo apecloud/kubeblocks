@@ -23,9 +23,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,7 +98,7 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if !checkClusterNCompRunning(transCtx, comp.Name) {
-		return controllerutil.NewDelayedRequeueError(clusterNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
 	// update cluster spec after the cluster and component are ready
@@ -107,46 +109,100 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if spec.Replicas == replicas {
-		return t.up(transCtx, rollout, spec, tpl)
+		return t.up(transCtx, rollout, comp, spec, tpl)
 	} else {
-		return t.down(transCtx, rollout, spec, tpl)
+		return t.down(transCtx, rollout, comp, spec, tpl)
 	}
 }
 
 func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
-	rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	if err := t.checkDelaySeconds(rollout, comp, *tpl.Replicas, false); err != nil {
+		return err
+	}
 	tpl.Replicas = ptr.To(*tpl.Replicas + 1)
 	spec.Replicas += 1
 	return nil
 }
 
 func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
-	rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
+	if err := t.checkDelaySeconds(rollout, comp, *tpl.Replicas, true); err != nil {
+		return err
+	}
+
 	instance, instTpl, err := t.pickInstanceToScaleDown(transCtx, spec, tpl)
 	if err != nil {
 		return err
-	}
-	if len(instance) == 0 {
-		return fmt.Errorf("the component %s hasn't been successfully rolled out, but already no instances to scale down", spec.Name)
 	}
 
 	spec.Replicas -= 1
 	if instTpl != nil {
 		if instTpl.Replicas == nil || *instTpl.Replicas == 0 {
-			return fmt.Errorf("the instance template %s still has instances, but the replicas is 0", instTpl.Name)
+			return fmt.Errorf("the instance template %s still has running instances, but its replicas is already 0", instTpl.Name)
 		}
 		instTpl.Replicas = ptr.To(*instTpl.Replicas - 1)
 	}
-	spec.OfflineInstances = append(spec.OfflineInstances, instance)
+	if len(instance) > 0 {
+		spec.OfflineInstances = append(spec.OfflineInstances, instance)
+	}
 
 	// add the scale down instance to the rollout status
-	for i, status := range rollout.Status.Components {
-		if status.Name == spec.Name {
-			rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
-			break
+	if len(instance) > 0 {
+		for i, status := range rollout.Status.Components {
+			if status.Name == spec.Name {
+				rollout.Status.Components[i].ScaleDownInstances = append(rollout.Status.Components[i].ScaleDownInstances, instance)
+				break
+			}
 		}
 	}
 
+	return nil
+}
+
+func (t *rolloutReplaceTransformer) checkDelaySeconds(rollout *appsv1alpha1.Rollout,
+	comp appsv1alpha1.RolloutComponent, newReplicas int32, scaleDown bool) error {
+	delaySeconds := comp.Strategy.Replace.PerInstanceIntervalSeconds
+	if scaleDown {
+		delaySeconds = comp.Strategy.Replace.ScaleDownDelaySeconds
+	}
+	if delaySeconds == nil || *delaySeconds == 0 {
+		return nil
+	}
+	if *delaySeconds < 0 {
+		return controllerutil.NewDelayedRequeueError(infiniteDelayRequeueDuration, "infinite delay")
+	}
+
+	var lastSucceedTimestamp metav1.Time
+	for _, status := range rollout.Status.Components {
+		if status.Name == comp.Name {
+			if scaleDown {
+				if status.NewReplicas == newReplicas {
+					lastSucceedTimestamp = status.LastScaleUpTimestamp
+				} else {
+					return controllerutil.NewDelayedRequeueError(time.Second, "stale up status")
+				}
+			} else {
+				if status.RolledOutReplicas == newReplicas {
+					lastSucceedTimestamp = status.LastScaleDownTimestamp
+				} else {
+					return controllerutil.NewDelayedRequeueError(time.Second, "stale down status")
+				}
+			}
+			break
+		}
+	}
+	if lastSucceedTimestamp.IsZero() {
+		return nil
+	}
+
+	diff := time.Until(lastSucceedTimestamp.Add(time.Duration(*delaySeconds) * time.Second))
+	if diff > 0 {
+		if scaleDown {
+			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("delay to scale down for %s seconds", diff.String()))
+		}
+		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("delay to rollout next instance for %s seconds", diff.String()))
+	}
 	return nil
 }
 
@@ -251,6 +307,10 @@ func replaceInstanceTemplate(transCtx *rolloutTransformContext,
 			Tolerations:               policy.Tolerations,
 			TopologySpreadConstraints: policy.TopologySpreadConstraints,
 		}
+	}
+	if comp.InstanceMeta != nil && comp.InstanceMeta.Canary != nil {
+		tpl.Labels = comp.InstanceMeta.Canary.Labels
+		tpl.Annotations = comp.InstanceMeta.Canary.Annotations
 	}
 	return tpl, false, nil
 }

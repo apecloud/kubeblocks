@@ -27,7 +27,7 @@ spec:
       name: REPLICAS
       type: string
     - description: The rolled out replicas.
-      jsonPath: .status.components[0].rolledReplicas
+      jsonPath: .status.components[0].rolledOutReplicas
       name: ROLLED-OUT
       type: string
     - description: The canary replicas.
@@ -79,23 +79,11 @@ spec:
                         component.
                       maxLength: 64
                       type: string
-                    metadata:
-                      description: Additional metadata for the instances.
+                    instanceMeta:
+                      description: Additional meta for the instances.
                       properties:
                         canary:
-                          description: Metadata added to the new instances.
-                          properties:
-                            annotations:
-                              additionalProperties:
-                                type: string
-                              type: object
-                            labels:
-                              additionalProperties:
-                                type: string
-                              type: object
-                          type: object
-                        stable:
-                          description: Metadata added to the old instances.
+                          description: Meta added to the new instances.
                           properties:
                             annotations:
                               additionalProperties:
@@ -133,6 +121,10 @@ spec:
 
                             If specified, the rollout will be performed by creating new instances.
                           properties:
+                            canary:
+                              description: Whether to decorate the new instances as
+                                canary instances.
+                              type: boolean
                             promotion:
                               description: Specifies the promotion strategy for the
                                 component.
@@ -3152,14 +3144,29 @@ spec:
                       description: The number of canary replicas the component has.
                       format: int32
                       type: integer
+                    lastScaleDownTimestamp:
+                      description: The last time a component replica was scaled down
+                        successfully.
+                      format: date-time
+                      type: string
+                    lastScaleUpTimestamp:
+                      description: The last time a component replica was scaled up
+                        successfully.
+                      format: date-time
+                      type: string
                     name:
                       description: The name of the component.
                       type: string
+                    newReplicas:
+                      description: The new replicas the component has been created
+                        successfully.
+                      format: int32
+                      type: integer
                     replicas:
                       description: The replicas the component has before the rollout.
                       format: int32
                       type: integer
-                    rolledReplicas:
+                    rolledOutReplicas:
                       description: The replicas the component has been rolled out
                         successfully.
                       format: int32

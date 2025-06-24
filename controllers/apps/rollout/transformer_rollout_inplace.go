@@ -79,7 +79,7 @@ func (t *rolloutInplaceTransformer) component(transCtx *rolloutTransformContext,
 	}
 
 	if !checkClusterNCompRunning(transCtx, comp.Name) {
-		return controllerutil.NewDelayedRequeueError(clusterNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
 	if len(comp.ServiceVersion) > 0 && comp.ServiceVersion != spec.ServiceVersion {

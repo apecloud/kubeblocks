@@ -2873,7 +2873,7 @@ If set to true, a separate Service will be created for each Pod in the Cluster.<
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>)
 </p>
 <div>
 <p>ClusterComponentSpec defines the specification of a Component within a Cluster.</p>
@@ -3725,25 +3725,6 @@ string
 </tr>
 <tr>
 <td>
-<code>template</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
-ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>The template for generating Components for shards, where each shard consists of one Component.</p>
-<p>This field is of type ClusterComponentSpec, which encapsulates all the required details and
-definitions for creating and managing the Components.
-KubeBlocks uses this template to generate a set of identical Components of shards.
-All the generated Components will have the same specifications and definitions as specified in the <code>template</code> field.</p>
-<p>This allows for the creation of multiple Components with consistent configurations,
-enabling sharding and distribution of workloads across Components.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>shards</code><br/>
 <em>
 int32
@@ -3762,6 +3743,41 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
+ClusterComponentSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The default template for generating Components for shards, where each shard consists of one Component.</p>
+<p>This field is of type ClusterComponentSpec, which encapsulates all the required details and
+definitions for creating and managing the Components.
+KubeBlocks uses this template to generate a set of identical Components of shards.
+All the generated Components will have the same specifications and definitions as specified in the <code>template</code> field.</p>
+<p>This allows for the creation of multiple Components with consistent configurations,
+enabling sharding and distribution of workloads across Components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardTemplate">
+[]ShardTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of heterogeneous shard templates, allowing different groups of shards
+to be created with distinct configurations.</p>
 </td>
 </tr>
 <tr>
@@ -11120,6 +11136,73 @@ NamedVar
 <p>Port references a port or node-port defined in the service.</p>
 <p>If the referenced service is a pod-service, there will be multiple service objects matched,
 and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The unique name of this ShardTemplate.</p>
+<p>The name can&rsquo;t be empty.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ShardingDefinition custom resource (CR) that defines the sharding&rsquo;s characteristics and behavior.</p>
+<p>The full name or regular expression is supported to match the ShardingDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>Shards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of shards to create from this ShardTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
+ClusterComponentSpec
+</a>
+</em>
+</td>
+<td>
+<p>The template for generating shards from this ShardTemplate.</p>
 </td>
 </tr>
 </tbody>

@@ -81,6 +81,7 @@ func LoadRegistryConfig() error {
 	if err := viper.UnmarshalKey(constant.CfgRegistries, &newRegistriesConfig); err != nil {
 		return err
 	}
+
 	for _, registry := range registriesConfigInstance.RegistryConfig {
 		if len(registry.From) == 0 {
 			return errors.New("registries config invalid: from can't be empty")

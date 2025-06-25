@@ -226,6 +226,24 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	return restore, nil
 }
 
+func (r *RestoreManager) getConnectionCredential(comp *component.SynthesizedComponent) *dpv1alpha1.ConnectionCredential {
+	if len(comp.SystemAccounts) == 0 {
+		return nil
+	}
+	accountName := comp.SystemAccounts[0].Name
+	for _, account := range comp.SystemAccounts {
+		if account.InitAccount {
+			accountName = account.Name
+			break
+		}
+	}
+	return &dpv1alpha1.ConnectionCredential{
+		SecretName:  constant.GenerateAccountSecretName(r.Cluster.Name, comp.Name, accountName),
+		PasswordKey: constant.AccountPasswdForSecret,
+		UsernameKey: constant.AccountNameForSecret,
+	}
+}
+
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {
@@ -272,6 +290,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 						},
 					},
 				},
+				ConnectionCredential: r.getConnectionCredential(comp),
 			},
 		},
 	}

@@ -118,13 +118,13 @@ type RolloutComponent struct {
 	//
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
-	ServiceVersion string `json:"serviceVersion,omitempty"`
+	ServiceVersion *string `json:"serviceVersion,omitempty"`
 
 	// Specifies the target ComponentDefinition of the component.
 	//
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
-	CompDef string `json:"compDef,omitempty"`
+	CompDef *string `json:"compDef,omitempty"`
 
 	// Specifies the rollout strategy for the component.
 	//
@@ -283,6 +283,16 @@ type RolloutComponentStatus struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// The ServiceVersion of the component before the rollout.
+	//
+	// +kubebuilder:validation:Required
+	ServiceVersion string `json:"serviceVersion"`
+
+	// The ComponentDefinition of the component before the rollout.
+	//
+	// +kubebuilder:validation:Required
+	CompDef string `json:"compDef"`
 
 	// The replicas the component has before the rollout.
 	//

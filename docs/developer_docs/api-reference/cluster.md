@@ -7935,6 +7935,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the name of the referenced ComponentDefinition.</p>
 </td>
 </tr>
@@ -25643,6 +25644,28 @@ string
 </td>
 <td>
 <p>The name of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ServiceVersion of the component before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ComponentDefinition of the component before the rollout.</p>
 </td>
 </tr>
 <tr>

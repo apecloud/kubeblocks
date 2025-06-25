@@ -62,13 +62,13 @@ func (factory *MockRolloutFactory) updateLastComponent(update updateRollComponen
 
 func (factory *MockRolloutFactory) SetServiceVersion(serviceVersion string) *MockRolloutFactory {
 	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
-		comp.ServiceVersion = serviceVersion
+		comp.ServiceVersion = ptr.To(serviceVersion)
 	})
 }
 
 func (factory *MockRolloutFactory) SetCompDef(compDef string) *MockRolloutFactory {
 	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
-		comp.CompDef = compDef
+		comp.CompDef = ptr.To(compDef)
 	})
 }
 

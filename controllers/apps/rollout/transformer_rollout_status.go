@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
-	"fmt"
-	"strings"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -126,27 +123,15 @@ func (t *rolloutStatusTransformer) component(transCtx *rolloutTransformContext,
 
 func (t *rolloutStatusTransformer) inplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
-	succeed := func() appsv1alpha1.RolloutState {
-		if checkClusterNCompRunning(transCtx, comp.Name) {
-			return appsv1alpha1.SucceedRolloutState
-		}
-		return appsv1alpha1.RollingRolloutState
-	}
 	spec := t.compSpec(transCtx, comp.Name)
-	if len(comp.ServiceVersion) > 0 {
-		if comp.ServiceVersion == spec.ServiceVersion {
-			return succeed(), nil
-		}
+	serviceVersion, compDef := serviceVersionNCompDef(rollout, comp, spec)
+	if serviceVersion == spec.ServiceVersion && compDef == spec.ComponentDef {
 		return appsv1alpha1.PendingRolloutState, nil
 	}
-	if len(comp.CompDef) > 0 {
-		if strings.HasPrefix(spec.ComponentDef, comp.CompDef) { // TODO: comp-def match
-			return succeed(), nil
-		}
-		return appsv1alpha1.PendingRolloutState, nil
+	if checkClusterNCompRunning(transCtx, comp.Name) {
+		return appsv1alpha1.SucceedRolloutState, nil
 	}
-	return appsv1alpha1.ErrorRolloutState,
-		fmt.Errorf("neither the service version nor the component definition is defined, component: %s", comp.Name)
+	return appsv1alpha1.RollingRolloutState, nil
 }
 
 func (t *rolloutStatusTransformer) replace(transCtx *rolloutTransformContext,

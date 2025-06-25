@@ -21,11 +21,11 @@ package rollout
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -78,17 +78,34 @@ func (t *rolloutInplaceTransformer) component(transCtx *rolloutTransformContext,
 		return fmt.Errorf("partially rollout with the inplace strategy not supported, component: %s", comp.Name)
 	}
 
+	serviceVersion, compDef := serviceVersionNCompDef(transCtx.Rollout, comp, spec)
+	if serviceVersion != spec.ServiceVersion || compDef != spec.ComponentDef {
+		return nil
+	}
+	// TODO: how about the target service version and component definition are same with the original ones?
+
 	if !checkClusterNCompRunning(transCtx, comp.Name) {
 		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
-	if len(comp.ServiceVersion) > 0 && comp.ServiceVersion != spec.ServiceVersion {
-		spec.ServiceVersion = comp.ServiceVersion
-		spec.ComponentDef = comp.CompDef
+	if comp.ServiceVersion != nil {
+		spec.ServiceVersion = *comp.ServiceVersion
 	}
-	// the case that only upgrade the component definition
-	if len(comp.CompDef) > 0 && !strings.HasPrefix(spec.ComponentDef, comp.CompDef) { // TODO: comp-def match
-		spec.ComponentDef = comp.CompDef
+	if comp.CompDef != nil {
+		spec.ComponentDef = *comp.CompDef
 	}
 	return nil
+}
+
+// serviceVersionNCompDef obtains the original service version and component definition.
+func serviceVersionNCompDef(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (string, string) {
+	serviceVer, compDef := spec.ServiceVersion, spec.ComponentDef
+	for _, status := range rollout.Status.Components {
+		if status.Name == comp.Name {
+			serviceVer = status.ServiceVersion
+			compDef = status.CompDef
+			break
+		}
+	}
+	return serviceVer, compDef
 }

@@ -140,11 +140,15 @@ func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformCo
 		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
 	}
 	tpl := appsv1.InstanceTemplate{
-		Name:           name,
-		ServiceVersion: comp.ServiceVersion,
-		CompDef:        comp.CompDef,
-		Canary:         comp.Strategy.Create.Canary,
-		Replicas:       ptr.To[int32](0),
+		Name:     name,
+		Canary:   comp.Strategy.Create.Canary,
+		Replicas: ptr.To[int32](0),
+	}
+	if comp.ServiceVersion != nil {
+		tpl.ServiceVersion = *comp.ServiceVersion
+	}
+	if comp.CompDef != nil {
+		tpl.CompDef = *comp.CompDef
 	}
 	if comp.InstanceMeta != nil && comp.InstanceMeta.Canary != nil {
 		tpl.Labels = comp.InstanceMeta.Canary.Labels

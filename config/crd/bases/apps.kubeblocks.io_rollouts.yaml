@@ -3144,6 +3144,10 @@ spec:
                       description: The number of canary replicas the component has.
                       format: int32
                       type: integer
+                    compDef:
+                      description: The ComponentDefinition of the component before
+                        the rollout.
+                      type: string
                     lastScaleDownTimestamp:
                       description: The last time a component replica was scaled down
                         successfully.
@@ -3176,9 +3180,15 @@ spec:
                       items:
                         type: string
                       type: array
+                    serviceVersion:
+                      description: The ServiceVersion of the component before the
+                        rollout.
+                      type: string
                   required:
+                  - compDef
                   - name
                   - replicas
+                  - serviceVersion
                   type: object
                 type: array
               conditions:

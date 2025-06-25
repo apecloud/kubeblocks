@@ -292,10 +292,14 @@ func replaceInstanceTemplate(transCtx *rolloutTransformContext,
 		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
 	tpl := &appsv1.InstanceTemplate{
-		Name:           name,
-		ServiceVersion: comp.ServiceVersion,
-		CompDef:        comp.CompDef,
-		Replicas:       ptr.To[int32](0),
+		Name:     name,
+		Replicas: ptr.To[int32](0),
+	}
+	if comp.ServiceVersion != nil {
+		tpl.ServiceVersion = *comp.ServiceVersion
+	}
+	if comp.CompDef != nil {
+		tpl.CompDef = *comp.CompDef
 	}
 	if comp.Strategy.Replace.SchedulingPolicy != nil {
 		policy := comp.Strategy.Replace.SchedulingPolicy

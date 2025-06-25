@@ -43,32 +43,56 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 
 	var (
-		graphCli = transCtx.Client.(model.GraphClient)
-		cluster  = transCtx.Cluster
-		rollout  = transCtx.Rollout
+		rollout = transCtx.Rollout
 	)
 
-	// pre-check the rollout strategy
+	// pre-check
 	for _, comp := range rollout.Spec.Components {
-		cnt := 0
-		if comp.Strategy.Inplace != nil {
-			cnt++
-		}
-		if comp.Strategy.Replace != nil {
-			cnt++
-		}
-		if comp.Strategy.Create != nil {
-			cnt++
-		}
-		if cnt == 0 {
-			return fmt.Errorf("the rollout strategy of component %s is not defined", comp.Name)
-		}
-		if cnt > 1 {
-			return fmt.Errorf("more than one rollout strategy is defined for component %s", comp.Name)
+		if err := t.precheck(comp); err != nil {
+			return err
 		}
 	}
 
 	// check and add the rollout label to the cluster
+	if err := t.patchClusterLabel(transCtx, dag, rollout); err != nil {
+		return err
+	}
+
+	// init the rollout component status
+	return t.initRolloutStatus(transCtx, dag, rollout)
+}
+
+func (t *rolloutSetupTransformer) precheck(comp appsv1alpha1.RolloutComponent) error {
+	// target serviceVersion & componentDef
+	if comp.ServiceVersion == nil && comp.CompDef == nil {
+		return fmt.Errorf("neither serviceVersion nor compDef is defined for component %s", comp.Name)
+	}
+
+	// rollout strategy
+	cnt := 0
+	if comp.Strategy.Inplace != nil {
+		cnt++
+	}
+	if comp.Strategy.Replace != nil {
+		cnt++
+	}
+	if comp.Strategy.Create != nil {
+		cnt++
+	}
+	if cnt == 0 {
+		return fmt.Errorf("the rollout strategy of component %s is not defined", comp.Name)
+	}
+	if cnt > 1 {
+		return fmt.Errorf("more than one rollout strategy is defined for component %s", comp.Name)
+	}
+	return nil
+}
+
+func (t *rolloutSetupTransformer) patchClusterLabel(transCtx *rolloutTransformContext, dag *graph.DAG, rollout *appsv1alpha1.Rollout) error {
+	var (
+		graphCli = transCtx.Client.(model.GraphClient)
+		cluster  = transCtx.Cluster
+	)
 	if cluster.Labels == nil {
 		cluster.Labels = make(map[string]string)
 	}
@@ -87,10 +111,15 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 		graphCli.Update(dag, transCtx.ClusterOrig, cluster)
 		return graph.ErrPrematureStop
 	}
+	return nil
+}
 
-	// init the rollout component status
+func (t *rolloutSetupTransformer) initRolloutStatus(transCtx *rolloutTransformContext, dag *graph.DAG, rollout *appsv1alpha1.Rollout) error {
+	var (
+		graphCli = transCtx.Client.(model.GraphClient)
+	)
 	for _, comp := range rollout.Spec.Components {
-		if err := t.component(transCtx, rollout, comp); err != nil {
+		if err := t.initCompStatus(transCtx, rollout, comp); err != nil {
 			return err
 		}
 	}
@@ -101,7 +130,7 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func (t *rolloutSetupTransformer) component(transCtx *rolloutTransformContext,
+func (t *rolloutSetupTransformer) initCompStatus(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
 	if spec == nil {
@@ -113,8 +142,10 @@ func (t *rolloutSetupTransformer) component(transCtx *rolloutTransformContext,
 		}
 	}
 	rollout.Status.Components = append(rollout.Status.Components, appsv1alpha1.RolloutComponentStatus{
-		Name:     comp.Name,
-		Replicas: spec.Replicas,
+		Name:           comp.Name,
+		ServiceVersion: spec.ServiceVersion,
+		CompDef:        spec.ComponentDef,
+		Replicas:       spec.Replicas,
 	})
 	return nil
 }

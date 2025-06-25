@@ -57,6 +57,17 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - delete
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

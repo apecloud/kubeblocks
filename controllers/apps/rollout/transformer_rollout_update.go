@@ -31,13 +31,13 @@ type rolloutUpdateTransformer struct{}
 var _ graph.Transformer = &rolloutUpdateTransformer{}
 
 func (t *rolloutUpdateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 
 	if !reflect.DeepEqual(transCtx.ClusterOrig.Spec, transCtx.Cluster.Spec) {
-		graphCli, _ := transCtx.Client.(model.GraphClient)
+		graphCli := transCtx.Client.(model.GraphClient)
 		graphCli.Update(dag, transCtx.ClusterOrig, transCtx.Cluster)
 	}
 

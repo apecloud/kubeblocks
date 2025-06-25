@@ -37,15 +37,15 @@ type rolloutSetupTransformer struct{}
 var _ graph.Transformer = &rolloutSetupTransformer{}
 
 func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}
 
 	var (
-		graphCli, _ = transCtx.Client.(model.GraphClient)
-		cluster     = transCtx.Cluster
-		rollout     = transCtx.Rollout
+		graphCli = transCtx.Client.(model.GraphClient)
+		cluster  = transCtx.Cluster
+		rollout  = transCtx.Rollout
 	)
 
 	// pre-check the rollout strategy

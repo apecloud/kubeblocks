@@ -29,7 +29,7 @@ type rolloutInitTransformer struct{}
 var _ graph.Transformer = &rolloutInitTransformer{}
 
 func (t *rolloutInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 
 	root := &model.ObjectVertex{Obj: transCtx.Rollout, OriObj: transCtx.RolloutOrig, Action: model.ActionStatusPtr()}
 	dag.AddVertex(root)

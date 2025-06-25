@@ -32,7 +32,7 @@ type rolloutTearDownTransformer struct{}
 var _ graph.Transformer = &rolloutTearDownTransformer{}
 
 func (t *rolloutTearDownTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}

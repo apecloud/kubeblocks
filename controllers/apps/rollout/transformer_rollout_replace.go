@@ -45,7 +45,7 @@ type rolloutReplaceTransformer struct{}
 var _ graph.Transformer = &rolloutReplaceTransformer{}
 
 func (t *rolloutReplaceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 	if model.IsObjectDeleting(transCtx.RolloutOrig) || isRolloutSucceed(transCtx.RolloutOrig) {
 		return nil
 	}

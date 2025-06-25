@@ -35,7 +35,7 @@ type rolloutDeletionTransformer struct{}
 var _ graph.Transformer = &rolloutDeletionTransformer{}
 
 func (t *rolloutDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 	if !model.IsObjectDeleting(transCtx.RolloutOrig) {
 		return nil
 	}

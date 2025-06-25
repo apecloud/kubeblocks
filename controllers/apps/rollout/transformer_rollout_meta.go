@@ -34,7 +34,7 @@ type rolloutMetaTransformer struct{}
 var _ graph.Transformer = &rolloutMetaTransformer{}
 
 func (t *rolloutMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*rolloutTransformContext)
+	transCtx := ctx.(*rolloutTransformContext)
 	rollout := transCtx.Rollout
 
 	controllerutil.AddFinalizer(rollout, constant.RolloutFinalizerName)
@@ -43,7 +43,7 @@ func (t *rolloutMetaTransformer) Transform(ctx graph.TransformContext, dag *grap
 		return nil
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
+	graphCli := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, transCtx.RolloutOrig, rollout)
 
 	return graph.ErrPrematureStop

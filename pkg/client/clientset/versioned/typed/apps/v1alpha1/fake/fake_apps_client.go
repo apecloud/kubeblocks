@@ -52,6 +52,10 @@ func (c *FakeAppsV1alpha1) ConfigConstraints() v1alpha1.ConfigConstraintInterfac
 	return &FakeConfigConstraints{c}
 }
 
+func (c *FakeAppsV1alpha1) Rollouts(namespace string) v1alpha1.RolloutInterface {
+	return &FakeRollouts{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) ServiceDescriptors(namespace string) v1alpha1.ServiceDescriptorInterface {
 	return &FakeServiceDescriptors{c, namespace}
 }

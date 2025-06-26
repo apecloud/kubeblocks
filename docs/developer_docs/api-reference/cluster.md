@@ -2282,7 +2282,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -7935,6 +7935,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the name of the referenced ComponentDefinition.</p>
 </td>
 </tr>
@@ -12502,6 +12503,8 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Configuration">Configuration</a>
 </li><li>
+<a href="#apps.kubeblocks.io/v1alpha1.Rollout">Rollout</a>
+</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ServiceDescriptor">ServiceDescriptor</a>
 </li></ul>
 <h3 id="apps.kubeblocks.io/v1alpha1.Cluster">Cluster
@@ -14841,6 +14844,105 @@ Each configuration file is stored as a key-value pair within the ConfigMap.</p>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ConfigurationStatus">
 ConfigurationStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.Rollout">Rollout
+</h3>
+<div>
+<p>Rollout is the Schema for the rollouts API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>Rollout</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutSpec">
+RolloutSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tbody>
+<tr>
+<td>
+<code>clusterName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the target cluster of the Rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">
+[]RolloutComponent
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target components to be rolled out.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutStatus">
+RolloutStatus
 </a>
 </em>
 </td>
@@ -23288,6 +23390,45 @@ ContainerVars
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.InstanceMeta">InstanceMeta
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">RolloutInstanceMeta</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
@@ -25399,10 +25540,717 @@ Default to 10 seconds. Minimum value is 1.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutSpec">RolloutSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target ServiceVersion of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target ComponentDefinition of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>strategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategy">
+RolloutStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the rollout strategy for the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of instances to be rolled out.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceMeta</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">
+RolloutInstanceMeta
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Additional meta for the instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutComponentStatus">RolloutComponentStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ServiceVersion of the component before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ComponentDefinition of the component before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The replicas the component has before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>newReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The new replicas the component has been created successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rolledOutReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The replicas the component has been rolled out successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>canaryReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of canary replicas the component has.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The instances that are scaled down.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastScaleUpTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The last time a component replica was scaled up successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastScaleDownTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The last time a component replica was scaled down successfully.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">RolloutInstanceMeta
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>canary</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.InstanceMeta">
+InstanceMeta
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Meta added to the new instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">RolloutPromotion</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>prev</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The condition before promoting the new instances.</p>
+<p>If specified, the new instances will be promoted only when the condition is met.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>post</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The condition after promoting the new instances successfully.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutPromotion">RolloutPromotion
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyCreate">RolloutStrategyCreate</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>auto</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to automatically promote the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>delaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The delay seconds before promoting the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>condition</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">
+RolloutPromoteCondition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The condition for promoting the new instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The delay seconds before scaling down the old instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutSpec">RolloutSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Rollout">Rollout</a>)
+</p>
+<div>
+<p>RolloutSpec defines the desired state of Rollout</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>clusterName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the target cluster of the Rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">
+[]RolloutComponent
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target components to be rolled out.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutState">RolloutState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus</a>)
+</p>
+<div>
+<p>RolloutState defines the state of the Rollout within the .status.state field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Error&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Rolling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Succeed&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Rollout">Rollout</a>)
+</p>
+<div>
+<p>RolloutStatus defines the observed state of Rollout</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The most recent generation number of the Rollout object that has been observed by the controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutState">
+RolloutState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The current state of the Rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a list of detailed status of the Rollout object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>components</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutComponentStatus">
+[]RolloutComponentStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the status information of all components within the Rollout.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutStrategy">RolloutStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>inplace</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyInplace">
+RolloutStrategyInplace
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>In-place rollout strategy.</p>
+<p>If specified, the rollout will be performed in-place (delete and then create).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replace</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyReplace">
+RolloutStrategyReplace
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Replace rollout strategy.</p>
+<p>If specified, the rollout will be performed by replacing the old instances with new instances one by one (create and then delete).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>create</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyCreate">
+RolloutStrategyCreate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Create rollout strategy.</p>
+<p>If specified, the rollout will be performed by creating new instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutStrategyCreate">RolloutStrategyCreate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategy">RolloutStrategy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>canary</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether to decorate the new instances as canary instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the new instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>promotion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutPromotion">
+RolloutPromotion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the promotion strategy for the component.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutStrategyInplace">RolloutStrategyInplace
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategy">RolloutStrategy</a>)
+</p>
+<div>
+</div>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutStrategyReplace">RolloutStrategyReplace
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategy">RolloutStrategy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the new instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>perInstanceIntervalSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of seconds to wait between rolling out two instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownDelaySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of seconds to wait before scaling down an old instance, after the new instance becomes ready.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyCreate">RolloutStrategyCreate</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategyReplace">RolloutStrategyReplace</a>)
 </p>
 <div>
 </div>

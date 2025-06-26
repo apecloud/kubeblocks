@@ -764,6 +764,7 @@ type InstanceTemplate struct {
 	// Specifies the name of the referenced ComponentDefinition.
 	//
 	// +kubebuilder:validation:MaxLength=64
+	// +optional
 	CompDef string `json:"compDef,omitempty"`
 
 	// Indicate whether the instances belonging to this template are canary instances.

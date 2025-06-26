@@ -22,20 +22,17 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
-
-type ValueTransformer interface {
-	transformValue(value string, schema string) (any, error)
-}
 
 type defaultValueTransformer struct {
 	flattenedSchema apiextv1.JSONSchemaProps
 }
 
-func (d *defaultValueTransformer) transformValue(value string, key string) (any, error) {
-	schema, ok := FindParameterSchema(d.flattenedSchema.Properties, key)
+func (d *defaultValueTransformer) resolveValueWithType(value string, fieldName string) (any, error) {
+	schema, ok := FindParameterSchema(d.flattenedSchema.Properties, fieldName)
 	if !ok {
 		return value, nil
 	}
@@ -56,7 +53,7 @@ type valueManager struct {
 	formatConfigs map[string]parametersv1alpha1.FileFormatConfig
 }
 
-func (v *valueManager) buildValueTransformer(key string) func(value string, schema string) (any, error) {
+func (v *valueManager) buildValueTransformer(key string) core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
 	if format, ok := v.formatConfigs[key]; !ok || format.Format != parametersv1alpha1.JSON {
 		return nil
@@ -71,11 +68,11 @@ func (v *valueManager) buildValueTransformer(key string) func(value string, sche
 	if _, ok := schema.Properties[openapi.DefaultSchemaName]; !ok {
 		return nil
 	}
-	transformer := &defaultValueTransformer{
-		flattenedSchema: openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]),
+	defaultTransformer := &defaultValueTransformer{
+		openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]),
 	}
-	return func(value string, schema string) (any, error) {
-		return transformer.transformValue(value, schema)
+	return func(value string, fieldName string) (any, error) {
+		return defaultTransformer.resolveValueWithType(value, fieldName)
 	}
 }
 

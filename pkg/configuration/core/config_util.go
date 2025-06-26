@@ -71,7 +71,7 @@ func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 }
 
 // FromStringMap converts a map[string]string to a map[string]interface{}
-func FromStringMap(m map[string]*string, valueTransformer func(string, string) (any, error)) (map[string]interface{}, error) {
+func FromStringMap(m map[string]*string, valueTransformer ValueTransformer) (map[string]interface{}, error) {
 	result := make(map[string]interface{}, len(m))
 	for key, v := range m {
 		switch {
@@ -88,11 +88,11 @@ func FromStringMap(m map[string]*string, valueTransformer func(string, string) (
 	return result, nil
 }
 
-func wrapValue(result map[string]interface{}, paramValue string, paramName string, valueTransformer func(string, string) (any, error)) error {
+func wrapValue(result map[string]interface{}, paramValue string, paramName string, transformer ValueTransformer) error {
 	value := interface{}(paramValue)
 
-	if valueTransformer != nil {
-		transformedValue, err := valueTransformer(paramValue, paramName)
+	if transformer != nil {
+		transformedValue, err := transformer.TransformValue(paramValue, paramName)
 		if err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ func FromStringPointerMap(m map[string]string) map[string]*string {
 func ApplyConfigPatch(baseCfg []byte,
 	updatedParameters map[string]*string,
 	formatConfig *parametersv1alpha1.FileFormatConfig,
-	valueTransformer func(string, string) (any, error),
+	valueTransformer ValueTransformer,
 ) (string, error) {
 	configLoaderOption := CfgOption{
 		Type:    CfgRawType,

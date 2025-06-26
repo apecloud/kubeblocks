@@ -88,7 +88,7 @@ func FromStringMap(m map[string]*string, valueTransformer func(string, string) (
 	return result, nil
 }
 
-func wrapValue(r map[string]interface{}, paramValue string, paramName string, valueTransformer func(string, string) (any, error)) error {
+func wrapValue(result map[string]interface{}, paramValue string, paramName string, valueTransformer func(string, string) (any, error)) error {
 	value := interface{}(paramValue)
 
 	if valueTransformer != nil {
@@ -99,7 +99,7 @@ func wrapValue(r map[string]interface{}, paramValue string, paramName string, va
 		value = transformedValue
 	}
 
-	r[paramName] = value
+	result[paramName] = value
 	return nil
 }
 

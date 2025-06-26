@@ -22,7 +22,6 @@ package component
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/exp/maps"
@@ -219,23 +218,10 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 		password = []byte(factory.GetRestorePassword(ctx.SynthesizeComponent))
 	}
 	if len(password) == 0 {
-		return t.generatePassword(account), nil
+		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+		return []byte(password), err
 	}
 	return password, nil
-}
-
-func (t *componentAccountTransformer) generatePassword(account synthesizedSystemAccount) []byte {
-	config := account.PasswordGenerationPolicy
-	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed)
-	switch config.LetterCase {
-	case appsv1.UpperCases:
-		passwd = strings.ToUpper(passwd)
-	case appsv1.LowerCases:
-		passwd = strings.ToLower(passwd)
-	case appsv1.MixedCases:
-		passwd, _ = common.EnsureMixedCase(passwd, config.Seed)
-	}
-	return []byte(passwd)
 }
 
 func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext,

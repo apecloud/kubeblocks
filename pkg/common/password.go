@@ -23,15 +23,18 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	mathrand "math/rand"
+	"strings"
 	"time"
 	"unicode"
 
 	"github.com/sethvargo/go-password/password"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
-	// Symbols is the list of symbols.
-	Symbols = "!@#&*"
+	// DefaultSymbols is the list of default symbols to generate password.
+	DefaultSymbols = "!@#&*"
 )
 
 type PasswordReader struct {
@@ -46,17 +49,36 @@ func (r *PasswordReader) Seed(seed int64) {
 	r.rand.Seed(seed)
 }
 
+func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
+	passwd, err := GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
+	if err != nil {
+		return "", err
+	}
+	switch config.LetterCase {
+	case appsv1.UpperCases:
+		passwd = strings.ToUpper(passwd)
+	case appsv1.LowerCases:
+		passwd = strings.ToLower(passwd)
+	case appsv1.MixedCases:
+		passwd, err = EnsureMixedCase(passwd, config.Seed)
+	}
+	return passwd, err
+}
+
 // GeneratePassword generates a password with the given requirements and seed in lowercase.
-func GeneratePassword(length, numDigits, numSymbols int, seed string) (string, error) {
+func GeneratePassword(length, numDigits, numSymbols int, seed string, symbols string) (string, error) {
 	rand, err := newRngFromSeed(seed)
 	if err != nil {
 		return "", err
 	}
 	passwordReader := &PasswordReader{rand: rand}
+	if symbols == "" {
+		symbols = DefaultSymbols
+	}
 	gen, err := password.NewGenerator(&password.GeneratorInput{
 		LowerLetters: password.LowerLetters,
 		UpperLetters: password.UpperLetters,
-		Symbols:      Symbols,
+		Symbols:      symbols,
 		Digits:       password.Digits,
 		Reader:       passwordReader,
 	})
@@ -67,7 +89,8 @@ func GeneratePassword(length, numDigits, numSymbols int, seed string) (string, e
 }
 
 // EnsureMixedCase randomizes the letter casing in the given string, ensuring
-// that the result contains at least one uppercase and one lowercase letter
+// that the result contains at least one uppercase and one lowercase letter.
+// If the give string only has one letter, it is returned unmodified.
 func EnsureMixedCase(in, seed string) (string, error) {
 	runes := []rune(in)
 	letterIndices := make([]int, 0, len(runes))

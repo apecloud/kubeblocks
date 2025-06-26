@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package controllerutil
+package sharding
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -31,8 +31,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("cluster utils test", func() {
-
+var _ = Describe("cluster shard component", func() {
 	// Cleanups
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -50,13 +49,12 @@ var _ = Describe("cluster utils test", func() {
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
 	}
 
-	Context("cluster utils test", func() {
+	Context("cluster shard component", func() {
 		const (
 			compDefName           = "test-compdef"
-			clusterName           = "test-cls"
+			clusterName           = "test-cluster"
 			mysqlCompName         = "mysql"
 			mysqlShardingName     = "mysql-sharding"
 			mysqlShardingCompName = "mysql-sharding-comp"
@@ -74,20 +72,11 @@ var _ = Describe("cluster utils test", func() {
 				SetUID(clusterName).
 				AddComponent(mysqlCompName, compDefName).
 				AddSharding(mysqlShardingName, "", compDefName).
-				SetShards(0).
+				SetShards(1).
 				Create(&testCtx).GetObject()
 		})
 
-		It("get original or generated cluster component spec test", func() {
-			compSpec, err := GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlCompName)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(compSpec).ShouldNot(BeNil())
-			Expect(compSpec.Name).Should(Equal(mysqlCompName))
-
-			compSpec, err = GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, "fakeCompName")
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(compSpec).Should(BeNil())
-
+		It("generate sharding component spec test", func() {
 			By("create mock sharding component object")
 			mockCompObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+mysqlShardingCompName, "").
 				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
@@ -99,10 +88,17 @@ var _ = Describe("cluster utils test", func() {
 			compKey := client.ObjectKeyFromObject(mockCompObj)
 			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			compSpec, err = GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
+			sharding := &appsv1.ClusterSharding{
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 2,
+				},
+				Name:   mysqlShardingName,
+				Shards: 2,
+			}
+			shardingCompSpecList, err := GenShardingCompSpecList4Test(testCtx.Ctx, k8sClient, cluster, sharding)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(compSpec).ShouldNot(BeNil())
-			Expect(compSpec.Name).Should(Equal(mysqlShardingCompName))
+			Expect(shardingCompSpecList).ShouldNot(BeNil())
+			Expect(len(shardingCompSpecList)).Should(BeEquivalentTo(2))
 		})
 	})
 })

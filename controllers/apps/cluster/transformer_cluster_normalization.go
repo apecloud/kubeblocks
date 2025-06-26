@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -78,7 +79,7 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	// build component specs for shardings after resolving definitions
-	transCtx.shardingComps, err = t.buildShardingComps(transCtx)
+	transCtx.shardingComps, transCtx.shardingCompsWithTpl, err = t.buildShardingComps(transCtx)
 	if err != nil {
 		return err
 	}
@@ -270,6 +271,35 @@ func (t *clusterNormalizationTransformer) resolveShardingNCompDefinition(transCt
 	return shardingDef, compDef, serviceVersion, err
 }
 
+// func (t *clusterNormalizationTransformer) resolveShardingNCompDefinitions(transCtx *clusterTransformContext,
+//	sharding *appsv1.ClusterSharding) (map[string]shardTemplate, error) {
+//	// comp, err := t.firstShardingComponent(transCtx, sharding)
+//	// if err != nil {
+//	//	return nil, err
+//	// }
+//	//
+//	// var shardingDef *appsv1.ShardingDefinition
+//	// shardingDefName := t.shardingDefinitionName(sharding, comp)
+//	// if len(shardingDefName) > 0 {
+//	//	shardingDef, err = resolveShardingDefinition(transCtx.Context, transCtx.Client, shardingDefName)
+//	//	if err != nil {
+//	//		return nil, err
+//	//	}
+//	//	if len(sharding.Template.ComponentDef) == 0 {
+//	//		sharding.Template.ComponentDef = shardingDef.Spec.Template.CompDef
+//	//	}
+//	// }
+//	//
+//	// spec := sharding.Template
+//	// compDef, serviceVersion, err := t.resolveCompDefinitionNServiceVersionWithComp(transCtx, &spec, comp)
+//	// if err != nil {
+//	//	return nil, err
+//	// }
+//	//
+//	// return shardingDef, compDef, serviceVersion, err
+//	return nil, nil
+// }
+
 func (t *clusterNormalizationTransformer) firstShardingComponent(transCtx *clusterTransformContext,
 	sharding *appsv1.ClusterSharding) (*appsv1.Component, error) {
 	var (
@@ -410,16 +440,20 @@ func (t *clusterNormalizationTransformer) checkTemplateUpgrade(serviceVersion, c
 	return serviceVersion != runningTpl.ServiceVersion || compDefName != runningTpl.CompDef
 }
 
-func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, error) {
-	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec)
-	for _, sharding := range transCtx.shardings {
-		comps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, transCtx.Cluster, sharding)
+func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, map[string]map[string][]*appsv1.ClusterComponentSpec, error) {
+	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec, 0)
+	shardingCompsWithTpl := make(map[string]map[string][]*appsv1.ClusterComponentSpec)
+	for _, spec := range transCtx.shardings {
+		tplComps, err := sharding.BuildShardingCompSpecs(transCtx.Context, transCtx.Client, transCtx.Cluster, spec)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		shardingComps[sharding.Name] = comps
+		shardingCompsWithTpl[spec.Name] = tplComps
+		for tpl := range tplComps {
+			shardingComps[spec.Name] = append(shardingComps[spec.Name], tplComps[tpl]...)
+		}
 	}
-	return shardingComps, nil
+	return shardingComps, shardingCompsWithTpl, nil
 }
 
 func (t *clusterNormalizationTransformer) postcheck(transCtx *clusterTransformContext) error {
@@ -572,6 +606,13 @@ func clusterTopologyCompMatched(comp appsv1.ClusterTopologyComponent, compName s
 	}
 	return false
 }
+
+// type shardTemplate struct {
+//	shardingName   string
+//	shardingDef    *appsv1.ShardingDefinition
+//	serviceVersion string
+//	compDef        *appsv1.ComponentDefinition
+// }
 
 // resolveShardingDefinition resolves and returns the specific sharding definition object supported.
 func resolveShardingDefinition(ctx context.Context, cli client.Reader, shardingDefName string) (*appsv1.ShardingDefinition, error) {

@@ -34,6 +34,7 @@ import (
 	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -183,7 +184,7 @@ var _ = Describe("Parameter Controller", func() {
 			prepareTestEnv()
 
 			By("Create sharding component objs")
-			shardingCompSpecList, err := intctrlutil.GenShardingCompSpecList(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.Shardings[0])
+			shardingCompSpecList, err := sharding.GenShardingCompSpecList4Test(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.Shardings[0])
 			Expect(err).ShouldNot(HaveOccurred())
 			for _, spec := range shardingCompSpecList {
 				shardingLabels := map[string]string{

@@ -5433,6 +5433,11 @@ spec:
                             Seed to generate the account's password.
                             Cannot be updated.
                           type: string
+                        symbolCharacters:
+                          description: |-
+                            The set of symbols allowed when generating password. If empty, kubeblocks will
+                            use a default symbol set, which is "!@#&*".
+                          type: string
                       type: object
                     secretRef:
                       description: |-

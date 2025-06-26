@@ -16613,6 +16613,19 @@ int32
 </tr>
 <tr>
 <td>
+<code>symbolCharacters</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The set of symbols allowed when generating password. If empty, kubeblocks will
+use a default symbol set, which is &ldquo;!@#&amp;*&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>letterCase</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.LetterCase">

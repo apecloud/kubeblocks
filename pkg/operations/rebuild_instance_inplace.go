@@ -249,6 +249,9 @@ func (inPlaceHelper *inplaceRebuildHelper) buildRestoreMetaObject(opsRequest *op
 
 func (inPlaceHelper *inplaceRebuildHelper) getConnectionCredential(backup *dpv1alpha1.Backup) *dpv1alpha1.ConnectionCredential {
 	if inPlaceHelper.sourceBackupTargetName == "" {
+		if backup.Status.Target == nil {
+			return nil
+		}
 		return backup.Status.Target.ConnectionCredential
 	}
 	for _, target := range backup.Status.Targets {

@@ -158,7 +158,7 @@ func (t *clusterSharedAccountTransformer) buildAccountSecret(transCtx *clusterTr
 
 func (t *clusterSharedAccountTransformer) generatePassword(account appsv1alpha1.ComponentSystemAccount) []byte {
 	config := account.PasswordConfig
-	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed)
+	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
 	switch config.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)

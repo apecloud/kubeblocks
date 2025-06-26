@@ -257,6 +257,12 @@ type PasswordConfig struct {
 	// +optional
 	NumSymbols int32 `json:"numSymbols,omitempty"`
 
+	// The set of symbols allowed when generating password. If empty, kubeblocks will
+	// use a default symbol set, which is "!@#&*".
+	//
+	// +optional
+	SymbolCharacters string `json:"symbolCharacters,omitempty"`
+
 	// The case of the letters in the password.
 	//
 	// +kubebuilder:default=MixedCases

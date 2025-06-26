@@ -69,17 +69,15 @@ KubeBlocks integrates the most popular database engines and provides rich manage
 
 ## Get started with KubeBlocks
 
-[Quick Start](https://kubeblocks.io/docs/preview/user_docs/try-out-on-playground/try-kubeblocks-on-your-laptop) shows you the quickest way to get started with KubeBlocks.
+[Quick Start](https://kubeblocks.io/docs/preview/user_docs/overview/install-kubeblocks) shows you the quickest way to get started with KubeBlocks.
 
 ## Resources
 
-[API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/cluster)
-
-[How to write a KubeBlocks Addon?](https://kubeblocks.io/docs/release-0.8/developer_docs/integration/how-to-add-an-add-on)
+[API Reference](https://kubeblocks.io/docs/preview/user_docs/references/api-reference/cluster)
 
 [KubeBlocks: Cloud-Native Data Infrastructure for Kubernetes](https://www.youtube.com/watch?v=KNwpG51Whzg) (A Video made by Viktor Farcic)
 
-[Dashboard Demo](https://console.kubeblocks.io/)
+[KubeBlocks Enterprise Demo](https://console.kubeblocks.io/)
 
 ## KubeBlocks at KubeCon
 

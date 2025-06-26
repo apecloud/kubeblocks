@@ -247,6 +247,21 @@ func (inPlaceHelper *inplaceRebuildHelper) buildRestoreMetaObject(opsRequest *op
 	}
 }
 
+func (inPlaceHelper *inplaceRebuildHelper) getConnectionCredential(backup *dpv1alpha1.Backup) *dpv1alpha1.ConnectionCredential {
+	if inPlaceHelper.sourceBackupTargetName == "" {
+		if backup.Status.Target == nil {
+			return nil
+		}
+		return backup.Status.Target.ConnectionCredential
+	}
+	for _, target := range backup.Status.Targets {
+		if target.Name == inPlaceHelper.sourceBackupTargetName {
+			return target.ConnectionCredential
+		}
+	}
+	return nil
+}
+
 // createPostReadyRestore creates a Restore to restore the data with postReady stage.
 func (inPlaceHelper *inplaceRebuildHelper) createPostReadyRestore(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -279,6 +294,7 @@ func (inPlaceHelper *inplaceRebuildHelper) createPostReadyRestore(reqCtx intctrl
 						Strategy:      dpv1alpha1.PodSelectionStrategyAny,
 					}},
 				},
+				ConnectionCredential: inPlaceHelper.getConnectionCredential(inPlaceHelper.backup),
 			},
 		},
 	}

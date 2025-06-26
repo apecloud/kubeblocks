@@ -34,6 +34,7 @@ type AppsV1alpha1Interface interface {
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
 	ConfigConstraintsGetter
+	RolloutsGetter
 	ServiceDescriptorsGetter
 }
 
@@ -64,6 +65,10 @@ func (c *AppsV1alpha1Client) ComponentVersions() ComponentVersionInterface {
 
 func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
 	return newConfigConstraints(c)
+}
+
+func (c *AppsV1alpha1Client) Rollouts(namespace string) RolloutInterface {
+	return newRollouts(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {

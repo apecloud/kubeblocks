@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package common
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sethvargo/go-password/password"
@@ -34,7 +35,7 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GeneratePassword(10, 5, 0, seed)
+		res, err := GeneratePassword(10, 5, 0, seed, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -52,13 +53,34 @@ func testGeneratorGeneratePassword(t *testing.T) {
 	t.Run("exceeds_length", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := GeneratePassword(0, 1, 0, ""); err != password.ErrExceedsTotalLength {
+		if _, err := GeneratePassword(0, 1, 0, "", ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 
-		if _, err := GeneratePassword(0, 0, 1, ""); err != password.ErrExceedsTotalLength {
+		if _, err := GeneratePassword(0, 0, 1, "", ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
+	})
+
+	t.Run("should respect allowed symbols", func(t *testing.T) {
+		t.Parallel()
+
+		symbols := "!$_#"
+		for i := 0; i < N; i++ {
+			res, err := GeneratePassword(10, 0, 5, "", symbols)
+			if err != nil {
+				t.Error(err)
+			}
+			for _, r := range res {
+				if r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' {
+					continue
+				}
+				if !strings.ContainsRune(symbols, r) {
+					t.Errorf("unexpected symbol %q in password %q", r, res)
+				}
+			}
+		}
+
 	})
 
 	t.Run("should be different when seed is empty", func(t *testing.T) {
@@ -67,7 +89,7 @@ func testGeneratorGeneratePassword(t *testing.T) {
 		resultSeedEachTime := ""
 		hasDiffPassword := false
 		for i := 0; i < N; i++ {
-			res, err := GeneratePassword(i%(len(password.LowerLetters)+len(password.UpperLetters)), 0, 0, "")
+			res, err := GeneratePassword(i%(len(password.LowerLetters)+len(password.UpperLetters)), 0, 0, "", "")
 			if err != nil {
 				t.Error(err)
 			}
@@ -126,7 +148,7 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 
 		// Generate multiple passwords and check they have both upper and lower letters.
 		for i := 0; i < 100; i++ {
-			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed)
+			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed, "")
 			if err != nil {
 				t.Fatalf("unexpected error generating password: %v", err)
 			}
@@ -148,7 +170,7 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 
 		var firstPwd string
 		for i := 0; i < 50; i++ {
-			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed)
+			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed, "")
 			if err != nil {
 				t.Fatalf("unexpected error generating password with seed: %v", err)
 			}

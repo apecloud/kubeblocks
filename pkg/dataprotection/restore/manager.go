@@ -654,7 +654,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				attachBackupRepo().
 				setCommand(actionSpec.Job.Command).
 				setToleration(targetPod.Spec.Tolerations).
-				addTargetPodAndCredentialEnv(targetPod, target.ConnectionCredential, &target.BackupTarget).
+				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
 				setServiceAccount(r.WorkerServiceAccount).
 				build()
 		}

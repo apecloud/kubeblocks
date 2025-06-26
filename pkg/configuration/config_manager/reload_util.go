@@ -128,7 +128,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 			if err != nil {
 				return err
 			}
-			newConfig, err := core.ApplyConfigPatch(b, core.FromStringPointerMap(updatedParams), formatConfig)
+			newConfig, err := core.ApplyConfigPatch(b, core.FromStringPointerMap(updatedParams), formatConfig, nil)
 			if err != nil {
 				return err
 			}

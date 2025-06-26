@@ -2873,7 +2873,7 @@ If set to true, a separate Service will be created for each Pod in the Cluster.<
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
 </p>
 <div>
 <p>ClusterComponentSpec defines the specification of a Component within a Cluster.</p>
@@ -7903,7 +7903,7 @@ ContainerVars
 <h3 id="apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -8771,7 +8771,7 @@ and specifies that PersistentVolumeClaims associated with VolumeClaimTemplates w
 <h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimTemplate">PersistentVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>)
 </p>
 <div>
 </div>
@@ -9685,7 +9685,7 @@ it will be counted towards MaxUnavailable.</p>
 <h3 id="apps.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>SchedulingPolicy defines the scheduling policy for instances.</p>
@@ -11208,15 +11208,147 @@ int32
 </tr>
 <tr>
 <td>
-<code>template</code><br/>
+<code>serviceVersion</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
-ClusterComponentSpec
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this template.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
 </a>
 </em>
 </td>
 <td>
-<p>The template for generating shards from this ShardTemplate.</p>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired number of replicas for the shard which are created from this template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the shard.
+If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the resource requirements of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimTemplate">
+[]PersistentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the storage requirements of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the custom instances of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the instance naming of the shard.</p>
 </td>
 </tr>
 </tbody>

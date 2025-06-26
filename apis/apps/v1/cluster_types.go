@@ -653,7 +653,6 @@ type ShardTemplate struct {
 	// +kubebuilder:validation:MaxLength=15
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the name is immutable"
 	Name string `json:"name"`
 
 	// Specifies the ShardingDefinition custom resource (CR) that defines the sharding's characteristics and behavior.
@@ -662,7 +661,7 @@ type ShardTemplate struct {
 	//
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
-	ShardingDef string `json:"shardingDef,omitempty"`
+	ShardingDef *string `json:"shardingDef,omitempty"`
 
 	// The number of shards to create from this ShardTemplate.
 	//
@@ -671,10 +670,67 @@ type ShardTemplate struct {
 	// +optional
 	Shards *int32 `json:"Shards,omitempty"`
 
-	// The template for generating shards from this ShardTemplate.
+	// ServiceVersion specifies the version of the Service expected to be provisioned by this template.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	//
-	// +kubebuilder:validation:Required
-	Template ClusterComponentSpec `json:"template"`
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion *string `json:"serviceVersion,omitempty"`
+
+	// Specifies the name of the referenced ComponentDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +optional
+	CompDef *string `json:"compDef,omitempty"`
+
+	// Specifies Labels to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies Annotations to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines Env to override.
+	// Add new or override existing envs.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies the desired number of replicas for the shard which are created from this template.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the scheduling policy for the shard.
+	// If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or default template.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
+
+	// Specifies an override for the resource requirements of the shard.
+	//
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Specifies an override for the storage requirements of the shard.
+	//
+	// +optional
+	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+
+	// Specifies an override for the custom instances of the shard.
+	//
+	// +optional
+	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies an override for the instance naming of the shard.
+	//
+	// +optional
+	FlatInstanceOrdinal *bool `json:"flatInstanceOrdinal,omitempty"`
 }
 
 // ClusterService defines a service that is exposed externally, allowing entities outside the cluster to access it.

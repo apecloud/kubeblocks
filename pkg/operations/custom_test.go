@@ -28,7 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -357,7 +357,7 @@ var _ = Describe("CustomOps", func() {
 
 			// create a sharding component
 			shardingNamePrefix := constant.GenerateClusterComponentName(cluster.Name, defaultCompName)
-			shardingCompName := fmt.Sprintf("%s-%s", shardingNamePrefix, utilrand.String(sharding.ShardIDLength))
+			shardingCompName := fmt.Sprintf("%s-%s", shardingNamePrefix, rand.String(sharding.ShardIDLength))
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, shardingCompName, compDefName).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 				AddLabels(constant.KBAppClusterUIDKey, string(cluster.UID)).

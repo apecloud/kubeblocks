@@ -77,6 +77,42 @@ func (g *shardIDGenerator) init() {
 }
 
 func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, comps []appsv1.Component) []*shardTemplate {
+	mergeWithTemplate := func(tpl *appsv1.ShardTemplate) *appsv1.ClusterComponentSpec {
+		spec := sharding.Template.DeepCopy()
+		if tpl.ServiceVersion != nil || tpl.CompDef != nil {
+			spec.ServiceVersion = ptr.Deref(tpl.ServiceVersion, "")
+			spec.ComponentDef = ptr.Deref(tpl.CompDef, "")
+		}
+		if tpl.Replicas != nil {
+			spec.Replicas = *tpl.Replicas
+		}
+		if tpl.Labels != nil {
+			spec.Labels = tpl.Labels
+		}
+		if tpl.Annotations != nil {
+			spec.Annotations = tpl.Annotations
+		}
+		if tpl.Env != nil {
+			spec.Env = tpl.Env
+		}
+		if tpl.SchedulingPolicy != nil {
+			spec.SchedulingPolicy = tpl.SchedulingPolicy
+		}
+		if tpl.Resources != nil {
+			spec.Resources = *tpl.Resources
+		}
+		if tpl.VolumeClaimTemplates != nil {
+			spec.VolumeClaimTemplates = tpl.VolumeClaimTemplates
+		}
+		if tpl.Instances != nil {
+			spec.Instances = tpl.Instances
+		}
+		if tpl.FlatInstanceOrdinal != nil {
+			spec.FlatInstanceOrdinal = *tpl.FlatInstanceOrdinal
+		}
+		return spec
+	}
+
 	templates := make([]*shardTemplate, 0)
 	nameToIndex := map[string]int{}
 	cnt := int32(0)
@@ -87,7 +123,7 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, c
 		template := &shardTemplate{
 			name:     tpl.Name,
 			count:    ptr.Deref(tpl.Shards, 0),
-			template: &sharding.ShardTemplates[i].Template,
+			template: mergeWithTemplate(&sharding.ShardTemplates[i]),
 			shards:   make([]*appsv1.ClusterComponentSpec, 0),
 		}
 		templates = append(templates, template)
@@ -106,7 +142,10 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, c
 
 	offline := sets.New(sharding.Offline...)
 	for _, comp := range comps {
-		if model.IsObjectDeleting(&comp) || comp.Labels == nil || offline.Has(comp.Name) {
+		if model.IsObjectDeleting(&comp) || offline.Has(comp.Name) {
+			continue
+		}
+		if comp.Labels == nil {
 			continue
 		}
 		tplName, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]

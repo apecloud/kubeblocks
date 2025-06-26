@@ -90,7 +90,12 @@ func (v *viperWrap) Marshal() (string, error) {
 	return dumpCfgContent(v.Viper, tmpFile)
 }
 
-func (v viperWrap) Unmarshal(str string) error {
+const emptyJson = "{}"
+
+func (v *viperWrap) Unmarshal(str string) error {
+	if v.format == parametersv1alpha1.JSON && str == "" {
+		str = emptyJson
+	}
 	return v.ReadConfig(bytes.NewReader([]byte(str)))
 }
 

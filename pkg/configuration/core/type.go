@@ -54,7 +54,10 @@ type ValueTransformer interface {
 type ValueTransformerFunc func(string, string) (any, error)
 
 func (f ValueTransformerFunc) TransformValue(value string, fieldName string) (any, error) {
-	return f(value, fieldName)
+	if f != nil {
+		return f(value, fieldName)
+	}
+	return value, nil
 }
 
 type IniContext struct {

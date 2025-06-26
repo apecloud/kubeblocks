@@ -1,0 +1,50 @@
+# azureblob is a storage provider for [Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs).
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: azureblob
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  datasafedConfigTemplate: |
+    [storage]
+    type = azureblob
+    account = {{ `{{ index .Parameters "accountName" }}` }}
+    key = {{ `{{ index .Parameters "accountKey" }}` }}
+    {{ `{{- $endpoint := index .Parameters "endpoint" }}` }}
+    {{ `{{- if $endpoint }}` }}
+    endpoint = {{ `{{ $endpoint }}` }}
+    {{ `{{- end }}` }}
+    root = {{ `{{ index .Parameters "container" }}` }}
+    no_check_container = {{ `{{ index .Parameters "noCheckContainer" }}` }}
+    chunk_size = 50Mi
+
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        container:
+          type: string
+          description: "Azure Blob Storage container"
+        accountName:
+          type: string
+          description: "Azure Blob Storage account name"
+        accountKey:
+          type: string
+          description: "Azure Blob Storage account key"
+        endpoint:
+          type: string
+          description: "Azure Blob Storage endpoint (optional)"
+        noCheckContainer:
+          type: boolean
+          default: false
+          description: "Do not check if the container exists, and do not try to create it"
+
+      required:
+        - container
+        - accountName
+        - accountKey
+
+    credentialFields:
+      - accountName
+      - accountKey

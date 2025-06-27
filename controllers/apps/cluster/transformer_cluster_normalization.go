@@ -231,9 +231,13 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4Shardings(transCtx 
 				return err
 			}
 			for _, tpl := range templates {
-				idx := tpl[3].(int)
-				if tpl[0] != nil {
-					shardingDef := tpl[0].(*appsv1.ShardingDefinition)
+				var (
+					shardingDef    = tpl[0].(*appsv1.ShardingDefinition)
+					compDef        = tpl[1].(*appsv1.ComponentDefinition)
+					serviceVersion = tpl[2].(string)
+					idx            = tpl[3].(int)
+				)
+				if shardingDef != nil {
 					transCtx.shardingDefs[shardingDef.Name] = shardingDef
 					// set the shardingDef as resolved
 					if idx < 0 {
@@ -242,7 +246,6 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4Shardings(transCtx 
 						transCtx.shardings[i].ShardTemplates[idx].ShardingDef = ptr.To(shardingDef.Name)
 					}
 				}
-				compDef, serviceVersion := tpl[1].(*appsv1.ComponentDefinition), tpl[2].(string)
 				transCtx.componentDefs[compDef.Name] = compDef
 				// set the componentDef and serviceVersion of template as resolved
 				if idx < 0 {
@@ -458,8 +461,10 @@ func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTr
 			return nil, nil, err
 		}
 		shardingCompsWithTpl[spec.Name] = tplComps
-		for tpl := range tplComps {
-			shardingComps[spec.Name] = append(shardingComps[spec.Name], tplComps[tpl]...)
+		for tpl, comps := range tplComps {
+			if len(comps) > 0 {
+				shardingComps[spec.Name] = append(shardingComps[spec.Name], tplComps[tpl]...)
+			}
 		}
 	}
 	return shardingComps, shardingCompsWithTpl, nil

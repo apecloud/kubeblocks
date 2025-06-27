@@ -416,7 +416,7 @@ var _ = Describe("cluster component transformer test", func() {
 		transCtx.components, transCtx.shardings, err = transformer.resolveCompsNShardingsFromTopology(clusterDef, cluster)
 		Expect(err).Should(BeNil())
 
-		transCtx.shardingComps, _, err = transformer.buildShardingComps(transCtx)
+		transCtx.shardingComps, transCtx.shardingCompsWithTpl, err = transformer.buildShardingComps(transCtx)
 		Expect(err).Should(BeNil())
 	}
 

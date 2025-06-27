@@ -145,16 +145,15 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, c
 		if model.IsObjectDeleting(&comp) || offline.Has(comp.Name) {
 			continue
 		}
-		if comp.Labels == nil {
-			continue
-		}
-		tplName, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]
-		if !ok {
-			continue
+		tplName := defaultShardTemplateName
+		if comp.Labels != nil {
+			if name, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]; ok {
+				tplName = name
+			}
 		}
 		idx, ok := nameToIndex[tplName]
 		if !ok {
-			continue
+			continue // ignore the component
 		}
 		spec := templates[idx].template.DeepCopy()
 		spec.Name, _ = strings.CutPrefix(comp.Name, fmt.Sprintf("%s-", clusterName))
@@ -177,7 +176,7 @@ func (t *shardTemplate) align(generator *shardIDGenerator, shardingName string) 
 	case diff == 0:
 		return nil
 	case diff < 0:
-		return t.create(generator, shardingName, diff)
+		return t.create(generator, shardingName, diff*-1)
 	default:
 		return t.delete(diff)
 	}

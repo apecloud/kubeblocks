@@ -110,29 +110,31 @@ func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParamete
 	return classifyParams, nil
 }
 
-func updateConfigParameter(paramKey string,
-	paramValue *string,
-	parametersMap map[string]*intctrlutil.ParameterMeta,
-	classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile) error {
-
+func FindParameterSchema[T any](parametersMap map[string]T, paramKey string) (T, bool) {
 	genMatchRegex := func(key string) string {
 		key = strings.ReplaceAll(key, ".", `\.`)
 		key = strings.ReplaceAll(key, "*", `.*`)
 		return "^" + key + "$"
 	}
-	matchParamFromSchema := func(key string) *intctrlutil.ParameterMeta {
-		if meta, ok := parametersMap[key]; ok {
-			return meta
-		}
-		for param, meta := range parametersMap {
-			if strings.Contains(param, openapi.SchemaMapFieldKeyName) {
-				if matched, _ := regexp.MatchString(genMatchRegex(param), key); matched {
-					return meta
-				}
+	if meta, ok := parametersMap[paramKey]; ok {
+		return meta, true
+	}
+	for param, meta := range parametersMap {
+		if strings.Contains(param, openapi.SchemaMapFieldKeyName) {
+			if matched, _ := regexp.MatchString(genMatchRegex(param), paramKey); matched {
+				return meta, true
 			}
 		}
-		return nil
 	}
+	var zero T
+	return zero, false
+}
+
+func updateConfigParameter(paramKey string,
+	paramValue *string,
+	parametersMap map[string]*intctrlutil.ParameterMeta,
+	classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile,
+) error {
 	deRefParamInTemplate := func(name string) map[string]*parametersv1alpha1.ParametersInFile {
 		if _, ok := classifyParams[name]; !ok {
 			classifyParams[name] = make(map[string]*parametersv1alpha1.ParametersInFile)
@@ -149,8 +151,8 @@ func updateConfigParameter(paramKey string,
 		return v[fileName]
 	}
 
-	parameterMeta := matchParamFromSchema(paramKey)
-	if parameterMeta == nil {
+	parameterMeta, ok := FindParameterSchema(parametersMap, paramKey)
+	if !ok {
 		return fmt.Errorf("parameter %s not found in parameters schema", paramKey)
 	}
 	deRefParamInFile(parameterMeta.ConfigTemplateName, parameterMeta.FileName).Parameters[paramKey] = paramValue

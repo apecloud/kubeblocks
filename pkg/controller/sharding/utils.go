@@ -21,30 +21,48 @@ package sharding
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 func BuildShardingCompSpecs(ctx context.Context, cli client.Reader,
-	cluster *appsv1.Cluster, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
-	shardingComps, err := ListShardingComponents(ctx, cli, cluster, sharding.Name)
+	namespace, clusterName string, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	shardingComps, err := listShardingComponents(ctx, cli, namespace, clusterName, sharding.Name)
 	if err != nil {
 		return nil, err
 	}
+	return buildShardingCompSpecs(clusterName, shardingComps, sharding)
+}
+
+func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
+	return listShardingComponents(ctx, cli, cluster.Namespace, cluster.Name, shardingName)
+}
+
+func buildShardingCompSpecs(clusterName string, shardingComps []appsv1.Component, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	compNames := make([]string, 0)
+	for _, comp := range shardingComps {
+		compNames = append(compNames, comp.Name)
+	}
 
 	generator := &shardIDGenerator{
-		clusterName:  cluster.Name,
+		clusterName:  clusterName,
 		shardingName: sharding.Name,
-		running:      shardingComps,
+		running:      compNames,
 		offline:      sharding.Offline,
 	}
 
-	templates := buildShardTemplates(cluster.Name, sharding, shardingComps)
+	templates := buildShardTemplates(clusterName, sharding, shardingComps)
 	for i := range templates {
-		if err = templates[i].align(generator, sharding.Name); err != nil {
+		if err := templates[i].align(generator, sharding.Name); err != nil {
 			return nil, err
 		}
 	}
@@ -56,11 +74,102 @@ func BuildShardingCompSpecs(ctx context.Context, cli client.Reader,
 	return shards, nil
 }
 
-func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
+func listShardingComponents(ctx context.Context, cli client.Reader, namespace, clusterName, shardingName string) ([]appsv1.Component, error) {
 	compList := &appsv1.ComponentList{}
-	labels := constant.GetClusterLabels(cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: shardingName})
-	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+	labels := constant.GetClusterLabels(clusterName, map[string]string{constant.KBAppShardingNameLabelKey: shardingName})
+	if err := cli.List(ctx, compList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 	return compList.Items, nil
+}
+
+func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) []*shardTemplate {
+	mergeWithTemplate := func(tpl *appsv1.ShardTemplate) *appsv1.ClusterComponentSpec {
+		spec := sharding.Template.DeepCopy()
+		if tpl.ServiceVersion != nil || tpl.CompDef != nil {
+			spec.ServiceVersion = ptr.Deref(tpl.ServiceVersion, "")
+			spec.ComponentDef = ptr.Deref(tpl.CompDef, "")
+		}
+		if tpl.Replicas != nil {
+			spec.Replicas = *tpl.Replicas
+		}
+		if tpl.Labels != nil {
+			spec.Labels = tpl.Labels
+		}
+		if tpl.Annotations != nil {
+			spec.Annotations = tpl.Annotations
+		}
+		if tpl.Env != nil {
+			spec.Env = tpl.Env
+		}
+		if tpl.SchedulingPolicy != nil {
+			spec.SchedulingPolicy = tpl.SchedulingPolicy
+		}
+		if tpl.Resources != nil {
+			spec.Resources = *tpl.Resources
+		}
+		if tpl.VolumeClaimTemplates != nil {
+			spec.VolumeClaimTemplates = tpl.VolumeClaimTemplates
+		}
+		if tpl.Instances != nil {
+			spec.Instances = tpl.Instances
+		}
+		if tpl.FlatInstanceOrdinal != nil {
+			spec.FlatInstanceOrdinal = *tpl.FlatInstanceOrdinal
+		}
+		return spec
+	}
+
+	templates := make([]*shardTemplate, 0)
+	nameToIndex := map[string]int{}
+	cnt := int32(0)
+	for i, tpl := range sharding.ShardTemplates {
+		if ptr.Deref(tpl.Shards, 0) <= 0 {
+			continue
+		}
+		template := &shardTemplate{
+			name:     tpl.Name,
+			count:    ptr.Deref(tpl.Shards, 0),
+			template: mergeWithTemplate(&sharding.ShardTemplates[i]),
+			shards:   make([]*appsv1.ClusterComponentSpec, 0),
+		}
+		templates = append(templates, template)
+		cnt += template.count
+		nameToIndex[tpl.Name] = len(templates) - 1
+	}
+	if cnt < sharding.Shards {
+		templates = append(templates, &shardTemplate{
+			name:     defaultShardTemplateName,
+			count:    sharding.Shards - cnt,
+			template: &sharding.Template,
+			shards:   make([]*appsv1.ClusterComponentSpec, 0),
+		})
+		nameToIndex[defaultShardTemplateName] = len(templates) - 1
+	}
+
+	offline := sets.New(sharding.Offline...)
+	for _, comp := range shardingComps {
+		if model.IsObjectDeleting(&comp) || offline.Has(comp.Name) {
+			continue
+		}
+		tplName := defaultShardTemplateName
+		if comp.Labels != nil {
+			if name, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]; ok {
+				tplName = name
+			}
+		}
+		idx, ok := nameToIndex[tplName]
+		if !ok {
+			continue // ignore the component
+		}
+		spec := templates[idx].template.DeepCopy()
+		spec.Name, _ = strings.CutPrefix(comp.Name, fmt.Sprintf("%s-", clusterName))
+		templates[idx].shards = append(templates[idx].shards, spec)
+	}
+
+	slices.SortFunc(templates, func(a, b *shardTemplate) int {
+		return strings.Compare(a.name, b.name)
+	})
+
+	return templates
 }

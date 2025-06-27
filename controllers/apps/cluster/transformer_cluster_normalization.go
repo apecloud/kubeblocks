@@ -321,9 +321,11 @@ func (t *clusterNormalizationTransformer) firstShardingComponent(transCtx *clust
 
 	compList := &appsv1.ComponentList{}
 	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:        cluster.Name,
-		constant.KBAppShardingNameLabelKey:  shardingName,
-		constant.KBAppShardTemplateLabelKey: shardTemplateName,
+		constant.AppInstanceLabelKey:       cluster.Name,
+		constant.KBAppShardingNameLabelKey: shardingName,
+	}
+	if len(shardTemplateName) > 0 {
+		ml[constant.KBAppShardTemplateLabelKey] = shardTemplateName
 	}
 	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml, client.Limit(1)); err != nil {
 		return nil, err
@@ -453,10 +455,11 @@ func (t *clusterNormalizationTransformer) checkTemplateUpgrade(serviceVersion, c
 }
 
 func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, map[string]map[string][]*appsv1.ClusterComponentSpec, error) {
+	cluster := transCtx.Cluster
 	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec, 0)
 	shardingCompsWithTpl := make(map[string]map[string][]*appsv1.ClusterComponentSpec)
 	for _, spec := range transCtx.shardings {
-		tplComps, err := sharding.BuildShardingCompSpecs(transCtx.Context, transCtx.Client, transCtx.Cluster, spec)
+		tplComps, err := sharding.BuildShardingCompSpecs(transCtx.Context, transCtx.Client, cluster.Namespace, cluster.Name, spec)
 		if err != nil {
 			return nil, nil, err
 		}

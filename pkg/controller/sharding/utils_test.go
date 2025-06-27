@@ -20,85 +20,396 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package sharding
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/generics"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("cluster shard component", func() {
-	// Cleanups
-	cleanEnv := func() {
-		// must wait till resources deleted and no longer existed before the testcases start,
-		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, it will find the existence of old objects, resulting failure to
-		// create the new objects.
-		By("clean resources")
+var _ = Describe("sharding", func() {
+	const (
+		seed = 1670750000
+	)
 
-		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+	var (
+		// first 10 ids
+		ids = []string{"bvj", "g7c", "gpz", "w8b", "dng", "rhk", "rzn", "ql8", "929", "99n"}
+	)
 
-		// delete rest mocked objects
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-	}
-
-	Context("cluster shard component", func() {
+	Context("build sharding comp specs", func() {
 		const (
-			compDefName           = "test-compdef"
-			clusterName           = "test-cluster"
-			mysqlCompName         = "mysql"
-			mysqlShardingName     = "mysql-sharding"
-			mysqlShardingCompName = "mysql-sharding-comp"
-		)
-
-		var (
-			cluster *appsv1.Cluster
+			clusterName       = "test-cluster"
+			shardingName      = "sharding"
+			shardTemplateName = "shard-template"
 		)
 
 		BeforeEach(func() {
-			cleanEnv()
-
-			testapps.NewComponentDefinitionFactory(compDefName).SetDefaultSpec().GetObject()
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				SetUID(clusterName).
-				AddComponent(mysqlCompName, compDefName).
-				AddSharding(mysqlShardingName, "", compDefName).
-				SetShards(1).
-				Create(&testCtx).GetObject()
+			rand.Seed(seed)
 		})
 
-		It("generate sharding component spec test", func() {
-			By("create mock sharding component object")
-			mockCompObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+mysqlShardingCompName, "").
-				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
-				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppShardingNameLabelKey, mysqlShardingName).
-				SetReplicas(1).
-				Create(&testCtx).
-				GetObject()
-			compKey := client.ObjectKeyFromObject(mockCompObj)
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
-
+		It("provision", func() {
 			sharding := &appsv1.ClusterSharding{
-				Template: appsv1.ClusterComponentSpec{
-					Replicas: 2,
-				},
-				Name:   mysqlShardingName,
+				Name:   shardingName,
 				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
 			}
-			shardingCompSpecList, err := GenShardingCompSpecList4Test(testCtx.Ctx, k8sClient, cluster, sharding)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(shardingCompSpecList).ShouldNot(BeNil())
-			Expect(len(shardingCompSpecList)).Should(BeEquivalentTo(2))
+
+			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(1))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(2))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[0]))
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs[defaultShardTemplateName][1].Name).Should(HaveSuffix(ids[1]))
+			Expect(specs[defaultShardTemplateName][1].Replicas).Should(Equal(int32(3)))
+		})
+
+		It("provision with template", func() {
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     shardTemplateName,
+						Shards:   ptr.To[int32](1),
+						Replicas: ptr.To[int32](5),
+					},
+				},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(2))
+			Expect(specs).Should(And(HaveKey(defaultShardTemplateName), HaveKey(shardTemplateName)))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[0]))
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs[shardTemplateName]).Should(HaveLen(1))
+			Expect(specs[shardTemplateName][0].Name).Should(HaveSuffix(ids[1]))
+			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
+		})
+
+		It("provision with offline", func() {
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     shardTemplateName,
+						Shards:   ptr.To[int32](1),
+						Replicas: ptr.To[int32](5),
+					},
+				},
+				Offline: []string{fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[0])},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(2))
+			Expect(specs).Should(And(HaveKey(defaultShardTemplateName), HaveKey(shardTemplateName)))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[1])) // skip offline shard of ids[0]
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs[shardTemplateName]).Should(HaveLen(1))
+			Expect(specs[shardTemplateName][0].Name).Should(HaveSuffix(ids[2]))
+			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
+		})
+
+		PIt("merge with shard template", func() {
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     shardTemplateName,
+						Shards:   ptr.To[int32](1),
+						Replicas: ptr.To[int32](5),
+					},
+				},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(2))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs).Should(HaveKey(shardTemplateName))
+			Expect(specs[shardTemplateName]).Should(HaveLen(1))
+			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
+		})
+
+		It("scale out", func() {
+			runningComp := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(1))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(2))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[9]))
+			Expect(specs[defaultShardTemplateName][1].Name).Should(HaveSuffix(ids[0]))
+		})
+
+		It("scale out - shard template", func() {
+			runningComp := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     shardTemplateName,
+						Shards:   ptr.To[int32](1),
+						Replicas: ptr.To[int32](5),
+					},
+				},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(2))
+			Expect(specs).Should(And(HaveKey(defaultShardTemplateName), HaveKey(shardTemplateName)))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[9]))
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs[shardTemplateName]).Should(HaveLen(1))
+			Expect(specs[shardTemplateName][0].Name).Should(HaveSuffix(ids[0]))
+			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
+		})
+
+		It("scale in", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[8]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			runningComp2 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 1,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(1))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[8])) // runningComp1.Name < runningComp2.Name
+		})
+
+		It("scale in - shard template", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[8]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: shardTemplateName, // shard template
+					},
+				},
+			}
+			runningComp2 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 1,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				// the shard template is removed
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(1))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[9])) // runningComp1 belongs to the shard template
+		})
+
+		It("scale in - offline", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[8]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			runningComp2 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 1,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				Offline: []string{runningComp1.Name},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(1))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[9])) // runningComp1 has been offline
+		})
+
+		It("scale in & out", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[8]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			runningComp2 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2, // still 2 shards
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				Offline: []string{runningComp1.Name}, // but shard 1 is offline
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(1))
+			Expect(specs).Should(HaveKey(defaultShardTemplateName))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(2))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(Or(HaveSuffix(ids[9]), HaveSuffix(ids[0])))
+			Expect(specs[defaultShardTemplateName][1].Name).Should(Or(HaveSuffix(ids[9]), HaveSuffix(ids[0])))
+		})
+
+		It("scale in & out - shard template", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[8]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			runningComp2 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: shardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2, // still 2 shards
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     shardTemplateName,
+						Shards:   ptr.To[int32](1),
+						Replicas: ptr.To[int32](5),
+					},
+				},
+				Offline: []string{runningComp1.Name, runningComp2.Name}, // both shard 1 and shard 2 are offline
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(2))
+			Expect(specs).Should(And(HaveKey(defaultShardTemplateName), HaveKey(shardTemplateName)))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[0]))
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs[shardTemplateName]).Should(HaveLen(1))
+			Expect(specs[shardTemplateName][0].Name).Should(HaveSuffix(ids[1]))
+			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
 		})
 	})
 })

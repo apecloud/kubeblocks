@@ -26,11 +26,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 const (
@@ -45,7 +42,7 @@ const (
 type shardIDGenerator struct {
 	clusterName  string
 	shardingName string
-	running      []appsv1.Component
+	running      []string
 	offline      []string
 	initialized  bool
 	ids          sets.Set[string]
@@ -53,114 +50,18 @@ type shardIDGenerator struct {
 
 func (g *shardIDGenerator) allocate() (string, error) {
 	if !g.initialized {
-		g.init()
+		g.ids = sets.New(g.running...).Insert(g.offline...)
+		g.initialized = true
 	}
 	for i := 0; i < generateShardIDMaxRetryTimes; i++ {
 		id := rand.String(ShardIDLength)
 		name := fmt.Sprintf("%s-%s-%s", g.clusterName, g.shardingName, id)
 		if !g.ids.Has(name) {
+			g.ids.Insert(name)
 			return id, nil
 		}
 	}
 	return "", fmt.Errorf("failed to allocate a unique shard id")
-}
-
-func (g *shardIDGenerator) init() {
-	g.ids = sets.Set[string]{}
-	for _, comp := range g.running {
-		g.ids.Insert(comp.Name)
-	}
-	for _, name := range g.offline {
-		g.ids.Insert(name)
-	}
-	g.initialized = true
-}
-
-func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, comps []appsv1.Component) []*shardTemplate {
-	mergeWithTemplate := func(tpl *appsv1.ShardTemplate) *appsv1.ClusterComponentSpec {
-		spec := sharding.Template.DeepCopy()
-		if tpl.ServiceVersion != nil || tpl.CompDef != nil {
-			spec.ServiceVersion = ptr.Deref(tpl.ServiceVersion, "")
-			spec.ComponentDef = ptr.Deref(tpl.CompDef, "")
-		}
-		if tpl.Replicas != nil {
-			spec.Replicas = *tpl.Replicas
-		}
-		if tpl.Labels != nil {
-			spec.Labels = tpl.Labels
-		}
-		if tpl.Annotations != nil {
-			spec.Annotations = tpl.Annotations
-		}
-		if tpl.Env != nil {
-			spec.Env = tpl.Env
-		}
-		if tpl.SchedulingPolicy != nil {
-			spec.SchedulingPolicy = tpl.SchedulingPolicy
-		}
-		if tpl.Resources != nil {
-			spec.Resources = *tpl.Resources
-		}
-		if tpl.VolumeClaimTemplates != nil {
-			spec.VolumeClaimTemplates = tpl.VolumeClaimTemplates
-		}
-		if tpl.Instances != nil {
-			spec.Instances = tpl.Instances
-		}
-		if tpl.FlatInstanceOrdinal != nil {
-			spec.FlatInstanceOrdinal = *tpl.FlatInstanceOrdinal
-		}
-		return spec
-	}
-
-	templates := make([]*shardTemplate, 0)
-	nameToIndex := map[string]int{}
-	cnt := int32(0)
-	for i, tpl := range sharding.ShardTemplates {
-		if ptr.Deref(tpl.Shards, 0) <= 0 {
-			continue
-		}
-		template := &shardTemplate{
-			name:     tpl.Name,
-			count:    ptr.Deref(tpl.Shards, 0),
-			template: mergeWithTemplate(&sharding.ShardTemplates[i]),
-			shards:   make([]*appsv1.ClusterComponentSpec, 0),
-		}
-		templates = append(templates, template)
-		cnt += template.count
-		nameToIndex[tpl.Name] = len(templates) - 1
-	}
-	if cnt < sharding.Shards {
-		templates = append(templates, &shardTemplate{
-			name:     defaultShardTemplateName,
-			count:    sharding.Shards - cnt,
-			template: &sharding.Template,
-			shards:   make([]*appsv1.ClusterComponentSpec, 0),
-		})
-		nameToIndex[defaultShardTemplateName] = len(templates) - 1
-	}
-
-	offline := sets.New(sharding.Offline...)
-	for _, comp := range comps {
-		if model.IsObjectDeleting(&comp) || offline.Has(comp.Name) {
-			continue
-		}
-		tplName := defaultShardTemplateName
-		if comp.Labels != nil {
-			if name, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]; ok {
-				tplName = name
-			}
-		}
-		idx, ok := nameToIndex[tplName]
-		if !ok {
-			continue // ignore the component
-		}
-		spec := templates[idx].template.DeepCopy()
-		spec.Name, _ = strings.CutPrefix(comp.Name, fmt.Sprintf("%s-", clusterName))
-		templates[idx].shards = append(templates[idx].shards, spec)
-	}
-
-	return templates
 }
 
 type shardTemplate struct {

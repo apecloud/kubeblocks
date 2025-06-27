@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	// Symbols is the list of symbols.
-	Symbols = "!@#&*"
+	// DefaultSymbols is the list of default symbols to generate password.
+	DefaultSymbols = "!@#&*"
 )
 
 type PasswordReader struct {
@@ -47,16 +47,19 @@ func (r *PasswordReader) Seed(seed int64) {
 }
 
 // GeneratePassword generates a password with the given requirements and seed in lowercase.
-func GeneratePassword(length, numDigits, numSymbols int, seed string) (string, error) {
+func GeneratePassword(length, numDigits, numSymbols int, seed string, symbols string) (string, error) {
 	rand, err := newRngFromSeed(seed)
 	if err != nil {
 		return "", err
 	}
 	passwordReader := &PasswordReader{rand: rand}
+	if symbols == "" {
+		symbols = DefaultSymbols
+	}
 	gen, err := password.NewGenerator(&password.GeneratorInput{
 		LowerLetters: password.LowerLetters,
 		UpperLetters: password.UpperLetters,
-		Symbols:      Symbols,
+		Symbols:      symbols,
 		Digits:       password.Digits,
 		Reader:       passwordReader,
 	})

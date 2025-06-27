@@ -91,10 +91,11 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	r.tplCount = len(backupPolicyTPLs.Items)
 	backupPolicyNames := map[string]struct{}{}
 	backupScheduleNames := map[string]struct{}{}
-	for _, tpl := range backupPolicyTPLs.Items {
+	for i := range backupPolicyTPLs.Items {
+		tpl := &backupPolicyTPLs.Items[i]
 		r.isDefaultTemplate = tpl.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey]
 		r.tplIdentifier = tpl.Spec.Identifier
-		r.backupPolicyTpl = &tpl
+		r.backupPolicyTpl = tpl
 
 		for i := range tpl.Spec.BackupPolicies {
 			r.backupPolicy = &tpl.Spec.BackupPolicies[i]

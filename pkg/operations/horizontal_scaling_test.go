@@ -673,6 +673,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("mock the new components")
 			createComponent := func(compName string) *appsv1.Component {
 				comp := testapps.NewComponentFactory(testCtx.DefaultNamespace, opsRes.Cluster.Name+"-"+compName, compDefName).
+					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
 					AddLabels(constant.KBAppClusterUIDKey, string(opsRes.Cluster.UID)).
 					AddLabels(constant.KBAppShardingNameLabelKey, secondaryCompName).

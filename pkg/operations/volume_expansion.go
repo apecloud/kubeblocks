@@ -36,6 +36,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -146,17 +147,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		}
 		setVeHelpers(compSpec, compOps, compSpec.Name)
 	}
-	for _, sharding := range opsRes.Cluster.Spec.Shardings {
-		compOps, ok := compOpsHelper.componentOpsSet[sharding.Name]
+	for _, spec := range opsRes.Cluster.Spec.Shardings {
+		compOps, ok := compOpsHelper.componentOpsSet[spec.Name]
 		if !ok {
 			continue
 		}
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, sharding.Name)
+		shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, spec.Name)
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			setVeHelpers(sharding.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+			setVeHelpers(spec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,

@@ -166,6 +166,7 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 			testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterObj.Name+"-"+defaultShardingCompName, "").
 				WithRandomName().
 				AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 				AddLabels(constant.AppInstanceLabelKey, clusterObj.Name).
 				AddLabels(constant.KBAppShardingNameLabelKey, defaultShardingCompName).
 				SetReplicas(1).
@@ -174,6 +175,7 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 			testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterObj.Name+"-"+defaultShardingCompName, "").
 				WithRandomName().
 				AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 				AddLabels(constant.AppInstanceLabelKey, clusterObj.Name).
 				AddLabels(constant.KBAppShardingNameLabelKey, defaultShardingCompName).
 				SetReplicas(1).
@@ -182,6 +184,7 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 			testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterObj.Name+"-"+defaultShardingCompName, "").
 				WithRandomName().
 				AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 				AddLabels(constant.AppInstanceLabelKey, clusterObj.Name).
 				AddLabels(constant.KBAppShardingNameLabelKey, defaultShardingCompName).
 				SetReplicas(1).

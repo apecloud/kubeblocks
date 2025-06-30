@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -493,7 +494,7 @@ func (c *notExistPrecondition) compExist(transCtx *clusterTransformContext, dag 
 
 func (c *notExistPrecondition) shardingExist(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
 	list := func() (bool, error) {
-		comps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+		comps, err := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 		if err != nil {
 			return false, err
 		}
@@ -608,7 +609,7 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 		return false, fmt.Errorf("cluster sharding %s not found", name)
 	}
 
-	comps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+	comps, err := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 	if err != nil {
 		return false, err
 	}
@@ -827,7 +828,7 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 
 // delete handles the sharding component deletion when cluster is Deleting
 func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
-	runningComps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+	runningComps, err := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 	if err != nil {
 		return err
 	}
@@ -860,7 +861,7 @@ func (h *clusterShardingHandler) deleteComp(transCtx *clusterTransformContext,
 }
 
 func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
-	runningComps, err1 := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+	runningComps, err1 := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 	if err1 != nil {
 		return err1
 	}
@@ -934,27 +935,32 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
 	sharding *appsv1.ClusterSharding, running *appsv1.Component) ([]*appsv1.Component, error) {
 	objs := make([]*appsv1.Component, 0)
-	shardingComps := transCtx.shardingComps[sharding.Name]
-	for i := range shardingComps {
-		spec := shardingComps[i]
-		labels := h.buildLabels(sharding)
-		annotations := h.buildAnnotations(transCtx, sharding.Name, spec.Name)
-		obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
-		if err != nil {
-			return nil, err
+	shardingComps := transCtx.shardingCompsWithTpl[sharding.Name]
+	for tplName, tplComps := range shardingComps {
+		for i := range tplComps {
+			spec := shardingComps[tplName][i]
+			labels := h.buildLabels(sharding, tplName)
+			annotations := h.buildAnnotations(transCtx, sharding.Name, spec.Name)
+			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
+			if err != nil {
+				return nil, err
+			}
+			h.buildShardPodAntiAffinity(transCtx, sharding.Name, spec.Name, obj)
+			objs = append(objs, obj)
 		}
-		h.buildShardPodAntiAffinity(transCtx, sharding.Name, spec.Name, obj)
-		objs = append(objs, obj)
 	}
 	return objs, nil
 }
 
-func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding) map[string]string {
+func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding, shardTplName string) map[string]string {
 	labels := map[string]string{
 		constant.KBAppShardingNameLabelKey: sharding.Name,
 	}
 	if len(sharding.ShardingDef) > 0 {
 		labels[constant.ShardingDefLabelKey] = sharding.ShardingDef
+	}
+	if len(shardTplName) > 0 {
+		labels[constant.KBAppShardTemplateLabelKey] = shardTplName
 	}
 	return labels
 }

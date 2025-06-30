@@ -44,6 +44,7 @@ const (
 	KBAppComponentLabelKey    = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey = "apps.kubeblocks.io/sharding-name"
 
+	KBAppShardTemplateLabelKey      = "apps.kubeblocks.io/shard-template"
 	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
 	PVCNameLabelKey                 = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"

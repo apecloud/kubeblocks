@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -560,7 +561,7 @@ func handleScaleOutForShards(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	compList, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
+	compList, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
 	if err != nil {
 		return 0, err
 	}
@@ -591,7 +592,7 @@ func handleScaleInForShards(reqCtx intctrlutil.RequestCtx,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus,
 	updateShards int32) (int32, error) {
-	compList, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
+	compList, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
 	if err != nil {
 		return 0, err
 	}

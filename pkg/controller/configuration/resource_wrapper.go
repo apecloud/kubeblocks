@@ -31,7 +31,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 )
 
 type ResourceFetcher[T any] struct {
@@ -103,12 +103,32 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 
 func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	return r.Wrap(func() (err error) {
-		r.ClusterComObj, err = intctrlutil.GetComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
+		r.ClusterComObj, err = r.getComponentSpecByName()
 		if err != nil {
 			return err
 		}
 		return
 	})
+}
+
+func (r *ResourceFetcher[T]) getComponentSpecByName() (*appsv1.ClusterComponentSpec, error) {
+	compSpec := r.ClusterObj.Spec.GetComponentByName(r.ComponentName)
+	if compSpec != nil {
+		return compSpec, nil
+	}
+	for _, spec := range r.ClusterObj.Spec.Shardings {
+		shardingCompList, err := sharding.ListShardingCompSpecs(r.Context, r.Client, r.ClusterObj, &spec)
+		if err != nil {
+			return nil, err
+		}
+		for i, shardingComp := range shardingCompList {
+			if shardingComp.Name == r.ComponentName {
+				compSpec = shardingCompList[i]
+				return compSpec, nil
+			}
+		}
+	}
+	return nil, nil
 }
 
 func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {

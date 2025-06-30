@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -88,6 +89,9 @@ func (r *BackupPolicyDriverReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 	if err := r.reconcile(reqCtx, cluster); err != nil {
+		if apierrors.IsConflict(err) {
+			return intctrlutil.Requeue(reqCtx.Log, err.Error())
+		}
 		r.Recorder.Eventf(cluster, corev1.EventTypeWarning, "ReconcileBackupPolicyFail", "failed to reconcile: %v", err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

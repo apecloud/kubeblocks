@@ -668,7 +668,7 @@ type ShardTemplate struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
 	// +optional
-	Shards *int32 `json:"Shards,omitempty"`
+	Shards *int32 `json:"shards,omitempty"`
 
 	// ServiceVersion specifies the version of the Service expected to be provisioned by this template.
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).

@@ -7842,13 +7842,6 @@ spec:
                         to be created with distinct configurations.
                       items:
                         properties:
-                          Shards:
-                            description: The number of shards to create from this
-                              ShardTemplate.
-                            format: int32
-                            maximum: 2048
-                            minimum: 0
-                            type: integer
                           annotations:
                             additionalProperties:
                               type: string
@@ -10960,6 +10953,13 @@ spec:
                               The full name or regular expression is supported to match the ShardingDefinition.
                             maxLength: 64
                             type: string
+                          shards:
+                            description: The number of shards to create from this
+                              ShardTemplate.
+                            format: int32
+                            maximum: 2048
+                            minimum: 0
+                            type: integer
                           volumeClaimTemplates:
                             description: Specifies an override for the storage requirements
                               of the shard.

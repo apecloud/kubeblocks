@@ -11196,7 +11196,7 @@ string
 </tr>
 <tr>
 <td>
-<code>Shards</code><br/>
+<code>shards</code><br/>
 <em>
 int32
 </em>

@@ -52,6 +52,17 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - delete
 {{- end }}
 {{- if .Values.webhooks.conversionEnabled }}
 ---

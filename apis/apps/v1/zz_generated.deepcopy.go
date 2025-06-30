@@ -3062,6 +3062,11 @@ func (in *ShardTemplate) DeepCopyInto(out *ShardTemplate) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ShardIDs != nil {
+		in, out := &in.ShardIDs, &out.ShardIDs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ServiceVersion != nil {
 		in, out := &in.ServiceVersion, &out.ServiceVersion
 		*out = new(string)

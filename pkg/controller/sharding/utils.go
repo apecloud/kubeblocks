@@ -147,6 +147,16 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, s
 		nameToIndex[defaultShardTemplateName] = len(templates) - 1
 	}
 
+	takeOverByTemplate := func() map[string]string {
+		result := make(map[string]string)
+		for _, tpl := range sharding.ShardTemplates {
+			for _, id := range tpl.ShardIDs {
+				result[fmt.Sprintf("%s-%s-%s", clusterName, sharding.Name, id)] = tpl.Name
+			}
+		}
+		return result
+	}()
+
 	offline := sets.New(sharding.Offline...)
 	for _, comp := range shardingComps {
 		if model.IsObjectDeleting(&comp) || offline.Has(comp.Name) {
@@ -155,6 +165,11 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, s
 		tplName := defaultShardTemplateName
 		if comp.Labels != nil {
 			if name, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]; ok {
+				tplName = name
+			}
+		}
+		if tplName == defaultShardTemplateName {
+			if name, ok := takeOverByTemplate[comp.Name]; ok {
 				tplName = name
 			}
 		}

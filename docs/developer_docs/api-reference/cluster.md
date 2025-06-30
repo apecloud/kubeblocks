@@ -11208,6 +11208,18 @@ int32
 </tr>
 <tr>
 <td>
+<code>shardIDs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the shard IDs to take over from the existing shards.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceVersion</code><br/>
 <em>
 string

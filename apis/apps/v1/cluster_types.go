@@ -670,6 +670,11 @@ type ShardTemplate struct {
 	// +optional
 	Shards *int32 `json:"shards,omitempty"`
 
+	// Specifies the shard IDs to take over from the existing shards.
+	//
+	// +optional
+	ShardIDs []string `json:"shardIDs,omitempty"`
+
 	// ServiceVersion specifies the version of the Service expected to be provisioned by this template.
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	//

@@ -37,9 +37,6 @@ import (
 
 func BuildShardingCompSpecs(ctx context.Context, cli client.Reader,
 	namespace, clusterName string, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
-	if err := precheck(sharding); err != nil {
-		return nil, err
-	}
 	shardingComps, err := listShardingComponents(ctx, cli, namespace, clusterName, sharding.Name)
 	if err != nil {
 		return nil, err
@@ -51,30 +48,24 @@ func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *app
 	return listShardingComponents(ctx, cli, cluster.Namespace, cluster.Name, shardingName)
 }
 
-func precheck(sharding *appsv1.ClusterSharding) error {
-	shards := int32(0)
-	shardIDs := sets.NewString()
-	for _, tpl := range sharding.ShardTemplates {
-		shards += ptr.Deref(tpl.Shards, 0)
-		for _, id := range tpl.ShardIDs {
-			if shardIDs.Has(id) {
-				return fmt.Errorf("shard id %s is duplicated", id)
-			}
-		}
-		shardIDs.Insert(tpl.ShardIDs...)
+func listShardingComponents(ctx context.Context, cli client.Reader, namespace, clusterName, shardingName string) ([]appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
+	labels := constant.GetClusterLabels(clusterName, map[string]string{constant.KBAppShardingNameLabelKey: shardingName})
+	if err := cli.List(ctx, compList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
+		return nil, err
 	}
-	if shards > sharding.Shards {
-		return fmt.Errorf("the sum of shards in shard templates is greater than the total shards: %d vs %d", sharding.Shards, shards)
-	}
-	return nil
+	return compList.Items, nil
 }
 
 func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	if err := precheck(sharding); err != nil {
+		return nil, err
+	}
+
 	compNames := make([]string, 0)
 	for _, comp := range shardingComps {
 		compNames = append(compNames, comp.Name)
 	}
-
 	generator := &shardIDGenerator{
 		clusterName:        clusterName,
 		shardingName:       sharding.Name,
@@ -97,13 +88,22 @@ func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding
 	return shards, nil
 }
 
-func listShardingComponents(ctx context.Context, cli client.Reader, namespace, clusterName, shardingName string) ([]appsv1.Component, error) {
-	compList := &appsv1.ComponentList{}
-	labels := constant.GetClusterLabels(clusterName, map[string]string{constant.KBAppShardingNameLabelKey: shardingName})
-	if err := cli.List(ctx, compList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
-		return nil, err
+func precheck(sharding *appsv1.ClusterSharding) error {
+	shards := int32(0)
+	shardIDs := sets.NewString()
+	for _, tpl := range sharding.ShardTemplates {
+		shards += ptr.Deref(tpl.Shards, 0)
+		for _, id := range tpl.ShardIDs {
+			if shardIDs.Has(id) {
+				return fmt.Errorf("shard id %s is duplicated", id)
+			}
+		}
+		shardIDs.Insert(tpl.ShardIDs...)
 	}
-	return compList.Items, nil
+	if shards > sharding.Shards {
+		return fmt.Errorf("the sum of shards in shard templates is greater than the total shards: %d vs %d", sharding.Shards, shards)
+	}
+	return nil
 }
 
 func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) []*shardTemplate {

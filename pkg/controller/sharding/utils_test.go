@@ -54,6 +54,68 @@ var _ = Describe("sharding", func() {
 			rand.Seed(seed)
 		})
 
+		It("precheck - shards", func() {
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     fmt.Sprintf("%s-0", shardTemplateName),
+						Shards:   ptr.To[int32](2),
+						Replicas: ptr.To[int32](5),
+					},
+					{
+						Name:     fmt.Sprintf("%s-1", shardTemplateName),
+						Shards:   ptr.To[int32](2),
+						Replicas: ptr.To[int32](5),
+					},
+				},
+			}
+
+			_, err := buildShardingCompSpecs(clusterName, sharding, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("the sum of shards in shard templates is greater than the total shards"))
+		})
+
+		It("precheck - shard ids", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     fmt.Sprintf("%s-0", shardTemplateName),
+						Shards:   ptr.To[int32](1),
+						ShardIDs: []string{ids[9]},
+						Replicas: ptr.To[int32](5),
+					},
+					{
+						Name:     fmt.Sprintf("%s-1", shardTemplateName),
+						Shards:   ptr.To[int32](1),
+						ShardIDs: []string{ids[9]},
+						Replicas: ptr.To[int32](5),
+					},
+				},
+			}
+
+			_, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1})
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf("shard id %s is duplicated", ids[9])))
+		})
+
 		It("provision", func() {
 			sharding := &appsv1.ClusterSharding{
 				Name:   shardingName,
@@ -409,6 +471,52 @@ var _ = Describe("sharding", func() {
 			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
 			Expect(specs[shardTemplateName]).Should(HaveLen(1))
 			Expect(specs[shardTemplateName][0].Name).Should(HaveSuffix(ids[1]))
+			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
+		})
+
+		It("take over", func() {
+			runningComp1 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[8]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			runningComp2 := appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[9]),
+					Labels: map[string]string{
+						constant.KBAppShardTemplateLabelKey: defaultShardTemplateName,
+					},
+				},
+			}
+			sharding := &appsv1.ClusterSharding{
+				Name:   shardingName,
+				Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+				},
+				ShardTemplates: []appsv1.ShardTemplate{
+					{
+						Name:     shardTemplateName,
+						Shards:   ptr.To[int32](1),
+						ShardIDs: []string{ids[9]}, // take over
+						Replicas: ptr.To[int32](5),
+					},
+				},
+			}
+
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1, runningComp2})
+			Expect(err).Should(Succeed())
+
+			Expect(len(specs)).Should(BeEquivalentTo(2))
+			Expect(specs).Should(And(HaveKey(defaultShardTemplateName), HaveKey(shardTemplateName)))
+			Expect(specs[defaultShardTemplateName]).Should(HaveLen(1))
+			Expect(specs[defaultShardTemplateName][0].Name).Should(HaveSuffix(ids[8]))
+			Expect(specs[defaultShardTemplateName][0].Replicas).Should(Equal(int32(3)))
+			Expect(specs[shardTemplateName]).Should(HaveLen(1))
+			Expect(specs[shardTemplateName][0].Name).Should(HaveSuffix(ids[9]))
 			Expect(specs[shardTemplateName][0].Replicas).Should(Equal(int32(5)))
 		})
 	})

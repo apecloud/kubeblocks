@@ -22,7 +22,6 @@ package sharding
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
@@ -90,8 +89,12 @@ func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding
 
 func precheck(sharding *appsv1.ClusterSharding) error {
 	shards := int32(0)
-	shardIDs := sets.NewString()
+	names, shardIDs := sets.New[string](), sets.New[string]()
 	for _, tpl := range sharding.ShardTemplates {
+		if names.Has(tpl.Name) {
+			return fmt.Errorf("shard template name %s is duplicated", tpl.Name)
+		}
+		names.Insert(tpl.Name)
 		shards += ptr.Deref(tpl.Shards, 0)
 		for _, id := range tpl.ShardIDs {
 			if shardIDs.Has(id) {
@@ -205,7 +208,7 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, s
 
 func shardNamesTakeOverByTemplate(clusterName string, sharding *appsv1.ClusterSharding) []string {
 	result := make([]string, 0)
-	for name := range maps.Keys(shardNamesTakeOverByTemplateMap(clusterName, sharding)) {
+	for name := range shardNamesTakeOverByTemplateMap(clusterName, sharding) {
 		result = append(result, name)
 	}
 	return result

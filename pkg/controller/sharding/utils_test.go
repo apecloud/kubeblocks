@@ -63,7 +63,7 @@ var _ = Describe("sharding", func() {
 				},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, nil)
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(1))
@@ -91,7 +91,7 @@ var _ = Describe("sharding", func() {
 				},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, nil)
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(2))
@@ -121,7 +121,7 @@ var _ = Describe("sharding", func() {
 				Offline: []string{fmt.Sprintf("%s-%s-%s", clusterName, shardingName, ids[0])},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, nil)
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(2))
@@ -150,7 +150,7 @@ var _ = Describe("sharding", func() {
 				},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, nil, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, nil)
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(2))
@@ -179,7 +179,7 @@ var _ = Describe("sharding", func() {
 				},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(1))
@@ -213,7 +213,7 @@ var _ = Describe("sharding", func() {
 				},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(2))
@@ -251,7 +251,7 @@ var _ = Describe("sharding", func() {
 				},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1, runningComp2})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(1))
@@ -286,7 +286,7 @@ var _ = Describe("sharding", func() {
 				// the shard template is removed
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1, runningComp2})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(1))
@@ -321,7 +321,7 @@ var _ = Describe("sharding", func() {
 				Offline: []string{runningComp1.Name},
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1, runningComp2})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(1))
@@ -356,7 +356,7 @@ var _ = Describe("sharding", func() {
 				Offline: []string{runningComp1.Name}, // but shard 1 is offline
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1, runningComp2})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(1))
@@ -399,7 +399,7 @@ var _ = Describe("sharding", func() {
 				Offline: []string{runningComp1.Name, runningComp2.Name}, // both shard 1 and shard 2 are offline
 			}
 
-			specs, err := buildShardingCompSpecs(clusterName, []appsv1.Component{runningComp1, runningComp2}, sharding)
+			specs, err := buildShardingCompSpecs(clusterName, sharding, []appsv1.Component{runningComp1, runningComp2})
 			Expect(err).Should(Succeed())
 
 			Expect(len(specs)).Should(BeEquivalentTo(2))

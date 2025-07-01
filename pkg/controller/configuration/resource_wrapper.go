@@ -123,8 +123,7 @@ func (r *ResourceFetcher[T]) getComponentSpecByName() (*appsv1.ClusterComponentS
 		}
 		for i, shardingComp := range shardingCompList {
 			if shardingComp.Name == r.ComponentName {
-				compSpec = shardingCompList[i]
-				return compSpec, nil
+				return shardingCompList[i], nil
 			}
 		}
 	}

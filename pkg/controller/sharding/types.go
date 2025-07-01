@@ -40,17 +40,18 @@ const (
 )
 
 type shardIDGenerator struct {
-	clusterName  string
-	shardingName string
-	running      []string
-	offline      []string
-	initialized  bool
-	ids          sets.Set[string]
+	clusterName        string
+	shardingName       string
+	running            []string
+	offline            []string
+	takeOverByTemplate []string
+	initialized        bool
+	ids                sets.Set[string]
 }
 
 func (g *shardIDGenerator) allocate() (string, error) {
 	if !g.initialized {
-		g.ids = sets.New(g.running...).Insert(g.offline...)
+		g.ids = sets.New(g.running...).Insert(g.offline...).Insert(g.takeOverByTemplate...)
 		g.initialized = true
 	}
 	for i := 0; i < generateShardIDMaxRetryTimes; i++ {
@@ -71,26 +72,26 @@ type shardTemplate struct {
 	shards   []*appsv1.ClusterComponentSpec
 }
 
-func (t *shardTemplate) align(generator *shardIDGenerator, shardingName string) error {
+func (t *shardTemplate) align(generator *shardIDGenerator) error {
 	diff := len(t.shards) - int(t.count)
 	switch {
 	case diff == 0:
 		return nil
 	case diff < 0:
-		return t.create(generator, shardingName, diff*-1)
+		return t.create(generator, diff*-1)
 	default:
 		return t.delete(diff)
 	}
 }
 
-func (t *shardTemplate) create(generator *shardIDGenerator, shardingName string, cnt int) error {
+func (t *shardTemplate) create(generator *shardIDGenerator, cnt int) error {
 	for i := 0; i < cnt; i++ {
 		id, err := generator.allocate()
 		if err != nil {
 			return err
 		}
 		spec := t.template.DeepCopy()
-		spec.Name = fmt.Sprintf("%s-%s", shardingName, id)
+		spec.Name = fmt.Sprintf("%s-%s", generator.shardingName, id)
 		t.shards = append(t.shards, spec)
 	}
 	return nil

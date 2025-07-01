@@ -22,6 +22,7 @@ package sharding
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -36,33 +37,55 @@ import (
 
 func BuildShardingCompSpecs(ctx context.Context, cli client.Reader,
 	namespace, clusterName string, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	if err := precheck(sharding); err != nil {
+		return nil, err
+	}
 	shardingComps, err := listShardingComponents(ctx, cli, namespace, clusterName, sharding.Name)
 	if err != nil {
 		return nil, err
 	}
-	return buildShardingCompSpecs(clusterName, shardingComps, sharding)
+	return buildShardingCompSpecs(clusterName, sharding, shardingComps)
 }
 
 func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
 	return listShardingComponents(ctx, cli, cluster.Namespace, cluster.Name, shardingName)
 }
 
-func buildShardingCompSpecs(clusterName string, shardingComps []appsv1.Component, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
+func precheck(sharding *appsv1.ClusterSharding) error {
+	shards := int32(0)
+	shardIDs := sets.NewString()
+	for _, tpl := range sharding.ShardTemplates {
+		shards += ptr.Deref(tpl.Shards, 0)
+		for _, id := range tpl.ShardIDs {
+			if shardIDs.Has(id) {
+				return fmt.Errorf("shard id %s is duplicated", id)
+			}
+		}
+		shardIDs.Insert(tpl.ShardIDs...)
+	}
+	if shards > sharding.Shards {
+		return fmt.Errorf("the sum of shards in shard templates is greater than the total shards: %d vs %d", sharding.Shards, shards)
+	}
+	return nil
+}
+
+func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) (map[string][]*appsv1.ClusterComponentSpec, error) {
 	compNames := make([]string, 0)
 	for _, comp := range shardingComps {
 		compNames = append(compNames, comp.Name)
 	}
 
 	generator := &shardIDGenerator{
-		clusterName:  clusterName,
-		shardingName: sharding.Name,
-		running:      compNames,
-		offline:      sharding.Offline,
+		clusterName:        clusterName,
+		shardingName:       sharding.Name,
+		running:            compNames,
+		offline:            sharding.Offline,
+		takeOverByTemplate: shardNamesTakeOverByTemplate(clusterName, sharding),
 	}
 
 	templates := buildShardTemplates(clusterName, sharding, shardingComps)
 	for i := range templates {
-		if err := templates[i].align(generator, sharding.Name); err != nil {
+		if err := templates[i].align(generator); err != nil {
 			return nil, err
 		}
 	}
@@ -147,17 +170,8 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, s
 		nameToIndex[defaultShardTemplateName] = len(templates) - 1
 	}
 
-	takeOverByTemplate := func() map[string]string {
-		result := make(map[string]string)
-		for _, tpl := range sharding.ShardTemplates {
-			for _, id := range tpl.ShardIDs {
-				result[fmt.Sprintf("%s-%s-%s", clusterName, sharding.Name, id)] = tpl.Name
-			}
-		}
-		return result
-	}()
-
 	offline := sets.New(sharding.Offline...)
+	takeOverByTemplate := shardNamesTakeOverByTemplateMap(clusterName, sharding)
 	for _, comp := range shardingComps {
 		if model.IsObjectDeleting(&comp) || offline.Has(comp.Name) {
 			continue
@@ -187,4 +201,22 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, s
 	})
 
 	return templates
+}
+
+func shardNamesTakeOverByTemplate(clusterName string, sharding *appsv1.ClusterSharding) []string {
+	result := make([]string, 0)
+	for name := range maps.Keys(shardNamesTakeOverByTemplateMap(clusterName, sharding)) {
+		result = append(result, name)
+	}
+	return result
+}
+
+func shardNamesTakeOverByTemplateMap(clusterName string, sharding *appsv1.ClusterSharding) map[string]string {
+	result := make(map[string]string)
+	for _, tpl := range sharding.ShardTemplates {
+		for _, id := range tpl.ShardIDs {
+			result[fmt.Sprintf("%s-%s-%s", clusterName, sharding.Name, id)] = tpl.Name
+		}
+	}
+	return result
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -298,7 +299,7 @@ func resolveComponents(ctx context.Context, reader client.Reader, cluster *appsv
 	if shardingComp == nil {
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `component not found: %s`, componentName)
 	}
-	components, err := intctrlutil.ListShardingComponents(ctx, reader, cluster, componentName)
+	components, err := sharding.ListShardingComponents(ctx, reader, cluster, componentName)
 	if err != nil {
 		return nil, err
 	}

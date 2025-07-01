@@ -591,7 +591,7 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=15
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="the name is immutable"
 	Name string `json:"name"`
 
 	// Specifies the ShardingDefinition custom resource (CR) that defines the sharding's characteristics and behavior.
@@ -601,19 +601,6 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
 	ShardingDef string `json:"shardingDef,omitempty"`
-
-	// The template for generating Components for shards, where each shard consists of one Component.
-	//
-	// This field is of type ClusterComponentSpec, which encapsulates all the required details and
-	// definitions for creating and managing the Components.
-	// KubeBlocks uses this template to generate a set of identical Components of shards.
-	// All the generated Components will have the same specifications and definitions as specified in the `template` field.
-	//
-	// This allows for the creation of multiple Components with consistent configurations,
-	// enabling sharding and distribution of workloads across Components.
-	//
-	// +kubebuilder:validation:Required
-	Template ClusterComponentSpec `json:"template"`
 
 	// Specifies the desired number of shards.
 	//
@@ -633,10 +620,122 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Required
 	Shards int32 `json:"shards,omitempty"`
 
+	// The default template for generating Components for shards, where each shard consists of one Component.
+	//
+	// This field is of type ClusterComponentSpec, which encapsulates all the required details and
+	// definitions for creating and managing the Components.
+	// KubeBlocks uses this template to generate a set of identical Components of shards.
+	// All the generated Components will have the same specifications and definitions as specified in the `template` field.
+	//
+	// This allows for the creation of multiple Components with consistent configurations,
+	// enabling sharding and distribution of workloads across Components.
+	//
+	// +optional
+	Template ClusterComponentSpec `json:"template,omitempty"`
+
+	// Specifies a list of heterogeneous shard templates, allowing different groups of shards
+	// to be created with distinct configurations.
+	//
+	// +optional
+	ShardTemplates []ShardTemplate `json:"shardTemplates,omitempty"`
+
 	// Specifies the names of shards (components) to be transitioned to offline status.
 	//
 	// +optional
 	Offline []string `json:"offline,omitempty"`
+}
+
+type ShardTemplate struct {
+	// The unique name of this ShardTemplate.
+	//
+	// The name can't be empty.
+	//
+	// +kubebuilder:validation:MaxLength=15
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the ShardingDefinition custom resource (CR) that defines the sharding's characteristics and behavior.
+	//
+	// The full name or regular expression is supported to match the ShardingDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +optional
+	ShardingDef *string `json:"shardingDef,omitempty"`
+
+	// The number of shards to create from this ShardTemplate.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=2048
+	// +optional
+	Shards *int32 `json:"shards,omitempty"`
+
+	// Specifies the shard IDs to take over from the existing shards.
+	//
+	// +optional
+	ShardIDs []string `json:"shardIDs,omitempty"`
+
+	// ServiceVersion specifies the version of the Service expected to be provisioned by this template.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion *string `json:"serviceVersion,omitempty"`
+
+	// Specifies the name of the referenced ComponentDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +optional
+	CompDef *string `json:"compDef,omitempty"`
+
+	// Specifies Labels to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies Annotations to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Defines Env to override.
+	// Add new or override existing envs.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Specifies the desired number of replicas for the shard which are created from this template.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1
+	// +optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the scheduling policy for the shard.
+	// If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or default template.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
+
+	// Specifies an override for the resource requirements of the shard.
+	//
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Specifies an override for the storage requirements of the shard.
+	//
+	// +optional
+	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+
+	// Specifies an override for the custom instances of the shard.
+	//
+	// +optional
+	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies an override for the instance naming of the shard.
+	//
+	// +optional
+	FlatInstanceOrdinal *bool `json:"flatInstanceOrdinal,omitempty"`
 }
 
 // ClusterService defines a service that is exposed externally, allowing entities outside the cluster to access it.

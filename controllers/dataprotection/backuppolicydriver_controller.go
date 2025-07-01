@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -460,7 +461,7 @@ func (r *backupPolicyAndScheduleBuilder) matchMappingName(names []string, target
 }
 
 func (r *backupPolicyAndScheduleBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarget) []dpv1alpha1.BackupTarget {
-	shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, r.componentName)
+	shardComponents, _ := sharding.ListShardingComponents(r.Context, r.Client, r.Cluster, r.componentName)
 	sourceTargetMap := map[string]*dpv1alpha1.BackupTarget{}
 	for i := range targets {
 		sourceTargetMap[targets[i].Name] = &targets[i]

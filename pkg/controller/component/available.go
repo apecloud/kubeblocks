@@ -137,7 +137,7 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition, its *workloads.InstanceSet) (*bool, string, error) {
 	policy := GetComponentAvailablePolicy(compDef)
 	if policy.WithProbe == nil || policy.WithProbe.Condition == nil {
-		if policy.WithPhases != nil {
+		if policy.WithPhases != nil || policy.WithRole != nil {
 			return nil, "", nil
 		}
 		return nil, "", fmt.Errorf("the referenced ComponentDefinition does not have available probe defined, but we got a probe event? %s", compDef.Name)

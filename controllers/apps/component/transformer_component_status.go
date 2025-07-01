@@ -344,23 +344,36 @@ func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componen
 
 func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) error {
 	policy := component.GetComponentAvailablePolicy(transCtx.CompDef)
-	if policy.WithPhases == nil {
+	if policy.WithPhases == nil && policy.WithRole == nil {
 		return nil
 	}
 
 	var (
-		comp = transCtx.Component
+		comp                        = transCtx.Component
+		status, status1, status2    metav1.ConditionStatus
+		reason, reason1, reason2    string
+		message, message1, message2 string
 	)
-	status, reason, message := func() (metav1.ConditionStatus, string, string) {
-		if comp.Status.Phase == "" {
-			return metav1.ConditionUnknown, "Unknown", "the component phase is unknown"
+	if policy.WithPhases != nil {
+		status1, reason1, message1 = t.availableWithPhases(transCtx, comp, policy)
+	}
+	if policy.WithRole != nil {
+		status2, reason2, message2 = t.availableWithRole(transCtx, comp, policy)
+	}
+
+	// merge conditions
+	switch {
+	case policy.WithPhases != nil && policy.WithRole == nil:
+		status, reason, message = status1, reason1, message1
+	case policy.WithPhases == nil && policy.WithRole != nil:
+		status, reason, message = status2, reason2, message2
+	default: // both are not nil
+		if status1 != metav1.ConditionTrue {
+			status, reason, message = status1, reason1, message1
+		} else {
+			status, reason, message = status2, reason2, message2
 		}
-		phases := sets.New[string](strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
-		if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
-			return metav1.ConditionTrue, "Available", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
-		}
-		return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
-	}()
+	}
 
 	cond := metav1.Condition{
 		Type:               appsv1.ConditionTypeAvailable,
@@ -373,8 +386,38 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
 		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, reason, message)
 	}
-
 	return nil
+}
+
+func (t *componentStatusTransformer) availableWithPhases(_ *componentTransformContext,
+	comp *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string, string) {
+	if comp.Status.Phase == "" {
+		return metav1.ConditionUnknown, "Unknown", "the component phase is unknown"
+	}
+	phases := sets.New[string](strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
+	if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
+		return metav1.ConditionTrue, "Available", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
+	}
+	return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
+}
+
+func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransformContext,
+	_ *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string, string) {
+	var its *workloads.InstanceSet
+	if transCtx.RunningWorkload != nil {
+		its = transCtx.RunningWorkload.(*workloads.InstanceSet)
+	}
+	if its == nil {
+		return metav1.ConditionFalse, "Unavailable", "the workload is not present"
+	}
+	for _, member := range its.Status.MembersStatus {
+		if member.ReplicaRole != nil {
+			if strings.EqualFold(member.ReplicaRole.Name, *policy.WithRole) {
+				return metav1.ConditionTrue, "Available", fmt.Sprintf("the role %s is present", *policy.WithRole)
+			}
+		}
+	}
+	return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the role %s is not present", *policy.WithRole)
 }
 
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,

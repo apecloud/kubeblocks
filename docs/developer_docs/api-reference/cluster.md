@@ -4455,6 +4455,19 @@ string
 </tr>
 <tr>
 <td>
+<code>withRole</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the role that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>withProbe</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">

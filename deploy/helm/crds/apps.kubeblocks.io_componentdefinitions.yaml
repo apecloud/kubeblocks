@@ -4214,6 +4214,13 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                  withRole:
+                    description: |-
+                      Specifies the role that the component will go through to be considered available.
+
+
+                      This field is immutable once set.
+                    type: string
                 type: object
               configs:
                 description: |-

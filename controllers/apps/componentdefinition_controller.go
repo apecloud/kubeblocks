@@ -393,10 +393,20 @@ func (r *ComponentDefinitionReconciler) validateAvailable(cli client.Client, rct
 	if cmpd.Spec.Available == nil {
 		return nil
 	}
-	if cmpd.Spec.Available.WithPhases != nil && cmpd.Spec.Available.WithProbe == nil {
-		return r.validateAvailableWithPhases(cmpd)
+	if cmpd.Spec.Available.WithProbe != nil {
+		return r.validateAvailableWithProbe(cmpd)
 	}
-	return r.validateAvailableWithProbe(cmpd)
+	if cmpd.Spec.Available.WithPhases != nil {
+		if err := r.validateAvailableWithPhases(cmpd); err != nil {
+			return err
+		}
+	}
+	if cmpd.Spec.Available.WithRole != nil {
+		if err := r.validateAvailableWithRole(cmpd); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1.ComponentDefinition) error {
@@ -416,6 +426,16 @@ func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1
 		return fmt.Errorf("unsupported phases are specified: %s", strings.Join(sets.List(result), ","))
 	}
 	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateAvailableWithRole(cmpd *appsv1.ComponentDefinition) error {
+	role := strings.ToLower(*cmpd.Spec.Available.WithRole)
+	for _, r := range cmpd.Spec.Roles {
+		if strings.ToLower(r.Name) == role {
+			return nil
+		}
+	}
+	return fmt.Errorf("the role that available with role used is not defined: %s", role)
 }
 
 func (r *ComponentDefinitionReconciler) validateAvailableWithProbe(cmpd *appsv1.ComponentDefinition) error {

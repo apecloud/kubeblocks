@@ -10513,32 +10513,6 @@ Cluster by default.</p>
 </tr>
 <tr>
 <td>
-<code>cluster</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the KubeBlocks Cluster being referenced.
-This is used when services from another KubeBlocks Cluster are consumed.</p>
-<p>By default, the referenced KubeBlocks Cluster&rsquo;s <code>clusterDefinition.spec.connectionCredential</code>
-will be utilized to bind to the current Component. This credential should include:
-<code>endpoint</code>, <code>port</code>, <code>username</code>, and <code>password</code>.</p>
-<p>Note:</p>
-<ul>
-<li>The <code>ServiceKind</code> and <code>ServiceVersion</code> specified in the service reference within the
-ClusterDefinition are not validated when using this approach.</li>
-<li>If both <code>cluster</code> and <code>serviceDescriptor</code> are present, <code>cluster</code> will take precedence.</li>
-</ul>
-<p>Deprecated since v0.9 since <code>clusterDefinition.spec.connectionCredential</code> is deprecated,
-use <code>clusterServiceSelector</code> instead.
-This field is maintained for backward compatibility and its use is discouraged.
-Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>clusterServiceSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ServiceRefClusterSelector">
@@ -10549,7 +10523,10 @@ ServiceRefClusterSelector
 <td>
 <em>(Optional)</em>
 <p>References a service provided by another KubeBlocks Cluster.
-It specifies the ClusterService and the account credentials needed for access.</p>
+It specifies the ClusterService and the account credentials needed for access.
+The <code>ServiceKind</code> and <code>ServiceVersion</code> specified in the service reference within the
+ClusterDefinition are not validated when using this approach.</p>
+<p>If both <code>clusterServiceSelector</code> and <code>serviceDescriptor</code> are specified, the <code>cluster</code> takes precedence.</p>
 </td>
 </tr>
 <tr>
@@ -10566,7 +10543,7 @@ string
 the service binding.
 The <code>serviceDescriptor.spec.serviceKind</code> and <code>serviceDescriptor.spec.serviceVersion</code> should match the serviceKind
 and serviceVersion declared in the definition.</p>
-<p>If both <code>cluster</code> and <code>serviceDescriptor</code> are specified, the <code>cluster</code> takes precedence.</p>
+<p>If both <code>clusterServiceSelector</code> and <code>serviceDescriptor</code> are specified, the <code>cluster</code> takes precedence.</p>
 </td>
 </tr>
 </tbody>

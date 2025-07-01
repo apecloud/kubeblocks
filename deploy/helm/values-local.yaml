@@ -1,0 +1,8 @@
+image:
+  tag: "1.0.0-beta.47"
+dataProtection:
+  image:
+    tag: "1.0.0-beta.47"
+registryConfig: 
+  defaultRegistry: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com
+  defaultNamespace: apecloud

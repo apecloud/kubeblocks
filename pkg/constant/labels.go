@@ -44,6 +44,7 @@ const (
 	KBAppComponentLabelKey    = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey = "apps.kubeblocks.io/sharding-name"
 
+	KBAppShardTemplateLabelKey      = "apps.kubeblocks.io/shard-template"
 	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
 	PVCNameLabelKey                 = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
@@ -55,14 +56,14 @@ const (
 )
 
 func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {
-	return withShardingNameLabel(map[string]string{
+	return withShardingLabels(map[string]string{
 		AppManagedByLabelKey: AppName,
 		AppInstanceLabelKey:  clusterName,
 	}, labels...)
 }
 
 func GetCompLabels(clusterName, compName string, labels ...map[string]string) map[string]string {
-	return withShardingNameLabel(map[string]string{
+	return withShardingLabels(map[string]string{
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: compName,
@@ -78,15 +79,17 @@ func GetCompLabelsWithDef(clusterName, compName, compDef string, labels ...map[s
 	if len(compDef) > 0 {
 		m[AppComponentLabelKey] = compDef
 	}
-	return withShardingNameLabel(m, labels...)
+	return withShardingLabels(m, labels...)
 }
 
-func withShardingNameLabel(labels map[string]string, extraLabels ...map[string]string) map[string]string {
+func withShardingLabels(labels map[string]string, extraLabels ...map[string]string) map[string]string {
 	for _, m := range extraLabels {
 		if m != nil {
 			if v, ok := m[KBAppShardingNameLabelKey]; ok {
 				labels[KBAppShardingNameLabelKey] = v
-				break
+			}
+			if v, ok := m[KBAppShardTemplateLabelKey]; ok {
+				labels[KBAppShardTemplateLabelKey] = v
 			}
 		}
 	}

@@ -24,17 +24,18 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -356,7 +357,7 @@ var _ = Describe("CustomOps", func() {
 
 			// create a sharding component
 			shardingNamePrefix := constant.GenerateClusterComponentName(cluster.Name, defaultCompName)
-			shardingCompName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+			shardingCompName := fmt.Sprintf("%s-%s", shardingNamePrefix, rand.String(sharding.ShardIDLength))
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, shardingCompName, compDefName).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 				AddLabels(constant.KBAppClusterUIDKey, string(cluster.UID)).

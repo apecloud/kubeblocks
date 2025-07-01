@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -137,7 +138,7 @@ func (c CustomOpsHandler) listComponents(reqCtx intctrlutil.RequestCtx,
 		}
 		return []appsv1.Component{*comp}, nil
 	}
-	return intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, cluster, componentName)
+	return sharding.ListShardingComponents(reqCtx.Ctx, cli, cluster, componentName)
 }
 
 func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,

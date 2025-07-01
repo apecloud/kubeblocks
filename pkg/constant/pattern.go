@@ -92,8 +92,3 @@ func GenerateDefaultRoleName(cmpdName string) string {
 func GenerateWorkloadNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
-
-// GenerateShardingNamePrefix generates sharding name prefix.
-func GenerateShardingNamePrefix(shardingName string) string {
-	return fmt.Sprintf("%s-", shardingName)
-}

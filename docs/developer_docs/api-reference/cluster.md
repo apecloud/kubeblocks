@@ -3725,25 +3725,6 @@ string
 </tr>
 <tr>
 <td>
-<code>template</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
-ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>The template for generating Components for shards, where each shard consists of one Component.</p>
-<p>This field is of type ClusterComponentSpec, which encapsulates all the required details and
-definitions for creating and managing the Components.
-KubeBlocks uses this template to generate a set of identical Components of shards.
-All the generated Components will have the same specifications and definitions as specified in the <code>template</code> field.</p>
-<p>This allows for the creation of multiple Components with consistent configurations,
-enabling sharding and distribution of workloads across Components.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>shards</code><br/>
 <em>
 int32
@@ -3762,6 +3743,41 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
+ClusterComponentSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The default template for generating Components for shards, where each shard consists of one Component.</p>
+<p>This field is of type ClusterComponentSpec, which encapsulates all the required details and
+definitions for creating and managing the Components.
+KubeBlocks uses this template to generate a set of identical Components of shards.
+All the generated Components will have the same specifications and definitions as specified in the <code>template</code> field.</p>
+<p>This allows for the creation of multiple Components with consistent configurations,
+enabling sharding and distribution of workloads across Components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardTemplate">
+[]ShardTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of heterogeneous shard templates, allowing different groups of shards
+to be created with distinct configurations.</p>
 </td>
 </tr>
 <tr>
@@ -7887,7 +7903,7 @@ ContainerVars
 <h3 id="apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -8755,7 +8771,7 @@ and specifies that PersistentVolumeClaims associated with VolumeClaimTemplates w
 <h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimTemplate">PersistentVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>)
 </p>
 <div>
 </div>
@@ -9669,7 +9685,7 @@ it will be counted towards MaxUnavailable.</p>
 <h3 id="apps.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>SchedulingPolicy defines the scheduling policy for instances.</p>
@@ -11134,6 +11150,217 @@ NamedVar
 <p>Port references a port or node-port defined in the service.</p>
 <p>If the referenced service is a pod-service, there will be multiple service objects matched,
 and the value will be presented in the following format: service1.name:port1,service2.name:port2&hellip;</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The unique name of this ShardTemplate.</p>
+<p>The name can&rsquo;t be empty.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ShardingDefinition custom resource (CR) that defines the sharding&rsquo;s characteristics and behavior.</p>
+<p>The full name or regular expression is supported to match the ShardingDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of shards to create from this ShardTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardIDs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the shard IDs to take over from the existing shards.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this template.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines Env to override.
+Add new or override existing envs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired number of replicas for the shard which are created from this template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the shard.
+If defined, it will overwrite the scheduling policy defined in ClusterSpec and/or default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resources</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
+Kubernetes core/v1.ResourceRequirements
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the resource requirements of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimTemplate">
+[]PersistentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the storage requirements of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
+[]InstanceTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the custom instances of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>flatInstanceOrdinal</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the instance naming of the shard.</p>
 </td>
 </tr>
 </tbody>

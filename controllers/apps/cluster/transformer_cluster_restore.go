@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -67,7 +68,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 				`the source targets count of the backup "%s" must be equal to or greater than the count of the shard components "%s"`,
 				backup.Name, spec.Name)
 		}
-		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, spec.Name)
+		shardComponents, err := sharding.ListShardingComponents(c.Context, c.Client, c.Cluster, spec.Name)
 		if err != nil {
 			return err
 		}

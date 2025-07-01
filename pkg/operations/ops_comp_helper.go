@@ -31,6 +31,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -198,25 +199,25 @@ func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx
 
 	// 2. handle the sharding status.
 	for i := range opsRes.Cluster.Spec.Shardings {
-		sharding := opsRes.Cluster.Spec.Shardings[i]
-		compOps, ok := c.getComponentOps(sharding.Name)
+		spec := opsRes.Cluster.Spec.Shardings[i]
+		compOps, ok := c.getComponentOps(spec.Name)
 		if !ok {
 			continue
 		}
 		if c.isHScaleShards(opsRes.OpsRequest, compOps) {
-			if err := setProgressResource(&sharding.Template, compOps, "", &sharding.Shards); err != nil {
+			if err := setProgressResource(&spec.Template, compOps, "", &spec.Shards); err != nil {
 				return nil, err
 			}
 			continue
 		}
 		// handle the progress of the components of the sharding.
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, sharding.Name)
+		shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, spec.Name)
 		if err != nil {
 			return nil, err
 		}
 		for j := range shardingComps {
-			if err = setProgressResource(&sharding.Template, compOps,
-				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &sharding.Shards); err != nil {
+			if err = setProgressResource(&spec.Template, compOps,
+				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &spec.Shards); err != nil {
 				return nil, err
 			}
 		}

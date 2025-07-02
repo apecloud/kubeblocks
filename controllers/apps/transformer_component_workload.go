@@ -515,6 +515,13 @@ func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
 		return nil
 	}
+
+	podsToMemberJoin := getPodsToMemberJoinFromAnno(r.runningITS)
+	if podsToMemberJoin.Len() > 0 {
+		r.reqCtx.Log.Info(fmt.Sprintf("wait for member join: %v to finish", sets.List(podsToMemberJoin)))
+		return nil
+	}
+
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
 	err := r.leaveMember4ScaleIn()
 	if err != nil {
@@ -634,7 +641,6 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
 
-	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
 		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
@@ -645,10 +651,6 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	var leaveErrors []error
 	for _, pod := range podsToMemberLeave {
-		if podsToMemberjoin.Has(pod.Name) {
-			leaveErrors = append(leaveErrors, fmt.Errorf("pod %s is in memberjoin process", pod.Name))
-			continue
-		}
 		if err := r.leaveMemberForPod(pod, pods); err != nil {
 			leaveErrors = append(leaveErrors, err)
 		}

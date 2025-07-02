@@ -77,7 +77,6 @@ var _ = Describe("Request Test", func() {
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
-		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
 

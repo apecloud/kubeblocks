@@ -65,7 +65,6 @@ var _ = Describe("Log Collection Controller", func() {
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
-		testapps.ClearResources(&testCtx, generics.VolumeSnapshotClassSignature, ml)
 	}
 
 	BeforeEach(func() {

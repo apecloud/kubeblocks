@@ -977,20 +977,9 @@ rules:
   resources:
   - volumesnapshotclasses
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - snapshot.storage.k8s.io
-  resources:
-  - volumesnapshotclasses/finalizers
-  verbs:
-  - patch
-  - update
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:

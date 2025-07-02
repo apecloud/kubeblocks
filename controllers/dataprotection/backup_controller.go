@@ -172,7 +172,7 @@ func (r *BackupReconciler) filterBackupPods(ctx context.Context, obj client.Obje
 		return requests
 	}
 	for _, v := range obj.GetOwnerReferences() {
-		if v.Kind == constant.StatefulSetKind && v.Name == backupName {
+		if (v.Kind == constant.StatefulSetKind && v.Name == backupName) || v.Kind == constant.JobKind {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: obj.GetNamespace(),

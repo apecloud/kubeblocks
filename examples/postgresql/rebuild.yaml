@@ -1,0 +1,16 @@
+apiVersion: operations.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: pg-rebuildinstance
+  namespace: demo
+spec:
+  clusterName: pg-cluster
+  force: true
+  preConditionDeadlineSeconds: 0
+  rebuildFrom:
+  - backupName: pg-cluster-pg-basebackup
+    componentName: postgresql
+    inPlace: true
+    instances:
+    - name: pg-cluster-postgresql-1
+  type: RebuildInstance

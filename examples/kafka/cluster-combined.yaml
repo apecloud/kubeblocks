@@ -1,0 +1,82 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: kafka-combined-cluster
+  namespace: demo
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # Valid options are: [DoNotTerminate, Delete, WipeOut] (`Halt` is deprecated since KB 0.9)
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
+  # Note: DO NOT UPDATE THIS FIELD
+  # The value must be `kafaka` to create a Kafka Cluster
+  clusterDef: kafka
+  # Specifies the name of the ClusterTopology to be used when creating the
+  # Cluster.
+  # - combined: combined Kafka controller (KRaft) and broker in one Component
+  # - combined_monitor: combined mode with monitor component
+  # - separated: separated KRaft and Broker Components.
+  # - separated_monitor: separated mode with monitor component
+  # Valid options are: [combined,combined_monitor,separated,separated_monitor]
+  topology: combined_monitor
+  # Specifies a list of ClusterComponentSpec objects used to define the
+  # individual Components that make up a Cluster.
+  # This field allows for detailed configuration of each Component within the Cluster
+  componentSpecs:
+    - name: kafka-combine
+      env:
+        - name: KB_KAFKA_BROKER_HEAP # use this ENV to set BROKER HEAP
+          value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+        - name: KB_KAFKA_CONTROLLER_HEAP # use this ENV to set CONTOLLER_HEAP
+          value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+          # Whether to enable direct Pod IP address access mode.
+          # - If set to 'true', Kafka clients will connect to Brokers using the Pod IP address directly.
+          # - If set to 'false', Kafka clients will connect to Brokers using the Headless Service's FQDN.
+        - name: KB_BROKER_DIRECT_POD_ACCESS
+          value: "false"
+      # Update `replicas` to your need.
+      replicas: 1
+      # Specifies the resources required by the Component.
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      # Specifies a list of PersistentVolumeClaim templates that define the storage
+      # requirements for the Component.
+      volumeClaimTemplates:
+        # Refers to the name of a volumeMount defined in
+        # `componentDefinition.spec.runtime.containers[*].volumeMounts
+        - name: data
+          spec:
+            # The name of the StorageClass required by the claim.
+            # If not specified, the StorageClass annotated with
+            # `storageclass.kubernetes.io/is-default-class=true` will be used by default
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+        - name: metadata
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+    - name: kafka-exporter # component for exporter
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "1Gi"
+        requests:
+          cpu: "0.1"
+          memory: "0.2Gi"

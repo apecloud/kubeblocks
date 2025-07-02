@@ -1,0 +1,226 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  namespace: demo
+  name: milvus-cluster
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # Valid options are: [DoNotTerminate, Delete, WipeOut] (`Halt` is deprecated since KB 0.9)
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
+  # Note: DO NOT UPDATE THIS FIELD
+  # The value must be `milvus` to create a Milvus Cluster
+  clusterDef: milvus
+  # Specifies the name of the ClusterTopology to be used when creating the
+  # Cluster.
+  # Valid options are: [standalone,cluster]
+  topology: cluster
+  # Specifies a list of ClusterComponentSpec objects used to define the
+  # individual Components that make up a Cluster.
+  # This field allows for detailed configuration of each Component within the Cluster
+  componentSpecs:
+    - name: proxy
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      # Defines a list of ServiceRef for a Component
+      serviceRefs:
+        - name: milvus-meta-storage # Specifies the identifier of the service reference declaration, defined in `componentDefinition.spec.serviceRefDeclarations[*].name`
+          namespace: demo        # namepspace of referee cluster, update on demand
+          # References a service provided by another KubeBlocks Cluster
+          clusterServiceSelector:
+            cluster: etcdm-cluster  # ETCD Cluster Name, update the cluster name on demand
+            service:
+              component: etcd       # component name, should be etcd
+              service: headless     # Refer to default headless Service
+              port: client          # Refer to port name 'client'
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster # Pulsar Cluster Name
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster # Minio Cluster Name
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:            # Specifies the SystemAccount to authenticate and establish a connection with the referenced Cluster.
+              component: minio     # for component 'minio'
+              name: admin          # the name of the credential (SystemAccount) to reference, using account 'admin' in this case
+      disableExporter: true
+    - name: mixcoord
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: datanode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+    - name: indexnode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+    - name: querynode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin

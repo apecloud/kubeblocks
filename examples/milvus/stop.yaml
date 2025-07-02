@@ -1,0 +1,22 @@
+apiVersion: operations.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: milvus-stop
+  namespace: demo
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: milvus-cluster
+  type: Stop
+  # Lists Components to be stopped. ComponentOps specifies the Component to be operated on.
+  # # The stop field is optional, all components in the cluster will be stopped if not specifed.
+  # stop:
+  #   # Specifies the name of the Component.
+  #   # - standalone: milvus
+  #   # - standalone: etcd
+  #   # - standalone: minio
+  #   # - distributed: proxy
+  #   # - distributed: mixcoord
+  #   # - distributed: datanode
+  #   # - distributed: indexnode
+  #   # - distributed: querynode
+  #   - componentName: mixcoord

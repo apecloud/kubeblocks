@@ -1,0 +1,38 @@
+apiVersion: operations.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: es-expose-enable
+  namespace: demo
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: es-multinode
+  # Lists Expose objects, each specifying a Component and its services to be exposed.
+  expose:
+    # Specifies the name of the Component.
+    # - master
+    # - data
+    # - ingest
+    # - transform
+  - componentName: master
+    # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`.
+    services:
+    - name: internet
+      # Determines how the Service is exposed. Defaults to 'ClusterIP'.
+      # Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
+      serviceType: LoadBalancer
+      # Contains cloud provider related parameters if ServiceType is LoadBalancer.
+      # Following is an example for Aliyun ACK, please adjust the following annotations as needed.
+      annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-charge-type: ""
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-spec: slb.s1.small
+      ports:
+      - name: es-http
+        port: 9200
+        protocol: TCP
+        targetPort: es-http
+    # Indicates whether the services will be exposed. 'Enable' exposes the services. while 'Disable' removes the exposed Service.
+    switch: Enable
+  # Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
+  preConditionDeadlineSeconds: 0
+  type: Expose

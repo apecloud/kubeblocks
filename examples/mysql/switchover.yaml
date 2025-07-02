@@ -1,17 +1,16 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: operations.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: mysql-switchover
+  namespace: demo
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
   clusterName: mysql-cluster
-  type: Custom
+  type: Switchover
   # Lists Switchover objects, each specifying a Component to perform the switchover operation.
-  custom:
-    components:
-      - componentName: mysql
-        parameters:
-          - name: candidate
-            value: mysql-cluster-mysql-mysql-1
-    opsDefinitionName: mysql-orc-switchover
-
+  switchover:
+    # Specifies the name of the Component.
+  - componentName: mysql
+    # Specifies the instance whose role will be transferred.
+    # A typical usage is to transfer the leader role in a consensus system.
+    instanceName: mysql-cluster-mysql-0

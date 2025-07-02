@@ -1,22 +1,32 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: operations.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: pg-expose-enable
-  namespace: default
+  namespace: demo
 spec:
+  # Specifies the type of this operation.
+  type: Expose
   # Specifies the name of the Cluster resource that this operation is targeting.
   clusterName: pg-cluster
   # Lists Expose objects, each specifying a Component and its services to be exposed.
   expose:
     # Specifies the name of the Component.
   - componentName: postgresql
-    # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`. 
+    # Specifies a list of OpsService. When an OpsService is exposed, a corresponding ClusterService will be added to `cluster.spec.services`.
     services:
     - name: internet
-      roleSelector: primary
+      # Determines how the Service is exposed. Defaults to 'ClusterIP'.
+      # Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
       serviceType: LoadBalancer
+      # Contains cloud provider related parameters if ServiceType is LoadBalancer.
+      # Following is an example for Aliyun ACK, please adjust the following annotations as needed.
+      annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-charge-type: ""
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-spec: slb.s1.small
+      # Specifies a role to target with the service.
+      # If specified, the service will only be exposed to pods with the matching
+      # role.
+      roleSelector: primary
     # Indicates whether the services will be exposed. 'Enable' exposes the services. while 'Disable' removes the exposed Service.
     switch: Enable
-  # Specifies the maximum number of seconds the OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed.
-  preConditionDeadlineSeconds: 0
-  type: Expose

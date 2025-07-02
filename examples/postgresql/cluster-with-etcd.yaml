@@ -1,0 +1,35 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: pg-cluster-etcd
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  clusterDef: postgresql
+  topology: replication
+  componentSpecs:
+    - name: postgresql
+      serviceVersion: "14.7.2"
+      env:
+      - name: DCS_ENABLE_KUBERNETES_API  # unset this env if you use zookeeper or etcd, default to empty
+      - name: ETCD3_HOST
+        value: 'myetcd-etcd-headless.default.svc.cluster.local:2379' # where is your etcd?
+      # - name: ZOOKEEPER_HOSTS
+      #   value: 'myzk-zookeeper-0.myzk-zookeeper-headless.default.svc.cluster.local:2181' # where is your zookeeper?
+      replicas: 2
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

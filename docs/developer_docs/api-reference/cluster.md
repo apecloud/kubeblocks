@@ -10526,7 +10526,7 @@ ServiceRefClusterSelector
 It specifies the ClusterService and the account credentials needed for access.
 The <code>ServiceKind</code> and <code>ServiceVersion</code> specified in the service reference within the
 ClusterDefinition are not validated when using this approach.</p>
-<p>If both <code>clusterServiceSelector</code> and <code>serviceDescriptor</code> are specified, the <code>cluster</code> takes precedence.</p>
+<p>If both <code>clusterServiceSelector</code> and <code>serviceDescriptor</code> are specified, the <code>clusterServiceSelector</code> takes precedence.</p>
 </td>
 </tr>
 <tr>
@@ -10543,7 +10543,7 @@ string
 the service binding.
 The <code>serviceDescriptor.spec.serviceKind</code> and <code>serviceDescriptor.spec.serviceVersion</code> should match the serviceKind
 and serviceVersion declared in the definition.</p>
-<p>If both <code>clusterServiceSelector</code> and <code>serviceDescriptor</code> are specified, the <code>cluster</code> takes precedence.</p>
+<p>If both <code>clusterServiceSelector</code> and <code>serviceDescriptor</code> are specified, the <code>clusterServiceSelector</code> takes precedence.</p>
 </td>
 </tr>
 </tbody>

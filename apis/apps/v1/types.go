@@ -71,7 +71,7 @@ type ServiceRef struct {
 	// The `ServiceKind` and `ServiceVersion` specified in the service reference within the
 	// ClusterDefinition are not validated when using this approach.
 	//
-	// If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `cluster` takes precedence.
+	// If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `clusterServiceSelector` takes precedence.
 	//
 	// +optional
 	ClusterServiceSelector *ServiceRefClusterSelector `json:"clusterServiceSelector,omitempty"`
@@ -83,7 +83,7 @@ type ServiceRef struct {
 	// The `serviceDescriptor.spec.serviceKind` and `serviceDescriptor.spec.serviceVersion` should match the serviceKind
 	// and serviceVersion declared in the definition.
 	//
-	// If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `cluster` takes precedence.
+	// If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `clusterServiceSelector` takes precedence.
 	//
 	// +optional
 	ServiceDescriptor string `json:"serviceDescriptor,omitempty"`

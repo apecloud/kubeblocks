@@ -3738,7 +3738,7 @@ spec:
                         ClusterDefinition are not validated when using this approach.
 
 
-                        If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `cluster` takes precedence.
+                        If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `clusterServiceSelector` takes precedence.
                       properties:
                         cluster:
                           description: The name of the Cluster being referenced.
@@ -3839,7 +3839,7 @@ spec:
                         and serviceVersion declared in the definition.
 
 
-                        If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `cluster` takes precedence.
+                        If both `clusterServiceSelector` and `serviceDescriptor` are specified, the `clusterServiceSelector` takes precedence.
                       type: string
                   required:
                   - name

@@ -129,12 +129,8 @@ func (r *probeRunner) launchRunLoop(probe *proto.Probe) {
 }
 
 func (r *probeRunner) runLoop(probe *proto.Probe) {
-	runOnce := func() ([]byte, error) {
-		return r.actionService.handleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
-	}
-
-	for range r.ticker.C {
-		output, err := runOnce()
+	once := func() {
+		output, err := r.actionService.handleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
 		if err == nil {
 			r.succeedCount++
 			r.failedCount = 0
@@ -148,6 +144,13 @@ func (r *probeRunner) runLoop(probe *proto.Probe) {
 		if succeed, _ := r.succeed(probe); succeed && !reflect.DeepEqual(output, r.latestOutput) {
 			r.latestOutput = output
 		}
+	}
+
+	// initial run
+	once()
+
+	for range r.ticker.C {
+		once()
 	}
 }
 

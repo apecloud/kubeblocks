@@ -1,0 +1,19 @@
+apiVersion: operations.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  generateName: mysql-rebuildinstance
+  namespace: demo
+spec:
+  # Operation type is RebuildInstance
+  type: RebuildInstance
+  # Specify the name of the cluster to be rebuilt
+  clusterName: mysql-cluster
+  # If set to true, the operation will be forced even if the node is running
+  force: true
+  rebuildFrom:
+    - componentName: mysql # Name of the component to be rebuilt
+      backupName: <MYSQL_FULL_BACKUP_NAME> # the name of the Backup to restore the instance.
+      inPlace: true # Whether to rebuild in place on the existing Pod
+      instances:
+        - name: mysql-cluster-mysql-0 # Name of the Pod to be rebuilt
+          targetNodeName: <NODE_NAME> # rebuild on the specified nod

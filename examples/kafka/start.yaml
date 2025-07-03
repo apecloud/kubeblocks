@@ -1,9 +1,9 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: operations.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: kafka-start
-  namespace: default
+  name: kafka-combined-start
+  namespace: demo
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterName: kafka-cluster
+  clusterName: kafka-combined-cluster
   type: Start

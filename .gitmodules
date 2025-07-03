@@ -1,0 +1,3 @@
+[submodule "docs/kubeblocks-docs"]
+	path = docs/kubeblocks-docs
+	url = https://github.com/apecloud/kubeblocks-docs.git

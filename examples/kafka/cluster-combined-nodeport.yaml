@@ -1,0 +1,58 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: kafka-combined-cluster-np
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  clusterDef: kafka
+  topology: combined_monitor
+  componentSpecs:
+    - name: kafka-combine
+      # Override per-pod servcie named 'advertised-listener'
+      # by setting its `serviceType` to `NodePort` (default to `ClusterIP`)
+      services:
+        - name: advertised-listener
+          serviceType: NodePort
+          podService: true
+      env:
+        - name: KB_KAFKA_BROKER_HEAP
+          value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+        - name: KB_KAFKA_CONTROLLER_HEAP
+          value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+        - name: KB_BROKER_DIRECT_POD_ACCESS # set KB_BROKER_DIRECT_POD_ACCESS to FALSE to disable direct pod access
+          value: "false"
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+        - name: metadata
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+    - name: kafka-exporter
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "1Gi"
+        requests:
+          cpu: "0.1"
+          memory: "0.2Gi"

@@ -1,0 +1,54 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: redis-replication-with-proxy
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  clusterDef: redis
+  topology: replication-twemproxy  # set topology to standalone
+  componentSpecs:
+  - name: redis
+    replicas: 2
+    disableExporter: true
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: "0.5Gi"
+      requests:
+        cpu: "0.5"
+        memory: "0.5Gi"
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+  - name: redis-sentinel
+    replicas: 3
+    resources:
+      limits:
+        cpu: "0.2"
+        memory:  "0.2Gi"
+      requests:
+        cpu: "0.2"
+        memory:  "0.2Gi"
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+  - name: redis-twemproxy       # add one componet on provisioniing: twemproxy
+    replicas: 3
+    resources:
+      limits:
+        cpu: "0.2"
+        memory: "0.2Gi"
+      requests:
+        cpu: "0.2"
+        memory: "0.2Gi"

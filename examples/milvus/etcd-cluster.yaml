@@ -1,0 +1,28 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: etcdm-cluster
+  namespace: demo
+spec:
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: etcd
+      componentDef: etcd-3-1.0.0
+      serviceVersion: 3.5.6
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

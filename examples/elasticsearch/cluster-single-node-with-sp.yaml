@@ -1,0 +1,48 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: es-singlenode-with-sp
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: mdit
+      componentDef: elasticsearch-8
+      serviceVersion: 8.8.2
+      schedulingPolicy:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: es-cluster
+                    apps.kubeblocks.io/component-name: mdit
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: es-cluster
+                  apps.kubeblocks.io/component-name: mdit
+              topologyKey: kubernetes.io/hostname
+      replicas: 1
+      configs:
+        - name: es-cm
+          variables:
+            mode: "single-node"
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

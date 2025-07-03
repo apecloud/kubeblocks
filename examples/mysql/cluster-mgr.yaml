@@ -1,0 +1,60 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: mysql-mgr-cluster
+  namespace: demo
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # Valid options are: [DoNotTerminate, Delete, WipeOut] (`Halt` is deprecated since KB 0.9)
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies a list of ClusterComponentSpec objects used to define the
+  # individual Components that make up a Cluster.
+  # This field allows for detailed configuration of each Component within the Cluster
+  componentSpecs:
+    - name: mysql
+      # Specifies the ComponentDefinition custom resource (CR) that defines the
+      # Component's characteristics and behavior.
+      # Supports three different ways to specify the ComponentDefinition:
+      # - the regular expression - recommended
+      # - the full name - recommended
+      # - the name prefix
+      componentDef: "mysql-mgr-8.0"  # match all CMPD named with 'mysql-mgr-8.0-'
+      # ServiceVersion specifies the version of the Service expected to be
+      # provisioned by this Component.
+      # When componentDef is "mysql-8.0",
+      # Valid options are: [8.0.30,8.0.31,8.0.32,8.0.33,8.0.34,8.0.35,8.0.36,8.0.37,8.0.38,8.0.39]
+      serviceVersion: 8.0.35
+      # Determines whether metrics exporter information is annotated on the
+      # Component's headless Service.
+      # Valid options are [true, false]
+      disableExporter: false
+      # Specifies the desired number of replicas in the Component
+      replicas: 3
+      # Specifies the resources required by the Component.
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      # Specifies a list of PersistentVolumeClaim templates that define the storage
+      # requirements for the Component.
+      volumeClaimTemplates:
+        # Refers to the name of a volumeMount defined in
+        # `componentDefinition.spec.runtime.containers[*].volumeMounts
+        - name: data
+          spec:
+            # The name of the StorageClass required by the claim.
+            # If not specified, the StorageClass annotated with
+            # `storageclass.kubernetes.io/is-default-class=true` will be used by default
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                # Set the storage size as needed
+                storage: 20Gi

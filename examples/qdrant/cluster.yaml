@@ -2,35 +2,54 @@ apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: qdrant-cluster
-  namespace: default
+  namespace: demo
+  annotations: {}
 spec:
   # Specifies the behavior when a Cluster is deleted.
+  # Valid options are: [DoNotTerminate, Delete, WipeOut] (`Halt` is deprecated since KB 0.9)
   # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
-  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
   # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
   # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
   terminationPolicy: Delete
-  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster.
-  # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
-  # ClusterComponentSpec defines the specifications for a Component in a Cluster.
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
+  # Note: DO NOT UPDATE THIS FIELD
+  # The value must be `qdrant` to create a Qdrant Cluster
+  clusterDef: qdrant
+  # Specifies the name of the ClusterTopology to be used when creating the
+  # Cluster.
+  # Valid options are: [cluster]
+  topology: cluster
   componentSpecs:
-  - name: qdrant
-    componentDef: qdrant
-    disableExporter: true
-    serviceAccountName: kb-qdrant-cluster
-    replicas: 2
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+    - name: qdrant
+      # ServiceVersion specifies the version of the Service expected to be
+      # provisioned by this Component.
+      # Valid options are: [1.10.0,1.5.0,1.7.3,1.8.1,1.8.4]
+      serviceVersion: 1.10.0
+      # Update `replicas` to your need.
+      # Recommended values are: [3,5,7]
+      replicas: 3
+      # Specifies the resources required by the Component.
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      # Specifies a list of PersistentVolumeClaim templates that define the storage
+      # requirements for the Component.
+      volumeClaimTemplates:
+        # Refers to the name of a volumeMount defined in
+        # `componentDefinition.spec.runtime.containers[*].volumeMounts
+        - name: data
+          spec:
+            # The name of the StorageClass required by the claim.
+            # If not specified, the StorageClass annotated with
+            # `storageclass.kubernetes.io/is-default-class=true` will be used by default
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                # Set the storage size as needed
+                storage: 20Gi

@@ -1,0 +1,58 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: es-multinode-708
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: data
+      componentDef: elasticsearch-7
+      serviceVersion: 7.8.1
+      configs:
+        - name: es-cm
+          variables:
+            version: 7.8.1
+            roles: data,ingest,transform
+      replicas: 3
+      disableExporter: false
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: master
+      componentDef: elasticsearch-7
+      serviceVersion: 7.8.1
+      configs:
+        - name: es-cm
+          variables:
+            version: 7.8.1
+            roles: master
+      replicas: 3
+      disableExporter: false
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

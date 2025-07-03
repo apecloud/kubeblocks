@@ -516,12 +516,12 @@ func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 		return nil
 	}
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
-	err := r.leaveMember4ScaleIn()
+	leaveDone, err := r.leaveMember4ScaleIn()
 	if err != nil {
 		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
 	}
-	return r.deletePVCs4ScaleIn(itsObj)
+	return r.deletePVCs4ScaleIn(itsObj, leaveDone)
 }
 
 func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
@@ -624,11 +624,11 @@ func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[st
 	return podsToMemberjoin
 }
 
-func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
+func (r *componentWorkloadOps) leaveMember4ScaleIn() ([]string, error) {
 	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	pods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
@@ -644,19 +644,22 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	}
 
 	var leaveErrors []error
+	var leaveDone []string
 	for _, pod := range podsToMemberLeave {
 		if podsToMemberjoin.Has(pod.Name) {
-			leaveErrors = append(leaveErrors, fmt.Errorf("pod %s is in memberjoin process", pod.Name))
+			r.reqCtx.Log.Info(fmt.Sprintf("pod %s is in memberjoin process", pod.Name))
 			continue
 		}
-		if err := r.leaveMemberForPod(pod, pods); err != nil {
+		if err = r.leaveMemberForPod(pod, pods); err != nil {
 			leaveErrors = append(leaveErrors, err)
+		} else {
+			leaveDone = append(leaveDone, pod.Name)
 		}
 	}
 	if len(leaveErrors) > 0 {
-		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
+		return nil, newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
 	}
-	return nil
+	return leaveDone, nil
 }
 
 func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
@@ -838,12 +841,16 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, podSet sets.Set
 	return nil
 }
 
-func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
+func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet, leaveDone []string) error {
 	graphCli := model.NewGraphClient(r.cli)
 	for _, podName := range r.runningItsPodNames {
 		if _, ok := r.desiredCompPodNameSet[podName]; ok {
 			continue
 		}
+		if !slices.Contains(leaveDone, podName) {
+			continue
+		}
+
 		for _, vct := range itsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,

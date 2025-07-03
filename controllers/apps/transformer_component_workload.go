@@ -652,6 +652,8 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() ([]string, error) {
 		}
 		if err = r.leaveMemberForPod(pod, pods); err != nil {
 			leaveErrors = append(leaveErrors, err)
+		} else {
+			leaveDone = append(leaveDone, pod.Name)
 		}
 	}
 	if len(leaveErrors) > 0 {

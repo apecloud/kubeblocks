@@ -32222,8 +32222,95 @@ Action
 </div>
 Resource Types:
 <ul><li>
+<a href="#workloads.kubeblocks.io/v1alpha1.Instance">Instance</a>
+</li><li>
 <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSet">InstanceSet</a>
 </li></ul>
+<h3 id="workloads.kubeblocks.io/v1alpha1.Instance">Instance
+</h3>
+<div>
+<p>Instance is the Schema for the instances API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>workloads.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>Instance</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceSpec">
+InstanceSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tbody>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of Instance. Edit instance_types.go to remove/update</p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceStatus">
+InstanceStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.InstanceSet">InstanceSet
 </h3>
 <div>
@@ -33371,6 +33458,43 @@ key is the pod name, value is the revision.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceSpec">InstanceSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.Instance">Instance</a>)
+</p>
+<div>
+<p>InstanceSpec defines the desired state of Instance</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>foo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Foo is an example field of Instance. Edit instance_types.go to remove/update</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceStatus">InstanceStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.Instance">Instance</a>)
+</p>
+<div>
+<p>InstanceStatus defines the observed state of Instance</p>
+</div>
 <h3 id="workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>

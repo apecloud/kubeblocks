@@ -1057,6 +1057,32 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
+  - instances
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - instances/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - instances/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
   - instancesets
   verbs:
   - create

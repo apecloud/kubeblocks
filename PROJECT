@@ -368,4 +368,13 @@ resources:
   kind: Rollout
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: workloads
+  kind: Instance
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
+  version: v1alpha1
 version: "3"

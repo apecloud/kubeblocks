@@ -28,6 +28,10 @@ type FakeWorkloadsV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeWorkloadsV1alpha1) Instances(namespace string) v1alpha1.InstanceInterface {
+	return &FakeInstances{c, namespace}
+}
+
 func (c *FakeWorkloadsV1alpha1) InstanceSets(namespace string) v1alpha1.InstanceSetInterface {
 	return &FakeInstanceSets{c, namespace}
 }

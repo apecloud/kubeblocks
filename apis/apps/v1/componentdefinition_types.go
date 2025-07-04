@@ -1235,6 +1235,13 @@ type ComponentAvailable struct {
 	// +optional
 	WithPhases *string `json:"withPhases,omitempty"`
 
+	// Specifies the role that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithRole *string `json:"withRole,omitempty"`
+
 	// Specifies the strategies for determining whether the component is available based on the available probe.
 	//
 	// This field is immutable once set.

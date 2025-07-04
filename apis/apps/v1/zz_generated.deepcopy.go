@@ -897,6 +897,11 @@ func (in *ComponentAvailable) DeepCopyInto(out *ComponentAvailable) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.WithRole != nil {
+		in, out := &in.WithRole, &out.WithRole
+		*out = new(string)
+		**out = **in
+	}
 	if in.WithProbe != nil {
 		in, out := &in.WithProbe, &out.WithProbe
 		*out = new(ComponentAvailableWithProbe)

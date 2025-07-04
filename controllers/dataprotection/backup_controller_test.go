@@ -1008,7 +1008,7 @@ var _ = Describe("Backup Controller test", func() {
 
 		It("delays backup job when restore is in progress", func() {
 			By("setting restore annotation on cluster")
-			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *kbappsv1.Cluster) {
+			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *appsv1alpha1.Cluster) {
 				if cluster.Annotations == nil {
 					cluster.Annotations = make(map[string]string)
 				}
@@ -1046,7 +1046,7 @@ var _ = Describe("Backup Controller test", func() {
 			}).Should(BeTrue())
 
 			By("delete restore annotation")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *appsv1alpha1.Cluster) {
 				delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
 			})).Should(Succeed())
 

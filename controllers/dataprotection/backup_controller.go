@@ -685,7 +685,7 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
 		return false, nil
 	}
-	cluster := &kbappsv1.Cluster{}
+	cluster := &appsv1alpha1.Cluster{}
 	backupTargetExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
 		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
 	if err != nil || !backupTargetExists {

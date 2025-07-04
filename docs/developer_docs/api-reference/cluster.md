@@ -8885,7 +8885,7 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-Default to 10 seconds. Minimum value is 1.</p>
+Default to 60 seconds. Minimum value is 1.</p>
 </td>
 </tr>
 <tr>

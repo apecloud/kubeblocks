@@ -1903,7 +1903,7 @@ type Probe struct {
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 
 	// Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-	// Default to 10 seconds. Minimum value is 1.
+	// Default to 60 seconds. Minimum value is 1.
 	//
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`

@@ -4214,6 +4214,13 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                  withRole:
+                    description: |-
+                      Specifies the role that the component will go through to be considered available.
+
+
+                      This field is immutable once set.
+                    type: string
                 type: object
               configs:
                 description: |-
@@ -4920,7 +4927,7 @@ spec:
                       periodSeconds:
                         description: |-
                           Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-                          Default to 10 seconds. Minimum value is 1.
+                          Default to 60 seconds. Minimum value is 1.
                         format: int32
                         type: integer
                       preCondition:
@@ -7801,7 +7808,7 @@ spec:
                       periodSeconds:
                         description: |-
                           Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-                          Default to 10 seconds. Minimum value is 1.
+                          Default to 60 seconds. Minimum value is 1.
                         format: int32
                         type: integer
                       preCondition:

@@ -4471,6 +4471,19 @@ string
 </tr>
 <tr>
 <td>
+<code>withRole</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the role that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>withProbe</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">
@@ -9151,7 +9164,7 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-Default to 10 seconds. Minimum value is 1.</p>
+Default to 60 seconds. Minimum value is 1.</p>
 </td>
 </tr>
 <tr>

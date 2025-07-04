@@ -1243,6 +1243,13 @@ type ComponentAvailable struct {
 	// +optional
 	WithPhases *string `json:"withPhases,omitempty"`
 
+	// Specifies the role that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithRole *string `json:"withRole,omitempty"`
+
 	// Specifies the strategies for determining whether the component is available based on the available probe.
 	//
 	// This field is immutable once set.
@@ -1911,7 +1918,7 @@ type Probe struct {
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
 
 	// Specifies the frequency at which the probe is conducted. This value is expressed in seconds.
-	// Default to 10 seconds. Minimum value is 1.
+	// Default to 60 seconds. Minimum value is 1.
 	//
 	// +optional
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`

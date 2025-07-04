@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,23 +50,6 @@ func NewConfigMap(namespace, name string, options ...any) *corev1.ConfigMap {
 	return cm
 }
 
-func SetConfigMapData(key string, value string) func(*corev1.ConfigMap) {
-	return func(configMap *corev1.ConfigMap) {
-		configMap.Data[key] = value
-	}
-}
-
-func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
-	return corev1.PersistentVolumeClaimSpec{
-		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse(size),
-			},
-		},
-	}
-}
-
 func CreateStorageClass(testCtx *testutil.TestContext, storageClassName string,
 	allowVolumeExpansion bool) *storagev1.StorageClass {
 	storageClass := &storagev1.StorageClass{
@@ -82,15 +63,4 @@ func CreateStorageClass(testCtx *testutil.TestContext, storageClassName string,
 		AllowVolumeExpansion: &allowVolumeExpansion,
 	}
 	return CreateK8sResource(testCtx, storageClass).(*storagev1.StorageClass)
-}
-
-func CreateVolumeSnapshotClass(testCtx *testutil.TestContext) {
-	volumeSnapshotClass := &vsv1.VolumeSnapshotClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "default-vs",
-		},
-		Driver:         testutil.DefaultCSIDriver,
-		DeletionPolicy: vsv1.VolumeSnapshotContentDelete,
-	}
-	CreateK8sResource(testCtx, volumeSnapshotClass)
 }

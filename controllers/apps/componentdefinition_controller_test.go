@@ -427,6 +427,33 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
 		})
 
+		It("with role - ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddRole("leader").
+				SetAvailable(&kbappsv1.ComponentAvailable{
+					WithRole: pointer.String("leader"),
+				}).
+				Create(&testCtx).
+				GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
+		})
+
+		It("with role - fail", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				SetAvailable(&kbappsv1.ComponentAvailable{
+					WithRole: pointer.String("leader"), // leader role is not defined
+				}).
+				Create(&testCtx).
+				GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+
 		It("with probe - ok", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).

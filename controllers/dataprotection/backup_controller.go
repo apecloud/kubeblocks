@@ -559,6 +559,16 @@ func (r *BackupReconciler) patchBackupStatus(
 func (r *BackupReconciler) handleRunningPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	restoreInProgress, err := r.checkRestoreInProgress(reqCtx, backup)
+	if err != nil {
+		return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
+	}
+	if restoreInProgress {
+		msg := "backup job is delayed because restore is in progress"
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "RestoreInProgress", msg)
+		return intctrlutil.Requeue(reqCtx.Log, msg)
+	}
+
 	if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
 		// check if the continuous backup is completed.
 		if completed, err := r.checkIsCompletedDuringRunning(reqCtx, backup); err != nil {
@@ -598,8 +608,8 @@ func (r *BackupReconciler) handleRunningPhase(
 		// check all actions status, if any action failed, update backup status to failed
 		// if all actions completed, update backup status to completed, otherwise,
 		// continue to handle following actions.
+	actions:
 		for targetPodName, acts := range actions {
-		actions:
 			for _, act := range acts {
 				status, err := act.Execute(actionCtx)
 				if err != nil {
@@ -667,6 +677,25 @@ func (r *BackupReconciler) syncContinuousBackupEncryptionConfig(reqCtx intctrlut
 		return r.Client.Status().Update(reqCtx.Ctx, backup)
 	}
 	return nil
+}
+
+func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (restoreInProgress bool, err error) {
+	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
+	if !ok {
+		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
+		return false, nil
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	backupTargetExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
+	if err != nil || !backupTargetExists {
+		return false, err
+	}
+	if cluster.Annotations == nil {
+		return false, nil
+	}
+	_, ok = cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
+	return ok, nil
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

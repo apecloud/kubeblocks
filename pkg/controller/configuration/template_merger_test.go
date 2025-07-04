@@ -32,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -57,11 +58,31 @@ xengine_row_cache_size=102
 max_connections=666
 `
 
+	jsonExtenConfig := `
+{
+    "boolparamf": false,
+    "boolparamt": true,
+    "intparam": 123,
+    "floatparam": 123.456,
+    "stringparam": "123"
+}
+`
+	schmaCUE := `
+#MysqlParameter: {
+  boolparamf: bool
+  boolparamt: bool
+  intparam: int
+  stringparam: string
+  floatparam: float
+}
+`
+
 	testString := "// this is a test string"
 
 	const (
-		baseCMName    = "base-cm"
-		updatedCMName = "updated-cm"
+		baseCMName        = "base-cm"
+		updatedCMName     = "updated-cm"
+		jsonUpdatedCMName = "updated-cm2"
 
 		testConfigSpecName = "test-config"
 		testClusterName    = "test-cluster"
@@ -74,9 +95,12 @@ max_connections=666
 		templateBuilder     *configTemplateBuilder
 		configSpec          appsv1alpha1.ComponentConfigSpec
 		configConstraintObj *appsv1beta1.ConfigConstraint
+		mockCCObject        *appsv1beta1.ConfigConstraint
 
 		baseCMObject    *corev1.ConfigMap
 		updatedCMObject *corev1.ConfigMap
+
+		jsonUpdatedCMObject *corev1.ConfigMap
 	)
 
 	BeforeEach(func() {
@@ -96,10 +120,17 @@ max_connections=666
 				testConfig2Name: testString,
 			},
 		}
+		jsonUpdatedCMObject = &corev1.ConfigMap{
+			Data: map[string]string{
+				testConfigName: jsonExtenConfig,
+			},
+		}
 		baseCMObject.SetName(baseCMName)
-		baseCMObject.SetNamespace("default")
+		baseCMObject.SetNamespace(testCtx.DefaultNamespace)
 		updatedCMObject.SetName(updatedCMName)
-		updatedCMObject.SetNamespace("default")
+		updatedCMObject.SetNamespace(testCtx.DefaultNamespace)
+		jsonUpdatedCMObject.SetName(jsonUpdatedCMName)
+		jsonUpdatedCMObject.SetNamespace(testCtx.DefaultNamespace)
 
 		configSpec = appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -109,6 +140,18 @@ max_connections=666
 			},
 			Keys:                []string{"my.cnf"},
 			ConfigConstraintRef: configConstraintObj.GetName(),
+		}
+
+		openAPISchema, err := openapi.GenerateOpenAPISchema(schmaCUE, "")
+		Expect(err).Should(Succeed())
+		mockCCObject = configConstraintObj.DeepCopy()
+		mockCCObject.Spec.ParametersSchema = &appsv1beta1.ParametersSchema{
+			CUE:          schmaCUE,
+			SchemaInJSON: openAPISchema,
+		}
+		mockCCObject.Name = configConstraintObj.GetName() + "_mock"
+		mockCCObject.Spec.FileFormatConfig = &appsv1beta1.FileFormatConfig{
+			Format: appsv1beta1.JSON,
 		}
 
 		templateBuilder = newTemplateBuilder(
@@ -127,6 +170,8 @@ max_connections=666
 			baseCMObject,
 			updatedCMObject,
 			configConstraintObj,
+			mockCCObject,
+			jsonUpdatedCMObject,
 		}), testutil.WithAnyTimes()))
 	})
 
@@ -271,4 +316,38 @@ max_connections=666
 			Expect(err).ShouldNot(Succeed())
 		})
 	})
+
+	Context("with patch Merge", func() {
+		It("mergerConfigTemplate patch policy for json format", func() {
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
+				ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+					Namespace:   "default",
+					TemplateRef: jsonUpdatedCMObject.GetName(),
+					Policy:      appsv1alpha1.PatchPolicy,
+				},
+			}
+
+			mockConfig := configSpec.DeepCopy()
+			mockConfig.ConfigConstraintRef = mockCCObject.GetName()
+
+			mockData := map[string]string{
+				testConfigName: "{}",
+			}
+
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, *mockConfig, mockData, ctx, mockClient.Client())
+			Expect(err).Should(Succeed())
+			Expect(mergedData).Should(HaveLen(1))
+
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, mockCCObject.Spec.FileFormatConfig, []string{testConfigName})
+			Expect(err).Should(Succeed())
+			Expect(configReaders).Should(HaveLen(1))
+			configObject := configReaders[testConfigName]
+			Expect(configObject.Get("boolparamf")).Should(BeFalse())
+			Expect(configObject.Get("boolparamt")).Should(BeTrue())
+			Expect(configObject.Get("intparam")).Should(BeEquivalentTo(123))
+			Expect(configObject.Get("floatparam")).Should(Equal(123.456))
+			Expect(configObject.Get("stringparam")).Should(Equal("123"))
+		})
+	})
+
 })

@@ -138,7 +138,7 @@ func main() {
 		failed(err, "failed to render secondary templates")
 	}
 
-	mergedData, err := mergePolicy.Merge(baseData, renderedData)
+	mergedData, err := mergePolicy.Merge(baseData, renderedData, nil)
 	if err != nil {
 		failed(err, "failed to merge data")
 	}

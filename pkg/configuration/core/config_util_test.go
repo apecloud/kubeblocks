@@ -254,7 +254,7 @@ test=test
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ApplyConfigPatch(tt.args.baseCfg, FromStringPointerMap(tt.args.updatedParameters), tt.args.formatConfig)
+			got, err := ApplyConfigPatch(tt.args.baseCfg, FromStringPointerMap(tt.args.updatedParameters), tt.args.formatConfig, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ApplyConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -343,7 +343,7 @@ func TestFromStringMap(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := FromStringMap(tt.args.m); !reflect.DeepEqual(got, tt.want) {
+			if got, _ := FromStringMap(tt.args.m, nil); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("FromStringMap() = %v, want %v", got, tt.want)
 			}
 		})

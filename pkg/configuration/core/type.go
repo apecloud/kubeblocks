@@ -48,6 +48,19 @@ type RawConfig struct {
 	RawData string
 }
 
+type ValueTransformer interface {
+	TransformValue(value string, fieldName string) (any, error)
+}
+
+type ValueTransformerFunc func(string, string) (any, error)
+
+func (f ValueTransformerFunc) TransformValue(value string, fieldName string) (any, error) {
+	if f != nil {
+		return f(value, fieldName)
+	}
+	return value, nil
+}
+
 type IniContext struct {
 	SectionName string
 }

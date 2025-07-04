@@ -50,12 +50,16 @@ func (d *defaultValueTransformer) resolveValueWithType(value string, fieldName s
 	}
 }
 
+type ValueTransformerBuilder interface {
+	BuildValueTransformer() core.ValueTransformerFunc
+}
+
 type valueManager struct {
 	paramsDef     *appsv1beta1.ConfigConstraint
 	formatConfigs *appsv1beta1.FileFormatConfig
 }
 
-func (v *valueManager) buildValueTransformer() core.ValueTransformerFunc {
+func (v *valueManager) BuildValueTransformer() core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
 	if v.formatConfigs == nil || v.formatConfigs.Format != appsv1beta1.JSON || v.paramsDef.Spec.ParametersSchema == nil {
 		return nil
@@ -73,7 +77,7 @@ func (v *valueManager) buildValueTransformer() core.ValueTransformerFunc {
 	}
 }
 
-func NewValueManager(paramsDefs *appsv1beta1.ConfigConstraint) *valueManager {
+func NewValueManager(paramsDefs *appsv1beta1.ConfigConstraint) ValueTransformerBuilder {
 	return &valueManager{
 		paramsDef:     paramsDefs,
 		formatConfigs: paramsDefs.Spec.FileFormatConfig,

@@ -31,8 +31,8 @@ import (
 
 type TemplateMerger interface {
 
-	// merge merges the baseData with the data from the template.
-	merge(baseData map[string]string, updatedData map[string]string, manager *valueManager) (map[string]string, error)
+	// Merge merges the baseData with the data from the template.
+	Merge(baseData map[string]string, updatedData map[string]string, manager ValueTransformerBuilder) (map[string]string, error)
 
 	// renderTemplate renders the template and returns the data.
 	renderTemplate() (map[string]string, error)
@@ -68,7 +68,7 @@ type noneOp struct {
 	*mergeContext
 }
 
-func (n noneOp) merge(_ map[string]string, updatedData map[string]string, _ *valueManager) (map[string]string, error) {
+func (n noneOp) Merge(_ map[string]string, updatedData map[string]string, _ ValueTransformerBuilder) (map[string]string, error) {
 	return updatedData, nil
 }
 
@@ -84,7 +84,9 @@ type configOnlyAddMerger struct {
 	*mergeContext
 }
 
-func (c *configPatcher) merge(baseData map[string]string, updatedData map[string]string, manager *valueManager) (map[string]string, error) {
+func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string]string, manager ValueTransformerBuilder) (map[string]string, error) {
+	var transformer core.ValueTransformer
+
 	formatter := c.ccSpec.FileFormatConfig
 	configPatch, err := core.TransformConfigPatchFromData(updatedData, formatter.Format, c.configSpec.Keys)
 	if err != nil {
@@ -92,6 +94,9 @@ func (c *configPatcher) merge(baseData map[string]string, updatedData map[string
 	}
 	if !configPatch.IsModify {
 		return baseData, nil
+	}
+	if manager != nil {
+		transformer = manager.BuildValueTransformer()
 	}
 
 	mergedData := copyMap(baseData)
@@ -102,7 +107,7 @@ func (c *configPatcher) merge(baseData map[string]string, updatedData map[string
 			mergedData[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, formatter, manager.buildValueTransformer())
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, formatter, transformer)
 		if err != nil {
 			return nil, err
 		}
@@ -111,11 +116,11 @@ func (c *configPatcher) merge(baseData map[string]string, updatedData map[string
 	return mergedData, err
 }
 
-func (c *configReplaceMerger) merge(baseData map[string]string, updatedData map[string]string, _ *valueManager) (map[string]string, error) {
+func (c *configReplaceMerger) Merge(baseData map[string]string, updatedData map[string]string, _ ValueTransformerBuilder) (map[string]string, error) {
 	return core.MergeUpdatedConfig(baseData, updatedData), nil
 }
 
-func (c *configOnlyAddMerger) merge(baseData map[string]string, updatedData map[string]string, _ *valueManager) (map[string]string, error) {
+func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[string]string, _ ValueTransformerBuilder) (map[string]string, error) {
 	return nil, core.MakeError("not implemented")
 }
 
@@ -176,7 +181,7 @@ func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
 	if len(data) == 0 {
 		return nil, nil
 	}
-	return templateMerger.merge(baseData, data, NewValueManager(ccObj))
+	return templateMerger.Merge(baseData, data, NewValueManager(ccObj))
 }
 
 func splitParameters(params []core.VisualizedParam) map[string]map[string]*string {

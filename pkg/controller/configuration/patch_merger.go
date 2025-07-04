@@ -38,7 +38,7 @@ func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ConfigPar
 			updatedFiles[key] = *params.Content
 		}
 		if len(params.Parameters) > 0 {
-			upParams, _ := core.FromStringMap(params.Parameters, builder.buildValueTransformer())
+			upParams, _ := core.FromStringMap(params.Parameters, builder.BuildValueTransformer())
 			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key,
 				UpdatedParams: upParams,

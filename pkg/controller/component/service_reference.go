@@ -70,10 +70,8 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 			err       error
 		)
 		switch {
-		case serviceRef.Cluster != "":
-			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl, true)
 		case serviceRef.ClusterServiceSelector != nil:
-			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl, false)
+			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl)
 		case serviceRef.ServiceDescriptor != "":
 			sd, err = handleServiceRefFromServiceDescriptor(ctx, cli, namespace, *serviceRef, serviceRefDecl)
 		}
@@ -99,13 +97,9 @@ type serviceRefReferenceVars struct {
 }
 
 func handleServiceRefFromCluster(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1.ServiceRef, serviceRefDecl appsv1.ServiceRefDeclaration, legacy bool) (*appsv1.ServiceDescriptor, error) {
-	resolver := referencedVars
-	if legacy {
-		resolver = referencedVars4Legacy
-	}
+	serviceRef appsv1.ServiceRef, serviceRefDecl appsv1.ServiceRefDeclaration) (*appsv1.ServiceDescriptor, error) {
 	vars := &serviceRefReferenceVars{}
-	if err := resolver(ctx, cli, namespace, serviceRef, vars); err != nil {
+	if err := referencedVars(ctx, cli, namespace, serviceRef, vars); err != nil {
 		return nil, err
 	}
 
@@ -245,35 +239,6 @@ func referencedCredentialVars(ctx context.Context, cli client.Reader, namespace 
 
 	copySecretDataToCredentialVar(namespace, secret, constant.AccountNameForSecret, &vars.username)
 	copySecretDataToCredentialVar(namespace, secret, constant.AccountPasswdForSecret, &vars.password)
-
-	return nil
-}
-
-func referencedVars4Legacy(ctx context.Context, cli client.Reader, namespace string,
-	serviceRef appsv1.ServiceRef, vars *serviceRefReferenceVars) error {
-	secret := &corev1.Secret{}
-	secretKey := types.NamespacedName{
-		Namespace: func() string {
-			if serviceRef.Namespace != "" {
-				return serviceRef.Namespace
-			}
-			return namespace
-		}(),
-		// keep this to reference a legacy cluster
-		Name: fmt.Sprintf("%s-conn-credential", serviceRef.Cluster),
-	}
-	if err := cli.Get(ctx, secretKey, secret); err != nil {
-		return err
-	}
-
-	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorEndpointKey, &vars.endpoint)
-	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorPortKey, &vars.port)
-	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorUsernameKey, &vars.username)
-	copySecretDataToCredentialVar("", secret, constant.ServiceDescriptorPasswordKey, &vars.password)
-
-	// don't set the host and podFQDNs for legacy clusters
-	vars.host = nil
-	vars.podFQDNs = nil
 
 	return nil
 }

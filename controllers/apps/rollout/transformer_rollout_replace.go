@@ -56,8 +56,7 @@ func (t *rolloutReplaceTransformer) rollout(transCtx *rolloutTransformContext) e
 	if err := t.components(transCtx); err != nil {
 		return err
 	}
-	// TODO: sharding
-	return nil
+	return t.shardings(transCtx)
 }
 
 func (t *rolloutReplaceTransformer) components(transCtx *rolloutTransformContext) error {
@@ -75,24 +74,15 @@ func (t *rolloutReplaceTransformer) components(transCtx *rolloutTransformContext
 func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
-	replicas, _, err := t.replicas(rollout, comp, spec)
+	replicas, _, err := replaceCompReplicas(rollout, comp, spec)
 	if err != nil {
 		return err
 	}
-	return t.rolling(transCtx, rollout, comp, spec, replicas)
-}
-
-func (t *rolloutReplaceTransformer) replicas(rollout *appsv1alpha1.Rollout,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
-	return replaceReplicas(rollout, comp, spec)
-}
-
-func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
-	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas int32) error {
-	tpl, exist, err := replaceInstanceTemplate(transCtx, comp, spec)
+	tpl, exist, err := replaceCompInstanceTemplate(transCtx, comp, spec)
 	if err != nil {
 		return err
 	}
+
 	if *tpl.Replicas == replicas && spec.Replicas == replicas {
 		return nil
 	}
@@ -109,15 +99,15 @@ func (t *rolloutReplaceTransformer) rolling(transCtx *rolloutTransformContext,
 	}
 
 	if spec.Replicas == replicas {
-		return t.up(transCtx, rollout, comp, spec, tpl)
+		return t.compUp(transCtx, rollout, comp, spec, tpl)
 	} else {
-		return t.down(transCtx, rollout, comp, spec, tpl)
+		return t.compDown(transCtx, rollout, comp, spec, tpl)
 	}
 }
 
-func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
+func (t *rolloutReplaceTransformer) compUp(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
-	if err := t.checkDelaySeconds(rollout, comp, *tpl.Replicas, false); err != nil {
+	if err := t.checkCompDelaySeconds(rollout, comp, *tpl.Replicas, false); err != nil {
 		return err
 	}
 	tpl.Replicas = ptr.To(*tpl.Replicas + 1)
@@ -125,13 +115,13 @@ func (t *rolloutReplaceTransformer) up(transCtx *rolloutTransformContext,
 	return nil
 }
 
-func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
+func (t *rolloutReplaceTransformer) compDown(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) error {
-	if err := t.checkDelaySeconds(rollout, comp, *tpl.Replicas, true); err != nil {
+	if err := t.checkCompDelaySeconds(rollout, comp, *tpl.Replicas, true); err != nil {
 		return err
 	}
 
-	instance, instTpl, err := t.pickInstanceToScaleDown(transCtx, spec, tpl)
+	instance, instTpl, err := t.pickCompInstanceToScaleDown(transCtx, spec, tpl)
 	if err != nil {
 		return err
 	}
@@ -160,7 +150,7 @@ func (t *rolloutReplaceTransformer) down(transCtx *rolloutTransformContext,
 	return nil
 }
 
-func (t *rolloutReplaceTransformer) checkDelaySeconds(rollout *appsv1alpha1.Rollout,
+func (t *rolloutReplaceTransformer) checkCompDelaySeconds(rollout *appsv1alpha1.Rollout,
 	comp appsv1alpha1.RolloutComponent, newReplicas int32, scaleDown bool) error {
 	delaySeconds := comp.Strategy.Replace.PerInstanceIntervalSeconds
 	if scaleDown {
@@ -206,7 +196,7 @@ func (t *rolloutReplaceTransformer) checkDelaySeconds(rollout *appsv1alpha1.Roll
 	return nil
 }
 
-func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(transCtx *rolloutTransformContext,
+func (t *rolloutReplaceTransformer) pickCompInstanceToScaleDown(transCtx *rolloutTransformContext,
 	spec *appsv1.ClusterComponentSpec, tpl *appsv1.InstanceTemplate) (string, *appsv1.InstanceTemplate, error) {
 	matchingLabels := constant.GetCompLabels(transCtx.Cluster.Name, spec.Name)
 	matchingLabels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
@@ -245,7 +235,180 @@ func (t *rolloutReplaceTransformer) pickInstanceToScaleDown(transCtx *rolloutTra
 	return "", nil, fmt.Errorf("the instance template %s has not been found", tplName)
 }
 
-func replaceReplicas(rollout *appsv1alpha1.Rollout,
+func (t *rolloutReplaceTransformer) shardings(transCtx *rolloutTransformContext) error {
+	rollout := transCtx.Rollout
+	for _, sharding := range rollout.Spec.Shardings {
+		if sharding.Strategy.Replace != nil {
+			if err := t.sharding(transCtx, rollout, sharding); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *rolloutReplaceTransformer) sharding(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
+	spec := transCtx.ClusterShardings[sharding.Name]
+	replicas := replaceShardingReplicas(rollout, sharding, spec)
+	tpl, exist, err := replaceShardingInstanceTemplate(transCtx, sharding, spec)
+	if err != nil {
+		return err
+	}
+
+	if *tpl.Replicas == replicas && spec.Template.Replicas == replicas {
+		return nil
+	}
+
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the sharding %s is not ready", sharding.Name))
+	}
+
+	// update cluster spec after the cluster and sharding are ready
+	if !exist {
+		spec.Template.Instances = append(spec.Template.Instances, *tpl)
+		spec.Template.FlatInstanceOrdinal = true
+		tpl = &spec.Template.Instances[len(spec.Template.Instances)-1]
+	}
+
+	if spec.Template.Replicas == replicas {
+		return t.shardingUp(transCtx, rollout, sharding, spec, tpl)
+	} else {
+		return t.shardingDown(transCtx, rollout, sharding, spec, tpl)
+	}
+}
+
+func (t *rolloutReplaceTransformer) shardingUp(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, tpl *appsv1.InstanceTemplate) error {
+	if err := t.checkShardingDelaySeconds(rollout, sharding, *tpl.Replicas, false); err != nil {
+		return err
+	}
+	tpl.Replicas = ptr.To(*tpl.Replicas + 1)
+	spec.Template.Replicas += 1
+	return nil
+}
+
+func (t *rolloutReplaceTransformer) shardingDown(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, tpl *appsv1.InstanceTemplate) error {
+	if err := t.checkShardingDelaySeconds(rollout, sharding, *tpl.Replicas, true); err != nil {
+		return err
+	}
+
+	instance, instTpl, err := t.pickShardingInstancesToScaleDown(transCtx, spec, tpl)
+	if err != nil {
+		return err
+	}
+
+	spec.Template.Replicas -= 1
+	if instTpl != nil {
+		if instTpl.Replicas == nil || *instTpl.Replicas == 0 {
+			return fmt.Errorf("the instance template %s still has running instances, but its replicas is already 0", instTpl.Name)
+		}
+		instTpl.Replicas = ptr.To(*instTpl.Replicas - 1)
+	}
+	if len(instance) > 0 {
+		spec.Template.OfflineInstances = append(spec.Template.OfflineInstances, instance)
+	}
+
+	// add the scale down instances to the rollout status
+	if len(instance) > 0 {
+		for i, status := range rollout.Status.Shardings {
+			if status.Name == spec.Name {
+				rollout.Status.Shardings[i].ScaleDownInstances = append(rollout.Status.Shardings[i].ScaleDownInstances, instance)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *rolloutReplaceTransformer) checkShardingDelaySeconds(rollout *appsv1alpha1.Rollout,
+	sharding appsv1alpha1.RolloutSharding, newReplicas int32, scaleDown bool) error {
+	delaySeconds := sharding.Strategy.Replace.PerInstanceIntervalSeconds
+	if scaleDown {
+		delaySeconds = sharding.Strategy.Replace.ScaleDownDelaySeconds
+	}
+	if delaySeconds == nil || *delaySeconds == 0 {
+		return nil
+	}
+	if *delaySeconds < 0 {
+		return controllerutil.NewDelayedRequeueError(infiniteDelayRequeueDuration, "infinite delay")
+	}
+
+	var lastSucceedTimestamp metav1.Time
+	for _, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			if scaleDown {
+				if status.NewReplicas == newReplicas {
+					lastSucceedTimestamp = status.LastScaleUpTimestamp
+				} else {
+					return controllerutil.NewDelayedRequeueError(time.Second, "stale up status")
+				}
+			} else {
+				if status.RolledOutReplicas == newReplicas {
+					lastSucceedTimestamp = status.LastScaleDownTimestamp
+				} else {
+					return controllerutil.NewDelayedRequeueError(time.Second, "stale down status")
+				}
+			}
+			break
+		}
+	}
+	if lastSucceedTimestamp.IsZero() {
+		return nil
+	}
+
+	diff := time.Until(lastSucceedTimestamp.Add(time.Duration(*delaySeconds) * time.Second))
+	if diff > 0 {
+		if scaleDown {
+			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("delay to scale down for %s seconds", diff.String()))
+		}
+		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("delay to rollout next instance for %s seconds", diff.String()))
+	}
+	return nil
+}
+
+func (t *rolloutReplaceTransformer) pickShardingInstancesToScaleDown(transCtx *rolloutTransformContext,
+	spec *appsv1.ClusterSharding, tpl *appsv1.InstanceTemplate) (string, *appsv1.InstanceTemplate, error) {
+	matchingLabels := constant.GetCompLabels(transCtx.Cluster.Name, spec.Name)
+	matchingLabels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
+	pods := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(transCtx.Cluster.Namespace),
+		client.MatchingLabels(matchingLabels),
+	}
+	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
+		return "", nil, err
+	}
+
+	slices.SortFunc(pods.Items, func(a, b corev1.Pod) int {
+		return strings.Compare(a.Name, b.Name) * -1
+	})
+	var targetPod *corev1.Pod
+	for i, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil && pod.Labels[constant.KBAppInstanceTemplateLabelKey] != tpl.Name {
+			targetPod = &pods.Items[i]
+			break
+		}
+	}
+
+	if targetPod == nil {
+		return "", nil, nil
+	}
+	tplName, ok := targetPod.Labels[constant.KBAppInstanceTemplateLabelKey]
+	if !ok || len(tplName) == 0 {
+		return targetPod.Name, nil, nil
+	}
+	for i, tpl := range spec.Template.Instances {
+		if tpl.Name == tplName {
+			return targetPod.Name, &spec.Template.Instances[i], nil
+		}
+	}
+	return "", nil, fmt.Errorf("the instance template %s has not been found", tplName)
+}
+
+func replaceCompReplicas(rollout *appsv1alpha1.Rollout,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (int32, int32, error) {
 	// the original replicas
 	replicas := spec.Replicas
@@ -280,7 +443,19 @@ func replaceReplicas(rollout *appsv1alpha1.Rollout,
 	return replicas, target, nil
 }
 
-func replaceInstanceTemplate(transCtx *rolloutTransformContext,
+func replaceShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) int32 {
+	// the original replicas
+	replicas := spec.Template.Replicas
+	for _, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			replicas = status.Replicas
+			break
+		}
+	}
+	return replicas
+}
+
+func replaceCompInstanceTemplate(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, bool, error) {
 	name := string(transCtx.Rollout.UID[:8])
 	for i, tpl := range spec.Instances {
@@ -315,6 +490,45 @@ func replaceInstanceTemplate(transCtx *rolloutTransformContext,
 	if comp.InstanceMeta != nil && comp.InstanceMeta.Canary != nil {
 		tpl.Labels = comp.InstanceMeta.Canary.Labels
 		tpl.Annotations = comp.InstanceMeta.Canary.Annotations
+	}
+	return tpl, false, nil
+}
+
+func replaceShardingInstanceTemplate(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (*appsv1.InstanceTemplate, bool, error) {
+	name := string(transCtx.Rollout.UID[:8])
+	for i, tpl := range spec.Template.Instances {
+		if tpl.Name == name {
+			return &spec.Template.Instances[i], true, nil
+		}
+	}
+	if len(spec.Template.Instances) > 0 && !spec.Template.FlatInstanceOrdinal {
+		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
+	}
+	tpl := &appsv1.InstanceTemplate{
+		Name:     name,
+		Replicas: ptr.To[int32](0),
+	}
+	if sharding.ServiceVersion != nil {
+		tpl.ServiceVersion = *sharding.ServiceVersion
+	}
+	if sharding.CompDef != nil {
+		tpl.CompDef = *sharding.CompDef
+	}
+	if sharding.Strategy.Replace.SchedulingPolicy != nil {
+		policy := sharding.Strategy.Replace.SchedulingPolicy
+		tpl.SchedulingPolicy = &appsv1.SchedulingPolicy{
+			SchedulerName:             policy.SchedulerName,
+			NodeSelector:              policy.NodeSelector,
+			NodeName:                  policy.NodeName,
+			Affinity:                  policy.Affinity,
+			Tolerations:               policy.Tolerations,
+			TopologySpreadConstraints: policy.TopologySpreadConstraints,
+		}
+	}
+	if sharding.InstanceMeta != nil && sharding.InstanceMeta.Canary != nil {
+		tpl.Labels = sharding.InstanceMeta.Canary.Labels
+		tpl.Annotations = sharding.InstanceMeta.Canary.Annotations
 	}
 	return tpl, false, nil
 }

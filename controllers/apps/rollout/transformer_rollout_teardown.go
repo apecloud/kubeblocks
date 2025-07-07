@@ -43,25 +43,24 @@ func (t *rolloutTearDownTransformer) tearDown(transCtx *rolloutTransformContext)
 	if err := t.components(transCtx); err != nil {
 		return err
 	}
-	// TODO: sharding
-	return nil
+	return t.shardings(transCtx)
 }
 
 func (t *rolloutTearDownTransformer) components(transCtx *rolloutTransformContext) error {
 	rollout := transCtx.Rollout
 	for _, comp := range rollout.Spec.Components {
 		if comp.Strategy.Inplace != nil {
-			if err := t.inplace(transCtx, rollout, comp); err != nil {
+			if err := t.compInplace(transCtx, rollout, comp); err != nil {
 				return err
 			}
 		}
 		if comp.Strategy.Replace != nil {
-			if err := t.replace(transCtx, rollout, comp); err != nil {
+			if err := t.compReplace(transCtx, rollout, comp); err != nil {
 				return err
 			}
 		}
 		if comp.Strategy.Create != nil {
-			if err := t.create(transCtx, rollout, comp); err != nil {
+			if err := t.compCreate(transCtx, rollout, comp); err != nil {
 				return err
 			}
 		}
@@ -69,19 +68,19 @@ func (t *rolloutTearDownTransformer) components(transCtx *rolloutTransformContex
 	return nil
 }
 
-func (t *rolloutTearDownTransformer) inplace(transCtx *rolloutTransformContext,
+func (t *rolloutTearDownTransformer) compInplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	return nil // do nothing
 }
 
-func (t *rolloutTearDownTransformer) replace(transCtx *rolloutTransformContext,
+func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
-	replicas, _, err := replaceReplicas(rollout, comp, spec)
+	replicas, _, err := replaceCompReplicas(rollout, comp, spec)
 	if err != nil {
 		return err
 	}
-	tpl, _, err := replaceInstanceTemplate(transCtx, comp, spec)
+	tpl, _, err := replaceCompInstanceTemplate(transCtx, comp, spec)
 	if err != nil {
 		return err
 	}
@@ -100,8 +99,64 @@ func (t *rolloutTearDownTransformer) replace(transCtx *rolloutTransformContext,
 	return nil
 }
 
-func (t *rolloutTearDownTransformer) create(transCtx *rolloutTransformContext,
+func (t *rolloutTearDownTransformer) compCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
+	// TODO: impl
+	return createStrategyNotSupportedError
+}
+
+func (t *rolloutTearDownTransformer) shardings(transCtx *rolloutTransformContext) error {
+	rollout := transCtx.Rollout
+	for _, sharding := range rollout.Spec.Shardings {
+		if sharding.Strategy.Inplace != nil {
+			if err := t.shardingInplace(transCtx, rollout, sharding); err != nil {
+				return err
+			}
+		}
+		if sharding.Strategy.Replace != nil {
+			if err := t.shardingReplace(transCtx, rollout, sharding); err != nil {
+				return err
+			}
+		}
+		if sharding.Strategy.Create != nil {
+			if err := t.shardingCreate(transCtx, rollout, sharding); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *rolloutTearDownTransformer) shardingInplace(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
+	return nil // do nothing
+}
+
+func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
+	spec := transCtx.ClusterShardings[sharding.Name]
+	replicas := replaceShardingReplicas(rollout, sharding, spec)
+	tpl, _, err := replaceShardingInstanceTemplate(transCtx, sharding, spec)
+	if err != nil {
+		return err
+	}
+	if *tpl.Replicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
+		spec.Template.ServiceVersion = tpl.ServiceVersion
+		spec.Template.ComponentDef = tpl.CompDef
+		spec.Template.OfflineInstances = slices.DeleteFunc(spec.Template.OfflineInstances, func(instance string) bool {
+			for _, status := range rollout.Status.Components {
+				if status.Name == sharding.Name {
+					return slices.Contains(status.ScaleDownInstances, instance)
+				}
+			}
+			return false
+		})
+	}
+	return nil
+}
+
+func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
 	// TODO: impl
 	return createStrategyNotSupportedError
 }

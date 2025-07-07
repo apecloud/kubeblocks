@@ -168,11 +168,11 @@ var _ = Describe("rollout controller", func() {
 		BeforeEach(func() {
 			createClusterNCompObj()
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(appsv1alpha1.RolloutStrategy{
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(appsv1alpha1.RolloutStrategy{
 						Replace: &appsv1alpha1.RolloutStrategyReplace{},
 					}).
-					SetReplicas(replicas)
+					SetCompReplicas(replicas)
 			})
 		})
 
@@ -234,11 +234,11 @@ var _ = Describe("rollout controller", func() {
 
 			By("creating a new rollout object")
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(appsv1alpha1.RolloutStrategy{
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(appsv1alpha1.RolloutStrategy{
 						Replace: &appsv1alpha1.RolloutStrategyReplace{},
 					}).
-					SetReplicas(replicas)
+					SetCompReplicas(replicas)
 			})
 
 			By("checking the rollout state of new object")
@@ -261,9 +261,9 @@ var _ = Describe("rollout controller", func() {
 
 		It("rolling", func() {
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(defaultInplaceStrategy).
-					SetReplicas(replicas)
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultInplaceStrategy).
+					SetCompReplicas(replicas)
 			})
 
 			By("checking the rollout state")
@@ -287,9 +287,9 @@ var _ = Describe("rollout controller", func() {
 
 		It("succeed", func() {
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(defaultInplaceStrategy).
-					SetReplicas(replicas)
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultInplaceStrategy).
+					SetCompReplicas(replicas)
 			})
 
 			mockClusterNCompRunning()
@@ -321,9 +321,9 @@ var _ = Describe("rollout controller", func() {
 
 		It("rolling", func() {
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(defaultReplaceStrategy).
-					SetReplicas(replicas)
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
 			})
 
 			By("checking the rollout state")
@@ -355,9 +355,9 @@ var _ = Describe("rollout controller", func() {
 
 		It("scale down", func() {
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(defaultReplaceStrategy).
-					SetReplicas(replicas)
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
 			})
 
 			mockClusterNCompRunning() // to up
@@ -391,9 +391,9 @@ var _ = Describe("rollout controller", func() {
 
 		It("succeed", func() {
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(defaultReplaceStrategy).
-					SetReplicas(replicas)
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
 			})
 
 			By("creating pods for the component")
@@ -448,9 +448,9 @@ var _ = Describe("rollout controller", func() {
 
 		It("tear down", func() {
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
-				f.SetServiceVersion(serviceVersion2).
-					SetStrategy(defaultReplaceStrategy).
-					SetReplicas(replicas)
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
 			})
 
 			By("creating pods for the component")

@@ -48,8 +48,7 @@ func (t *rolloutInplaceTransformer) rollout(transCtx *rolloutTransformContext) e
 	if err := t.components(transCtx); err != nil {
 		return err
 	}
-	// TODO: sharding
-	return nil
+	return t.shardings(transCtx)
 }
 
 func (t *rolloutInplaceTransformer) components(transCtx *rolloutTransformContext) error {
@@ -97,6 +96,42 @@ func (t *rolloutInplaceTransformer) component(transCtx *rolloutTransformContext,
 	return nil
 }
 
+func (t *rolloutInplaceTransformer) shardings(transCtx *rolloutTransformContext) error {
+	rollout := transCtx.Rollout
+	for _, sharding := range rollout.Spec.Shardings {
+		if sharding.Strategy.Inplace != nil {
+			if err := t.sharding(transCtx, sharding); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *rolloutInplaceTransformer) sharding(transCtx *rolloutTransformContext, sharding appsv1alpha1.RolloutSharding) error {
+	spec := transCtx.ClusterShardings[sharding.Name]
+	shardingDef, serviceVersion, compDef := shardingDefNServiceVersionNCompDef(transCtx.Rollout, sharding, spec)
+	if shardingDef != spec.ShardingDef || serviceVersion != spec.Template.ServiceVersion || compDef != spec.Template.ComponentDef {
+		return nil
+	}
+	// TODO: how about the target sharding definition, service version and component definition are same with the original ones?
+
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the sharding %s is not ready", sharding.Name))
+	}
+
+	if sharding.ShardingDef != nil {
+		spec.ShardingDef = *sharding.ShardingDef
+	}
+	if sharding.ServiceVersion != nil {
+		spec.Template.ServiceVersion = *sharding.ServiceVersion
+	}
+	if sharding.CompDef != nil {
+		spec.Template.ComponentDef = *sharding.CompDef
+	}
+	return nil
+}
+
 // serviceVersionNCompDef obtains the original service version and component definition.
 func serviceVersionNCompDef(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (string, string) {
 	serviceVer, compDef := spec.ServiceVersion, spec.ComponentDef
@@ -108,4 +143,18 @@ func serviceVersionNCompDef(rollout *appsv1alpha1.Rollout, comp appsv1alpha1.Rol
 		}
 	}
 	return serviceVer, compDef
+}
+
+func shardingDefNServiceVersionNCompDef(rollout *appsv1alpha1.Rollout,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (string, string, string) {
+	shardingDef, serviceVer, compDef := spec.ShardingDef, spec.Template.ServiceVersion, spec.Template.ComponentDef
+	for _, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			shardingDef = status.ShardingDef
+			serviceVer = status.ServiceVersion
+			compDef = status.CompDef
+			break
+		}
+	}
+	return shardingDef, serviceVer, compDef
 }

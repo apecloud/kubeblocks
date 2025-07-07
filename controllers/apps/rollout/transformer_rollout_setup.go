@@ -58,7 +58,7 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return err
 	}
 
-	// init the rollout component status
+	// init the rollout status
 	return t.initRolloutStatus(transCtx, dag, rollout)
 }
 
@@ -123,6 +123,11 @@ func (t *rolloutSetupTransformer) initRolloutStatus(transCtx *rolloutTransformCo
 			return err
 		}
 	}
+	for _, sharding := range rollout.Spec.Shardings {
+		if err := t.initShardingStatus(transCtx, rollout, sharding); err != nil {
+			return err
+		}
+	}
 	if !reflect.DeepEqual(transCtx.RolloutOrig.Status, rollout.Status) {
 		graphCli.Status(dag, transCtx.RolloutOrig, rollout)
 		return graph.ErrPrematureStop
@@ -146,6 +151,27 @@ func (t *rolloutSetupTransformer) initCompStatus(transCtx *rolloutTransformConte
 		ServiceVersion: spec.ServiceVersion,
 		CompDef:        spec.ComponentDef,
 		Replicas:       spec.Replicas,
+	})
+	return nil
+}
+
+func (t *rolloutSetupTransformer) initShardingStatus(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
+	spec := transCtx.ClusterShardings[sharding.Name]
+	if spec == nil {
+		return fmt.Errorf("the sharding %s is not found in cluster", sharding.Name)
+	}
+	for _, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			return nil // has been initialized
+		}
+	}
+	rollout.Status.Shardings = append(rollout.Status.Shardings, appsv1alpha1.RolloutShardingStatus{
+		Name:           sharding.Name,
+		ShardingDef:    spec.ShardingDef,
+		ServiceVersion: spec.Template.ServiceVersion,
+		CompDef:        spec.Template.ComponentDef,
+		Replicas:       spec.Template.Replicas,
 	})
 	return nil
 }

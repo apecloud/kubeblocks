@@ -506,5 +506,32 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp.CompDef2CompCnt).Should(HaveKeyWithValue("test-compdef-b", int32(1)))
 			Expect(synthesizedComp.CompDef2CompCnt).Should(HaveKeyWithValue("test-compdef-c", int32(5)))
 		})
+
+		It("roll back serviceaccount change", func() {
+			lastCompDef := compDef.DeepCopy()
+			lastCompDef.Name = "last-comp-def"
+			comp1.Labels[constant.LastComponentDefinitionLabelKey] = lastCompDef.Name
+			reader.objs = []client.Object{comp1, lastCompDef}
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, reader, compDef, comp1)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.ServiceAccountName).Should(Equal(constant.GenerateDefaultServiceAccountName(lastCompDef.Name)))
+		})
+
+		It("does not roll back serviceaccount change when roles change", func() {
+			lastCompDef := compDef.DeepCopy()
+			lastCompDef.Name = "last-comp-def"
+			lastCompDef.Spec.LifecycleActions = &appsv1.ComponentLifecycleActions{
+				RoleProbe: &appsv1.Probe{},
+			}
+			comp1.Labels[constant.LastComponentDefinitionLabelKey] = lastCompDef.Name
+			reader.objs = []client.Object{comp1, lastCompDef}
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, reader, compDef, comp1)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.ServiceAccountName).Should(Equal(constant.GenerateDefaultServiceAccountName(compDef.Name)))
+		})
 	})
 })

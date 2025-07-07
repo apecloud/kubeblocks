@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -147,7 +148,15 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	overrideComponentServices(synthesizeComp, comp)
 
 	// build serviceAccountName
-	buildServiceAccountName(synthesizeComp)
+	var lastCompDef *appsv1.ComponentDefinition
+	if lastCmpdName := comp.Labels[constant.LastComponentDefinitionLabelKey]; lastCmpdName != "" {
+		lastCompDef, err = GetCompDefByName(ctx, cli, lastCmpdName)
+		if err != nil {
+			// FIXME: should we ignore not found error?
+			return nil, err
+		}
+	}
+	buildServiceAccountName(synthesizeComp, lastCompDef)
 
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
@@ -511,7 +520,7 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.
-func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
+func buildServiceAccountName(synthesizeComp *SynthesizedComponent, lastCompDef *appsv1.ComponentDefinition) {
 	if synthesizeComp.ServiceAccountName != "" {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
@@ -519,7 +528,20 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 	if !viper.GetBool(constant.EnableRBACManager) {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
+
+	saName := constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
+	// HACK: roll back serviceaccount name if current and last compDef's roles' contents are not changed.
+	// The comparison should align with componentRBACTransformer.
+	if lastCompDef != nil {
+		curLifecycleActionEnabled := synthesizeComp.LifecycleActions != nil
+		lastLifecycleActionEnabled := lastCompDef.Spec.LifecycleActions != nil
+		if equality.Semantic.DeepEqual(synthesizeComp.PolicyRules, lastCompDef.Spec.PolicyRules) &&
+			curLifecycleActionEnabled == lastLifecycleActionEnabled {
+			saName = constant.GenerateDefaultServiceAccountName(lastCompDef.Name)
+		}
+	}
+
+	synthesizeComp.ServiceAccountName = saName
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 

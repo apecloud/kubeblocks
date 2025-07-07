@@ -45,6 +45,8 @@ import (
 )
 
 // componentRBACTransformer puts the RBAC objects at the beginning of the DAG
+// Note: rbac objects created in this transformer are not necessarily used in workload objects,
+// as when updating componentdefition, old serviceaccount may be retained to prevent pod restart.
 type componentRBACTransformer struct{}
 
 var _ graph.Transformer = &componentRBACTransformer{}

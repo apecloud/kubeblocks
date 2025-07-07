@@ -47,10 +47,8 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	)
 
 	// pre-check
-	for _, comp := range rollout.Spec.Components {
-		if err := t.precheck(comp); err != nil {
-			return err
-		}
+	if err := t.precheck(rollout); err != nil {
+		return err
 	}
 
 	// check and add the rollout label to the cluster
@@ -62,28 +60,55 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return t.initRolloutStatus(transCtx, dag, rollout)
 }
 
-func (t *rolloutSetupTransformer) precheck(comp appsv1alpha1.RolloutComponent) error {
-	// target serviceVersion & componentDef
-	if comp.ServiceVersion == nil && comp.CompDef == nil {
-		return fmt.Errorf("neither serviceVersion nor compDef is defined for component %s", comp.Name)
+func (t *rolloutSetupTransformer) precheck(rollout *appsv1alpha1.Rollout) error {
+	if err := t.compPrecheck(rollout); err != nil {
+		return err
 	}
+	return t.shardingPrecheck(rollout)
+}
 
-	// rollout strategy
+func (t *rolloutSetupTransformer) compPrecheck(rollout *appsv1alpha1.Rollout) error {
+	for _, comp := range rollout.Spec.Components {
+		// target serviceVersion & componentDef
+		if comp.ServiceVersion == nil && comp.CompDef == nil {
+			return fmt.Errorf("neither serviceVersion nor compDef is defined for component %s", comp.Name)
+		}
+		if err := t.checkRolloutStrategy("component", comp.Name, comp.Strategy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *rolloutSetupTransformer) shardingPrecheck(rollout *appsv1alpha1.Rollout) error {
+	for _, sharding := range rollout.Spec.Shardings {
+		// target shardingDef & serviceVersion & componentDef
+		if sharding.ShardingDef == nil && sharding.ServiceVersion == nil && sharding.CompDef == nil {
+			return fmt.Errorf("neither shardingDef, serviceVersion nor compDef is defined for sharding %s", sharding.Name)
+		}
+		if err := t.checkRolloutStrategy("sharding", sharding.Name, sharding.Strategy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *rolloutSetupTransformer) checkRolloutStrategy(kind, name string, strategy appsv1alpha1.RolloutStrategy) error {
 	cnt := 0
-	if comp.Strategy.Inplace != nil {
+	if strategy.Inplace != nil {
 		cnt++
 	}
-	if comp.Strategy.Replace != nil {
+	if strategy.Replace != nil {
 		cnt++
 	}
-	if comp.Strategy.Create != nil {
+	if strategy.Create != nil {
 		cnt++
 	}
 	if cnt == 0 {
-		return fmt.Errorf("the rollout strategy of component %s is not defined", comp.Name)
+		return fmt.Errorf("the rollout strategy of %s %s is not defined", kind, name)
 	}
 	if cnt > 1 {
-		return fmt.Errorf("more than one rollout strategy is defined for component %s", comp.Name)
+		return fmt.Errorf("more than one rollout strategy is defined for %s %s", kind, name)
 	}
 	return nil
 }

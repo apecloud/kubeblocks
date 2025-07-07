@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"slices"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -142,15 +145,11 @@ func (t *rolloutStatusTransformer) compInplace(transCtx *rolloutTransformContext
 
 func (t *rolloutStatusTransformer) compReplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
-	var rollingTpl *appsv1.InstanceTemplate
 	spec := t.compSpec(transCtx, comp.Name)
-	tplName := string(rollout.UID[:8])
-	for i, tpl := range spec.Instances {
-		if tpl.Name == tplName {
-			rollingTpl = &spec.Instances[i]
-		}
-	}
-	if rollingTpl == nil {
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	if slices.IndexFunc(spec.Instances, func(tpl appsv1.InstanceTemplate) bool {
+		return strings.HasPrefix(tpl.Name, prefix)
+	}) < 0 {
 		return appsv1alpha1.PendingRolloutState, nil
 	}
 
@@ -166,7 +165,7 @@ func (t *rolloutStatusTransformer) compReplace(transCtx *rolloutTransformContext
 	allPodCnt := int32(len(pods.Items))
 	newPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
 		if pod.Labels != nil {
-			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] == tplName
+			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
 		}
 		return false
 	}))
@@ -190,7 +189,12 @@ func (t *rolloutStatusTransformer) compReplace(transCtx *rolloutTransformContext
 		}
 	}
 
-	if !checkClusterNCompRunning(transCtx, comp.Name) || spec.Replicas != *rollingTpl.Replicas {
+	tpls, _, err := replaceCompInstanceTemplates(rollout, comp, spec)
+	if err != nil {
+		return "", err
+	}
+	newReplicas := replaceInstanceTemplateReplicas(tpls)
+	if !checkClusterNCompRunning(transCtx, comp.Name) || spec.Replicas != newReplicas {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 	if allPodCnt != spec.Replicas {
@@ -257,23 +261,20 @@ func (t *rolloutStatusTransformer) shardingInplace(transCtx *rolloutTransformCon
 
 func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) (appsv1alpha1.RolloutState, error) {
-	var rollingTpl *appsv1.InstanceTemplate
 	spec := t.shardingSpec(transCtx, sharding.Name)
-	tplName := string(rollout.UID[:8])
-	for i, tpl := range spec.Template.Instances {
-		if tpl.Name == tplName {
-			rollingTpl = &spec.Template.Instances[i]
-		}
-	}
-	if rollingTpl == nil {
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	if slices.IndexFunc(spec.Template.Instances, func(tpl appsv1.InstanceTemplate) bool {
+		return strings.HasPrefix(tpl.Name, prefix)
+	}) < 0 {
 		return appsv1alpha1.PendingRolloutState, nil
 	}
 
 	pods := &corev1.PodList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(rollout.Namespace),
-		client.MatchingLabels(constant.GetClusterLabels(rollout.Spec.ClusterName,
-			map[string]string{constant.KBAppShardingNameLabelKey: sharding.Name})),
+		client.MatchingLabels(constant.GetClusterLabels(rollout.Spec.ClusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: sharding.Name,
+		})),
 	}
 	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
 		return "", err
@@ -282,7 +283,7 @@ func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformCon
 	allPodCnt := int32(len(pods.Items))
 	newPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
 		if pod.Labels != nil {
-			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] == tplName
+			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
 		}
 		return false
 	}))
@@ -306,7 +307,12 @@ func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformCon
 		}
 	}
 
-	if !checkClusterNShardingRunning(transCtx, sharding.Name) || spec.Template.Replicas != *rollingTpl.Replicas {
+	tpls, _, err := replaceShardingInstanceTemplates(rollout, sharding, spec)
+	if err != nil {
+		return "", err
+	}
+	newReplicas := replaceInstanceTemplateReplicas(tpls)
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) || spec.Template.Replicas != newReplicas {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 	if allPodCnt != spec.Template.Replicas {

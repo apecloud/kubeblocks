@@ -165,7 +165,7 @@ func checkClusterNShardingRunning(transCtx *rolloutTransformContext, shardingNam
 		return false
 	}
 	compObjs, ok := transCtx.ShardingComps[shardingName]
-	if !ok || len(compObjs) == 0 {
+	if !ok {
 		return false
 	}
 	for _, compObj := range compObjs {
@@ -173,5 +173,6 @@ func checkClusterNShardingRunning(transCtx *rolloutTransformContext, shardingNam
 			return false
 		}
 	}
-	return true
+	spec := transCtx.ClusterShardings[shardingName]
+	return len(compObjs) == int(spec.Shards)
 }

@@ -89,9 +89,19 @@ func (t *rolloutInplaceTransformer) component(transCtx *rolloutTransformContext,
 
 	if comp.ServiceVersion != nil {
 		spec.ServiceVersion = *comp.ServiceVersion
+		for i := range spec.Instances {
+			if len(spec.Instances[i].ServiceVersion) > 0 || len(spec.Instances[i].CompDef) > 0 {
+				spec.Instances[i].ServiceVersion = *comp.ServiceVersion
+			}
+		}
 	}
 	if comp.CompDef != nil {
 		spec.ComponentDef = *comp.CompDef
+		for i := range spec.Instances {
+			if len(spec.Instances[i].ServiceVersion) > 0 || len(spec.Instances[i].CompDef) > 0 {
+				spec.Instances[i].CompDef = *comp.CompDef
+			}
+		}
 	}
 	return nil
 }
@@ -122,12 +132,37 @@ func (t *rolloutInplaceTransformer) sharding(transCtx *rolloutTransformContext, 
 
 	if sharding.ShardingDef != nil {
 		spec.ShardingDef = *sharding.ShardingDef
+		for i, tpl := range spec.ShardTemplates {
+			if tpl.ShardingDef != nil {
+				spec.ShardTemplates[i].ShardingDef = sharding.ShardingDef
+			}
+		}
 	}
 	if sharding.ServiceVersion != nil {
 		spec.Template.ServiceVersion = *sharding.ServiceVersion
+		for i := range spec.Template.Instances {
+			if len(spec.Template.Instances[i].ServiceVersion) > 0 || len(spec.Template.Instances[i].CompDef) > 0 {
+				spec.Template.Instances[i].ServiceVersion = *sharding.ServiceVersion
+			}
+		}
+		for i, tpl := range spec.ShardTemplates {
+			if tpl.ServiceVersion != nil || tpl.CompDef != nil {
+				spec.ShardTemplates[i].ServiceVersion = sharding.ServiceVersion
+			}
+		}
 	}
 	if sharding.CompDef != nil {
 		spec.Template.ComponentDef = *sharding.CompDef
+		for i := range spec.Template.Instances {
+			if len(spec.Template.Instances[i].ServiceVersion) > 0 || len(spec.Template.Instances[i].CompDef) > 0 {
+				spec.Template.Instances[i].CompDef = *sharding.CompDef
+			}
+		}
+		for i, tpl := range spec.ShardTemplates {
+			if tpl.ServiceVersion != nil || tpl.CompDef != nil {
+				spec.ShardTemplates[i].CompDef = sharding.CompDef
+			}
+		}
 	}
 	return nil
 }

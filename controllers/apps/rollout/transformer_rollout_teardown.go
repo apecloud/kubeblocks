@@ -80,11 +80,13 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 	if err != nil {
 		return err
 	}
-	tpl, _, err := replaceCompInstanceTemplate(transCtx, comp, spec)
+	tpls, _, err := replaceCompInstanceTemplates(rollout, comp, spec)
 	if err != nil {
 		return err
 	}
-	if *tpl.Replicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
+	newReplicas := replaceInstanceTemplateReplicas(tpls)
+	if newReplicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
+		tpl := tpls[""] // use the default template
 		spec.ServiceVersion = tpl.ServiceVersion
 		spec.ComponentDef = tpl.CompDef
 		spec.OfflineInstances = slices.DeleteFunc(spec.OfflineInstances, func(instance string) bool {
@@ -136,15 +138,17 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
 	spec := transCtx.ClusterShardings[sharding.Name]
 	replicas := replaceShardingReplicas(rollout, sharding, spec)
-	tpl, _, err := replaceShardingInstanceTemplate(transCtx, sharding, spec)
+	tpls, _, err := replaceShardingInstanceTemplates(rollout, sharding, spec)
 	if err != nil {
 		return err
 	}
-	if *tpl.Replicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
+	newReplicas := replaceInstanceTemplateReplicas(tpls)
+	if newReplicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
+		tpl := tpls[""] // use the default template
 		spec.Template.ServiceVersion = tpl.ServiceVersion
 		spec.Template.ComponentDef = tpl.CompDef
 		spec.Template.OfflineInstances = slices.DeleteFunc(spec.Template.OfflineInstances, func(instance string) bool {
-			for _, status := range rollout.Status.Components {
+			for _, status := range rollout.Status.Shardings {
 				if status.Name == sharding.Name {
 					return slices.Contains(status.ScaleDownInstances, instance)
 				}

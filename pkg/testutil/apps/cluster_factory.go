@@ -144,6 +144,18 @@ func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
 	})
 }
 
+func (factory *MockClusterFactory) SetShardingReplicas(replicas int32) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.Replicas = replicas
+	})
+}
+
+func (factory *MockClusterFactory) SetShardingServiceVersion(serviceVersion string) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.ServiceVersion = serviceVersion
+	})
+}
+
 func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.ComponentDef = compDef

@@ -95,8 +95,9 @@ func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
 
 	// update cluster spec after the cluster and component are ready
 	if !exist {
-		for _, tpl := range tpls {
+		for name, tpl := range tpls {
 			spec.Instances = append(spec.Instances, *tpl)
+			tpls[name] = &spec.Instances[len(spec.Instances)-1]
 		}
 		spec.FlatInstanceOrdinal = true
 	}
@@ -276,8 +277,9 @@ func (t *rolloutReplaceTransformer) sharding(transCtx *rolloutTransformContext,
 
 	// update cluster spec after the cluster and sharding are ready
 	if !exist {
-		for _, tpl := range tpls {
+		for name, tpl := range tpls {
 			spec.Template.Instances = append(spec.Template.Instances, *tpl)
+			tpls[name] = &spec.Template.Instances[len(spec.Template.Instances)-1]
 		}
 		spec.Template.FlatInstanceOrdinal = true
 	}
@@ -386,7 +388,9 @@ func (t *rolloutReplaceTransformer) checkShardingDelaySeconds(rollout *appsv1alp
 
 func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rolloutTransformContext,
 	spec *appsv1.ClusterSharding) (string, *appsv1.InstanceTemplate, error) {
-	matchingLabels := constant.GetCompLabels(transCtx.Cluster.Name, spec.Name)
+	matchingLabels := constant.GetClusterLabels(transCtx.Cluster.Name, map[string]string{
+		constant.KBAppShardingNameLabelKey: spec.Name,
+	})
 	matchingLabels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
 	pods := &corev1.PodList{}
 	listOpts := []client.ListOption{

@@ -1,0 +1,27 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: redis-standalone
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  clusterDef: redis
+  topology: standalone # set topology to standalone
+  componentSpecs:
+  - name: redis
+    replicas: 1       # set replica to 1
+    resources:
+      limits:
+        cpu: "0.5"
+        memory: "0.5Gi"
+      requests:
+        cpu: "0.5"
+        memory: "0.5Gi"
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi

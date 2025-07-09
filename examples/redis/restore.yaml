@@ -1,64 +1,50 @@
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: redis-cluster-restore
-  namespace: default
+  name: redis-replication-restore
+  namespace: demo
   annotations:
-    kubeblocks.io/restore-from-backup: '{"redis":{"connectionPassword":"<backup-connection-password>","name":"redis-cluster-backup","namespace":"default","volumeRestorePolicy":"Parallel"}}'
+    kubeblocks.io/restore-from-backup: '{"redis":{"encryptedSystemAccounts":"<ENCRYPTED-SYSTEM-ACCOUNTS>","name":"redis-replication-backup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
-  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
-  clusterDefinitionRef: redis
-  # Specifies the redis cluster topology defined in ClusterDefinition.Spec.topologies, support standalone, replication, and replication-twemproxy.
-  # - `standalone`: single redis instance
-  # - `replication`: primary-secondary replication with redis sentinel, refer: https://redis.io/docs/management/sentinel
-  # - `replication-twemproxy`: primary-secondary replication with sentinel and twemproxy, it is just a demo for how to use twemproxy with redis, not recommended for production
-  topology: replication
-  # Specifies the behavior when a Cluster is deleted.
-  # Specifies the behavior when a Cluster is deleted.
-  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
-  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
-  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
-  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
   terminationPolicy: Delete
-  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster.
-  # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
-  # ClusterComponentSpec defines the specifications for a Component in a Cluster.
+  clusterDef: redis
+  topology: replication
   componentSpecs:
-  - name: redis
-    disableExporter: true
-    enabledLogs:
-    - running
-    serviceAccountName: kb-redis-cluster
-    replicas: 3
-    resources:
-      limits:
-        cpu: '1'
-        memory: 1Gi
-      requests:
-        cpu: '1'
-        memory: 1Gi
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 30Gi
-  - name: redis-sentinel
-    replicas: 3
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+    - name: redis
+      serviceVersion: "7.2.4"
+      disableExporter: false
+      replicas: 2
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: redis-sentinel
+      replicas: 3
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

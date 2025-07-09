@@ -1,0 +1,17 @@
+apiVersion: operations.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: pg-cluster-reconfigure-archive-command
+  namespace: demo
+spec:
+  # Specifies the type of this operation.
+  type: Reconfiguring
+  clusterName: pg-cluster
+  reconfigures:
+  - componentName: postgresql
+    parameters:
+      # Represents the name of the parameter that is to be updated.
+      # The archive_command parameter in PostgreSQL is used to specify a shell command that the server runs to archive a completed WAL (Write-Ahead Logging) file.
+      # Here it sets up the necessary environment variables using envdir and then uses wal-g to archive the WAL file
+    - key: archive_command
+      value: "'envdir /home/postgres/pgdata/wal-g/env /home/postgres/pgdata/wal-g/wal-g wal-push %p'"

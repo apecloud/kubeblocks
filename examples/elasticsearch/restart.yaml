@@ -1,0 +1,17 @@
+apiVersion: operations.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: elasticsearch-restart
+  namespace: demo
+spec:
+  # Specifies the name of the Cluster resource that this operation is targeting.
+  clusterName: es-multinode
+  type: Restart
+  # Lists Components to be restarted. ComponentOps specifies the Component to be operated on.
+  restart:
+    # Specifies the name of the Component.If not specified, ALL Components will be restarted.
+    # - master
+    # - data
+    # - ingest
+    # - transform
+  - componentName: data

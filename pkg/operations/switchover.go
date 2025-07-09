@@ -124,7 +124,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 
 		checkOwnership := func(pod *corev1.Pod) error {
-			if pod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(pod) != synthesizedComp.Name {
+			if pod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || pod.Labels[constant.KBAppComponentLabelKey] != synthesizedComp.Name {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, compName))
 			}
 			return nil

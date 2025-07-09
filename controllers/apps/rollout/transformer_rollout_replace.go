@@ -95,11 +95,12 @@ func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
 
 	// update cluster spec after the cluster and component are ready
 	if !exist {
-		for name, tpl := range tpls {
+		for _, tpl := range tpls {
 			spec.Instances = append(spec.Instances, *tpl)
-			tpls[name] = &spec.Instances[len(spec.Instances)-1]
 		}
 		spec.FlatInstanceOrdinal = true
+		// retrieve the templates again after the spec is updated
+		tpls = replaceCompInstanceTemplatesFromSpec(rollout, spec)
 	}
 
 	instance, instTpl, err := t.pickCompInstanceToRollout(transCtx, spec)
@@ -277,11 +278,12 @@ func (t *rolloutReplaceTransformer) sharding(transCtx *rolloutTransformContext,
 
 	// update cluster spec after the cluster and sharding are ready
 	if !exist {
-		for name, tpl := range tpls {
+		for _, tpl := range tpls {
 			spec.Template.Instances = append(spec.Template.Instances, *tpl)
-			tpls[name] = &spec.Template.Instances[len(spec.Template.Instances)-1]
 		}
 		spec.Template.FlatInstanceOrdinal = true
+		// retrieve the templates again after the spec is updated
+		tpls = replaceShardingInstanceTemplatesFromSpec(rollout, spec)
 	}
 
 	instance, instTpl, err := t.pickShardingInstancesToRollout(transCtx, spec)
@@ -478,17 +480,7 @@ func replaceShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha
 
 func replaceCompInstanceTemplates(rollout *appsv1alpha1.Rollout,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (map[string]*appsv1.InstanceTemplate, bool, error) {
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
-	tpls := make(map[string]*appsv1.InstanceTemplate)
-	for i, tpl := range spec.Instances {
-		if strings.HasPrefix(tpl.Name, prefix) {
-			if tpl.Name == prefix {
-				tpls[""] = &spec.Instances[i]
-			} else {
-				tpls[strings.TrimPrefix(tpl.Name, prefix)] = &spec.Instances[i]
-			}
-		}
-	}
+	tpls := replaceCompInstanceTemplatesFromSpec(rollout, spec)
 	if len(tpls) > 0 {
 		return tpls, true, nil
 	}
@@ -497,6 +489,7 @@ func replaceCompInstanceTemplates(rollout *appsv1alpha1.Rollout,
 		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
 
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
 	tpls[""] = replaceCompInstanceTemplate(comp, prefix, nil)
 	for _, tpl := range spec.Instances {
 		if ptr.Deref(tpl.Replicas, 0) > 0 {
@@ -504,6 +497,21 @@ func replaceCompInstanceTemplates(rollout *appsv1alpha1.Rollout,
 		}
 	}
 	return tpls, false, nil
+}
+
+func replaceCompInstanceTemplatesFromSpec(rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterComponentSpec) map[string]*appsv1.InstanceTemplate {
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	tpls := make(map[string]*appsv1.InstanceTemplate)
+	for i, tpl := range spec.Instances {
+		if strings.HasPrefix(tpl.Name, prefix) {
+			if tpl.Name == prefix {
+				tpls[""] = &spec.Instances[i]
+			} else {
+				tpls[strings.TrimPrefix(tpl.Name, fmt.Sprintf("%s-", prefix))] = &spec.Instances[i]
+			}
+		}
+	}
+	return tpls
 }
 
 func replaceCompInstanceTemplate(comp appsv1alpha1.RolloutComponent, newTplName string, tpl *appsv1.InstanceTemplate) *appsv1.InstanceTemplate {
@@ -539,17 +547,7 @@ func replaceCompInstanceTemplate(comp appsv1alpha1.RolloutComponent, newTplName 
 
 func replaceShardingInstanceTemplates(rollout *appsv1alpha1.Rollout,
 	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (map[string]*appsv1.InstanceTemplate, bool, error) {
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
-	tpls := make(map[string]*appsv1.InstanceTemplate)
-	for i, tpl := range spec.Template.Instances {
-		if strings.HasPrefix(tpl.Name, prefix) {
-			if tpl.Name == prefix {
-				tpls[""] = &spec.Template.Instances[i]
-			} else {
-				tpls[strings.TrimPrefix(tpl.Name, prefix)] = &spec.Template.Instances[i]
-			}
-		}
-	}
+	tpls := replaceShardingInstanceTemplatesFromSpec(rollout, spec)
 	if len(tpls) > 0 {
 		return tpls, true, nil
 	}
@@ -558,6 +556,7 @@ func replaceShardingInstanceTemplates(rollout *appsv1alpha1.Rollout,
 		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
 
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
 	tpls[""] = replaceShardingInstanceTemplate(sharding, prefix, nil)
 	for _, tpl := range spec.Template.Instances {
 		if ptr.Deref(tpl.Replicas, 0) > 0 {
@@ -565,6 +564,21 @@ func replaceShardingInstanceTemplates(rollout *appsv1alpha1.Rollout,
 		}
 	}
 	return tpls, false, nil
+}
+
+func replaceShardingInstanceTemplatesFromSpec(rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterSharding) map[string]*appsv1.InstanceTemplate {
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	tpls := make(map[string]*appsv1.InstanceTemplate)
+	for i, tpl := range spec.Template.Instances {
+		if strings.HasPrefix(tpl.Name, prefix) {
+			if tpl.Name == prefix {
+				tpls[""] = &spec.Template.Instances[i]
+			} else {
+				tpls[strings.TrimPrefix(tpl.Name, fmt.Sprintf("%s-", prefix))] = &spec.Template.Instances[i]
+			}
+		}
+	}
+	return tpls
 }
 
 func replaceShardingInstanceTemplate(sharding appsv1alpha1.RolloutSharding, newTplName string, tpl *appsv1.InstanceTemplate) *appsv1.InstanceTemplate {

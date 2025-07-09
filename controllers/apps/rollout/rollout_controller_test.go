@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -41,15 +42,16 @@ import (
 
 var _ = Describe("rollout controller", func() {
 	const (
-		compDefName     = "test-compdef"
-		clusterName     = "test-cluster"
-		shardingName    = "sharding"
-		compName        = "comp"
-		serviceVersion1 = "1.0.1"
-		serviceVersion2 = "1.0.2"
-		rolloutName     = "test-rollout"
-		replicas        = int32(3)
-		seed            = 1670750000
+		compDefName          = "test-compdef"
+		clusterName          = "test-cluster"
+		shardingName         = "sharding"
+		compName             = "comp"
+		instanceTemplateName = "aaa"
+		serviceVersion1      = "1.0.1"
+		serviceVersion2      = "1.0.2"
+		rolloutName          = "test-rollout"
+		replicas             = int32(3)
+		seed                 = 1670750000
 	)
 
 	var (
@@ -77,7 +79,43 @@ var _ = Describe("rollout controller", func() {
 		compObjName := constant.GenerateClusterComponentName(clusterKey.Name, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
 			AddLabelsInMap(constant.GetCompLabelsWithDef(clusterKey.Name, compName, compDefName)).
+			SetServiceVersion(serviceVersion1).
 			SetReplicas(replicas).
+			Create(&testCtx).
+			GetObject()
+		compKey = client.ObjectKeyFromObject(compObj)
+	}
+
+	createClusterNCompObjWithInstanceTemplate := func() {
+		By("creating a cluster object")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+			WithRandomName().
+			AddComponent(compName, compDefName).
+			SetServiceVersion(serviceVersion1).
+			SetReplicas(replicas).
+			AddInstances(compName, appsv1.InstanceTemplate{
+				Name:           instanceTemplateName,
+				ServiceVersion: serviceVersion1,
+				Replicas:       ptr.To[int32](1),
+			}).
+			SetFlatInstanceOrdinal(true).
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("creating a component object")
+		compObjName := constant.GenerateClusterComponentName(clusterKey.Name, compName)
+		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
+			AddLabelsInMap(constant.GetCompLabelsWithDef(clusterKey.Name, compName, compDefName)).
+			SetServiceVersion(serviceVersion1).
+			SetReplicas(replicas).
+			AddInstances(appsv1.InstanceTemplate{
+				Name:           instanceTemplateName,
+				ServiceVersion: serviceVersion1,
+				CompDef:        compObjName,
+				Replicas:       ptr.To[int32](1),
+			}).
+			SetFlatInstanceOrdinal(true).
 			Create(&testCtx).
 			GetObject()
 		compKey = client.ObjectKeyFromObject(compObj)
@@ -100,7 +138,45 @@ var _ = Describe("rollout controller", func() {
 			AddLabelsInMap(constant.GetCompLabelsWithDef(clusterKey.Name, compName, compDefName, map[string]string{
 				constant.KBAppShardingNameLabelKey: shardingName,
 			})).
+			SetServiceVersion(serviceVersion1).
 			SetReplicas(replicas).
+			Create(&testCtx).
+			GetObject()
+		compKey = client.ObjectKeyFromObject(compObj)
+	}
+
+	createClusterNShardingObjWithInstanceTemplate := func() {
+		By("creating a cluster object")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+			WithRandomName().
+			AddSharding(shardingName, "", compDefName).
+			SetShardingServiceVersion(serviceVersion1).
+			SetShardingReplicas(replicas).
+			AddShardingInstances(appsv1.InstanceTemplate{
+				Name:           instanceTemplateName,
+				ServiceVersion: serviceVersion1,
+				Replicas:       ptr.To[int32](1),
+			}).
+			SetShardingFlatInstanceOrdinal(true).
+			Create(&testCtx).
+			GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("creating a component object")
+		compObjName := constant.GenerateClusterComponentName(clusterKey.Name, fmt.Sprintf("%s-%s", compName, shardIDs[0]))
+		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
+			AddLabelsInMap(constant.GetCompLabelsWithDef(clusterKey.Name, compName, compDefName, map[string]string{
+				constant.KBAppShardingNameLabelKey: shardingName,
+			})).
+			SetServiceVersion(serviceVersion1).
+			SetReplicas(replicas).
+			AddInstances(appsv1.InstanceTemplate{
+				Name:           instanceTemplateName,
+				ServiceVersion: serviceVersion1,
+				CompDef:        compObjName,
+				Replicas:       ptr.To[int32](1),
+			}).
+			SetFlatInstanceOrdinal(true).
 			Create(&testCtx).
 			GetObject()
 		compKey = client.ObjectKeyFromObject(compObj)
@@ -246,6 +322,7 @@ var _ = Describe("rollout controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.RolloutSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ComponentSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -400,6 +477,67 @@ var _ = Describe("rollout controller", func() {
 		})
 	})
 
+	Context("inplace - instance template", func() {
+		var (
+			defaultInplaceStrategy = appsv1alpha1.RolloutStrategy{
+				Inplace: &appsv1alpha1.RolloutStrategyInplace{},
+			}
+		)
+
+		BeforeEach(func() {
+			createClusterNCompObjWithInstanceTemplate()
+		})
+
+		It("rolling", func() {
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultInplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			By("checking the rollout state")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+				// TODO: check message
+			})).Should(Succeed())
+
+			mockClusterNCompRunning()
+
+			By("checking the cluster spec been updated")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVersion2))
+				g.Expect(cluster.Spec.ComponentSpecs[0].Instances[0].ServiceVersion).Should(Equal(serviceVersion2))
+			})).Should(Succeed())
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+		})
+
+		It("succeed", func() {
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultInplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			mockClusterNCompRunning()
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			mockClusterNCompRunning()
+
+			By("checking the rollout state as succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).Should(Succeed())
+		})
+	})
+
 	Context("inplace - sharding", func() {
 		var (
 			defaultInplaceStrategy = appsv1alpha1.RolloutStrategy{
@@ -429,6 +567,66 @@ var _ = Describe("rollout controller", func() {
 			By("checking the cluster spec been updated")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.Shardings[0].Template.ServiceVersion).Should(Equal(serviceVersion2))
+			})).Should(Succeed())
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+		})
+
+		It("succeed", func() {
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultInplaceStrategy)
+			})
+
+			mockClusterNShardingRunning()
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning()
+
+			By("checking the rollout state as succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).Should(Succeed())
+		})
+	})
+
+	Context("inplace - sharding + instance template", func() {
+		var (
+			defaultInplaceStrategy = appsv1alpha1.RolloutStrategy{
+				Inplace: &appsv1alpha1.RolloutStrategyInplace{},
+			}
+		)
+
+		BeforeEach(func() {
+			rand.Seed(seed)
+			createClusterNShardingObjWithInstanceTemplate()
+		})
+
+		It("rolling", func() {
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultInplaceStrategy)
+			})
+
+			By("checking the rollout state")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+				// TODO: check message
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning()
+
+			By("checking the cluster spec been updated")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.Shardings[0].Template.ServiceVersion).Should(Equal(serviceVersion2))
+				g.Expect(cluster.Spec.Shardings[0].Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion2))
 			})).Should(Succeed())
 
 			By("checking the rollout state as rolling")
@@ -505,6 +703,9 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("scale down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1, 2}, "")
+
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
 				f.SetCompServiceVersion(serviceVersion2).
 					SetCompStrategy(defaultReplaceStrategy).
@@ -517,9 +718,6 @@ var _ = Describe("rollout controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
 				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
 			})).Should(Succeed())
-
-			By("creating pods for the component")
-			pods := mockCreatePods([]int32{0, 1, 2}, "")
 
 			mockClusterNCompRunning() // to down
 
@@ -541,14 +739,14 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("succeed", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1, 2}, "")
+
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
 				f.SetCompServiceVersion(serviceVersion2).
 					SetCompStrategy(defaultReplaceStrategy).
 					SetCompReplicas(replicas)
 			})
-
-			By("creating pods for the component")
-			pods := mockCreatePods([]int32{0, 1, 2}, "")
 
 			for i := int32(0); i < replicas; i++ {
 				mockClusterNCompRunning() // to up
@@ -598,14 +796,14 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("tear down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1, 2}, "")
+
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
 				f.SetCompServiceVersion(serviceVersion2).
 					SetCompStrategy(defaultReplaceStrategy).
 					SetCompReplicas(replicas)
 			})
-
-			By("creating pods for the component")
-			pods := mockCreatePods([]int32{0, 1, 2}, "")
 
 			for i := int32(0); i < replicas; i++ {
 				mockClusterNCompRunning() // to up
@@ -627,6 +825,322 @@ var _ = Describe("rollout controller", func() {
 				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 					spec := cluster.Spec.ComponentSpecs[0]
 					g.Expect(spec.Replicas).Should(Equal(replicas))
+					g.Expect(spec.OfflineInstances).Should(HaveLen(int(i + 1)))
+					for j := int32(0); j < i+1; j++ {
+						g.Expect(spec.OfflineInstances[j]).Should(Equal(pods[j].Name))
+					}
+				})).Should(Succeed())
+
+				By("deleting the scaled down pod")
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, pods[i])).Should(Succeed())
+			}
+
+			mockClusterNCompRunning() // all old pods are deleted
+
+			By("checking the cluster spec updated finally")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.ComponentSpecs[0]
+				g.Expect(spec.ServiceVersion).Should(Equal(serviceVersion2))
+				g.Expect(spec.OfflineInstances).Should(BeEmpty())
+			})).Should(Succeed())
+
+			mockClusterNCompRunning() // tear down will update the cluster spec
+
+			By("checking the rollout state as succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).Should(Succeed())
+		})
+	})
+
+	Context("replace - instance template", func() {
+		var (
+			defaultReplaceStrategy = appsv1alpha1.RolloutStrategy{
+				Replace: &appsv1alpha1.RolloutStrategyReplace{},
+			}
+		)
+
+		BeforeEach(func() {
+			createClusterNCompObjWithInstanceTemplate()
+		})
+
+		It("rolling", func() {
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			By("checking the rollout state")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+				// TODO: check message
+			})).Should(Succeed())
+
+			mockClusterNCompRunning()
+
+			By("checking the cluster spec & status been updated")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.ComponentSpecs[0]
+				g.Expect(spec.Replicas).Should(Equal(replicas + 1))
+				g.Expect(spec.ServiceVersion).Should(Equal(serviceVersion1))
+				g.Expect(spec.Instances).Should(HaveLen(3)) // aaa, prefix, prefix-aaa
+				g.Expect(spec.Instances[0].Name).Should(Equal(instanceTemplateName))
+				g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
+				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(1)))
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, i := range []int{1, 2} {
+					tpl := spec.Instances[i]
+					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+					g.Expect(tpl.Name).Should(HavePrefix(prefix))
+					if tpl.Name == prefix {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+					} else {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
+					}
+				}
+				g.Expect(spec.FlatInstanceOrdinal).Should(BeTrue())
+				g.Expect(cluster.Generation).Should(Equal(cluster.Status.ObservedGeneration + 1))
+			})).Should(Succeed())
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+		})
+
+		It("scale down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0}, instanceTemplateName)  // pod 0 is the instance template pod
+			pods = append(mockCreatePods([]int32{1, 2}, ""), pods...) // 2, 1, 0
+
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			mockClusterNCompRunning() // to up
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			mockClusterNCompRunning() // to down
+
+			By("checking the rollout state as rolling, and one instance is scaled down")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Components).Should(HaveLen(1))
+				g.Expect(rollout.Status.Components[0].ScaleDownInstances).Should(HaveLen(1))
+				g.Expect(rollout.Status.Components[0].ScaleDownInstances[0]).Should(Equal(pods[0].Name))
+			})).Should(Succeed())
+
+			By("checking the cluster spec after scale down")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.ComponentSpecs[0]
+				g.Expect(spec.Replicas).Should(Equal(replicas))
+				g.Expect(spec.OfflineInstances).Should(HaveLen(1))
+				g.Expect(spec.OfflineInstances[0]).Should(Equal(pods[0].Name))
+				g.Expect(spec.Instances[0].Name).Should(Equal(instanceTemplateName))
+				g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
+				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(1)))             // hasn't been scaled down
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, i := range []int{1, 2} {
+					tpl := spec.Instances[i]
+					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+					g.Expect(tpl.Name).Should(HavePrefix(prefix))
+					if tpl.Name == prefix {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+					} else {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
+					}
+				}
+			})).Should(Succeed())
+		})
+
+		It("scale down - instance template pod", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1}, "")
+			pods = append(mockCreatePods([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
+
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			mockClusterNCompRunning() // to up
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			mockClusterNCompRunning() // to down
+
+			By("checking the rollout state as rolling, and one instance is scaled down")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Components).Should(HaveLen(1))
+				g.Expect(rollout.Status.Components[0].ScaleDownInstances).Should(HaveLen(1))
+				g.Expect(rollout.Status.Components[0].ScaleDownInstances[0]).Should(Equal(pods[0].Name))
+			})).Should(Succeed())
+
+			By("checking the cluster spec after scale down")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.ComponentSpecs[0]
+				g.Expect(spec.Replicas).Should(Equal(replicas))
+				g.Expect(spec.OfflineInstances).Should(HaveLen(1))
+				g.Expect(spec.OfflineInstances[0]).Should(Equal(pods[0].Name))
+				g.Expect(spec.Instances[0].Name).Should(Equal(instanceTemplateName))
+				g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
+				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(0)))             // should be scaled down
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, i := range []int{1, 2} {
+					tpl := spec.Instances[i]
+					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+					g.Expect(tpl.Name).Should(HavePrefix(prefix))
+					if tpl.Name == prefix {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
+					} else {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+					}
+				}
+			})).Should(Succeed())
+		})
+
+		It("succeed", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1}, "")
+			pods = append(mockCreatePods([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
+
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			for i := int32(0); i < replicas; i++ {
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
+				newTplName := prefix
+				if tplName != "" {
+					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+				}
+
+				mockClusterNCompRunning() // to up
+
+				By("checking the cluster spec after roll up")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.ComponentSpecs[0]
+					g.Expect(spec.Replicas).Should(Equal(replicas + 1))
+					g.Expect(spec.ServiceVersion).Should(Equal(serviceVersion1))
+					for _, tpl := range spec.Instances {
+						if tpl.Name == newTplName {
+							if tplName == "" {
+								g.Expect(*tpl.Replicas).Should(Equal(i))
+							} else {
+								g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+							}
+						}
+					}
+				})).Should(Succeed())
+
+				By("creating the new pod")
+				if tplName == "" {
+					mockCreatePods([]int32{i + 10}, prefix)
+				} else {
+					mockCreatePods([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+				}
+
+				mockClusterNCompRunning() // to down
+
+				By("checking the cluster spec after scale down")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.ComponentSpecs[0]
+					g.Expect(spec.Replicas).Should(Equal(replicas))
+					g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(0)))
+					g.Expect(spec.OfflineInstances).Should(HaveLen(int(i + 1)))
+					for j := int32(0); j < i+1; j++ {
+						g.Expect(spec.OfflineInstances[j]).Should(Equal(pods[j].Name))
+					}
+				})).Should(Succeed())
+
+				By("deleting the scaled down pod")
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, pods[i])).Should(Succeed())
+			}
+
+			mockClusterNCompRunning() // all old pods are deleted
+
+			By("checking the cluster spec finally")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.ComponentSpecs[0]
+				g.Expect(spec.Replicas).Should(Equal(replicas))
+				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(0)))
+				g.Expect(*spec.Instances[1].Replicas + *spec.Instances[2].Replicas).Should(Equal(replicas))
+			})).Should(Succeed())
+
+			mockClusterNCompRunning() // tear down will update the cluster spec
+
+			By("checking the rollout state as succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).Should(Succeed())
+		})
+
+		It("tear down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1}, "")
+			pods = append(mockCreatePods([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
+
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(defaultReplaceStrategy).
+					SetCompReplicas(replicas)
+			})
+
+			for i := int32(0); i < replicas; i++ {
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
+				newTplName := prefix
+				if tplName != "" {
+					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+				}
+
+				mockClusterNCompRunning() // to up
+
+				By("checking the cluster spec after roll up")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.ComponentSpecs[0]
+					g.Expect(spec.Replicas).Should(Equal(replicas + 1))
+					g.Expect(spec.ServiceVersion).Should(Equal(serviceVersion1))
+					for _, tpl := range spec.Instances {
+						if tpl.Name == newTplName {
+							if tplName == "" {
+								g.Expect(*tpl.Replicas).Should(Equal(i))
+							} else {
+								g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+							}
+						}
+					}
+				})).Should(Succeed())
+
+				By("creating the new pod")
+				if tplName == "" {
+					mockCreatePods([]int32{i + 10}, prefix)
+				} else {
+					mockCreatePods([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+				}
+
+				mockClusterNCompRunning() // to down
+
+				By("checking the cluster spec after scale down")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.ComponentSpecs[0]
+					g.Expect(spec.Replicas).Should(Equal(replicas))
+					g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(0)))
 					g.Expect(spec.OfflineInstances).Should(HaveLen(int(i + 1)))
 					for j := int32(0); j < i+1; j++ {
 						g.Expect(spec.OfflineInstances[j]).Should(Equal(pods[j].Name))
@@ -701,6 +1215,9 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("scale down", func() {
+			By("creating pods for the shard")
+			pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
+
 			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
 				f.SetShardingServiceVersion(serviceVersion2).
 					SetShardingStrategy(defaultReplaceStrategy)
@@ -712,9 +1229,6 @@ var _ = Describe("rollout controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
 				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
 			})).Should(Succeed())
-
-			By("creating pods for the shard")
-			pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
 
 			mockClusterNShardingRunning() // to down
 
@@ -736,13 +1250,13 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("succeed", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
+
 			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
 				f.SetShardingServiceVersion(serviceVersion2).
 					SetShardingStrategy(defaultReplaceStrategy)
 			})
-
-			By("creating pods for the component")
-			pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
 
 			for i := int32(0); i < replicas; i++ {
 				mockClusterNShardingRunning() // to up
@@ -792,13 +1306,13 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("tear down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
+
 			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
 				f.SetShardingServiceVersion(serviceVersion2).
 					SetShardingStrategy(defaultReplaceStrategy)
 			})
-
-			By("creating pods for the component")
-			pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
 
 			for i := int32(0); i < replicas; i++ {
 				mockClusterNShardingRunning() // to up
@@ -848,23 +1362,315 @@ var _ = Describe("rollout controller", func() {
 		})
 	})
 
-	// Context("create", func() {
-	//	It("auto promotion", func() {
-	//	})
-	//
-	//	It("partly", func() {
-	//	})
-	//
-	//	It("partly - done", func() {
-	//	})
-	//
-	//	It("promote condition", func() {
-	//	})
-	//
-	//	It("scale down", func() {
-	//	})
-	//
-	//	It("tear down", func() {
-	//	})
-	// })
+	Context("replace - sharding + instance template", func() {
+		var (
+			defaultReplaceStrategy = appsv1alpha1.RolloutStrategy{
+				Replace: &appsv1alpha1.RolloutStrategyReplace{},
+			}
+		)
+
+		BeforeEach(func() {
+			rand.Seed(seed)
+			createClusterNShardingObjWithInstanceTemplate()
+		})
+
+		It("rolling", func() {
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultReplaceStrategy)
+			})
+
+			By("checking the rollout state")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+				// TODO: check message
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning()
+
+			By("checking the cluster spec & status been updated")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.Shardings[0]
+				g.Expect(spec.Template.Replicas).Should(Equal(replicas + 1))
+				g.Expect(spec.Template.ServiceVersion).Should(Equal(serviceVersion1))
+				g.Expect(spec.Template.Instances).Should(HaveLen(3)) // aaa, prefix, prefix-aaa
+				g.Expect(spec.Template.Instances[0].Name).Should(Equal(instanceTemplateName))
+				g.Expect(spec.Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
+				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(1)))
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, i := range []int{1, 2} {
+					tpl := spec.Template.Instances[i]
+					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+					g.Expect(tpl.Name).Should(HavePrefix(prefix))
+					if tpl.Name == prefix {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+					} else {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
+					}
+				}
+				g.Expect(spec.Template.FlatInstanceOrdinal).Should(BeTrue())
+				g.Expect(cluster.Generation).Should(Equal(cluster.Status.ObservedGeneration + 1))
+			})).Should(Succeed())
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+		})
+
+		It("scale down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods4Sharding([]int32{0}, instanceTemplateName)  // pod 0 is the instance template pod
+			pods = append(mockCreatePods4Sharding([]int32{1, 2}, ""), pods...) // 2, 1, 0
+
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultReplaceStrategy)
+			})
+
+			mockClusterNShardingRunning() // to up
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning() // to down
+
+			By("checking the rollout state as rolling, and one instance is scaled down")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Shardings).Should(HaveLen(1))
+				g.Expect(rollout.Status.Shardings[0].ScaleDownInstances).Should(HaveLen(1))
+				g.Expect(rollout.Status.Shardings[0].ScaleDownInstances[0]).Should(Equal(pods[0].Name))
+			})).Should(Succeed())
+
+			By("checking the cluster spec after scale down")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.Shardings[0]
+				g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+				g.Expect(spec.Template.OfflineInstances).Should(HaveLen(1))
+				g.Expect(spec.Template.OfflineInstances[0]).Should(Equal(pods[0].Name))
+				g.Expect(spec.Template.Instances[0].Name).Should(Equal(instanceTemplateName))
+				g.Expect(spec.Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
+				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(1)))             // hasn't been scaled down
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, i := range []int{1, 2} {
+					tpl := spec.Template.Instances[i]
+					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+					g.Expect(tpl.Name).Should(HavePrefix(prefix))
+					if tpl.Name == prefix {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+					} else {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
+					}
+				}
+			})).Should(Succeed())
+		})
+
+		It("scale down - instance template pod", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods4Sharding([]int32{0, 1}, "")
+			pods = append(mockCreatePods4Sharding([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
+
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultReplaceStrategy)
+			})
+
+			mockClusterNShardingRunning() // to up
+
+			By("checking the rollout state as rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning() // to down
+
+			By("checking the rollout state as rolling, and one instance is scaled down")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Shardings).Should(HaveLen(1))
+				g.Expect(rollout.Status.Shardings[0].ScaleDownInstances).Should(HaveLen(1))
+				g.Expect(rollout.Status.Shardings[0].ScaleDownInstances[0]).Should(Equal(pods[0].Name))
+			})).Should(Succeed())
+
+			By("checking the cluster spec after scale down")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.Shardings[0]
+				g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+				g.Expect(spec.Template.OfflineInstances).Should(HaveLen(1))
+				g.Expect(spec.Template.OfflineInstances[0]).Should(Equal(pods[0].Name))
+				g.Expect(spec.Template.Instances[0].Name).Should(Equal(instanceTemplateName))
+				g.Expect(spec.Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
+				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(0)))             // should be scaled down
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, i := range []int{1, 2} {
+					tpl := spec.Template.Instances[i]
+					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+					g.Expect(tpl.Name).Should(HavePrefix(prefix))
+					if tpl.Name == prefix {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
+					} else {
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+					}
+				}
+			})).Should(Succeed())
+		})
+
+		It("succeed", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods4Sharding([]int32{0, 1}, "")
+			pods = append(mockCreatePods4Sharding([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
+
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultReplaceStrategy)
+			})
+
+			for i := int32(0); i < replicas; i++ {
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
+				newTplName := prefix
+				if tplName != "" {
+					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+				}
+
+				mockClusterNShardingRunning() // to up
+
+				By("checking the cluster spec after roll up")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.Shardings[0]
+					g.Expect(spec.Template.Replicas).Should(Equal(replicas + 1))
+					g.Expect(spec.Template.ServiceVersion).Should(Equal(serviceVersion1))
+					for _, tpl := range spec.Template.Instances {
+						if tpl.Name == newTplName {
+							if tplName == "" {
+								g.Expect(*tpl.Replicas).Should(Equal(i))
+							} else {
+								g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+							}
+						}
+					}
+				})).Should(Succeed())
+
+				By("creating the new pod")
+				if tplName == "" {
+					mockCreatePods4Sharding([]int32{i + 10}, prefix)
+				} else {
+					mockCreatePods4Sharding([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+				}
+
+				mockClusterNShardingRunning() // to down
+
+				By("checking the cluster spec after scale down")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.Shardings[0]
+					g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+					g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(0)))
+					g.Expect(spec.Template.OfflineInstances).Should(HaveLen(int(i + 1)))
+					for j := int32(0); j < i+1; j++ {
+						g.Expect(spec.Template.OfflineInstances[j]).Should(Equal(pods[j].Name))
+					}
+				})).Should(Succeed())
+
+				By("deleting the scaled down pod")
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, pods[i])).Should(Succeed())
+			}
+
+			mockClusterNShardingRunning() // all old pods are deleted
+
+			By("checking the cluster spec finally")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.Shardings[0]
+				g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(0)))
+				g.Expect(*spec.Template.Instances[1].Replicas + *spec.Template.Instances[2].Replicas).Should(Equal(replicas))
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning() // tear down will update the cluster spec
+
+			By("checking the rollout state as succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).Should(Succeed())
+		})
+
+		It("tear down", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods4Sharding([]int32{0, 1}, "")
+			pods = append(mockCreatePods4Sharding([]int32{2}, instanceTemplateName), pods...) // pod 2 is the instance template pod
+
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultReplaceStrategy)
+			})
+
+			for i := int32(0); i < replicas; i++ {
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
+				newTplName := prefix
+				if tplName != "" {
+					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+				}
+
+				mockClusterNShardingRunning() // to up
+
+				By("checking the cluster spec after roll up")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.Shardings[0]
+					g.Expect(spec.Template.Replicas).Should(Equal(replicas + 1))
+					g.Expect(spec.Template.ServiceVersion).Should(Equal(serviceVersion1))
+					for _, tpl := range spec.Template.Instances {
+						if tpl.Name == newTplName {
+							if tplName == "" {
+								g.Expect(*tpl.Replicas).Should(Equal(i))
+							} else {
+								g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+							}
+						}
+					}
+				})).Should(Succeed())
+
+				By("creating the new pod")
+				if tplName == "" {
+					mockCreatePods4Sharding([]int32{i + 10}, prefix)
+				} else {
+					mockCreatePods4Sharding([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+				}
+
+				mockClusterNShardingRunning() // to down
+
+				By("checking the cluster spec after scale down")
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.Shardings[0]
+					g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+					g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(0)))
+					g.Expect(spec.Template.OfflineInstances).Should(HaveLen(int(i + 1)))
+					for j := int32(0); j < i+1; j++ {
+						g.Expect(spec.Template.OfflineInstances[j]).Should(Equal(pods[j].Name))
+					}
+				})).Should(Succeed())
+
+				By("deleting the scaled down pod")
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, pods[i])).Should(Succeed())
+			}
+
+			mockClusterNShardingRunning() // all old pods are deleted
+
+			By("checking the cluster spec updated finally")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.Shardings[0]
+				g.Expect(spec.Template.ServiceVersion).Should(Equal(serviceVersion2))
+				g.Expect(spec.Template.OfflineInstances).Should(BeEmpty())
+			})).Should(Succeed())
+
+			mockClusterNShardingRunning() // tear down will update the cluster spec
+
+			By("checking the rollout state as succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).Should(Succeed())
+		})
+	})
 })

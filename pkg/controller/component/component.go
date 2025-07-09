@@ -163,11 +163,3 @@ func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
 	}
 	return nil
 }
-
-// GetComponentNameFromObj gets the component name from the k8s object.
-func GetComponentNameFromObj(obj client.Object) string {
-	if shardingName, ok := obj.GetLabels()[constant.KBAppShardingNameLabelKey]; ok {
-		return shardingName
-	}
-	return obj.GetLabels()[constant.KBAppComponentLabelKey]
-}

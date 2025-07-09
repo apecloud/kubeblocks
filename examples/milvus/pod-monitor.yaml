@@ -1,0 +1,21 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: milvus-cluster-pod-monitor
+  labels:               # this is labels set in `prometheus.spec.podMonitorSelector`
+    release: prometheus
+spec:
+  podMetricsEndpoints:
+    - path: /metrics
+      port: metrics
+      scheme: http
+      relabelings:
+        - targetLabel: app_kubernetes_io_name
+          replacement: milvus
+  namespaceSelector:
+    matchNames:
+      - demo
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: milvus-cluster # cluster name: milvus-cluster

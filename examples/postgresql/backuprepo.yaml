@@ -1,8 +1,9 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupRepo
 metadata:
-  name: s3-repo
+  name: <test-backuprepo>
   annotations:
+    # optional, mark this backuprepo as default
     dataprotection.kubeblocks.io/is-default-repo: 'true'
 spec:
   # Specifies the name of the `StorageProvider` used by this backup repository.
@@ -13,24 +14,30 @@ spec:
   # - gcs (Google Cloud Storage)
   # - obs (Huawei Cloud Object Storage)
   # - minio, and other S3-compatible services.
-  storageProviderRef: s3
+  # Note: set the provider name to you own needs
+  storageProviderRef: oss
   # Specifies the access method of the backup repository.
   # - Tool
   # - Mount
+  # If the access mode is Mount, it will mount the PVC through the CSI driver (make sure it is installed and configured properly)
+  # In Tool mode, it will directly stream to the object storage without mounting the PVC.
   accessMethod: Tool
-  # Specifies reclaim policy of the PV created by this backup repository.
-  pvReclaimPolicy: Retain
-  # Specifies the capacity of the PVC created by this backup repository.
-  volumeCapacity: 100Gi
   # Stores the non-secret configuration parameters for the `StorageProvider`.
   config:
-    bucket: <storage-provider-bucket-name>
-    endpoint: ''
-    mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
-    region: <storage-provider-region-name>
+    # Note: set the bucket name to you own needs
+    bucket: <kubeblocks-test>
+    # Note: set the region name to you own needs
+    region: <cn-zhangjiakou>
   # References to the secret that holds the credentials for the `StorageProvider`.
+  # kubectl create secret generic demo-credential-for-backuprepo --from-literal=accessKeyId=* --from-literal=secretAccessKey=* --namespace=kb-system
   credential:
     # name is unique within a namespace to reference a secret resource.
-    name: s3-credential-for-backuprepo
+    # Note: set the secret name to you own needs
+    name: <credential-for-backuprepo>
     # namespace defines the space within which the secret name must be unique.
     namespace: kb-system
+  # Specifies reclaim policy of the PV created by this backup repository
+  # Valid Options are [Retain, Delete]
+  # Delete means the volume will be deleted from Kubernetes on release from its claim.
+  # Retain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
+  pvReclaimPolicy: Retain

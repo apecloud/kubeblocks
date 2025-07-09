@@ -1,0 +1,87 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: kafka2-ext-zk-descriptor
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
+  # Note: DO NOT UPDATE THIS FIELD
+  # The value must be `kafaka` to create a Kafka Cluster
+  clusterDef: kafka
+  # Specifies the name of the ClusterTopology to be used when creating the
+  # Cluster.
+  # - combined: combined Kafka controller (KRaft) and broker in one Component
+  # - combined_monitor: combined mode with monitor component
+  # - separated: separated KRaft and Broker Components.
+  # - separated_monitor: separated mode with monitor component
+  # Valid options are: [combined,combined_monitor,separated,separated_monitor,kafka2-external-zk]
+  topology: kafka2-external-zk
+  services:
+    - name: bootstrap
+      serviceName: bootstrap
+      componentSelector: kafka-broker
+      spec:
+        type: ClusterIP
+        ports:
+          - name: kafka-client
+            targetPort: 9092
+            port: 9092
+  componentSpecs:
+    - name: kafka-broker
+      componentDef: kafka27-broker
+      serviceRefs:
+        - name: kafkaZookeeper
+          namespace: demo
+          serviceDescriptor: kafka-cluster-zookeeper-service
+      tls: false
+      replicas: 3
+      env:
+        - name: KB_BROKER_DIRECT_POD_ACCESS
+          value: 'true'
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx500m -Xms500m"
+        - name: KB_KAFKA_ZK_SUB_PATH
+          value: "test"   # set sub path to use for sharing zk, default value is $(CLUSTER_NAME), set empty string for root
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+        - name: metadata
+          spec:
+            storageClassName: null
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+---
+apiVersion: apps.kubeblocks.io/v1
+kind: ServiceDescriptor
+metadata:
+  name: kafka-cluster-zookeeper-service
+  namespace: demo
+spec:
+  # Specifies the type or nature of the service.
+  # Should represent a well-known application cluster type, such as {mysql, redis, zookeeper}.
+  serviceKind: zookeeper
+  # Represents the version of the service reference.
+  serviceVersion: 3.8.5
+  # Represents the endpoint of the service connection credential.
+  endpoint:
+    # your external zk endpoints here
+    value: "zookeeper-cluster-zookeeper-0.zookeeper-cluster-zookeeper-headless.demo:2181,zookeeper-cluster-zookeeper-1.zookeeper-cluster-zookeeper-headless.demo:2181,zookeeper-cluster-zookeeper-2.zookeeper-cluster-zookeeper-headless.demo:2181"
+  # Represents the port of the service connection credential.
+  port:
+    value: "2181"

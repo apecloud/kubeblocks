@@ -38,7 +38,6 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -323,7 +322,7 @@ func GetRestoreFromBackupAnnotation(
 	doReadyRestoreAfterClusterRunning bool,
 	parameters []dpv1alpha1.ParameterPair,
 ) (string, error) {
-	componentName := component.GetComponentNameFromObj(backup)
+	componentName := getComponentNameFromObj(backup)
 	if len(componentName) == 0 {
 		return "", intctrlutil.NewFatalError("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
 	}
@@ -498,4 +497,12 @@ func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvV
 		},
 	}...)
 	return envs
+}
+
+// getComponentNameFromObj gets the component name from the k8s object.
+func getComponentNameFromObj(obj client.Object) string {
+	if shardingName, ok := obj.GetLabels()[constant.KBAppShardingNameLabelKey]; ok {
+		return shardingName
+	}
+	return obj.GetLabels()[constant.KBAppComponentLabelKey]
 }

@@ -121,10 +121,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 	}
 
-	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
-		return nil, err
-	}
-
 	// build scheduling policy for workload
 	scheduling.ApplySchedulingPolicyToPodSpec(synthesizeComp.PodSpec, comp.Spec.SchedulingPolicy)
 
@@ -165,6 +161,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// build volume mounts after kb-agent containers
 	buildVolumeMounts(synthesizeComp)
+
+	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
+		return nil, err
+	}
 
 	if err = buildServiceReferences(ctx, cli, synthesizeComp, compDef, comp); err != nil {
 		return nil, errors.Wrap(err, "build service references failed")

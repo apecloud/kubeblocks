@@ -35,6 +35,7 @@ import (
 	testclocks "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -483,10 +484,10 @@ var _ = Describe("Restore Controller test", func() {
 		})
 
 		Context("test postReady stage", func() {
-			var _ *testdp.BackupClusterInfo
+			var backupClusterInfo *testdp.BackupClusterInfo
 			BeforeEach(func() {
 				By("fake a new cluster")
-				_ = testdp.NewFakeCluster(&testCtx)
+				backupClusterInfo = testdp.NewFakeCluster(&testCtx)
 			})
 
 			It("test post ready actions", func() {
@@ -580,6 +581,7 @@ var _ = Describe("Restore Controller test", func() {
 				})).Should(Succeed())
 
 			})
+
 			It("test parameters env", func() {
 				By("set schema and parameters in actionSet")
 				testdp.MockActionSetWithSchema(&testCtx, actionSet)
@@ -601,6 +603,56 @@ var _ = Describe("Restore Controller test", func() {
 					})
 				By("expect parameters env in restore jobs")
 				checkJobParametersEnv(restore)
+			})
+
+			It("respects DoReadyRestoreAfterClusterRunning annotation", func() {
+				By("set annotation for actionset")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+					if set.Annotations == nil {
+						set.Annotations = make(map[string]string)
+					}
+					set.Annotations[constant.DoReadyRestoreAfterClusterRunningAnnotationKey] = "true"
+				})).Should(Succeed())
+
+				By("create restore cr")
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.
+							SetConnectCredential(testdp.ClusterName).
+							SetJobActionConfig(matchLabels).
+							SetExecActionConfig(matchLabels).
+							SetLabels(matchLabels)
+					}, nil)
+
+				By("check event fired")
+				Eventually(func() bool {
+					eventList := &corev1.EventList{}
+					err := k8sClient.List(ctx, eventList, client.InNamespace(backupClusterInfo.Cluster.Namespace))
+					if err != nil {
+						return false
+					}
+					for _, e := range eventList.Items {
+						if e.Reason == dprestore.ReasonWaitForClusterRunning && e.InvolvedObject.Name == restore.Name {
+							return true
+						}
+					}
+					return false
+
+				}).Should(BeTrue())
+
+				By("mock cluster running")
+				Expect(testapps.ChangeObjStatus(&testCtx, backupClusterInfo.Cluster, func() {
+					backupClusterInfo.Cluster.Status.Phase = kbappsv1.RunningClusterPhase
+				})).Should(Succeed())
+
+				By("check job created")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
 			})
 		})
 

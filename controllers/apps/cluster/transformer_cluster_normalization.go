@@ -252,11 +252,19 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4Sharding(transCtx *
 			spec.ServiceVersion = ptr.Deref(tpl.ServiceVersion, "")
 		}
 		for _, inst := range tpl.Instances {
-			spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
-				Name:           inst.Name,
-				CompDef:        inst.CompDef,
-				ServiceVersion: inst.ServiceVersion,
+			idx := slices.IndexFunc(spec.Instances, func(item appsv1.InstanceTemplate) bool {
+				return item.Name == inst.Name
 			})
+			if idx >= 0 {
+				spec.Instances[idx].CompDef = inst.CompDef
+				spec.Instances[idx].ServiceVersion = inst.ServiceVersion
+			} else {
+				spec.Instances = append(spec.Instances, appsv1.InstanceTemplate{
+					Name:           inst.Name,
+					CompDef:        inst.CompDef,
+					ServiceVersion: inst.ServiceVersion,
+				})
+			}
 		}
 		return shardingDefName, spec
 	}
@@ -269,9 +277,12 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4Sharding(transCtx *
 		// set the componentDef and serviceVersion of template as resolved
 		tpl.CompDef = ptr.To(spec.ComponentDef)
 		tpl.ServiceVersion = ptr.To(spec.ServiceVersion)
-		for i := range spec.Instances {
-			tpl.Instances[i].CompDef = spec.Instances[i].CompDef
-			tpl.Instances[i].ServiceVersion = spec.Instances[i].ServiceVersion
+		for i, inst := range tpl.Instances {
+			idx := slices.IndexFunc(spec.Instances, func(item appsv1.InstanceTemplate) bool {
+				return item.Name == inst.Name
+			})
+			tpl.Instances[i].CompDef = spec.Instances[idx].CompDef
+			tpl.Instances[i].ServiceVersion = spec.Instances[idx].ServiceVersion
 		}
 	}
 
@@ -422,7 +433,7 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4ComponentWithObj(tr
 		if len(tpl.ServiceVersion) == 0 && len(tpl.CompDef) == 0 {
 			continue
 		}
-		compDef, serviceVersion, err = t.resolveCompDefinitionNServiceVersionWithTemplate(transCtx, compSpec, comp, &tpl)
+		compDef, serviceVersion, err = t.resolveCompDefinitionNServiceVersionWithTemplate(transCtx, comp, &tpl)
 		if err != nil {
 			return nil, err
 		}
@@ -447,7 +458,7 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 }
 
 func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWithTemplate(transCtx *clusterTransformContext,
-	compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component, protoTpl *appsv1.InstanceTemplate) (*appsv1.ComponentDefinition, string, error) {
+	comp *appsv1.Component, protoTpl *appsv1.InstanceTemplate) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		ctx        = transCtx.Context
 		cli        = transCtx.Client
@@ -461,15 +472,8 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 			}
 		}
 	}
-
-	serviceVersion := compSpec.ServiceVersion
-	if len(protoTpl.ServiceVersion) > 0 {
-		serviceVersion = protoTpl.ServiceVersion
-	}
-	compDefName := compSpec.ComponentDef
-	if len(protoTpl.CompDef) > 0 {
-		compDefName = protoTpl.CompDef
-	}
+	serviceVersion := protoTpl.ServiceVersion
+	compDefName := protoTpl.CompDef
 	if comp == nil || runningTpl == nil || t.checkTemplateUpgrade(serviceVersion, compDefName, runningTpl) {
 		return resolveCompDefinitionNServiceVersion(ctx, cli, compDefName, serviceVersion)
 	}

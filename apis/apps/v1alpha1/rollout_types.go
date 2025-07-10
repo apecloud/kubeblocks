@@ -75,6 +75,13 @@ type RolloutSpec struct {
 	// +optional
 	Components []RolloutComponent `json:"components,omitempty"`
 
+	// Specifies the target shardings to be rolled out.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Shardings []RolloutSharding `json:"shardings,omitempty"`
+
 	// TODO: auto-reclaim the successful rollouts.
 }
 
@@ -104,6 +111,11 @@ type RolloutStatus struct {
 	//
 	// +optional
 	Components []RolloutComponentStatus `json:"components,omitempty"`
+
+	// Records the status information of all shardings within the Rollout.
+	//
+	// +optional
+	Shardings []RolloutShardingStatus `json:"shardings,omitempty"`
 }
 
 type RolloutComponent struct {
@@ -135,6 +147,43 @@ type RolloutComponent struct {
 	//
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
+
+	// Additional meta for the instances.
+	//
+	// +optional
+	InstanceMeta *RolloutInstanceMeta `json:"instanceMeta,omitempty"`
+}
+
+type RolloutSharding struct {
+	// Specifies the name of the sharding.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies the target ShardingDefinition of the sharding.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ShardingDef *string `json:"shardingDef,omitempty"`
+
+	// Specifies the target ServiceVersion of the sharding.
+	//
+	// +kubebuilder:validation:MaxLength=32
+	// +optional
+	ServiceVersion *string `json:"serviceVersion,omitempty"`
+
+	// Specifies the target ComponentDefinition of the sharding.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +optional
+	CompDef *string `json:"compDef,omitempty"`
+
+	// Specifies the rollout strategy for the sharding.
+	//
+	// +kubebuilder:validation:Required
+	Strategy RolloutStrategy `json:"strategy"`
 
 	// Additional meta for the instances.
 	//
@@ -325,6 +374,63 @@ type RolloutComponentStatus struct {
 	LastScaleUpTimestamp metav1.Time `json:"lastScaleUpTimestamp,omitempty"`
 
 	// The last time a component replica was scaled down successfully.
+	//
+	// +optional
+	LastScaleDownTimestamp metav1.Time `json:"lastScaleDownTimestamp,omitempty"`
+}
+
+type RolloutShardingStatus struct {
+	// The name of the sharding.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The ShardingDefinition of the sharding before the rollout.
+	//
+	// optional
+	ShardingDef string `json:"shardingDef"`
+
+	// The ServiceVersion of the sharding before the rollout.
+	//
+	// +kubebuilder:validation:Required
+	ServiceVersion string `json:"serviceVersion"`
+
+	// The ComponentDefinition of the sharding before the rollout.
+	//
+	// +kubebuilder:validation:Required
+	CompDef string `json:"compDef"`
+
+	// The replicas the sharding has before the rollout.
+	//
+	// +kubebuilder:validation:Required
+	Replicas int32 `json:"replicas"`
+
+	// The new replicas the sharding has been created successfully.
+	//
+	// +optional
+	NewReplicas int32 `json:"newReplicas"`
+
+	// The replicas the sharding has been rolled out successfully.
+	//
+	// +optional
+	RolledOutReplicas int32 `json:"rolledOutReplicas"`
+
+	// The number of canary replicas the sharding has.
+	//
+	// +optional
+	CanaryReplicas int32 `json:"canaryReplicas"`
+
+	// The instances that are scaled down.
+	//
+	// +optional
+	ScaleDownInstances []string `json:"scaleDownInstances,omitempty"`
+
+	// The last time a sharding replica was scaled up successfully.
+	//
+	// +optional
+	LastScaleUpTimestamp metav1.Time `json:"lastScaleUpTimestamp,omitempty"`
+
+	// The last time a sharding replica was scaled down successfully.
 	//
 	// +optional
 	LastScaleDownTimestamp metav1.Time `json:"lastScaleDownTimestamp,omitempty"`

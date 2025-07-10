@@ -49,9 +49,17 @@ func (factory *MockRolloutFactory) AddComponent(compName string) *MockRolloutFac
 	return factory
 }
 
-type updateRollComponentFn func(*appsv1alpha1.RolloutComponent)
+func (factory *MockRolloutFactory) AddSharding(shardingName string) *MockRolloutFactory {
+	sharding := appsv1alpha1.RolloutSharding{
+		Name: shardingName,
+	}
+	factory.Get().Spec.Shardings = append(factory.Get().Spec.Shardings, sharding)
+	return factory
+}
 
-func (factory *MockRolloutFactory) updateLastComponent(update updateRollComponentFn) *MockRolloutFactory {
+type updateRolloutComponentFn func(*appsv1alpha1.RolloutComponent)
+
+func (factory *MockRolloutFactory) updateLastComponent(update updateRolloutComponentFn) *MockRolloutFactory {
 	comps := factory.Get().Spec.Components
 	if len(comps) > 0 {
 		update(&comps[len(comps)-1])
@@ -60,44 +68,61 @@ func (factory *MockRolloutFactory) updateLastComponent(update updateRollComponen
 	return factory
 }
 
-func (factory *MockRolloutFactory) SetServiceVersion(serviceVersion string) *MockRolloutFactory {
+func (factory *MockRolloutFactory) SetCompServiceVersion(serviceVersion string) *MockRolloutFactory {
 	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
 		comp.ServiceVersion = ptr.To(serviceVersion)
 	})
 }
 
-func (factory *MockRolloutFactory) SetCompDef(compDef string) *MockRolloutFactory {
+func (factory *MockRolloutFactory) SetCompCompDef(compDef string) *MockRolloutFactory {
 	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
 		comp.CompDef = ptr.To(compDef)
 	})
 }
 
-func (factory *MockRolloutFactory) SetStrategy(strategy appsv1alpha1.RolloutStrategy) *MockRolloutFactory {
+func (factory *MockRolloutFactory) SetCompStrategy(strategy appsv1alpha1.RolloutStrategy) *MockRolloutFactory {
 	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
 		comp.Strategy = strategy
 	})
 }
 
-func (factory *MockRolloutFactory) SetInplaceStrategy() *MockRolloutFactory {
-	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
-		comp.Strategy.Inplace = &appsv1alpha1.RolloutStrategyInplace{}
-	})
-}
-
-func (factory *MockRolloutFactory) SetReplaceStrategy() *MockRolloutFactory {
-	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
-		comp.Strategy.Replace = &appsv1alpha1.RolloutStrategyReplace{}
-	})
-}
-
-func (factory *MockRolloutFactory) SetCreateStrategy() *MockRolloutFactory {
-	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
-		comp.Strategy.Create = &appsv1alpha1.RolloutStrategyCreate{}
-	})
-}
-
-func (factory *MockRolloutFactory) SetReplicas(replicas int32) *MockRolloutFactory {
+func (factory *MockRolloutFactory) SetCompReplicas(replicas int32) *MockRolloutFactory {
 	return factory.updateLastComponent(func(comp *appsv1alpha1.RolloutComponent) {
 		comp.Replicas = ptr.To(intstr.FromInt32(replicas))
+	})
+}
+
+type updateRolloutShardingFn func(*appsv1alpha1.RolloutSharding)
+
+func (factory *MockRolloutFactory) updateLastSharding(update updateRolloutShardingFn) *MockRolloutFactory {
+	shardings := factory.Get().Spec.Shardings
+	if len(shardings) > 0 {
+		update(&shardings[len(shardings)-1])
+	}
+	factory.Get().Spec.Shardings = shardings
+	return factory
+}
+
+func (factory *MockRolloutFactory) SetShardingDef(shardingDef string) *MockRolloutFactory {
+	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
+		sharding.ShardingDef = ptr.To(shardingDef)
+	})
+}
+
+func (factory *MockRolloutFactory) SetShardingServiceVersion(serviceVersion string) *MockRolloutFactory {
+	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
+		sharding.ServiceVersion = ptr.To(serviceVersion)
+	})
+}
+
+func (factory *MockRolloutFactory) SetShardingCompDef(compDef string) *MockRolloutFactory {
+	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
+		sharding.CompDef = ptr.To(compDef)
+	})
+}
+
+func (factory *MockRolloutFactory) SetShardingStrategy(strategy appsv1alpha1.RolloutStrategy) *MockRolloutFactory {
+	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
+		sharding.Strategy = strategy
 	})
 }

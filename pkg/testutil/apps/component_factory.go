@@ -120,3 +120,8 @@ func (factory *MockComponentFactory) AddInstances(instance appsv1.InstanceTempla
 	factory.Get().Spec.Instances = append(factory.Get().Spec.Instances, instance)
 	return factory
 }
+
+func (factory *MockComponentFactory) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *MockComponentFactory {
+	factory.Get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
+	return factory
+}

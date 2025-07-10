@@ -144,6 +144,30 @@ func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
 	})
 }
 
+func (factory *MockClusterFactory) SetShardingReplicas(replicas int32) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.Replicas = replicas
+	})
+}
+
+func (factory *MockClusterFactory) SetShardingServiceVersion(serviceVersion string) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.ServiceVersion = serviceVersion
+	})
+}
+
+func (factory *MockClusterFactory) AddShardingInstances(instance appsv1.InstanceTemplate) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.Instances = append(sharding.Template.Instances, instance)
+	})
+}
+
+func (factory *MockClusterFactory) SetShardingFlatInstanceOrdinal(flatInstanceOrdinal bool) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.FlatInstanceOrdinal = flatInstanceOrdinal
+	})
+}
+
 func (factory *MockClusterFactory) SetCompDef(compDef string) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.ComponentDef = compDef
@@ -221,5 +245,11 @@ func (factory *MockClusterFactory) SetBackup(backup *appsv1.ClusterBackup) *Mock
 func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1.ServiceRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.ServiceRefs = serviceRefs
+	})
+}
+
+func (factory *MockClusterFactory) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
+		comp.FlatInstanceOrdinal = flatInstanceOrdinal
 	})
 }

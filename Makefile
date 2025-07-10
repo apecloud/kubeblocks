@@ -439,6 +439,10 @@ else
 KUBECTL=$(shell which kubectl)
 endif
 
+.PHONY: sync-examples
+sync-examples: ## Sync examples from kubeblocks-addons.
+	@./hack/sync-examples.sh
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)
 # $2 - package url which can be installed

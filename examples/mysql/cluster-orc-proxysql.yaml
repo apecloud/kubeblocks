@@ -1,0 +1,88 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: mysql-orc-proxysql-cluster
+  namespace: demo
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # Valid options are: [DoNotTerminate, Delete, WipeOut] (`Halt` is deprecated since KB 0.9)
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies the topology of the Cluster. Currently supports `semisync`, `semisync-proxysql`, `orc`, `orc-proxysql`
+  # - `semisync`: A topology that uses semi-sync replication for MySQL high availability.
+  # - `semisync-proxysql`: A topology that uses semi-sync replication and Proxysql for load balancing and query routing.
+  # - `orc`: A topology that uses MySQL Orchestrator for MySQL high availability and management.
+  # - `orc-proxysql`: A topology that uses MySQL Orchestrator and Proxysql for high availability, management, and load balancing.
+  topology: orc-proxysql
+  clusterDef: mysql
+  # Specifies a list of ClusterComponentSpec objects used to define the
+  # individual Components that make up a Cluster.
+  # This field allows for detailed configuration of each Component within the Cluster
+  componentSpecs:
+    - name: mysql
+      # Specifies the ComponentDefinition custom resource (CR) that defines the
+      # Component's characteristics and behavior.
+      # Supports three different ways to specify the ComponentDefinition:
+      # - regular expression - recommended
+      # - full name - recommended
+      # - name prefix
+      serviceVersion: "8.0.35"
+      # Determines whether metrics exporter information is annotated on the
+      # Component's headless Service.
+      # Valid options are [true, false]
+      disableExporter: true
+      # Specifies the desired number of replicas in the Component
+      replicas: 2
+      # Specifies the resources required by the Component.
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      # Specifies a list of PersistentVolumeClaim templates that define the storage
+      # requirements for the Component.
+      volumeClaimTemplates:
+        # Refers to the name of a volumeMount defined in
+        # `componentDefinition.spec.runtime.containers[*].volumeMounts`
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                # Set the storage size as needed
+                storage: 20Gi
+      serviceRefs:
+        - name: orchestrator
+          namespace: demo # Set to your orchestrator cluster namespace
+          clusterServiceSelector:
+            cluster:  myorc  # Set to your orchestrator cluster name
+            service:
+              component: orchestrator
+              service: orchestrator
+              port:  orc-http
+            credential:
+              component: orchestrator
+              name: orchestrator
+    - name: proxysql
+      # Specifies the ComponentDefinition custom resource (CR) that defines the
+      # Component's characteristics and behavior.
+      # Supports three different ways to specify the ComponentDefinition:
+      # - regular expression - recommended
+      # - full name - recommended
+      # - name prefix
+      serviceVersion: 2.4.4
+      # Specifies the desired number of replicas in the Component
+      replicas: 1
+      # Specifies the resources required by the Component.
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi

@@ -1,0 +1,105 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: pulsarm-cluster
+  namespace: demo
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # Valid options are: [DoNotTerminate, Delete, WipeOut] (`Halt` is deprecated since KB 0.9)
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies the name of the ClusterDefinition to use when creating a Cluster.
+  # Note: DO NOT UPDATE THIS FIELD
+  # The value must be `pulsar` to create a Pulsar Cluster
+  clusterDef: pulsar
+  # Specifies the name of the ClusterTopology to be used when creating the
+  # Cluster.
+  topology: pulsar-basic-cluster
+  # Defines a list of additional Services that are exposed by a Cluster.
+  services:
+    - name: broker-bootstrap
+      serviceName: broker-bootstrap
+      componentSelector: broker
+      spec:
+        type: ClusterIP
+        ports:
+          - name: pulsar
+            port: 6650
+            targetPort: 6650
+          - name: http
+            port: 80
+            targetPort: 8080
+          - name: kafka-client
+            port: 9092
+            targetPort: 9092
+    - name: zookeeper
+      serviceName: zookeeper
+      componentSelector: zookeeper
+      spec:
+        type: ClusterIP
+        ports:
+          - name: client
+            port: 2181
+            targetPort: 2181
+  componentSpecs:
+    - name: broker
+      # ServiceVersion specifies the version of the Service expected to be
+      # provisioned by this Component.
+      # Valid options are: [2.11.2,3.0.2]
+      serviceVersion: 3.0.2
+      replicas: 1
+      env:
+        - name: KB_PULSAR_BROKER_NODEPORT
+          value: "false"
+      resources:
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+    - name: bookies
+      serviceVersion: 3.0.2
+      replicas: 4
+      resources:
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+        requests:
+          cpu: "200m"
+          memory: "512Mi"
+      volumeClaimTemplates:
+        - name: ledgers
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 8Gi
+        - name: journal
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 8Gi
+    - name: zookeeper
+      serviceVersion: 3.0.2
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: "512Mi"
+        requests:
+          cpu: "100m"
+          memory: "512Mi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 8Gi

@@ -1,9 +1,9 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: operations.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: kafka-stop
-  namespace: default
+  name:  kafka-combine-stop
+  namespace: demo
 spec:
   # Specifies the name of the Cluster resource that this operation is targeting.
-  clusterName: kafka-cluster
+  clusterName:  kafka-combined-cluster
   type: Stop

@@ -36,7 +36,8 @@ import (
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -105,7 +106,9 @@ var ClusterSignature = func(_ appsv1.Cluster, _ *appsv1.Cluster, _ appsv1.Cluste
 }
 var ComponentSignature = func(appsv1.Component, *appsv1.Component, appsv1.ComponentList, *appsv1.ComponentList) {
 }
-var InstanceSetSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
+var InstanceSetSignature = func(_ workloadsv1.InstanceSet, _ *workloadsv1.InstanceSet, _ workloadsv1.InstanceSetList, _ *workloadsv1.InstanceSetList) {
+}
+var InstanceSignature = func(_ workloadsv1alpha1.Instance, _ *workloadsv1alpha1.Instance, _ workloadsv1alpha1.InstanceList, _ *workloadsv1alpha1.InstanceList) {
 }
 var RolloutSignature = func(_ appsv1alpha1.Rollout, _ *appsv1alpha1.Rollout, _ appsv1alpha1.RolloutList, _ *appsv1alpha1.RolloutList) {
 }

@@ -28,7 +28,10 @@ import (
 )
 
 func TestPropertiesFormat(t *testing.T) {
-	const propsContext = `
+
+	testProperties := func(formatter parametersv1alpha1.CfgFileFormat) {
+
+		const propsContext = `
 # Time of inactivity after which the broker will discard the deduplication information
 # relative to a disconnected producer. Default is 6 hours.
 brokerDeduplicationProducerInactivityTimeoutMinutes=360
@@ -53,34 +56,38 @@ brokerMaxConnections=0
 # The maximum number of connections per IP. If it exceeds, new connections are rejected.
 brokerMaxConnectionsPerIp=0
 `
-	propsConfigObj, err := LoadConfig("props_test", propsContext, parametersv1alpha1.PropertiesPlus)
-	assert.Nil(t, err)
+		propsConfigObj, err := LoadConfig("props_test", propsContext, formatter)
+		assert.Nil(t, err)
 
-	assert.EqualValues(t, propsConfigObj.Get("brokerDeduplicationProducerInactivityTimeoutMinutes"), "360")
-	assert.EqualValues(t, propsConfigObj.Get("maxNamespacesPerTenant.brokerMaxConnections.threadMethod"), "660")
+		assert.EqualValues(t, propsConfigObj.Get("brokerDeduplicationProducerInactivityTimeoutMinutes"), "360")
+		assert.EqualValues(t, propsConfigObj.Get("maxNamespacesPerTenant.brokerMaxConnections.threadMethod"), "660")
 
-	v, _ := propsConfigObj.GetString("defaultNumberOfNamespaceBundles")
-	assert.EqualValues(t, v, "4")
-	v, _ = propsConfigObj.GetString("brokerMaxConnectionsPerIp")
-	assert.EqualValues(t, v, "0")
+		v, _ := propsConfigObj.GetString("defaultNumberOfNamespaceBundles")
+		assert.EqualValues(t, v, "4")
+		v, _ = propsConfigObj.GetString("brokerMaxConnectionsPerIp")
+		assert.EqualValues(t, v, "0")
 
-	v, err = propsConfigObj.GetString("profiles.web.xxxx")
-	assert.Nil(t, err)
-	assert.EqualValues(t, v, "")
+		v, err = propsConfigObj.GetString("profiles.web.xxxx")
+		assert.Nil(t, err)
+		assert.EqualValues(t, v, "")
 
-	dumpContext, err := propsConfigObj.Marshal()
-	assert.Nil(t, err)
-	newObj, err := LoadConfig("props_test", dumpContext, parametersv1alpha1.PropertiesPlus)
-	assert.Nil(t, err)
-	assert.EqualValues(t, newObj.GetAllParameters(), propsConfigObj.GetAllParameters())
+		dumpContext, err := propsConfigObj.Marshal()
+		assert.Nil(t, err)
+		newObj, err := LoadConfig("props_test", dumpContext, parametersv1alpha1.PropertiesPlus)
+		assert.Nil(t, err)
+		assert.EqualValues(t, newObj.GetAllParameters(), propsConfigObj.GetAllParameters())
 
-	assert.EqualValues(t, newObj.SubConfig("test"), nil)
+		assert.EqualValues(t, newObj.SubConfig("test"), nil)
 
-	assert.Nil(t, propsConfigObj.Update("profiles.web.timeout_before_checking_execution_speed", 200))
-	assert.EqualValues(t, propsConfigObj.Get("profiles.web.timeout_before_checking_execution_speed"), "200")
+		assert.Nil(t, propsConfigObj.Update("profiles.web.timeout_before_checking_execution_speed", 200))
+		assert.EqualValues(t, propsConfigObj.Get("profiles.web.timeout_before_checking_execution_speed"), "200")
 
-	assert.Nil(t, propsConfigObj.Update("defaultNumberOfNamespaceBundles", "600"))
-	assert.EqualValues(t, propsConfigObj.Get("defaultNumberOfNamespaceBundles"), "600")
+		assert.Nil(t, propsConfigObj.Update("defaultNumberOfNamespaceBundles", "600"))
+		assert.EqualValues(t, propsConfigObj.Get("defaultNumberOfNamespaceBundles"), "600")
+	}
+
+	testProperties(parametersv1alpha1.PropertiesPlus)
+	testProperties(parametersv1alpha1.PropertiesUltra)
 }
 
 func TestPropertiesEmpty(t *testing.T) {

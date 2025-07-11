@@ -53,34 +53,39 @@ brokerMaxConnections=0
 # The maximum number of connections per IP. If it exceeds, new connections are rejected.
 brokerMaxConnectionsPerIp=0
 `
-	propsConfigObj, err := LoadConfig("props_test", propsContext, appsv1beta1.PropertiesPlus)
-	assert.Nil(t, err)
+	testProperties := func(format appsv1beta1.CfgFileFormat) {
+		propsConfigObj, err := LoadConfig("props_test", propsContext, format)
+		assert.Nil(t, err)
 
-	assert.EqualValues(t, propsConfigObj.Get("brokerDeduplicationProducerInactivityTimeoutMinutes"), "360")
-	assert.EqualValues(t, propsConfigObj.Get("maxNamespacesPerTenant.brokerMaxConnections.threadMethod"), "660")
+		assert.EqualValues(t, propsConfigObj.Get("brokerDeduplicationProducerInactivityTimeoutMinutes"), "360")
+		assert.EqualValues(t, propsConfigObj.Get("maxNamespacesPerTenant.brokerMaxConnections.threadMethod"), "660")
 
-	v, _ := propsConfigObj.GetString("defaultNumberOfNamespaceBundles")
-	assert.EqualValues(t, v, "4")
-	v, _ = propsConfigObj.GetString("brokerMaxConnectionsPerIp")
-	assert.EqualValues(t, v, "0")
+		v, _ := propsConfigObj.GetString("defaultNumberOfNamespaceBundles")
+		assert.EqualValues(t, v, "4")
+		v, _ = propsConfigObj.GetString("brokerMaxConnectionsPerIp")
+		assert.EqualValues(t, v, "0")
 
-	v, err = propsConfigObj.GetString("profiles.web.xxxx")
-	assert.Nil(t, err)
-	assert.EqualValues(t, v, "")
+		v, err = propsConfigObj.GetString("profiles.web.xxxx")
+		assert.Nil(t, err)
+		assert.EqualValues(t, v, "")
 
-	dumpContext, err := propsConfigObj.Marshal()
-	assert.Nil(t, err)
-	newObj, err := LoadConfig("props_test", dumpContext, appsv1beta1.PropertiesPlus)
-	assert.Nil(t, err)
-	assert.EqualValues(t, newObj.GetAllParameters(), propsConfigObj.GetAllParameters())
+		dumpContext, err := propsConfigObj.Marshal()
+		assert.Nil(t, err)
+		newObj, err := LoadConfig("props_test", dumpContext, format)
+		assert.Nil(t, err)
+		assert.EqualValues(t, newObj.GetAllParameters(), propsConfigObj.GetAllParameters())
 
-	assert.EqualValues(t, newObj.SubConfig("test"), nil)
+		assert.EqualValues(t, newObj.SubConfig("test"), nil)
 
-	assert.Nil(t, propsConfigObj.Update("profiles.web.timeout_before_checking_execution_speed", 200))
-	assert.EqualValues(t, propsConfigObj.Get("profiles.web.timeout_before_checking_execution_speed"), "200")
+		assert.Nil(t, propsConfigObj.Update("profiles.web.timeout_before_checking_execution_speed", 200))
+		assert.EqualValues(t, propsConfigObj.Get("profiles.web.timeout_before_checking_execution_speed"), "200")
 
-	assert.Nil(t, propsConfigObj.Update("defaultNumberOfNamespaceBundles", "600"))
-	assert.EqualValues(t, propsConfigObj.Get("defaultNumberOfNamespaceBundles"), "600")
+		assert.Nil(t, propsConfigObj.Update("defaultNumberOfNamespaceBundles", "600"))
+		assert.EqualValues(t, propsConfigObj.Get("defaultNumberOfNamespaceBundles"), "600")
+	}
+
+	testProperties(appsv1beta1.PropertiesPlus)
+	testProperties(appsv1beta1.PropertiesUltra)
 }
 
 func TestPropertiesEmpty(t *testing.T) {

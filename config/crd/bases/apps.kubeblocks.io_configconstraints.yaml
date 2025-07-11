@@ -288,6 +288,7 @@ spec:
                     - properties
                     - redis
                     - props-plus
+                    - props-ultra
                     type: string
                   iniConfig:
                     description: Holds options specific to the 'ini' file format.
@@ -998,6 +999,7 @@ spec:
                     - properties
                     - redis
                     - props-plus
+                    - props-ultra
                     type: string
                   iniConfig:
                     description: Holds options specific to the 'ini' file format.

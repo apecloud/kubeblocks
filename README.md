@@ -1,6 +1,5 @@
 # Welcome to the KubeBlocks project!
 
-[![Documentation status](https://github.com/apecloud/kubeblocks.io/workflows/Documentation/badge.svg)](https://kubeblocks.io)
 [![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/7544/badge)](https://bestpractices.coreinfrastructure.org/projects/7544)
 [![CICD Push](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/cicd-push.yml)
 [![CodeQL](https://github.com/apecloud/kubeblocks/actions/workflows/codeql.yml/badge.svg)](https://github.com/apecloud/kubeblocks/actions/workflows/codeql.yml)
@@ -90,7 +89,7 @@ KubeCon 2024 in HongKong from 21-23 August 2024: [KuaiShou's 100% Resource Utili
 If you have any questions, you can reach out to us through:
 
 - KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2pjob3ezp-FzaZM7NId~Tbzp6PYNbOzQ)
-- KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
+- KubeBlocks GitHub [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 - KubeBlocks Wechat Account:
 
    <img src=".\docs\img\wechat-assistant.jpg" alt="wechat" width="100" height="100">

@@ -31,6 +31,9 @@ import (
 type propertiesConfig struct {
 	name       string
 	Properties *properties.Properties
+
+	// Specifies the separator of key and value while writing the properties, default " = "
+	writeSeparator string
 }
 
 const commentPrefix = "# "
@@ -38,6 +41,9 @@ const commentPrefix = "# "
 func init() {
 	CfgObjectRegistry().RegisterConfigCreator(parametersv1alpha1.PropertiesPlus, func(name string) ConfigObject {
 		return &propertiesConfig{name: name}
+	})
+	CfgObjectRegistry().RegisterConfigCreator(parametersv1alpha1.PropertiesUltra, func(name string) ConfigObject {
+		return &propertiesConfig{name: name, writeSeparator: "="}
 	})
 }
 
@@ -81,6 +87,10 @@ func (p *propertiesConfig) SubConfig(key string) ConfigObject {
 func (p *propertiesConfig) Marshal() (string, error) {
 	if p.Properties.Len() == 0 {
 		return "", nil
+	}
+
+	if p.writeSeparator != "" {
+		p.Properties.WriteSeparator = p.writeSeparator
 	}
 
 	var buf bytes.Buffer

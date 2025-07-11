@@ -38,7 +38,7 @@ var _ = Describe("reconciler test", func() {
 	Context("ObjectTree methods", func() {
 		It("should work well", func() {
 			By("NewObjectTree")
-			expectedTree := &ObjectTree{children: make(model.ObjectSnapshot)}
+			expectedTree := &ObjectTree{children: make(model.ObjectSnapshot), childrenOptions: make(map[model.GVKNObjKey]ObjectOptions)}
 			tree := NewObjectTree()
 			Expect(tree).Should(Equal(expectedTree))
 

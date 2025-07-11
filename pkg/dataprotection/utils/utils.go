@@ -26,14 +26,13 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/rogpeppe/go-internal/semver"
+	"golang.org/x/mod/semver"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -315,21 +314,8 @@ func GetPodByName(podList *corev1.PodList, name string) *corev1.Pod {
 	return nil
 }
 
-// GetKubeVersion get the version of Kubernetes and return the gitVersion
-func GetKubeVersion() (string, error) {
-	verInfo := viper.Get(constant.CfgKeyServerInfo)
-	ver, ok := verInfo.(version.Info)
-	if !ok {
-		return "", fmt.Errorf("failed to get kubernetes version, version info %v", verInfo)
-	}
-	if !semver.IsValid(ver.GitVersion) {
-		return "", fmt.Errorf("kubernetes version is not a valid semver, version info %v", verInfo)
-	}
-	return semver.MajorMinor(ver.GitVersion), nil
-}
-
 func SupportsCronJobV1() bool {
-	kubeVersion, err := GetKubeVersion()
+	kubeVersion, err := intctrlutil.GetKubeVersion()
 	if err != nil {
 		return true
 	}

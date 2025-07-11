@@ -27,9 +27,11 @@ import (
 	"strings"
 
 	"golang.org/x/exp/slices"
+	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-	"github.com/apecloud/kubeblocks/version"
+	kbversion "github.com/apecloud/kubeblocks/version"
 )
 
 // GetUncachedObjects returns a list of K8s objects, for these object types,
@@ -169,7 +171,7 @@ func GeKubeRestConfig(userAgent string) *rest.Config {
 }
 
 func defaultUserAgent() string {
-	return fmt.Sprintf("KubeBlocks %s (%s/%s)", version.GitVersion, gruntime.GOOS, gruntime.GOARCH)
+	return fmt.Sprintf("KubeBlocks %s (%s/%s)", kbversion.GitVersion, gruntime.GOOS, gruntime.GOARCH)
 }
 
 // DeleteOwnedResources deletes the matched resources which are owned by the owner.
@@ -210,4 +212,31 @@ func MergeList[E any](src, dst *[]E, f func(E) func(E) bool) {
 			*dst = append(*dst, item)
 		}
 	}
+}
+
+// GetKubeVersion get the version of Kubernetes and return the gitVersion
+func GetKubeVersion() (string, error) {
+	verInfo := viper.Get(constant.CfgKeyServerInfo)
+	ver, ok := verInfo.(version.Info)
+	if !ok {
+		return "", fmt.Errorf("failed to get kubernetes version, version info %v", verInfo)
+	}
+	if !semver.IsValid(ver.GitVersion) {
+		return "", fmt.Errorf("kubernetes version is not a valid semver, version info %v", verInfo)
+	}
+	return semver.MajorMinor(ver.GitVersion), nil
+}
+
+// SupportResizeSubResource is for the ease of tests
+var SupportResizeSubResource = supportResizeSubResourceImpl
+
+func supportResizeSubResourceImpl() (bool, error) {
+	kubeVersion, err := GetKubeVersion()
+	if err != nil {
+		return false, err
+	}
+	if semver.Compare(kubeVersion, "v1.32") < 0 {
+		return false, nil
+	}
+	return true, nil
 }

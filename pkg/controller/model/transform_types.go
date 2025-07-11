@@ -70,6 +70,7 @@ type ObjectVertex struct {
 	Obj               client.Object
 	OriObj            client.Object
 	Action            *Action
+	SubResource       string
 	ClientOpt         any
 	PropagationPolicy client.PropagationPolicy
 }
@@ -87,10 +88,11 @@ func NewObjectVertex(oldObj, newObj client.Object, action *Action, opts ...Graph
 		opt.ApplyTo(graphOpts)
 	}
 	return &ObjectVertex{
-		Obj:       newObj,
-		OriObj:    oldObj,
-		Action:    action,
-		ClientOpt: graphOpts.clientOpt,
+		Obj:         newObj,
+		OriObj:      oldObj,
+		Action:      action,
+		SubResource: graphOpts.subResource,
+		ClientOpt:   graphOpts.clientOpt,
 	}
 }
 

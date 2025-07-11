@@ -238,6 +238,40 @@ var _ = Describe("update reconciler test", func() {
 			expectUpdatedPods(strictInPlaceTree, []string{})
 		})
 
+		prepareForUpdate := func(tree *kubebuilderx.ObjectTree) {
+			By("fix meta")
+			reconciler = NewFixMetaReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+
+			By("update revisions")
+			reconciler = NewRevisionUpdateReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			By("assistant object")
+			reconciler = NewAssistantObjectReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			By("replicas alignment")
+			reconciler = NewReplicasAlignmentReconciler()
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+		}
+
+		getPodReadyCondition := func() corev1.PodCondition {
+			return corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			}
+		}
+
 		testInplacePodVerticalScaling := func(useSubResource bool) {
 			oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 			defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)

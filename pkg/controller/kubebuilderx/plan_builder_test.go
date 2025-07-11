@@ -234,7 +234,7 @@ var _ = Describe("plan builder test", func() {
 				currentTree.SetRoot(its)
 				desiredTree.SetRoot(itsCopy)
 				Expect(desiredTree.Add(pod, headlessSvc, svc, env)).Should(Succeed())
-				vertices := buildOrderedVertices(ctx, currentTree, desiredTree)
+				vertices := buildOrderedVertices(transCtx, currentTree, desiredTree)
 
 				// compare vertices
 				Expect(vertices).Should(HaveLen(len(verticesExpected)))
@@ -246,6 +246,45 @@ var _ = Describe("plan builder test", func() {
 						return false
 					})).Should(BeNumerically(">=", 0))
 				}
+			})
+
+			It("should append a vertex with subresource when Pod resource has the corresponding options", func() {
+				// Setup: two pods with different container resources
+				oldPod := builder.NewPodBuilder("ns", "pod").
+					AddContainer(corev1.Container{
+						Name:  "foo",
+						Image: "bar",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
+					}).
+					GetObject()
+				newPod := oldPod.DeepCopy()
+				newPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("200m")
+
+				// Setup trees
+				subResource := "foo"
+				currentTree := NewObjectTree()
+				desiredTree := NewObjectTree()
+				currentTree.SetRoot(builder.NewInstanceSetBuilder("ns", "root").GetObject())
+				desiredTree.SetRoot(currentTree.GetRoot())
+				Expect(currentTree.Add(oldPod)).Should(Succeed())
+				Expect(desiredTree.Update(newPod, WithSubResource(subResource))).Should(Succeed())
+
+				vertices := buildOrderedVertices(transCtx, currentTree, desiredTree)
+
+				// Find the vertex with subresource
+				found := false
+				for _, v := range vertices {
+					if pod, ok := v.Obj.(*corev1.Pod); ok && pod.Name == "pod" && v.SubResource == subResource {
+						found = true
+						Expect(*v.Action).To(Equal(model.UPDATE))
+					}
+				}
+				Expect(found).To(BeTrue())
 			})
 		})
 	})

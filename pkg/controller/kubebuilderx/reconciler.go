@@ -33,14 +33,30 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+type ObjectOption interface {
+	ApplyToObject(*ObjectOptions)
+}
+
+type ObjectOptions struct {
+	// if not empty, action should be done on the specified subresource
+	SubResource string
+}
+
+type WithSubResource string
+
+func (w WithSubResource) ApplyToObject(opts *ObjectOptions) {
+	opts.SubResource = string(w)
+}
+
 type ObjectTree struct {
 	// TODO(free6om): should find a better place to hold these two params?
 	context.Context
 	record.EventRecorder
 	logr.Logger
 
-	root     client.Object
-	children model.ObjectSnapshot
+	root            client.Object
+	children        model.ObjectSnapshot
+	childrenOptions map[model.GVKNObjKey]ObjectOptions
 
 	// finalizer to protect all objects of this tree
 	finalizer string
@@ -112,7 +128,12 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 		}
 		children[key] = childCopied
 	}
+	childrenOptions := make(map[model.GVKNObjKey]ObjectOptions, len(t.childrenOptions))
+	for key, options := range t.childrenOptions {
+		childrenOptions[key] = options
+	}
 	out.children = children
+	out.childrenOptions = childrenOptions
 	out.finalizer = t.finalizer
 	out.Context = t.Context
 	out.EventRecorder = t.EventRecorder
@@ -126,6 +147,14 @@ func (t *ObjectTree) Get(object client.Object) (client.Object, error) {
 		return nil, err
 	}
 	return t.children[*name], nil
+}
+
+func (t *ObjectTree) GetWithOption(object client.Object) (client.Object, ObjectOptions, error) {
+	name, err := model.GetGVKName(object)
+	if err != nil {
+		return nil, ObjectOptions{}, err
+	}
+	return t.children[*name], t.childrenOptions[*name], nil
 }
 
 func (t *ObjectTree) GetRoot() client.Object {
@@ -163,19 +192,25 @@ func (t *ObjectTree) GetSecondaryObjects() model.ObjectSnapshot {
 }
 
 func (t *ObjectTree) Add(objects ...client.Object) error {
-	return t.replace(objects...)
+	return t.replace(objects)
 }
 
-func (t *ObjectTree) Update(objects ...client.Object) error {
-	return t.replace(objects...)
+func (t *ObjectTree) Update(object client.Object, options ...ObjectOption) error {
+	return t.replace([]client.Object{object}, options...)
 }
 
-func (t *ObjectTree) replace(objects ...client.Object) error {
+func (t *ObjectTree) replace(objects []client.Object, options ...ObjectOption) error {
+	option := ObjectOptions{}
+	for _, opt := range options {
+		opt.ApplyToObject(&option)
+	}
+
 	for _, object := range objects {
 		name, err := model.GetGVKName(object)
 		if err != nil {
 			return err
 		}
+		t.childrenOptions[*name] = option
 		t.children[*name] = object
 	}
 	return nil
@@ -206,6 +241,7 @@ func (t *ObjectTree) GetFinalizer() string {
 
 func NewObjectTree() *ObjectTree {
 	return &ObjectTree{
-		children: make(model.ObjectSnapshot),
+		children:        make(model.ObjectSnapshot),
+		childrenOptions: make(map[model.GVKNObjKey]ObjectOptions),
 	}
 }

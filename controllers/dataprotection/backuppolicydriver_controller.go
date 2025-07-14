@@ -485,6 +485,9 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupTarget(
 	if oldTarget != nil {
 		// if the target already exists, only sync the role by component replicas automatically.
 		r.syncRoleLabelSelectorWhenReplicaChanges(oldTarget, targetTpl.Role, targetTpl.FallbackRole, compName)
+		if oldTarget.PodSelector != nil {
+			oldTarget.PodSelector.UseParentSelectedPods = targetTpl.UseParentSelectedPods
+		}
 		return oldTarget
 	}
 	clusterName := r.Cluster.Name

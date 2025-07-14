@@ -540,6 +540,9 @@ func (r *clusterBackupPolicyTransformer) buildBackupTarget(
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
 		r.syncRoleLabelSelectorWhenReplicaChanges(comp, oldTarget, targetTpl.Role, targetTpl.FallbackRole)
+		if oldTarget.PodSelector != nil {
+			oldTarget.PodSelector.UseParentSelectedPods = targetTpl.UseParentSelectedPods
+		}
 		return oldTarget
 	}
 	clusterName := r.OrigCluster.Name

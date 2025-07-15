@@ -40,6 +40,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
@@ -424,6 +425,80 @@ func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMappin
 	return nil
 }
 
+func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet, revision string) (*workloadsv1alpha1.Instance, error) {
+	labels := getMatchLabels(its.Name)
+	if len(revision) == 0 {
+		var err error
+		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, its)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// 1. build pod spec from template
+	inst := builder.NewInstanceBuilder(its.Namespace, name).
+		AddAnnotationsInMap(template.Annotations).
+		AddLabelsInMap(template.Labels).
+		AddLabelsInMap(labels).
+		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
+		AddControllerRevisionHashLabel(revision).
+		SetPodSpec(*template.Spec.DeepCopy())
+
+	// set these immutable fields only on initial Pod creation, not updates.
+	inst.SetHostname(name).
+		SetSubdomain(getHeadlessSvcName(its.Name))
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return nil, err
+	}
+	if nodeName, ok := podToNodeMapping[name]; ok {
+		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
+		inst.SetNodeSelector(map[string]string{corev1.LabelHostname: nodeName})
+	}
+
+	// 2. build pvcs from template
+	pvcNameMap := make(map[string]string)
+	for _, claimTemplate := range template.VolumeClaimTemplates {
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, its.Name, name)
+		pvc := builder.NewPVCBuilder(its.Namespace, pvcName).
+			AddLabelsInMap(labels).
+			AddLabelsInMap(template.Labels).
+			AddLabelsInMap(claimTemplate.Labels).
+			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			AddLabels(constant.KBAppPodNameLabelKey, name).
+			AddAnnotationsInMap(claimTemplate.Annotations).
+			SetSpec(*claimTemplate.Spec.DeepCopy()).
+			GetObject()
+		if template.Name != "" {
+			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
+		}
+		inst.AddVolumeClaimTemplate(*pvc)
+		pvcNameMap[pvcName] = claimTemplate.Name
+	}
+
+	instObj := inst.GetObject()
+
+	// 3. update pod volumes
+	var volumeList []corev1.Volume
+	for pvcName, claimTemplateName := range pvcNameMap {
+		volume := builder.NewVolumeBuilder(claimTemplateName).
+			SetVolumeSource(corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+			}).GetObject()
+		volumeList = append(volumeList, *volume)
+	}
+	intctrlutil.MergeList(&volumeList, &instObj.Spec.Template.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+		return func(v corev1.Volume) bool {
+			return v.Name == item.Name
+		}
+	})
+
+	if err := controllerutil.SetControllerReference(its, instObj, model.GetScheme()); err != nil {
+		return nil, err
+	}
+	return instObj, nil
+}
+
 func buildInstancePodByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet, revision string) (*corev1.Pod, error) {
 	// 1. build a pod from template
 	var err error
@@ -438,7 +513,7 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
-		AddLabels(constant.KBAppPodNameLabelKey, name).                  // used as a pod-service selector
+		AddLabels(constant.KBAppPodNameLabelKey, name). // used as a pod-service selector
 		AddLabels(instancetemplate.TemplateNameLabelKey, template.Name). // TODO: remove this label later
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
 		AddControllerRevisionHashLabel(revision).

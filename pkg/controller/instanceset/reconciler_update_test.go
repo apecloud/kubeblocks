@@ -71,12 +71,6 @@ var _ = Describe("update reconciler test", func() {
 		Expect(err).Should(BeNil())
 		Expect(res).Should(Equal(kubebuilderx.Continue))
 
-		By("assistant object")
-		reconciler = NewAssistantObjectReconciler()
-		res, err = reconciler.Reconcile(tree)
-		Expect(err).Should(BeNil())
-		Expect(res).Should(Equal(kubebuilderx.Continue))
-
 		By("replicas alignment")
 		reconciler = NewReplicasAlignmentReconciler()
 		res, err = reconciler.Reconcile(tree)

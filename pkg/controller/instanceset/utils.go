@@ -22,6 +22,7 @@ package instanceset
 import (
 	"encoding/json"
 	"fmt"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -66,6 +67,10 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 // getRoleName gets role name of pod 'pod'
 func getRoleName(pod *corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
+}
+
+func getInstanceRoleName(inst *workloadsv1alpha1.Instance) string {
+	return strings.ToLower(inst.Labels[constant.RoleLabelKey])
 }
 
 // AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.

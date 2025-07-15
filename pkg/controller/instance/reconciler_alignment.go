@@ -26,6 +26,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -211,6 +212,76 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			break
 		}
 		concurrency--
+	}
+
+	return kubebuilderx.Continue, nil
+}
+
+func (r *alignmentReconciler) Reconcile2(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	inst, _ := tree.GetRoot().(*workloadsv1alpha1.Instance)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	// 1. build desired name to template map
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(
+		itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder},
+	)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	// 2. find the create and delete set
+	newNameSet := sets.New[string]()
+	for name := range nameToTemplateMap {
+		newNameSet.Insert(name)
+	}
+	oldNameSet := sets.New[string]()
+	oldInstanceMap := make(map[string]*corev1.Pod)
+	oldInstanceList := tree.List(&corev1.Pod{})
+	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
+	for _, object := range oldInstanceList {
+		oldNameSet.Insert(object.GetName())
+		pod, _ := object.(*corev1.Pod)
+		oldInstanceMap[object.GetName()] = pod
+	}
+	createNameSet := newNameSet.Difference(oldNameSet)
+	deleteNameSet := oldNameSet.Difference(newNameSet)
+
+	newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if err := tree.Add(newPod); err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	// create PVCs
+	pvcs, err := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	for _, pvc := range pvcs {
+		switch oldPvc, err := tree.Get(pvc); {
+		case err != nil:
+			return kubebuilderx.Continue, err
+		case oldPvc == nil:
+			if err = tree.Add(pvc); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		default:
+			pvcObj := copyAndMerge(oldPvc, pvc)
+			if pvcObj != nil {
+				if err = tree.Update(pvcObj); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
 	}
 
 	return kubebuilderx.Continue, nil

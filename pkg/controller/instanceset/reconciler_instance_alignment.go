@@ -24,25 +24,26 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
-// including horizontal scaling and recovering from unintended pod deletions etc.
+func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
+	return &instanceAlignmentReconciler{}
+}
+
+// instanceAlignmentReconciler is responsible for aligning the actual instances with the desired replicas specified in the spec,
+// including horizontal scaling and recovering from unintended instance deletions etc.
 // only handle instance count, don't care instance revision.
 //
 // TODO(free6om): support membership reconfiguration
 type instanceAlignmentReconciler struct{}
 
-func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
-	return &instanceAlignmentReconciler{}
-}
+var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
 
 func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -55,7 +56,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 }
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	its, _ := tree.GetRoot().(*workloadsv1.InstanceSet)
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -79,13 +80,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		newNameSet.Insert(name)
 	}
 	oldNameSet := sets.New[string]()
-	oldInstanceMap := make(map[string]*corev1.Pod)
-	oldInstanceList := tree.List(&corev1.Pod{})
-	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
+	oldInstanceMap := make(map[string]*workloadsv1alpha1.Instance)
+	oldInstanceList := tree.List(&workloadsv1alpha1.Instance{})
 	for _, object := range oldInstanceList {
 		oldNameSet.Insert(object.GetName())
-		pod, _ := object.(*corev1.Pod)
-		oldInstanceMap[object.GetName()] = pod
+		inst, _ := object.(*workloadsv1alpha1.Instance)
+		oldInstanceMap[object.GetName()] = inst
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
@@ -108,7 +108,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
-	getPredecessor := func(i int) *corev1.Pod {
+	getPredecessor := func(i int) *workloadsv1alpha1.Instance {
 		if i <= 0 {
 			return nil
 		}
@@ -117,7 +117,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	if !isOrderedReady {
 		for _, name := range newNameList {
 			if _, ok := createNameSet[name]; !ok {
-				if !intctrlutil.IsPodAvailable(oldInstanceMap[name], its.Spec.MinReadySeconds) {
+				if !intctrlutil.IsInstanceAvailable(oldInstanceMap[name]) {
 					concurrency--
 				}
 			}
@@ -133,14 +133,14 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			break
 		}
 		predecessor := getPredecessor(i)
-		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
+		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) {
 			break
 		}
-		newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
+		newInst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.Add(newPod); err != nil {
+		if err := tree.Add(newInst); err != nil {
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
@@ -151,65 +151,26 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		concurrency--
 	}
 
-	// create PVCs
-	for _, name := range currentAlignedNameList {
-		pvcs, err := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		for _, pvc := range pvcs {
-			switch oldPvc, err := tree.Get(pvc); {
-			case err != nil:
-				return kubebuilderx.Continue, err
-			case oldPvc == nil:
-				if err = tree.Add(pvc); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			default:
-				pvcObj := copyAndMerge(oldPvc, pvc)
-				if pvcObj != nil {
-					if err = tree.Update(pvcObj); err != nil {
-						return kubebuilderx.Continue, err
-					}
-				}
-			}
-		}
-	}
-
 	// delete useless instances
 	priorities := make(map[string]int)
 	sortObjects(oldInstanceList, priorities, false)
 	for _, object := range oldInstanceList {
-		pod, _ := object.(*corev1.Pod)
-		if _, ok := deleteNameSet[pod.Name]; !ok {
+		inst, _ := object.(*workloadsv1alpha1.Instance)
+		if _, ok := deleteNameSet[inst.Name]; !ok {
 			continue
 		}
 		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
-		if isOrderedReady && !intctrlutil.IsPodReady(pod) {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Pod %s to be Ready",
+		if isOrderedReady && !intctrlutil.IsInstanceReady(inst) {
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Instance %s to be Ready",
 				its.Namespace,
 				its.Name,
-				pod.Name)
+				inst.Name)
 		}
-		if err := tree.Delete(pod); err != nil {
+		if err := tree.Delete(inst); err != nil {
 			return kubebuilderx.Continue, err
 		}
-
-		retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
-		// the default policy is `Delete`
-		if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
-			for _, obj := range oldPVCList {
-				pvc := obj.(*corev1.PersistentVolumeClaim)
-				if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {
-					if err := tree.Delete(pvc); err != nil {
-						return kubebuilderx.Continue, err
-					}
-				}
-			}
-		}
-
 		if isOrderedReady {
 			break
 		}
@@ -218,5 +179,3 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	return kubebuilderx.Continue, nil
 }
-
-var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

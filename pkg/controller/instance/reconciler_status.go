@@ -54,6 +54,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []*corev1.Pod
@@ -61,6 +62,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
 	}
+
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {

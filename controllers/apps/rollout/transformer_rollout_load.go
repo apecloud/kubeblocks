@@ -57,7 +57,7 @@ func (t *rolloutLoadTransformer) Transform(ctx graph.TransformContext, dag *grap
 	transCtx.ClusterOrig = transCtx.Cluster.DeepCopy()
 	transCtx.ClusterComps, transCtx.ClusterShardings = t.clusterCompNSharding(transCtx.Cluster)
 
-	transCtx.Components, err = t.getNCheckComponents(transCtx.Context, transCtx.Client, rollout)
+	transCtx.Components, transCtx.ShardingComps, err = t.getNCheckComponents(transCtx.Context, transCtx.Client, rollout)
 	if err != nil {
 		return err
 	}
@@ -89,19 +89,28 @@ func (t *rolloutLoadTransformer) clusterCompNSharding(cluster *appsv1.Cluster) (
 	return comps, shardings
 }
 
-func (t *rolloutLoadTransformer) getNCheckComponents(ctx context.Context, cli client.Reader, rollout *appsv1alpha1.Rollout) (map[string]*appsv1.Component, error) {
-	if len(rollout.Spec.Components) == 0 {
-		return nil, nil
+func (t *rolloutLoadTransformer) getNCheckComponents(ctx context.Context, cli client.Reader,
+	rollout *appsv1alpha1.Rollout) (map[string]*appsv1.Component, map[string][]*appsv1.Component, error) {
+	if len(rollout.Spec.Components) == 0 && len(rollout.Spec.Shardings) == 0 {
+		return nil, nil, nil
 	}
-	components := make(map[string]*appsv1.Component)
+	comps := make(map[string]*appsv1.Component)
 	for _, comp := range rollout.Spec.Components {
 		obj, err := t.getNCheckComponent(ctx, cli, rollout, comp.Name)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		components[comp.Name] = obj
+		comps[comp.Name] = obj
 	}
-	return components, nil
+	shardingComps := make(map[string][]*appsv1.Component)
+	for _, sharding := range rollout.Spec.Shardings {
+		objs, err := t.getNCheckShardingComps(ctx, cli, rollout, sharding.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		shardingComps[sharding.Name] = objs
+	}
+	return comps, shardingComps, nil
 }
 
 func (t *rolloutLoadTransformer) getNCheckComponent(ctx context.Context, cli client.Reader, rollout *appsv1alpha1.Rollout, compName string) (*appsv1.Component, error) {
@@ -117,6 +126,25 @@ func (t *rolloutLoadTransformer) getNCheckComponent(ctx context.Context, cli cli
 	return comp, nil
 }
 
+func (t *rolloutLoadTransformer) getNCheckShardingComps(ctx context.Context, cli client.Reader, rollout *appsv1alpha1.Rollout, shardingName string) ([]*appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
+	opts := []client.ListOption{
+		client.InNamespace(rollout.Namespace),
+		client.MatchingLabels(constant.GetClusterLabels(rollout.Spec.ClusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: shardingName,
+		})),
+	}
+	if err := cli.List(ctx, compList, opts...); err != nil {
+		return nil, err
+	}
+	shardingComps := make([]*appsv1.Component, 0)
+	for i := range compList.Items {
+		shardingComps = append(shardingComps, &compList.Items[i])
+	}
+	// TODO: check component status
+	return shardingComps, nil
+}
+
 func checkClusterNCompRunning(transCtx *rolloutTransformContext, compName string) bool {
 	cluster := transCtx.ClusterOrig
 	compStatus := cluster.Status.Components[compName]
@@ -128,4 +156,23 @@ func checkClusterNCompRunning(transCtx *rolloutTransformContext, compName string
 		return false
 	}
 	return compObj.Generation == compObj.Status.ObservedGeneration && compObj.Status.Phase == appsv1.RunningComponentPhase
+}
+
+func checkClusterNShardingRunning(transCtx *rolloutTransformContext, shardingName string) bool {
+	cluster := transCtx.ClusterOrig
+	status := cluster.Status.Shardings[shardingName]
+	if cluster.Generation != cluster.Status.ObservedGeneration || status.Phase != appsv1.RunningComponentPhase {
+		return false
+	}
+	compObjs, ok := transCtx.ShardingComps[shardingName]
+	if !ok {
+		return false
+	}
+	for _, compObj := range compObjs {
+		if compObj.Generation != compObj.Status.ObservedGeneration || compObj.Status.Phase != appsv1.RunningComponentPhase {
+			return false
+		}
+	}
+	spec := transCtx.ClusterShardings[shardingName]
+	return len(compObjs) == int(spec.Shards)
 }

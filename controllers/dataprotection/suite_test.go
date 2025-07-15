@@ -69,6 +69,7 @@ var fakeClock *testclocks.FakeClock
 
 func init() {
 	viper.AutomaticEnv()
+	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
 func TestAPIs(t *testing.T) {

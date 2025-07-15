@@ -15150,6 +15150,20 @@ string
 <p>Specifies the target components to be rolled out.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutSharding">
+[]RolloutSharding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target shardings to be rolled out.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -25990,7 +26004,7 @@ Kubernetes meta/v1.Time
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">RolloutInstanceMeta
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutSharding">RolloutSharding</a>)
 </p>
 <div>
 </div>
@@ -26131,6 +26145,246 @@ int32
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutSharding">RolloutSharding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutSpec">RolloutSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target ShardingDefinition of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target ServiceVersion of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target ComponentDefinition of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>strategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutStrategy">
+RolloutStrategy
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the rollout strategy for the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceMeta</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutInstanceMeta">
+RolloutInstanceMeta
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Additional meta for the instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.RolloutShardingStatus">RolloutShardingStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutStatus">RolloutStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ShardingDefinition of the sharding before the rollout.</p>
+<p>optional</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ServiceVersion of the sharding before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The ComponentDefinition of the sharding before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The replicas the sharding has before the rollout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>newReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The new replicas the sharding has been created successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rolledOutReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The replicas the sharding has been rolled out successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>canaryReplicas</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The number of canary replicas the sharding has.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaleDownInstances</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The instances that are scaled down.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastScaleUpTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The last time a sharding replica was scaled up successfully.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastScaleDownTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The last time a sharding replica was scaled down successfully.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutSpec">RolloutSpec
 </h3>
 <p>
@@ -26170,6 +26424,20 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the target components to be rolled out.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutSharding">
+[]RolloutSharding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target shardings to be rolled out.</p>
 </td>
 </tr>
 </tbody>
@@ -26281,12 +26549,26 @@ string
 <p>Records the status information of all components within the Rollout.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.RolloutShardingStatus">
+[]RolloutShardingStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the status information of all shardings within the Rollout.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.RolloutStrategy">RolloutStrategy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RolloutComponent">RolloutComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutSharding">RolloutSharding</a>)
 </p>
 <div>
 </div>

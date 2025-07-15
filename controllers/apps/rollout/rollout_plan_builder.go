@@ -66,6 +66,7 @@ type rolloutTransformContext struct {
 	ClusterComps     map[string]*appsv1.ClusterComponentSpec
 	ClusterShardings map[string]*appsv1.ClusterSharding
 	Components       map[string]*appsv1.Component
+	ShardingComps    map[string][]*appsv1.Component
 }
 
 func (c *rolloutTransformContext) GetContext() context.Context {

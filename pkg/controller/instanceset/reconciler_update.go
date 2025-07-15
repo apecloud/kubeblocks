@@ -33,7 +33,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -85,13 +84,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		newNameSet.Insert(name)
 	}
 	oldNameSet := sets.New[string]()
-	oldInstanceMap := make(map[string]*workloadsv1alpha1.Instance)
-	var oldInstanceList []*workloadsv1alpha1.Instance
-	for _, object := range tree.List(&workloadsv1alpha1.Instance{}) {
+	oldInstanceMap := make(map[string]*corev1.Pod)
+	var oldPodList []*corev1.Pod
+	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
-		inst, _ := object.(*workloadsv1alpha1.Instance)
-		oldInstanceMap[object.GetName()] = inst
-		oldInstanceList = append(oldInstanceList, inst)
+		pod, _ := object.(*corev1.Pod)
+		oldInstanceMap[object.GetName()] = pod
+		oldPodList = append(oldPodList, pod)
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
@@ -106,22 +105,22 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// handle 'RollingUpdate'
-	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(oldInstanceList))
+	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(oldPodList))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	currentUnavailable := 0
-	for _, inst := range oldInstanceList {
-		if !intctrlutil.IsInstanceAvailable(inst) {
+	for _, pod := range oldPodList {
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			currentUnavailable++
 		}
 	}
 	unavailable := maxUnavailable - currentUnavailable
 
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
-	updateCount := len(oldInstanceList)
+	updateCount := len(oldPodList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, oldInstanceList, r.isPodOrConfigUpdated)
+		plan := NewUpdatePlan(*its, oldPodList, r.isPodOrConfigUpdated)
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -134,11 +133,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	isBlocked := false
 	needRetry := false
-	sortObjects(oldInstanceList, priorities, false)
+	sortObjects(oldPodList, priorities, false)
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
-	for _, pod := range oldInstanceList {
+	for _, pod := range oldPodList {
 		updatePolicy, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -173,7 +172,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return true
 	}
 
-	for _, pod := range oldInstanceList {
+	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
 		}

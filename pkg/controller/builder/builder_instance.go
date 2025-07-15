@@ -23,16 +23,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type InstanceBuilder struct {
-	BaseBuilder[workloadsv1alpha1.Instance, *workloadsv1alpha1.Instance, InstanceBuilder]
+	BaseBuilder[workloads.Instance, *workloads.Instance, InstanceBuilder]
 }
 
 func NewInstanceBuilder(namespace, name string) *InstanceBuilder {
 	builder := &InstanceBuilder{}
-	builder.init(namespace, name, &workloadsv1alpha1.Instance{}, builder)
+	builder.init(namespace, name, &workloads.Instance{}, builder)
 	return builder
 }
 

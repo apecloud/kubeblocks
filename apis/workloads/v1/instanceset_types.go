@@ -76,6 +76,11 @@ func init() {
 
 // InstanceSetSpec defines the desired state of InstanceSet
 type InstanceSetSpec struct {
+	// Specifies whether to enable the Instance API.
+	//
+	// +optional
+	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
+
 	// Specifies the desired number of replicas of the given Template.
 	// These replicas are instantiations of the same Template, with each having a consistent identity.
 	// Defaults to 1 if unspecified.

@@ -24,17 +24,17 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // IsInstanceReady returns true if an instance is ready
-func IsInstanceReady(inst *workloadsv1alpha1.Instance) bool {
+func IsInstanceReady(inst *workloads.Instance) bool {
 	return isInstanceReady(inst) && !isInstanceTerminating(inst)
 }
 
 // IsInstanceReadyWithRole checks if an instance is ready with the role label.
-func IsInstanceReadyWithRole(inst *workloadsv1alpha1.Instance) bool {
+func IsInstanceReadyWithRole(inst *workloads.Instance) bool {
 	if _, ok := inst.Labels[constant.RoleLabelKey]; !ok {
 		return false
 	}
@@ -42,12 +42,12 @@ func IsInstanceReadyWithRole(inst *workloadsv1alpha1.Instance) bool {
 }
 
 // IsInstanceAvailable returns true if an instance is ready for at least minReadySeconds
-func IsInstanceAvailable(inst *workloadsv1alpha1.Instance) bool {
+func IsInstanceAvailable(inst *workloads.Instance) bool {
 	return isInstanceAvailable(inst) && !isInstanceTerminating(inst)
 }
 
 // isInstanceTerminating returns true if instance's DeletionTimestamp has been set
-func isInstanceTerminating(inst *workloadsv1alpha1.Instance) bool {
+func isInstanceTerminating(inst *workloads.Instance) bool {
 	return inst.DeletionTimestamp != nil
 }
 
@@ -56,7 +56,7 @@ func isInstanceTerminating(inst *workloadsv1alpha1.Instance) bool {
 // of that, there are two cases when an instance can be considered available:
 // 1. minReadySeconds == 0, or
 // 2. LastTransitionTime (is set) + minReadySeconds < current time
-func isInstanceAvailable(inst *workloadsv1alpha1.Instance) bool {
+func isInstanceAvailable(inst *workloads.Instance) bool {
 	if !isInstanceReady(inst) {
 		return false
 	}
@@ -73,26 +73,26 @@ func isInstanceAvailable(inst *workloadsv1alpha1.Instance) bool {
 }
 
 // isInstanceReady returns true if an instance is ready; false otherwise.
-func isInstanceReady(inst *workloadsv1alpha1.Instance) bool {
+func isInstanceReady(inst *workloads.Instance) bool {
 	return isInstanceReadyConditionTrue(inst.Status)
 }
 
 // IsPodReadyConditionTrue returns true if a pod is ready; false otherwise.
-func isInstanceReadyConditionTrue(status workloadsv1alpha1.InstanceStatus) bool {
+func isInstanceReadyConditionTrue(status workloads.InstanceStatus2) bool {
 	condition := getInstanceReadyCondition(status)
 	return condition != nil && condition.Status == metav1.ConditionTrue
 }
 
 // getInstanceReadyCondition extracts the instance ready condition from the given status and returns that.
 // Returns nil if the condition is not present.
-func getInstanceReadyCondition(status workloadsv1alpha1.InstanceStatus) *metav1.Condition {
+func getInstanceReadyCondition(status workloads.InstanceStatus2) *metav1.Condition {
 	_, condition := getInstanceCondition(&status, "Ready")
 	return condition
 }
 
 // getInstanceCondition extracts the provided condition from the given status and returns that.
 // Returns nil and -1 if the condition is not present, and the index of the located condition.
-func getInstanceCondition(status *workloadsv1alpha1.InstanceStatus, conditionType string) (int, *metav1.Condition) {
+func getInstanceCondition(status *workloads.InstanceStatus2, conditionType string) (int, *metav1.Condition) {
 	if status == nil {
 		return -1, nil
 	}

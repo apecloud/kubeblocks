@@ -23,7 +23,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
-    name: v1alpha1
+    name: v1
     schema:
       openAPIV3Schema:
         description: Instance is the Schema for the instances API
@@ -52,146 +52,286 @@ spec:
                 default: false
                 description: Specifies whether to create the default headless service.
                 type: boolean
+              instanceTemplateName:
+                type: string
+              instanceUpdateStrategyType:
+                description: Provides fine-grained control over the spec update process
+                  of the instance.
+                enum:
+                - RollingUpdate
+                - OnDelete
+                type: string
               membershipReconfiguration:
                 description: Provides actions to do membership dynamic reconfiguration.
                 properties:
-                  logSyncAction:
-                    description: |-
-                      Defines the action to trigger the new member to start log syncing.
-                      If the Image is not configured, the Image from the previous non-nil action will be used.
+                  switchover:
+                    description: Defines the procedure for a controlled transition
+                      of a role to a new replica.
                     properties:
-                      args:
-                        description: Additional parameters used to perform specific
-                          statements. This field is optional.
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: A set of instructions that will be executed within
-                          the Container to retrieve or process role information. This
-                          field is required.
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: Refers to the utility image that contains the
-                          command which can be utilized to retrieve or process role
-                          information.
-                        type: string
-                    required:
-                    - command
-                    type: object
-                  memberJoinAction:
-                    description: |-
-                      Defines the action to add a member.
-                      If the Image is not configured, the Image from the previous non-nil action will be used.
-                    properties:
-                      args:
-                        description: Additional parameters used to perform specific
-                          statements. This field is optional.
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: A set of instructions that will be executed within
-                          the Container to retrieve or process role information. This
-                          field is required.
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: Refers to the utility image that contains the
-                          command which can be utilized to retrieve or process role
-                          information.
-                        type: string
-                    required:
-                    - command
-                    type: object
-                  memberLeaveAction:
-                    description: |-
-                      Defines the action to remove a member.
-                      If the Image is not configured, the Image from the previous non-nil action will be used.
-                    properties:
-                      args:
-                        description: Additional parameters used to perform specific
-                          statements. This field is optional.
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: A set of instructions that will be executed within
-                          the Container to retrieve or process role information. This
-                          field is required.
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: Refers to the utility image that contains the
-                          command which can be utilized to retrieve or process role
-                          information.
-                        type: string
-                    required:
-                    - command
-                    type: object
-                  promoteAction:
-                    description: |-
-                      Defines the action to inform the cluster that the new member can join voting now.
-                      If the Image is not configured, the Image from the previous non-nil action will be used.
-                    properties:
-                      args:
-                        description: Additional parameters used to perform specific
-                          statements. This field is optional.
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: A set of instructions that will be executed within
-                          the Container to retrieve or process role information. This
-                          field is required.
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: Refers to the utility image that contains the
-                          command which can be utilized to retrieve or process role
-                          information.
-                        type: string
-                    required:
-                    - command
-                    type: object
-                  switchoverAction:
-                    description: |-
-                      Specifies the environment variables that can be used in all following Actions:
-                      - KB_ITS_USERNAME: Represents the username part of the credential
-                      - KB_ITS_PASSWORD: Represents the password part of the credential
-                      - KB_ITS_LEADER_HOST: Represents the leader host
-                      - KB_ITS_TARGET_HOST: Represents the target host
-                      - KB_ITS_SERVICE_PORT: Represents the service port
+                      exec:
+                        description: |-
+                          Defines the command to run.
 
 
-                      Defines the action to perform a switchover.
-                      If the Image is not configured, the latest [BusyBox](https://busybox.net/) image will be used.
-                    properties:
-                      args:
-                        description: Additional parameters used to perform specific
-                          statements. This field is optional.
-                        items:
-                          type: string
-                        type: array
-                      command:
-                        description: A set of instructions that will be executed within
-                          the Container to retrieve or process role information. This
-                          field is required.
-                        items:
-                          type: string
-                        type: array
-                      image:
-                        description: Refers to the utility image that contains the
-                          command which can be utilized to retrieve or process role
-                          information.
+                          This field cannot be updated.
+                        properties:
+                          args:
+                            description: Args represents the arguments that are passed
+                              to the `command` for execution.
+                            items:
+                              type: string
+                            type: array
+                          command:
+                            description: |-
+                              Specifies the command to be executed inside the container.
+                              The working directory for this command is the container's root directory('/').
+                              Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
+                              If the shell is required, it must be explicitly invoked in the command.
+
+
+                              A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
+                            items:
+                              type: string
+                            type: array
+                          container:
+                            description: |-
+                              Specifies the name of the container within the same pod whose resources will be shared with the action.
+                              This allows the action to utilize the specified container's resources without executing within it.
+
+
+                              The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                              The resources that can be shared are included:
+
+
+                              - volume mounts
+
+
+                              This field cannot be updated.
+                            type: string
+                          env:
+                            description: |-
+                              Represents a list of environment variables that will be injected into the container.
+                              These variables enable the container to adapt its behavior based on the environment it's running in.
+
+
+                              This field cannot be updated.
+                            items:
+                              description: EnvVar represents an environment variable
+                                present in a Container.
+                              properties:
+                                name:
+                                  description: Name of the environment variable. Must
+                                    be a C_IDENTIFIER.
+                                  type: string
+                                value:
+                                  description: |-
+                                    Variable references $(VAR_NAME) are expanded
+                                    using the previously defined environment variables in the container and
+                                    any service environment variables. If a variable cannot be resolved,
+                                    the reference in the input string will be unchanged. Double $$ are reduced
+                                    to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                                    "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                                    Escaped references will never be expanded, regardless of whether the variable
+                                    exists or not.
+                                    Defaults to "".
+                                  type: string
+                                valueFrom:
+                                  description: Source for the environment variable's
+                                    value. Cannot be used if value is not empty.
+                                  properties:
+                                    configMapKeyRef:
+                                      description: Selects a key of a ConfigMap.
+                                      properties:
+                                        key:
+                                          description: The key to select.
+                                          type: string
+                                        name:
+                                          description: |-
+                                            Name of the referent.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            TODO: Add other useful fields. apiVersion, kind, uid?
+                                          type: string
+                                        optional:
+                                          description: Specify whether the ConfigMap
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    fieldRef:
+                                      description: |-
+                                        Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                        spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                      properties:
+                                        apiVersion:
+                                          description: Version of the schema the FieldPath
+                                            is written in terms of, defaults to "v1".
+                                          type: string
+                                        fieldPath:
+                                          description: Path of the field to select
+                                            in the specified API version.
+                                          type: string
+                                      required:
+                                      - fieldPath
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    resourceFieldRef:
+                                      description: |-
+                                        Selects a resource of the container: only resources limits and requests
+                                        (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                      properties:
+                                        containerName:
+                                          description: 'Container name: required for
+                                            volumes, optional for env vars'
+                                          type: string
+                                        divisor:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: Specifies the output format
+                                            of the exposed resources, defaults to
+                                            "1"
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                        resource:
+                                          description: 'Required: resource to select'
+                                          type: string
+                                      required:
+                                      - resource
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                    secretKeyRef:
+                                      description: Selects a key of a secret in the
+                                        pod's namespace
+                                      properties:
+                                        key:
+                                          description: The key of the secret to select
+                                            from.  Must be a valid secret key.
+                                          type: string
+                                        name:
+                                          description: |-
+                                            Name of the referent.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            TODO: Add other useful fields. apiVersion, kind, uid?
+                                          type: string
+                                        optional:
+                                          description: Specify whether the Secret
+                                            or its key must be defined
+                                          type: boolean
+                                      required:
+                                      - key
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            type: array
+                          image:
+                            description: |-
+                              Specifies the container image to be used for running the Action.
+
+
+                              When specified, a dedicated container will be created using this image to execute the Action.
+                              All actions with same image will share the same container.
+
+
+                              This field cannot be updated.
+                            type: string
+                          matchingKey:
+                            description: |-
+                              Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                              The impact of this field depends on the `targetPodSelector` value:
+
+
+                              - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                              - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                                will be selected for the Action.
+
+
+                              This field cannot be updated.
+                            type: string
+                          targetPodSelector:
+                            description: |-
+                              Defines the criteria used to select the target Pod(s) for executing the Action.
+                              This is useful when there is no default target replica identified.
+                              It allows for precise control over which Pod(s) the Action should run in.
+
+
+                              If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                              to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                              post-provision or pre-terminate of the component.
+
+
+                              This field cannot be updated.
+                            enum:
+                            - Any
+                            - All
+                            - Role
+                            - Ordinal
+                            type: string
+                        type: object
+                      preCondition:
+                        description: |-
+                          Specifies the state that the cluster must reach before the Action is executed.
+                          Currently, this is only applicable to the `postProvision` action.
+
+
+                          The conditions are as follows:
+
+
+                          - `Immediately`: Executed right after the Component object is created.
+                            The readiness of the Component and its resources is not guaranteed at this stage.
+                          - `RuntimeReady`: The Action is triggered after the Component object has been created and all associated
+                            runtime resources (e.g. Pods) are in a ready state.
+                          - `ComponentReady`: The Action is triggered after the Component itself is in a ready state.
+                            This process does not affect the readiness state of the Component or the Cluster.
+                          - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
+                            This execution does not alter the Component or the Cluster's state of readiness.
+
+
+                          This field cannot be updated.
                         type: string
-                    required:
-                    - command
+                      retryPolicy:
+                        description: |-
+                          Defines the strategy to be taken when retrying the Action after a failure.
+
+
+                          It specifies the conditions under which the Action should be retried and the limits to apply,
+                          such as the maximum number of retries and backoff strategy.
+
+
+                          This field cannot be updated.
+                        properties:
+                          maxRetries:
+                            default: 0
+                            description: |-
+                              Defines the maximum number of retry attempts that should be made for a given Action.
+                              This value is set to 0 by default, indicating that no retries will be made.
+                            type: integer
+                          retryInterval:
+                            default: 0
+                            description: |-
+                              Indicates the duration of time to wait between each retry attempt.
+                              This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                            format: int64
+                            type: integer
+                        type: object
+                      timeoutSeconds:
+                        default: 0
+                        description: |-
+                          Specifies the maximum duration in seconds that the Action is allowed to run.
+
+
+                          If the Action does not complete within this time frame, it will be terminated.
+
+
+                          This field cannot be updated.
+                        format: int32
+                        type: integer
                     type: object
                 type: object
               minReadySeconds:
@@ -235,33 +375,69 @@ spec:
                     - Delete
                     type: string
                 type: object
+              podUpdatePolicy:
+                description: PodUpdatePolicy indicates how pods should be updated.
+                type: string
               roles:
                 description: A list of roles defined in the system. Instanceset obtains
                   role through pods' role label `kubeblocks.io/role`.
                 items:
+                  description: ReplicaRole represents a role that can be assigned
+                    to a component instance, defining its behavior and responsibilities.
                   properties:
-                    accessMode:
-                      default: ReadWrite
-                      description: Specifies the service capabilities of this member.
-                      enum:
-                      - None
-                      - Readonly
-                      - ReadWrite
-                      type: string
-                    canVote:
-                      default: true
-                      description: Indicates if this member has voting rights.
-                      type: boolean
-                    isLeader:
-                      default: false
-                      description: Determines if this member is the leader.
-                      type: boolean
                     name:
-                      default: leader
-                      description: Defines the role name of the replica.
+                      description: |-
+                        Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
+                        on the corresponding object to identify its role.
+
+
+                        For example, common role names include:
+                        - "leader": The primary/master instance that handles write operations
+                        - "follower": Secondary/replica instances that replicate data from the leader
+                        - "learner": Read-only instances that don't participate in elections
+
+
+                        This field is immutable once set.
+                      maxLength: 32
+                      pattern: ^.*[^\s]+.*$
                       type: string
+                    participatesInQuorum:
+                      default: false
+                      description: |-
+                        ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+                        This affects update strategies that need to maintain quorum for availability. Roles participate
+                        in quorum should have higher update priority than roles do not participate in quorum.
+                        The default value is false.
+
+
+                        For example, in a 5-pod component where:
+                        - 2 learner pods (participatesInQuorum=false)
+                        - 2 follower pods (participatesInQuorum=true)
+                        - 1 leader pod (participatesInQuorum=true)
+                        The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+                        of 2 learners and 1 follower while maintaining quorum.
+
+
+                        This field is immutable once set.
+                      type: boolean
+                    updatePriority:
+                      default: 0
+                      description: |-
+                        UpdatePriority determines the order in which pods with different roles are updated.
+                        Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+                        Roles with the highest priority will be updated last.
+                        The default priority is 0.
+
+
+                        For example:
+                        - Leader role may have priority 2 (updated last)
+                        - Follower role may have priority 1 (updated before leader)
+                        - Learner role may have priority 0 (updated first)
+
+
+                        This field is immutable once set.
+                      type: integer
                   required:
-                  - accessMode
                   - name
                   type: object
                 type: array
@@ -7837,29 +8013,19 @@ spec:
                   size, and access modes.
                   These templates are used to dynamically provision persistent volumes for instance upon their creation.
                   The final name of each PVC is generated by appending the pod's identifier to the name specified in volumeClaimTemplates[*].name.
+
+
+                  VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
                 items:
-                  description: PersistentVolumeClaim is a user's request for and claim
-                    to a persistent volume
+                  description: |-
+                    PersistentVolumeClaimTemplate is used to produce
+                    PersistentVolumeClaim objects as part of an EphemeralVolumeSource.
                   properties:
-                    apiVersion:
-                      description: |-
-                        APIVersion defines the versioned schema of this representation of an object.
-                        Servers should convert recognized schemas to the latest internal value, and
-                        may reject unrecognized values.
-                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-                      type: string
-                    kind:
-                      description: |-
-                        Kind is a string value representing the REST resource this object represents.
-                        Servers may infer this from the endpoint the client submits requests to.
-                        Cannot be updated.
-                        In CamelCase.
-                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                      type: string
                     metadata:
                       description: |-
-                        Standard object's metadata.
-                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                        May contain labels and annotations that will be copied into the PVC
+                        when creating it. No other fields are allowed and will be rejected during
+                        validation.
                       properties:
                         annotations:
                           additionalProperties:
@@ -7880,8 +8046,10 @@ spec:
                       type: object
                     spec:
                       description: |-
-                        spec defines the desired characteristics of a volume requested by a pod author.
-                        More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+                        The specification for the PersistentVolumeClaim. The entire content is
+                        copied unchanged into the PVC that gets created from this
+                        template. The same fields as in a PersistentVolumeClaim
+                        are also valid here.
                       properties:
                         accessModes:
                           description: |-
@@ -8074,182 +8242,8 @@ spec:
                             PersistentVolume backing this claim.
                           type: string
                       type: object
-                    status:
-                      description: |-
-                        status represents the current information/status of a persistent volume claim.
-                        Read-only.
-                        More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
-                      properties:
-                        accessModes:
-                          description: |-
-                            accessModes contains the actual access modes the volume backing the PVC has.
-                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
-                          items:
-                            type: string
-                          type: array
-                        allocatedResourceStatuses:
-                          additionalProperties:
-                            description: |-
-                              When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource
-                              that it does not recognizes, then it should ignore that update and let other controllers
-                              handle it.
-                            type: string
-                          description: "allocatedResourceStatuses stores status of
-                            resource being resized for the given PVC.\nKey names follow
-                            standard Kubernetes label syntax. Valid values are either:\n\t*
-                            Un-prefixed keys:\n\t\t- storage - the capacity of the
-                            volume.\n\t* Custom resources must use implementation-defined
-                            prefixed names such as \"example.com/my-custom-resource\"\nApart
-                            from above values - keys that are unprefixed or have kubernetes.io
-                            prefix are considered\nreserved and hence may not be used.\n\n\nClaimResourceStatus
-                            can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState
-                            set when resize controller starts resizing the volume
-                            in control-plane.\n\t- ControllerResizeFailed:\n\t\tState
-                            set when resize has failed in resize controller with a
-                            terminal error.\n\t- NodeResizePending:\n\t\tState set
-                            when resize controller has finished resizing the volume
-                            but further resizing of\n\t\tvolume is needed on the node.\n\t-
-                            NodeResizeInProgress:\n\t\tState set when kubelet starts
-                            resizing the volume.\n\t- NodeResizeFailed:\n\t\tState
-                            set when resizing has failed in kubelet with a terminal
-                            error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor
-                            example: if expanding a PVC for more capacity - this field
-                            can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage']
-                            = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
-                            = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage']
-                            = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage']
-                            = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
-                            = \"NodeResizeFailed\"\nWhen this field is not set, it
-                            means that no resize operation is in progress for the
-                            given PVC.\n\n\nA controller that receives PVC update
-                            with previously unknown resourceName or ClaimResourceStatus\nshould
-                            ignore the update for the purpose it was designed. For
-                            example - a controller that\nonly is responsible for resizing
-                            capacity of the volume, should ignore PVC updates that
-                            change other valid\nresources associated with PVC.\n\n\nThis
-                            is an alpha field and requires enabling RecoverVolumeExpansionFailure
-                            feature."
-                          type: object
-                          x-kubernetes-map-type: granular
-                        allocatedResources:
-                          additionalProperties:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                            x-kubernetes-int-or-string: true
-                          description: "allocatedResources tracks the resources allocated
-                            to a PVC including its capacity.\nKey names follow standard
-                            Kubernetes label syntax. Valid values are either:\n\t*
-                            Un-prefixed keys:\n\t\t- storage - the capacity of the
-                            volume.\n\t* Custom resources must use implementation-defined
-                            prefixed names such as \"example.com/my-custom-resource\"\nApart
-                            from above values - keys that are unprefixed or have kubernetes.io
-                            prefix are considered\nreserved and hence may not be used.\n\n\nCapacity
-                            reported here may be larger than the actual capacity when
-                            a volume expansion operation\nis requested.\nFor storage
-                            quota, the larger value from allocatedResources and PVC.spec.resources
-                            is used.\nIf allocatedResources is not set, PVC.spec.resources
-                            alone is used for quota calculation.\nIf a volume expansion
-                            capacity request is lowered, allocatedResources is only\nlowered
-                            if there are no expansion operations in progress and if
-                            the actual volume capacity\nis equal or lower than the
-                            requested capacity.\n\n\nA controller that receives PVC
-                            update with previously unknown resourceName\nshould ignore
-                            the update for the purpose it was designed. For example
-                            - a controller that\nonly is responsible for resizing
-                            capacity of the volume, should ignore PVC updates that
-                            change other valid\nresources associated with PVC.\n\n\nThis
-                            is an alpha field and requires enabling RecoverVolumeExpansionFailure
-                            feature."
-                          type: object
-                        capacity:
-                          additionalProperties:
-                            anyOf:
-                            - type: integer
-                            - type: string
-                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                            x-kubernetes-int-or-string: true
-                          description: capacity represents the actual resources of
-                            the underlying volume.
-                          type: object
-                        conditions:
-                          description: |-
-                            conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
-                            resized then the Condition will be set to 'ResizeStarted'.
-                          items:
-                            description: PersistentVolumeClaimCondition contains details
-                              about state of pvc
-                            properties:
-                              lastProbeTime:
-                                description: lastProbeTime is the time we probed the
-                                  condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: lastTransitionTime is the time the condition
-                                  transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: message is the human-readable message
-                                  indicating details about last transition.
-                                type: string
-                              reason:
-                                description: |-
-                                  reason is a unique, this should be a short, machine understandable string that gives the reason
-                                  for condition's last transition. If it reports "ResizeStarted" that means the underlying
-                                  persistent volume is being resized.
-                                type: string
-                              status:
-                                type: string
-                              type:
-                                description: PersistentVolumeClaimConditionType is
-                                  a valid value of PersistentVolumeClaimCondition.Type
-                                type: string
-                            required:
-                            - status
-                            - type
-                            type: object
-                          type: array
-                        currentVolumeAttributesClassName:
-                          description: |-
-                            currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
-                            When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
-                            This is an alpha field and requires enabling VolumeAttributesClass feature.
-                          type: string
-                        modifyVolumeStatus:
-                          description: |-
-                            ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
-                            When this is unset, there is no ModifyVolume operation being attempted.
-                            This is an alpha field and requires enabling VolumeAttributesClass feature.
-                          properties:
-                            status:
-                              description: "status is the status of the ControllerModifyVolume
-                                operation. It can be in any of following states:\n
-                                - Pending\n   Pending indicates that the PersistentVolumeClaim
-                                cannot be modified due to unmet requirements, such
-                                as\n   the specified VolumeAttributesClass not existing.\n
-                                - InProgress\n   InProgress indicates that the volume
-                                is being modified.\n - Infeasible\n  Infeasible indicates
-                                that the request has been rejected as invalid by the
-                                CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass
-                                needs to be specified.\nNote: New statuses can be
-                                added in the future. Consumers should check for unknown
-                                statuses and fail appropriately."
-                              type: string
-                            targetVolumeAttributesClassName:
-                              description: targetVolumeAttributesClassName is the
-                                name of the VolumeAttributesClass the PVC currently
-                                being reconciled
-                              type: string
-                          required:
-                          - status
-                          type: object
-                        phase:
-                          description: phase represents the current phase of PersistentVolumeClaim.
-                          type: string
-                      type: object
+                  required:
+                  - spec
                   type: object
                 type: array
             required:
@@ -8257,12 +8251,12 @@ spec:
             - template
             type: object
           status:
-            description: InstanceStatus defines the observed state of Instance
+            description: InstanceStatus2 defines the observed state of Instance
             properties:
               conditions:
                 description: |-
-                  Represents the latest available observations of an instanceset's current state.
-                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
+                  Represents the latest available observations of an instance's current state.
+                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable"
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource.\n---\nThis struct is intended for
@@ -8331,13 +8325,9 @@ spec:
                   - type
                   type: object
                 type: array
-                x-kubernetes-list-map-keys:
-                - type
-                x-kubernetes-list-type: map
               currentRevision:
-                description: |-
-                  currentRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the
-                  sequence [0,currentReplicas).
+                description: currentRevision, if not empty, indicates the version
+                  of the Instance used to generate pod.
                 type: string
               observedGeneration:
                 description: |-
@@ -8346,36 +8336,11 @@ spec:
                 format: int64
                 type: integer
               role:
-                description: Defines the role of the replica in the cluster.
-                properties:
-                  accessMode:
-                    default: ReadWrite
-                    description: Specifies the service capabilities of this member.
-                    enum:
-                    - None
-                    - Readonly
-                    - ReadWrite
-                    type: string
-                  canVote:
-                    default: true
-                    description: Indicates if this member has voting rights.
-                    type: boolean
-                  isLeader:
-                    default: false
-                    description: Determines if this member is the leader.
-                    type: boolean
-                  name:
-                    default: leader
-                    description: Defines the role name of the replica.
-                    type: string
-                required:
-                - accessMode
-                - name
-                type: object
+                description: Represents the role of the instance observed.
+                type: string
               updateRevision:
-                description: |-
-                  updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
-                  [replicas-updatedReplicas,replicas)
+                description: updateRevision, if not empty, indicates the version of
+                  the Instance used to generate pod.
                 type: string
             type: object
         type: object

@@ -28,13 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -62,83 +60,30 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
+	inst := tree.GetRoot().(*workloads.Instance)
 
-	// 1. build desired name to template map
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
-	// 2. validate the update set
-	newNameSet := sets.New[string]()
-	for name := range nameToTemplateMap {
-		newNameSet.Insert(name)
-	}
+	newNameSet := sets.New[string](podName(inst))
 	oldNameSet := sets.New[string]()
-	oldInstanceMap := make(map[string]*corev1.Pod)
-	var oldPodList []*corev1.Pod
+	oldPodList := make([]*corev1.Pod, 0)
 	for _, object := range tree.List(&corev1.Pod{}) {
 		oldNameSet.Insert(object.GetName())
-		pod, _ := object.(*corev1.Pod)
-		oldInstanceMap[object.GetName()] = pod
-		oldPodList = append(oldPodList, pod)
+		oldPodList = append(oldPodList, object.(*corev1.Pod))
 	}
 	updateNameSet := oldNameSet.Intersection(newNameSet)
 	if len(updateNameSet) != len(oldNameSet) || len(updateNameSet) != len(newNameSet) {
-		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s instances are not aligned", its.Namespace, its.Name))
+		tree.Logger.Info(fmt.Sprintf("Instance %s/%s is not aligned", inst.Namespace, inst.Name))
 		return kubebuilderx.Continue, nil
 	}
 
-	// 3. do update
 	// do nothing if update strategy type is 'OnDelete'
-	if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
+	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
 		return kubebuilderx.Continue, nil
 	}
-
-	// handle 'RollingUpdate'
-	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(oldPodList))
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	currentUnavailable := 0
-	for _, pod := range oldPodList {
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-			currentUnavailable++
-		}
-	}
-	unavailable := maxUnavailable - currentUnavailable
-
-	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
-	updateCount := len(oldPodList)
-	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, oldPodList, r.isPodOrConfigUpdated)
-		podsToBeUpdated, err := plan.Execute()
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		updateCount = len(podsToBeUpdated)
-	}
-
-	updatingPods := 0
-	updatedPods := 0
-	priorities := ComposeRolePriorityMap(its.Spec.Roles)
-	isBlocked := false
-	needRetry := false
-	sortObjects(oldPodList, priorities, false)
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
-		updatePolicy, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -149,57 +94,51 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
+	needRetry := false
+	isBlocked := false
 	canBeUpdated := func(pod *corev1.Pod) bool {
 		if !isImageMatched(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
+			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", inst.Namespace, inst.Name, pod.Name))
 			return false
 		}
 		if !intctrlutil.IsPodReady(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
+			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s is not ready", inst.Namespace, inst.Name, pod.Name))
 			return false
 		}
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+		if !intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
+			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the pod %s is not available", inst.Namespace, inst.Name, pod.Name))
 			// no pod event will trigger the next reconciliation, so retry it
 			needRetry = true
 			return false
 		}
-		if !isRoleReady(pod, its.Spec.Roles) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+		if !isRoleReady(pod, inst.Spec.Roles) {
+			tree.Logger.Info(fmt.Sprintf("Instance %s/%s blocks on update as the role of pod %s is not ready", inst.Namespace, inst.Name, pod.Name))
 			return false
 		}
-
 		return true
 	}
 
 	for _, pod := range oldPodList {
-		if updatingPods >= updateCount || updatingPods >= unavailable {
-			break
-		}
-		if updatedPods >= replicas {
-			break
-		}
-
 		if !canBeUpdated(pod) {
 			break
 		}
 
-		updatePolicy, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if its.Spec.PodUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
-			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
-				its.Namespace, its.Name, kbappsv1.StrictInPlacePodUpdatePolicyType, pod.Name)
+		if inst.Spec.PodUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
+			message := fmt.Sprintf("Instance %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
+				inst.Namespace, inst.Name, kbappsv1.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
-				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
+				tree.EventRecorder.Eventf(inst, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
 			}
-			meta.SetStatusCondition(&its.Status.Conditions, *buildBlockedCondition(its, message))
+			meta.SetStatusCondition(&inst.Status.Conditions, *buildBlockedCondition(inst, message))
 			isBlocked = true
 			break
 		}
 		if updatePolicy == InPlaceUpdatePolicy {
-			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePod(inst, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
@@ -215,7 +154,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource {
 				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
 			} else {
-				if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
+				if err = r.switchover(tree, inst, newMergedPod.(*corev1.Pod)); err != nil {
 					return kubebuilderx.Continue, err
 				}
 				err = tree.Update(newMergedPod)
@@ -223,64 +162,58 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			updatingPods++
 		} else if updatePolicy == RecreatePolicy {
 			if !isTerminating(pod) {
-				if err = r.switchover(tree, its, pod); err != nil {
+				if err = r.switchover(tree, inst, pod); err != nil {
 					return kubebuilderx.Continue, err
 				}
 				if err = tree.Delete(pod); err != nil {
 					return kubebuilderx.Continue, err
 				}
 			}
-			updatingPods++
 		}
 
 		// actively reload the new configuration when the pod or container has not been updated
 		if updatePolicy == NoOpsPolicy {
-			allUpdated, err := r.reconfigure(tree, its, pod)
+			_, err := r.reconfigure(tree, inst, pod)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			if !allUpdated {
-				updatingPods++
-			}
 		}
-
-		updatedPods++
 	}
 	if !isBlocked {
-		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
+		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceUpdateRestricted))
 	}
 	if needRetry {
-		return kubebuilderx.RetryAfter(time.Second * time.Duration(its.Spec.MinReadySeconds)), nil
+		return kubebuilderx.RetryAfter(time.Second * time.Duration(inst.Spec.MinReadySeconds)), nil
 	}
 	return kubebuilderx.Continue, nil
 }
 
-func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
-	if its.Spec.MembershipReconfiguration == nil || its.Spec.MembershipReconfiguration.Switchover == nil {
+func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) error {
+	if inst.Spec.MembershipReconfiguration == nil || inst.Spec.MembershipReconfiguration.Switchover == nil {
 		return nil
 	}
 
-	clusterName, err := r.clusterName(its)
+	clusterName, err := r.clusterName(inst)
 	if err != nil {
 		return err
 	}
 	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Switchover: its.Spec.MembershipReconfiguration.Switchover,
+		Switchover: inst.Spec.MembershipReconfiguration.Switchover,
 	}
 	templateVars := func() map[string]any {
-		if its.Spec.TemplateVars == nil {
+		if inst.Spec.TemplateVars == nil {
 			return nil
 		}
 		m := make(map[string]any)
-		for k, v := range its.Spec.TemplateVars {
+		for k, v := range inst.Spec.TemplateVars {
 			m[k] = v
 		}
 		return m
 	}()
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod)
+	// TODO: inst.Name -> its.Name
+	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Name, lifecycleActions, templateVars, pod)
 	if err != nil {
 		return err
 	}
@@ -296,27 +229,27 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
 	allUpdated := true
-	for _, config := range its.Spec.Configs {
-		if !r.isConfigUpdated(its, pod, config) {
+	for _, config := range inst.Spec.Configs {
+		if !r.isConfigUpdated(inst, pod, config) {
 			allUpdated = false
-			if err := r.reconfigureConfig(tree, its, pod, config); err != nil {
+			if err := r.reconfigureConfig(tree, inst, pod, config); err != nil {
 				return false, err
 			}
 		}
 		// TODO: compose the status from pods but not the its spec and status
-		r.setInstanceConfigStatus(its, pod, config)
+		r.setInstanceConfigStatus(inst, pod, config)
 	}
 	return allUpdated, nil
 }
 
-func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
 	if config.Reconfigure == nil {
 		return nil // skip
 	}
 
-	clusterName, err := r.clusterName(its)
+	clusterName, err := r.clusterName(inst)
 	if err != nil {
 		return err
 	}
@@ -325,16 +258,17 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 		Reconfigure: config.Reconfigure,
 	}
 	templateVars := func() map[string]any {
-		if its.Spec.TemplateVars == nil {
+		if inst.Spec.TemplateVars == nil {
 			return nil
 		}
 		m := make(map[string]any)
-		for k, v := range its.Spec.TemplateVars {
+		for k, v := range inst.Spec.TemplateVars {
 			m[k] = v
 		}
 		return m
 	}()
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod)
+	// TODO: inst.Name -> its.Name
+	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Name, lifecycleActions, templateVars, pod)
 	if err != nil {
 		return err
 	}
@@ -386,30 +320,30 @@ func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, p
 	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
 }
 
-func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, err := getPodUpdatePolicy(its, pod)
+func (r *updateReconciler) isPodOrConfigUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+	policy, err := getPodUpdatePolicy(inst, pod)
 	if err != nil {
 		return false, err
 	}
 	if policy != NoOpsPolicy {
 		return false, nil
 	}
-	for _, config := range its.Spec.Configs {
-		if !r.isConfigUpdated(its, pod, config) {
+	for _, config := range inst.Spec.Configs {
+		if !r.isConfigUpdated(inst, pod, config) {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+func (r *updateReconciler) isConfigUpdated(inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
+	idx := slices.IndexFunc(inst.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
 		return instance.PodName == pod.Name
 	})
 	if idx < 0 {
 		return true // new pod provisioned
 	}
-	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
+	for _, configStatus := range inst.Status.InstanceStatus[idx].Configs {
 		if configStatus.Name == config.Name {
 			return config.Generation <= configStatus.Generation
 		}
@@ -417,54 +351,23 @@ func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *core
 	return config.Generation <= 0
 }
 
-func (r *updateReconciler) clusterName(its *workloads.InstanceSet) (string, error) {
+func (r *updateReconciler) clusterName(inst *workloads.Instance) (string, error) {
 	var clusterName string
-	if its.Labels != nil {
-		clusterName = its.Labels[constant.AppInstanceLabelKey]
+	if inst.Labels != nil {
+		clusterName = inst.Labels[constant.AppInstanceLabelKey]
 	}
 	if len(clusterName) == 0 {
-		return "", fmt.Errorf("InstanceSet %s/%s has no label %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
+		return "", fmt.Errorf("Instance %s/%s has no label %s", inst.Namespace, inst.Name, constant.AppInstanceLabelKey)
 	}
 	return clusterName, nil
 }
 
-func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {
+func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               string(workloads.InstanceUpdateRestricted),
 		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
+		ObservedGeneration: inst.Generation,
 		Reason:             workloads.ReasonInstanceUpdateRestricted,
 		Message:            message,
 	}
-}
-
-func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrategy, totalReplicas int) (int, int, error) {
-	replicas := totalReplicas
-	maxUnavailable := 1
-	if updateStrategy == nil {
-		return replicas, maxUnavailable, nil
-	}
-	rollingUpdate := updateStrategy.RollingUpdate
-	if rollingUpdate == nil {
-		return replicas, maxUnavailable, nil
-	}
-	var err error
-	if rollingUpdate.Replicas != nil {
-		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, false)
-		if err != nil {
-			return replicas, maxUnavailable, err
-		}
-	}
-	if rollingUpdate.MaxUnavailable != nil {
-		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(rollingUpdate.MaxUnavailable, intstr.FromInt32(1)), totalReplicas, false)
-		if err != nil {
-			return 0, 0, err
-		}
-		// maxUnavailable might be zero for small percentage with round down.
-		// So we have to enforce it not to be less than 1.
-		if maxUnavailable < 1 {
-			maxUnavailable = 1
-		}
-	}
-	return replicas, maxUnavailable, nil
 }

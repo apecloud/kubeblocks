@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1alpha1
+package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -37,8 +37,8 @@ type Instance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   InstanceSpec   `json:"spec,omitempty"`
-	Status InstanceStatus `json:"status,omitempty"`
+	Spec   InstanceSpec    `json:"spec,omitempty"`
+	Status InstanceStatus2 `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -91,6 +91,19 @@ type InstanceSpec struct {
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *PersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
 
+	// +optional
+	InstanceTemplateName string `json:"instanceTemplateName,omitempty"`
+
+	// Provides fine-grained control over the spec update process of the instance.
+	//
+	// +optional
+	InstanceUpdateStrategyType *kbappsv1.InstanceUpdateStrategyType `json:"instanceUpdateStrategyType,omitempty"`
+
+	// PodUpdatePolicy indicates how pods should be updated.
+	//
+	// +optional
+	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
 	// Specifies whether to create the default headless service.
 	//
 	// +kubebuilder:default=false
@@ -100,7 +113,7 @@ type InstanceSpec struct {
 	// A list of roles defined in the system. Instanceset obtains role through pods' role label `kubeblocks.io/role`.
 	//
 	// +optional
-	Roles []ReplicaRole `json:"roles,omitempty"`
+	Roles []kbappsv1.ReplicaRole `json:"roles,omitempty"`
 
 	// Provides actions to do membership dynamic reconfiguration.
 	//
@@ -118,39 +131,32 @@ type InstanceSpec struct {
 	Paused bool `json:"paused,omitempty"`
 }
 
-// InstanceStatus defines the observed state of Instance
-type InstanceStatus struct {
+// InstanceStatus2 defines the observed state of Instance
+type InstanceStatus2 struct {
 	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
 	// InstanceSet's generation, which is updated on mutation by the API Server.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// currentRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the
-	// sequence [0,currentReplicas).
+	// currentRevision, if not empty, indicates the version of the Instance used to generate pod.
+	//
+	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// updateRevision, if not empty, indicates the version of the InstanceSet used to generate instances in the sequence
-	// [replicas-updatedReplicas,replicas)
+	// updateRevision, if not empty, indicates the version of the Instance used to generate pod.
+	//
+	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
-	// Represents the latest available observations of an instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
+	// Represents the role of the instance observed.
 	//
 	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Role *string `json:"role,omitempty"`
 
-	// Defines the role of the replica in the cluster.
+	// Represents the latest available observations of an instance's current state.
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable"
 	//
 	// +optional
-	ReplicaRole *ReplicaRole `json:"role,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
-
-// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.
-//
-// +kubebuilder:object:generate=false
-type PersistentVolumeClaimRetentionPolicy = kbappsv1.PersistentVolumeClaimRetentionPolicy

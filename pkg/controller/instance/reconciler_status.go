@@ -20,17 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"encoding/json"
-	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -53,288 +51,159 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 }
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	inst := tree.GetRoot().(*workloads.Instance)
 
-	// 1. get all pods
-	pods := tree.List(&corev1.Pod{})
-	var podList []*corev1.Pod
-	for _, object := range pods {
-		pod, _ := object.(*corev1.Pod)
-		podList = append(podList, pod)
-	}
-
-	// 2. calculate status summary
-	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+	obj, err := tree.Get(podObj(inst))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	replicas := int32(0)
-	ordinals := make([]int32, 0)
-	currentReplicas, updatedReplicas := int32(0), int32(0)
-	readyReplicas, availableReplicas := int32(0), int32(0)
-	notReadyNames := sets.New[string]()
-	notAvailableNames := sets.New[string]()
-	currentRevisions := map[string]string{}
+	if obj == nil {
+		return kubebuilderx.Continue, nil
+	}
+	pod := obj.(*corev1.Pod)
 
-	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
-	template2TotalReplicas := map[string]int32{}
-	for _, template := range its.Spec.Instances {
-		templateReplicas := int32(1)
-		if template.Replicas != nil {
-			templateReplicas = *template.Replicas
-		}
-		template2TotalReplicas[template.Name] = templateReplicas
-	}
+	ready, available, updated := false, false, false
+	notReadyName, notAvailableName := "", ""
 
-	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
+	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
+	// if err != nil {
+	//	return kubebuilderx.Continue, err
+	// }
 
-	for _, pod := range podList {
-		_, ordinal := parseParentNameAndOrdinal(pod.Name)
-		templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
-		if template2TemplatesStatus[templateName] == nil {
-			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
-				Name:     templateName,
-				Ordinals: make([]int32, 0),
-			}
-		}
-		currentRevisions[pod.Name] = getPodRevision(pod)
-		if isCreated(pod) {
-			notReadyNames.Insert(pod.Name)
-			replicas++
-			if len(templateName) == 0 {
-				ordinals = append(ordinals, int32(ordinal))
-			}
-			template2TemplatesStatus[templateName].Replicas++
-			template2TemplatesStatus[templateName].Ordinals = append(template2TemplatesStatus[templateName].Ordinals, int32(ordinal))
-		}
-		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
-			readyReplicas++
-			template2TemplatesStatus[templateName].ReadyReplicas++
-			notReadyNames.Delete(pod.Name)
-			if intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-				availableReplicas++
-				template2TemplatesStatus[templateName].AvailableReplicas++
-			} else {
-				notAvailableNames.Insert(pod.Name)
-			}
-		}
-		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := IsPodUpdated(its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			switch _, ok := updateRevisions[pod.Name]; {
-			case !ok, !isPodUpdated:
-				currentReplicas++
-				template2TemplatesStatus[templateName].CurrentReplicas++
-			default:
-				updatedReplicas++
-				template2TemplatesStatus[templateName].UpdatedReplicas++
-			}
-		}
-
-		if nodeName, ok := podToNodeMapping[pod.Name]; ok {
-			// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-			if pod.Spec.NodeName == nodeName {
-				if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			}
+	if isCreated(pod) {
+		notReadyName = pod.Name
+	}
+	if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+		ready = true
+		notReadyName = ""
+		if intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
+			available = true
+		} else {
+			notAvailableName = pod.Name
 		}
 	}
-	its.Status.Replicas = replicas
-	its.Status.Ordinals = ordinals
-	its.Status.ReadyReplicas = readyReplicas
-	its.Status.AvailableReplicas = availableReplicas
-	its.Status.CurrentReplicas = currentReplicas
-	its.Status.UpdatedReplicas = updatedReplicas
-	its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
-	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
-	// all pods have been updated
-	totalReplicas := int32(1)
-	if its.Spec.Replicas != nil {
-		totalReplicas = *its.Spec.Replicas
-	}
-	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		its.Status.CurrentRevision = its.Status.UpdateRevision
-		its.Status.CurrentReplicas = totalReplicas
-	}
-	for idx, templateStatus := range its.Status.TemplatesStatus {
-		templateTotalReplicas := template2TotalReplicas[templateStatus.Name]
-		if templateStatus.Replicas == templateTotalReplicas && templateStatus.UpdatedReplicas == templateTotalReplicas {
-			its.Status.TemplatesStatus[idx].CurrentReplicas = templateTotalReplicas
+	if isCreated(pod) && !isTerminating(pod) {
+		updated, err = IsPodUpdated(inst, pod)
+		if err != nil {
+			return kubebuilderx.Continue, err
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
+	// TODO: ???
+	// if nodeName, ok := podToNodeMapping[pod.Name]; ok {
+	//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
+	//	if pod.Spec.NodeName == nodeName {
+	//		if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
+	//			return kubebuilderx.Continue, err
+	//		}
+	//	}
+	// }
 
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
-	if err != nil {
-		return kubebuilderx.Continue, err
+	inst.Status.CurrentRevision = getPodRevision(pod)
+	if updated {
+		inst.Status.CurrentRevision = inst.Status.UpdateRevision
 	}
-	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
 
-	// 3. set InstanceFailure condition
-	failureCondition, err := buildFailureCondition(its, podList)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
+	readyCondition := buildReadyCondition(inst, ready, notReadyName)
+	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
+
+	availableCondition := buildAvailableCondition(inst, available, notAvailableName)
+	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
+
+	failureCondition := buildFailureCondition(inst, pod)
 	if failureCondition != nil {
-		meta.SetStatusCondition(&its.Status.Conditions, *failureCondition)
+		meta.SetStatusCondition(&inst.Status.Conditions, *failureCondition)
 	} else {
-		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
+		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
 	// 4. set members status
-	setMembersStatus(its, podList)
+	setMembersStatus(inst, pod)
 
-	// 5. set instance status
-	setInstanceStatus(its, podList)
+	// TODO: 5. set instance status
+	// setInstanceStatus(inst, podList)
 
-	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
+	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }
 
-func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
-	baseSort(podNames, func(i int) (string, int) {
-		return parseParentNameAndOrdinal(podNames[i])
-	}, nil, true)
-	return json.Marshal(podNames)
-}
-
-func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.InstanceTemplateStatus) []workloads.InstanceTemplateStatus {
-	var templatesStatus []workloads.InstanceTemplateStatus
-	for templateName, templateStatus := range template2TemplatesStatus {
-		if len(templateName) == 0 {
-			continue
-		}
-		templatesStatus = append(templatesStatus, *templateStatus)
-	}
-	sort.Slice(templatesStatus, func(i, j int) bool {
-		return templatesStatus[i].Name < templatesStatus[j].Name
-	})
-	return templatesStatus
-}
-
-func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
+func buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceReady),
 		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
+		ObservedGeneration: inst.Generation,
 		Reason:             workloads.ReasonReady,
 	}
 	if !ready {
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = workloads.ReasonNotReady
-		message, err := buildConditionMessageWithNames(notReadyNames.UnsortedList())
-		if err != nil {
-			return nil, err
-		}
-		condition.Message = string(message)
+		condition.Message = notReadyName
 	}
-	return condition, nil
+	return condition
 }
 
-func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
+func buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceAvailable),
 		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
+		ObservedGeneration: inst.Generation,
 		Reason:             workloads.ReasonAvailable,
 	}
 	if !available {
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = workloads.ReasonNotAvailable
-		message, err := buildConditionMessageWithNames(notAvailableNames.UnsortedList())
-		if err != nil {
-			return nil, err
-		}
-		condition.Message = string(message)
+		condition.Message = notAvailableName
 	}
-	return condition, nil
+	return condition
 }
 
-func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
-	var failureNames []string
-	for _, pod := range pods {
-		if isTerminating(pod) {
-			continue
-		}
-		// Kubernetes says the Pod is 'Failed'
-		if pod.Status.Phase == corev1.PodFailed {
-			failureNames = append(failureNames, pod.Name)
-			continue
-		}
-		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
-		if isFailed && isTimedOut {
-			failureNames = append(failureNames, pod.Name)
-		}
+func buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {
+	if isTerminating(pod) {
+		return nil
 	}
-	if len(failureNames) == 0 {
-		return nil, nil
+	var failureName string
+	// Kubernetes says the Pod is 'Failed'
+	if pod.Status.Phase == corev1.PodFailed {
+		failureName = pod.Name
 	}
-	message, err := buildConditionMessageWithNames(failureNames)
-	if err != nil {
-		return nil, err
+	// KubeBlocks says the Pod is 'Failed'
+	isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+	if len(failureName) == 0 && isFailed && isTimedOut {
+		failureName = pod.Name
+	}
+	if len(failureName) == 0 {
+		return nil
 	}
 	return &metav1.Condition{
 		Type:               string(workloads.InstanceFailure),
 		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
+		ObservedGeneration: inst.Generation,
 		Reason:             workloads.ReasonInstanceFailure,
-		Message:            string(message),
-	}, nil
+		Message:            failureName,
+	}
 }
 
-func setMembersStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
+func setMembersStatus(inst *workloads.Instance, pod *corev1.Pod) {
+	// reset it first
+	inst.Status.Role = nil
+
 	// no roles defined
-	if its.Spec.Roles == nil {
+	if inst.Spec.Roles == nil {
 		return
 	}
+
 	// compose new status
-	newMembersStatus := make([]workloads.MemberStatus, 0)
-	roleMap := composeRoleMap(*its)
-	for _, pod := range pods {
-		if !intctrlutil.PodIsReadyWithLabel(*pod) {
-			continue
-		}
+	inst.Status.Role = ptr.To("")
+	if intctrlutil.PodIsReadyWithLabel(*pod) {
+		roleMap := composeRoleMap(inst)
 		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
-		if !ok {
-			continue
+		if ok {
+			inst.Status.Role = ptr.To(role.Name)
 		}
-		memberStatus := workloads.MemberStatus{
-			PodName:     pod.Name,
-			ReplicaRole: &role,
-		}
-		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
-
-	// sort and set
-	rolePriorityMap := ComposeRolePriorityMap(its.Spec.Roles)
-	sortMembersStatus(newMembersStatus, rolePriorityMap)
-	its.Status.MembersStatus = newMembersStatus
-}
-
-func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
-	getRolePriorityFunc := func(i int) int {
-		role := membersStatus[i].ReplicaRole.Name
-		return rolePriorityMap[role]
-	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(membersStatus[i].PodName)
-	}
-	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }
 
 func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
@@ -349,7 +218,7 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 
 	syncInstanceConfigStatus(its, newInstanceStatus)
 
-	sortInstanceStatus(newInstanceStatus)
+	// sortInstanceStatus(newInstanceStatus)
 	its.Status.InstanceStatus = newInstanceStatus
 }
 
@@ -390,9 +259,9 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 	}
 }
 
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
-	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
-}
+// func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+//	getNameNOrdinalFunc := func(i int) (string, int) {
+//		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+//	}
+//	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
+// }

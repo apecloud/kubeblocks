@@ -24,11 +24,12 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
@@ -43,7 +44,7 @@ var _ kubebuilderx.TreeLoader = &treeLoader{}
 func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
 	ml := getMatchLabels(req.Name)
 	kinds := ownedKinds()
-	tree, err := kubebuilderx.ReadObjectTree[*workloadsv1alpha1.Instance](ctx, reader, req, ml, kinds...)
+	tree, err := kubebuilderx.ReadObjectTree[*workloads.Instance](ctx, reader, req, ml, kinds...)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +62,10 @@ func ownedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&corev1.PodList{},
 		&corev1.PersistentVolumeClaimList{},
-		&corev1.ServiceList{},
-		&corev1.ConfigMapList{},
-		&corev1.SecretList{},
+		&corev1.ServiceList{},   // headless
+		&corev1.ConfigMapList{}, // config & script, env
+		&corev1.SecretList{},    // account, tls
+		&corev1.ServiceAccountList{},
+		&rbacv1.RoleBindingList{},
 	}
 }

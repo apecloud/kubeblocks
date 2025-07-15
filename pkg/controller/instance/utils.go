@@ -20,103 +20,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"encoding/json"
-	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-const defaultPriority = 0
-
-// ComposeRolePriorityMap generates a priority map based on roles.
-func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
-	rolePriorityMap := make(map[string]int)
-	rolePriorityMap[""] = defaultPriority
-	for _, role := range roles {
-		roleName := strings.ToLower(role.Name)
-		rolePriorityMap[roleName] = role.UpdatePriority
-	}
-
-	return rolePriorityMap
+func podName(inst *workloads.Instance) string {
+	return inst.Name
 }
 
-// SortPods sorts pods by their role priority
-// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
-// reverse it if reverse==true
-func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
-	getRolePriorityFunc := func(i int) int {
-		role := getRoleName(&pods[i])
-		return rolePriorityMap[role]
+func podObj(inst *workloads.Instance) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: inst.Namespace,
+			Name:      podName(inst),
+		},
 	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(pods[i].GetName())
-	}
-	baseSort(pods, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-// getRoleName gets role name of pod 'pod'
+func podObjKey(inst *workloads.Instance) client.ObjectKey {
+	return client.ObjectKeyFromObject(podObj(inst))
+}
+
+// getRoleName gets role name of pod
 func getRoleName(pod *corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
 }
 
-// AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.
-func AddAnnotationScope(scope AnnotationScope, annotations map[string]string) map[string]string {
-	if annotations == nil {
-		return nil
-	}
-	scopedAnnotations := make(map[string]string, len(annotations))
-	for k, v := range annotations {
-		scopedAnnotations[fmt.Sprintf("%s%s", k, scope)] = v
-	}
-	return scopedAnnotations
-}
-
-// ParseAnnotationsOfScope parses all annotations with AnnotationScope defined by 'scope'.
-// the AnnotationScope suffix of keys in result map will be trimmed.
-func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string]string) map[string]string {
-	if scopedAnnotations == nil {
-		return nil
-	}
-
-	annotations := make(map[string]string, 0)
-	if scope == RootScope {
-		for k, v := range scopedAnnotations {
-			if strings.HasSuffix(k, scopeSuffix) {
-				continue
-			}
-			annotations[k] = v
-		}
-		return annotations
-	}
-
-	for k, v := range scopedAnnotations {
-		if strings.HasSuffix(k, string(scope)) {
-			annotations[strings.TrimSuffix(k, string(scope))] = v
-		}
-	}
-	return annotations
-}
-
-func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
+func composeRoleMap(inst *workloads.Instance) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole)
-	for _, role := range its.Spec.Roles {
+	for _, role := range inst.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
@@ -138,116 +82,158 @@ func mergeMap[K comparable, V any](src, dst *map[K]V) {
 
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
-		constant.AppManagedByLabelKey: constant.AppName,
-		WorkloadsManagedByLabelKey:    workloads.InstanceSetKind,
-		WorkloadsInstanceLabelKey:     name,
+		constant.AppManagedByLabelKey:      constant.AppName,
+		constant.KBAppInstanceNameLabelKey: name,
 	}
 }
 
-// GetMatchLabels exposes getMatchLabels for external usages
-// TODO: remove this method when no usage
-func GetMatchLabels(name string) map[string]string {
-	return getMatchLabels(name)
+// isRoleReady returns true if pod has role label
+func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
+	if len(roles) == 0 {
+		return true
+	}
+	_, ok := pod.Labels[constant.RoleLabelKey]
+	return ok
 }
 
-func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
-	selectors := make(map[string]string)
-	for k, v := range its.Spec.Selector.MatchLabels {
-		selectors[k] = v
-	}
-	selectors[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
-	return selectors
+// isCreated returns true if pod has been created and is maintained by the API server
+func isCreated(pod *corev1.Pod) bool {
+	return pod.Status.Phase != ""
 }
 
-// GetPodNameSetFromInstanceSetCondition get the pod name sets from the InstanceSet conditions
-func GetPodNameSetFromInstanceSetCondition(its *workloads.InstanceSet, conditionType workloads.ConditionType) map[string]sets.Empty {
-	podSet := map[string]sets.Empty{}
-	condition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
-	if condition != nil &&
-		condition.Status == metav1.ConditionFalse &&
-		condition.Message != "" {
-		var podNames []string
-		_ = json.Unmarshal([]byte(condition.Message), &podNames)
-		podSet = sets.New(podNames...)
-	}
-	return podSet
+// isTerminating returns true if pod's DeletionTimestamp has been set
+func isTerminating(pod *corev1.Pod) bool {
+	return pod.DeletionTimestamp != nil
 }
 
-// CalculateConcurrencyReplicas returns absolute value of concurrency for workload. This func can solve some
-// corner cases about percentage-type concurrency, such as:
-// - if concurrency > "0%" and replicas > 0, it will ensure at least 1 pod is reserved.
-// - if concurrency < "100%" and replicas > 1, it will ensure at least 1 pod is reserved.
-//
-// if concurrency is nil, concurrency will be treated as 100%.
-func CalculateConcurrencyReplicas(concurrency *intstr.IntOrString, replicas int) (int, error) {
-	if concurrency == nil {
-		return integer.IntMax(replicas, 1), nil
-	}
-
-	// 'roundUp=true' will ensure at least 1 pod is reserved if concurrency > "0%" and replicas > 0.
-	pValue, err := intstr.GetScaledValueFromIntOrPercent(concurrency, replicas, true)
-	if err != nil {
-		return pValue, err
-	}
-
-	// if concurrency < "100%" and replicas > 1, it will ensure at least 1 pod is reserved.
-	if replicas > 1 && pValue == replicas && concurrency.Type == intstr.String && concurrency.StrVal != "100%" {
-		pValue = replicas - 1
-	}
-
-	// if the calculated concurrency is 0, it will ensure the concurrency at least 1.
-	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 1)
-	return pValue, nil
+func isPodPending(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodPending
 }
 
-func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateStrategy {
-	updateStrategy := workloads.SerialUpdateStrategy
-	if its.Spec.MemberUpdateStrategy != nil {
-		updateStrategy = *its.Spec.MemberUpdateStrategy
+// isImageMatched returns true if all container statuses have same image as defined in pod spec
+func isImageMatched(pod *corev1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		index := slices.IndexFunc(pod.Status.ContainerStatuses, func(status corev1.ContainerStatus) bool {
+			return status.Name == container.Name
+		})
+		if index == -1 {
+			continue
+		}
+		specImage := container.Image
+		statusImage := pod.Status.ContainerStatuses[index].Image
+		// Image in status may not match the image used in the PodSpec.
+		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
+		specName, specTag, specDigest := imageSplit(specImage)
+		statusName, statusTag, statusDigest := imageSplit(statusImage)
+		// if digest presents in spec, it must be same in status
+		if len(specDigest) != 0 && specDigest != statusDigest {
+			return false
+		}
+		// if tag presents in spec, it must be same in status
+		if len(specTag) != 0 && specTag != statusTag {
+			return false
+		}
+		// otherwise, statusName should be same as or has suffix of specName
+		if specName != statusName {
+			specNames := strings.Split(specName, "/")
+			statusNames := strings.Split(statusName, "/")
+			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
+				return false
+			}
+		}
 	}
-	return updateStrategy
+	return true
 }
 
-func buildInstancePodByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet, revision string) (*corev1.Pod, error) {
-	// 1. build a pod from template
+// imageSplit separates and returns the name and tag parts
+// from the image string using either colon `:` or at `@` separators.
+// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
+func imageSplit(imageName string) (name string, tag string, digest string) {
+	// check if image name contains a domain
+	// if domain is present, ignore domain and check for `:`
+	searchName := imageName
+	slashIndex := strings.Index(imageName, "/")
+	if slashIndex > 0 {
+		searchName = imageName[slashIndex:]
+	} else {
+		slashIndex = 0
+	}
+
+	id := strings.Index(searchName, "@")
+	ic := strings.Index(searchName, ":")
+
+	// no tag or digest
+	if ic < 0 && id < 0 {
+		return imageName, "", ""
+	}
+
+	// digest only
+	if id >= 0 && (id < ic || ic < 0) {
+		id += slashIndex
+		name = imageName[:id]
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, "", digest
+	}
+
+	// tag and digest
+	if id >= 0 && ic >= 0 {
+		id += slashIndex
+		ic += slashIndex
+		name = imageName[:ic]
+		tag = strings.TrimPrefix(imageName[ic:id], ":")
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, tag, digest
+	}
+
+	// tag only
+	ic += slashIndex
+	name = imageName[:ic]
+	tag = strings.TrimPrefix(imageName[ic:], ":")
+	return name, tag, ""
+}
+
+func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, error) {
+	// 1. build a pod from pod template
 	var err error
 	if len(revision) == 0 {
-		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
+		revision, err = buildInstancePodRevision(&inst.Spec.Template, inst)
 		if err != nil {
 			return nil, err
 		}
 	}
-	labels := getMatchLabels(parent.Name)
-	pod := builder.NewPodBuilder(parent.Namespace, name).
-		AddAnnotationsInMap(template.Annotations).
-		AddLabelsInMap(template.Labels).
+	labels := getMatchLabels(inst.Name)
+	pod := builder.NewPodBuilder(inst.Namespace, inst.Name).
+		AddAnnotationsInMap(inst.Annotations).
+		AddLabelsInMap(inst.Labels).
 		AddLabelsInMap(labels).
-		AddLabels(constant.KBAppPodNameLabelKey, name).                  // used as a pod-service selector
-		AddLabels(instancetemplate.TemplateNameLabelKey, template.Name). // TODO: remove this label later
-		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
+		AddLabels(constant.KBAppPodNameLabelKey, inst.Name). // used as a pod-service selector
+		AddLabels(constant.KBAppInstanceTemplateLabelKey, inst.Spec.InstanceTemplateName).
 		AddControllerRevisionHashLabel(revision).
-		SetPodSpec(*template.Spec.DeepCopy()).
+		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
-	pod.Spec.Subdomain = getHeadlessSvcName(parent.Name)
+	// TODO: inst.Name -> its.Name
+	pod.Spec.Subdomain = getHeadlessSvcName(inst.Name)
 
-	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(parent)
-	if err != nil {
-		return nil, err
-	}
-	if nodeName, ok := podToNodeMapping[name]; ok {
-		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
-		if pod.Spec.NodeSelector == nil {
-			pod.Spec.NodeSelector = make(map[string]string)
-		}
-		pod.Spec.NodeSelector[corev1.LabelHostname] = nodeName
-	}
+	// TODO: ???
+	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
+	// if err != nil {
+	//	return nil, err
+	// }
+	// if nodeName, ok := podToNodeMapping[inst.Name]; ok {
+	//	// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
+	//	if pod.Spec.NodeSelector == nil {
+	//		pod.Spec.NodeSelector = make(map[string]string)
+	//	}
+	//	pod.Spec.NodeSelector[corev1.LabelHostname] = nodeName
+	// }
 
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
-	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, pod.GetName())
+	for _, claimTemplate := range inst.Spec.VolumeClaimTemplates {
+		// TODO: inst.Name -> its.Name
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Name, pod.GetName())
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
 
@@ -266,33 +252,34 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 		}
 	})
 
-	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
+	if err := controllerutil.SetControllerReference(inst, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
 	return pod, nil
 }
 
-func buildInstancePVCByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
+func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClaim, error) {
 	var pvcs []*corev1.PersistentVolumeClaim
-	labels := getMatchLabels(parent.Name)
-	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, name)
-		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
+	labels := getMatchLabels(inst.Name)
+	for _, claimTemplate := range inst.Spec.VolumeClaimTemplates {
+		// TODO: inst.Name -> its.Name
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Name, inst.Name)
+		pvc := builder.NewPVCBuilder(inst.Namespace, pvcName).
+			AddLabelsInMap(inst.Labels).
 			AddLabelsInMap(labels).
-			AddLabelsInMap(template.Labels).
 			AddLabelsInMap(claimTemplate.Labels).
+			AddLabels(constant.KBAppPodNameLabelKey, inst.Name).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
-			AddLabels(constant.KBAppPodNameLabelKey, name).
 			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
-		if template.Name != "" {
-			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
+		if inst.Spec.InstanceTemplateName != "" {
+			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = inst.Spec.InstanceTemplateName
 		}
 		pvcs = append(pvcs, pvc)
 	}
 	for _, pvc := range pvcs {
-		if err := controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+		if err := controllerutil.SetControllerReference(inst, pvc, model.GetScheme()); err != nil {
 			return nil, err
 		}
 	}
@@ -405,115 +392,22 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
-	template := src.DeepCopy()
-	// filter annotations
-	var annotations map[string]string
-	if len(template.Annotations) > 0 {
-		annotations = make(map[string]string)
-		// keep Restart annotation
-		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations[constant.RestartAnnotationKey] = restart
-		}
-		// keep Reconfigure annotation
-		for k, v := range template.Annotations {
-			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
-				annotations[k] = v
-			}
-		}
-		if len(annotations) == 0 {
-			annotations = nil
-		}
-	}
-	template.Annotations = annotations
-	// filter labels
-	template.Labels = nil
-	// filter spec.containers[*].images & spec.initContainers[*].images
-	for i := range template.Spec.Containers {
-		template.Spec.Containers[i].Image = ""
-	}
-	for i := range template.Spec.InitContainers {
-		template.Spec.InitContainers[i].Image = ""
-	}
-	// filter spec.activeDeadlineSeconds
-	template.Spec.ActiveDeadlineSeconds = nil
-	// filter spec.tolerations
-	template.Spec.Tolerations = nil
-	// filter spec.containers[*].resources["cpu|memory"]
-	for i := range template.Spec.Containers {
-		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceCPU)
-		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceMemory)
-		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceCPU)
-		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceMemory)
-	}
+func buildInstancePodRevision(template *corev1.PodTemplateSpec, inst *workloads.Instance) (string, error) {
+	podTemplate := filterInPlaceFields(template)
+	its := builder.NewInstanceSetBuilder(inst.Namespace, inst.Name).
+		SetUID(inst.UID).
+		AddAnnotationsInMap(inst.Annotations).
+		SetSelectorMatchLabel(inst.Labels).
+		SetTemplate(*podTemplate).
+		GetObject()
 
-	return template
+	cr, err := NewRevision(its)
+	if err != nil {
+		return "", err
+	}
+	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
-func mergeInPlaceFields(src, dst *corev1.Pod) {
-	mergeMap(&src.Annotations, &dst.Annotations)
-	mergeMap(&src.Labels, &dst.Labels)
-	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
-	// according to the Pod API spec, tolerations can only be appended.
-	// means old tolerations must be in new toleration list.
-	intctrlutil.MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
-		return func(t corev1.Toleration) bool {
-			return reflect.DeepEqual(item, t)
-		}
-	})
-	for _, container := range src.Spec.InitContainers {
-		for i, c := range dst.Spec.InitContainers {
-			if container.Name == c.Name {
-				dst.Spec.InitContainers[i].Image = container.Image
-				break
-			}
-		}
-	}
-	mergeResources := func(src, dst *corev1.ResourceList) {
-		if len(*src) == 0 {
-			return
-		}
-		if *dst == nil {
-			*dst = make(corev1.ResourceList)
-		}
-		for k, v := range *src {
-			(*dst)[k] = v
-		}
-	}
-	ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
-	for _, container := range src.Spec.Containers {
-		for i, c := range dst.Spec.Containers {
-			if container.Name == c.Name {
-				dst.Spec.Containers[i].Image = container.Image
-				if !ignorePodVerticalScaling {
-					requests, limits := copyRequestsNLimitsFields(&container)
-					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
-					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
-				}
-				break
-			}
-		}
-	}
-}
-
-func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
-	requests := make(corev1.ResourceList)
-	limits := make(corev1.ResourceList)
-	if len(container.Resources.Requests) > 0 {
-		if requestCPU, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-			requests[corev1.ResourceCPU] = requestCPU
-		}
-		if requestMemory, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-			requests[corev1.ResourceMemory] = requestMemory
-		}
-	}
-	if len(container.Resources.Limits) > 0 {
-		if limitCPU, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
-			limits[corev1.ResourceCPU] = limitCPU
-		}
-		if limitMemory, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
-			limits[corev1.ResourceMemory] = limitMemory
-		}
-	}
-	return requests, limits
+func getHeadlessSvcName(itsName string) string {
+	return strings.Join([]string{itsName, "headless"}, "-")
 }

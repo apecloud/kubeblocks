@@ -401,6 +401,9 @@ spec:
                 default: false
                 description: Specifies whether to create the default headless service.
                 type: boolean
+              enableInstanceAPI:
+                description: Specifies whether to enable the Instance API.
+                type: boolean
               flatInstanceOrdinal:
                 default: false
                 description: |-

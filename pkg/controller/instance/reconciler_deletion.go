@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -50,7 +50,7 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	inst, _ := tree.GetRoot().(*workloadsv1alpha1.Instance)
+	inst, _ := tree.GetRoot().(*workloads.Instance)
 	pvcRetentionPolicy := inst.Spec.PersistentVolumeClaimRetentionPolicy
 	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
 

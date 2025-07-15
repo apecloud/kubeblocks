@@ -21,8 +21,8 @@ package fake
 import (
 	"context"
 
-	v1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -31,29 +31,29 @@ import (
 
 // FakeInstances implements InstanceInterface
 type FakeInstances struct {
-	Fake *FakeWorkloadsV1alpha1
+	Fake *FakeWorkloadsV1
 	ns   string
 }
 
-var instancesResource = v1alpha1.SchemeGroupVersion.WithResource("instances")
+var instancesResource = v1.SchemeGroupVersion.WithResource("instances")
 
-var instancesKind = v1alpha1.SchemeGroupVersion.WithKind("Instance")
+var instancesKind = v1.SchemeGroupVersion.WithKind("Instance")
 
 // Get takes name of the instance, and returns the corresponding instance object, and an error if there is any.
-func (c *FakeInstances) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Instance, err error) {
+func (c *FakeInstances) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Instance, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(instancesResource, c.ns, name), &v1alpha1.Instance{})
+		Invokes(testing.NewGetAction(instancesResource, c.ns, name), &v1.Instance{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Instance), err
+	return obj.(*v1.Instance), err
 }
 
 // List takes label and field selectors, and returns the list of Instances that match those selectors.
-func (c *FakeInstances) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.InstanceList, err error) {
+func (c *FakeInstances) List(ctx context.Context, opts metav1.ListOptions) (result *v1.InstanceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(instancesResource, instancesKind, c.ns, opts), &v1alpha1.InstanceList{})
+		Invokes(testing.NewListAction(instancesResource, instancesKind, c.ns, opts), &v1.InstanceList{})
 
 	if obj == nil {
 		return nil, err
@@ -63,8 +63,8 @@ func (c *FakeInstances) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.InstanceList{ListMeta: obj.(*v1alpha1.InstanceList).ListMeta}
-	for _, item := range obj.(*v1alpha1.InstanceList).Items {
+	list := &v1.InstanceList{ListMeta: obj.(*v1.InstanceList).ListMeta}
+	for _, item := range obj.(*v1.InstanceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -73,69 +73,69 @@ func (c *FakeInstances) List(ctx context.Context, opts v1.ListOptions) (result *
 }
 
 // Watch returns a watch.Interface that watches the requested instances.
-func (c *FakeInstances) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeInstances) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(instancesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a instance and creates it.  Returns the server's representation of the instance, and an error, if there is any.
-func (c *FakeInstances) Create(ctx context.Context, instance *v1alpha1.Instance, opts v1.CreateOptions) (result *v1alpha1.Instance, err error) {
+func (c *FakeInstances) Create(ctx context.Context, instance *v1.Instance, opts metav1.CreateOptions) (result *v1.Instance, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(instancesResource, c.ns, instance), &v1alpha1.Instance{})
+		Invokes(testing.NewCreateAction(instancesResource, c.ns, instance), &v1.Instance{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Instance), err
+	return obj.(*v1.Instance), err
 }
 
 // Update takes the representation of a instance and updates it. Returns the server's representation of the instance, and an error, if there is any.
-func (c *FakeInstances) Update(ctx context.Context, instance *v1alpha1.Instance, opts v1.UpdateOptions) (result *v1alpha1.Instance, err error) {
+func (c *FakeInstances) Update(ctx context.Context, instance *v1.Instance, opts metav1.UpdateOptions) (result *v1.Instance, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(instancesResource, c.ns, instance), &v1alpha1.Instance{})
+		Invokes(testing.NewUpdateAction(instancesResource, c.ns, instance), &v1.Instance{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Instance), err
+	return obj.(*v1.Instance), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeInstances) UpdateStatus(ctx context.Context, instance *v1alpha1.Instance, opts v1.UpdateOptions) (*v1alpha1.Instance, error) {
+func (c *FakeInstances) UpdateStatus(ctx context.Context, instance *v1.Instance, opts metav1.UpdateOptions) (*v1.Instance, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(instancesResource, "status", c.ns, instance), &v1alpha1.Instance{})
+		Invokes(testing.NewUpdateSubresourceAction(instancesResource, "status", c.ns, instance), &v1.Instance{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Instance), err
+	return obj.(*v1.Instance), err
 }
 
 // Delete takes name of the instance and deletes it. Returns an error if one occurs.
-func (c *FakeInstances) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeInstances) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(instancesResource, c.ns, name, opts), &v1alpha1.Instance{})
+		Invokes(testing.NewDeleteActionWithOptions(instancesResource, c.ns, name, opts), &v1.Instance{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeInstances) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeInstances) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(instancesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.InstanceList{})
+	_, err := c.Fake.Invokes(action, &v1.InstanceList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched instance.
-func (c *FakeInstances) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Instance, err error) {
+func (c *FakeInstances) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Instance, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(instancesResource, c.ns, name, pt, data, subresources...), &v1alpha1.Instance{})
+		Invokes(testing.NewPatchSubresourceAction(instancesResource, c.ns, name, pt, data, subresources...), &v1.Instance{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1alpha1.Instance), err
+	return obj.(*v1.Instance), err
 }

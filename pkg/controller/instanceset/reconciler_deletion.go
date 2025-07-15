@@ -22,6 +22,10 @@ package instanceset
 import (
 	"maps"
 
+	corev1 "k8s.io/api/core/v1"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -40,8 +44,12 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	pvcRetentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+
 	// delete secondary objects first
-	if has, err := r.deleteSecondaryObjects(tree); has {
+	if has, err := r.deleteSecondaryObjects(tree, retainPVC); has {
 		return kubebuilderx.Continue, err
 	}
 
@@ -50,9 +58,21 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	return kubebuilderx.Continue, nil
 }
 
-func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree) (bool, error) {
+func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, retainPVC bool) (bool, error) {
 	// secondary objects to be deleted
 	secondaryObjects := maps.Clone(tree.GetSecondaryObjects())
+	if retainPVC {
+		// exclude PVCs from them
+		pvcList := tree.List(&corev1.PersistentVolumeClaim{})
+		for _, pvc := range pvcList {
+			name, err := model.GetGVKName(pvc)
+			if err != nil {
+				return true, err
+			}
+			delete(secondaryObjects, *name)
+		}
+	}
+	// delete them
 	for _, obj := range secondaryObjects {
 		if err := tree.Delete(obj); err != nil {
 			return true, err

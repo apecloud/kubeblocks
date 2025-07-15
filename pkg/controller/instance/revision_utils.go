@@ -29,6 +29,8 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -205,4 +207,13 @@ func buildRevisions(updateRevisions map[string]string) (map[string]string, error
 	revisionsData := writer.EncodeAll(revisionsJSON, nil)
 	revisionsStr := base64.StdEncoding.EncodeToString(revisionsData)
 	return map[string]string{revisionsZSTDKey: revisionsStr}, nil
+}
+
+// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// string is returned.
+func getPodRevision(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }

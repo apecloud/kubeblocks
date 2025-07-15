@@ -375,6 +375,6 @@ resources:
   domain: kubeblocks.io
   group: workloads
   kind: Instance
-  path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
-  version: v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1
+  version: v1
 version: "3"

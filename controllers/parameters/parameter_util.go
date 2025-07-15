@@ -164,12 +164,12 @@ func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters
 			rctx.ConfigRender,
 		)
 		if err != nil {
-			return err
+			return intctrlutil.NewFatalError(err.Error())
 		}
 		for tpl, m := range classParameters {
 			configDescs := intctrlutil.GetComponentConfigDescriptions(&rctx.ConfigRender.Spec, tpl)
 			if len(configDescs) == 0 {
-				return fmt.Errorf("not found config description from pdcr: %s", tpl)
+				return intctrlutil.NewFatalError(fmt.Sprintf("not found config description from pdcr: %s", tpl))
 			}
 			if err := validateComponentParameter(toArray(rctx.ParametersDefs), configDescs, m); err != nil {
 				return intctrlutil.NewFatalError(err.Error())

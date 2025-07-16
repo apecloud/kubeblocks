@@ -164,3 +164,13 @@ func (builder *InstanceSetBuilder) SetDisableDefaultHeadlessService(disable bool
 	builder.get().Spec.DisableDefaultHeadlessService = disable
 	return builder
 }
+
+func (builder *InstanceSetBuilder) SetAssistantObjects(objs []corev1.ObjectReference) *InstanceSetBuilder {
+	builder.get().Spec.AssistantObjects = objs
+	return builder
+}
+
+func (builder *InstanceSetBuilder) SetCloneAssistantObjects(clone bool) *InstanceSetBuilder {
+	builder.get().Spec.CloneAssistantObjects = clone
+	return builder
+}

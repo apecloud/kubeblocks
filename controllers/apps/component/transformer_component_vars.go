@@ -81,6 +81,12 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if err := createOrUpdateEnvConfigMap(transCtx, dag, envData); err != nil {
 		return err
 	}
+	component.AddAssistantObject(synthesizedComp, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		},
+	})
 	return nil
 }
 

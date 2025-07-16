@@ -23,7 +23,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -35,7 +34,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+func NewTreeLoader() kubebuilderx.TreeLoader {
+	return &treeLoader{}
+}
+
 type treeLoader struct{}
+
+var _ kubebuilderx.TreeLoader = &treeLoader{}
 
 func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
 	ml := getMatchLabels(req.Name)
@@ -50,12 +55,23 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 		return nil, err
 	}
 
+	// load assistant objects
+	if err = loadAssistantObjects(ctx, reader, tree); err != nil {
+		return nil, err
+	}
+
 	tree.Context = ctx
 	tree.EventRecorder = recorder
 	tree.Logger = logger
 	tree.SetFinalizer(finalizer)
 
 	return tree, err
+}
+
+func ownedKinds() []client.ObjectList {
+	return []client.ObjectList{
+		&workloads.InstanceSetList{},
+	}
 }
 
 func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
@@ -78,19 +94,3 @@ func loadCompressedInstanceTemplates(ctx context.Context, reader client.Reader, 
 	}
 	return nil
 }
-
-func ownedKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&corev1.ServiceList{},
-		&corev1.ConfigMapList{},
-		&corev1.PodList{},
-		&corev1.PersistentVolumeClaimList{},
-		&batchv1.JobList{},
-	}
-}
-
-func NewTreeLoader() kubebuilderx.TreeLoader {
-	return &treeLoader{}
-}
-
-var _ kubebuilderx.TreeLoader = &treeLoader{}

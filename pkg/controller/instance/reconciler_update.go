@@ -22,7 +22,6 @@ package instance
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -173,13 +172,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 
-		// actively reload the new configuration when the pod or container has not been updated
-		if updatePolicy == NoOpsPolicy {
-			_, err := r.reconfigure(tree, inst, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-		}
+		// TODO: ???
+		//// actively reload the new configuration when the pod or container has not been updated
+		// if updatePolicy == NoOpsPolicy {
+		//	_, err := r.reconfigure(tree, inst, pod)
+		//	if err != nil {
+		//		return kubebuilderx.Continue, err
+		//	}
+		// }
 	}
 	if !isBlocked {
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceUpdateRestricted))
@@ -229,127 +229,127 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-	allUpdated := true
-	for _, config := range inst.Spec.Configs {
-		if !r.isConfigUpdated(inst, pod, config) {
-			allUpdated = false
-			if err := r.reconfigureConfig(tree, inst, pod, config); err != nil {
-				return false, err
-			}
-		}
-		// TODO: compose the status from pods but not the its spec and status
-		r.setInstanceConfigStatus(inst, pod, config)
-	}
-	return allUpdated, nil
-}
-
-func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
-	if config.Reconfigure == nil {
-		return nil // skip
-	}
-
-	clusterName, err := r.clusterName(inst)
-	if err != nil {
-		return err
-	}
-
-	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Reconfigure: config.Reconfigure,
-	}
-	templateVars := func() map[string]any {
-		if inst.Spec.TemplateVars == nil {
-			return nil
-		}
-		m := make(map[string]any)
-		for k, v := range inst.Spec.TemplateVars {
-			m[k] = v
-		}
-		return m
-	}()
-	// TODO: inst.Name -> its.Name
-	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Name, lifecycleActions, templateVars, pod)
-	if err != nil {
-		return err
-	}
-
-	if len(config.ReconfigureActionName) == 0 {
-		err = lfa.Reconfigure(tree.Context, nil, nil, config.Parameters)
-	} else {
-		err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
-	}
-	if err != nil {
-		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
-		}
-		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-			return intctrlutil.NewDelayedRequeueError(time.Second,
-				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
-		}
-		return err
-	}
-	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "generation", config.Generation)
-	return nil
-}
-
-func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
-	if its.Status.InstanceStatus == nil {
-		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
-	}
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-		return instance.PodName == pod.Name
-	})
-	if idx < 0 {
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
-		idx = len(its.Status.InstanceStatus) - 1
-	}
-
-	if its.Status.InstanceStatus[idx].Configs == nil {
-		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
-	}
-	status := workloads.InstanceConfigStatus{
-		Name:       config.Name,
-		Generation: config.Generation,
-	}
-	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
-		if configStatus.Name == config.Name {
-			its.Status.InstanceStatus[idx].Configs[i] = status
-			return
-		}
-	}
-	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
-}
-
-func (r *updateReconciler) isPodOrConfigUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-	policy, err := getPodUpdatePolicy(inst, pod)
-	if err != nil {
-		return false, err
-	}
-	if policy != NoOpsPolicy {
-		return false, nil
-	}
-	for _, config := range inst.Spec.Configs {
-		if !r.isConfigUpdated(inst, pod, config) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (r *updateReconciler) isConfigUpdated(inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
-	idx := slices.IndexFunc(inst.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-		return instance.PodName == pod.Name
-	})
-	if idx < 0 {
-		return true // new pod provisioned
-	}
-	for _, configStatus := range inst.Status.InstanceStatus[idx].Configs {
-		if configStatus.Name == config.Name {
-			return config.Generation <= configStatus.Generation
-		}
-	}
-	return config.Generation <= 0
-}
+// func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+//	allUpdated := true
+//	for _, config := range inst.Spec.Configs {
+//		if !r.isConfigUpdated(inst, pod, config) {
+//			allUpdated = false
+//			if err := r.reconfigureConfig(tree, inst, pod, config); err != nil {
+//				return false, err
+//			}
+//		}
+//		// TODO: compose the status from pods but not the its spec and status
+//		r.setInstanceConfigStatus(inst, pod, config)
+//	}
+//	return allUpdated, nil
+// }
+//
+// func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+//	if config.Reconfigure == nil {
+//		return nil // skip
+//	}
+//
+//	clusterName, err := r.clusterName(inst)
+//	if err != nil {
+//		return err
+//	}
+//
+//	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
+//		Reconfigure: config.Reconfigure,
+//	}
+//	templateVars := func() map[string]any {
+//		if inst.Spec.TemplateVars == nil {
+//			return nil
+//		}
+//		m := make(map[string]any)
+//		for k, v := range inst.Spec.TemplateVars {
+//			m[k] = v
+//		}
+//		return m
+//	}()
+//	// TODO: inst.Name -> its.Name
+//	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Name, lifecycleActions, templateVars, pod)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if len(config.ReconfigureActionName) == 0 {
+//		err = lfa.Reconfigure(tree.Context, nil, nil, config.Parameters)
+//	} else {
+//		err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
+//	}
+//	if err != nil {
+//		if errors.Is(err, lifecycle.ErrActionNotDefined) {
+//			return nil
+//		}
+//		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+//			return intctrlutil.NewDelayedRequeueError(time.Second,
+//				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
+//		}
+//		return err
+//	}
+//	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "generation", config.Generation)
+//	return nil
+// }
+//
+// func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
+//	if its.Status.InstanceStatus == nil {
+//		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
+//	}
+//	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+//		return instance.PodName == pod.Name
+//	})
+//	if idx < 0 {
+//		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
+//		idx = len(its.Status.InstanceStatus) - 1
+//	}
+//
+//	if its.Status.InstanceStatus[idx].Configs == nil {
+//		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
+//	}
+//	status := workloads.InstanceConfigStatus{
+//		Name:       config.Name,
+//		Generation: config.Generation,
+//	}
+//	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
+//		if configStatus.Name == config.Name {
+//			its.Status.InstanceStatus[idx].Configs[i] = status
+//			return
+//		}
+//	}
+//	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
+// }
+//
+// func (r *updateReconciler) isPodOrConfigUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+//	policy, err := getPodUpdatePolicy(inst, pod)
+//	if err != nil {
+//		return false, err
+//	}
+//	if policy != NoOpsPolicy {
+//		return false, nil
+//	}
+//	for _, config := range inst.Spec.Configs {
+//		if !r.isConfigUpdated(inst, pod, config) {
+//			return false, nil
+//		}
+//	}
+//	return true, nil
+// }
+//
+// func (r *updateReconciler) isConfigUpdated(inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
+//	idx := slices.IndexFunc(inst.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+//		return instance.PodName == pod.Name
+//	})
+//	if idx < 0 {
+//		return true // new pod provisioned
+//	}
+//	for _, configStatus := range inst.Status.InstanceStatus[idx].Configs {
+//		if configStatus.Name == config.Name {
+//			return config.Generation <= configStatus.Generation
+//		}
+//	}
+//	return config.Generation <= 0
+// }
 
 func (r *updateReconciler) clusterName(inst *workloads.Instance) (string, error) {
 	var clusterName string
@@ -357,7 +357,7 @@ func (r *updateReconciler) clusterName(inst *workloads.Instance) (string, error)
 		clusterName = inst.Labels[constant.AppInstanceLabelKey]
 	}
 	if len(clusterName) == 0 {
-		return "", fmt.Errorf("Instance %s/%s has no label %s", inst.Namespace, inst.Name, constant.AppInstanceLabelKey)
+		return "", fmt.Errorf("instance %s/%s has no label %s", inst.Namespace, inst.Name, constant.AppInstanceLabelKey)
 	}
 	return clusterName, nil
 }

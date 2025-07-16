@@ -20,17 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	"encoding/json"
-	"fmt"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -50,65 +44,22 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	return rolePriorityMap
 }
 
-// SortPods sorts pods by their role priority
+// sortInstances sorts instances by their role priority
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
 // reverse it if reverse==true
-func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
+func sortInstances(instances []workloads.Instance, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
-		role := getRoleName(&pods[i])
+		role := getInstanceRoleName(&instances[i])
 		return rolePriorityMap[role]
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(pods[i].GetName())
+		return parseParentNameAndOrdinal(instances[i].GetName())
 	}
-	baseSort(pods, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
+	baseSort(instances, getNameNOrdinalFunc, getRolePriorityFunc, reverse)
 }
 
-// getRoleName gets role name of pod 'pod'
-func getRoleName(pod *corev1.Pod) string {
-	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
-}
-
-func getInstanceRoleName(inst *workloadsv1alpha1.Instance) string {
-	return strings.ToLower(inst.Labels[constant.RoleLabelKey])
-}
-
-// AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.
-func AddAnnotationScope(scope AnnotationScope, annotations map[string]string) map[string]string {
-	if annotations == nil {
-		return nil
-	}
-	scopedAnnotations := make(map[string]string, len(annotations))
-	for k, v := range annotations {
-		scopedAnnotations[fmt.Sprintf("%s%s", k, scope)] = v
-	}
-	return scopedAnnotations
-}
-
-// ParseAnnotationsOfScope parses all annotations with AnnotationScope defined by 'scope'.
-// the AnnotationScope suffix of keys in result map will be trimmed.
-func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string]string) map[string]string {
-	if scopedAnnotations == nil {
-		return nil
-	}
-
-	annotations := make(map[string]string, 0)
-	if scope == RootScope {
-		for k, v := range scopedAnnotations {
-			if strings.HasSuffix(k, scopeSuffix) {
-				continue
-			}
-			annotations[k] = v
-		}
-		return annotations
-	}
-
-	for k, v := range scopedAnnotations {
-		if strings.HasSuffix(k, string(scope)) {
-			annotations[strings.TrimSuffix(k, string(scope))] = v
-		}
-	}
-	return annotations
+func getInstanceRoleName(inst *workloads.Instance) string {
+	return ptr.Deref(inst.Status.Role, "")
 }
 
 func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
@@ -139,35 +90,6 @@ func getMatchLabels(name string) map[string]string {
 		WorkloadsManagedByLabelKey:    workloads.InstanceSetKind,
 		WorkloadsInstanceLabelKey:     name,
 	}
-}
-
-// GetMatchLabels exposes getMatchLabels for external usages
-// TODO: remove this method when no usage
-func GetMatchLabels(name string) map[string]string {
-	return getMatchLabels(name)
-}
-
-func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
-	selectors := make(map[string]string)
-	for k, v := range its.Spec.Selector.MatchLabels {
-		selectors[k] = v
-	}
-	selectors[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
-	return selectors
-}
-
-// GetPodNameSetFromInstanceSetCondition get the pod name sets from the InstanceSet conditions
-func GetPodNameSetFromInstanceSetCondition(its *workloads.InstanceSet, conditionType workloads.ConditionType) map[string]sets.Empty {
-	podSet := map[string]sets.Empty{}
-	condition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
-	if condition != nil &&
-		condition.Status == metav1.ConditionFalse &&
-		condition.Message != "" {
-		var podNames []string
-		_ = json.Unmarshal([]byte(condition.Message), &podNames)
-		podSet = sets.New(podNames...)
-	}
-	return podSet
 }
 
 // CalculateConcurrencyReplicas returns absolute value of concurrency for workload. This func can solve some

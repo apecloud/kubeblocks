@@ -31159,14 +31159,16 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>paused</code><br/>
+<code>assistantObjects</code><br/>
 <em>
-bool
+<a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
+[]InstanceAssistantObject
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+<p>Assistant objects that are necessary to run the instance.</p>
 </td>
 </tr>
 </tbody>
@@ -31597,6 +31599,51 @@ bool
 <p>Specifies whether to create the default headless service.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>assistantObjects</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
+[]Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assistant objects that are necessary to run the instance.</p>
+<ul>
+<li>ConfigMap:
+<ul>
+<li>config &amp; script templates</li>
+<li>env</li>
+<li>kbagent task parameters</li>
+</ul></li>
+<li>Secret:
+<ul>
+<li>account</li>
+<li>TLS</li>
+</ul></li>
+<li>RBAC:
+<ul>
+<li>sa</li>
+<li>role</li>
+<li>rolebinding</li>
+</ul></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>cloneAssistantObjects</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to clone the assistant objects.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -31719,6 +31766,95 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>The parameters to call the reconfigure action.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceAssistantObject">InstanceAssistantObject
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>configMap</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmap-v1-core">
+Kubernetes core/v1.ConfigMap
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>secret</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secret-v1-core">
+Kubernetes core/v1.Secret
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAccount</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceaccount-v1-core">
+Kubernetes core/v1.ServiceAccount
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterRole</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#role-v1-rbac">
+Kubernetes rbac/v1.Role
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleBinding</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#rolebinding-v1-rbac">
+Kubernetes rbac/v1.RoleBinding
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>
@@ -32128,6 +32264,51 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether to create the default headless service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>assistantObjects</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
+[]Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assistant objects that are necessary to run the instance.</p>
+<ul>
+<li>ConfigMap:
+<ul>
+<li>config &amp; script templates</li>
+<li>env</li>
+<li>kbagent task parameters</li>
+</ul></li>
+<li>Secret:
+<ul>
+<li>account</li>
+<li>TLS</li>
+</ul></li>
+<li>RBAC:
+<ul>
+<li>sa</li>
+<li>role</li>
+<li>rolebinding</li>
+</ul></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>cloneAssistantObjects</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to clone the assistant objects.</p>
 </td>
 </tr>
 </tbody>
@@ -32557,14 +32738,16 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>paused</code><br/>
+<code>assistantObjects</code><br/>
 <em>
-bool
+<a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
+[]InstanceAssistantObject
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+<p>Assistant objects that are necessary to run the instance.</p>
 </td>
 </tr>
 </tbody>

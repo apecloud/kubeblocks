@@ -20,12 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 const (
-	finalizer = "instanceset.workloads.kubeblocks.io/finalizer"
-)
-
-const (
-	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
-	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
+	finalizer = "instance.workloads.kubeblocks.io/finalizer"
 )
 
 const (
@@ -33,11 +28,5 @@ const (
 )
 
 const (
-	// MaxPlainRevisionCount specified max number of plain revision stored in status.updateRevisions.
-	// All revisions will be compressed if exceeding this value.
-	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"
-
-	revisionsZSTDKey = "zstd"
-
 	FeatureGateIgnorePodVerticalScaling = "IGNORE_POD_VERTICAL_SCALING"
 )

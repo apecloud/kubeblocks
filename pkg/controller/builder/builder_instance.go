@@ -21,6 +21,7 @@ package builder
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -135,11 +136,63 @@ func (builder *InstanceBuilder) SetImagePullSecrets(secrets []corev1.LocalObject
 	return builder
 }
 
+func (builder *InstanceBuilder) SetSelector(selector *metav1.LabelSelector) *InstanceBuilder {
+	builder.get().Spec.Selector = selector
+	return builder
+}
+
+func (builder *InstanceBuilder) SetMinReadySeconds(seconds int32) *InstanceBuilder {
+	builder.get().Spec.MinReadySeconds = seconds
+	return builder
+}
+
 func (builder *InstanceBuilder) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *InstanceBuilder {
 	builder.get().Spec.VolumeClaimTemplates = append(builder.get().Spec.VolumeClaimTemplates,
 		corev1.PersistentVolumeClaimTemplate{
 			ObjectMeta: pvc.ObjectMeta,
 			Spec:       pvc.Spec,
 		})
+	return builder
+}
+
+func (builder *InstanceBuilder) SetPVCRetentionPolicy(policy *workloads.PersistentVolumeClaimRetentionPolicy) *InstanceBuilder {
+	builder.get().Spec.PersistentVolumeClaimRetentionPolicy = policy
+	return builder
+}
+
+func (builder *InstanceBuilder) SetInstanceTemplateName(name string) *InstanceBuilder {
+	builder.get().Spec.InstanceTemplateName = name
+	return builder
+}
+
+func (builder *InstanceBuilder) SetInstanceUpdateStrategyType(strategy *workloads.InstanceUpdateStrategy) *InstanceBuilder {
+	if strategy != nil {
+		builder.get().Spec.InstanceUpdateStrategyType = &strategy.Type
+	}
+	return builder
+}
+
+func (builder *InstanceBuilder) SetPodUpdatePolicy(policy workloads.PodUpdatePolicyType) *InstanceBuilder {
+	builder.get().Spec.PodUpdatePolicy = policy
+	return builder
+}
+
+func (builder *InstanceBuilder) SetRoles(roles []workloads.ReplicaRole) *InstanceBuilder {
+	builder.get().Spec.Roles = roles
+	return builder
+}
+
+func (builder *InstanceBuilder) SetMembershipReconfiguration(arg *workloads.MembershipReconfiguration) *InstanceBuilder {
+	builder.get().Spec.MembershipReconfiguration = arg
+	return builder
+}
+
+func (builder *InstanceBuilder) SetTemplateVars(vars map[string]string) *InstanceBuilder {
+	builder.get().Spec.TemplateVars = vars
+	return builder
+}
+
+func (builder *InstanceBuilder) SetAssistantObjects(objs []workloads.InstanceAssistantObject) *InstanceBuilder {
+	builder.get().Spec.AssistantObjects = objs
 	return builder
 }

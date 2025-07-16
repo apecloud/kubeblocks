@@ -23,8 +23,6 @@ import (
 	"errors"
 	"math"
 
-	corev1 "k8s.io/api/core/v1"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -34,17 +32,17 @@ import (
 type updatePlan interface {
 	// Execute executes the plan
 	// return error when any error occurred
-	// return pods to be updated,
-	// nil slice means no pods need to be updated
-	Execute() ([]*corev1.Pod, error)
+	// return instances to be updated,
+	// nil slice means no instance need to be updated
+	Execute() ([]*workloads.Instance, error)
 }
 
 type realUpdatePlan struct {
-	its             workloads.InstanceSet
-	pods            []corev1.Pod
-	dag             *graph.DAG
-	podsToBeUpdated []*corev1.Pod
-	isPodUpdated    func(*workloads.InstanceSet, *corev1.Pod) (bool, error)
+	its                  workloads.InstanceSet
+	instances            []workloads.Instance
+	dag                  *graph.DAG
+	instancesToBeUpdated []*workloads.Instance
+	isInstanceUpdated    func(*workloads.InstanceSet, *workloads.Instance) (bool, error)
 }
 
 var _ updatePlan = &realUpdatePlan{}
@@ -62,35 +60,35 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	if v.Obj == nil {
 		return ErrContinue
 	}
-	pod, ok := v.Obj.(*corev1.Pod)
+	inst, ok := v.Obj.(*workloads.Instance)
 	if !ok {
 		return ErrContinue
 	}
 
 	// if DeletionTimestamp is not nil, it is terminating.
-	if !pod.DeletionTimestamp.IsZero() {
+	if !inst.DeletionTimestamp.IsZero() {
 		return ErrWait
 	}
 
 	var (
-		isPodUpdated bool
-		err          error
+		isInstanceUpdated bool
+		err               error
 	)
-	if p.isPodUpdated == nil {
-		isPodUpdated, err = p.defaultIsPodUpdatedFunc(&p.its, pod)
+	if p.isInstanceUpdated == nil {
+		isInstanceUpdated, err = p.defaultIsPodUpdatedFunc(&p.its, inst)
 	} else {
-		isPodUpdated, err = p.isPodUpdated(&p.its, pod)
+		isInstanceUpdated, err = p.isInstanceUpdated(&p.its, inst)
 	}
 	if err != nil {
 		return err
 	}
 	// if pod is the latest version, we do nothing
-	if isPodUpdated {
-		if !intctrlutil.IsPodReady(pod) {
+	if isInstanceUpdated {
+		if !intctrlutil.IsInstanceReady(inst) {
 			return ErrWait
 		}
 		isRoleful := func() bool { return len(p.its.Spec.Roles) > 0 }()
-		if isRoleful && !intctrlutil.PodIsReadyWithLabel(*pod) {
+		if isRoleful && !intctrlutil.IsInstanceReadyWithRole(inst) {
 			// If none of the replicas are ready, and the system is employing a serial update strategy, it may end up
 			// waiting indefinitely. To prevent this, we choose to bypass the role label check if there are no replicas
 			// that have had their role probed.
@@ -108,13 +106,15 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 		return ErrContinue
 	}
 
-	// delete the pod to trigger associate StatefulSet to re-create it
-	p.podsToBeUpdated = append(p.podsToBeUpdated, pod)
+	// delete the instance to trigger associate workload to re-create it
+	p.instancesToBeUpdated = append(p.instancesToBeUpdated, inst)
 	return ErrStop
 }
 
-func (p *realUpdatePlan) defaultIsPodUpdatedFunc(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	return intctrlutil.GetPodRevision(pod) == its.Status.UpdateRevision, nil
+func (p *realUpdatePlan) defaultIsPodUpdatedFunc(its *workloads.InstanceSet, inst *workloads.Instance) (bool, error) {
+	// TODO: ???
+	// return intctrlutil.GetPodRevision(pod) == its.Status.UpdateRevision, nil
+	return true, nil
 }
 
 // build builds the update plan based on memberUpdateStrategy
@@ -126,7 +126,7 @@ func (p *realUpdatePlan) build() {
 	memberUpdateStrategy := getMemberUpdateStrategy(&p.its)
 
 	rolePriorityMap := ComposeRolePriorityMap(p.its.Spec.Roles)
-	SortPods(p.pods, rolePriorityMap, false)
+	sortInstances(p.instances, rolePriorityMap, false)
 
 	// generate plan by memberUpdateStrategy
 	switch memberUpdateStrategy {
@@ -157,11 +157,11 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 
 	// append unknown, empty and roles that do not participate in quorum
 	index := 0
-	podList := p.pods
-	for i, pod := range podList {
-		roleName := getRoleName(&pod)
+	instanceList := p.instances
+	for i, inst := range instanceList {
+		roleName := getInstanceRoleName(&inst)
 		if rolePriorityMap[roleName] < quorumPriority {
-			vertex := &model.ObjectVertex{Obj: &podList[i]}
+			vertex := &model.ObjectVertex{Obj: &instanceList[i]}
 			p.dag.AddConnect(preVertex, vertex)
 			currentVertex = vertex
 			index++
@@ -170,37 +170,37 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	preVertex = currentVertex
 
 	// append 1/2 followers
-	podList = podList[index:]
+	instanceList = instanceList[index:]
 	followerCount := 0
-	for _, pod := range podList {
-		roleName := getRoleName(&pod)
+	for _, inst := range instanceList {
+		roleName := getInstanceRoleName(&inst)
 		if rolePriorityMap[roleName] < leaderPriority {
 			followerCount++
 		}
 	}
 	end := followerCount / 2
 	for i := 0; i < end; i++ {
-		vertex := &model.ObjectVertex{Obj: &podList[i]}
+		vertex := &model.ObjectVertex{Obj: &instanceList[i]}
 		p.dag.AddConnect(preVertex, vertex)
 		currentVertex = vertex
 	}
 	preVertex = currentVertex
 
 	// append the other 1/2 followers
-	podList = podList[end:]
+	instanceList = instanceList[end:]
 	end = followerCount - end
 	for i := 0; i < end; i++ {
-		vertex := &model.ObjectVertex{Obj: &podList[i]}
+		vertex := &model.ObjectVertex{Obj: &instanceList[i]}
 		p.dag.AddConnect(preVertex, vertex)
 		currentVertex = vertex
 	}
 	preVertex = currentVertex
 
 	// append leader
-	podList = podList[end:]
-	end = len(podList)
+	instanceList = instanceList[end:]
+	end = len(instanceList)
 	for i := 0; i < end; i++ {
-		vertex := &model.ObjectVertex{Obj: &podList[i]}
+		vertex := &model.ObjectVertex{Obj: &instanceList[i]}
 		p.dag.AddConnect(preVertex, vertex)
 	}
 }
@@ -208,8 +208,8 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 // unknown & empty & all roles
 func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	root, _ := model.FindRootVertex(p.dag)
-	for i := range p.pods {
-		vertex := &model.ObjectVertex{Obj: &p.pods[i]}
+	for i := range p.instances {
+		vertex := &model.ObjectVertex{Obj: &p.instances[i]}
 		p.dag.AddConnect(root, vertex)
 	}
 }
@@ -217,39 +217,31 @@ func (p *realUpdatePlan) buildParallelUpdatePlan() {
 // update according to role update priority
 func (p *realUpdatePlan) buildSerialUpdatePlan() {
 	preVertex, _ := model.FindRootVertex(p.dag)
-	for i := range p.pods {
-		vertex := &model.ObjectVertex{Obj: &p.pods[i]}
+	for i := range p.instances {
+		vertex := &model.ObjectVertex{Obj: &p.instances[i]}
 		p.dag.AddConnect(preVertex, vertex)
 		preVertex = vertex
 	}
 }
 
-func (p *realUpdatePlan) Execute() ([]*corev1.Pod, error) {
+func (p *realUpdatePlan) Execute() ([]*workloads.Instance, error) {
 	p.build()
 	if err := p.dag.WalkBFS(p.planWalkFunc); err != ErrContinue && err != ErrWait && err != ErrStop {
 		return nil, err
 	}
-
-	return p.podsToBeUpdated, nil
+	return p.instancesToBeUpdated, nil
 }
 
-func newUpdatePlan(its workloads.InstanceSet, pods []corev1.Pod) updatePlan {
-	return &realUpdatePlan{
-		its:  its,
-		pods: pods,
-		dag:  graph.NewDAG(),
-	}
-}
-
-func NewUpdatePlan(its workloads.InstanceSet, pods []*corev1.Pod, isPodUpdated func(*workloads.InstanceSet, *corev1.Pod) (bool, error)) updatePlan {
-	var podList []corev1.Pod
-	for _, pod := range pods {
-		podList = append(podList, *pod)
+func NewUpdatePlan(its workloads.InstanceSet, instances []*workloads.Instance,
+	isInstanceUpdated func(*workloads.InstanceSet, *workloads.Instance) (bool, error)) updatePlan {
+	var instanceList []workloads.Instance
+	for _, inst := range instances {
+		instanceList = append(instanceList, *inst)
 	}
 	return &realUpdatePlan{
-		its:          its,
-		pods:         podList,
-		dag:          graph.NewDAG(),
-		isPodUpdated: isPodUpdated,
+		its:               its,
+		instances:         instanceList,
+		dag:               graph.NewDAG(),
+		isInstanceUpdated: isInstanceUpdated,
 	}
 }

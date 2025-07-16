@@ -22,8 +22,6 @@ package workloads
 import (
 	"context"
 
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/handler"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset2"
@@ -71,19 +68,12 @@ func (r *InstanceSetReconciler2) SetupWithManager(mgr ctrl.Manager) error {
 	return r.setupWithManager(mgr, ctx)
 }
 
-func (r *InstanceSetReconciler2) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
-	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset2.WorkloadsManagedByLabelKey, workloads.InstanceSetKind, instanceset2.WorkloadsInstanceLabelKey)
-	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
+func (r *InstanceSetReconciler2) setupWithManager(mgr ctrl.Manager, _ *handler.FinderContext) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Owns(&workloadsv1alpha1.Instance{}).
-		Watches(&corev1.Pod{}, podHandler).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&batchv1.Job{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&workloads.Instance{}).
 		Complete(r)
 }

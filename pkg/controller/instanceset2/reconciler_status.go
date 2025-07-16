@@ -24,13 +24,11 @@ import (
 	"sort"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -56,10 +54,10 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all instances
-	instances := tree.List(&workloadsv1alpha1.Instance{})
-	var instanceList []*workloadsv1alpha1.Instance
+	instances := tree.List(&workloads.Instance{})
+	var instanceList []*workloads.Instance
 	for _, object := range instances {
-		inst, _ := object.(*workloadsv1alpha1.Instance)
+		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
 	// 2. calculate status summary
@@ -85,10 +83,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		template2TotalReplicas[template.Name] = templateReplicas
 	}
 
-	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
+	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
+	// if err != nil {
+	//	return kubebuilderx.Continue, err
+	// }
 
 	for _, inst := range instanceList {
 		_, ordinal := parseParentNameAndOrdinal(inst.Name)
@@ -99,8 +97,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Ordinals: make([]int32, 0),
 			}
 		}
-		currentRevisions[inst.Name] = getPodRevision(inst)
-		if isCreated(inst) {
+		currentRevisions[inst.Name] = getInstanceRevision(inst)
+		// if isCreated(inst) {
+		{
 			notReadyNames.Insert(inst.Name)
 			replicas++
 			if len(templateName) == 0 {
@@ -109,7 +108,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			template2TemplatesStatus[templateName].Replicas++
 			template2TemplatesStatus[templateName].Ordinals = append(template2TemplatesStatus[templateName].Ordinals, int32(ordinal))
 		}
-		if isImageMatched(inst) && intctrlutil.IsInstanceReady(inst) {
+		if intctrlutil.IsInstanceReady(inst) {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(inst.Name)
@@ -120,8 +119,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
-		if isCreated(inst) && !isTerminating(inst) {
-			isPodUpdated, err := IsPodUpdated(its, inst)
+		if !intctrlutil.IsInstanceTerminating(inst) {
+			isPodUpdated, err := isInstanceUpdated(tree, its, inst)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
@@ -135,14 +134,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 
-		if nodeName, ok := podToNodeMapping[inst.Name]; ok {
-			// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-			if inst.Spec.NodeName == nodeName {
-				if err := deleteNodeSelectorOnceAnnotation(its, inst.Name); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			}
-		}
+		// TODO: ???
+		// if nodeName, ok := podToNodeMapping[inst.Name]; ok {
+		//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
+		//	if inst.Spec.NodeName == nodeName {
+		//		if err := deleteNodeSelectorOnceAnnotation(its, inst.Name); err != nil {
+		//			return kubebuilderx.Continue, err
+		//		}
+		//	}
+		// }
 	}
 	its.Status.Replicas = replicas
 	its.Status.Ordinals = ordinals
@@ -203,11 +203,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
-	baseSort(podNames, func(i int) (string, int) {
-		return parseParentNameAndOrdinal(podNames[i])
+func buildConditionMessageWithNames(instanceNames []string) ([]byte, error) {
+	baseSort(instanceNames, func(i int) (string, int) {
+		return parseParentNameAndOrdinal(instanceNames[i])
 	}, nil, true)
-	return json.Marshal(podNames)
+	return json.Marshal(instanceNames)
 }
 
 func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.InstanceTemplateStatus) []workloads.InstanceTemplateStatus {
@@ -262,21 +262,11 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 	return condition, nil
 }
 
-func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
+func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.Instance) (*metav1.Condition, error) {
 	var failureNames []string
-	for _, pod := range pods {
-		if isTerminating(pod) {
-			continue
-		}
-		// Kubernetes says the Pod is 'Failed'
-		if pod.Status.Phase == corev1.PodFailed {
-			failureNames = append(failureNames, pod.Name)
-			continue
-		}
-		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
-		if isFailed && isTimedOut {
-			failureNames = append(failureNames, pod.Name)
+	for _, inst := range instances {
+		if intctrlutil.IsInstanceFailure(inst) {
+			failureNames = append(failureNames, inst.Name)
 		}
 	}
 	if len(failureNames) == 0 {
@@ -295,7 +285,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setMembersStatus(its *workloads.InstanceSet, instances []*workloadsv1alpha1.Instance) {
+func setMembersStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
 	// no roles defined
 	if its.Spec.Roles == nil {
 		return
@@ -336,7 +326,7 @@ func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap m
 	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
 }
 
-func setInstanceStatus(its *workloads.InstanceSet, instances []*workloadsv1alpha1.Instance) {
+func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
 	// compose new instance status
 	newInstanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, inst := range instances {

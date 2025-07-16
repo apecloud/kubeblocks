@@ -49,10 +49,6 @@ func podObj(inst *workloads.Instance) *corev1.Pod {
 	}
 }
 
-func podObjKey(inst *workloads.Instance) client.ObjectKey {
-	return client.ObjectKeyFromObject(podObj(inst))
-}
-
 // getRoleName gets role name of pod
 func getRoleName(pod *corev1.Pod) string {
 	return strings.ToLower(pod.Labels[constant.RoleLabelKey])
@@ -211,6 +207,7 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
 		GetObject()
+
 	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
 	// TODO: inst.Name -> its.Name
@@ -374,22 +371,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	default:
 		return newObj
 	}
-}
-
-func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
-	podTemplate := filterInPlaceFields(template)
-	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
-		SetUID(parent.UID).
-		AddAnnotationsInMap(parent.Annotations).
-		SetSelectorMatchLabel(parent.Labels).
-		SetTemplate(*podTemplate).
-		GetObject()
-
-	cr, err := NewRevision(its)
-	if err != nil {
-		return "", err
-	}
-	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
 func buildInstancePodRevision(template *corev1.PodTemplateSpec, inst *workloads.Instance) (string, error) {

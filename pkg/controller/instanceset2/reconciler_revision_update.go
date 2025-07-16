@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -89,7 +88,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
 	its.Status.UpdateRevision = updateRevision
-	updatedReplicas, err := calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
+	updatedReplicas, err := calculateUpdatedReplicas(tree, its, tree.List(&workloads.Instance{}))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -102,18 +101,17 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
+func calculateUpdatedReplicas(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []client.Object) (int32, error) {
 	updatedReplicas := int32(0)
-	for i := range pods {
-		pod, _ := pods[i].(*corev1.Pod)
-		updated, err := IsPodUpdated(its, pod)
+	for i := range instances {
+		inst, _ := instances[i].(*workloads.Instance)
+		updated, err := isInstanceUpdated(tree, its, inst)
 		if err != nil {
 			return 0, nil
 		}
 		if updated {
 			updatedReplicas++
 		}
-
 	}
 	return updatedReplicas, nil
 }

@@ -81,10 +81,10 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instance.NewTreeLoader()).
-		Do(instance.NewAPIVersionReconciler()).
 		Do(instance.NewFixMetaReconciler()).
 		Do(instance.NewDeletionReconciler()).
 		Do(instance.NewStatusReconciler()).
+		Do(instance.NewAssistantObjectReconciler()).
 		Do(instance.NewAlignmentReconciler()).
 		Do(instance.NewUpdateReconciler()).
 		Commit()

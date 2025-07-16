@@ -23,43 +23,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
-
-type InstanceTemplate interface {
-	GetName() string
-	GetReplicas() int32
-	GetOrdinals() kbappsv1.Ordinals
-}
-
-type instanceTemplateExt struct {
-	Name     string
-	Replicas int32
-	corev1.PodTemplateSpec
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim
-}
 
 var (
 	reader *zstd.Decoder
@@ -140,237 +122,8 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-// isRoleReady returns true if pod has role label
-func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
-	if len(roles) == 0 {
-		return true
-	}
-	_, ok := pod.Labels[constant.RoleLabelKey]
-	return ok
-}
-
-// isCreated returns true if pod has been created and is maintained by the API server
-func isCreated(pod *corev1.Pod) bool {
-	return pod.Status.Phase != ""
-}
-
-// isTerminating returns true if pod's DeletionTimestamp has been set
-func isTerminating(pod *corev1.Pod) bool {
-	return pod.DeletionTimestamp != nil
-}
-
-func isPodPending(pod *corev1.Pod) bool {
-	return pod.Status.Phase == corev1.PodPending
-}
-
-// isImageMatched returns true if all container statuses have same image as defined in pod spec
-func isImageMatched(pod *corev1.Pod) bool {
-	for _, container := range pod.Spec.Containers {
-		index := slices.IndexFunc(pod.Status.ContainerStatuses, func(status corev1.ContainerStatus) bool {
-			return status.Name == container.Name
-		})
-		if index == -1 {
-			continue
-		}
-		specImage := container.Image
-		statusImage := pod.Status.ContainerStatuses[index].Image
-		// Image in status may not match the image used in the PodSpec.
-		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		specName, specTag, specDigest := imageSplit(specImage)
-		statusName, statusTag, statusDigest := imageSplit(statusImage)
-		// if digest presents in spec, it must be same in status
-		if len(specDigest) != 0 && specDigest != statusDigest {
-			return false
-		}
-		// if tag presents in spec, it must be same in status
-		if len(specTag) != 0 && specTag != statusTag {
-			return false
-		}
-		// otherwise, statusName should be same as or has suffix of specName
-		if specName != statusName {
-			specNames := strings.Split(specName, "/")
-			statusNames := strings.Split(statusName, "/")
-			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// imageSplit separates and returns the name and tag parts
-// from the image string using either colon `:` or at `@` separators.
-// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
-func imageSplit(imageName string) (name string, tag string, digest string) {
-	// check if image name contains a domain
-	// if domain is present, ignore domain and check for `:`
-	searchName := imageName
-	slashIndex := strings.Index(imageName, "/")
-	if slashIndex > 0 {
-		searchName = imageName[slashIndex:]
-	} else {
-		slashIndex = 0
-	}
-
-	id := strings.Index(searchName, "@")
-	ic := strings.Index(searchName, ":")
-
-	// no tag or digest
-	if ic < 0 && id < 0 {
-		return imageName, "", ""
-	}
-
-	// digest only
-	if id >= 0 && (id < ic || ic < 0) {
-		id += slashIndex
-		name = imageName[:id]
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, "", digest
-	}
-
-	// tag and digest
-	if id >= 0 && ic >= 0 {
-		id += slashIndex
-		ic += slashIndex
-		name = imageName[:ic]
-		tag = strings.TrimPrefix(imageName[ic:id], ":")
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, tag, digest
-	}
-
-	// tag only
-	ic += slashIndex
-	name = imageName[:ic]
-	tag = strings.TrimPrefix(imageName[ic:], ":")
-	return name, tag, ""
-}
-
-// getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
-// string is returned.
-func getPodRevision(pod *corev1.Pod) string {
-	if pod.Labels == nil {
-		return ""
-	}
-	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
-}
-
-// Deprecated: should use instancetemplate.PodNameBuilder
-func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals kbappsv1.Ordinals) ([]string, error) {
-	totalReplicas := int32(0)
-	instanceNameList := make([]string, 0)
-	for _, template := range templates {
-		replicas := template.GetReplicas()
-		ordinalList, err := convertOrdinalsToSortedList(template.GetOrdinals())
-		if err != nil {
-			return nil, err
-		}
-		names, err := GenerateInstanceNamesFromTemplate(parentName, template.GetName(), replicas, offlineInstances, ordinalList)
-		if err != nil {
-			return nil, err
-		}
-		instanceNameList = append(instanceNameList, names...)
-		totalReplicas += replicas
-	}
-	if totalReplicas < replicas {
-		ordinalList, err := convertOrdinalsToSortedList(defaultTemplateOrdinals)
-		if err != nil {
-			return nil, err
-		}
-		names, err := GenerateInstanceNamesFromTemplate(parentName, "", replicas-totalReplicas, offlineInstances, ordinalList)
-		if err != nil {
-			return nil, err
-		}
-		instanceNameList = append(instanceNameList, names...)
-	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceNameList[i])
-	}
-	baseSort(instanceNameList, getNameNOrdinalFunc, nil, true)
-	return instanceNameList, nil
-}
-
-func GenerateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	instanceNames, err := generateInstanceNames(parentName, templateName, replicas, 0, offlineInstances, ordinalList)
-	return instanceNames, err
-}
-
-// generateInstanceNames generates instance names based on certain rules:
-// The naming convention for instances (pods) based on the Parent Name, InstanceTemplate Name, and ordinal.
-// The constructed instance name follows the pattern: $(parent.name)-$(template.name)-$(ordinal).
-func generateInstanceNames(parentName, templateName string,
-	replicas int32, ordinal int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	if len(ordinalList) > 0 {
-		return generateInstanceNamesWithOrdinalList(parentName, templateName, replicas, offlineInstances, ordinalList)
-	}
-	usedNames := sets.New(offlineInstances...)
-	var instanceNameList []string
-	for count := int32(0); count < replicas; count++ {
-		var name string
-		for {
-			if len(templateName) == 0 {
-				name = fmt.Sprintf("%s-%d", parentName, ordinal)
-			} else {
-				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
-			}
-			ordinal++
-			if !usedNames.Has(name) {
-				instanceNameList = append(instanceNameList, name)
-				break
-			}
-		}
-	}
-	return instanceNameList, nil
-}
-
-// generateInstanceNamesWithOrdinalList generates instance names based on ordinalList and offlineInstances.
-func generateInstanceNamesWithOrdinalList(parentName, templateName string,
-	replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {
-	var instanceNameList []string
-	usedNames := sets.New(offlineInstances...)
-	slices.Sort(ordinalList)
-	for _, ordinal := range ordinalList {
-		if len(instanceNameList) >= int(replicas) {
-			break
-		}
-		var name string
-		if len(templateName) == 0 {
-			name = fmt.Sprintf("%s-%d", parentName, ordinal)
-		} else {
-			name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
-		}
-		if usedNames.Has(name) {
-			continue
-		}
-		instanceNameList = append(instanceNameList, name)
-	}
-	if int32(len(instanceNameList)) != replicas {
-		errorMessage := fmt.Sprintf("for template '%s', expected %d instance names but generated %d: [%s]",
-			templateName, replicas, len(instanceNameList), strings.Join(instanceNameList, ", "))
-		return instanceNameList, fmt.Errorf("%s", errorMessage)
-	}
-	return instanceNameList, nil
-}
-
-func convertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
-	ordinalList := sets.New(ordinals.Discrete...)
-	for _, item := range ordinals.Ranges {
-		start := item.Start
-		end := item.End
-
-		if start > end {
-			return nil, fmt.Errorf("range's end(%v) must >= start(%v)", end, start)
-		}
-
-		for ordinal := start; ordinal <= end; ordinal++ {
-			if ordinalList.Has(ordinal) {
-				klog.Warningf("Overlap detected: ordinal %v already exists in the ordinals", ordinal)
-			}
-			ordinalList.Insert(ordinal)
-		}
-	}
-	sortedOrdinalList := ordinalList.UnsortedList()
-	slices.Sort(sortedOrdinalList)
-	return sortedOrdinalList, nil
+func getInstanceRevision(inst *workloads.Instance) string {
+	return inst.Status.CurrentRevision
 }
 
 // ParseNodeSelectorOnceAnnotation will return a non-nil map
@@ -386,46 +139,7 @@ func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 	return podToNodeMapping, nil
 }
 
-// sets annotation in place
-func deleteNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podName string) error {
-	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
-	if err != nil {
-		return err
-	}
-	delete(podToNodeMapping, podName)
-	if len(podToNodeMapping) == 0 {
-		delete(its.Annotations, constant.NodeSelectorOnceAnnotationKey)
-	} else {
-		data, err := json.Marshal(podToNodeMapping)
-		if err != nil {
-			return err
-		}
-		its.Annotations[constant.NodeSelectorOnceAnnotationKey] = string(data)
-	}
-	return nil
-}
-
-// MergeNodeSelectorOnceAnnotation merges its's nodeSelectorOnce annotation in place
-func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMapping map[string]string) error {
-	origPodToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
-	if err != nil {
-		return err
-	}
-	for k, v := range podToNodeMapping {
-		origPodToNodeMapping[k] = v
-	}
-	data, err := json.Marshal(origPodToNodeMapping)
-	if err != nil {
-		return err
-	}
-	if its.Annotations == nil {
-		its.Annotations = make(map[string]string)
-	}
-	its.Annotations[constant.NodeSelectorOnceAnnotationKey] = string(data)
-	return nil
-}
-
-func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet, revision string) (*workloadsv1alpha1.Instance, error) {
+func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet, revision string) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
 	if len(revision) == 0 {
 		var err error
@@ -435,17 +149,25 @@ func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTem
 		}
 	}
 
-	// 1. build pod spec from template
-	inst := builder.NewInstanceBuilder(its.Namespace, name).
+	b := builder.NewInstanceBuilder(its.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
 		AddControllerRevisionHashLabel(revision).
-		SetPodSpec(*template.Spec.DeepCopy())
+		// TODO: labels & annotations for instance and pod
+		SetPodSpec(*template.Spec.DeepCopy()).
+		SetSelector(its.Spec.Selector).
+		SetMinReadySeconds(its.Spec.MinReadySeconds).
+		SetInstanceTemplateName(template.Name).
+		SetInstanceUpdateStrategyType(its.Spec.InstanceUpdateStrategy).
+		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
+		SetRoles(its.Spec.Roles).
+		SetMembershipReconfiguration(its.Spec.MembershipReconfiguration).
+		SetTemplateVars(its.Spec.TemplateVars)
 
 	// set these immutable fields only on initial Pod creation, not updates.
-	inst.SetHostname(name).
+	b.SetHostname(name).
 		SetSubdomain(getHeadlessSvcName(its.Name))
 	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
 	if err != nil {
@@ -453,10 +175,9 @@ func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTem
 	}
 	if nodeName, ok := podToNodeMapping[name]; ok {
 		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
-		inst.SetNodeSelector(map[string]string{corev1.LabelHostname: nodeName})
+		b.SetNodeSelector(map[string]string{corev1.LabelHostname: nodeName})
 	}
 
-	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {
 		pvcName := intctrlutil.ComposePVCName(claimTemplate, its.Name, name)
@@ -472,77 +193,21 @@ func buildInstanceByTemplate(name string, template *instancetemplate.InstanceTem
 		if template.Name != "" {
 			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
 		}
-		inst.AddVolumeClaimTemplate(*pvc)
+		b.AddVolumeClaimTemplate(*pvc)
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
+	b.SetPVCRetentionPolicy(its.Spec.PersistentVolumeClaimRetentionPolicy)
 
-	instObj := inst.GetObject()
-
-	// 3. update pod volumes
-	var volumeList []corev1.Volume
-	for pvcName, claimTemplateName := range pvcNameMap {
-		volume := builder.NewVolumeBuilder(claimTemplateName).
-			SetVolumeSource(corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
-			}).GetObject()
-		volumeList = append(volumeList, *volume)
-	}
-	intctrlutil.MergeList(&volumeList, &instObj.Spec.Template.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
-		return func(v corev1.Volume) bool {
-			return v.Name == item.Name
-		}
-	})
-
-	if err := controllerutil.SetControllerReference(its, instObj, model.GetScheme()); err != nil {
-		return nil, err
-	}
-	return instObj, nil
-}
-
-func buildInstancePodByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet, revision string) (*corev1.Pod, error) {
-	// 1. build a pod from template
-	var err error
-	if len(revision) == 0 {
-		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
+	if its.Spec.CloneAssistantObjects && len(its.Spec.AssistantObjects) > 0 {
+		objs, err := cloneAssistantObjects(tree, its)
 		if err != nil {
 			return nil, err
 		}
-	}
-	labels := getMatchLabels(parent.Name)
-	pod := builder.NewPodBuilder(parent.Namespace, name).
-		AddAnnotationsInMap(template.Annotations).
-		AddLabelsInMap(template.Labels).
-		AddLabelsInMap(labels).
-		AddLabels(constant.KBAppPodNameLabelKey, name).                  // used as a pod-service selector
-		AddLabels(instancetemplate.TemplateNameLabelKey, template.Name). // TODO: remove this label later
-		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
-		AddControllerRevisionHashLabel(revision).
-		SetPodSpec(*template.Spec.DeepCopy()).
-		GetObject()
-	// Set these immutable fields only on initial Pod creation, not updates.
-	pod.Spec.Hostname = pod.Name
-	pod.Spec.Subdomain = getHeadlessSvcName(parent.Name)
-
-	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(parent)
-	if err != nil {
-		return nil, err
-	}
-	if nodeName, ok := podToNodeMapping[name]; ok {
-		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
-		if pod.Spec.NodeSelector == nil {
-			pod.Spec.NodeSelector = make(map[string]string)
-		}
-		pod.Spec.NodeSelector[corev1.LabelHostname] = nodeName
+		b.SetAssistantObjects(objs)
 	}
 
-	// 2. build pvcs from template
-	pvcNameMap := make(map[string]string)
-	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, pod.GetName())
-		pvcNameMap[pvcName] = claimTemplate.Name
-	}
+	inst := b.GetObject()
 
-	// 3. update pod volumes
 	var volumeList []corev1.Volume
 	for pvcName, claimTemplateName := range pvcNameMap {
 		volume := builder.NewVolumeBuilder(claimTemplateName).
@@ -551,43 +216,16 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 			}).GetObject()
 		volumeList = append(volumeList, *volume)
 	}
-	intctrlutil.MergeList(&volumeList, &pod.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
+	intctrlutil.MergeList(&volumeList, &inst.Spec.Template.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
 		return func(v corev1.Volume) bool {
 			return v.Name == item.Name
 		}
 	})
 
-	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
+	if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
 		return nil, err
 	}
-	return pod, nil
-}
-
-func buildInstancePVCByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {
-	var pvcs []*corev1.PersistentVolumeClaim
-	labels := getMatchLabels(parent.Name)
-	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, parent.Name, name)
-		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
-			AddLabelsInMap(labels).
-			AddLabelsInMap(template.Labels).
-			AddLabelsInMap(claimTemplate.Labels).
-			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
-			AddLabels(constant.KBAppPodNameLabelKey, name).
-			AddAnnotationsInMap(claimTemplate.Annotations).
-			SetSpec(*claimTemplate.Spec.DeepCopy()).
-			GetObject()
-		if template.Name != "" {
-			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
-		}
-		pvcs = append(pvcs, pvc)
-	}
-	for _, pvc := range pvcs {
-		if err := controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
-			return nil, err
-		}
-	}
-	return pvcs, nil
+	return inst, nil
 }
 
 // copyAndMerge merges two objects for updating:
@@ -665,8 +303,15 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldPVC
 	}
 
+	copyAndMergeInstance := func(oldInst, newInst *workloads.Instance) client.Object {
+		// TODO: impl
+		return newInst
+	}
+
 	targetObj := oldObj.DeepCopyObject()
 	switch o := newObj.(type) {
+	case *workloads.Instance:
+		return copyAndMergeInstance(targetObj.(*workloads.Instance), o)
 	case *corev1.Service:
 		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
 	case *corev1.ConfigMap:
@@ -709,4 +354,8 @@ func getInstanceTemplateMap(annotations map[string]string) (map[string]string, e
 		return nil, err
 	}
 	return templateMap, nil
+}
+
+func getHeadlessSvcName(itsName string) string {
+	return strings.Join([]string{itsName, "headless"}, "-")
 }

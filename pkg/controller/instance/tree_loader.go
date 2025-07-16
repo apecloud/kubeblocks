@@ -66,6 +66,7 @@ func ownedKinds() []client.ObjectList {
 		&corev1.ConfigMapList{}, // config & script, env
 		&corev1.SecretList{},    // account, tls
 		&corev1.ServiceAccountList{},
+		&rbacv1.RoleList{},
 		&rbacv1.RoleBindingList{},
 	}
 }

@@ -27,67 +27,14 @@ const (
 )
 
 const (
-	EventReasonInvalidSpec   = "InvalidSpec"
-	EventReasonStrictInPlace = "StrictInPlace"
-)
-
-const (
 	// MaxPlainRevisionCount specified max number of plain revision stored in status.updateRevisions.
 	// All revisions will be compressed if exceeding this value.
 	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"
 
 	templateRefAnnotationKey = "kubeblocks.io/template-ref"
-	templateRefDataKey       = "instances"
 	revisionsZSTDKey         = "zstd"
 
 	FeatureGateIgnorePodVerticalScaling = "IGNORE_POD_VERTICAL_SCALING"
 
 	finalizer = "instanceset.workloads.kubeblocks.io/finalizer"
 )
-
-// AnnotationScope defines scope that annotations belong to.
-//
-// it is a common pattern to add annotations to extend the functionalities of K8s builtin resources.
-//
-// e.g.: Prometheus will start to scrape metrics if a service has annotation 'prometheus.io/scrape'.
-//
-// The InstanceSet has encapsulated K8s builtin resources like Service, Headless Service, Pod, ConfigMap etc.
-// AnnotationScope specified a way to tell the InstanceSet controller which resource an annotation belongs to.
-//
-// e.g.:
-// let's say we want to add an annotation 'prometheus.io/scrape' with value 'true' to the underlying headless service.
-// here is what we should do:
-// add annotation 'prometheus.io/scrape' with an HeadlessServiceScope suffix to the RSM object's annotations field.
-//
-//	kind: InstanceSet
-//	metadata:
-//	  annotations:
-//	    prometheus.io/scrape.headless.its: true
-//
-// the InstanceSet controller will figure out which objects this annotation belongs to, cut the suffix and set it to the right place:
-//
-//	kind: Service
-//	metadata:
-//	  annotations:
-//	    prometheus.io/scrape: true
-type AnnotationScope string
-
-const (
-	// RootScope specifies the annotation belongs to the RSM object itself.
-	// they will also be set on the encapsulated StatefulSet.
-	RootScope AnnotationScope = ""
-
-	// HeadlessServiceScope specifies the annotation belongs to the encapsulated headless Service.
-	HeadlessServiceScope AnnotationScope = ".headless.its"
-
-	// ServiceScope specifies the annotation belongs to the encapsulated Service.
-	ServiceScope AnnotationScope = ".svc.its"
-
-	// AlternativeServiceScope specifies the annotation belongs to the encapsulated alternative Services.
-	AlternativeServiceScope AnnotationScope = ".alternative.its"
-
-	// ConfigMapScope specifies the annotation belongs to the encapsulated ConfigMap.
-	ConfigMapScope AnnotationScope = ".cm.its"
-)
-
-const scopeSuffix = ".its"

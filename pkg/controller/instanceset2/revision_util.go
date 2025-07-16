@@ -28,7 +28,7 @@ import (
 	"strconv"
 
 	jsoniter "github.com/json-iterator/go"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,11 +47,11 @@ const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
 var Codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
-var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+var controllerKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 
 var jsonIter = jsoniter.ConfigCompatibleWithStandardLibrary
 
-func NewRevision(its *workloads.InstanceSet) (*apps.ControllerRevision, error) {
+func NewRevision(its *workloads.InstanceSet) (*appsv1.ControllerRevision, error) {
 	patch, err := getPatch(its)
 	if err != nil {
 		return nil, err
@@ -120,12 +120,12 @@ func NewControllerRevision(parent metav1.Object,
 	templateLabels map[string]string,
 	data runtime.RawExtension,
 	revision int64,
-	collisionCount *int32) (*apps.ControllerRevision, error) {
+	collisionCount *int32) (*appsv1.ControllerRevision, error) {
 	labelMap := make(map[string]string)
 	for k, v := range templateLabels {
 		labelMap[k] = v
 	}
-	cr := &apps.ControllerRevision{
+	cr := &appsv1.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labelMap,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
@@ -141,7 +141,7 @@ func NewControllerRevision(parent metav1.Object,
 
 // HashControllerRevision hashes the contents of revision's Data using FNV hashing. If probe is not nil, the byte value
 // of probe is added written to the hash as well. The returned hash will be a safe encoded string to avoid bad words.
-func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) string {
+func HashControllerRevision(revision *appsv1.ControllerRevision, probe *int32) string {
 	hf := fnv.New32()
 	if len(revision.Data.Raw) > 0 {
 		hf.Write(revision.Data.Raw)

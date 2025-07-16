@@ -20,15 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"hash"
 	"hash/fnv"
 	"strconv"
 
-	jsoniter "github.com/json-iterator/go"
-	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +37,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/lru"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
@@ -49,11 +44,9 @@ const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
 var Codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
-var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+var controllerKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 
-var jsonIter = jsoniter.ConfigCompatibleWithStandardLibrary
-
-func NewRevision(its *workloads.InstanceSet) (*apps.ControllerRevision, error) {
+func NewRevision(its *workloads.InstanceSet) (*appsv1.ControllerRevision, error) {
 	patch, err := getPatch(its)
 	if err != nil {
 		return nil, err
@@ -122,12 +115,12 @@ func NewControllerRevision(parent metav1.Object,
 	templateLabels map[string]string,
 	data runtime.RawExtension,
 	revision int64,
-	collisionCount *int32) (*apps.ControllerRevision, error) {
+	collisionCount *int32) (*appsv1.ControllerRevision, error) {
 	labelMap := make(map[string]string)
 	for k, v := range templateLabels {
 		labelMap[k] = v
 	}
-	cr := &apps.ControllerRevision{
+	cr := &appsv1.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labelMap,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
@@ -143,7 +136,7 @@ func NewControllerRevision(parent metav1.Object,
 
 // HashControllerRevision hashes the contents of revision's Data using FNV hashing. If probe is not nil, the byte value
 // of probe is added written to the hash as well. The returned hash will be a safe encoded string to avoid bad words.
-func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) string {
+func HashControllerRevision(revision *appsv1.ControllerRevision, probe *int32) string {
 	hf := fnv.New32()
 	if len(revision.Data.Raw) > 0 {
 		hf.Write(revision.Data.Raw)
@@ -163,50 +156,6 @@ func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) str
 func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
-}
-
-var revisionsCache = lru.New(1024)
-
-func GetRevisions(revisions map[string]string) (map[string]string, error) {
-	if revisions == nil {
-		return nil, nil
-	}
-	revisionsStr, ok := revisions[revisionsZSTDKey]
-	if !ok {
-		return revisions, nil
-	}
-	if revisionsInCache, ok := revisionsCache.Get(revisionsStr); ok {
-		return revisionsInCache.(map[string]string), nil
-	}
-	revisionsData, err := base64.StdEncoding.DecodeString(revisionsStr)
-	if err != nil {
-		return nil, err
-	}
-	revisionsJSON, err := reader.DecodeAll(revisionsData, nil)
-	if err != nil {
-		return nil, err
-	}
-	updateRevisions := make(map[string]string)
-
-	if err = jsonIter.Unmarshal(revisionsJSON, &updateRevisions); err != nil {
-		return nil, err
-	}
-	revisionsCache.Put(revisionsStr, updateRevisions)
-	return updateRevisions, nil
-}
-
-func buildRevisions(updateRevisions map[string]string) (map[string]string, error) {
-	maxPlainRevisionCount := viper.GetInt(MaxPlainRevisionCount)
-	if len(updateRevisions) <= maxPlainRevisionCount {
-		return updateRevisions, nil
-	}
-	revisionsJSON, err := jsonIter.Marshal(updateRevisions)
-	if err != nil {
-		return nil, err
-	}
-	revisionsData := writer.EncodeAll(revisionsJSON, nil)
-	revisionsStr := base64.StdEncoding.EncodeToString(revisionsData)
-	return map[string]string{revisionsZSTDKey: revisionsStr}, nil
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

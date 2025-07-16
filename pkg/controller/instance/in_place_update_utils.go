@@ -29,7 +29,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -313,18 +312,6 @@ func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (PodUpdatePol
 		return InPlaceUpdatePolicy, nil
 	}
 	return NoOpsPolicy, nil
-}
-
-func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.Pod) (string, error) {
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return "", err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return "", err
-	}
-	return nameToTemplateMap[pod.Name].Name, nil
 }
 
 // IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.

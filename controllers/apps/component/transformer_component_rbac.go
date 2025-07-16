@@ -36,6 +36,7 @@ import (
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -140,6 +141,7 @@ func labelAndAnnotationEqual(old, new metav1.Object) bool {
 
 func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformContext,
 	obj PT, graphCli model.GraphClient, dag *graph.DAG, cmpFn func(oldObj, newObj PT) bool) (PT, error) {
+	component.AddAssistantObject(transCtx.SynthesizeComponent, obj)
 	oldObj := PT(new(T))
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(obj), oldObj); err != nil {
 		if errors.IsNotFound(err) {

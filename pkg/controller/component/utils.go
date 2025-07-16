@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -201,4 +202,20 @@ func ConfigTemplates(synthesizedComp *SynthesizedComponent) []appsv1.ComponentFi
 		}
 	}
 	return templates
+}
+
+func AddAssistantObject(synthesizedComp *SynthesizedComponent, object client.Object) {
+	if synthesizedComp.AssistantObjects == nil {
+		synthesizedComp.AssistantObjects = make([]corev1.ObjectReference, 0)
+	}
+	objRef := corev1.ObjectReference{
+		Kind:      object.GetObjectKind().GroupVersionKind().Kind,
+		Namespace: object.GetNamespace(),
+		Name:      object.GetName(),
+	}
+	synthesizedComp.AssistantObjects = append(synthesizedComp.AssistantObjects, objRef)
+}
+
+func SetCloneAssistantObjects(synthesizedComp *SynthesizedComponent, clone bool) {
+	synthesizedComp.CloneAssistantObjects = clone
 }

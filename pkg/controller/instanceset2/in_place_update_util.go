@@ -31,6 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -229,7 +230,7 @@ func equalField(old, new any) bool {
 	return false
 }
 
-func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
+func equalInstanceBasicInPlaceFields(old, new *workloads.Instance) bool {
 	// Only comparing annotations and labels that are relevant to the new spec.
 	// These two fields might be modified by other controllers without the InstanceSet controller knowing.
 	// For instance, two new annotations have been added by Patroni.
@@ -243,33 +244,30 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	if !equalField(old.Labels, new.Labels) {
 		return false
 	}
-	if !equalField(old.Spec.ActiveDeadlineSeconds, new.Spec.ActiveDeadlineSeconds) {
+	if !equalField(old.Spec.Template.Spec.ActiveDeadlineSeconds, new.Spec.Template.Spec.ActiveDeadlineSeconds) {
 		return false
 	}
-	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) {
+	if !equalField(old.Spec.Template.Spec.InitContainers, new.Spec.Template.Spec.InitContainers) {
 		return false
 	}
-	if !equalField(old.Spec.Containers, new.Spec.Containers) {
+	if !equalField(old.Spec.Template.Spec.Containers, new.Spec.Template.Spec.Containers) {
 		return false
 	}
-	if !equalField(old.Spec.Tolerations, new.Spec.Tolerations) {
+	if !equalField(old.Spec.Template.Spec.Tolerations, new.Spec.Template.Spec.Tolerations) {
 		return false
 	}
 	return true
 }
 
-// equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
-// If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
-// will not participate in the comparison.
-func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
-	for _, nc := range new.Spec.Containers {
-		index := slices.IndexFunc(old.Spec.Containers, func(oc corev1.Container) bool {
+func equalInstanceResourcesInPlaceFields(old, new *workloads.Instance) bool {
+	for _, nc := range new.Spec.Template.Spec.Containers {
+		index := slices.IndexFunc(old.Spec.Template.Spec.Containers, func(oc corev1.Container) bool {
 			return oc.Name == nc.Name
 		})
 		if index < 0 {
 			return false
 		}
-		oc := old.Spec.Containers[index]
+		oc := old.Spec.Template.Spec.Containers[index]
 		realRequests := nc.Resources.Requests
 		// 'requests' defaults to Limits if that is explicitly specified, see: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#resources
 		if realRequests == nil {
@@ -285,13 +283,13 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdatePolicy, error) {
+func getInstanceUpdatePolicy(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) (PodUpdatePolicy, error) {
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return NoOpsPolicy, err
 	}
 
-	if getPodRevision(pod) != updateRevisions[pod.Name] {
+	if getInstanceRevision(inst) != updateRevisions[inst.Name] {
 		return RecreatePolicy, nil
 	}
 
@@ -300,21 +298,18 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return NoOpsPolicy, err
 	}
 	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
-	templateName, err := getTemplateNameByPod(itsExt, pod)
-	if err != nil {
-		return NoOpsPolicy, err
-	}
+	templateName := getTemplateNameByInstance(inst)
 	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
 		return templateName == templateExt.Name
 	})
 	if index < 0 {
-		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", pod.Name)
+		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", inst.Name)
 	}
-	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
+	newPod, err := buildInstanceByTemplate(tree, inst.Name, templateList[index], its, getInstanceRevision(inst))
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	basicUpdate := !equalBasicInPlaceFields(pod, newPod)
+	basicUpdate := !equalInstanceBasicInPlaceFields(inst, newPod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
 			return InPlaceUpdatePolicy, nil
@@ -322,7 +317,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return NoOpsPolicy, nil
 	}
 
-	resourceUpdate := !equalResourcesInPlaceFields(pod, newPod)
+	resourceUpdate := !equalInstanceResourcesInPlaceFields(inst, newPod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
 			return InPlaceUpdatePolicy, nil
@@ -336,22 +331,37 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 	return NoOpsPolicy, nil
 }
 
-func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.Pod) (string, error) {
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return "", err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return "", err
-	}
-	return nameToTemplateMap[pod.Name].Name, nil
+func getTemplateNameByInstance(inst *workloads.Instance) string {
+	return inst.Spec.InstanceTemplateName
 }
 
-// IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
-// This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
-// as the pod template revision has been redefined in instanceset.
-func IsPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, err := getPodUpdatePolicy(its, pod)
-	return policy == NoOpsPolicy, err
+func isInstanceUpdated(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) (bool, error) {
+	policy, err := getInstanceUpdatePolicy(tree, its, inst)
+	if err != nil {
+		return false, err
+	}
+	if policy != NoOpsPolicy {
+		return false, nil
+	}
+	for _, config := range its.Spec.Configs {
+		if !isConfigUpdated(its, inst, config) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func isConfigUpdated(its *workloads.InstanceSet, inst *workloads.Instance, config workloads.ConfigTemplate) bool {
+	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+		return instance.PodName == inst.Name
+	})
+	if idx < 0 {
+		return true // new pod provisioned
+	}
+	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
+		if configStatus.Name == config.Name {
+			return config.Generation <= configStatus.Generation
+		}
+	}
+	return config.Generation <= 0
 }

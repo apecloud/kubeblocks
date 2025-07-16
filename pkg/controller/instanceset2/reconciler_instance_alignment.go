@@ -24,8 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -56,7 +55,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 }
 
 func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	its, _ := tree.GetRoot().(*workloadsv1.InstanceSet)
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -80,11 +79,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		newNameSet.Insert(name)
 	}
 	oldNameSet := sets.New[string]()
-	oldInstanceMap := make(map[string]*workloadsv1alpha1.Instance)
-	oldInstanceList := tree.List(&workloadsv1alpha1.Instance{})
+	oldInstanceMap := make(map[string]*workloads.Instance)
+	oldInstanceList := tree.List(&workloads.Instance{})
 	for _, object := range oldInstanceList {
 		oldNameSet.Insert(object.GetName())
-		inst, _ := object.(*workloadsv1alpha1.Instance)
+		inst, _ := object.(*workloads.Instance)
 		oldInstanceMap[object.GetName()] = inst
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
@@ -108,7 +107,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	baseSort(newNameList, func(i int) (string, int) {
 		return parseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)
-	getPredecessor := func(i int) *workloadsv1alpha1.Instance {
+	getPredecessor := func(i int) *workloads.Instance {
 		if i <= 0 {
 			return nil
 		}
@@ -123,10 +122,8 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			}
 		}
 	}
-	var currentAlignedNameList []string
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
-			currentAlignedNameList = append(currentAlignedNameList, name)
 			continue
 		}
 		if !isOrderedReady && concurrency <= 0 {
@@ -136,14 +133,13 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) {
 			break
 		}
-		newInst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")
+		newInst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its, "")
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
 		if err := tree.Add(newInst); err != nil {
 			return kubebuilderx.Continue, err
 		}
-		currentAlignedNameList = append(currentAlignedNameList, name)
 
 		if isOrderedReady {
 			break
@@ -155,7 +151,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	priorities := make(map[string]int)
 	sortObjects(oldInstanceList, priorities, false)
 	for _, object := range oldInstanceList {
-		inst, _ := object.(*workloadsv1alpha1.Instance)
+		inst, _ := object.(*workloads.Instance)
 		if _, ok := deleteNameSet[inst.Name]; !ok {
 			continue
 		}

@@ -89,6 +89,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 					return kubebuilderx.Continue, err
 				}
 			default:
+				// TODO: do not update PVC here
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
 					if err = tree.Update(pvcObj); err != nil {

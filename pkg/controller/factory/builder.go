@@ -83,7 +83,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
-		SetTemplateVars(synthesizedComp.TemplateVars)
+		SetTemplateVars(synthesizedComp.TemplateVars).
+		SetAssistantObjects(synthesizedComp.AssistantObjects).
+		SetCloneAssistantObjects(synthesizedComp.CloneAssistantObjects)
 	if compDef != nil {
 		itsBuilder.SetDisableDefaultHeadlessService(compDef.Spec.DisableDefaultHeadlessService)
 	}

@@ -69,6 +69,10 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 
+	for _, obj := range protoObjs {
+		component.AddAssistantObject(transCtx.SynthesizeComponent, obj)
+	}
+
 	return t.buildPodVolumes(transCtx)
 }
 

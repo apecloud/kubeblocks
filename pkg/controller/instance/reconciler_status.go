@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -205,63 +204,3 @@ func setMembersStatus(inst *workloads.Instance, pod *corev1.Pod) {
 		}
 	}
 }
-
-func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
-	// compose new instance status
-	newInstanceStatus := make([]workloads.InstanceStatus, 0)
-	for _, pod := range pods {
-		instanceStatus := workloads.InstanceStatus{
-			PodName: pod.Name,
-		}
-		newInstanceStatus = append(newInstanceStatus, instanceStatus)
-	}
-
-	syncInstanceConfigStatus(its, newInstanceStatus)
-
-	// sortInstanceStatus(newInstanceStatus)
-	its.Status.InstanceStatus = newInstanceStatus
-}
-
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
-	if its.Status.InstanceStatus == nil {
-		// initialize
-		configs := make([]workloads.InstanceConfigStatus, 0)
-		for _, config := range its.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				Generation: config.Generation,
-			})
-		}
-		for i := range instanceStatus {
-			instanceStatus[i].Configs = configs
-		}
-	} else {
-		// HACK: copy the existing config status from the current its.status.instanceStatus
-		configs := sets.New[string]()
-		for _, config := range its.Spec.Configs {
-			configs.Insert(config.Name)
-		}
-		for i, newStatus := range instanceStatus {
-			for _, status := range its.Status.InstanceStatus {
-				if status.PodName == newStatus.PodName {
-					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
-					}
-					for j, config := range status.Configs {
-						if configs.Has(config.Name) {
-							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
-						}
-					}
-					break
-				}
-			}
-		}
-	}
-}
-
-// func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-//	getNameNOrdinalFunc := func(i int) (string, int) {
-//		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
-//	}
-//	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
-// }

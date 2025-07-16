@@ -20,15 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},shortName=inst
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -66,6 +66,7 @@ type InstanceSpec struct {
 	// Defines the minimum number of seconds a newly created pod should be ready
 	// without any of its container crashing to be considered available.
 	// Defaults to 0, meaning the pod will be considered available as soon as it is ready.
+	//
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -113,7 +114,7 @@ type InstanceSpec struct {
 	// A list of roles defined in the system. Instanceset obtains role through pods' role label `kubeblocks.io/role`.
 	//
 	// +optional
-	Roles []kbappsv1.ReplicaRole `json:"roles,omitempty"`
+	Roles []ReplicaRole `json:"roles,omitempty"`
 
 	// Provides actions to do membership dynamic reconfiguration.
 	//
@@ -125,10 +126,10 @@ type InstanceSpec struct {
 	// +optional
 	TemplateVars map[string]string `json:"templateVars,omitempty"`
 
-	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
+	// Assistant objects that are necessary to run the instance.
 	//
 	// +optional
-	Paused bool `json:"paused,omitempty"`
+	AssistantObjects []InstanceAssistantObject `json:"assistantObjects,omitempty"`
 }
 
 // InstanceStatus2 defines the observed state of Instance
@@ -159,4 +160,13 @@ type InstanceStatus2 struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+type InstanceAssistantObject struct {
+	ConfigMap      *corev1.ConfigMap      `json:"configMap,omitempty"`
+	Secret         *corev1.Secret         `json:"secret,omitempty"`
+	Service        *corev1.Service        `json:"service,omitempty"`
+	ServiceAccount *corev1.ServiceAccount `json:"serviceAccount,omitempty"`
+	Role           *rbacv1.Role           `json:"clusterRole,omitempty"`
+	RoleBinding    *rbacv1.RoleBinding    `json:"roleBinding,omitempty"`
 }

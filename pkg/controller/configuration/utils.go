@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
@@ -37,4 +38,8 @@ func copyMap(data map[string]string) map[string]string {
 		r[k] = v
 	}
 	return r
+}
+
+func IsConfigManagerContainer(containerName string) bool {
+	return containerName == installConfigMangerToolContainerName || containerName == constant.ConfigSidecarName
 }

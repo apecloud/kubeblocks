@@ -458,6 +458,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods/resize
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - pods/status
   verbs:
   - get

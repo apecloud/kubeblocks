@@ -42,13 +42,13 @@ func (builder *InstanceBuilder) SetFinalizers() *InstanceBuilder {
 	return builder
 }
 
-func (builder *InstanceBuilder) podSpec() *corev1.PodSpec {
-	return &builder.get().Spec.Template.Spec
+func (builder *InstanceBuilder) SetPodTemplate(template corev1.PodTemplateSpec) *InstanceBuilder {
+	builder.get().Spec.Template = template
+	return builder
 }
 
-func (builder *InstanceBuilder) SetPodSpec(podSpec corev1.PodSpec) *InstanceBuilder {
-	*builder.podSpec() = podSpec
-	return builder
+func (builder *InstanceBuilder) podSpec() *corev1.PodSpec {
+	return &builder.get().Spec.Template.Spec
 }
 
 func (builder *InstanceBuilder) SetContainers(containers []corev1.Container) *InstanceBuilder {
@@ -138,6 +138,20 @@ func (builder *InstanceBuilder) SetImagePullSecrets(secrets []corev1.LocalObject
 
 func (builder *InstanceBuilder) SetSelector(selector *metav1.LabelSelector) *InstanceBuilder {
 	builder.get().Spec.Selector = selector
+	return builder
+}
+
+func (builder *InstanceBuilder) SetSelectorMatchLabels(labels map[string]string) *InstanceBuilder {
+	selector := builder.get().Spec.Selector
+	if selector == nil {
+		selector = &metav1.LabelSelector{}
+		builder.get().Spec.Selector = selector
+	}
+	matchLabels := make(map[string]string, len(labels))
+	for k, v := range labels {
+		matchLabels[k] = v
+	}
+	builder.get().Spec.Selector.MatchLabels = matchLabels
 	return builder
 }
 

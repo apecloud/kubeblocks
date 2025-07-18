@@ -70,7 +70,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 
 func ownedKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&workloads.InstanceSetList{},
+		&workloads.InstanceList{},
 	}
 }
 

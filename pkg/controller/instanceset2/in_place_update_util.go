@@ -115,7 +115,7 @@ func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList
 	return requests, limits
 }
 
-func mergeInPlaceFields(src, dst *corev1.Pod) {
+func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
 	mergeMap(&src.Annotations, &dst.Annotations)
 	mergeMap(&src.Labels, &dst.Labels)
 	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds

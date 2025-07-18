@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package instanceset2
+package instance
 
 import (
 	"encoding/json"
@@ -173,17 +173,17 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 
 		var name string
 		if pod.Labels != nil {
-			if n, ok := pod.Labels[WorkloadsInstanceLabelKey]; ok {
+			if n, ok := pod.Labels[constant.KBAppInstanceNameLabelKey]; ok {
 				name = n
 			}
 		}
-		its := &workloads.InstanceSet{}
-		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, its); err != nil {
+		inst := &workloads.Instance{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, inst); err != nil {
 			return "", err
 		}
 		reqCtx.Log.Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 
-		if err := updatePodRoleLabel(cli, reqCtx, *its, pod, pair.RoleName, snapshot.Version); err != nil {
+		if err := updatePodRoleLabel(cli, reqCtx, inst, pod, pair.RoleName, snapshot.Version); err != nil {
 			return "", err
 		}
 	}
@@ -239,9 +239,9 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	its workloads.InstanceSet, pod *corev1.Pod, roleName string, version string) error {
+	inst *workloads.Instance, pod *corev1.Pod, roleName string, version string) error {
 	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(its)
+	roleMap := composeRoleMap(inst)
 	// role not defined in CR, ignore it
 	roleName = strings.ToLower(roleName)
 
@@ -250,9 +250,9 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	role, ok := roleMap[roleName]
 	switch ok {
 	case true:
-		newPod.Labels[RoleLabelKey] = role.Name
+		newPod.Labels[constant.RoleLabelKey] = role.Name
 	case false:
-		delete(newPod.Labels, RoleLabelKey)
+		delete(newPod.Labels, constant.RoleLabelKey)
 	}
 
 	if newPod.Annotations == nil {

@@ -20,16 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},shortName=inst
+// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="update to date."
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready",description="ready."
+// +kubebuilder:printcolumn:name="AVAILABLE",type="string",JSONPath=".status.available",description="available."
+// +kubebuilder:printcolumn:name="ROLE",type="string",JSONPath=".status.role2",description="with role."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Instance is the Schema for the instances API
@@ -93,6 +98,9 @@ type InstanceSpec struct {
 	PersistentVolumeClaimRetentionPolicy *PersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
 
 	// +optional
+	InstanceSetName string `json:"instanceSetName,omitempty"`
+
+	// +optional
 	InstanceTemplateName string `json:"instanceTemplateName,omitempty"`
 
 	// Provides fine-grained control over the spec update process of the instance.
@@ -140,6 +148,12 @@ type InstanceStatus2 struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// Represents the latest available observations of an instance's current state.
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable"
+	//
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// currentRevision, if not empty, indicates the version of the Instance used to generate pod.
 	//
 	// +optional
@@ -150,22 +164,31 @@ type InstanceStatus2 struct {
 	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
+	// Represents whether the instance is up-to-date.
+	//
+	// +optional
+	UpToDate string `json:"upToDate,omitempty"`
+
+	// +optional
+	Ready string `json:"ready,omitempty"`
+
+	// +optional
+	Available string `json:"available,omitempty"`
+
 	// Represents the role of the instance observed.
 	//
 	// +optional
 	Role *string `json:"role,omitempty"`
 
-	// Represents the latest available observations of an instance's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable"
+	// Represents the role of the instance observed.
 	//
 	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Role2 string `json:"role2,omitempty"`
 }
 
 type InstanceAssistantObject struct {
 	ConfigMap      *corev1.ConfigMap      `json:"configMap,omitempty"`
 	Secret         *corev1.Secret         `json:"secret,omitempty"`
-	Service        *corev1.Service        `json:"service,omitempty"`
 	ServiceAccount *corev1.ServiceAccount `json:"serviceAccount,omitempty"`
 	Role           *rbacv1.Role           `json:"clusterRole,omitempty"`
 	RoleBinding    *rbacv1.RoleBinding    `json:"roleBinding,omitempty"`

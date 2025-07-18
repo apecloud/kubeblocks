@@ -68,7 +68,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, compDef)).
 		SetTemplate(getTemplate(synthesizedComp)).
-		SetSelectorMatchLabel(constant.GetCompLabels(clusterName, compName)).
+		SetSelectorMatchLabel(getTemplateLabels(synthesizedComp)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetVolumeClaimTemplates(defaultVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
@@ -84,8 +84,17 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars).
-		SetAssistantObjects(synthesizedComp.AssistantObjects).
-		SetCloneAssistantObjects(synthesizedComp.CloneAssistantObjects)
+		SetAssistantObjects(synthesizedComp.AssistantObjects)
+	if synthesizedComp.Annotations != nil {
+		enable, ok1 := synthesizedComp.Annotations["enable-instance-api"]
+		if ok1 && enable == "true" {
+			itsBuilder.SetEnableInstanceAPI(ptr.To(true))
+		}
+		clone, ok2 := synthesizedComp.Annotations["clone-assistant-objects"]
+		if ok2 && clone == "true" {
+			itsBuilder.SetCloneAssistantObjects(true)
+		}
+	}
 	if compDef != nil {
 		itsBuilder.SetDisableDefaultHeadlessService(compDef.Spec.DisableDefaultHeadlessService)
 	}
@@ -107,14 +116,19 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Labels)).
-		AddLabels(constant.KBAppReleasePhaseKey, constant.ReleasePhaseStable).
+		AddLabelsInMap(getTemplateLabels(synthesizedComp)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations)
 	return corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
 	}
+}
+
+func getTemplateLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
+	labels := constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Labels)
+	labels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
+	return labels
 }
 
 func defaultVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {

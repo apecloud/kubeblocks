@@ -32,6 +32,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -208,14 +209,20 @@ func AddAssistantObject(synthesizedComp *SynthesizedComponent, object client.Obj
 	if synthesizedComp.AssistantObjects == nil {
 		synthesizedComp.AssistantObjects = make([]corev1.ObjectReference, 0)
 	}
+	gvk, _ := model.GetGVKName(object)
 	objRef := corev1.ObjectReference{
-		Kind:      object.GetObjectKind().GroupVersionKind().Kind,
-		Namespace: object.GetNamespace(),
-		Name:      object.GetName(),
+		Kind:      gvk.Kind,
+		Namespace: gvk.Namespace,
+		Name:      gvk.Name,
 	}
 	synthesizedComp.AssistantObjects = append(synthesizedComp.AssistantObjects, objRef)
-}
-
-func SetCloneAssistantObjects(synthesizedComp *SynthesizedComponent, clone bool) {
-	synthesizedComp.CloneAssistantObjects = clone
+	slices.SortFunc(synthesizedComp.AssistantObjects, func(a, b corev1.ObjectReference) int {
+		if a.Kind != b.Kind {
+			return strings.Compare(a.Kind, b.Kind)
+		}
+		if a.Namespace != b.Namespace {
+			return strings.Compare(a.Namespace, b.Namespace)
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
 }

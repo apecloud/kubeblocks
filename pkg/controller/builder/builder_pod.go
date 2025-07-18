@@ -21,7 +21,6 @@ package builder
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type PodBuilder struct {
@@ -49,8 +48,18 @@ func (builder *PodBuilder) SetInitContainers(initContainers []corev1.Container) 
 	return builder
 }
 
-func (builder *PodBuilder) SetNodeName(nodeName types.NodeName) *PodBuilder {
-	builder.get().Spec.NodeName = string(nodeName)
+func (builder *PodBuilder) SetNodeName(nodeName string) *PodBuilder {
+	builder.get().Spec.NodeName = nodeName
+	return builder
+}
+
+func (builder *PodBuilder) SetHostname(hostname string) *PodBuilder {
+	builder.get().Spec.Hostname = hostname
+	return builder
+}
+
+func (builder *PodBuilder) SetSubdomain(subdomain string) *PodBuilder {
+	builder.get().Spec.Subdomain = subdomain
 	return builder
 }
 

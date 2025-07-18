@@ -510,7 +510,7 @@ func main() {
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("instance-set-controller2"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet v2")
 			os.Exit(1)
 		}

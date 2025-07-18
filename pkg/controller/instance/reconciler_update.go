@@ -212,8 +212,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 		}
 		return m
 	}()
-	// TODO: inst.Name -> its.Name
-	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Name, lifecycleActions, templateVars, pod)
+	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Spec.InstanceSetName, lifecycleActions, templateVars, pod)
 	if err != nil {
 		return err
 	}
@@ -267,8 +266,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 //		}
 //		return m
 //	}()
-//	// TODO: inst.Name -> its.Name
-//	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Name, lifecycleActions, templateVars, pod)
+//	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Spec.InstanceSetName, lifecycleActions, templateVars, pod)
 //	if err != nil {
 //		return err
 //	}

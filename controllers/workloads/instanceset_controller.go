@@ -22,7 +22,6 @@ package workloads
 import (
 	"context"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -61,12 +60,12 @@ type InstanceSetReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
-
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -122,27 +121,19 @@ func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.
 		}).
 		Watches(&corev1.Pod{}, podHandler).
 		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
 
-func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
-	multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
-	nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-	delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
-	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
-	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-
+func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
 	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		})
 
-	multiClusterMgr.Watch(b, &batchv1.Job{}, jobHandler).
-		Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
+	multiClusterMgr.Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
 		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.InstanceSet{})
 
 	return b.Complete(r)

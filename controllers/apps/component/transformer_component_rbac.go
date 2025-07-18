@@ -21,6 +21,9 @@ package component
 
 import (
 	"fmt"
+	"reflect"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -33,10 +36,8 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -105,9 +106,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 
+	objs := []client.Object{sa, role}
 	if sa != nil {
 		// serviceAccount should be created before roleBinding and role
 		for _, rb := range rbs {
+			objs = append(objs, rb)
 			graphCli.DependOn(dag, rb, sa, role)
 		}
 		// serviceAccount should be created before workload
@@ -117,7 +120,35 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
+	t.rbacAssistantObjects(graphCli, dag, objs)
+
 	return nil
+}
+
+func (t *componentRBACTransformer) rbacAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {
+	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
+	for _, itsObj := range itsList {
+		its := itsObj.(*workloads.InstanceSet)
+		for _, obj := range objs {
+			if obj != nil && !reflect.ValueOf(obj).IsNil() {
+				gvk, _ := model.GetGVKName(obj)
+				its.Spec.AssistantObjects = append(its.Spec.AssistantObjects, corev1.ObjectReference{
+					Kind:      gvk.Kind,
+					Namespace: gvk.Namespace,
+					Name:      gvk.Name,
+				})
+			}
+		}
+		slices.SortFunc(its.Spec.AssistantObjects, func(a, b corev1.ObjectReference) int {
+			if a.Kind != b.Kind {
+				return strings.Compare(a.Kind, b.Kind)
+			}
+			if a.Namespace != b.Namespace {
+				return strings.Compare(a.Namespace, b.Namespace)
+			}
+			return strings.Compare(a.Name, b.Name)
+		})
+	}
 }
 
 func labelAndAnnotationEqual(old, new metav1.Object) bool {
@@ -141,11 +172,11 @@ func labelAndAnnotationEqual(old, new metav1.Object) bool {
 
 func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformContext,
 	obj PT, graphCli model.GraphClient, dag *graph.DAG, cmpFn func(oldObj, newObj PT) bool) (PT, error) {
-	component.AddAssistantObject(transCtx.SynthesizeComponent, obj)
 	oldObj := PT(new(T))
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(obj), oldObj); err != nil {
 		if errors.IsNotFound(err) {
-			graphCli.Create(dag, obj, appsutil.InDataContext4G())
+			// graphCli.Create(dag, obj, appsutil.InDataContext4G())
+			graphCli.Create(dag, obj)
 			return obj, nil
 		}
 		return nil, err
@@ -154,7 +185,8 @@ func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformC
 	if !cmpFn(oldObj, obj) || metav1.GetControllerOf(oldObj) == nil {
 		transCtx.Logger.V(1).Info("updating rbac resources",
 			"name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
-		graphCli.Update(dag, oldObj, obj, appsutil.InDataContext4G())
+		// graphCli.Update(dag, oldObj, obj, appsutil.InDataContext4G())
+		graphCli.Update(dag, oldObj, obj)
 	}
 	return obj, nil
 }

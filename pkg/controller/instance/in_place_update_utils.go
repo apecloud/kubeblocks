@@ -285,6 +285,9 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 
 func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (PodUpdatePolicy, error) {
 	if getPodRevision(pod) != inst.Status.UpdateRevision {
+		if len(inst.Status.UpdateRevision) == 0 {
+			return NoOpsPolicy, nil
+		}
 		return RecreatePolicy, nil
 	}
 

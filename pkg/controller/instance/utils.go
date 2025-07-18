@@ -199,19 +199,16 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 	}
 	labels := getMatchLabels(inst.Name)
 	pod := builder.NewPodBuilder(inst.Namespace, inst.Name).
-		AddAnnotationsInMap(inst.Annotations).
-		AddLabelsInMap(inst.Labels).
+		AddAnnotationsInMap(inst.Spec.Template.Annotations).
+		AddLabelsInMap(inst.Spec.Template.Labels).
 		AddLabelsInMap(labels).
 		AddLabels(constant.KBAppPodNameLabelKey, inst.Name). // used as a pod-service selector
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, inst.Spec.InstanceTemplateName).
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
+		SetHostname(inst.Name).
+		SetSubdomain(getHeadlessSvcName(inst.Spec.InstanceSetName)).
 		GetObject()
-
-	// Set these immutable fields only on initial Pod creation, not updates.
-	pod.Spec.Hostname = pod.Name
-	// TODO: inst.Name -> its.Name
-	pod.Spec.Subdomain = getHeadlessSvcName(inst.Name)
 
 	// TODO: ???
 	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
@@ -229,8 +226,7 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range inst.Spec.VolumeClaimTemplates {
-		// TODO: inst.Name -> its.Name
-		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Name, pod.GetName())
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Spec.InstanceSetName, pod.GetName())
 		pvcNameMap[pvcName] = claimTemplate.Name
 	}
 
@@ -259,10 +255,8 @@ func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClai
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(inst.Name)
 	for _, claimTemplate := range inst.Spec.VolumeClaimTemplates {
-		// TODO: inst.Name -> its.Name
-		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Name, inst.Name)
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
 		pvc := builder.NewPVCBuilder(inst.Namespace, pvcName).
-			AddLabelsInMap(inst.Labels).
 			AddLabelsInMap(labels).
 			AddLabelsInMap(claimTemplate.Labels).
 			AddLabels(constant.KBAppPodNameLabelKey, inst.Name).
@@ -371,22 +365,6 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	default:
 		return newObj
 	}
-}
-
-func buildInstancePodRevision(template *corev1.PodTemplateSpec, inst *workloads.Instance) (string, error) {
-	podTemplate := filterInPlaceFields(template)
-	its := builder.NewInstanceSetBuilder(inst.Namespace, inst.Name).
-		SetUID(inst.UID).
-		AddAnnotationsInMap(inst.Annotations).
-		SetSelectorMatchLabel(inst.Labels).
-		SetTemplate(*podTemplate).
-		GetObject()
-
-	cr, err := NewRevision(its)
-	if err != nil {
-		return "", err
-	}
-	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
 func getHeadlessSvcName(itsName string) string {

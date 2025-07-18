@@ -80,7 +80,6 @@ type SynthesizedComponent struct {
 	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
 	Stop                             *bool
 	AssistantObjects                 []corev1.ObjectReference
-	CloneAssistantObjects            bool
 }
 
 type SynthesizedFileTemplate struct {

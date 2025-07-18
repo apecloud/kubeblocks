@@ -102,12 +102,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
 	}
+	inst.Status.UpToDate = yesOrNo(updated)
 
 	readyCondition := buildReadyCondition(inst, ready, notReadyName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
+	inst.Status.Ready = yesOrNo(ready)
 
 	availableCondition := buildAvailableCondition(inst, available, notAvailableName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
+	inst.Status.Available = yesOrNo(available)
 
 	failureCondition := buildFailureCondition(inst, pod)
 	if failureCondition != nil {
@@ -187,6 +190,7 @@ func buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Co
 func setMembersStatus(inst *workloads.Instance, pod *corev1.Pod) {
 	// reset it first
 	inst.Status.Role = nil
+	inst.Status.Role2 = "-"
 
 	// no roles defined
 	if inst.Spec.Roles == nil {
@@ -195,12 +199,21 @@ func setMembersStatus(inst *workloads.Instance, pod *corev1.Pod) {
 
 	// compose new status
 	inst.Status.Role = ptr.To("")
+	inst.Status.Role2 = "N/A"
 	if intctrlutil.PodIsReadyWithLabel(*pod) {
 		roleMap := composeRoleMap(inst)
 		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if ok {
 			inst.Status.Role = ptr.To(role.Name)
+			inst.Status.Role2 = role.Name
 		}
 	}
+}
+
+func yesOrNo(v bool) string {
+	if v {
+		return "Y"
+	}
+	return "N"
 }

@@ -20,143 +20,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+func NewAssistantObjectReconciler() kubebuilderx.Reconciler {
+	return &assistantObjectReconciler{}
+}
+
+type assistantObjectReconciler struct{}
+
+func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return nil
+		return kubebuilderx.ConditionUnsatisfied
 	}
-	its := tree.GetRoot().(*workloads.InstanceSet)
-	if its.Spec.CloneAssistantObjects {
-		for _, objRef := range its.Spec.AssistantObjects {
-			obj, err := loadAssistantObject(ctx, reader, objRef)
-			if err != nil {
-				return err
-			}
-			if obj != nil {
-				if err = tree.Add(obj); err != nil {
-					return err
-				}
-			}
+	if model.IsReconciliationPaused(tree.GetRoot()) {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	return kubebuilderx.ConditionSatisfied
+}
+
+func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	var (
+		objects []client.Object
+		its, _  = tree.GetRoot().(*workloads.InstanceSet)
+	)
+
+	if !its.Spec.DisableDefaultHeadlessService && !its.Spec.CloneAssistantObjects {
+		labels := getMatchLabels(its.Name)
+		headlessSelectors := getHeadlessSvcSelector(its)
+		headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
+		objects = append(objects, headLessSvc)
+	}
+	for _, object := range objects {
+		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
+			return kubebuilderx.Continue, err
 		}
 	}
-	return nil
-}
 
-func loadAssistantObject(ctx context.Context, reader client.Reader, objRef corev1.ObjectReference) (client.Object, error) {
-	obj, err := objectReferenceToObject(objRef)
-	if err != nil {
-		return nil, err
-	}
-	if err = reader.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-	return obj, nil
-}
-
-func cloneAssistantObjects(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]workloads.InstanceAssistantObject, error) {
-	objs := make([]workloads.InstanceAssistantObject, 0)
-	for _, objRef := range its.Spec.AssistantObjects {
-		obj, err := cloneAssistantObject(tree, objRef)
+	// compute create/update/delete set
+	newSnapshot := make(map[model.GVKNObjKey]client.Object)
+	for _, object := range objects {
+		name, err := model.GetGVKName(object)
 		if err != nil {
-			return nil, err
+			return kubebuilderx.Continue, err
 		}
-		if obj != nil {
-			resetAssistantObjectMeta(obj)
-			objs = append(objs, instanceAssistantObject(obj))
+		newSnapshot[*name] = object
+	}
+	oldSnapshot := make(map[model.GVKNObjKey]client.Object)
+	svcList := tree.List(&corev1.Service{})
+	for _, objectList := range [][]client.Object{svcList} {
+		for _, object := range objectList {
+			name, err := model.GetGVKName(object)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			oldSnapshot[*name] = object
 		}
 	}
-	return objs, nil
+
+	// now compute the diff between old and target snapshot and generate the plan
+	oldNameSet := sets.KeySet(oldSnapshot)
+	newNameSet := sets.KeySet(newSnapshot)
+
+	createSet := newNameSet.Difference(oldNameSet)
+	updateSet := newNameSet.Intersection(oldNameSet)
+	deleteSet := oldNameSet.Difference(newNameSet)
+	for name := range createSet {
+		if err := tree.Add(newSnapshot[name]); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
+	for name := range updateSet {
+		oldObj := oldSnapshot[name]
+		newObj := copyAndMerge(oldObj, newSnapshot[name])
+		if err := tree.Update(newObj); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
+	for name := range deleteSet {
+		if err := tree.Delete(oldSnapshot[name]); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
+	return kubebuilderx.Continue, nil
 }
 
-func cloneAssistantObject(tree *kubebuilderx.ObjectTree, objRef corev1.ObjectReference) (client.Object, error) {
-	obj, err := objectReferenceToObject(objRef)
-	if err != nil {
-		return nil, err
+func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
+	selectors := make(map[string]string)
+	for k, v := range its.Spec.Selector.MatchLabels {
+		selectors[k] = v
 	}
-	return tree.Get(obj)
+	selectors[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
+	return selectors
 }
 
-func objectReferenceToObject(objRef corev1.ObjectReference) (client.Object, error) {
-	meta := metav1.ObjectMeta{
-		Namespace: objRef.Namespace,
-		Name:      objRef.Name,
-	}
-	switch objRef.Kind {
-	case objectKind(&corev1.ConfigMap{}):
-		return &corev1.ConfigMap{ObjectMeta: meta}, nil
-	case objectKind(&corev1.Secret{}):
-		return &corev1.Secret{ObjectMeta: meta}, nil
-	case objectKind(&corev1.ServiceAccount{}):
-		return &corev1.ServiceAccount{ObjectMeta: meta}, nil
-	case objectKind(&rbacv1.Role{}):
-		return &rbacv1.Role{ObjectMeta: meta}, nil
-	case objectKind(&rbacv1.RoleBinding{}):
-		return &rbacv1.RoleBinding{ObjectMeta: meta}, nil
-	case objectKind(&corev1.Service{}):
-		return &corev1.Service{ObjectMeta: meta}, nil
-	default:
-		return nil, fmt.Errorf("unknown assistant object: %s", objRef.String())
-	}
-}
+func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
+	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its.Name)).
+		AddLabelsInMap(labels).
+		AddSelectorsInMap(selectors).
+		SetPublishNotReadyAddresses(true)
 
-func objectKind(obj client.Object) string {
-	gvk, _ := apiutil.GVKForObject(obj, model.GetScheme())
-	return gvk.Kind
-}
-
-func resetAssistantObjectMeta(obj client.Object) {
-	obj.SetSelfLink("")
-	obj.SetUID("")
-	obj.SetResourceVersion("")
-	obj.SetGeneration(0)
-	obj.SetCreationTimestamp(metav1.Time{})
-	obj.SetDeletionTimestamp(nil)
-	obj.SetDeletionGracePeriodSeconds(nil)
-	obj.SetOwnerReferences(nil)
-	obj.SetFinalizers(nil)
-	obj.SetManagedFields(nil)
-}
-
-func instanceAssistantObject(obj client.Object) workloads.InstanceAssistantObject {
-	if cm, ok := obj.(*corev1.ConfigMap); ok {
-		return workloads.InstanceAssistantObject{
-			ConfigMap: cm,
+	portNames := sets.New[string]()
+	for _, container := range its.Spec.Template.Spec.Containers {
+		for _, port := range container.Ports {
+			servicePort := corev1.ServicePort{
+				Protocol: port.Protocol,
+				Port:     port.ContainerPort,
+			}
+			switch {
+			case len(port.Name) > 0 && !portNames.Has(port.Name):
+				portNames.Insert(port.Name)
+				servicePort.Name = port.Name
+			default:
+				servicePort.Name = fmt.Sprintf("%s-%d", strings.ToLower(string(port.Protocol)), port.ContainerPort)
+			}
+			hdlBuilder.AddPorts(servicePort)
 		}
 	}
-	if secret, ok := obj.(*corev1.Secret); ok {
-		return workloads.InstanceAssistantObject{
-			Secret: secret,
-		}
-	}
-	if service, ok := obj.(*corev1.Service); ok {
-		return workloads.InstanceAssistantObject{
-			Service: service,
-		}
-	}
-	if sa, ok := obj.(*corev1.ServiceAccount); ok {
-		return workloads.InstanceAssistantObject{
-			ServiceAccount: sa,
-		}
-	}
-	if role, ok := obj.(*rbacv1.Role); ok {
-		return workloads.InstanceAssistantObject{
-			Role: role,
-		}
-	}
-	return workloads.InstanceAssistantObject{
-		RoleBinding: obj.(*rbacv1.RoleBinding),
-	}
+	return hdlBuilder.GetObject()
 }

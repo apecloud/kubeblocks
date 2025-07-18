@@ -31068,6 +31068,17 @@ down.</p>
 </tr>
 <tr>
 <td>
+<code>instanceSetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceTemplateName</code><br/>
 <em>
 string
@@ -31803,18 +31814,6 @@ Kubernetes core/v1.ConfigMap
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secret-v1-core">
 Kubernetes core/v1.Secret
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>service</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-Kubernetes core/v1.Service
 </a>
 </em>
 </td>
@@ -32647,6 +32646,17 @@ down.</p>
 </tr>
 <tr>
 <td>
+<code>instanceSetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceTemplateName</code><br/>
 <em>
 string
@@ -32825,6 +32835,21 @@ InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.<
 </tr>
 <tr>
 <td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the latest available observations of an instance&rsquo;s current state.
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>currentRevision</code><br/>
 <em>
 string
@@ -32849,6 +32874,40 @@ string
 </tr>
 <tr>
 <td>
+<code>upToDate</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is up-to-date.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>role</code><br/>
 <em>
 string
@@ -32861,17 +32920,14 @@ string
 </tr>
 <tr>
 <td>
-<code>conditions</code><br/>
+<code>role2</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
-[]Kubernetes meta/v1.Condition
-</a>
+string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the latest available observations of an instance&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;</p>
+<p>Represents the role of the instance observed.</p>
 </td>
 </tr>
 </tbody>

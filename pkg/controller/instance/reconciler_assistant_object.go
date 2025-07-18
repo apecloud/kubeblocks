@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"reflect"
+
 	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -51,43 +55,33 @@ func (r *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	for _, obj := range inst.Spec.AssistantObjects {
-		if err := r.createOrUpdate(tree, inst, r.instanceAssistantObject(obj)); err != nil {
+		_, err := r.createOrUpdate(tree, inst, obj)
+		if err != nil {
 			return kubebuilderx.Continue, err
 		}
 	}
 	return kubebuilderx.Continue, nil
 }
 
-func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, obj client.Object) error {
+func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, assistantObj workloads.InstanceAssistantObject) (bool, error) {
+	obj := r.instanceAssistantObject(assistantObj)
 	robj, err := tree.Get(obj)
 	if err != nil && !errors.IsNotFound(err) {
-		return err
+		return false, err
 	}
 	if err != nil || robj == nil {
 		labels := obj.GetLabels()
 		maps.Copy(labels, getMatchLabels(inst.Name))
 		obj.SetLabels(labels)
 		if err := controllerutil.SetControllerReference(inst, obj, model.GetScheme()); err != nil {
-			return err
+			return false, err
 		}
-		return tree.Add(obj)
+		return true, tree.Add(obj)
 	}
-	r.mergeAssistantObjectMeta(robj, obj)
-	return tree.Update(obj)
-}
-
-func (r *assistantObjectReconciler) mergeAssistantObjectMeta(oldObj, newObj client.Object) {
-	newObj.SetSelfLink(oldObj.GetSelfLink())
-	newObj.SetUID(oldObj.GetUID())
-	newObj.SetResourceVersion(oldObj.GetResourceVersion())
-	newObj.SetGeneration(oldObj.GetGeneration())
-	newObj.SetCreationTimestamp(oldObj.GetCreationTimestamp())
-	newObj.SetDeletionTimestamp(oldObj.GetDeletionTimestamp())
-	newObj.SetDeletionGracePeriodSeconds(oldObj.GetDeletionGracePeriodSeconds())
-	newObj.SetOwnerReferences(oldObj.GetOwnerReferences())
-	newObj.SetFinalizers(oldObj.GetFinalizers())
-	newObj.SetManagedFields(oldObj.GetManagedFields())
-	// TODO: merge labels & annotations
+	if merged := r.copyAndMerge(assistantObj, robj, obj); merged != nil {
+		return true, tree.Update(merged)
+	}
+	return false, nil
 }
 
 func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
@@ -97,9 +91,6 @@ func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.Instan
 	if obj.Secret != nil {
 		return obj.Secret
 	}
-	if obj.Service != nil {
-		return obj.Service
-	}
 	if obj.ServiceAccount != nil {
 		return obj.ServiceAccount
 	}
@@ -107,4 +98,83 @@ func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.Instan
 		return obj.Role
 	}
 	return obj.RoleBinding
+}
+
+func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistantObject, oldObj, newObj client.Object) client.Object {
+	cm := func() client.Object {
+		return copyAndMergeAssistantObject(oldObj, newObj,
+			func(o, n client.Object) bool {
+				return reflect.DeepEqual(o.(*corev1.ConfigMap).Data, n.(*corev1.ConfigMap).Data)
+			},
+			func(o, n client.Object) {
+				o.(*corev1.ConfigMap).Data = n.(*corev1.ConfigMap).Data
+			})
+	}
+	secret := func() client.Object {
+		return copyAndMergeAssistantObject(oldObj, newObj,
+			func(o, n client.Object) bool {
+				return reflect.DeepEqual(o.(*corev1.Secret).Data, n.(*corev1.Secret).Data)
+			},
+			func(o, n client.Object) {
+				o.(*corev1.Secret).Data = n.(*corev1.Secret).Data
+			})
+	}
+	sa := func() client.Object {
+		return copyAndMergeAssistantObject(oldObj, newObj,
+			func(o, n client.Object) bool {
+				return reflect.DeepEqual(o.(*corev1.ServiceAccount).Secrets, n.(*corev1.ServiceAccount).Secrets)
+			},
+			func(o, n client.Object) {
+				o.(*corev1.ServiceAccount).Secrets = n.(*corev1.ServiceAccount).Secrets
+			})
+	}
+	role := func() client.Object {
+		return copyAndMergeAssistantObject(oldObj, newObj,
+			func(o, n client.Object) bool {
+				return reflect.DeepEqual(o.(*rbacv1.Role).Rules, n.(*rbacv1.Role).Rules)
+			},
+			func(o, n client.Object) {
+				o.(*rbacv1.Role).Rules = n.(*rbacv1.Role).Rules
+			})
+	}
+	roleBinding := func() client.Object {
+		return copyAndMergeAssistantObject(oldObj, newObj,
+			func(o, n client.Object) bool {
+				o1 := o.(*rbacv1.RoleBinding)
+				n1 := n.(*rbacv1.RoleBinding)
+				return reflect.DeepEqual(o1.Subjects, n1.Subjects) && reflect.DeepEqual(o1.RoleRef, n1.RoleRef)
+			},
+			func(o, n client.Object) {
+				o1 := o.(*rbacv1.RoleBinding)
+				n1 := n.(*rbacv1.RoleBinding)
+				o1.Subjects = n1.Subjects
+				o1.RoleRef = n1.RoleRef
+			})
+	}
+	if obj.ConfigMap != nil {
+		return cm()
+	}
+	if obj.Secret != nil {
+		return secret()
+	}
+	if obj.ServiceAccount != nil {
+		return sa()
+	}
+	if obj.Role != nil {
+		return role()
+	}
+	return roleBinding()
+}
+
+func copyAndMergeAssistantObject(oldObj, newObj client.Object, equal func(o, n client.Object) bool, set func(o, n client.Object)) client.Object {
+	if reflect.DeepEqual(oldObj.GetLabels(), newObj.GetLabels()) &&
+		reflect.DeepEqual(oldObj.GetAnnotations(), newObj.GetAnnotations()) &&
+		equal(oldObj, newObj) {
+		return nil
+	}
+	objCopy := oldObj.DeepCopyObject().(client.Object)
+	objCopy.SetLabels(newObj.GetLabels())
+	objCopy.SetAnnotations(newObj.GetAnnotations())
+	set(objCopy, newObj)
+	return objCopy
 }

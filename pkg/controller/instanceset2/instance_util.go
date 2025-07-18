@@ -27,34 +27,31 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var (
-	reader *zstd.Decoder
-	writer *zstd.Encoder
-)
-
-func init() {
-	var err error
-	reader, err = zstd.NewReader(nil)
-	runtime.Must(err)
-	writer, err = zstd.NewWriter(nil)
-	runtime.Must(err)
-}
+// var (
+//	reader *zstd.Decoder
+//	writer *zstd.Encoder
+// )
+//
+// func init() {
+//	var err error
+//	reader, err = zstd.NewReader(nil)
+//	runtime.Must(err)
+//	writer, err = zstd.NewWriter(nil)
+//	runtime.Must(err)
+// }
 
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
@@ -141,24 +138,25 @@ func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 
 func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet, revision string) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
-	if len(revision) == 0 {
-		var err error
-		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, its)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// if len(revision) == 0 {
+	//	var err error
+	//	revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, its)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	// }
 
 	b := builder.NewInstanceBuilder(its.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
-		AddControllerRevisionHashLabel(revision).
+		// AddControllerRevisionHashLabel(revision).
 		// TODO: labels & annotations for instance and pod
-		SetPodSpec(*template.Spec.DeepCopy()).
+		SetPodTemplate(*template.DeepCopy()).
 		SetSelector(its.Spec.Selector).
 		SetMinReadySeconds(its.Spec.MinReadySeconds).
+		SetInstanceSetName(its.Name).
 		SetInstanceTemplateName(template.Name).
 		SetInstanceUpdateStrategyType(its.Spec.InstanceUpdateStrategy).
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
@@ -178,23 +176,8 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, templat
 		b.SetNodeSelector(map[string]string{corev1.LabelHostname: nodeName})
 	}
 
-	pvcNameMap := make(map[string]string)
-	for _, claimTemplate := range template.VolumeClaimTemplates {
-		pvcName := intctrlutil.ComposePVCName(claimTemplate, its.Name, name)
-		pvc := builder.NewPVCBuilder(its.Namespace, pvcName).
-			AddLabelsInMap(labels).
-			AddLabelsInMap(template.Labels).
-			AddLabelsInMap(claimTemplate.Labels).
-			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
-			AddLabels(constant.KBAppPodNameLabelKey, name).
-			AddAnnotationsInMap(claimTemplate.Annotations).
-			SetSpec(*claimTemplate.Spec.DeepCopy()).
-			GetObject()
-		if template.Name != "" {
-			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
-		}
-		b.AddVolumeClaimTemplate(*pvc)
-		pvcNameMap[pvcName] = claimTemplate.Name
+	for i := range template.VolumeClaimTemplates {
+		b.AddVolumeClaimTemplate(template.VolumeClaimTemplates[i])
 	}
 	b.SetPVCRetentionPolicy(its.Spec.PersistentVolumeClaimRetentionPolicy)
 
@@ -207,30 +190,12 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, templat
 	}
 
 	inst := b.GetObject()
-
-	var volumeList []corev1.Volume
-	for pvcName, claimTemplateName := range pvcNameMap {
-		volume := builder.NewVolumeBuilder(claimTemplateName).
-			SetVolumeSource(corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
-			}).GetObject()
-		volumeList = append(volumeList, *volume)
-	}
-	intctrlutil.MergeList(&volumeList, &inst.Spec.Template.Spec.Volumes, func(item corev1.Volume) func(corev1.Volume) bool {
-		return func(v corev1.Volume) bool {
-			return v.Name == item.Name
-		}
-	})
-
-	if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
-		return nil, err
-	}
+	// if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
+	//	return nil, err
+	// }
 	return inst, nil
 }
 
-// copyAndMerge merges two objects for updating:
-// 1. new an object targetObj by copying from oldObj
-// 2. merge all fields can be updated from newObj into targetObj
 func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	if reflect.TypeOf(oldObj) != reflect.TypeOf(newObj) {
 		return nil
@@ -257,42 +222,41 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return oldSvc
 	}
 
-	copyAndMergeCm := func(oldCm, newCm *corev1.ConfigMap) client.Object {
-		intctrlutil.MergeList(&newCm.Finalizers, &oldCm.Finalizers, func(finalizer string) func(string) bool {
-			return func(item string) bool {
-				return finalizer == item
-			}
-		})
-		intctrlutil.MergeList(&newCm.OwnerReferences, &oldCm.OwnerReferences, func(reference metav1.OwnerReference) func(metav1.OwnerReference) bool {
-			return func(item metav1.OwnerReference) bool {
-				return reference.UID == item.UID
-			}
-		})
-		oldCm.Data = newCm.Data
-		oldCm.BinaryData = newCm.BinaryData
-		return oldCm
+	targetObj := oldObj.DeepCopyObject()
+	switch o := newObj.(type) {
+	case *corev1.Service:
+		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
+	default:
+		return newObj
 	}
+}
 
-	copyAndMergePod := func(oldPod, newPod *corev1.Pod) client.Object {
-		mergeInPlaceFields(newPod, oldPod)
-		return oldPod
-	}
+func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Instance {
+	targetInst := oldInst.DeepCopyObject().(*workloads.Instance)
 
-	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
-		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
+	// merge pod
+	mergeInPlaceFields(&newInst.Spec.Template, &targetInst.Spec.Template)
+	targetInst.Spec.Selector = newInst.Spec.Selector
+	targetInst.Spec.MinReadySeconds = newInst.Spec.MinReadySeconds
+
+	// merge pvcs
+	for i := range newInst.Spec.VolumeClaimTemplates {
+		newPVC := &newInst.Spec.VolumeClaimTemplates[i]
+		oldPVC := &targetInst.Spec.VolumeClaimTemplates[i]
 		mergeMap(&newPVC.Labels, &oldPVC.Labels)
+		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
 		// resources.request.storage and accessModes support in-place update.
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
 			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) >= 0 {
-			return oldPVC
+			continue
 		}
 		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
 		if newPVC.Spec.Resources.Requests == nil {
-			return oldPVC
+			continue
 		}
 		if _, ok := newPVC.Spec.Resources.Requests[corev1.ResourceStorage]; !ok {
-			return oldPVC
+			continue
 		}
 		requests := oldPVC.Spec.Resources.Requests
 		if requests == nil {
@@ -300,46 +264,104 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		}
 		requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
 		oldPVC.Spec.Resources.Requests = requests
-		return oldPVC
+	}
+	targetInst.Spec.PersistentVolumeClaimRetentionPolicy = newInst.Spec.PersistentVolumeClaimRetentionPolicy
+
+	copyAndMergeCM := func(old, new *corev1.ConfigMap) client.Object {
+		mergeMap(&new.Labels, &old.Labels)
+		mergeMap(&new.Annotations, &old.Annotations)
+		old.Data = new.Data
+		old.BinaryData = new.BinaryData
+		return old
 	}
 
-	copyAndMergeInstance := func(oldInst, newInst *workloads.Instance) client.Object {
-		// TODO: impl
-		return newInst
+	copyAndMergeSecret := func(old, new *corev1.Secret) client.Object {
+		mergeMap(&new.Labels, &old.Labels)
+		mergeMap(&new.Annotations, &old.Annotations)
+		old.Data = new.Data
+		old.StringData = new.StringData
+		return old
 	}
 
-	targetObj := oldObj.DeepCopyObject()
-	switch o := newObj.(type) {
-	case *workloads.Instance:
-		return copyAndMergeInstance(targetObj.(*workloads.Instance), o)
-	case *corev1.Service:
-		return copyAndMergeSvc(targetObj.(*corev1.Service), o)
-	case *corev1.ConfigMap:
-		return copyAndMergeCm(targetObj.(*corev1.ConfigMap), o)
-	case *corev1.Pod:
-		return copyAndMergePod(targetObj.(*corev1.Pod), o)
-	case *corev1.PersistentVolumeClaim:
-		return copyAndMergePVC(targetObj.(*corev1.PersistentVolumeClaim), o)
-	default:
-		return newObj
+	copyAndMergeSA := func(old, new *corev1.ServiceAccount) client.Object {
+		mergeMap(&new.Labels, &old.Labels)
+		mergeMap(&new.Annotations, &old.Annotations)
+		old.Secrets = new.Secrets
+		return old
 	}
+
+	copyAndMergeRole := func(old, new *rbacv1.Role) client.Object {
+		mergeMap(&new.Labels, &old.Labels)
+		mergeMap(&new.Annotations, &old.Annotations)
+		old.Rules = new.Rules
+		return old
+	}
+
+	copyAndMergeRoleBinding := func(old, new *rbacv1.RoleBinding) client.Object {
+		mergeMap(&new.Labels, &old.Labels)
+		mergeMap(&new.Annotations, &old.Annotations)
+		old.Subjects = new.Subjects
+		old.RoleRef = new.RoleRef
+		return old
+	}
+
+	copyNMergeAssistantObjects := func() {
+		for i := range newInst.Spec.AssistantObjects {
+			oldObj := &targetInst.Spec.AssistantObjects[i]
+			newObj := &newInst.Spec.AssistantObjects[i]
+			if newObj.ConfigMap != nil {
+				copyAndMergeCM(oldObj.ConfigMap, newObj.ConfigMap)
+			}
+			if newObj.Secret != nil {
+				copyAndMergeSecret(oldObj.Secret, newObj.Secret)
+			}
+			if newObj.ServiceAccount != nil {
+				copyAndMergeSA(oldObj.ServiceAccount, newObj.ServiceAccount)
+			}
+			if newObj.Role != nil {
+				copyAndMergeRole(oldObj.Role, newObj.Role)
+			}
+			if newObj.RoleBinding != nil {
+				copyAndMergeRoleBinding(oldObj.RoleBinding, newObj.RoleBinding)
+			}
+		}
+	}
+
+	// merge assistant objects
+	if len(targetInst.Spec.AssistantObjects) == 0 {
+		targetInst.Spec.AssistantObjects = newInst.Spec.AssistantObjects
+	} else {
+		copyNMergeAssistantObjects()
+	}
+
+	// other fields
+	targetInst.Spec.InstanceSetName = newInst.Spec.InstanceSetName
+	targetInst.Spec.InstanceTemplateName = newInst.Spec.InstanceTemplateName
+	targetInst.Spec.InstanceUpdateStrategyType = newInst.Spec.InstanceUpdateStrategyType
+	targetInst.Spec.PodUpdatePolicy = newInst.Spec.PodUpdatePolicy
+	targetInst.Spec.DisableDefaultHeadlessService = newInst.Spec.DisableDefaultHeadlessService
+	targetInst.Spec.Roles = newInst.Spec.Roles
+	// targetInst.Spec.MembershipReconfiguration = newInst.Spec.MembershipReconfiguration
+	targetInst.Spec.TemplateVars = newInst.Spec.TemplateVars
+
+	return targetInst
 }
 
-func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
-	podTemplate := filterInPlaceFields(template)
-	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
-		SetUID(parent.UID).
-		AddAnnotationsInMap(parent.Annotations).
-		SetSelectorMatchLabel(parent.Labels).
-		SetTemplate(*podTemplate).
-		GetObject()
-
-	cr, err := NewRevision(its)
-	if err != nil {
-		return "", err
-	}
-	return cr.Labels[ControllerRevisionHashLabel], nil
-}
+// func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
+//	podTemplate := filterInPlaceFields(template)
+//	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
+//		SetUID(parent.UID).
+//		AddAnnotationsInMap(parent.Annotations).
+//		SetSelectorMatchLabel(parent.Labels).
+//		SetTemplate(*podTemplate).
+//		GetObject()
+//
+//	cr, err := NewRevision(its)
+//	if err != nil {
+//		return "", err
+//	}
+//	return cr.Labels[ControllerRevisionHashLabel], nil
+// }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
 	if annotations == nil {

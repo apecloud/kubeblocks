@@ -62,7 +62,6 @@ func ownedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&corev1.PodList{},
 		&corev1.PersistentVolumeClaimList{},
-		&corev1.ServiceList{},   // headless
 		&corev1.ConfigMapList{}, // config & script, env
 		&corev1.SecretList{},    // account, tls
 		&corev1.ServiceAccountList{},

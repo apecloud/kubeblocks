@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -31,10 +30,10 @@ import (
 // revisionUpdateReconciler is responsible for updating the expected instance names and their corresponding revisions in the status when there are changes in the spec.
 type revisionUpdateReconciler struct{}
 
-type instanceRevision struct {
-	name     string
-	revision string
-}
+// type instanceRevision struct {
+//	name     string
+//	revision string
+// }
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
 	return &revisionUpdateReconciler{}
@@ -49,45 +48,45 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
+	// itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	// if err != nil {
+	//	return kubebuilderx.Continue, err
+	// }
 
-	// build instance revision list from instance templates
-	var instanceRevisionList []instanceRevision
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	for instanceName, templateExt := range nameMap {
-		revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
-	}
+	//// build instance revision list from instance templates
+	// var instanceRevisionList []instanceRevision
+	// nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	// if err != nil {
+	//	return kubebuilderx.Continue, err
+	// }
+	// nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	// if err != nil {
+	//	return kubebuilderx.Continue, err
+	// }
+	// for instanceName, templateExt := range nameMap {
+	//	revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
+	//	if err != nil {
+	//		return kubebuilderx.Continue, err
+	//	}
+	//	instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
+	// }
 
-	updatedRevisions := make(map[string]string, len(instanceRevisionList))
-	for _, r := range instanceRevisionList {
-		updatedRevisions[r.name] = r.revision
-	}
+	// updatedRevisions := make(map[string]string, len(instanceRevisionList))
+	// for _, r := range instanceRevisionList {
+	//	updatedRevisions[r.name] = r.revision
+	// }
 
 	// 3. persistent these revisions to status
-	revisions, err := buildRevisions(updatedRevisions)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	its.Status.UpdateRevisions = revisions
-	updateRevision := ""
-	if len(instanceRevisionList) > 0 {
-		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
-	}
-	its.Status.UpdateRevision = updateRevision
+	// revisions, err := buildRevisions(updatedRevisions)
+	// if err != nil {
+	//	return kubebuilderx.Continue, err
+	// }
+	// its.Status.UpdateRevisions = revisions
+	// updateRevision := ""
+	// if len(instanceRevisionList) > 0 {
+	//	updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
+	// }
+	// its.Status.UpdateRevision = updateRevision
 	updatedReplicas, err := calculateUpdatedReplicas(tree, its, tree.List(&workloads.Instance{}))
 	if err != nil {
 		return kubebuilderx.Continue, err

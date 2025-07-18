@@ -26,8 +26,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+func NewDeletionReconciler() kubebuilderx.Reconciler {
+	return &deletionReconciler{}
+}
+
 // deletionReconciler handles object and its secondary resources' deletion
 type deletionReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &deletionReconciler{}
 
 func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectDeleting(tree.GetRoot()) {
@@ -60,9 +66,3 @@ func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTre
 	}
 	return len(secondaryObjects) > 0, nil
 }
-
-func NewDeletionReconciler() kubebuilderx.Reconciler {
-	return &deletionReconciler{}
-}
-
-var _ kubebuilderx.Reconciler = &deletionReconciler{}

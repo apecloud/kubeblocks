@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -46,15 +47,15 @@ var Codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
 var controllerKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 
-func NewRevision(its *workloads.InstanceSet) (*appsv1.ControllerRevision, error) {
-	patch, err := getPatch(its)
+func NewRevision(inst *workloads.Instance) (*appsv1.ControllerRevision, error) {
+	patch, err := getPatch(inst)
 	if err != nil {
 		return nil, err
 	}
 	collision := int32(0)
-	cr, err := NewControllerRevision(its,
+	cr, err := NewControllerRevision(inst,
 		controllerKind,
-		its.Spec.Template.Labels,
+		inst.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},
 		1,
 		&collision)
@@ -64,7 +65,7 @@ func NewRevision(its *workloads.InstanceSet) (*appsv1.ControllerRevision, error)
 	if cr.ObjectMeta.Annotations == nil {
 		cr.ObjectMeta.Annotations = make(map[string]string)
 	}
-	for key, value := range its.Annotations {
+	for key, value := range inst.Annotations {
 		cr.ObjectMeta.Annotations[key] = value
 	}
 	return cr, nil
@@ -74,8 +75,8 @@ func NewRevision(its *workloads.InstanceSet) (*appsv1.ControllerRevision, error)
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func getPatch(its *workloads.InstanceSet) ([]byte, error) {
-	data, err := runtime.Encode(patchCodec, its)
+func getPatch(inst *workloads.Instance) ([]byte, error) {
+	data, err := runtime.Encode(patchCodec, inst)
 	if err != nil {
 		return nil, err
 	}
@@ -165,4 +166,20 @@ func getPodRevision(pod *corev1.Pod) string {
 		return ""
 	}
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
+}
+
+func buildInstancePodRevision(template *corev1.PodTemplateSpec, parent *workloads.Instance) (string, error) {
+	podTemplate := filterInPlaceFields(template)
+	inst := builder.NewInstanceBuilder(parent.Namespace, parent.Name).
+		SetUID(parent.UID).
+		AddAnnotationsInMap(parent.Annotations).
+		SetSelectorMatchLabels(parent.Labels).
+		SetPodTemplate(*podTemplate).
+		GetObject()
+
+	cr, err := NewRevision(inst)
+	if err != nil {
+		return "", err
+	}
+	return cr.Labels[ControllerRevisionHashLabel], nil
 }

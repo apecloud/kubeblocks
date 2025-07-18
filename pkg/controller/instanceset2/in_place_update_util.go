@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -48,50 +47,50 @@ func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 }
 
-func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
-	template := src.DeepCopy()
-	// filter annotations
-	var annotations map[string]string
-	if len(template.Annotations) > 0 {
-		annotations = make(map[string]string)
-		// keep Restart annotation
-		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations[constant.RestartAnnotationKey] = restart
-		}
-		// keep Reconfigure annotation
-		for k, v := range template.Annotations {
-			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
-				annotations[k] = v
-			}
-		}
-		if len(annotations) == 0 {
-			annotations = nil
-		}
-	}
-	template.Annotations = annotations
-	// filter labels
-	template.Labels = nil
-	// filter spec.containers[*].images & spec.initContainers[*].images
-	for i := range template.Spec.Containers {
-		template.Spec.Containers[i].Image = ""
-	}
-	for i := range template.Spec.InitContainers {
-		template.Spec.InitContainers[i].Image = ""
-	}
-	// filter spec.activeDeadlineSeconds
-	template.Spec.ActiveDeadlineSeconds = nil
-	// filter spec.tolerations
-	template.Spec.Tolerations = nil
-	// filter spec.containers[*].resources["cpu|memory"]
-	for i := range template.Spec.Containers {
-		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceCPU)
-		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceMemory)
-		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceCPU)
-		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceMemory)
-	}
-
-	return template
-}
+// func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
+//	template := src.DeepCopy()
+//	// filter annotations
+//	var annotations map[string]string
+//	if len(template.Annotations) > 0 {
+//		annotations = make(map[string]string)
+//		// keep Restart annotation
+//		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
+//			annotations[constant.RestartAnnotationKey] = restart
+//		}
+//		// keep Reconfigure annotation
+//		for k, v := range template.Annotations {
+//			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
+//				annotations[k] = v
+//			}
+//		}
+//		if len(annotations) == 0 {
+//			annotations = nil
+//		}
+//	}
+//	template.Annotations = annotations
+//	// filter labels
+//	template.Labels = nil
+//	// filter spec.containers[*].images & spec.initContainers[*].images
+//	for i := range template.Spec.Containers {
+//		template.Spec.Containers[i].Image = ""
+//	}
+//	for i := range template.Spec.InitContainers {
+//		template.Spec.InitContainers[i].Image = ""
+//	}
+//	// filter spec.activeDeadlineSeconds
+//	template.Spec.ActiveDeadlineSeconds = nil
+//	// filter spec.tolerations
+//	template.Spec.Tolerations = nil
+//	// filter spec.containers[*].resources["cpu|memory"]
+//	for i := range template.Spec.Containers {
+//		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceCPU)
+//		delete(template.Spec.Containers[i].Resources.Requests, corev1.ResourceMemory)
+//		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceCPU)
+//		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceMemory)
+//	}
+//
+//	return template
+// }
 
 func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
 	requests := make(corev1.ResourceList)
@@ -115,7 +114,7 @@ func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList
 	return requests, limits
 }
 
-func mergeInPlaceFields(src, dst *corev1.Pod) {
+func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
 	mergeMap(&src.Annotations, &dst.Annotations)
 	mergeMap(&src.Labels, &dst.Labels)
 	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
@@ -284,12 +283,14 @@ func equalInstanceResourcesInPlaceFields(old, new *workloads.Instance) bool {
 }
 
 func getInstanceUpdatePolicy(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, inst *workloads.Instance) (PodUpdatePolicy, error) {
-	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
-	if err != nil {
-		return NoOpsPolicy, err
-	}
-
-	if getInstanceRevision(inst) != updateRevisions[inst.Name] {
+	// updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+	// if err != nil {
+	//	return NoOpsPolicy, err
+	// }
+	// if getInstanceRevision(inst) != updateRevisions[inst.Name] {
+	//	return RecreatePolicy, nil
+	// }
+	if inst.Status.CurrentRevision != inst.Status.UpdateRevision {
 		return RecreatePolicy, nil
 	}
 
@@ -305,11 +306,11 @@ func getInstanceUpdatePolicy(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	if index < 0 {
 		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", inst.Name)
 	}
-	newPod, err := buildInstanceByTemplate(tree, inst.Name, templateList[index], its, getInstanceRevision(inst))
+	newInst, err := buildInstanceByTemplate(tree, inst.Name, templateList[index], its, getInstanceRevision(inst))
 	if err != nil {
 		return NoOpsPolicy, err
 	}
-	basicUpdate := !equalInstanceBasicInPlaceFields(inst, newPod)
+	basicUpdate := !equalInstanceBasicInPlaceFields(inst, newInst)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
 			return InPlaceUpdatePolicy, nil
@@ -317,7 +318,7 @@ func getInstanceUpdatePolicy(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 		return NoOpsPolicy, nil
 	}
 
-	resourceUpdate := !equalInstanceResourcesInPlaceFields(inst, newPod)
+	resourceUpdate := !equalInstanceResourcesInPlaceFields(inst, newInst)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
 			return InPlaceUpdatePolicy, nil

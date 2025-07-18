@@ -177,7 +177,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			mergedInst := copyAndMerge(inst, newInst)
+			mergedInst := copyAndMergeInstance(inst, newInst)
 			if mergedInst != nil {
 				err = tree.Update(mergedInst)
 				if err != nil {

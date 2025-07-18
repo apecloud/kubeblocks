@@ -505,6 +505,24 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)
 		}
+
+		if err = (&workloadscontrollers.InstanceSetReconciler2{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller2"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet v2")
+			os.Exit(1)
+		}
+
+		if err = (&workloadscontrollers.InstanceReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("instance-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Instance")
+			os.Exit(1)
+		}
 	}
 
 	if viper.GetBool(operationsFlagKey.viperName()) {

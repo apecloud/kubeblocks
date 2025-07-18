@@ -73,5 +73,7 @@ func InheritedAnnotations() []string {
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
 		KBAppMultiClusterPlacementKey,
+		"enable-instance-api",
+		"clone-assistant-objects",
 	}
 }

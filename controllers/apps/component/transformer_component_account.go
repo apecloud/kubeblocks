@@ -26,6 +26,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,6 +102,16 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		if err := t.updateAccount(transCtx, dag, graphCli, accounts[name], secrets[name]); err != nil {
 			return err
 		}
+	}
+
+	for name := range protoNameSet {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: synthesizedComp.Namespace,
+				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, name),
+			},
+		}
+		component.AddAssistantObject(transCtx.SynthesizeComponent, secret)
 	}
 
 	return nil

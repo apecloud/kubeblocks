@@ -28,12 +28,17 @@ import (
 
 type WorkloadsV1Interface interface {
 	RESTClient() rest.Interface
+	InstancesGetter
 	InstanceSetsGetter
 }
 
 // WorkloadsV1Client is used to interact with features provided by the workloads.kubeblocks.io group.
 type WorkloadsV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *WorkloadsV1Client) Instances(namespace string) InstanceInterface {
+	return newInstances(c, namespace)
 }
 
 func (c *WorkloadsV1Client) InstanceSets(namespace string) InstanceSetInterface {

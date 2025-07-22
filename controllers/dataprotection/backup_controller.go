@@ -609,8 +609,9 @@ func (r *BackupReconciler) handleRunningPhase(
 		// check all actions status, if any action failed, update backup status to failed
 		// if all actions completed, update backup status to completed, otherwise,
 		// continue to handle following actions.
-	actions:
 		for targetPodName, acts := range actions {
+			// the backup actions for selected pod
+		targetPodBackupActions:
 			for _, act := range acts {
 				status, err := act.Execute(actionCtx)
 				if err != nil {
@@ -624,10 +625,10 @@ func (r *BackupReconciler) handleRunningPhase(
 					continue
 				case dpv1alpha1.ActionPhaseFailed:
 					existFailedAction = true
-					break actions
+					break targetPodBackupActions
 				case dpv1alpha1.ActionPhaseRunning:
 					waiting = true
-					break actions
+					break targetPodBackupActions
 				}
 			}
 		}

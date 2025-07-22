@@ -48,7 +48,7 @@ spec:
     root = {{ `{{ index .Parameters "bucket" }}` }}
     no_check_certificate = {{ `{{ index .Parameters "insecure" }}` }}
     no_check_bucket = {{ `{{ index .Parameters "noCheckBucket" }}` }}
-    use_already_exists=false
+    use_already_exists = false
     chunk_size = 50Mi
 
   parametersSchema:

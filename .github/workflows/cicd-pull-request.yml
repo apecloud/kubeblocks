@@ -9,16 +9,18 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
   GO_VERSION: "1.23"
 
 jobs:
   trigger-mode:
     name: trigger mode
-    if: github.event.action == 'labeled' && (github.event.label.name == 'approved' || github.event.label.name == 'pre-approve')
+    if: github.event.action == 'labeled'
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
+      trigger-run: ${{ steps.get_trigger_run.outputs.trigger_run }}
       git-commit: ${{ steps.get_git_info.outputs.git_commit }}
       git-version: ${{ steps.get_git_info.outputs.git_version }}
     steps:
@@ -33,7 +35,21 @@ jobs:
           fetch-depth: 0
           repository: ${{ github.event.pull_request.head.repo.full_name }}
 
+      - name: check run
+        id: get_trigger_run
+        run: |
+          TRIGGER_RUN="false"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          GITHUB_REPO="${{ github.repository }}"
+          pr_view_labels=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPO} --json "labels")
+          pr_labels=$(echo "${pr_view_labels}" | jq -r '.labels[].name')
+          if [[ "${pr_labels}" == *"approved"* || "${pr_labels}" == *"pre-approve"* ]]; then
+              TRIGGER_RUN="true"
+          fi
+          echo "trigger_run="$TRIGGER_RUN >> $GITHUB_OUTPUT
+
       - name: Get trigger mode
+        if: ${{ steps.get_trigger_run.outputs.trigger_run == 'true' }}
         id: get_trigger_mode
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -167,7 +183,7 @@ jobs:
   pr-check:
     name: make test
     needs: [ trigger-mode, pr-pre-check, check-image, check-tools-image, check-dataprotection-image, check-helm ]
-    if: ${{ github.event.action == 'labeled' && (github.event.label.name == 'approved' || github.event.label.name == 'pre-approve') && always() }}
+    if: ${{ github.event.action == 'labeled' && needs.trigger-mode.outputs.trigger-run == 'true' && always() }}
     runs-on: ubuntu-latest
     steps:
       - name: pr pre check

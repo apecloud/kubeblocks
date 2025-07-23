@@ -274,7 +274,7 @@ var _ = Describe("Restore", func() {
 			backup                  *dpv1alpha1.Backup
 			fullBackupActionSet     *dpv1alpha1.ActionSet
 			fullBackupActionSetName string
-			startIndex = int32(10)
+			startIndex              int32 = 10
 		)
 
 		BeforeEach(func() {

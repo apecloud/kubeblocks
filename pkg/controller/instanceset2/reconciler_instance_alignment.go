@@ -35,11 +35,6 @@ func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
 	return &instanceAlignmentReconciler{}
 }
 
-// instanceAlignmentReconciler is responsible for aligning the actual instances with the desired replicas specified in the spec,
-// including horizontal scaling and recovering from unintended instance deletions etc.
-// only handle instance count, don't care instance revision.
-//
-// TODO(free6om): support membership reconfiguration
 type instanceAlignmentReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
@@ -93,13 +88,12 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	isOrderedReady := true
 	concurrency := 0
 	if its.Spec.PodManagementPolicy == appsv1.ParallelPodManagement {
-		concurrency, err = CalculateConcurrencyReplicas(its.Spec.ParallelPodManagementConcurrency, int(*its.Spec.Replicas))
+		concurrency, err = calculateConcurrencyReplicas(its.Spec.ParallelPodManagementConcurrency, int(*its.Spec.Replicas))
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
 		isOrderedReady = false
 	}
-	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
 
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
@@ -133,7 +127,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) {
 			break
 		}
-		newInst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its, "")
+		newInst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}

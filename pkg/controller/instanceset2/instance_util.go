@@ -29,6 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,20 +39,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-// var (
-//	reader *zstd.Decoder
-//	writer *zstd.Encoder
-// )
-//
-// func init() {
-//	var err error
-//	reader, err = zstd.NewReader(nil)
-//	runtime.Must(err)
-//	writer, err = zstd.NewWriter(nil)
-//	runtime.Must(err)
-// }
 
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
@@ -119,10 +108,6 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-func getInstanceRevision(inst *workloads.Instance) string {
-	return inst.Status.CurrentRevision
-}
-
 // ParseNodeSelectorOnceAnnotation will return a non-nil map
 func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
 	podToNodeMapping := make(map[string]string)
@@ -136,23 +121,14 @@ func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 	return podToNodeMapping, nil
 }
 
-func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet, revision string) (*workloads.Instance, error) {
+func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
-	// if len(revision) == 0 {
-	//	var err error
-	//	revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, its)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	// }
-
 	b := builder.NewInstanceBuilder(its.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
+		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(its.Generation, 10)).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
-		// AddControllerRevisionHashLabel(revision).
-		// TODO: labels & annotations for instance and pod
 		SetPodTemplate(*template.DeepCopy()).
 		SetSelector(its.Spec.Selector).
 		SetMinReadySeconds(its.Spec.MinReadySeconds).
@@ -190,6 +166,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, templat
 	}
 
 	inst := b.GetObject()
+	// TODO: ?
 	// if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
 	//	return nil, err
 	// }
@@ -344,24 +321,17 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	// targetInst.Spec.MembershipReconfiguration = newInst.Spec.MembershipReconfiguration
 	targetInst.Spec.TemplateVars = newInst.Spec.TemplateVars
 
-	return targetInst
-}
+	// object meta
+	mergeMap(&newInst.Labels, &targetInst.Labels)
+	mergeMap(&newInst.Annotations, &targetInst.Annotations)
 
-// func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
-//	podTemplate := filterInPlaceFields(template)
-//	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
-//		SetUID(parent.UID).
-//		AddAnnotationsInMap(parent.Annotations).
-//		SetSelectorMatchLabel(parent.Labels).
-//		SetTemplate(*podTemplate).
-//		GetObject()
-//
-//	cr, err := NewRevision(its)
-//	if err != nil {
-//		return "", err
-//	}
-//	return cr.Labels[ControllerRevisionHashLabel], nil
-// }
+	if equality.Semantic.DeepEqual(&oldInst.Spec, &targetInst.Spec) ||
+		!equality.Semantic.DeepEqual(oldInst.Labels, targetInst.Labels) ||
+		!equality.Semantic.DeepEqual(oldInst.Annotations, targetInst.Annotations) {
+		return targetInst
+	}
+	return nil
+}
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
 	if annotations == nil {
@@ -380,4 +350,80 @@ func getInstanceTemplateMap(annotations map[string]string) (map[string]string, e
 
 func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
+}
+
+func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
+	mergeMap(&src.Annotations, &dst.Annotations)
+	mergeMap(&src.Labels, &dst.Labels)
+	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
+	// according to the Pod API spec, tolerations can only be appended.
+	// means old tolerations must be in new toleration list.
+	intctrlutil.MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
+		return func(t corev1.Toleration) bool {
+			return reflect.DeepEqual(item, t)
+		}
+	})
+	for _, container := range src.Spec.InitContainers {
+		for i, c := range dst.Spec.InitContainers {
+			if container.Name == c.Name {
+				dst.Spec.InitContainers[i].Image = container.Image
+				break
+			}
+		}
+	}
+	mergeResources := func(src, dst *corev1.ResourceList) {
+		if len(*src) == 0 {
+			return
+		}
+		if *dst == nil {
+			*dst = make(corev1.ResourceList)
+		}
+		for k, v := range *src {
+			(*dst)[k] = v
+		}
+	}
+	ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
+	for _, container := range src.Spec.Containers {
+		for i, c := range dst.Spec.Containers {
+			if container.Name == c.Name {
+				dst.Spec.Containers[i].Image = container.Image
+				if !ignorePodVerticalScaling {
+					requests, limits := copyRequestsNLimitsFields(&container)
+					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
+					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
+				}
+				break
+			}
+		}
+	}
+}
+
+func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
+	requests := make(corev1.ResourceList)
+	limits := make(corev1.ResourceList)
+	if len(container.Resources.Requests) > 0 {
+		if requestCPU, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+			requests[corev1.ResourceCPU] = requestCPU
+		}
+		if requestMemory, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+			requests[corev1.ResourceMemory] = requestMemory
+		}
+	}
+	if len(container.Resources.Limits) > 0 {
+		if limitCPU, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
+			limits[corev1.ResourceCPU] = limitCPU
+		}
+		if limitMemory, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
+			limits[corev1.ResourceMemory] = limitMemory
+		}
+	}
+	return requests, limits
+}
+
+func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
+	generation, ok := inst.Annotations[constant.KubeBlocksGenerationKey]
+	if !ok {
+		return false
+	}
+	return strconv.FormatInt(its.Generation, 10) == generation
 }

@@ -29,6 +29,19 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func newUpdatePlan(its workloads.InstanceSet, instances []*workloads.Instance, updated func(*workloads.InstanceSet, *workloads.Instance) bool) updatePlan {
+	var instanceList []workloads.Instance
+	for _, inst := range instances {
+		instanceList = append(instanceList, *inst)
+	}
+	return &realUpdatePlan{
+		its:               its,
+		instances:         instanceList,
+		dag:               graph.NewDAG(),
+		isInstanceUpdated: updated,
+	}
+}
+
 type updatePlan interface {
 	// Execute executes the plan
 	// return error when any error occurred
@@ -37,24 +50,22 @@ type updatePlan interface {
 	Execute() ([]*workloads.Instance, error)
 }
 
-type realUpdatePlan struct {
-	its                  workloads.InstanceSet
-	instances            []workloads.Instance
-	dag                  *graph.DAG
-	instancesToBeUpdated []*workloads.Instance
-	isInstanceUpdated    func(*workloads.InstanceSet, *workloads.Instance) (bool, error)
-}
-
-var _ updatePlan = &realUpdatePlan{}
-
 var (
 	ErrContinue error
 	ErrWait     = errors.New("wait")
 	ErrStop     = errors.New("stop")
 )
 
-// planWalkFunc decides whether vertex should be updated
-// nil error means vertex should be updated
+type realUpdatePlan struct {
+	its                  workloads.InstanceSet
+	instances            []workloads.Instance
+	dag                  *graph.DAG
+	instancesToBeUpdated []*workloads.Instance
+	isInstanceUpdated    func(*workloads.InstanceSet, *workloads.Instance) bool
+}
+
+var _ updatePlan = &realUpdatePlan{}
+
 func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	v, _ := vertex.(*model.ObjectVertex)
 	if v.Obj == nil {
@@ -70,20 +81,8 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 		return ErrWait
 	}
 
-	var (
-		isInstanceUpdated bool
-		err               error
-	)
-	if p.isInstanceUpdated == nil {
-		isInstanceUpdated, err = p.defaultIsPodUpdatedFunc(&p.its, inst)
-	} else {
-		isInstanceUpdated, err = p.isInstanceUpdated(&p.its, inst)
-	}
-	if err != nil {
-		return err
-	}
-	// if pod is the latest version, we do nothing
-	if isInstanceUpdated {
+	// if instance is the latest version, we do nothing
+	if p.isInstanceUpdated(&p.its, inst) {
 		if !intctrlutil.IsInstanceReady(inst) {
 			return ErrWait
 		}
@@ -111,13 +110,6 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	return ErrStop
 }
 
-func (p *realUpdatePlan) defaultIsPodUpdatedFunc(its *workloads.InstanceSet, inst *workloads.Instance) (bool, error) {
-	// TODO: ???
-	// return intctrlutil.GetPodRevision(pod) == its.Status.UpdateRevision, nil
-	return true, nil
-}
-
-// build builds the update plan based on memberUpdateStrategy
 func (p *realUpdatePlan) build() {
 	// make a root vertex with nil Obj
 	root := &model.ObjectVertex{}
@@ -125,7 +117,7 @@ func (p *realUpdatePlan) build() {
 
 	memberUpdateStrategy := getMemberUpdateStrategy(&p.its)
 
-	rolePriorityMap := ComposeRolePriorityMap(p.its.Spec.Roles)
+	rolePriorityMap := composeRolePriorityMap(p.its.Spec.Roles)
 	sortInstances(p.instances, rolePriorityMap, false)
 
 	// generate plan by memberUpdateStrategy
@@ -230,18 +222,4 @@ func (p *realUpdatePlan) Execute() ([]*workloads.Instance, error) {
 		return nil, err
 	}
 	return p.instancesToBeUpdated, nil
-}
-
-func NewUpdatePlan(its workloads.InstanceSet, instances []*workloads.Instance,
-	isInstanceUpdated func(*workloads.InstanceSet, *workloads.Instance) (bool, error)) updatePlan {
-	var instanceList []workloads.Instance
-	for _, inst := range instances {
-		instanceList = append(instanceList, *inst)
-	}
-	return &realUpdatePlan{
-		its:               its,
-		instances:         instanceList,
-		dag:               graph.NewDAG(),
-		isInstanceUpdated: isInstanceUpdated,
-	}
 }

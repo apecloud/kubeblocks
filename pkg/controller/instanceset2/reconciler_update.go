@@ -33,15 +33,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// updateReconciler handles the updates of instances based on the UpdateStrategy.
-// Currently, two update strategies are supported: 'OnDelete' and 'RollingUpdate'.
-type updateReconciler struct{}
-
-var _ kubebuilderx.Reconciler = &updateReconciler{}
-
 func NewUpdateReconciler() kubebuilderx.Reconciler {
 	return &updateReconciler{}
 }
+
+type updateReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &updateReconciler{}
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -112,7 +110,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(oldInstanceList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, oldInstanceList, r.isInstanceUpdated(tree))
+		plan := newUpdatePlan(*its, oldInstanceList, isInstanceUpdated)
 		instancesToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -122,23 +120,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	updatingInstances := 0
 	updatedInstances := 0
-	priorities := ComposeRolePriorityMap(its.Spec.Roles)
+	priorities := composeRolePriorityMap(its.Spec.Roles)
 	sortObjects(oldInstanceList, priorities, false)
-
-	// TODO: ???
-	// treat old and Pending pod as a special case, as they can be updated without a consequence
-	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
-	// for _, pod := range oldInstanceList {
-	//	updatePolicy, err := getPodUpdatePolicy(its, pod)
-	//	if err != nil {
-	//		return kubebuilderx.Continue, err
-	//	}
-	//	if isPodPending(pod) && updatePolicy != NoOpsPolicy {
-	//		err = tree.Delete(pod)
-	//		// wait another reconciliation, so that the following update process won't be confused
-	//		return kubebuilderx.Continue, err
-	//	}
-	// }
 
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {
@@ -168,33 +151,21 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		updatePolicy, err := getInstanceUpdatePolicy(tree, its, inst)
+		newInst, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if updatePolicy != NoOpsPolicy {
-			newInst, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its, getInstanceRevision(inst))
+		mergedInst := copyAndMergeInstance(inst, newInst)
+		if mergedInst != nil {
+			err = tree.Update(mergedInst)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			mergedInst := copyAndMergeInstance(inst, newInst)
-			if mergedInst != nil {
-				err = tree.Update(mergedInst)
-				if err != nil {
-					return kubebuilderx.Continue, err
-				}
-				updatingInstances++
-			}
+			updatingInstances++
 		}
 		updatedInstances++
 	}
 	return kubebuilderx.Continue, nil
-}
-
-func (r *updateReconciler) isInstanceUpdated(tree *kubebuilderx.ObjectTree) func(*workloads.InstanceSet, *workloads.Instance) (bool, error) {
-	return func(its *workloads.InstanceSet, inst *workloads.Instance) (bool, error) {
-		return isInstanceUpdated(tree, its, inst)
-	}
 }
 
 func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrategy, totalReplicas int) (int, int, error) {

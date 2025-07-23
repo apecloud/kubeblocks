@@ -30,7 +30,6 @@ func NewDeletionReconciler() kubebuilderx.Reconciler {
 	return &deletionReconciler{}
 }
 
-// deletionReconciler handles object and its secondary resources' deletion
 type deletionReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &deletionReconciler{}
@@ -46,12 +45,10 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	// delete secondary objects first
 	if has, err := r.deleteSecondaryObjects(tree); has {
 		return kubebuilderx.Continue, err
 	}
 
-	// delete root object
 	tree.DeleteRoot()
 	return kubebuilderx.Continue, nil
 }

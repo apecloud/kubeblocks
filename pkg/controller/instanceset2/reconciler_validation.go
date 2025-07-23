@@ -25,7 +25,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
+func NewValidationReconciler() kubebuilderx.Reconciler {
+	return &validationReconciler{}
+}
+
 type validationReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &apiVersionReconciler{}
 
 func (r *validationReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil {
@@ -40,9 +46,3 @@ func (r *validationReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 	}
 	return kubebuilderx.Continue, nil
 }
-
-func NewValidationReconciler() kubebuilderx.Reconciler {
-	return &validationReconciler{}
-}
-
-var _ kubebuilderx.Reconciler = &apiVersionReconciler{}

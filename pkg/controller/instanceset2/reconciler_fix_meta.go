@@ -26,7 +26,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+func NewFixMetaReconciler() kubebuilderx.Reconciler {
+	return &fixMetaReconciler{}
+}
+
 type fixMetaReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &fixMetaReconciler{}
 
 func (r *fixMetaReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -47,9 +53,3 @@ func (r *fixMetaReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilde
 	controllerutil.AddFinalizer(tree.GetRoot(), finalizer)
 	return kubebuilderx.Commit, nil
 }
-
-func NewFixMetaReconciler() kubebuilderx.Reconciler {
-	return &fixMetaReconciler{}
-}
-
-var _ kubebuilderx.Reconciler = &fixMetaReconciler{}

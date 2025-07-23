@@ -27,17 +27,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// revisionUpdateReconciler is responsible for updating the expected instance names and their corresponding revisions in the status when there are changes in the spec.
-type revisionUpdateReconciler struct{}
-
-// type instanceRevision struct {
-//	name     string
-//	revision string
-// }
-
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
 	return &revisionUpdateReconciler{}
 }
+
+type revisionUpdateReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}
 
 func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectUpdating(tree.GetRoot()) {
@@ -48,46 +44,8 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	// itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
 
-	//// build instance revision list from instance templates
-	// var instanceRevisionList []instanceRevision
-	// nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-	// nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-	// for instanceName, templateExt := range nameMap {
-	//	revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
-	//	if err != nil {
-	//		return kubebuilderx.Continue, err
-	//	}
-	//	instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
-	// }
-
-	// updatedRevisions := make(map[string]string, len(instanceRevisionList))
-	// for _, r := range instanceRevisionList {
-	//	updatedRevisions[r.name] = r.revision
-	// }
-
-	// 3. persistent these revisions to status
-	// revisions, err := buildRevisions(updatedRevisions)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-	// its.Status.UpdateRevisions = revisions
-	// updateRevision := ""
-	// if len(instanceRevisionList) > 0 {
-	//	updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
-	// }
-	// its.Status.UpdateRevision = updateRevision
-	updatedReplicas, err := calculateUpdatedReplicas(tree, its, tree.List(&workloads.Instance{}))
+	updatedReplicas, err := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -100,19 +58,13 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func calculateUpdatedReplicas(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []client.Object) (int32, error) {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) (int32, error) {
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
-		updated, err := isInstanceUpdated(tree, its, inst)
-		if err != nil {
-			return 0, nil
-		}
-		if updated {
+		if isInstanceUpdated(its, inst) {
 			updatedReplicas++
 		}
 	}
 	return updatedReplicas, nil
 }
-
-var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}

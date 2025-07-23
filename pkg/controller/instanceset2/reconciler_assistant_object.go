@@ -41,6 +41,8 @@ func NewAssistantObjectReconciler() kubebuilderx.Reconciler {
 
 type assistantObjectReconciler struct{}
 
+var _ kubebuilderx.Reconciler = &assistantObjectReconciler{}
+
 func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied

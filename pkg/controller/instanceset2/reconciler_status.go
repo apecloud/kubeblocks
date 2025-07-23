@@ -35,14 +35,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// statusReconciler computes the current status
-type statusReconciler struct{}
-
-var _ kubebuilderx.Reconciler = &statusReconciler{}
-
 func NewStatusReconciler() kubebuilderx.Reconciler {
 	return &statusReconciler{}
 }
+
+type statusReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
@@ -53,18 +52,14 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	// 1. get all instances
+
 	instances := tree.List(&workloads.Instance{})
 	var instanceList []*workloads.Instance
 	for _, object := range instances {
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
-	// 2. calculate status summary
-	// updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
+
 	replicas := int32(0)
 	ordinals := make([]int32, 0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
@@ -97,8 +92,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				Ordinals: make([]int32, 0),
 			}
 		}
-		// currentRevisions[inst.Name] = getInstanceRevision(inst)
-		// if isCreated(inst) {
 		{
 			notReadyNames.Insert(inst.Name)
 			replicas++
@@ -120,19 +113,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			updated, err := isInstanceUpdated(tree, its, inst)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			// switch _, ok := updateRevisions[inst.Name]; {
-			// case !ok, !updated:
-			//	currentReplicas++
-			//	template2TemplatesStatus[templateName].CurrentReplicas++
-			// default:
-			//	updatedReplicas++
-			//	template2TemplatesStatus[templateName].UpdatedReplicas++
-			// }
-			if updated {
+			if isInstanceUpdated(its, inst) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -317,7 +298,7 @@ func setMembersStatus(its *workloads.InstanceSet, instances []*workloads.Instanc
 	}
 
 	// sort and set
-	rolePriorityMap := ComposeRolePriorityMap(its.Spec.Roles)
+	rolePriorityMap := composeRolePriorityMap(its.Spec.Roles)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
 	its.Status.MembersStatus = newMembersStatus
 }

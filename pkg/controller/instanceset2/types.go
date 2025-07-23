@@ -22,17 +22,10 @@ package instanceset2
 const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
-
-	RoleLabelKey = "kubeblocks.io/role"
 )
 
 const (
-	// MaxPlainRevisionCount specified max number of plain revision stored in status.updateRevisions.
-	// All revisions will be compressed if exceeding this value.
-	MaxPlainRevisionCount = "MAX_PLAIN_REVISION_COUNT"
-
 	templateRefAnnotationKey = "kubeblocks.io/template-ref"
-	revisionsZSTDKey         = "zstd"
 
 	FeatureGateIgnorePodVerticalScaling = "IGNORE_POD_VERTICAL_SCALING"
 

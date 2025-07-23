@@ -27,7 +27,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func NewAPIVersionReconciler() kubebuilderx.Reconciler {
+	return &apiVersionReconciler{}
+}
+
 type apiVersionReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &apiVersionReconciler{}
 
 func (r *apiVersionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil {
@@ -46,9 +52,3 @@ func (r *apiVersionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 	}
 	return kubebuilderx.Commit, nil
 }
-
-func NewAPIVersionReconciler() kubebuilderx.Reconciler {
-	return &apiVersionReconciler{}
-}
-
-var _ kubebuilderx.Reconciler = &apiVersionReconciler{}

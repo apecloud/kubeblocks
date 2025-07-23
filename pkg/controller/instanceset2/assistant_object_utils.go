@@ -74,7 +74,6 @@ func cloneAssistantObjects(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 			return nil, err
 		}
 		if obj != nil {
-			resetAssistantObjectMeta(obj)
 			objs = append(objs, instanceAssistantObject(obj))
 		}
 	}
@@ -113,19 +112,6 @@ func objectReferenceToObject(objRef corev1.ObjectReference) (client.Object, erro
 func objectKind(obj client.Object) string {
 	gvk, _ := apiutil.GVKForObject(obj, model.GetScheme())
 	return gvk.Kind
-}
-
-func resetAssistantObjectMeta(obj client.Object) {
-	obj.SetSelfLink("")
-	obj.SetUID("")
-	obj.SetResourceVersion("")
-	obj.SetGeneration(0)
-	obj.SetCreationTimestamp(metav1.Time{})
-	obj.SetDeletionTimestamp(nil)
-	obj.SetDeletionGracePeriodSeconds(nil)
-	obj.SetOwnerReferences(nil)
-	obj.SetFinalizers(nil)
-	obj.SetManagedFields(nil)
 }
 
 func instanceAssistantObject(obj client.Object) workloads.InstanceAssistantObject {

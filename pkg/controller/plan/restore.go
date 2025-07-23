@@ -133,7 +133,7 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 	for _, v := range comp.Instances {
 		r.replicas = replicas(v)
 		templateReplicas += r.replicas
-		restore, err := r.BuildPrepareDataRestore(comp, backupObj, v.Name)
+		restore, err := r.BuildPrepareDataRestore(comp, backupObj, &v)
 		if err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 	compReplicas := comp.Replicas - templateReplicas
 	if compReplicas > 0 {
 		r.replicas = compReplicas
-		restore, err := r.BuildPrepareDataRestore(comp, backupObj, "")
+		restore, err := r.BuildPrepareDataRestore(comp, backupObj, nil)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,17 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 	return r.createRestoreAndWait(compObj, restores...)
 }
 
-func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, templateName string) (*dpv1alpha1.Restore, error) {
+func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, template *appsv1.InstanceTemplate) (*dpv1alpha1.Restore, error) {
+	templateName := ""
+	startingIndex := r.startingIndex
+	if template != nil {
+		templateName = template.Name
+		if len(template.Ordinals.Ranges) > 0 {
+			// todo: currently restore api does not support multiple ranges, if implement in current way it
+			// need to use multiple restore objects
+			startingIndex = template.Ordinals.Ranges[0].Start
+		}
+	}
 	backupMethod := backupObj.Status.BackupMethod
 	if backupMethod == nil {
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `status.backupMethod of backup "%s" can not be empty`, backupObj.Name)
@@ -216,7 +226,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
-					StartingIndex: r.startingIndex,
+					StartingIndex: startingIndex,
 					Templates:     templates,
 				},
 			},

@@ -95,6 +95,24 @@ func (factory *MockClusterFactory) AddMultipleTemplateComponent(compName string,
 	return factory
 }
 
+func (factory *MockClusterFactory) AddMultipleTemplateComponentRange(compName string, compDefName string) *MockClusterFactory {
+	comp := appsv1.ClusterComponentSpec{
+		Name:         compName,
+		ComponentDef: compDefName,
+		Instances: []appsv1.InstanceTemplate{{
+			Name:     "foo",
+			Replicas: func() *int32 { replicas := int32(1); return &replicas }(),
+			Ordinals: appsv1.Ordinals{
+				Ranges: []appsv1.Range{
+					{Start: 10, End: 20},
+				},
+			},
+		}},
+	}
+	factory.Get().Spec.ComponentSpecs = append(factory.Get().Spec.ComponentSpecs, comp)
+	return factory
+}
+
 func (factory *MockClusterFactory) AddInstances(compName string, instance appsv1.InstanceTemplate) *MockClusterFactory {
 	for i, compSpec := range factory.Get().Spec.ComponentSpecs {
 		if compSpec.Name != compName {

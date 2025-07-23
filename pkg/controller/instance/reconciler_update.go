@@ -80,13 +80,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
-	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
+	// podUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
 		updatePolicy, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if isPodPending(pod) && updatePolicy != NoOpsPolicy {
+		if isPodPending(pod) && updatePolicy != noOpsPolicy {
 			err = tree.Delete(pod)
 			// wait another reconciliation, so that the following update process won't be confused
 			return kubebuilderx.Continue, err
@@ -126,8 +126,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if inst.Spec.PodUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
-			message := fmt.Sprintf("Instance %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
+		if inst.Spec.PodUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType && updatePolicy == recreatePolicy {
+			message := fmt.Sprintf("Instance %s/%s blocks on update as the podUpdatePolicy is %s and the pod %s can not inplace update",
 				inst.Namespace, inst.Name, kbappsv1.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
 				tree.EventRecorder.Eventf(inst, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
@@ -136,7 +136,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			isBlocked = true
 			break
 		}
-		if updatePolicy == InPlaceUpdatePolicy {
+		if updatePolicy == inPlaceUpdatePolicy {
 			newPod, err := buildInstancePod(inst, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
@@ -161,7 +161,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-		} else if updatePolicy == RecreatePolicy {
+		} else if updatePolicy == recreatePolicy {
 			if !isTerminating(pod) {
 				if err = r.switchover(tree, inst, pod); err != nil {
 					return kubebuilderx.Continue, err
@@ -174,7 +174,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		// TODO: ???
 		//// actively reload the new configuration when the pod or container has not been updated
-		// if updatePolicy == NoOpsPolicy {
+		// if updatePolicy == noOpsPolicy {
 		//	_, err := r.reconfigure(tree, inst, pod)
 		//	if err != nil {
 		//		return kubebuilderx.Continue, err
@@ -323,7 +323,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 //	if err != nil {
 //		return false, err
 //	}
-//	if policy != NoOpsPolicy {
+//	if policy != noOpsPolicy {
 //		return false, nil
 //	}
 //	for _, config := range inst.Spec.Configs {

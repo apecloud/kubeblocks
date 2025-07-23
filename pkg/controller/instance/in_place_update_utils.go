@@ -33,12 +33,12 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-type PodUpdatePolicy string
+type podUpdatePolicy string
 
 const (
-	NoOpsPolicy         PodUpdatePolicy = "NoOps"
-	RecreatePolicy      PodUpdatePolicy = "Recreate"
-	InPlaceUpdatePolicy PodUpdatePolicy = "InPlaceUpdate"
+	noOpsPolicy         podUpdatePolicy = "NoOps"
+	recreatePolicy      podUpdatePolicy = "Recreate"
+	inPlaceUpdatePolicy podUpdatePolicy = "InPlaceUpdate"
 )
 
 func supportPodVerticalScaling() bool {
@@ -283,44 +283,41 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (PodUpdatePolicy, error) {
+func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePolicy, error) {
 	if getPodRevision(pod) != inst.Status.UpdateRevision {
 		if len(inst.Status.UpdateRevision) == 0 {
-			return NoOpsPolicy, nil
+			return noOpsPolicy, nil
 		}
-		return RecreatePolicy, nil
+		return recreatePolicy, nil
 	}
 
 	newPod, err := buildInstancePod(inst, getPodRevision(pod))
 	if err != nil {
-		return NoOpsPolicy, err
+		return noOpsPolicy, err
 	}
 	basicUpdate := !equalBasicInPlaceFields(pod, newPod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return InPlaceUpdatePolicy, nil
+			return inPlaceUpdatePolicy, nil
 		}
-		return NoOpsPolicy, nil
+		return noOpsPolicy, nil
 	}
 
 	resourceUpdate := !equalResourcesInPlaceFields(pod, newPod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
-			return InPlaceUpdatePolicy, nil
+			return inPlaceUpdatePolicy, nil
 		}
-		return RecreatePolicy, nil
+		return recreatePolicy, nil
 	}
 
 	if basicUpdate {
-		return InPlaceUpdatePolicy, nil
+		return inPlaceUpdatePolicy, nil
 	}
-	return NoOpsPolicy, nil
+	return noOpsPolicy, nil
 }
 
-// IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
-// This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
-// as the pod template revision has been redefined in instanceset.
-func IsPodUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+func isPodUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
 	policy, err := getPodUpdatePolicy(inst, pod)
-	return policy == NoOpsPolicy, err
+	return policy == noOpsPolicy, err
 }

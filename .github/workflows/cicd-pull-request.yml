@@ -43,6 +43,7 @@ jobs:
           GITHUB_REPO="${{ github.repository }}"
           pr_view_labels=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPO} --json "labels")
           pr_labels=$(echo "${pr_view_labels}" | jq -r '.labels[].name')
+          echo "PR LABELS:"$pr_labels
           if [[ "${pr_labels}" == *"approved"* || "${pr_labels}" == *"pre-approve"* ]]; then
               TRIGGER_RUN="true"
           fi

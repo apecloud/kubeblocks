@@ -206,22 +206,7 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, inst.Spec.InstanceTemplateName).
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
-		SetHostname(inst.Name).
-		SetSubdomain(getHeadlessSvcName(inst.Spec.InstanceSetName)).
 		GetObject()
-
-	// TODO: ???
-	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
-	// if err != nil {
-	//	return nil, err
-	// }
-	// if nodeName, ok := podToNodeMapping[inst.Name]; ok {
-	//	// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
-	//	if pod.Spec.NodeSelector == nil {
-	//		pod.Spec.NodeSelector = make(map[string]string)
-	//	}
-	//	pod.Spec.NodeSelector[corev1.LabelHostname] = nodeName
-	// }
 
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)

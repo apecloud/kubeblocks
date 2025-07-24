@@ -38,8 +38,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
@@ -108,8 +110,7 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-// ParseNodeSelectorOnceAnnotation will return a non-nil map
-func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
+func parseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
 	podToNodeMapping := make(map[string]string)
 	data, ok := its.Annotations[constant.NodeSelectorOnceAnnotationKey]
 	if !ok {
@@ -121,9 +122,10 @@ func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]str
 	return podToNodeMapping, nil
 }
 
-func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet) (*workloads.Instance, error) {
+func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
+	instName string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
-	b := builder.NewInstanceBuilder(its.Namespace, name).
+	b := builder.NewInstanceBuilder(its.Namespace, instName).
 		AddAnnotationsInMap(template.Annotations).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(its.Generation, 10)).
 		AddLabelsInMap(template.Labels).
@@ -141,13 +143,13 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, templat
 		SetTemplateVars(its.Spec.TemplateVars)
 
 	// set these immutable fields only on initial Pod creation, not updates.
-	b.SetHostname(name).
+	b.SetHostname(instName).
 		SetSubdomain(getHeadlessSvcName(its.Name))
-	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
+	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
 	if err != nil {
 		return nil, err
 	}
-	if nodeName, ok := podToNodeMapping[name]; ok {
+	if nodeName, ok := podToNodeMapping[instName]; ok {
 		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
 		b.SetNodeSelector(map[string]string{corev1.LabelHostname: nodeName})
 	}
@@ -166,10 +168,11 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree, name string, templat
 	}
 
 	inst := b.GetObject()
-	// TODO: ?
-	// if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
-	//	return nil, err
-	// }
+	if !its.Spec.CloneAssistantObjects {
+		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
+			return nil, err
+		}
+	}
 	return inst, nil
 }
 

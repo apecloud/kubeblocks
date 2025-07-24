@@ -20,7 +20,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: update to date.
+    - description: update-to-date.
       jsonPath: .status.upToDate
       name: UP-TO-DATE
       type: string
@@ -32,8 +32,8 @@ spec:
       jsonPath: .status.available
       name: AVAILABLE
       type: string
-    - description: with role.
-      jsonPath: .status.role2
+    - description: role.
+      jsonPath: .status.role
       name: ROLE
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -540,10 +540,6 @@ spec:
                       type: object
                   type: object
                 type: array
-              disableDefaultHeadlessService:
-                default: false
-                description: Specifies whether to create the default headless service.
-                type: boolean
               instanceSetName:
                 type: string
               instanceTemplateName:
@@ -8744,7 +8740,8 @@ spec:
             description: InstanceStatus2 defines the observed state of Instance
             properties:
               available:
-                type: string
+                description: Represents whether the instance is in available condition.
+                type: boolean
               conditions:
                 description: |-
                   Represents the latest available observations of an instance's current state.
@@ -8828,16 +8825,14 @@ spec:
                 format: int64
                 type: integer
               ready:
-                type: string
+                description: Represents whether the instance is in ready condition.
+                type: boolean
               role:
-                description: Represents the role of the instance observed.
-                type: string
-              role2:
                 description: Represents the role of the instance observed.
                 type: string
               upToDate:
                 description: Represents whether the instance is up-to-date.
-                type: string
+                type: boolean
               updateRevision:
                 description: updateRevision, if not empty, indicates the version of
                   the Instance used to generate pod.

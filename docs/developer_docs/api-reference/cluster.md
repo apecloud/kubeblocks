@@ -31118,18 +31118,6 @@ PodUpdatePolicyType
 </tr>
 <tr>
 <td>
-<code>disableDefaultHeadlessService</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to create the default headless service.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -32696,18 +32684,6 @@ PodUpdatePolicyType
 </tr>
 <tr>
 <td>
-<code>disableDefaultHeadlessService</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to create the default headless service.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -32876,7 +32852,7 @@ string
 <td>
 <code>upToDate</code><br/>
 <em>
-string
+bool
 </em>
 </td>
 <td>
@@ -32888,39 +32864,29 @@ string
 <td>
 <code>ready</code><br/>
 <em>
-string
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>Represents whether the instance is in ready condition.</p>
 </td>
 </tr>
 <tr>
 <td>
 <code>available</code><br/>
 <em>
-string
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
+<p>Represents whether the instance is in available condition.</p>
 </td>
 </tr>
 <tr>
 <td>
 <code>role</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the role of the instance observed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>role2</code><br/>
 <em>
 string
 </em>

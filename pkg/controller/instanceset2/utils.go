@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/integer"
-	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -59,7 +58,7 @@ func sortInstances(instances []workloads.Instance, rolePriorityMap map[string]in
 }
 
 func getInstanceRoleName(inst *workloads.Instance) string {
-	return ptr.Deref(inst.Status.Role, "")
+	return inst.Status.Role
 }
 
 func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {

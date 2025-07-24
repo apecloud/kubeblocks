@@ -31,10 +31,10 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},shortName=inst
-// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="update to date."
+// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="update-to-date."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready",description="ready."
 // +kubebuilder:printcolumn:name="AVAILABLE",type="string",JSONPath=".status.available",description="available."
-// +kubebuilder:printcolumn:name="ROLE",type="string",JSONPath=".status.role2",description="with role."
+// +kubebuilder:printcolumn:name="ROLE",type="string",JSONPath=".status.role",description="role."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Instance is the Schema for the instances API
@@ -113,12 +113,6 @@ type InstanceSpec struct {
 	// +optional
 	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
-	// Specifies whether to create the default headless service.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	DisableDefaultHeadlessService bool `json:"disableDefaultHeadlessService,omitempty"`
-
 	// A list of roles defined in the system. Instanceset obtains role through pods' role label `kubeblocks.io/role`.
 	//
 	// +optional
@@ -167,23 +161,22 @@ type InstanceStatus2 struct {
 	// Represents whether the instance is up-to-date.
 	//
 	// +optional
-	UpToDate string `json:"upToDate,omitempty"`
+	UpToDate bool `json:"upToDate,omitempty"`
 
+	// Represents whether the instance is in ready condition.
+	//
 	// +optional
-	Ready string `json:"ready,omitempty"`
+	Ready bool `json:"ready,omitempty"`
 
+	// Represents whether the instance is in available condition.
+	//
 	// +optional
-	Available string `json:"available,omitempty"`
+	Available bool `json:"available,omitempty"`
 
 	// Represents the role of the instance observed.
 	//
 	// +optional
-	Role *string `json:"role,omitempty"`
-
-	// Represents the role of the instance observed.
-	//
-	// +optional
-	Role2 string `json:"role2,omitempty"`
+	Role string `json:"role,omitempty"`
 }
 
 type InstanceAssistantObject struct {

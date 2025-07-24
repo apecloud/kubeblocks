@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -41,7 +42,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
@@ -319,7 +319,6 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.InstanceTemplateName = newInst.Spec.InstanceTemplateName
 	targetInst.Spec.InstanceUpdateStrategyType = newInst.Spec.InstanceUpdateStrategyType
 	targetInst.Spec.PodUpdatePolicy = newInst.Spec.PodUpdatePolicy
-	targetInst.Spec.DisableDefaultHeadlessService = newInst.Spec.DisableDefaultHeadlessService
 	targetInst.Spec.Roles = newInst.Spec.Roles
 	// targetInst.Spec.MembershipReconfiguration = newInst.Spec.MembershipReconfiguration
 	targetInst.Spec.TemplateVars = newInst.Spec.TemplateVars

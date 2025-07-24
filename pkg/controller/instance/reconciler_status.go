@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -33,14 +32,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// statusReconciler computes the current status
-type statusReconciler struct{}
-
-var _ kubebuilderx.Reconciler = &statusReconciler{}
-
 func NewStatusReconciler() kubebuilderx.Reconciler {
 	return &statusReconciler{}
 }
+
+type statusReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
@@ -102,28 +100,24 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
 	}
-	inst.Status.UpToDate = yesOrNo(updated)
 
-	readyCondition := buildReadyCondition(inst, ready, notReadyName)
+	readyCondition := r.buildReadyCondition(inst, ready, notReadyName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
-	inst.Status.Ready = yesOrNo(ready)
 
-	availableCondition := buildAvailableCondition(inst, available, notAvailableName)
+	availableCondition := r.buildAvailableCondition(inst, available, notAvailableName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
-	inst.Status.Available = yesOrNo(available)
 
-	failureCondition := buildFailureCondition(inst, pod)
+	failureCondition := r.buildFailureCondition(inst, pod)
 	if failureCondition != nil {
 		meta.SetStatusCondition(&inst.Status.Conditions, *failureCondition)
 	} else {
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	// 4. set members status
-	setMembersStatus(inst, pod)
-
-	// TODO: 5. set instance status
-	// setInstanceStatus(inst, podList)
+	inst.Status.UpToDate = updated
+	inst.Status.Ready = ready
+	inst.Status.Available = available
+	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -131,7 +125,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
+func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceReady),
 		Status:             metav1.ConditionTrue,
@@ -146,7 +140,7 @@ func buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName stri
 	return condition
 }
 
-func buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
+func (r *statusReconciler) buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceAvailable),
 		Status:             metav1.ConditionTrue,
@@ -161,7 +155,7 @@ func buildAvailableCondition(inst *workloads.Instance, available bool, notAvaila
 	return condition
 }
 
-func buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {
+func (r *statusReconciler) buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {
 	if isTerminating(pod) {
 		return nil
 	}
@@ -187,33 +181,14 @@ func buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Co
 	}
 }
 
-func setMembersStatus(inst *workloads.Instance, pod *corev1.Pod) {
-	// reset it first
-	inst.Status.Role = nil
-	inst.Status.Role2 = "-"
-
-	// no roles defined
-	if inst.Spec.Roles == nil {
-		return
-	}
-
-	// compose new status
-	inst.Status.Role = ptr.To("")
-	inst.Status.Role2 = "N/A"
-	if intctrlutil.PodIsReadyWithLabel(*pod) {
+func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *corev1.Pod) string {
+	if inst.Spec.Roles != nil && intctrlutil.PodIsReadyWithLabel(*pod) {
 		roleMap := composeRoleMap(inst)
 		roleName := getRoleName(pod)
 		role, ok := roleMap[roleName]
 		if ok {
-			inst.Status.Role = ptr.To(role.Name)
-			inst.Status.Role2 = role.Name
+			return role.Name
 		}
 	}
-}
-
-func yesOrNo(v bool) string {
-	if v {
-		return "Y"
-	}
-	return "N"
+	return ""
 }

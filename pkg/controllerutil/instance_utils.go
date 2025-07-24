@@ -25,9 +25,9 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// IsInstanceReadyWithRole checks if an instance is ready with the role label.
+// IsInstanceReadyWithRole checks if an instance is ready with the role observed.
 func IsInstanceReadyWithRole(inst *workloads.Instance) bool {
-	if len(inst.Spec.Roles) > 0 && inst.Status.Role == nil {
+	if len(inst.Spec.Roles) > 0 && len(inst.Status.Role) == 0 {
 		return false
 	}
 	return IsInstanceReady(inst)

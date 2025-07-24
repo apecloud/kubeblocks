@@ -348,7 +348,3 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 		return newObj
 	}
 }
-
-func getHeadlessSvcName(itsName string) string {
-	return strings.Join([]string{itsName, "headless"}, "-")
-}

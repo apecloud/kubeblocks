@@ -117,6 +117,10 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(getTemplateLabels(synthesizedComp)).
+		AddLabelsInMap(map[string]string{
+			constant.AppComponentLabelKey:   synthesizedComp.CompDefName,
+			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
+		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations)
 	return corev1.PodTemplateSpec{

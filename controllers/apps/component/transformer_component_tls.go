@@ -79,7 +79,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return err
 			}
 		}
-		component.AddAssistantObject(synthesizedComp, &corev1.Secret{
+		component.AddInstanceAssistantObject(synthesizedComp, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: synthesizedComp.Namespace,
 				Name:      tlsSecretName(synthesizedComp.ClusterName, synthesizedComp.Name),

@@ -30,23 +30,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
-func shouldCloneAssistantObjects(its *workloads.InstanceSet) bool {
-	return its.Annotations != nil && len(its.Annotations[constant.KBAppMultiClusterPlacementKey]) > 0
+func shouldCloneInstanceAssistantObjects(its *workloads.InstanceSet) bool {
+	return multicluster.Enabled4Object(its)
 }
 
-func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+func loadInstanceAssistantObjects(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return nil
 	}
 	its := tree.GetRoot().(*workloads.InstanceSet)
-	if shouldCloneAssistantObjects(its) {
-		for _, objRef := range its.Spec.AssistantObjects {
-			obj, err := loadAssistantObject(ctx, reader, objRef)
+	if shouldCloneInstanceAssistantObjects(its) {
+		for _, objRef := range its.Spec.InstanceAssistantObjects {
+			obj, err := loadInstanceAssistantObject(ctx, reader, objRef)
 			if err != nil {
 				return err
 			}
@@ -60,7 +60,7 @@ func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubeb
 	return nil
 }
 
-func loadAssistantObject(ctx context.Context, reader client.Reader, objRef corev1.ObjectReference) (client.Object, error) {
+func loadInstanceAssistantObject(ctx context.Context, reader client.Reader, objRef corev1.ObjectReference) (client.Object, error) {
 	obj, err := objectReferenceToObject(objRef)
 	if err != nil {
 		return nil, err
@@ -71,10 +71,10 @@ func loadAssistantObject(ctx context.Context, reader client.Reader, objRef corev
 	return obj, nil
 }
 
-func cloneAssistantObjects(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]workloads.InstanceAssistantObject, error) {
+func cloneInstanceAssistantObjects(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]workloads.InstanceAssistantObject, error) {
 	objs := make([]workloads.InstanceAssistantObject, 0)
-	for _, objRef := range its.Spec.AssistantObjects {
-		obj, err := cloneAssistantObject(tree, objRef)
+	for _, objRef := range its.Spec.InstanceAssistantObjects {
+		obj, err := cloneInstanceAssistantObject(tree, objRef)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +85,7 @@ func cloneAssistantObjects(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 	return objs, nil
 }
 
-func cloneAssistantObject(tree *kubebuilderx.ObjectTree, objRef corev1.ObjectReference) (client.Object, error) {
+func cloneInstanceAssistantObject(tree *kubebuilderx.ObjectTree, objRef corev1.ObjectReference) (client.Object, error) {
 	obj, err := objectReferenceToObject(objRef)
 	if err != nil {
 		return nil, err

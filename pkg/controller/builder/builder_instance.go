@@ -211,7 +211,7 @@ func (builder *InstanceBuilder) SetTemplateVars(vars map[string]string) *Instanc
 	return builder
 }
 
-func (builder *InstanceBuilder) SetAssistantObjects(objs []workloads.InstanceAssistantObject) *InstanceBuilder {
-	builder.get().Spec.AssistantObjects = objs
+func (builder *InstanceBuilder) SetInstanceAssistantObjects(objs []workloads.InstanceAssistantObject) *InstanceBuilder {
+	builder.get().Spec.InstanceAssistantObjects = objs
 	return builder
 }

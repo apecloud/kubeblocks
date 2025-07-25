@@ -56,7 +56,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	}
 
 	// load assistant objects
-	if err = loadAssistantObjects(ctx, reader, tree); err != nil {
+	if err = loadInstanceAssistantObjects(ctx, reader, tree); err != nil {
 		return nil, err
 	}
 

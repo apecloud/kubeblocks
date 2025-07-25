@@ -21,9 +21,6 @@ package component
 
 import (
 	"fmt"
-	"reflect"
-	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -38,6 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -120,34 +118,16 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
-	t.rbacAssistantObjects(graphCli, dag, objs)
+	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
 
 	return nil
 }
 
-func (t *componentRBACTransformer) rbacAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {
+func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
 	for _, itsObj := range itsList {
 		its := itsObj.(*workloads.InstanceSet)
-		for _, obj := range objs {
-			if obj != nil && !reflect.ValueOf(obj).IsNil() {
-				gvk, _ := model.GetGVKName(obj)
-				its.Spec.AssistantObjects = append(its.Spec.AssistantObjects, corev1.ObjectReference{
-					Kind:      gvk.Kind,
-					Namespace: gvk.Namespace,
-					Name:      gvk.Name,
-				})
-			}
-		}
-		slices.SortFunc(its.Spec.AssistantObjects, func(a, b corev1.ObjectReference) int {
-			if a.Kind != b.Kind {
-				return strings.Compare(a.Kind, b.Kind)
-			}
-			if a.Namespace != b.Namespace {
-				return strings.Compare(a.Namespace, b.Namespace)
-			}
-			return strings.Compare(a.Name, b.Name)
-		})
+		component.AddInstanceAssistantObjectsToITS(its, objs...)
 	}
 }
 

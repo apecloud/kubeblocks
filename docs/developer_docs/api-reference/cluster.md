@@ -31194,7 +31194,7 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>assistantObjects</code><br/>
+<code>instanceAssistantObjects</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
 []InstanceAssistantObject
@@ -31636,7 +31636,7 @@ bool
 </tr>
 <tr>
 <td>
-<code>assistantObjects</code><br/>
+<code>instanceAssistantObjects</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
 []Kubernetes core/v1.ObjectReference
@@ -32279,7 +32279,7 @@ bool
 </tr>
 <tr>
 <td>
-<code>assistantObjects</code><br/>
+<code>instanceAssistantObjects</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
 []Kubernetes core/v1.ObjectReference
@@ -32736,7 +32736,7 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>assistantObjects</code><br/>
+<code>instanceAssistantObjects</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
 []InstanceAssistantObject

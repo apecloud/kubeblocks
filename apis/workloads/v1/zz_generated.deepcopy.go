@@ -315,8 +315,8 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.AssistantObjects != nil {
-		in, out := &in.AssistantObjects, &out.AssistantObjects
+	if in.InstanceAssistantObjects != nil {
+		in, out := &in.InstanceAssistantObjects, &out.InstanceAssistantObjects
 		*out = make([]corev1.ObjectReference, len(*in))
 		copy(*out, *in)
 	}
@@ -437,8 +437,8 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 			(*out)[key] = val
 		}
 	}
-	if in.AssistantObjects != nil {
-		in, out := &in.AssistantObjects, &out.AssistantObjects
+	if in.InstanceAssistantObjects != nil {
+		in, out := &in.InstanceAssistantObjects, &out.InstanceAssistantObjects
 		*out = make([]InstanceAssistantObject, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

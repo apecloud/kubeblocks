@@ -64,7 +64,7 @@ spec:
           spec:
             description: InstanceSpec defines the desired state of Instance
             properties:
-              assistantObjects:
+              instanceAssistantObjects:
                 description: Assistant objects that are necessary to run the instance.
                 items:
                   properties:

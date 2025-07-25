@@ -131,7 +131,7 @@ type InstanceSpec struct {
 	// Assistant objects that are necessary to run the instance.
 	//
 	// +optional
-	AssistantObjects []InstanceAssistantObject `json:"assistantObjects,omitempty"`
+	InstanceAssistantObjects []InstanceAssistantObject `json:"instanceAssistantObjects,omitempty"`
 }
 
 // InstanceStatus2 defines the observed state of Instance

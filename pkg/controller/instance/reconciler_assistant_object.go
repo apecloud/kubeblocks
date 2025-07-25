@@ -54,7 +54,7 @@ func (r *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 
 func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
-	for _, obj := range inst.Spec.AssistantObjects {
+	for _, obj := range inst.Spec.InstanceAssistantObjects {
 		_, err := r.createOrUpdate(tree, inst, obj)
 		if err != nil {
 			return kubebuilderx.Continue, err

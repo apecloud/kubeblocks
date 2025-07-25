@@ -273,7 +273,7 @@ type InstanceSetSpec struct {
 	//   - rolebinding
 	//
 	// +optional
-	AssistantObjects []corev1.ObjectReference `json:"assistantObjects,omitempty"`
+	InstanceAssistantObjects []corev1.ObjectReference `json:"instanceAssistantObjects,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet

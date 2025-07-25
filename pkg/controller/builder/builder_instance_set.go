@@ -170,7 +170,7 @@ func (builder *InstanceSetBuilder) SetEnableInstanceAPI(enableInstanceAPI *bool)
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetAssistantObjects(objs []corev1.ObjectReference) *InstanceSetBuilder {
-	builder.get().Spec.AssistantObjects = objs
+func (builder *InstanceSetBuilder) SetInstanceAssistantObjects(objs []corev1.ObjectReference) *InstanceSetBuilder {
+	builder.get().Spec.InstanceAssistantObjects = objs
 	return builder
 }

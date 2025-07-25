@@ -111,7 +111,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, name),
 			},
 		}
-		component.AddAssistantObject(transCtx.SynthesizeComponent, secret)
+		component.AddInstanceAssistantObject(transCtx.SynthesizeComponent, secret)
 	}
 
 	return nil

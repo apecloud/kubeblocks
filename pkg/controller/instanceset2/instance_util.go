@@ -159,16 +159,16 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 	b.SetPVCRetentionPolicy(its.Spec.PersistentVolumeClaimRetentionPolicy)
 
-	if shouldCloneAssistantObjects(its) && len(its.Spec.AssistantObjects) > 0 {
-		objs, err := cloneAssistantObjects(tree, its)
+	if shouldCloneInstanceAssistantObjects(its) && len(its.Spec.InstanceAssistantObjects) > 0 {
+		objs, err := cloneInstanceAssistantObjects(tree, its)
 		if err != nil {
 			return nil, err
 		}
-		b.SetAssistantObjects(objs)
+		b.SetInstanceAssistantObjects(objs)
 	}
 
 	inst := b.GetObject()
-	if !shouldCloneAssistantObjects(its) {
+	if !shouldCloneInstanceAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
 			return nil, err
 		}
@@ -286,9 +286,9 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	}
 
 	copyNMergeAssistantObjects := func() {
-		for i := range newInst.Spec.AssistantObjects {
-			oldObj := &targetInst.Spec.AssistantObjects[i]
-			newObj := &newInst.Spec.AssistantObjects[i]
+		for i := range newInst.Spec.InstanceAssistantObjects {
+			oldObj := &targetInst.Spec.InstanceAssistantObjects[i]
+			newObj := &newInst.Spec.InstanceAssistantObjects[i]
 			if newObj.ConfigMap != nil {
 				copyAndMergeCM(oldObj.ConfigMap, newObj.ConfigMap)
 			}
@@ -308,8 +308,8 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	}
 
 	// merge assistant objects
-	if len(targetInst.Spec.AssistantObjects) == 0 {
-		targetInst.Spec.AssistantObjects = newInst.Spec.AssistantObjects
+	if len(targetInst.Spec.InstanceAssistantObjects) == 0 {
+		targetInst.Spec.InstanceAssistantObjects = newInst.Spec.InstanceAssistantObjects
 	} else {
 		copyNMergeAssistantObjects()
 	}

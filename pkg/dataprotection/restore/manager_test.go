@@ -22,6 +22,7 @@ package restore
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -172,9 +173,9 @@ var _ = Describe("RestoreManager Test", func() {
 			return restoreMGR, backupSet
 		}
 
-		checkPVC := func(startingIndex int, useVolumeSnapshot bool) {
+		checkPVC := func(startingIndex int, useVolumeSnapshot bool, managedBy string) {
 			By("expect for pvcs are created")
-			pvcMatchingLabels := client.MatchingLabels{constant.AppManagedByLabelKey: "restore"}
+			pvcMatchingLabels := client.MatchingLabels{constant.AppManagedByLabelKey: managedBy}
 			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, pvcMatchingLabels,
 				client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(replicas))
 
@@ -183,7 +184,8 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(k8sClient.List(ctx, pvcList, pvcMatchingLabels,
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 			for _, v := range pvcList.Items {
-				indexStr := string(v.Name[len(v.Name)-1])
+				parts := strings.Split(v.Name, "-")
+				indexStr := parts[len(parts)-1]
 				index, _ := strconv.Atoi(indexStr)
 				Expect(index >= startingIndex).Should(BeTrue())
 				if useVolumeSnapshot {
@@ -227,7 +229,7 @@ var _ = Describe("RestoreManager Test", func() {
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 			Expect(restoreMGR.RestorePVCFromSnapshot(reqCtx, k8sClient, *backupSet, target)).Should(Succeed())
 
-			checkPVC(startingIndex, useVolumeSnapshot)
+			checkPVC(startingIndex, useVolumeSnapshot, "restore")
 		})
 
 		It("test with BuildPrepareDataJobs function and Parallel volumeRestorePolicy", func() {
@@ -251,7 +253,34 @@ var _ = Describe("RestoreManager Test", func() {
 			// image should be expanded by env
 			Expect(jobs[0].Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
 
-			checkPVC(startingIndex, false)
+			checkPVC(startingIndex, false, "restore")
+		})
+
+		It("test with BuildPrepareDataJobs function with InstanceTemplates claims", func() {
+			reqCtx := getReqCtx()
+			startingIndex := 300
+			templateName := "abc"
+			cmpName := "mysql"
+			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
+				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), map[string]string{
+						constant.AppInstanceLabelKey:           instanceName,
+						constant.KBAppComponentLabelKey:        cmpName,
+						constant.KBAppInstanceTemplateLabelKey: templateName,
+					})
+			})
+			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect job label pod name contains template '%s' and ordinal correct", templateName))
+			actionSetName := "preparedata-0"
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+			jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, target, actionSetName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(len(jobs)).Should(Equal(replicas))
+			// job label contains pod name and ordinal match
+			for i := 0; i < replicas; i++ {
+				Expect(jobs[i].Spec.Template.Labels[constant.KBAppPodNameLabelKey]).Should(Equal(fmt.Sprintf("%s-%s-%s-%d", instanceName, cmpName, templateName, startingIndex+i)))
+			}
+
+			checkPVC(startingIndex, false, constant.AppName)
 		})
 
 		It("test with BuildPrepareDataJobs function and Serial volumeRestorePolicy", func() {

@@ -56,9 +56,14 @@ type valueManager struct {
 	formatConfigs map[string]parametersv1alpha1.FileFormatConfig
 }
 
+func needValueTransformer(formatter parametersv1alpha1.CfgFileFormat) bool {
+	return formatter == parametersv1alpha1.JSON ||
+		formatter == parametersv1alpha1.YAML
+}
+
 func (v *valueManager) buildValueTransformer(key string) core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
-	if format, ok := v.formatConfigs[key]; !ok || format.Format != parametersv1alpha1.JSON {
+	if format, ok := v.formatConfigs[key]; !ok || !needValueTransformer(format.Format) {
 		return nil
 	}
 	index := generics.FindFirstFunc(v.paramsDefs, func(paramDef *parametersv1alpha1.ParametersDefinition) bool {

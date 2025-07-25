@@ -285,6 +285,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
 	compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
 	compObjCopy.Spec.Resources = compProto.Spec.Resources
+	compObjCopy.Spec.EnableInstanceAPI = compProto.Spec.EnableInstanceAPI
 
 	metadataChanged := !reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) ||
 		!reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels)

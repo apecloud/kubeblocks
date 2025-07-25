@@ -933,6 +933,18 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -3355,6 +3367,18 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
 </tbody>
@@ -6615,6 +6639,18 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the sidecars to be injected into the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
 </tbody>
@@ -31248,18 +31284,6 @@ InstanceSetSpec
 <tbody>
 <tr>
 <td>
-<code>enableInstanceAPI</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to enable the Instance API.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -31600,6 +31624,18 @@ bool
 </tr>
 <tr>
 <td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>assistantObjects</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
@@ -31629,18 +31665,6 @@ bool
 <li>rolebinding</li>
 </ul></li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>cloneAssistantObjects</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to clone the assistant objects.</p>
 </td>
 </tr>
 </tbody>
@@ -31903,18 +31927,6 @@ int64
 <tbody>
 <tr>
 <td>
-<code>enableInstanceAPI</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to enable the Instance API.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -32255,6 +32267,18 @@ bool
 </tr>
 <tr>
 <td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>assistantObjects</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
@@ -32284,18 +32308,6 @@ bool
 <li>rolebinding</li>
 </ul></li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>cloneAssistantObjects</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether to clone the assistant objects.</p>
 </td>
 </tr>
 </tbody>

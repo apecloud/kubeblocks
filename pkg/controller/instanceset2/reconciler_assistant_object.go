@@ -59,7 +59,7 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 		its, _  = tree.GetRoot().(*workloads.InstanceSet)
 	)
 
-	if !its.Spec.DisableDefaultHeadlessService && !its.Spec.CloneAssistantObjects {
+	if !its.Spec.DisableDefaultHeadlessService && !shouldCloneAssistantObjects(its) {
 		labels := getMatchLabels(its.Name)
 		headlessSelectors := getHeadlessSvcSelector(its)
 		headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)

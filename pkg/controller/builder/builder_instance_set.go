@@ -174,8 +174,3 @@ func (builder *InstanceSetBuilder) SetAssistantObjects(objs []corev1.ObjectRefer
 	builder.get().Spec.AssistantObjects = objs
 	return builder
 }
-
-func (builder *InstanceSetBuilder) SetCloneAssistantObjects(clone bool) *InstanceSetBuilder {
-	builder.get().Spec.CloneAssistantObjects = clone
-	return builder
-}

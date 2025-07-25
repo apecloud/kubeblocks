@@ -76,11 +76,6 @@ func init() {
 
 // InstanceSetSpec defines the desired state of InstanceSet
 type InstanceSetSpec struct {
-	// Specifies whether to enable the Instance API.
-	//
-	// +optional
-	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
-
 	// Specifies the desired number of replicas of the given Template.
 	// These replicas are instantiations of the same Template, with each having a consistent identity.
 	// Defaults to 1 if unspecified.
@@ -258,6 +253,11 @@ type InstanceSetSpec struct {
 	// +optional
 	DisableDefaultHeadlessService bool `json:"disableDefaultHeadlessService,omitempty"`
 
+	// Specifies whether to enable the new Instance API.
+	//
+	// +optional
+	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
+
 	// Assistant objects that are necessary to run the instance.
 	//
 	// - ConfigMap:
@@ -271,16 +271,9 @@ type InstanceSetSpec struct {
 	//   - sa
 	//   - role
 	//   - rolebinding
-	// - Service  # TODO: ???
 	//
 	// +optional
 	AssistantObjects []corev1.ObjectReference `json:"assistantObjects,omitempty"`
-
-	// Specifies whether to clone the assistant objects.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	CloneAssistantObjects bool `json:"cloneAssistantObjects,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet

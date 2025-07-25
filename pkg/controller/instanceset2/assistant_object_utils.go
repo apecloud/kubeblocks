@@ -30,16 +30,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
+
+func shouldCloneAssistantObjects(its *workloads.InstanceSet) bool {
+	return its.Annotations != nil && len(its.Annotations[constant.KBAppMultiClusterPlacementKey]) > 0
+}
 
 func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return nil
 	}
 	its := tree.GetRoot().(*workloads.InstanceSet)
-	if its.Spec.CloneAssistantObjects {
+	if shouldCloneAssistantObjects(its) {
 		for _, objRef := range its.Spec.AssistantObjects {
 			obj, err := loadAssistantObject(ctx, reader, objRef)
 			if err != nil {

@@ -159,7 +159,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 	b.SetPVCRetentionPolicy(its.Spec.PersistentVolumeClaimRetentionPolicy)
 
-	if its.Spec.CloneAssistantObjects && len(its.Spec.AssistantObjects) > 0 {
+	if shouldCloneAssistantObjects(its) && len(its.Spec.AssistantObjects) > 0 {
 		objs, err := cloneAssistantObjects(tree, its)
 		if err != nil {
 			return nil, err
@@ -168,7 +168,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
-	if !its.Spec.CloneAssistantObjects {
+	if !shouldCloneAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
 			return nil, err
 		}

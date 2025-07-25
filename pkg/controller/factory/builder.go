@@ -84,17 +84,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars).
+		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
 		SetAssistantObjects(synthesizedComp.AssistantObjects)
-	if synthesizedComp.Annotations != nil {
-		enable, ok1 := synthesizedComp.Annotations["enable-instance-api"]
-		if ok1 && enable == "true" {
-			itsBuilder.SetEnableInstanceAPI(ptr.To(true))
-		}
-		clone, ok2 := synthesizedComp.Annotations["clone-assistant-objects"]
-		if ok2 && clone == "true" {
-			itsBuilder.SetCloneAssistantObjects(true)
-		}
-	}
 	if compDef != nil {
 		itsBuilder.SetDisableDefaultHeadlessService(compDef.Spec.DisableDefaultHeadlessService)
 	}

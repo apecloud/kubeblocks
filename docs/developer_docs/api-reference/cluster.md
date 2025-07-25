@@ -933,6 +933,18 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -3355,6 +3367,18 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
 </tbody>
@@ -6617,6 +6641,18 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
@@ -8152,7 +8188,7 @@ RollingUpdate
 <h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategyType">InstanceUpdateStrategyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 <p>InstanceUpdateStrategyType is a string enumeration type that enumerates
@@ -8707,7 +8743,7 @@ Cannot be updated.</p>
 <h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">PersistentVolumeClaimRetentionPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 <p>PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.</p>
@@ -9064,7 +9100,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 <p>PodUpdatePolicyType indicates how pods should be updated</p>
@@ -9310,7 +9346,7 @@ int32
 <h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
 </p>
 <div>
 <p>ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.</p>
@@ -30927,8 +30963,267 @@ string
 </div>
 Resource Types:
 <ul><li>
+<a href="#workloads.kubeblocks.io/v1.Instance">Instance</a>
+</li><li>
 <a href="#workloads.kubeblocks.io/v1.InstanceSet">InstanceSet</a>
 </li></ul>
+<h3 id="workloads.kubeblocks.io/v1.Instance">Instance
+</h3>
+<div>
+<p>Instance is the Schema for the instances API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>workloads.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>Instance</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceSpec">
+InstanceSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tbody>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>Represents a label query over pods that should match the desired replica count indicated by the <code>replica</code> field.
+It must match the labels defined in the pod template.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaimtemplate-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the instance.
+Each template specifies the desired characteristics of a persistent volume, such as storage class,
+size, and access modes.
+These templates are used to dynamically provision persistent volumes for instance upon their creation.
+The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
+<p>VolumeClaimTemplates []corev1.PersistentVolumeClaim <code>json:&quot;volumeClaimTemplates,omitempty&quot;</code></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceSetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceTemplateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceUpdateStrategyType</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategyType">
+InstanceUpdateStrategyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of roles defined in the system. Instanceset obtains role through pods&rsquo; role label <code>kubeblocks.io/role</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateVars</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides variables which are used to call Actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceAssistantObjects</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
+[]InstanceAssistantObject
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assistant objects that are necessary to run the instance.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceStatus2">
+InstanceStatus2
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSet">InstanceSet
 </h3>
 <div>
@@ -31327,6 +31622,51 @@ bool
 <p>Specifies whether to create the default headless service.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceAssistantObjects</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
+[]Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assistant objects that are necessary to run the instance.</p>
+<ul>
+<li>ConfigMap:
+<ul>
+<li>config &amp; script templates</li>
+<li>env</li>
+<li>kbagent task parameters</li>
+</ul></li>
+<li>Secret:
+<ul>
+<li>account</li>
+<li>TLS</li>
+</ul></li>
+<li>RBAC:
+<ul>
+<li>sa</li>
+<li>role</li>
+<li>rolebinding</li>
+</ul></li>
+</ul>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -31449,6 +31789,83 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>The parameters to call the reconfigure action.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceAssistantObject">InstanceAssistantObject
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>configMap</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#configmap-v1-core">
+Kubernetes core/v1.ConfigMap
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>secret</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secret-v1-core">
+Kubernetes core/v1.Secret
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAccount</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceaccount-v1-core">
+Kubernetes core/v1.ServiceAccount
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterRole</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#role-v1-rbac">
+Kubernetes rbac/v1.Role
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>roleBinding</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#rolebinding-v1-rbac">
+Kubernetes rbac/v1.RoleBinding
+</a>
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>
@@ -31848,6 +32265,51 @@ bool
 <p>Specifies whether to create the default headless service.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>enableInstanceAPI</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceAssistantObjects</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectreference-v1-core">
+[]Kubernetes core/v1.ObjectReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assistant objects that are necessary to run the instance.</p>
+<ul>
+<li>ConfigMap:
+<ul>
+<li>config &amp; script templates</li>
+<li>env</li>
+<li>kbagent task parameters</li>
+</ul></li>
+<li>Secret:
+<ul>
+<li>account</li>
+<li>TLS</li>
+</ul></li>
+<li>RBAC:
+<ul>
+<li>sa</li>
+<li>role</li>
+<li>rolebinding</li>
+</ul></li>
+</ul>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus
@@ -32087,6 +32549,207 @@ key is the pod name, value is the revision.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Instance">Instance</a>)
+</p>
+<div>
+<p>InstanceSpec defines the desired state of Instance</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
+Kubernetes core/v1.PodTemplateSpec
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>selector</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#labelselector-v1-meta">
+Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>Represents a label query over pods that should match the desired replica count indicated by the <code>replica</code> field.
+It must match the labels defined in the pod template.
+More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>minReadySeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the minimum number of seconds a newly created pod should be ready
+without any of its container crashing to be considered available.
+Defaults to 0, meaning the pod will be considered available as soon as it is ready.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaimtemplate-v1-core">
+[]Kubernetes core/v1.PersistentVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of PersistentVolumeClaim templates that define the storage requirements for the instance.
+Each template specifies the desired characteristics of a persistent volume, such as storage class,
+size, and access modes.
+These templates are used to dynamically provision persistent volumes for instance upon their creation.
+The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
+<p>VolumeClaimTemplates []corev1.PersistentVolumeClaim <code>json:&quot;volumeClaimTemplates,omitempty&quot;</code></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceSetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceTemplateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceUpdateStrategyType</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategyType">
+InstanceUpdateStrategyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>roles</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReplicaRole">
+[]ReplicaRole
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of roles defined in the system. Instanceset obtains role through pods&rsquo; role label <code>kubeblocks.io/role</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membershipReconfiguration</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
+MembershipReconfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateVars</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides variables which are used to call Actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceAssistantObjects</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
+[]InstanceAssistantObject
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assistant objects that are necessary to run the instance.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus
 </h3>
 <p>
@@ -32125,6 +32788,124 @@ string
 <td>
 <em>(Optional)</em>
 <p>The status of configs.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Instance">Instance</a>)
+</p>
+<div>
+<p>InstanceStatus2 defines the observed state of Instance</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the latest available observations of an instance&rsquo;s current state.
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>currentRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>updateRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is up-to-date.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is in ready condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is in available condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the role of the instance observed.</p>
 </td>
 </tr>
 </tbody>
@@ -32460,7 +33241,7 @@ ReplicaRole
 <h3 id="workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 </div>

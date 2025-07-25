@@ -327,7 +327,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	mergeMap(&newInst.Labels, &targetInst.Labels)
 	mergeMap(&newInst.Annotations, &targetInst.Annotations)
 
-	if equality.Semantic.DeepEqual(&oldInst.Spec, &targetInst.Spec) ||
+	if !equality.Semantic.DeepEqual(&oldInst.Spec, &targetInst.Spec) ||
 		!equality.Semantic.DeepEqual(oldInst.Labels, targetInst.Labels) ||
 		!equality.Semantic.DeepEqual(oldInst.Annotations, targetInst.Annotations) {
 		return targetInst

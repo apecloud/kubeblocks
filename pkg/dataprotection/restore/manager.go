@@ -357,12 +357,18 @@ func addItsManagingLabels(claim *dpv1alpha1.RestoreVolumeClaim, index int) {
 		claim.Labels = make(map[string]string)
 	}
 
-	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
-	itsMatchLabels := instanceset.GetMatchLabels(itsName)
+	compObjName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	itsMatchLabels := instanceset.GetMatchLabels(compObjName)
 	intctrlutil.MergeMetadataMapInplace(itsMatchLabels, &claim.Labels)
 
 	if claim.Labels[constant.KBAppPodNameLabelKey] == "" {
-		podName := fmt.Sprintf("%s-%d", itsName, index)
+		templateName, exist := claim.Labels[constant.KBAppInstanceTemplateLabelKey]
+		var podName string
+		if exist {
+			podName = fmt.Sprintf("%s-%s-%d", compObjName, templateName, index)
+		} else {
+			podName = fmt.Sprintf("%s-%d", compObjName, index)
+		}
 		claim.Labels[constant.KBAppPodNameLabelKey] = podName
 	}
 }
@@ -514,9 +520,13 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 	for i := 0; i < restoreJobReplicas; i++ {
 		// reset specific volumes and volumeMounts
 		jobBuilder.resetSpecificVolumesAndMounts()
+		// reset specific labels as addLabel does not override existing labels
+		jobBuilder.resetSpecificLabels()
 		if claimsTemplate != nil {
 			//  create pvc from claims template, build volumes and volumeMounts
-			for _, claim := range claimsTemplate.Templates {
+			for _, c := range claimsTemplate.Templates {
+				// deepcopy to avoid modify the original object
+				claim := *c.DeepCopy()
 				index := i + int(claimsTemplate.StartingIndex)
 				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
 				// HACK: add InstanceSet related labels to the PVC,

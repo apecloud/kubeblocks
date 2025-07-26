@@ -62,13 +62,6 @@ echo "" >> "$OUTPUT_FILE"
 echo "**Generated:** $(date)" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
-# Get summary statistics using the temp file
-cluster_roles=$(yq eval 'select(.kind == "ClusterRole") | .metadata.name' "$TEMP_YAML" | wc -l | tr -d ' ')
-roles=$(yq eval 'select(.kind == "Role") | .metadata.name' "$TEMP_YAML" | wc -l | tr -d ' ')
-
-echo "**Summary:** $cluster_roles ClusterRoles, $roles Roles" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-
 # Function to generate resource permissions table using simpler yq operations
 generate_permissions_table() {
     local title="$1"
@@ -293,9 +286,3 @@ rm -f "$TEMP_YAML"
 
 echo -e "${GREEN}RBAC permissions summary generated successfully!${NC}"
 echo -e "Output file: $OUTPUT_FILE"
-
-# Show statistics
-echo ""
-echo -e "${BLUE}Summary Statistics:${NC}"
-echo "ClusterRoles: $cluster_roles"
-echo "Roles: $roles"

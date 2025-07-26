@@ -343,7 +343,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmap
+  - configmaps
   verbs:
   - create
   - delete
@@ -355,7 +355,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmap/finalizers
+  - configmaps/finalizers
   verbs:
   - update
 - apiGroups:

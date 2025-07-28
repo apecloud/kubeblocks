@@ -118,6 +118,11 @@ func (r *restoreJobBuilder) resetSpecificVolumesAndMounts() {
 	r.specificVolumeMounts = []corev1.VolumeMount{}
 }
 
+// resetSpecificLabels resets the specific labels.
+func (r *restoreJobBuilder) resetSpecificLabels(){
+	r.labels = BuildRestoreLabels(r.restore.Name)
+}
+
 // addToSpecificVolumesAndMounts adds the volume and volumeMount to specific volumes and volumeMounts slice.
 func (r *restoreJobBuilder) addToSpecificVolumesAndMounts(volume *corev1.Volume, volumeMount *corev1.VolumeMount) *restoreJobBuilder {
 	if volume != nil {

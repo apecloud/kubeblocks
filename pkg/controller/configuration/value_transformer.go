@@ -59,9 +59,14 @@ type valueManager struct {
 	formatConfigs *appsv1beta1.FileFormatConfig
 }
 
+func needValueTransformer(formatter appsv1beta1.CfgFileFormat) bool {
+	return formatter == appsv1beta1.JSON ||
+		formatter == appsv1beta1.YAML
+}
+
 func (v *valueManager) BuildValueTransformer() core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
-	if v.formatConfigs == nil || v.formatConfigs.Format != appsv1beta1.JSON || v.paramsDef.Spec.ParametersSchema == nil {
+	if v.formatConfigs == nil || !needValueTransformer(v.formatConfigs.Format) || v.paramsDef.Spec.ParametersSchema == nil {
 		return nil
 	}
 

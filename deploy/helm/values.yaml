@@ -453,7 +453,7 @@ backupRepo:
     accessKeyId: ""
     secretAccessKey: ""
 
-  ## Addon controller settings, this will require cluster-admin clusterrole.
+  ## Addon controller settings
   ##
   ## @param addonController.enabled
   ## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.

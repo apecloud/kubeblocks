@@ -58,7 +58,7 @@ const (
 )
 
 func init() {
-	viper.SetDefault(addonSANameKey, "kubeblocks-addon-installer")
+	viper.SetDefault(constant.KBServiceAccountName, "kubeblocks")
 	viper.SetDefault(addonHelmInstallOptKey, []string{
 		"--atomic",
 		"--cleanup-on-fail",
@@ -543,7 +543,6 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			chartsPath,
 			"--namespace",
 			"$(RELEASE_NS)",
-			"--create-namespace",
 		}, viper.GetStringSlice(addonHelmInstallOptKey)...)
 
 		installValues := addon.Spec.Helm.BuildMergedValues(addon.Spec.InstallSpec)
@@ -861,19 +860,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		Name:            getJobMainContainerName(addon),
 		Image:           viper.GetString(constant.KBToolsImage),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
-		// TODO: need have image that is capable of following settings, current settings
-		// may expose potential security risk, as this pod is using cluster-admin clusterrole.
-		// SecurityContext: &corev1.SecurityContext{
-		//	RunAsNonRoot:             &[]bool{true}[0],
-		//	RunAsUser:                &[]int64{1001}[0],
-		//	AllowPrivilegeEscalation: &[]bool{false}[0],
-		//	Capabilities: &corev1.Capabilities{
-		//		Drop: []corev1.Capability{
-		//			"ALL",
-		//		},
-		//	},
-		// },
-		Command: []string{"helm"},
+		Command:         []string{"helm"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "RELEASE_NAME",
@@ -911,7 +898,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyNever,
-					ServiceAccountName: viper.GetString("KUBEBLOCKS_ADDON_SA_NAME"),
+					ServiceAccountName: viper.GetString(constant.KBServiceAccountName),
 					Containers:         []corev1.Container{container},
 					Volumes:            []corev1.Volume{},
 					Tolerations:        []corev1.Toleration{},

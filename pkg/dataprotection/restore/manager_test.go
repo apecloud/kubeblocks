@@ -265,9 +265,9 @@ var _ = Describe("RestoreManager Test", func() {
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), map[string]string{
-						constant.AppInstanceLabelKey:           instanceName,
-						constant.KBAppComponentLabelKey:        cmpName,
-						constant.KBAppInstanceTemplateLabelKey: templateName,
+						constant.AppInstanceLabelKey:                    instanceName,
+						constant.KBAppComponentLabelKey:                 cmpName,
+						constant.KBAppComponentInstanceTemplateLabelKey: templateName,
 					})
 			})
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect job label pod name contains template '%s' and ordinal correct", templateName))

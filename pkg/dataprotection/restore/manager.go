@@ -362,7 +362,7 @@ func addItsManagingLabels(claim *dpv1alpha1.RestoreVolumeClaim, index int) {
 	intctrlutil.MergeMetadataMapInplace(itsMatchLabels, &claim.Labels)
 
 	if claim.Labels[constant.KBAppPodNameLabelKey] == "" {
-		templateName, exist := claim.Labels[constant.KBAppInstanceTemplateLabelKey]
+		templateName, exist := claim.Labels[constant.KBAppComponentInstanceTemplateLabelKey]
 		var podName string
 		if exist {
 			podName = fmt.Sprintf("%s-%s-%d", compObjName, templateName, index)

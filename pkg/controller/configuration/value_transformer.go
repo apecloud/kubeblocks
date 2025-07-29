@@ -62,7 +62,7 @@ func needValueTransformer(formatter parametersv1alpha1.CfgFileFormat) bool {
 		formatter == parametersv1alpha1.TOML
 }
 
-func (v *valueManager) buildValueTransformer(key string) core.ValueTransformerFunc {
+func (v *valueManager) BuildValueTransformer(key string) core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
 	if format, ok := v.formatConfigs[key]; !ok || !needValueTransformer(format.Format) {
 		return nil

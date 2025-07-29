@@ -122,7 +122,7 @@ func (r *restoreJobBuilder) resetSpecificVolumesAndMounts() {
 }
 
 // resetSpecificLabels resets the specific labels.
-func (r *restoreJobBuilder) resetSpecificLabels(){
+func (r *restoreJobBuilder) resetSpecificLabels() {
 	r.labels = BuildRestoreLabels(r.restore.Name)
 }
 

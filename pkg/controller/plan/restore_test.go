@@ -263,6 +263,8 @@ var _ = Describe("Restore", func() {
 			topologyKey     = "testTopologyKey"
 			labelKey        = "testNodeLabelKey"
 			labelValue      = "testLabelValue"
+			istLabelKey     = "testISTLabelKey"
+			istLabelValue   = "testISTLabelValue"
 		)
 
 		var (
@@ -317,8 +319,26 @@ var _ = Describe("Restore", func() {
 			By("create actionset of full backup")
 			fullBackupActionSet = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 			fullBackupActionSetName = fullBackupActionSet.Name
+			podSpec := &compDef.Spec.Runtime
+			podSpec.Affinity = &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      labelKey,
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{labelValue},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
 			synthesizedComponent = &component.SynthesizedComponent{
-				PodSpec:              &compDef.Spec.Runtime,
+				PodSpec:              podSpec,
 				VolumeClaimTemplates: intctrlutil.ToCoreV1PVCTs(cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates),
 				Name:                 defaultCompName,
 				Replicas:             3,
@@ -335,6 +355,25 @@ var _ = Describe("Restore", func() {
 				Instances: []appsv1.InstanceTemplate{{
 					Name:     "foo",
 					Replicas: func() *int32 { replicas := int32(1); return &replicas }(),
+					SchedulingPolicy: &appsv1.SchedulingPolicy{
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      istLabelKey,
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{istLabelValue},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					Ordinals: appsv1.Ordinals{
 						Ranges: []appsv1.Range{
 							{Start: startIndex, End: 20},
@@ -400,6 +439,8 @@ var _ = Describe("Restore", func() {
 			Expect(k8sClient.Get(ctx, namedspace, restore)).Should(Succeed())
 			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(startIndex))
 			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(1)))
+			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(istLabelKey))
+			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(istLabelValue))
 
 			By("mock template restore of prepareData stage to Completed")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
@@ -417,6 +458,8 @@ var _ = Describe("Restore", func() {
 			Expect(k8sClient.Get(ctx, defaultNs, defaultRestore)).Should(Succeed())
 			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(int32(0)))
 			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(2)))
+			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
+			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(labelValue))
 
 			By("mock default restore of prepareData stage to Completed")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, defaultNs, func(restore *dpv1alpha1.Restore) {

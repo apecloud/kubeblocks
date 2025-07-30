@@ -102,7 +102,7 @@ func (c *configPatcher) merge(baseData map[string]string, updatedData map[string
 			mergedData[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec.Configs, key), manager.buildValueTransformer(key))
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec.Configs, key), manager.BuildValueTransformer(key))
 		if err != nil {
 			return nil, err
 		}

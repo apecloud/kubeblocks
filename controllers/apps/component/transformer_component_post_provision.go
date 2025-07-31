@@ -29,7 +29,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -58,8 +57,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-			transCtx.GetRecorder().Event(transCtx.Component, corev1.EventTypeWarning, "ActionPreconditionFailed", err.Error())
-			err = nil
+			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedError("wait for lifecycle action precondition"), err)
 		}
 		return err
 	}

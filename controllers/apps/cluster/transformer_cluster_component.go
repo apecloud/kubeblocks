@@ -86,7 +86,7 @@ func (t *clusterComponentTransformer) transform(transCtx *clusterTransformContex
 
 	var delayedErr error
 	if err := t.handleUpdate(transCtx, dag, updateSet); err != nil {
-		if !ictrlutil.IsDelayedRequeueError(err) {
+		if !ictrlutil.IsDelayedError(err) {
 			return err
 		}
 		delayedErr = err

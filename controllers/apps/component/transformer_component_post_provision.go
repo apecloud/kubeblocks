@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -54,7 +56,12 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 	err := t.postProvision(transCtx)
 	if err != nil {
-		return lifecycle.IgnorePreconditionFailed(lifecycle.IgnoreNotDefined(err))
+		err = lifecycle.IgnoreNotDefined(err)
+		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+			transCtx.GetRecorder().Event(transCtx.Component, corev1.EventTypeWarning, "ActionPreconditionFailed", err.Error())
+			err = nil
+		}
+		return err
 	}
 	return t.markPostProvisionDone(transCtx, dag)
 }

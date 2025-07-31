@@ -54,7 +54,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 	err := t.postProvision(transCtx)
 	if err != nil {
-		return lifecycle.IgnoreNotDefined(err)
+		return lifecycle.IgnorePreconditionFailed(lifecycle.IgnoreNotDefined(err))
 	}
 	return t.markPostProvisionDone(transCtx, dag)
 }

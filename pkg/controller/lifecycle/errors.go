@@ -40,3 +40,10 @@ func IgnoreNotDefined(err error) error {
 	}
 	return err
 }
+
+func IgnorePreconditionFailed(err error) error {
+	if errors.Is(err, ErrPreconditionFailed) {
+		return nil
+	}
+	return err
+}

@@ -41,8 +41,10 @@ import (
 	discoverycli "k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -85,10 +87,13 @@ import (
 const (
 	appName = "kubeblocks"
 
-	probeAddrFlagKey     flagName = "health-probe-bind-address"
-	metricsAddrFlagKey   flagName = "metrics-bind-address"
-	leaderElectFlagKey   flagName = "leader-elect"
-	leaderElectIDFlagKey flagName = "leader-elect-id"
+	probeAddrFlagKey                flagName = "health-probe-bind-address"
+	metricsAddrFlagKey              flagName = "metrics-bind-address"
+	leaderElectFlagKey              flagName = "leader-elect"
+	leaderElectIDFlagKey            flagName = "leader-elect-id"
+	leaderElectLeaseDurationFlagKey flagName = "leader-elect-lease-duration"
+	leaderElectRenewDeadlineFlagKey flagName = "leader-elect-renew-deadline"
+	leaderElectRetryPeriodFlagKey   flagName = "leader-elect-retry-period"
 
 	// switch flags key for API groups
 	appsFlagKey         flagName = "apps"
@@ -151,11 +156,14 @@ func init() {
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
-	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
 	viper.SetDefault(constant.I18nResourcesName, "kubeblocks-i18n-resources")
 	viper.SetDefault(constant.APIVersionSupported, "")
+	viper.SetDefault(constant.CfgKBReconcileWorkers, 32)
+	viper.SetDefault(constant.CfgCacheSyncTimeout, 300)
+	viper.SetDefault(constant.CfgClientQPS, 128)
+	viper.SetDefault(constant.CfgClientBurst, 256)
 }
 
 type flagName string
@@ -171,13 +179,19 @@ func (r flagName) viperName() string {
 func setupFlags() {
 	flag.String(metricsAddrFlagKey.String(), ":8080", "The address the metric endpoint binds to.")
 	flag.String(probeAddrFlagKey.String(), ":8081", "The address the probe endpoint binds to.")
+
 	flag.Bool(leaderElectFlagKey.String(), false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-
 	flag.String(leaderElectIDFlagKey.String(), "001c317f",
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
+	flag.Int(leaderElectLeaseDurationFlagKey.String(), 30,
+		"The duration (in seconds) that non-leader candidates will wait to force acquire leadership.")
+	flag.Int(leaderElectRenewDeadlineFlagKey.String(), 25,
+		"The duration (in seconds) that the acting control plane will retry refreshing leadership before giving up.")
+	flag.Int(leaderElectRetryPeriodFlagKey.String(), 5,
+		"The duration (in seconds) the LeaderElector clients should wait between tries of actions.")
 
 	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
@@ -356,7 +370,6 @@ func main() {
 		// pattern of '{{ hashFNV .Repo }}.{{ .Domain }}', make sure regenerate this ID
 		// if you have forked from this project template.
 		LeaderElectionID: enableLeaderElectionID + ".kubeblocks.io",
-
 		// NOTES:
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -369,6 +382,9 @@ func main() {
 		// if you are doing or intending to do any operation such as performing cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
+		LeaseDuration:                 ptr.To(time.Duration(viper.GetInt(leaderElectLeaseDurationFlagKey.viperName())) * time.Second),
+		RenewDeadline:                 ptr.To(time.Duration(viper.GetInt(leaderElectRenewDeadlineFlagKey.viperName())) * time.Second),
+		RetryPeriod:                   ptr.To(time.Duration(viper.GetInt(leaderElectRetryPeriodFlagKey.viperName())) * time.Second),
 
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    9443,
@@ -378,6 +394,9 @@ func main() {
 			Cache: &client.CacheOptions{
 				DisableFor: append(intctrlutil.GetUncachedObjects(), &parametersv1alpha1.ComponentParameter{}),
 			},
+		},
+		Controller: config.Controller{
+			CacheSyncTimeout: viper.GetDuration(constant.CfgCacheSyncTimeout) * time.Second,
 		},
 	})
 	if err != nil {

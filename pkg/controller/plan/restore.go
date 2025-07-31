@@ -222,7 +222,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
-				SchedulingSpec:                   r.buildSchedulingSpec(comp),
+				SchedulingSpec:                   r.buildSchedulingSpec(comp, template),
 				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
@@ -327,7 +327,19 @@ func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStat
 	return requiredPolicy
 }
 
-func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) dpv1alpha1.SchedulingSpec {
+func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent, template *appsv1.InstanceTemplate) dpv1alpha1.SchedulingSpec {
+	// if instance template provided and scheduling policy is set, use it
+	if template != nil && template.SchedulingPolicy != nil {
+		return dpv1alpha1.SchedulingSpec{
+			Affinity:                  template.SchedulingPolicy.Affinity,
+			Tolerations:               template.SchedulingPolicy.Tolerations,
+			TopologySpreadConstraints: template.SchedulingPolicy.TopologySpreadConstraints,
+			NodeSelector:              template.SchedulingPolicy.NodeSelector,
+			SchedulerName:             template.SchedulingPolicy.SchedulerName,
+			NodeName:                  template.SchedulingPolicy.NodeName,
+		}
+	}
+	// otherwise, fallback to component's pod spec
 	if comp.PodSpec == nil {
 		return dpv1alpha1.SchedulingSpec{}
 	}
@@ -335,6 +347,9 @@ func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponen
 		Affinity:                  comp.PodSpec.Affinity,
 		Tolerations:               comp.PodSpec.Tolerations,
 		TopologySpreadConstraints: comp.PodSpec.TopologySpreadConstraints,
+		NodeSelector:              comp.PodSpec.NodeSelector,
+		SchedulerName:             comp.PodSpec.SchedulerName,
+		NodeName:                  comp.PodSpec.NodeName,
 	}
 }
 

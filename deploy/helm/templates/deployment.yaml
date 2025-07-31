@@ -59,8 +59,17 @@ spec:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
-            {{- with .Values.manager }}
-            - "--leader-elect-id={{- default "001c317f" .leaderElectId }}"
+            {{- with .Values.manager.leaderElection }}
+            - "--leader-elect-id={{- default "001c317f" .Id }}"
+            {{- end }}
+            {{- if .Values.manager.leaderElection.leaseDuration }}
+            - "--leader-elect-lease-duration={{ .Values.manager.leaderElection.leaseDuration }}"
+            {{- end }}
+            {{- if .Values.manager.leaderElection.renewDeadline }}
+            - "--leader-elect-renew-deadline={{ .Values.manager.leaderElection.renewDeadline }}"
+            {{- end }}
+            {{- if .Values.manager.leaderElection.retryPeriod }}
+            - "--leader-elect-retry-period={{ .Values.manager.leaderElection.retryPeriod }}"
             {{- end }}
             - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
             - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
@@ -101,6 +110,10 @@ spec:
             {{- if .Values.reconcileWorkers }}
             - name: KUBEBLOCKS_RECONCILE_WORKERS
               value: {{ .Values.reconcileWorkers | quote }}
+            {{- end }}
+            {{- if .Values.cache.syncTimeout }}
+            - name: CACHE_SYNC_TIMEOUT
+              value: {{ .Values.cache.syncTimeout | quote }}
             {{- end }}
             {{- if .Values.client.qps }}
             - name: CLIENT_QPS

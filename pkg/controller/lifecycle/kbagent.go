@@ -380,18 +380,44 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 	}
 }
 
+func isKbAgentStarted(pod *corev1.Pod) bool {
+	if len(pod.Status.ContainerStatuses) > 0 {
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Name == kbagt.ContainerName && cs.Ready {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) ([]*corev1.Pod, error) {
 	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
 		return []*corev1.Pod{pod}, nil
 	}
 
 	anyPod := func() []*corev1.Pod {
-		i := rand.Int() % len(pods)
-		return []*corev1.Pod{pods[i]}
+		readyPods := []*corev1.Pod{}
+		for _, pod := range pods {
+			if isKbAgentStarted(pod) {
+				readyPods = append(readyPods, pod)
+			}
+		}
+		if len(readyPods) == 0 {
+			return readyPods
+		}
+		i := rand.Int() % len(readyPods)
+		return []*corev1.Pod{readyPods[i]}
 	}
 
 	allPods := func() []*corev1.Pod {
-		return pods
+		readyPods := []*corev1.Pod{}
+		for _, pod := range pods {
+			if isKbAgentStarted(pod) {
+				readyPods = append(readyPods, pod)
+			}
+		}
+		return readyPods
 	}
 
 	podsWithRole := func() []*corev1.Pod {

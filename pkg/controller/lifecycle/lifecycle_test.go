@@ -497,6 +497,14 @@ var _ = Describe("lifecycle", func() {
 							},
 						},
 					},
+					Status: corev1.PodStatus{
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name: "kbagent",
+								Ready: true,
+							},
+						},
+					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -524,7 +532,57 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, k8sClient, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(Or(ContainSubstring("pod pod-0 has no ip"), ContainSubstring("pod pod-1 has no ip")))
+			Expect(err.Error()).Should(ContainSubstring("pod pod-0 has no ip"))
+		})
+
+		It("pod selector - all (not ready)",func ()  {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("no available pod to execute action"))
 		})
 
 		It("pod selector - all", func() {

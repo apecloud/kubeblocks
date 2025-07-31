@@ -212,7 +212,7 @@ func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind 
 		return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
 	}
 	if !ready(obj) {
-		return fmt.Errorf("precondition check error, %s is not ready", kind)
+		return fmt.Errorf("%w: %s is not ready", ErrPreconditionFailed, kind)
 	}
 	return nil
 }

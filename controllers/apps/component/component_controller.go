@@ -157,8 +157,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentTLSTransformer{},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
-			// provision component system accounts, depend on vars
-			&componentAccountProvisionTransformer{},
 			// render config/script templates
 			&componentFileTemplateTransformer{},
 			// HACK: the legacy reload sidecar
@@ -171,6 +169,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentRBACTransformer{},
 			// handle component postProvision lifecycle action
 			&componentPostProvisionTransformer{},
+			// provision component system accounts, depend on vars
+			&componentAccountProvisionTransformer{},
 			// update component status
 			&componentStatusTransformer{Client: r.Client},
 			// notify dependent components the possible spec changes

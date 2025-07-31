@@ -474,7 +474,7 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, reader, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("precondition check error"))
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
 		})
 
 		It("pod selector - any", func() {

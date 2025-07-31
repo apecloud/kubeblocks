@@ -31,7 +31,7 @@ type RequeueError interface {
 	Reason() string
 }
 
-// DelayedRequeueError is a RequeueError that won't break transformer build process
+// DelayedRequeueError is a RequeueError that continues transformer build process until the end, then returns error
 type DelayedRequeueError interface {
 	RequeueError
 	Delayed()
@@ -54,7 +54,7 @@ func NewDelayedRequeueError(after time.Duration, reason string) error {
 	}
 }
 
-// delayedError is a error that won't break transformer build process
+// delayedError is a error that continues transformer build process until the end, then returns error
 type delayedError struct {
 	reason string
 }

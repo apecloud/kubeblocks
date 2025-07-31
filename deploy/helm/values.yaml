@@ -25,15 +25,20 @@ image:
 ##
 replicaCount: 1
 
-## MaxConcurrentReconciles for component, instanceSet and opsRequest controllers.
-##
+## MaxConcurrentReconciles for cluster, component and instanceSet controllers.
+## default is 32
 reconcileWorkers: ""
+
+## k8s cache configuration.
+cache:
+  # default is 600 seconds
+  syncTimeout: ""
 
 ## k8s client configuration.
 client:
-  # default is 20
+  # default is 128
   qps: ""
-  # default is 30
+  # default is 256
   burst: ""
 
 ## @param nameOverride
@@ -348,7 +353,16 @@ webhooks:
 
 ## manager server settings
 manager:
-  leaderElectId: ""
+  ## leader election
+  leaderElection:
+    # default is "001c317f"
+    Id: ""
+    # default is 15 seconds
+    leaseDuration:
+    # default is 10 seconds
+    renewDeadline:
+    # default is 2 seconds
+    retryPeriod:
 
 ## Data protection settings
 ##

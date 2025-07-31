@@ -127,6 +127,7 @@ var _ = Describe("post-provision transformer test", func() {
 			)
 
 			BeforeEach(func() {
+				postProvisionCompleted = false
 				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 						if req.Action == "postProvision" {

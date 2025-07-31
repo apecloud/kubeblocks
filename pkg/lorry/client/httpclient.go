@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -43,8 +44,6 @@ const (
 	urlTemplate = "http://%s:%d/v1.0/"
 )
 
-var NotImplemented = errors.New("NotImplemented")
-
 type HTTPClient struct {
 	lorryClient
 	Client           *http.Client
@@ -55,8 +54,6 @@ type HTTPClient struct {
 	logger           logr.Logger
 }
 
-var _ Client = &HTTPClient{}
-
 type OperationResult struct {
 	response *http.Response
 	err      error
@@ -64,7 +61,31 @@ type OperationResult struct {
 	respTime time.Time
 }
 
-var cache map[string]*OperationResult = make(map[string]*OperationResult)
+var (
+	_              Client                      = &HTTPClient{}
+	NotImplemented                             = errors.New("NotImplemented")
+	cache          map[string]*OperationResult = make(map[string]*OperationResult)
+	cacheMutex     sync.RWMutex
+)
+
+func cacheGet(key string) (*OperationResult, bool) {
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+	result, ok := cache[key]
+	return result, ok
+}
+
+func cacheSet(key string, value *OperationResult) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	cache[key] = value
+}
+
+func cacheDelete(key string) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	delete(cache, key)
+}
 
 func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	logger := ctrl.Log.WithName("Lorry HTTP client")
@@ -208,11 +229,12 @@ func (cli *HTTPClient) InvokeComponent(ctxWithReconcileTimeout context.Context, 
 	}
 
 	mapKey := GetMapKeyFromRequest(req)
-	operationRes, ok := cache[mapKey]
+
+	operationRes, ok := cacheGet(mapKey)
 	if ok {
 		if operationRes.response != nil {
 			// if the response is not nil, it means the request has been sent and the response is cached
-			delete(cache, mapKey)
+			cacheDelete(mapKey)
 			if time.Since(operationRes.respTime) <= cli.CacheTTL {
 				ch <- operationRes
 				return
@@ -222,7 +244,7 @@ func (cli *HTTPClient) InvokeComponent(ctxWithReconcileTimeout context.Context, 
 			// if the response is nil, it means the request has been sent and not finished yet
 			if time.Since(operationRes.reqTime) >= 2*cli.RequestTimeout {
 				// if the request has been sent for less than 2 times of cacheTTL, and there is no the response, clean the cache and send the request again
-				delete(cache, mapKey)
+				cacheDelete(mapKey)
 				cli.logger.Info("request timeout, and try again", "url", url, "method", method, "timeout", 2*cli.RequestTimeout, "since", time.Since(operationRes.reqTime))
 			} else {
 				ch <- operationRes
@@ -235,7 +257,7 @@ func (cli *HTTPClient) InvokeComponent(ctxWithReconcileTimeout context.Context, 
 		reqTime: time.Now(),
 	}
 
-	cache[mapKey] = operationRes
+	cacheSet(mapKey, operationRes)
 	resp, err := cli.Client.Do(req)
 	operationRes.response = resp
 	operationRes.err = err
@@ -243,7 +265,7 @@ func (cli *HTTPClient) InvokeComponent(ctxWithReconcileTimeout context.Context, 
 	select {
 	case <-ctxWithReconcileTimeout.Done():
 	default:
-		delete(cache, mapKey)
+		cacheDelete(mapKey)
 		ch <- operationRes
 	}
 }

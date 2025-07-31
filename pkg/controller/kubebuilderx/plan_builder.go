@@ -28,6 +28,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -158,7 +159,7 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 	)
 	findAndAppend := func(vertex *model.ObjectVertex) {
 		switch vertex.Obj.(type) {
-		case *corev1.Service, *corev1.ConfigMap, *corev1.Secret, *corev1.PersistentVolumeClaim:
+		case *corev1.PersistentVolumeClaim, *corev1.Service, *corev1.ConfigMap, *corev1.Secret, *corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding:
 			assistantVertices = append(assistantVertices, vertex)
 		default:
 			workloadVertices = append(workloadVertices, vertex)
@@ -166,12 +167,18 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 	}
 	createNewObjects := func() {
 		for name := range createSet {
+			if desiredTree.childrenOptions[name].SkipToReconcile {
+				continue
+			}
 			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext4G())
 			findAndAppend(v)
 		}
 	}
 	updateObjects := func() {
 		for name := range updateSet {
+			if desiredTree.childrenOptions[name].SkipToReconcile {
+				continue
+			}
 			oldObj := oldSnapshot[name]
 			newObj := newSnapshot[name]
 			if !equality.Semantic.DeepEqual(oldObj, newObj) {
@@ -193,6 +200,9 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
+			if desiredTree.childrenOptions[name].SkipToReconcile {
+				continue
+			}
 			object := oldSnapshot[name]
 			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), inDataContext4G())
 			findAndAppend(v)

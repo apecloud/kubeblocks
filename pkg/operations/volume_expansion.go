@@ -48,6 +48,8 @@ type volumeExpansionHelper struct {
 	vctName              string
 	expectCount          int
 	offlineInstanceNames []string
+	templateName         string
+	ordinals             appsv1.Ordinals
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
@@ -136,6 +138,18 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					vctName:              vct.Name,
 					offlineInstanceNames: compSpec.OfflineInstances,
 				})
+				for _, template := range compSpec.Instances {
+					// todo: consider instance template with volumeClaimTemplates
+					veHelpers = append(veHelpers, volumeExpansionHelper{
+						compOps:              compOps,
+						fullComponentName:    fullComponentName,
+						expectCount:          int(*template.Replicas),
+						vctName:              vct.Name,
+						offlineInstanceNames: compSpec.OfflineInstances,
+						templateName:         template.Name,
+						ordinals:             template.Ordinals,
+					})
+				}
 			}
 		}
 	}
@@ -284,6 +298,9 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		completedCount int
 		err            error
 	)
+	if veHelper.expectCount <= 0 {
+		return 0, 0, nil
+	}
 	matchingLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
 		constant.VolumeClaimTemplateNameLabelKey: veHelper.vctName,
@@ -294,7 +311,11 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		return 0, 0, err
 	}
 	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, veHelper.fullComponentName)
-	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", int32(veHelper.expectCount), veHelper.offlineInstanceNames, nil)
+	ordinalList, err := instanceset.ConvertOrdinalsToSortedList(veHelper.ordinals)
+	if err != nil {
+		return 0, 0, err
+	}
+	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, ordinalList)
 	if err != nil {
 		return 0, 0, err
 	}

@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/storage"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -67,9 +69,14 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResources(&testCtx)
 
+		// delete component definition resources
+		testapps.ClearComponentResourcesWithRemoveFinalizerOption(&testCtx)
+
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// delete pvc resources
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// non-namespaced
@@ -86,6 +93,25 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			consensusCompName, testapps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterName,
 			constant.VolumeClaimTemplateNameLabelKey, testapps.DataVolumeName,
 			constant.KBAppComponentLabelKey, consensusCompName).SetStorage("2Gi").SetStorageClass(storageClassName).CheckedCreate(&testCtx)
+	}
+
+	createItsPVC := func(clusterName, scName, vctName, pvcName, cmpName string) {
+		var itsName string
+		parts := strings.Split(pvcName, cmpName+"-")
+		if len(parts) == 2 && strings.Contains(parts[1], "-") {
+			p := strings.Split(parts[1], "-")
+			itsName = p[0]
+			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+				consensusCompName, testapps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterName,
+				constant.VolumeClaimTemplateNameLabelKey, testapps.DataVolumeName,
+				constant.KBAppComponentLabelKey, consensusCompName, constant.KBAppComponentInstanceTemplateLabelKey,
+				itsName).SetStorage("2Gi").SetStorageClass(storageClassName).CheckedCreate(&testCtx)
+		} else {
+			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+				consensusCompName, testapps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterName,
+				constant.VolumeClaimTemplateNameLabelKey, testapps.DataVolumeName,
+				constant.KBAppComponentLabelKey, consensusCompName).SetStorage("2Gi").SetStorageClass(storageClassName).CheckedCreate(&testCtx)
+		}
 	}
 
 	// getVolumeClaimNames gets all PVC names of component compName.
@@ -140,16 +166,73 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		return pvcNames
 	}
 
-	initResourcesForVolumeExpansion := func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int) (*opsv1alpha1.OpsRequest, []string) {
-		pvcNames := getVolumeClaimNames(opsRes.Cluster, consensusCompName)
-		for _, pvcName := range pvcNames {
-			createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
-			// mock pvc is Bound
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Phase = corev1.ClaimBound
-			})()).ShouldNot(HaveOccurred())
-
+	// getItsVolumeClaimNames gets all PVC names of component compName and instanceTemplateName.
+	//
+	// cluster.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
+	//
+	// nil return if:
+	//   1. component compName not found or
+	//   2. len(VolumeClaimTemplates)==0 or
+	//   3. any claimNames not found
+	getItsVolumeClaimNames := func(cluster *appsv1.Cluster, compName string, claimNames ...string) []string {
+		if cluster == nil {
+			return nil
 		}
+		comp := cluster.Spec.GetComponentByName(compName)
+		if comp == nil {
+			return nil
+		}
+		if len(comp.VolumeClaimTemplates) == 0 {
+			return nil
+		}
+		if len(claimNames) == 0 {
+			for _, template := range comp.VolumeClaimTemplates {
+				claimNames = append(claimNames, template.Name)
+			}
+		}
+		allExist := true
+		for _, name := range claimNames {
+			found := false
+			for _, template := range comp.VolumeClaimTemplates {
+				if template.Name == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				allExist = false
+				break
+			}
+		}
+		if !allExist {
+			return nil
+		}
+
+		pvcNames := make([]string, 0)
+		for _, claimName := range claimNames {
+			restReplicas := comp.Replicas
+			for i := 0; i < int(comp.Replicas); i++ {
+				// here we did not handle ordinals in instance template
+				for _, its := range comp.Instances {
+					for j := 0; j < int(*its.Replicas); j++ {
+						pvcName := fmt.Sprintf("%s-%s-%s-%s-%d", claimName, cluster.Name, compName, its.Name, j)
+						pvcNames = append(pvcNames, pvcName)
+						restReplicas--
+						i++
+					}
+				}
+				for x := 0; x < int(restReplicas); x++ {
+					pvcName := fmt.Sprintf("%s-%s-%s-%d", claimName, cluster.Name, compName, x)
+					pvcNames = append(pvcNames, pvcName)
+					i++
+				}
+			}
+		}
+		return pvcNames
+	}
+
+	initResourcesForVolumeExpansionBase := func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int, preparePvc func() []string) (*opsv1alpha1.OpsRequest, []string) {
+		pvcNames := preparePvc()
 		currRandomStr := testCtx.GetRandomStr()
 		ops := testops.NewOpsRequestObj("volumeexpansion-ops-"+currRandomStr, testCtx.DefaultNamespace,
 			clusterObject.Name, opsv1alpha1.VolumeExpansionType)
@@ -171,10 +254,44 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		return ops, pvcNames
 	}
 
+	initResourceForItsVolumeExpansion := func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int) (*opsv1alpha1.OpsRequest, []string) {
+		return initResourcesForVolumeExpansionBase(clusterObject, opsRes, storage, replicas, func() []string {
+			pvcNames := getItsVolumeClaimNames(opsRes.Cluster, consensusCompName)
+			for _, pvcName := range pvcNames {
+				createItsPVC(clusterObject.Name, storageClassName, vctName, pvcName, consensusCompName)
+				// mock pvc is Bound
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				})()).ShouldNot(HaveOccurred())
+
+			}
+			return pvcNames
+		})
+	}
+
+	initResourcesForVolumeExpansion := func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int) (*opsv1alpha1.OpsRequest, []string) {
+		return initResourcesForVolumeExpansionBase(clusterObject, opsRes, storage, replicas, func() []string {
+			pvcNames := getVolumeClaimNames(opsRes.Cluster, consensusCompName)
+			for _, pvcName := range pvcNames {
+				createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
+				// mock pvc is Bound
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				})()).ShouldNot(HaveOccurred())
+
+			}
+			return pvcNames
+		})
+	}
+
 	mockVolumeExpansionActionAndReconcile := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, newOps *opsv1alpha1.OpsRequest, pvcNames []string) {
 		// first step, validate ops and update phase to Creating
 		_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).Should(BeNil())
+		// ops phase should not failed
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: newOps.Name, Namespace: testCtx.DefaultNamespace}, func(g Gomega, tmpOps *opsv1alpha1.OpsRequest) {
+			g.Expect(tmpOps.Status.Phase).To(Not(Equal(opsv1alpha1.OpsFailedPhase)))
+		})).Should(Succeed())
 
 		// next step, do volume-expand action
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -203,7 +320,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		clusterObject *appsv1.Cluster,
 		opsRes *OpsResource,
 		requestStorage,
-		actualStorage string) {
+		actualStorage string,
+		initResourceFunc func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int) (*opsv1alpha1.OpsRequest, []string)) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1.RunningClusterPhase
@@ -211,7 +329,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 		// init resources for volume expansion
 		comp := clusterObject.Spec.GetComponentByName(consensusCompName)
-		newOps, pvcNames := initResourcesForVolumeExpansion(clusterObject, opsRes, requestStorage, int(comp.Replicas))
+		newOps, pvcNames := initResourceFunc(clusterObject, opsRes, requestStorage, int(comp.Replicas))
 
 		By("mock run volumeExpansion action and reconcileAction")
 		mockVolumeExpansionActionAndReconcile(reqCtx, opsRes, newOps, pvcNames)
@@ -303,13 +421,52 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			})).ShouldNot(HaveOccurred())
 
 			By("Test VolumeExpansion with consistent storageSize")
-			testVolumeExpansion(reqCtx, clusterObject, opsRes, "3Gi", "3Gi")
+			testVolumeExpansion(reqCtx, clusterObject, opsRes, "3Gi", "3Gi", initResourcesForVolumeExpansion)
 
 			By("Test VolumeExpansion with inconsistent storageSize but it is valid")
-			testVolumeExpansion(reqCtx, clusterObject, opsRes, "5G", "5Gi")
+			testVolumeExpansion(reqCtx, clusterObject, opsRes, "5G", "5Gi", initResourcesForVolumeExpansion)
 
 			By("Test delete the Running VolumeExpansion OpsRequest")
 			testDeleteRunningVolumeExpansion(clusterObject, opsRes)
+		})
+
+		It("VolumeExpandsion with InstanceTemplate", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
+			// all pods use instance template
+			Expect(testapps.ChangeObj(&testCtx, clusterObject, func(lc *appsv1.Cluster) {
+				lc.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{
+					{
+						Name:     "foo",
+						Replicas: ptr.To(int32(1)),
+					},
+					{
+						Name:     "bar",
+						Replicas: ptr.To(int32(2)),
+					},
+				}
+			})).ShouldNot(HaveOccurred())
+			// init storageClass
+			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
+			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
+				lsc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
+			})).ShouldNot(HaveOccurred())
+			opsRes := &OpsResource{
+				Cluster:  clusterObject,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+			By("Test OpsManager.MainEnter function with ClusterOps")
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+				clusterObject.Status.Phase = appsv1.RunningClusterPhase
+				clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
+					consensusCompName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+			})).ShouldNot(HaveOccurred())
+
+			By("Test volume expansion with instance template")
+			testVolumeExpansion(reqCtx, clusterObject, opsRes, "3Gi", "3Gi", initResourceForItsVolumeExpansion)
 		})
 	})
 })

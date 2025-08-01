@@ -27,9 +27,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {

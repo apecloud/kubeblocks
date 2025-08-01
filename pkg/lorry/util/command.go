@@ -49,11 +49,10 @@ func ExecCommand(ctx context.Context, command []string, envs []string) (string, 
 		return "", err
 	}
 
+	pid := cmd.Process.Pid
 	go func() {
 		<-ctx.Done()
-		if cmd.Process != nil {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		}
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
 	}()
 
 	err := cmd.Wait()

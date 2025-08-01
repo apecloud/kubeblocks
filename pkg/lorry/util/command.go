@@ -20,15 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"syscall"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func ExecCommand(ctx context.Context, command []string, envs []string) (string, error) {
@@ -37,11 +38,30 @@ func ExecCommand(ctx context.Context, command []string, envs []string) (string, 
 	}
 	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	cmd.Env = envs
-	bytes, err := cmd.Output()
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+
+	go func() {
+		<-ctx.Done()
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+	}()
+
+	err := cmd.Wait()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		err = errors.New(string(exitErr.Stderr))
 	}
-	return string(bytes), err
+
+	return buf.String(), err
 }
 
 func GetGlobalSharedEnvs() ([]string, error) {

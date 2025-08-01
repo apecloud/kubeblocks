@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -40,28 +39,20 @@ func ExecCommand(ctx context.Context, command []string, envs []string) (string, 
 	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	cmd.Env = envs
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-
-	if err := cmd.Start(); err != nil {
-		return "", err
+	cmd.Cancel = func() error {
+		if cmd.Process != nil {
+			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		return nil
 	}
 
-	pid := cmd.Process.Pid
-	go func() {
-		<-ctx.Done()
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
-	}()
-
-	err := cmd.Wait()
+	b, err := cmd.Output()
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		err = errors.New(string(exitErr.Stderr))
 	}
 
-	return buf.String(), err
+	return string(b), err
 }
 
 func GetGlobalSharedEnvs() ([]string, error) {

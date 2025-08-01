@@ -22,7 +22,9 @@ package officalpostgres
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/postgres"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Manager struct {
@@ -191,7 +194,42 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	return true
 }
 
+type patroniResp struct {
+	Role string `json:"role"`
+}
+
 func (mgr *Manager) GetMemberRoleWithHost(ctx context.Context, host string) (string, error) {
+	getRoleFromPatroni := func() (string, error) {
+		// role=$(curl -s 127.0.0.1:8008 | jq '.role')
+		resp, err := http.Get("http://127.0.0.1:8008")
+		if err != nil {
+			return "", err
+		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		var data patroniResp
+		if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			return "", err
+		}
+
+		role := strings.ToLower(data.Role)
+
+		switch role {
+		case "master", "standby_leader", "primary":
+			return models.PRIMARY, nil
+		case "replica":
+			return models.SECONDARY, nil
+		default:
+			return "", errors.Errorf("unknown role:%s", role)
+		}
+	}
+
+	if viper.IsSet("PATRONIVERSION") {
+		return getRoleFromPatroni()
+	}
+
 	sql := "select pg_is_in_recovery();"
 
 	resp, err := mgr.QueryWithHost(ctx, sql, host)

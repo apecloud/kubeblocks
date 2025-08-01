@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,11 +38,21 @@ func ExecCommand(ctx context.Context, command []string, envs []string) (string, 
 	}
 	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	cmd.Env = envs
-	bytes, err := cmd.Output()
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process != nil {
+			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		return nil
+	}
+
+	b, err := cmd.Output()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		err = errors.New(string(exitErr.Stderr))
 	}
-	return string(bytes), err
+
+	return string(b), err
 }
 
 func GetGlobalSharedEnvs() ([]string, error) {

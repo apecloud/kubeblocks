@@ -33,13 +33,14 @@ const (
 
 // labels defined by KubeBlocks
 const (
-	ClusterDefLabelKey            = "clusterdefinition.kubeblocks.io/name"
-	ShardingDefLabelKey           = "shardingdefinition.kubeblocks.io/name"
-	ComponentDefinitionLabelKey   = "componentdefinition.kubeblocks.io/name"
-	ComponentVersionLabelKey      = "componentversion.kubeblocks.io/name"
-	SidecarDefLabelKey            = "sidecardefinition.kubeblocks.io/name"
-	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"
-	AddonNameLabelKey             = "extensions.kubeblocks.io/addon-name"
+	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
+	ShardingDefLabelKey             = "shardingdefinition.kubeblocks.io/name"
+	LastComponentDefinitionLabelKey = "componentdefinition.kubeblocks.io/last=name"
+	ComponentDefinitionLabelKey     = "componentdefinition.kubeblocks.io/name"
+	ComponentVersionLabelKey        = "componentversion.kubeblocks.io/name"
+	SidecarDefLabelKey              = "sidecardefinition.kubeblocks.io/name"
+	ServiceDescriptorNameLabelKey   = "servicedescriptor.kubeblocks.io/name"
+	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 
 	KBAppComponentLabelKey    = "apps.kubeblocks.io/component-name"
 	KBAppShardingNameLabelKey = "apps.kubeblocks.io/sharding-name"

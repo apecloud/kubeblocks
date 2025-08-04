@@ -419,6 +419,8 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 	if len(restores) == 0 {
 		return nil
 	}
+	var errType intctrlutil.ErrorType
+	var msgs []string
 	for i := range restores {
 		restore := restores[i]
 		if r.Scheme != nil {
@@ -437,10 +439,25 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 		case dpv1alpha1.RestorePhaseCompleted:
 			continue
 		case dpv1alpha1.RestorePhaseFailed:
+			if r.volumeRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
+				errType = intctrlutil.ErrorTypeRestoreFailed
+				msgs = append(msgs, fmt.Sprintf(`restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName()))
+				continue
+			}
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
 		default:
+			if r.volumeRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
+				if errType != intctrlutil.ErrorTypeRestoreFailed {
+					errType = intctrlutil.ErrorTypeNeedWaiting
+				}
+				msgs = append(msgs, fmt.Sprintf(`waiting for restore "%s" successfully`, restore.GetName()))
+				continue
+			}
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 		}
+	}
+	if errType != "" {
+		return intctrlutil.NewErrorf(errType, strings.Join(msgs, ";"))
 	}
 	return nil
 }

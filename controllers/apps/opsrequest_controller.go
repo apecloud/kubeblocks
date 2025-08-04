@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -91,7 +90,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 2,
 		}).
 		Watches(&appsv1alpha1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForCluster)).
 		Watches(&appsv1alpha1.Component{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).

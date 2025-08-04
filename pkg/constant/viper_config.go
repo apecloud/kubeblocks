@@ -53,6 +53,7 @@ const (
 	CfgKeyDPBackupEncryptionAlgorithm    = "DP_BACKUP_ENCRYPTION_ALGORITHM"
 
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
+	CfgCacheSyncTimeout   = "CACHE_SYNC_TIMEOUT"
 	CfgClientQPS          = "CLIENT_QPS"
 	CfgClientBurst        = "CLIENT_BURST"
 

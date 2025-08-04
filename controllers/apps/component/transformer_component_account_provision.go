@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -123,6 +125,10 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	}
 
 	t.provisionCondDone(transCtx, condCopy, &cond, err3)
+
+	if err3 != nil {
+		err3 = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "account provision action failed"), err3)
+	}
 
 	return err3
 }

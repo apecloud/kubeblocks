@@ -50,14 +50,24 @@ spec:
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
           command:
             - /bin/true
         - name: datascript
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.datascript.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
           command:
             - /bin/true
       containers:
@@ -66,6 +76,15 @@ spec:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
+            {{- if .Values.leaderElection.leaseDuration }}
+            - "--leader-elect-lease-duration={{ .Values.leaderElection.leaseDuration }}"
+            {{- end }}
+            {{- if .Values.leaderElection.renewDeadline }}
+            - "--leader-elect-renew-deadline={{ .Values.leaderElection.renewDeadline }}"
+            {{- end }}
+            {{- if .Values.leaderElection.retryPeriod }}
+            - "--leader-elect-retry-period={{ .Values.leaderElection.retryPeriod }}"
+            {{- end }}
             - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
             - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
             {{- with .Values.loggerSettings.level }}
@@ -107,6 +126,10 @@ spec:
             {{- if .Values.reconcileWorkers }}
             - name: KUBEBLOCKS_RECONCILE_WORKERS
               value: {{ .Values.reconcileWorkers | quote }}
+            {{- end }}
+            {{- if .Values.cache.syncTimeout }}
+            - name: CACHE_SYNC_TIMEOUT
+              value: {{ .Values.cache.syncTimeout | quote }}
             {{- end }}
             {{- if .Values.client.qps }}
             - name: CLIENT_QPS
@@ -231,7 +254,12 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              cpu: {{ .Values.resources.cpu }}
+              memory: {{ .Values.resources.memory }}
+            requests:
+              cpu: {{ .Values.resources.cpu }}
+              memory: {{ .Values.resources.memory }}
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config

@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -140,7 +139,7 @@ func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
 		})
 
 	if multiClusterMgr != nil {

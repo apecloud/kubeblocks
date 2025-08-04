@@ -362,3 +362,7 @@ func ParsePgWalDumpError(errorInfo string, lsnStr string) string {
 
 	return errorInfo[startIndex:endIndex]
 }
+
+type PatroniResp struct {
+	Role string `json:"role"`
+}

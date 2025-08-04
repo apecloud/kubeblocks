@@ -27,8 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
-
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -38,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/lorry/dcs"
+	"github.com/apecloud/kubeblocks/pkg/lorry/engines"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/models"
 	"github.com/apecloud/kubeblocks/pkg/lorry/engines/register"
 	"github.com/apecloud/kubeblocks/pkg/lorry/operations"
@@ -95,8 +94,8 @@ func (s *CheckRole) Init(ctx context.Context) error {
 		timeoutSeconds = viper.GetInt(constant.KBEnvRoleProbeTimeout)
 	}
 	// lorry utilizes the pod readiness probe to trigger role probe and 'timeoutSeconds' is directly copied from the 'probe.timeoutSeconds' field of pod.
-	// here we give 80% of the total time to role probe job and leave the remaining 20% to kubelet to handle the readiness probe related tasks.
-	s.Timeout = time.Duration(timeoutSeconds) * (800 * time.Millisecond)
+	// here we give 50% of the total time to role probe job and leave the remaining 50% to kubelet to handle the readiness probe related tasks.
+	s.Timeout = time.Duration(timeoutSeconds) * (500 * time.Millisecond)
 	s.OriRole = "waitForStart"
 	actionJSON := viper.GetString(constant.KBEnvActionCommands)
 	if actionJSON != "" {

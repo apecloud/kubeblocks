@@ -22,7 +22,6 @@ package parameters
 import (
 	"context"
 	"fmt"
-	"math"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -88,7 +87,7 @@ func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager, multiC
 	builder := intctrlutil.NewControllerManagedBy(mgr).
 		For(&parametersv1alpha1.ComponentParameter{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
 		}).
 		Owns(&corev1.ConfigMap{})
 	if multiClusterMgr != nil {

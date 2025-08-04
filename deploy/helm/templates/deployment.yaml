@@ -50,7 +50,12 @@ spec:
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
           command:
             - /bin/true
       containers:
@@ -59,8 +64,17 @@ spec:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
-            {{- with .Values.manager }}
-            - "--leader-elect-id={{- default "001c317f" .leaderElectId }}"
+            {{- with .Values.manager.leaderElection }}
+            - "--leader-elect-id={{- default "001c317f" .Id }}"
+            {{- end }}
+            {{- if .Values.manager.leaderElection.leaseDuration }}
+            - "--leader-elect-lease-duration={{ .Values.manager.leaderElection.leaseDuration }}"
+            {{- end }}
+            {{- if .Values.manager.leaderElection.renewDeadline }}
+            - "--leader-elect-renew-deadline={{ .Values.manager.leaderElection.renewDeadline }}"
+            {{- end }}
+            {{- if .Values.manager.leaderElection.retryPeriod }}
+            - "--leader-elect-retry-period={{ .Values.manager.leaderElection.retryPeriod }}"
             {{- end }}
             - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
             - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
@@ -101,6 +115,10 @@ spec:
             {{- if .Values.reconcileWorkers }}
             - name: KUBEBLOCKS_RECONCILE_WORKERS
               value: {{ .Values.reconcileWorkers | quote }}
+            {{- end }}
+            {{- if .Values.cache.syncTimeout }}
+            - name: CACHE_SYNC_TIMEOUT
+              value: {{ .Values.cache.syncTimeout | quote }}
             {{- end }}
             {{- if .Values.client.qps }}
             - name: CLIENT_QPS
@@ -146,8 +164,6 @@ spec:
             - name: ADDON_JOB_IMAGE_PULL_POLICY
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             {{- end }}
-            - name: KUBEBLOCKS_ADDON_SA_NAME
-              value: {{ include "kubeblocks.addonSAName" . }}
             - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
               value: {{ join " " .Values.addonHelmInstallOptions }}
             - name: KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY
@@ -221,7 +237,12 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              cpu: {{ .Values.resources.cpu }}
+              memory: {{ .Values.resources.memory }}
+            requests:
+              cpu: {{ .Values.resources.cpu }}
+              memory: {{ .Values.resources.memory }}
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config

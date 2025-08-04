@@ -27,7 +27,7 @@ import (
 
 func TestIsDelayedRequeueError(t *testing.T) {
 	err := NewDelayedRequeueError(time.Second, "requeue for test")
-	if !IsDelayedError(err) {
+	if !IsDelayedRequeueError(err) {
 		t.Error("should return true when error is a delayed requeue error")
 	}
 	if !IsRequeueError(err) {

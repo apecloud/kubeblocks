@@ -55,7 +55,7 @@ func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	var delayedError error
 	for _, transformer := range r {
 		if err := transformer.Transform(ctx, dag); err != nil {
-			if intctrlutil.IsDelayedError(err) {
+			if intctrlutil.IsDelayedRequeueError(err) {
 				if delayedError == nil {
 					delayedError = err
 				}

@@ -20,18 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
 
-// RequeueError indicates a RequeueAfter result will be returned
 type RequeueError interface {
 	RequeueAfter() time.Duration
 	Reason() string
 }
 
-// DelayedRequeueError is a RequeueError that continues transformer build process until the end, then returns error
 type DelayedRequeueError interface {
 	RequeueError
 	Delayed()
@@ -54,26 +51,9 @@ func NewDelayedRequeueError(after time.Duration, reason string) error {
 	}
 }
 
-// delayedError is a error that continues transformer build process until the end, then returns error
-type delayedError struct {
-	reason string
-}
-
-func NewDelayedError(reason string) error {
-	return &delayedError{reason: reason}
-}
-
-func (d *delayedError) Error() string {
-	return d.reason
-}
-
-func IsDelayedError(err error) bool {
-	var delayedRequeue *delayedRequeueError
-	var delayed *delayedError
-	if errors.As(err, &delayed) || errors.As(err, &delayedRequeue) {
-		return true
-	}
-	return false
+func IsDelayedRequeueError(err error) bool {
+	_, ok := err.(DelayedRequeueError)
+	return ok
 }
 
 // IsRequeueError checks if the error is the RequeueError.

@@ -185,7 +185,7 @@ func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag
 		return nil, err
 	}
 	if err = deleteCompNShardingInOrder(transCtx, dag, nameSet, nil); err != nil {
-		if intctrlutil.IsDelayedError(err) {
+		if intctrlutil.IsDelayedRequeueError(err) {
 			delayedErr := err.(intctrlutil.DelayedRequeueError)
 			err = intctrlutil.NewRequeueError(delayedErr.RequeueAfter(), delayedErr.Reason())
 		}

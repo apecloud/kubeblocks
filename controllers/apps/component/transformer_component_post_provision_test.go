@@ -169,7 +169,7 @@ var _ = Describe("post-provision transformer test", func() {
 				err = transformer.Transform(transCtx, dag)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(ContainSubstring("wait for lifecycle action precondition"))
-				Expect(intctrlutil.IsDelayedError(err)).To(BeTrue())
+				Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
 				Expect(postProvisionCompleted).Should(BeFalse())
 			})
 		})

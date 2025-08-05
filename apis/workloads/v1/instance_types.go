@@ -180,6 +180,7 @@ type InstanceStatus2 struct {
 }
 
 type InstanceAssistantObject struct {
+	Service        *corev1.Service        `json:"service,omitempty"`
 	ConfigMap      *corev1.ConfigMap      `json:"configMap,omitempty"`
 	Secret         *corev1.Secret         `json:"secret,omitempty"`
 	ServiceAccount *corev1.ServiceAccount `json:"serviceAccount,omitempty"`

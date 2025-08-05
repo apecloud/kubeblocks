@@ -128,6 +128,14 @@ func instanceAssistantObject(obj client.Object) workloads.InstanceAssistantObjec
 			Annotations: obj.GetAnnotations(),
 		}
 	}
+	if service, ok := obj.(*corev1.Service); ok {
+		return workloads.InstanceAssistantObject{
+			Service: &corev1.Service{
+				ObjectMeta: objectMeta(),
+				Spec:       service.Spec,
+			},
+		}
+	}
 	if cm, ok := obj.(*corev1.ConfigMap); ok {
 		return workloads.InstanceAssistantObject{
 			ConfigMap: &corev1.ConfigMap{

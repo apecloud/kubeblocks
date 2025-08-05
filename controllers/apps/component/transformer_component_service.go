@@ -99,10 +99,13 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 			}
 			delete(runningServices, svc.Name)
 		}
+		for _, svc := range services {
+			component.AddInstanceAssistantObject(synthesizeComp, svc)
+		}
 	}
 
 	for svc := range runningServices {
-		graphCli.Delete(dag, runningServices[svc], appsutil.InDataContext4G())
+		graphCli.Delete(dag, runningServices[svc])
 	}
 
 	return nil
@@ -298,9 +301,9 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			Name:      service.Name,
 		}
 		originSvc := &corev1.Service{}
-		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, appsutil.InDataContext4C()); err != nil {
+		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc); err != nil {
 			if apierrors.IsNotFound(err) {
-				graphCli.Create(dag, service, appsutil.InDataContext4G())
+				graphCli.Create(dag, service)
 				return nil
 			}
 			return err
@@ -320,7 +323,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			newSvc.Spec = service.Spec
 			appsutil.ResolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
 			if !reflect.DeepEqual(originSvc, newSvc) {
-				graphCli.Update(dag, originSvc, newSvc, appsutil.InDataContext4G())
+				graphCli.Update(dag, originSvc, newSvc)
 			}
 			return nil
 		}
@@ -332,7 +335,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 		}
 		overrideMutableParams()
 		if !reflect.DeepEqual(originSvc, newSvc) {
-			graphCli.Update(dag, originSvc, newSvc, appsutil.InDataContext4G())
+			graphCli.Update(dag, originSvc, newSvc)
 		}
 		return nil
 	}

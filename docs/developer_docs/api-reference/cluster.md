@@ -31647,11 +31647,15 @@ bool
 <em>(Optional)</em>
 <p>Assistant objects that are necessary to run the instance.</p>
 <ul>
+<li>Service:
+<ul>
+<li>component service</li>
+</ul></li>
 <li>ConfigMap:
 <ul>
 <li>config &amp; script templates</li>
 <li>env</li>
-<li>kbagent task parameters</li>
+<li>kbagent task</li>
 </ul></li>
 <li>Secret:
 <ul>
@@ -31808,6 +31812,18 @@ map[string]string
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>service</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
+Kubernetes core/v1.Service
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
 <tr>
 <td>
 <code>configMap</code><br/>
@@ -32290,11 +32306,15 @@ bool
 <em>(Optional)</em>
 <p>Assistant objects that are necessary to run the instance.</p>
 <ul>
+<li>Service:
+<ul>
+<li>component service</li>
+</ul></li>
 <li>ConfigMap:
 <ul>
 <li>config &amp; script templates</li>
 <li>env</li>
-<li>kbagent task parameters</li>
+<li>kbagent task</li>
 </ul></li>
 <li>Secret:
 <ul>

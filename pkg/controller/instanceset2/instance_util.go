@@ -247,6 +247,16 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	}
 	targetInst.Spec.PersistentVolumeClaimRetentionPolicy = newInst.Spec.PersistentVolumeClaimRetentionPolicy
 
+	copyAndMergeService := func(old, new *corev1.Service) client.Object {
+		mergeMap(&new.Labels, &old.Labels)
+		mergeMap(&new.Annotations, &old.Annotations)
+		old.Spec.Selector = new.Spec.Selector
+		old.Spec.Type = new.Spec.Type
+		old.Spec.PublishNotReadyAddresses = new.Spec.PublishNotReadyAddresses
+		old.Spec.Ports = new.Spec.Ports
+		return old
+	}
+
 	copyAndMergeCM := func(old, new *corev1.ConfigMap) client.Object {
 		mergeMap(&new.Labels, &old.Labels)
 		mergeMap(&new.Annotations, &old.Annotations)
@@ -289,6 +299,9 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 		for i := range newInst.Spec.InstanceAssistantObjects {
 			oldObj := &targetInst.Spec.InstanceAssistantObjects[i]
 			newObj := &newInst.Spec.InstanceAssistantObjects[i]
+			if newObj.Service != nil {
+				copyAndMergeService(oldObj.Service, newObj.Service)
+			}
 			if newObj.ConfigMap != nil {
 				copyAndMergeCM(oldObj.ConfigMap, newObj.ConfigMap)
 			}

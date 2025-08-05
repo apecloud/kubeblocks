@@ -260,10 +260,12 @@ type InstanceSetSpec struct {
 
 	// Assistant objects that are necessary to run the instance.
 	//
+	// - Service:
+	//   - component service
 	// - ConfigMap:
 	//   - config & script templates
 	//   - env
-	//   - kbagent task parameters
+	//   - kbagent task
 	// - Secret:
 	//   - account
 	//   - TLS

@@ -85,6 +85,9 @@ func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree
 }
 
 func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
+	if obj.Service != nil {
+		return obj.Service
+	}
 	if obj.ConfigMap != nil {
 		return obj.ConfigMap
 	}
@@ -101,6 +104,25 @@ func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.Instan
 }
 
 func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistantObject, oldObj, newObj client.Object) client.Object {
+	service := func() client.Object {
+		return copyAndMergeAssistantObject(oldObj, newObj,
+			func(o, n client.Object) bool {
+				o1 := o.(*corev1.Service)
+				n1 := n.(*corev1.Service)
+				return reflect.DeepEqual(o1.Spec.Selector, n1.Spec.Selector) &&
+					reflect.DeepEqual(o1.Spec.Type, n1.Spec.Type) &&
+					reflect.DeepEqual(o1.Spec.PublishNotReadyAddresses, n1.Spec.PublishNotReadyAddresses) &&
+					reflect.DeepEqual(o1.Spec.Ports, n1.Spec.Ports)
+			},
+			func(o, n client.Object) {
+				o1 := o.(*corev1.Service)
+				n1 := n.(*corev1.Service)
+				o1.Spec.Selector = n1.Spec.Selector
+				o1.Spec.Type = n1.Spec.Type
+				o1.Spec.PublishNotReadyAddresses = n1.Spec.PublishNotReadyAddresses
+				o1.Spec.Ports = n1.Spec.Ports
+			})
+	}
 	cm := func() client.Object {
 		return copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
@@ -150,6 +172,9 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 				o1.Subjects = n1.Subjects
 				o1.RoleRef = n1.RoleRef
 			})
+	}
+	if obj.Service != nil {
+		return service()
 	}
 	if obj.ConfigMap != nil {
 		return cm()

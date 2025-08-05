@@ -88,11 +88,9 @@ func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx 
 	dag *graph.DAG, runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range toCreate {
-		// graphCli.Create(dag, protoObjs[name], appsutil.InDataContext4G())
 		graphCli.Create(dag, protoObjs[name])
 	}
 	for name := range toDelete {
-		// graphCli.Delete(dag, runningObjs[name], appsutil.InDataContext4G())
 		graphCli.Delete(dag, runningObjs[name])
 	}
 	for name := range toUpdate {
@@ -100,7 +98,6 @@ func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx 
 		if !reflect.DeepEqual(runningObj.Data, protoObj.Data) ||
 			!reflect.DeepEqual(runningObj.Labels, protoObj.Labels) ||
 			!reflect.DeepEqual(runningObj.Annotations, protoObj.Annotations) {
-			// graphCli.Update(dag, runningObj, protoObj, appsutil.InDataContext4G())
 			graphCli.Update(dag, runningObj, protoObj)
 		}
 	}

@@ -126,13 +126,13 @@ func (t *componentAccountTransformer) createAccount(transCtx *componentTransform
 	if err = t.buildAccountHash(account, nil, secret); err != nil {
 		return err
 	}
-	graphCli.Create(dag, secret, appsutil.InUniversalContext4G())
+	graphCli.Create(dag, secret)
 	return nil
 }
 
 func (t *componentAccountTransformer) deleteAccount(transCtx *componentTransformContext,
 	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) {
-	graphCli.Delete(dag, secret, appsutil.InUniversalContext4G())
+	graphCli.Delete(dag, secret)
 }
 
 func (t *componentAccountTransformer) updateAccount(transCtx *componentTransformContext,
@@ -153,7 +153,7 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 	ctrlutil.MergeMetadataMapInplace(secret.Labels, &runningCopy.Labels)
 	ctrlutil.MergeMetadataMapInplace(secret.Annotations, &runningCopy.Annotations)
 	if !reflect.DeepEqual(running, runningCopy) {
-		graphCli.Update(dag, running, runningCopy, appsutil.InUniversalContext4G())
+		graphCli.Update(dag, running, runningCopy)
 	}
 	return nil
 }

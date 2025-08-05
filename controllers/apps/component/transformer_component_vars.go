@@ -148,7 +148,6 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 		}
 
 		obj := &corev1.ConfigMap{}
-		// err := transCtx.Client.Get(transCtx.Context, envKey, obj, appsutil.InDataContext4C())
 		err := transCtx.Client.Get(transCtx.Context, envKey, obj)
 		if err != nil {
 			return nil, nil, client.IgnoreNotFound(err)
@@ -178,7 +177,6 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
 			return err
 		}
-		// graphCli.Create(dag, obj, appsutil.InDataContext4G())
 		graphCli.Create(dag, obj)
 		return nil
 	}
@@ -189,7 +187,6 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 		} else {
 			envObjCopy := envObj.DeepCopy()
 			envObjCopy.Data = newData
-			// graphCli.Update(dag, envObj, envObjCopy, appsutil.InDataContext4G())
 			graphCli.Update(dag, envObj, envObjCopy)
 		}
 		return nil

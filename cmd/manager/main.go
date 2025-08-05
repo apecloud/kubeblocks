@@ -517,10 +517,10 @@ func main() {
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)
 		}

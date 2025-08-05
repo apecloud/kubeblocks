@@ -155,7 +155,6 @@ func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformC
 	oldObj := PT(new(T))
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(obj), oldObj); err != nil {
 		if errors.IsNotFound(err) {
-			// graphCli.Create(dag, obj, appsutil.InDataContext4G())
 			graphCli.Create(dag, obj)
 			return obj, nil
 		}
@@ -165,7 +164,6 @@ func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformC
 	if !cmpFn(oldObj, obj) || metav1.GetControllerOf(oldObj) == nil {
 		transCtx.Logger.V(1).Info("updating rbac resources",
 			"name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
-		// graphCli.Update(dag, oldObj, obj, appsutil.InDataContext4G())
 		graphCli.Update(dag, oldObj, obj)
 	}
 	return obj, nil

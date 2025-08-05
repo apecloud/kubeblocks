@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/handler"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -98,20 +97,12 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ctx := &handler.FinderContext{
 		Context: context.Background(),
 		Reader:  r.Client,
 		Scheme:  *r.Scheme,
 	}
-
-	if multiClusterMgr == nil {
-		return r.setupWithManager(mgr, ctx)
-	}
-	return r.setupWithMultiClusterManager(mgr, multiClusterMgr, ctx)
-}
-
-func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
 	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.InstanceSetKind, instanceset.WorkloadsInstanceLabelKey)
 	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
 	return intctrlutil.NewControllerManagedBy(mgr).
@@ -124,17 +115,4 @@ func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
-}
-
-func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
-	b := intctrlutil.NewControllerManagedBy(mgr).
-		For(&workloads.InstanceSet{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
-		})
-
-	multiClusterMgr.Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
-		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.InstanceSet{})
-
-	return b.Complete(r)
 }

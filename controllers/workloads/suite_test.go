@@ -93,11 +93,24 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	recorder := k8sManager.GetEventRecorderFor("instance-set-controller")
 	err = (&InstanceSetReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: recorder,
+		Recorder: k8sManager.GetEventRecorderFor("instance-set-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&InstanceSetReconciler2{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("instance-set-controller-2"),
+	}).SetupWithManager(k8sManager, nil)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&InstanceReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("instance-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

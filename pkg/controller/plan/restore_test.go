@@ -21,6 +21,7 @@ package plan
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -79,6 +80,7 @@ var _ = Describe("Restore", func() {
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.RestoreSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentDefinitionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		//
 		// non-namespaced
@@ -417,9 +419,9 @@ var _ = Describe("Restore", func() {
 			patchBackupStatus(backup.Status, client.ObjectKeyFromObject(backup))
 		})
 
-		It("Test restore", func() {
+		It("Test restore Serial", func() {
 			By("restore from backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, defaultCompName, backup.Name)
+			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s","volumeRestorePolicy":"%s"}}`, defaultCompName, backup.Name, dpv1alpha1.VolumeClaimRestorePolicySerial)
 			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
 				tmpCluster.Annotations = map[string]string{
 					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
@@ -442,6 +444,12 @@ var _ = Describe("Restore", func() {
 			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(istLabelKey))
 			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(istLabelValue))
 
+			By("default restore should not exist")
+			defaultMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
+			defaultNs := types.NamespacedName{Name: defaultMeta.Name, Namespace: defaultMeta.Namespace}
+			defaultRestore := &dpv1alpha1.Restore{}
+			Expect(k8sClient.Get(ctx, defaultNs, defaultRestore)).ShouldNot(Succeed())
+
 			By("mock template restore of prepareData stage to Completed")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
 				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
@@ -452,6 +460,78 @@ var _ = Describe("Restore", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("verify default restore")
+			Expect(k8sClient.Get(ctx, defaultNs, defaultRestore)).Should(Succeed())
+			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(int32(0)))
+			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(2)))
+			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
+			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(labelValue))
+
+			By("mock default restore of prepareData stage to Completed")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, defaultNs, func(restore *dpv1alpha1.Restore) {
+				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+			})()).ShouldNot(HaveOccurred())
+
+			By("mock component and cluster phase to Running")
+			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.Phase = appsv1.RunningClusterPhase
+				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+					defaultCompName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
+				compObj.Status.Phase = appsv1.RunningComponentPhase
+			})).Should(Succeed())
+
+			By("wait for postReady restore created and mock it to Completed")
+			restoreMGR.Cluster = cluster
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+
+			// check if restore CR of postReady stage is created.
+			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
+			namedspace = types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
+			Eventually(testapps.CheckObjExists(&testCtx, namedspace,
+				&dpv1alpha1.Restore{}, true)).Should(Succeed())
+			// set restore to Completed
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
+				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+			})()).ShouldNot(HaveOccurred())
+
+			By("clean up annotations after cluster running")
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
+			})).Should(Succeed())
+		})
+
+		It("Test restore Parallel", func() {
+			By("restore from backup")
+			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s","volumeRestorePolicy":"%s"}}`, defaultCompName, backup.Name, dpv1alpha1.VolumeClaimRestorePolicyParallel)
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
+				tmpCluster.Annotations = map[string]string{
+					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
+				}
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
+
+			By("restore from template parallel")
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+			Expect(strings.Contains(err.Error(), ";")).Should(BeTrue())
+
+			By("verify template restore")
+			restore := &dpv1alpha1.Restore{}
+			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "foo")
+			namedspace := types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
+			Expect(k8sClient.Get(ctx, namedspace, restore)).Should(Succeed())
+			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(startIndex))
+			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(1)))
+			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(istLabelKey))
+			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(istLabelValue))
+
+			By("verify default restore")
 			defaultMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
 			defaultNs := types.NamespacedName{Name: defaultMeta.Name, Namespace: defaultMeta.Namespace}
 			defaultRestore := &dpv1alpha1.Restore{}
@@ -460,6 +540,17 @@ var _ = Describe("Restore", func() {
 			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(2)))
 			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
 			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(labelValue))
+
+			By("mock template restore of prepareData stage to Completed")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
+				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+			})()).ShouldNot(HaveOccurred())
+
+			By("restore remains default")
+			err = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+			// only one restore waiting and one err msg
+			Expect(strings.Contains(err.Error(), ";")).Should(BeFalse())
 
 			By("mock default restore of prepareData stage to Completed")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, defaultNs, func(restore *dpv1alpha1.Restore) {

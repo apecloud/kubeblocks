@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -52,8 +53,8 @@ func NewDelayedRequeueError(after time.Duration, reason string) error {
 }
 
 func IsDelayedRequeueError(err error) bool {
-	_, ok := err.(DelayedRequeueError)
-	return ok
+	var delayedRequeue *delayedRequeueError
+	return errors.As(err, &delayedRequeue)
 }
 
 // IsRequeueError checks if the error is the RequeueError.

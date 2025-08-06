@@ -127,6 +127,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	t.provisionCondDone(transCtx, condCopy, &cond, err3)
 
 	if err3 != nil {
+		// accountProvision might rely on postProvision to do some initialization, so delay this error to let postProvision run
 		err3 = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "account provision action failed"), err3)
 	}
 

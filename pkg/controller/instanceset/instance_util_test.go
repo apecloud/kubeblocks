@@ -859,7 +859,7 @@ var _ = Describe("instance util test", func() {
 				},
 				Discrete: []int32{0, 6},
 			}
-			ordinalList, err := convertOrdinalsToSortedList(ordinals)
+			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
 			Expect(err).Should(BeNil())
 			sets.New(ordinalList...).Equal(sets.New[int32](0, 2, 3, 4, 6))
 		})
@@ -874,7 +874,7 @@ var _ = Describe("instance util test", func() {
 				},
 				Discrete: []int32{0},
 			}
-			ordinalList, err := convertOrdinalsToSortedList(ordinals)
+			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
 			errExpected := fmt.Errorf("range's end(%v) must >= start(%v)", 2, 4)
 			Expect(err).Should(Equal(errExpected))
 			Expect(ordinalList).Should(BeNil())

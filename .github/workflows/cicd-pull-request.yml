@@ -9,7 +9,6 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
   GO_VERSION: "1.23"
 
@@ -37,6 +36,8 @@ jobs:
 
       - name: check run
         id: get_trigger_run
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           TRIGGER_RUN="false"
           PR_NUMBER="${{ github.event.pull_request.number }}"

@@ -169,9 +169,13 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	}
 	// inject container envs, volumeMounts and resource.
 	for i := range podSpec.Containers {
-		podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, env...)
-		podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts, volumeMounts...)
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&podSpec.Containers[i])
+		container := &podSpec.Containers[i]
+		container.Env = append(container.Env, env...)
+		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+		if image, ok := actionCtx.Images[container.Name]; ok {
+			container.Image = image
+		}
 	}
 	// inject extras script.
 	w.injectOpsUtils(podSpec)

@@ -20,6 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 // OpsDefinitionSpec defines the desired state of OpsDefinition.
@@ -523,7 +525,7 @@ func (o *OpsDefinition) GetComponentInfo(compDefName string) *ComponentInfo {
 		return nil
 	}
 	for _, v := range o.Spec.ComponentInfos {
-		if compDefName == v.ComponentDefinitionName {
+		if component.CompDefMatched(compDefName, v.ComponentDefinitionName) {
 			return &v
 		}
 	}

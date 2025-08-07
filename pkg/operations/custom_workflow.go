@@ -21,11 +21,13 @@ package operations
 
 import (
 	"fmt"
+	"slices"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/operations/custom"
 )
@@ -37,9 +39,10 @@ type WorkflowStatus struct {
 }
 
 type WorkflowContext struct {
-	reqCtx intctrlutil.RequestCtx
-	Cli    client.Client
-	OpsRes *OpsResource
+	reqCtx        intctrlutil.RequestCtx
+	Cli           client.Client
+	OpsRes        *OpsResource
+	ReleaseImages map[string]string
 }
 
 func NewWorkflowContext(
@@ -62,6 +65,7 @@ func (w *WorkflowContext) Run(compCustomSpec *opsv1alpha1.CustomOpsComponent) (*
 		workflowStatus = &WorkflowStatus{}
 		actions        = w.OpsRes.OpsDef.Spec.Actions
 		compSpec       = getComponentSpecOrShardingTemplate(w.OpsRes.Cluster, compCustomSpec.ComponentName)
+		images         = w.getImages(compSpec)
 	)
 	defer func() {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
@@ -94,7 +98,7 @@ steps:
 				err = intctrlutil.NewFatalError("the action type is not implement for action " + actions[i].Name)
 				return nil, err
 			}
-			actionStatus, err = ac.Execute(custom.ActionContext{ReqCtx: w.reqCtx, Client: w.Cli, Action: &actions[i]})
+			actionStatus, err = ac.Execute(custom.ActionContext{ReqCtx: w.reqCtx, Client: w.Cli, Action: &actions[i], Images: images})
 			if err != nil {
 				return nil, err
 			}
@@ -162,4 +166,21 @@ func (w *WorkflowContext) getAction(action opsv1alpha1.OpsAction,
 	default:
 		return nil
 	}
+}
+
+func (w *WorkflowContext) getImages(compSpec *appsv1.ClusterComponentSpec) map[string]string {
+	if len(w.OpsRes.OpsDef.Spec.ComponentInfos) == 0 {
+		return nil
+	}
+	for _, v := range w.OpsRes.OpsDef.Spec.ComponentInfos {
+		if component.PrefixOrRegexMatched(compSpec.ComponentDef, v.ComponentDefinitionName) {
+			for _, imageMapping := range v.ImageMappings {
+				if slices.Contains(imageMapping.ServiceVersions, compSpec.ServiceVersion) {
+					return imageMapping.Images
+				}
+			}
+			break
+		}
+	}
+	return nil
 }

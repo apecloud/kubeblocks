@@ -267,9 +267,9 @@ var _ = Describe("CustomOps", func() {
 			})).Should(Succeed())
 
 			// create a sharding component
-			shardingCompShortName := common.SimpleNameGenerator.GenerateName(consensusComp)
+			shardingNamePrefix := constant.GenerateShardingNamePrefix(consensusComp)
+			shardingCompShortName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
 			shardingCompName := constant.GenerateClusterComponentName(cluster.Name, shardingCompShortName)
-
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, shardingCompName, compDefName).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
@@ -280,7 +280,7 @@ var _ = Describe("CustomOps", func() {
 				GetObject()
 
 			// create a pod which belongs to the sharding component
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, consensusComp, fmt.Sprintf(shardingCompName+"-0"), "", "")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, shardingCompShortName, fmt.Sprintf(shardingCompName+"-0"), "", "")
 			Expect(testapps.ChangeObj(&testCtx, pod, func(obj *corev1.Pod) {
 				pod.Labels[constant.KBAppShardingNameLabelKey] = consensusComp
 			})).Should(Succeed())

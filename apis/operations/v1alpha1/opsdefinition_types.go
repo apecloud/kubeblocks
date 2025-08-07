@@ -215,6 +215,21 @@ type ComponentInfo struct {
 	//
 	// +optional
 	ServiceName string `json:"serviceName,omitempty"`
+
+	// ImageMappings specifies the mapping from service versions to image addresses.
+	// +optional
+	ImageMappings []ImageMappings `json:"imageMappings,omitempty"`
+}
+
+type ImageMappings struct {
+	// ServiceVersions is a list of service versions that this mapping applies to.
+	// +kubebuilder:validation:Required
+	ServiceVersions []string `json:"serviceVersions"`
+
+	// Images are the container image addresses to use for the matched service versions.
+	// Key is the container name, and value is the image address.
+	// +kubebuilder:validation:Required
+	Images map[string]string `json:"images"`
 }
 
 type ParametersSchema struct {

@@ -20,8 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 // OpsDefinitionSpec defines the desired state of OpsDefinition.
@@ -518,16 +516,4 @@ type OpsDefinitionList struct {
 
 func init() {
 	SchemeBuilder.Register(&OpsDefinition{}, &OpsDefinitionList{})
-}
-
-func (o *OpsDefinition) GetComponentInfo(compDefName string) *ComponentInfo {
-	if o == nil {
-		return nil
-	}
-	for _, v := range o.Spec.ComponentInfos {
-		if component.CompDefMatched(compDefName, v.ComponentDefinitionName) {
-			return &v
-		}
-	}
-	return nil
 }

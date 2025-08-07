@@ -8918,6 +8918,20 @@ and each service port is mapped to a corresponding environment variable named <c
 The <code>portName</code> is transformed by replacing &lsquo;-&rsquo; with &lsquo;_&rsquo; and converting to uppercase.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>imageMappings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ImageMappings">
+[]ImageMappings
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ImageMappings specifies the mapping from service versions to image addresses.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentLifecycleActions">ComponentLifecycleActions
@@ -13509,6 +13523,46 @@ ContainerVars
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.ImageMappings">ImageMappings
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentInfo">ComponentInfo</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceVersions</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>ServiceVersions is a list of service versions that this mapping applies to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>images</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<p>Images are the container image addresses to use for the matched service versions.
+Key is the container name, and value is the image address.</p>
 </td>
 </tr>
 </tbody>

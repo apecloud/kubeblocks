@@ -113,7 +113,8 @@ var _ = Describe("CustomOps", func() {
 						{Operator: corev1.TolerationOpExists, Key: "test"},
 					},
 				}).
-				WithRandomName().AddComponentV2(consensusComp, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
+				WithRandomName().AddComponentV2(consensusComp, componentDefObj.Name).
+				SetServiceVersion("8.0.30").SetReplicas(1).Create(&testCtx).GetObject()
 
 			fullCompName := constant.GenerateClusterComponentName(cluster.Name, consensusComp)
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
@@ -208,6 +209,7 @@ var _ = Describe("CustomOps", func() {
 			job := &jobList.Items[0]
 			Expect(job.Spec.Template.Spec.Tolerations).Should(HaveLen(1))
 			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("test"))
+			Expect(job.Spec.Template.Spec.Containers[0].Image).Should(Equal("docker.io/apecloud/apecloud-mysql-server:8.0.30"))
 			patchJobPhase(job, batchv1.JobComplete)
 			By("reconcile once and make the action succeed")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
@@ -248,6 +250,7 @@ var _ = Describe("CustomOps", func() {
 					},
 				}).
 				WithRandomName().AddShardingSpecV2(consensusComp, compDefName).Create(&testCtx).GetObject()
+			cluster.Spec.ShardingSpecs[0].Template.ServiceVersion = "8.0.30"
 			opsResource.Cluster = cluster
 
 			Expect(testapps.ChangeObj(&testCtx, opsDef, func(obj *appsv1alpha1.OpsDefinition) {
@@ -264,19 +267,20 @@ var _ = Describe("CustomOps", func() {
 			})).Should(Succeed())
 
 			// create a sharding component
-			shardingNamePrefix := constant.GenerateClusterComponentName(cluster.Name, consensusComp)
-			shardingCompName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+			shardingNamePrefix := constant.GenerateShardingNamePrefix(consensusComp)
+			shardingCompShortName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+			shardingCompName := constant.GenerateClusterComponentName(cluster.Name, shardingCompShortName)
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, shardingCompName, compDefName).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				AddLabels(constant.KBAppShardingNameLabelKey, consensusComp).
-				AddLabels(constant.KBAppComponentLabelKey, shardingCompName).
+				AddLabels(constant.KBAppComponentLabelKey, shardingCompShortName).
 				SetReplicas(1).
 				Create(&testCtx).
 				GetObject()
 
 			// create a pod which belongs to the sharding component
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, consensusComp, fmt.Sprintf(shardingCompName+"-0"), "", "")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, shardingCompShortName, fmt.Sprintf(shardingCompName+"-0"), "", "")
 			Expect(testapps.ChangeObj(&testCtx, pod, func(obj *corev1.Pod) {
 				pod.Labels[constant.KBAppShardingNameLabelKey] = consensusComp
 			})).Should(Succeed())

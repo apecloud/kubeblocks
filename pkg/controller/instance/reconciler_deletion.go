@@ -23,6 +23,7 @@ import (
 	"maps"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -53,6 +54,9 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	inst, _ := tree.GetRoot().(*workloads.Instance)
 	pvcRetentionPolicy := inst.Spec.PersistentVolumeClaimRetentionPolicy
 	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	if ptr.Deref(inst.Spec.ScaledDown, false) {
+		retainPVC = pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenScaled == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	}
 
 	// delete secondary objects first
 	if has, err := r.deleteSecondaryObjects(tree, retainPVC); has {

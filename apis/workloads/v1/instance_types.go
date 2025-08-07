@@ -132,6 +132,11 @@ type InstanceSpec struct {
 	//
 	// +optional
 	InstanceAssistantObjects []InstanceAssistantObject `json:"instanceAssistantObjects,omitempty"`
+
+	// Indicate whether the instance is scaled down.
+	//
+	// +optional
+	ScaledDown *bool `json:"scaledDown,omitempty"`
 }
 
 // InstanceStatus2 defines the observed state of Instance

@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
@@ -31,15 +32,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
-	return &instanceAlignmentReconciler{}
+func NewAlignmentReconciler() kubebuilderx.Reconciler {
+	return &alignmentReconciler{}
 }
 
-type instanceAlignmentReconciler struct{}
+type alignmentReconciler struct{}
 
-var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
+var _ kubebuilderx.Reconciler = &alignmentReconciler{}
 
-func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *alignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
@@ -49,7 +50,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
@@ -158,8 +159,16 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				inst.Name)
 		}
-		if err := tree.Delete(inst); err != nil {
-			return kubebuilderx.Continue, err
+		if ptr.Deref(inst.Spec.ScaledDown, false) {
+			if err := tree.Delete(inst); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		} else {
+			instCopy := inst.DeepCopy()
+			instCopy.Spec.ScaledDown = ptr.To(true)
+			if err := tree.Update(instCopy); err != nil {
+				return kubebuilderx.Continue, err
+			}
 		}
 		if isOrderedReady {
 			break

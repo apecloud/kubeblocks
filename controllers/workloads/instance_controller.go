@@ -50,7 +50,7 @@ type InstanceReconciler struct {
 //+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instances/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instances/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 
@@ -58,10 +58,14 @@ type InstanceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -89,8 +93,9 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		Prepare(instance.NewTreeLoader()).
 		Do(instance.NewFixMetaReconciler()).
 		Do(instance.NewDeletionReconciler()).
-		Do(instance.NewStatusReconciler()).
 		Do(instance.NewRevisionUpdateReconciler()).
+		Do(instance.NewStatusReconciler()).
+		// Do(instance.NewRevisionUpdateReconciler()).
 		Do(instance.NewAssistantObjectReconciler()).
 		Do(instance.NewAlignmentReconciler()).
 		Do(instance.NewUpdateReconciler()).
@@ -106,6 +111,7 @@ func (r *InstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ServiceAccount{}).

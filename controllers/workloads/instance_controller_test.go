@@ -106,55 +106,24 @@ var _ = Describe("Instance Controller", func() {
 		})).Should(Succeed())
 	}
 
-	mockPodStatusReady := func(podName string, readyTime metav1.Time) {
-		podKey := types.NamespacedName{
-			Namespace: instObj.Namespace,
-			Name:      podName,
-		}
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
-			pod.Status.Phase = corev1.PodRunning
-			pod.Status.Conditions = []corev1.PodCondition{
-				{
-					Type:               corev1.PodReady,
-					Status:             corev1.ConditionTrue,
-					LastTransitionTime: readyTime,
-				},
-			}
-			pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-				{
-					Name: pod.Spec.Containers[0].Name,
-					State: corev1.ContainerState{
-						Running: &corev1.ContainerStateRunning{},
-					},
-					Image: pod.Spec.Containers[0].Image,
-				},
-			}
-		})()).Should(Succeed())
-	}
-
-	mockPodReady := func(podName string) {
-		By("mock pod ready")
-		mockPodStatusReady(podName, metav1.Now())
-	}
-
-	mockPodReadyNAvailable := func(podName string) {
-		By("mock pod ready & available")
-		mockPodStatusReady(podName, metav1.NewTime(time.Now().Add(time.Duration(-1*(minReadySeconds+1))*time.Second)))
-	}
-
-	mockPodReadyNAvailableWithRole := func(podName string, role string) {
-		By("mock pod ready & available with role")
-		mockPodStatusReady(podName, metav1.NewTime(time.Now().Add(time.Duration(-1*(minReadySeconds+1))*time.Second)))
-		podKey := types.NamespacedName{
-			Namespace: instObj.Namespace,
-			Name:      podName,
-		}
-		Eventually(testapps.GetAndChangeObj(&testCtx, podKey, func(pod *corev1.Pod) {
-			pod.Labels[constant.RoleLabelKey] = role
-		})()).Should(Succeed())
-	}
-
 	Context("provision", func() {
+		var (
+			pvc = corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "data",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+		)
+
 		It("create & delete", func() {
 			createInstObj(instName, nil)
 
@@ -165,7 +134,7 @@ var _ = Describe("Instance Controller", func() {
 		It("status", func() {
 			createInstObj(instName, nil)
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 
 			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
 				g.Expect(inst.Status.UpToDate).Should(BeTrue())
@@ -191,7 +160,7 @@ var _ = Describe("Instance Controller", func() {
 					})
 			})
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 
 			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
 				g.Expect(inst.Status.UpToDate).Should(BeTrue())
@@ -200,7 +169,7 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.Role).Should(BeEmpty())
 			})).Should(Succeed())
 
-			mockPodReadyNAvailable(instObj.Name)
+			mockPodReadyNAvailable(instObj.Namespace, instObj.Name, minReadySeconds)
 
 			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
 				g.Expect(inst.Status.UpToDate).Should(BeTrue())
@@ -209,13 +178,75 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.Role).Should(BeEmpty())
 			})).Should(Succeed())
 
-			mockPodReadyNAvailableWithRole(instObj.Name, "leader")
+			mockPodReadyNAvailableWithRole(instObj.Namespace, instObj.Name, "leader", minReadySeconds)
 
 			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
 				g.Expect(inst.Status.UpToDate).Should(BeTrue())
 				g.Expect(inst.Status.Ready).Should(BeTrue())
 				g.Expect(inst.Status.Available).Should(BeTrue())
 				g.Expect(inst.Status.Role).Should(Equal("leader"))
+			})).Should(Succeed())
+		})
+
+		It("delete - delete pvc", func() {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddVolumeClaimTemplate(pvc).
+					SetPVCRetentionPolicy(&workloads.PersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					})
+			})
+
+			By("delete the instance object")
+			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
+
+			By("check the instance object NOT deleted")
+			Consistently(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, true)).Should(Succeed())
+
+			By("check pods deleted")
+			podKey := types.NamespacedName{
+				Namespace: instObj.Namespace,
+				Name:      instObj.Name,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+
+			By("check PVCs deleted, but the pvc-protection finalizer prevent the pvc to be deleted physically")
+			pvcKey := types.NamespacedName{
+				Namespace: instObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
+			}
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+				g.Expect(pvc.Finalizers).To(HaveLen(1))
+				g.Expect(pvc.Finalizers[0]).To(Equal("kubernetes.io/pvc-protection"))
+			})).Should(Succeed())
+		})
+
+		It("delete - retain pvc", func() {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddVolumeClaimTemplate(pvc).
+					SetPVCRetentionPolicy(&workloads.PersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					})
+			})
+
+			By("delete the instance object")
+			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, false)).Should(Succeed())
+
+			By("check pods deleted")
+			podKey := types.NamespacedName{
+				Namespace: instObj.Namespace,
+				Name:      instObj.Name,
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+
+			By("check PVCs retained and not deleted")
+			pvcKey := types.NamespacedName{
+				Namespace: instObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
+			}
+			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
 			})).Should(Succeed())
 		})
 	})
@@ -237,7 +268,7 @@ var _ = Describe("Instance Controller", func() {
 		It("update", func() {
 			createInstObj(instName, nil)
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 
 			By("update the pod spec")
 			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
@@ -256,7 +287,7 @@ var _ = Describe("Instance Controller", func() {
 				f.SetInstanceUpdateStrategyType(ptr.To(kbappsv1.OnDeleteStrategyType))
 			})
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 
 			By("update the pod spec")
 			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
@@ -334,7 +365,7 @@ var _ = Describe("Instance Controller", func() {
 					})
 			})
 
-			mockPodReadyNAvailable(instObj.Name)
+			mockPodReadyNAvailable(instObj.Namespace, instObj.Name, minReadySeconds)
 
 			By("update the pod spec")
 			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
@@ -347,7 +378,7 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(pod.Spec.Containers[0].Image).Should(Equal("bar:v1"))
 			})).Should(Succeed())
 
-			mockPodReadyNAvailableWithRole(instObj.Name, "leader")
+			mockPodReadyNAvailableWithRole(instObj.Namespace, instObj.Name, "leader", minReadySeconds)
 
 			By("check the pod is updated")
 			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
@@ -360,7 +391,7 @@ var _ = Describe("Instance Controller", func() {
 				f.SetPodUpdatePolicy(kbappsv1.StrictInPlacePodUpdatePolicyType)
 			})
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 
 			By("update the pod spec")
 			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
@@ -384,7 +415,7 @@ var _ = Describe("Instance Controller", func() {
 		It("in-place", func() {
 			createInstObj(instName, nil)
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 			podKey := instKey
 			podObj := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, podKey, podObj)).Should(Succeed())
@@ -404,7 +435,7 @@ var _ = Describe("Instance Controller", func() {
 		It("recreate", func() {
 			createInstObj(instName, nil)
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 			podKey := instKey
 			podObj := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, podKey, podObj)).Should(Succeed())
@@ -444,7 +475,7 @@ var _ = Describe("Instance Controller", func() {
 				})
 			})
 
-			mockPodReady(instObj.Name)
+			mockPodReady(instObj.Namespace, instObj.Name)
 			podKey := instKey
 			podObj := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, podKey, podObj)).Should(Succeed())
@@ -480,167 +511,53 @@ var _ = Describe("Instance Controller", func() {
 		//	// TODO
 		// })
 	})
-
-	Context("PVC retention policy", func() {
-		var (
-			pvc = corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      "data",
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources: corev1.VolumeResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse("1Gi"),
-						},
-					},
-				},
-			}
-		)
-
-		It("provision", func() {
-			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-				f.AddVolumeClaimTemplate(pvc)
-			})
-
-			By("check pods created")
-			podKey := types.NamespacedName{
-				Namespace: instObj.Namespace,
-				Name:      instObj.Name,
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
-
-			By("check PVCs created")
-			pvcKey := types.NamespacedName{
-				Namespace: instObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-		})
-
-		It("when deleted - delete", func() {
-			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-				f.AddVolumeClaimTemplate(pvc).
-					SetPVCRetentionPolicy(&workloads.PersistentVolumeClaimRetentionPolicy{
-						WhenDeleted: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType,
-					})
-			})
-
-			By("delete the instance object")
-			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
-
-			By("check the instance object NOT deleted")
-			Consistently(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, true)).Should(Succeed())
-
-			By("check pods deleted")
-			podKey := types.NamespacedName{
-				Namespace: instObj.Namespace,
-				Name:      instObj.Name,
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
-
-			By("check PVCs deleted, but the pvc-protection finalizer prevent the pvc to be deleted physically")
-			pvcKey := types.NamespacedName{
-				Namespace: instObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
-			}
-			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-				g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-				g.Expect(pvc.Finalizers).To(HaveLen(1))
-				g.Expect(pvc.Finalizers[0]).To(Equal("kubernetes.io/pvc-protection"))
-			})).Should(Succeed())
-		})
-
-		It("when deleted - retain", func() {
-			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-				f.AddVolumeClaimTemplate(pvc).
-					SetPVCRetentionPolicy(&workloads.PersistentVolumeClaimRetentionPolicy{
-						WhenDeleted: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
-					})
-			})
-
-			By("delete the instance object")
-			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, false)).Should(Succeed())
-
-			By("check pods deleted")
-			podKey := types.NamespacedName{
-				Namespace: instObj.Namespace,
-				Name:      instObj.Name,
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
-
-			By("check PVCs retained and not deleted")
-			pvcKey := types.NamespacedName{
-				Namespace: instObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
-			}
-			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
-			})).Should(Succeed())
-		})
-
-		// It("when scaled - delete", func() {
-		//	createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-		//		f.AddVolumeClaimTemplate(pvc).
-		//			SetPVCRetentionPolicy(&workloads.PersistentVolumeClaimRetentionPolicy{
-		//				WhenScaled: kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType,
-		//			})
-		//	})
-		//
-		//	By("scale-in")
-		//	Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(its *workloads.Instance) {
-		//		its.Spec.Replicas = ptr.To(int32(0))
-		//	})()).ShouldNot(HaveOccurred())
-		//
-		//	By("check pods deleted")
-		//	podKey := types.NamespacedName{
-		//		Namespace: instObj.Namespace,
-		//		Name:      instObj.Name,
-		//	}
-		//	Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
-		//
-		//	By("check PVCs deleted, but the pvc-protection finalizer prevent the pvc to be deleted physically")
-		//	pvcKey := types.NamespacedName{
-		//		Namespace: instObj.Namespace,
-		//		Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
-		//	}
-		//	Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-		//		g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-		//		g.Expect(pvc.Finalizers).To(HaveLen(1))
-		//		g.Expect(pvc.Finalizers[0]).To(Equal("kubernetes.io/pvc-protection"))
-		//	})).Should(Succeed())
-		// })
-		//
-		// It("when scaled - retain", func() {
-		//	createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-		//		f.AddVolumeClaimTemplate(pvc).
-		//			SetPVCRetentionPolicy(&workloads.PersistentVolumeClaimRetentionPolicy{
-		//				WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
-		//			})
-		//	})
-		//
-		//	By("scale-in")
-		//	Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(its *workloads.Instance) {
-		//		its.Spec.Replicas = ptr.To(int32(0))
-		//	})()).ShouldNot(HaveOccurred())
-		//
-		//	By("check pods deleted")
-		//	podKey := types.NamespacedName{
-		//		Namespace: instObj.Namespace,
-		//		Name:      instObj.Name,
-		//	}
-		//	Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
-		//
-		//	By("check PVCs retained and not deleted")
-		//	pvcKey := types.NamespacedName{
-		//		Namespace: instObj.Namespace,
-		//		Name:      fmt.Sprintf("%s-%s", pvc.Name, instObj.Name),
-		//	}
-		//	Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-		//		g.Expect(pvc.DeletionTimestamp).Should(BeNil())
-		//	})).Should(Succeed())
-		// })
-	})
 })
+
+func mockPodStatusReady(namespace, podName string, readyTime metav1.Time) {
+	podKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      podName,
+	}
+	Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{
+			{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: readyTime,
+			},
+		}
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+			{
+				Name: pod.Spec.Containers[0].Name,
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{},
+				},
+				Image: pod.Spec.Containers[0].Image,
+			},
+		}
+	})()).Should(Succeed())
+}
+
+func mockPodReady(namespace, podName string) {
+	By(fmt.Sprintf("mock pod ready: %s", podName))
+	mockPodStatusReady(namespace, podName, metav1.Now())
+}
+
+func mockPodReadyNAvailable(namespace, podName string, minReadySeconds int32) {
+	By(fmt.Sprintf("mock pod ready & available: %s", podName))
+	mockPodStatusReady(namespace, podName, metav1.NewTime(time.Now().Add(time.Duration(-1*(minReadySeconds+1))*time.Second)))
+}
+
+func mockPodReadyNAvailableWithRole(namespace, podName, role string, minReadySeconds int32) {
+	By(fmt.Sprintf("mock pod ready & available with role: %s, %s", podName, role))
+	mockPodStatusReady(namespace, podName, metav1.NewTime(time.Now().Add(time.Duration(-1*(minReadySeconds+1))*time.Second)))
+	podKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      podName,
+	}
+	Eventually(testapps.GetAndChangeObj(&testCtx, podKey, func(pod *corev1.Pod) {
+		pod.Labels[constant.RoleLabelKey] = role
+	})()).Should(Succeed())
+}

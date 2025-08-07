@@ -1467,6 +1467,9 @@ spec:
                   - name
                   type: object
                 type: array
+              scaledDown:
+                description: Indicate whether the instance is scaled down.
+                type: boolean
               selector:
                 description: |-
                   Represents a label query over pods that should match the desired replica count indicated by the `replica` field.

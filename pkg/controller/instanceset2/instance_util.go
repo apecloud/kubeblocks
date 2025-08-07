@@ -41,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
@@ -215,7 +214,8 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst := oldInst.DeepCopyObject().(*workloads.Instance)
 
 	// merge pod
-	mergeInPlaceFields(&newInst.Spec.Template, &targetInst.Spec.Template)
+	// mergeInPlaceFields(&newInst.Spec.Template, &targetInst.Spec.Template)
+	targetInst.Spec.Template = newInst.Spec.Template
 	targetInst.Spec.Selector = newInst.Spec.Selector
 	targetInst.Spec.MinReadySeconds = newInst.Spec.MinReadySeconds
 
@@ -367,73 +367,73 @@ func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
 }
 
-func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
-	mergeMap(&src.Annotations, &dst.Annotations)
-	mergeMap(&src.Labels, &dst.Labels)
-	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
-	// according to the Pod API spec, tolerations can only be appended.
-	// means old tolerations must be in new toleration list.
-	intctrlutil.MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
-		return func(t corev1.Toleration) bool {
-			return reflect.DeepEqual(item, t)
-		}
-	})
-	for _, container := range src.Spec.InitContainers {
-		for i, c := range dst.Spec.InitContainers {
-			if container.Name == c.Name {
-				dst.Spec.InitContainers[i].Image = container.Image
-				break
-			}
-		}
-	}
-	mergeResources := func(src, dst *corev1.ResourceList) {
-		if len(*src) == 0 {
-			return
-		}
-		if *dst == nil {
-			*dst = make(corev1.ResourceList)
-		}
-		for k, v := range *src {
-			(*dst)[k] = v
-		}
-	}
-	ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
-	for _, container := range src.Spec.Containers {
-		for i, c := range dst.Spec.Containers {
-			if container.Name == c.Name {
-				dst.Spec.Containers[i].Image = container.Image
-				if !ignorePodVerticalScaling {
-					requests, limits := copyRequestsNLimitsFields(&container)
-					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
-					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
-				}
-				break
-			}
-		}
-	}
-}
+// func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
+//	mergeMap(&src.Annotations, &dst.Annotations)
+//	mergeMap(&src.Labels, &dst.Labels)
+//	dst.Spec.ActiveDeadlineSeconds = src.Spec.ActiveDeadlineSeconds
+//	// according to the Pod API spec, tolerations can only be appended.
+//	// means old tolerations must be in new toleration list.
+//	intctrlutil.MergeList(&src.Spec.Tolerations, &dst.Spec.Tolerations, func(item corev1.Toleration) func(corev1.Toleration) bool {
+//		return func(t corev1.Toleration) bool {
+//			return reflect.DeepEqual(item, t)
+//		}
+//	})
+//	for _, container := range src.Spec.InitContainers {
+//		for i, c := range dst.Spec.InitContainers {
+//			if container.Name == c.Name {
+//				dst.Spec.InitContainers[i].Image = container.Image
+//				break
+//			}
+//		}
+//	}
+//	mergeResources := func(src, dst *corev1.ResourceList) {
+//		if len(*src) == 0 {
+//			return
+//		}
+//		if *dst == nil {
+//			*dst = make(corev1.ResourceList)
+//		}
+//		for k, v := range *src {
+//			(*dst)[k] = v
+//		}
+//	}
+//	ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
+//	for _, container := range src.Spec.Containers {
+//		for i, c := range dst.Spec.Containers {
+//			if container.Name == c.Name {
+//				dst.Spec.Containers[i].Image = container.Image
+//				if !ignorePodVerticalScaling {
+//					requests, limits := copyRequestsNLimitsFields(&container)
+//					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
+//					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
+//				}
+//				break
+//			}
+//		}
+//	}
+// }
 
-func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
-	requests := make(corev1.ResourceList)
-	limits := make(corev1.ResourceList)
-	if len(container.Resources.Requests) > 0 {
-		if requestCPU, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-			requests[corev1.ResourceCPU] = requestCPU
-		}
-		if requestMemory, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-			requests[corev1.ResourceMemory] = requestMemory
-		}
-	}
-	if len(container.Resources.Limits) > 0 {
-		if limitCPU, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
-			limits[corev1.ResourceCPU] = limitCPU
-		}
-		if limitMemory, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
-			limits[corev1.ResourceMemory] = limitMemory
-		}
-	}
-	return requests, limits
-}
+// func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
+//	requests := make(corev1.ResourceList)
+//	limits := make(corev1.ResourceList)
+//	if len(container.Resources.Requests) > 0 {
+//		if requestCPU, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+//			requests[corev1.ResourceCPU] = requestCPU
+//		}
+//		if requestMemory, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+//			requests[corev1.ResourceMemory] = requestMemory
+//		}
+//	}
+//	if len(container.Resources.Limits) > 0 {
+//		if limitCPU, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
+//			limits[corev1.ResourceCPU] = limitCPU
+//		}
+//		if limitMemory, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
+//			limits[corev1.ResourceMemory] = limitMemory
+//		}
+//	}
+//	return requests, limits
+// }
 
 func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
 	generation, ok := inst.Annotations[constant.KubeBlocksGenerationKey]

@@ -119,7 +119,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	updatingInstances := 0
-	updatedInstances := 0
 	priorities := composeRolePriorityMap(its.Spec.Roles)
 	sortObjects(oldInstanceList, priorities, false)
 
@@ -140,10 +139,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatingInstances >= updateCount || updatingInstances >= unavailable {
-			break
-		}
-		if updatedInstances >= replicas {
+		if updatingInstances >= min(replicas, unavailable, updateCount) {
 			break
 		}
 
@@ -163,7 +159,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingInstances++
 		}
-		updatedInstances++
 	}
 	return kubebuilderx.Continue, nil
 }

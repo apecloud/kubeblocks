@@ -31206,6 +31206,18 @@ map[string]string
 <p>Assistant objects that are necessary to run the instance.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>scaledDown</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicate whether the instance is scaled down.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -32766,6 +32778,18 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Assistant objects that are necessary to run the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scaledDown</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicate whether the instance is scaled down.</p>
 </td>
 </tr>
 </tbody>

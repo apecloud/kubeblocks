@@ -32,7 +32,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/handler"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -98,19 +97,12 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	ctx := &handler.FinderContext{
-		Context: context.Background(),
-		Reader:  r.Client,
-		Scheme:  *r.Scheme,
-	}
-	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.InstanceSetKind, instanceset.WorkloadsInstanceLabelKey)
-	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Watches(&corev1.Pod{}, podHandler).
+		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).

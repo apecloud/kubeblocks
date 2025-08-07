@@ -25,31 +25,36 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// IsInstanceReadyWithRole checks if an instance is ready with the role observed.
-func IsInstanceReadyWithRole(inst *workloads.Instance) bool {
-	if len(inst.Spec.Roles) > 0 && len(inst.Status.Role) == 0 {
-		return false
-	}
-	return IsInstanceReady(inst)
-}
-
 // IsInstanceReady returns true if an instance is ready
 func IsInstanceReady(inst *workloads.Instance) bool {
-	return isInstanceReady(inst) && !IsInstanceTerminating(inst)
+	return isInstanceUTD(inst) && !IsInstanceTerminating(inst) && isInstanceReady(inst)
+}
+
+// IsInstanceReadyWithRole checks if an instance is ready with the role observed.
+func IsInstanceReadyWithRole(inst *workloads.Instance) bool {
+	return IsInstanceReady(inst) && isInstanceHasRole(inst)
 }
 
 // IsInstanceAvailable returns true if an instance is ready for at least minReadySeconds
 func IsInstanceAvailable(inst *workloads.Instance) bool {
-	return isInstanceAvailable(inst) && !IsInstanceTerminating(inst)
+	return isInstanceUTD(inst) && !IsInstanceTerminating(inst) && isInstanceAvailable(inst)
 }
 
 func IsInstanceFailure(inst *workloads.Instance) bool {
-	return isInstanceFailure(inst) && !IsInstanceTerminating(inst)
+	return isInstanceUTD(inst) && !IsInstanceTerminating(inst) && isInstanceFailure(inst)
 }
 
 // IsInstanceTerminating returns true if instance's DeletionTimestamp has been set
 func IsInstanceTerminating(inst *workloads.Instance) bool {
 	return inst.DeletionTimestamp != nil
+}
+
+func isInstanceUTD(inst *workloads.Instance) bool {
+	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate
+}
+
+func isInstanceHasRole(inst *workloads.Instance) bool {
+	return len(inst.Spec.Roles) == 0 || len(inst.Status.Role) > 0
 }
 
 // isInstanceReady returns true if an instance is ready; false otherwise.

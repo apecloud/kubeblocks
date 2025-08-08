@@ -76,7 +76,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return err
 	}
-	componentInfo := opsDef.GetComponentInfo(compDef.Name)
+	componentInfo := getComponentInfo(opsDef, compDef.Name)
 	if componentInfo == nil {
 		return intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
 	}
@@ -397,4 +397,16 @@ func getTolerations(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.Cluste
 		return nil, nil
 	}
 	return schedulePolicy.Tolerations, nil
+}
+
+func getComponentInfo(opsDef *appsv1alpha1.OpsDefinition, compDefName string) *appsv1alpha1.ComponentInfo {
+	if opsDef == nil {
+		return nil
+	}
+	for _, v := range opsDef.Spec.ComponentInfos {
+		if component.CompDefMatched(compDefName, v.ComponentDefinitionName) {
+			return &v
+		}
+	}
+	return nil
 }

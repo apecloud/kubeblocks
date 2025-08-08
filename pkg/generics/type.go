@@ -107,6 +107,8 @@ var ComponentSignature = func(appsv1.Component, *appsv1.Component, appsv1.Compon
 }
 var InstanceSetSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
 }
+var InstanceSignature = func(_ workloads.Instance, _ *workloads.Instance, _ workloads.InstanceList, _ *workloads.InstanceList) {
+}
 var RolloutSignature = func(_ appsv1alpha1.Rollout, _ *appsv1alpha1.Rollout, _ appsv1alpha1.RolloutList, _ *appsv1alpha1.RolloutList) {
 }
 var OpsDefinitionSignature = func(_ opsv1alpha1.OpsDefinition, _ *opsv1alpha1.OpsDefinition, _ opsv1alpha1.OpsDefinitionList, _ *opsv1alpha1.OpsDefinitionList) {

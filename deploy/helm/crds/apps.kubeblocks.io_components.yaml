@@ -469,6 +469,9 @@ spec:
 
                   These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
                 type: boolean
+              enableInstanceAPI:
+                description: Specifies whether to enable the new Instance API.
+                type: boolean
               env:
                 description: List of environment variables to add.
                 items:

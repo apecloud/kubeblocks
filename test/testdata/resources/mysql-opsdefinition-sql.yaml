@@ -3,10 +3,14 @@ kind: OpsDefinition
 metadata:
   name: mysql-sql-executor
 spec:
-  componentDefinitionRefs:
-    - name: apecloud-mysql
+  componentInfos:
+    - componentDefinitionName: test-compdef
       accountName: root
       serviceName: rw
+      imageMappings:
+        - serviceVersions: ["8.0.30"]
+          images:
+            mysql: docker.io/apecloud/apecloud-mysql-server:8.0.30
 
   parametersSchema:
     openAPIV3Schema:

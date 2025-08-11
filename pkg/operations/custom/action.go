@@ -56,6 +56,7 @@ type ActionContext struct {
 	ReqCtx intctrlutil.RequestCtx
 	Client client.Client
 	Action *opsv1alpha1.OpsAction
+	Images map[string]string
 }
 
 func (actionCtx ActionContext) createActionK8sWorkload(

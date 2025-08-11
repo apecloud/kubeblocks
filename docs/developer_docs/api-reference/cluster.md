@@ -5705,10 +5705,6 @@ which initiates an update of the replica&rsquo;s role.</p>
 <p>Defining a RoleProbe Action for a Component is required if roles are defined for the Component.
 It ensures replicas are correctly labeled with their respective roles.
 Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.</p>
-<p>The container executing this action has access to following variables:</p>
-<ul>
-<li>KB_POD_FQDN: The FQDN of the Pod whose role is being assessed.</li>
-</ul>
 <p>Expected output of this action:
 - On Success: The determined role of the replica, which must align with one of the roles specified
   in the component definition.
@@ -5789,7 +5785,7 @@ during the addition of the new member.</p>
 - -c
 - |
    CLIENT=&quot;mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e&quot;
-	  $CLIENT &quot;ALTER SYSTEM ADD SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
+	  $CLIENT &quot;ALTER SYSTEM ADD SERVER '$POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
 </code></pre>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -5824,7 +5820,7 @@ Data migration is generally not part of this action and should be handled separa
 - -c
 - |
    CLIENT=&quot;mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e&quot;
-	  $CLIENT &quot;ALTER SYSTEM DELETE SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
+	  $CLIENT &quot;ALTER SYSTEM DELETE SERVER '$POD_FQDN:$SERVICE_PORT' ZONE 'zone1'&quot;
 </code></pre>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -5843,10 +5839,6 @@ Action
 <p>Defines the procedure to switch a replica into the read-only state.</p>
 <p>Use Case:
 This action is invoked when the database&rsquo;s volume capacity nears its upper limit and space is about to be exhausted.</p>
-<p>The container executing this action has access to following environment variables:</p>
-<ul>
-<li>KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.</li>
-</ul>
 <p>Expected action output:
 - On Failure: An error message, if applicable, indicating why the action failed.</p>
 <p>Note: This field is immutable once it has been set.</p>
@@ -5868,10 +5860,6 @@ Action
 This action is used to bring back a replica that was previously in a read-only state,
 which restricted write operations, to its normal operational state where it can handle
 both read and write operations.</p>
-<p>The container executing this action has access to following environment variables:</p>
-<ul>
-<li>KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.</li>
-</ul>
 <p>Expected action output:
 - On Failure: An error message, if applicable, indicating why the action failed.</p>
 <p>Note: This field is immutable once it has been set.</p>

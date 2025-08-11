@@ -1483,10 +1483,6 @@ type ComponentLifecycleActions struct {
 	// It ensures replicas are correctly labeled with their respective roles.
 	// Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.
 	//
-	// The container executing this action has access to following variables:
-	//
-	// - KB_POD_FQDN: The FQDN of the Pod whose role is being assessed.
-	//
 	// Expected output of this action:
 	// - On Success: The determined role of the replica, which must align with one of the roles specified
 	//   in the component definition.
@@ -1549,7 +1545,7 @@ type ComponentLifecycleActions struct {
 	// - -c
 	// - |
 	//    CLIENT="mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e"
-	// 	  $CLIENT "ALTER SYSTEM ADD SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'"
+	// 	  $CLIENT "ALTER SYSTEM ADD SERVER '$POD_FQDN:$SERVICE_PORT' ZONE 'zone1'"
 	// ```
 	//
 	// Note: This field is immutable once it has been set.
@@ -1582,7 +1578,7 @@ type ComponentLifecycleActions struct {
 	// - -c
 	// - |
 	//    CLIENT="mysql -u $SERVICE_USER -p$SERVICE_PASSWORD -P $SERVICE_PORT -h $SERVICE_HOST -e"
-	// 	  $CLIENT "ALTER SYSTEM DELETE SERVER '$KB_POD_FQDN:$SERVICE_PORT' ZONE 'zone1'"
+	// 	  $CLIENT "ALTER SYSTEM DELETE SERVER '$POD_FQDN:$SERVICE_PORT' ZONE 'zone1'"
 	// ```
 	//
 	// Note: This field is immutable once it has been set.
@@ -1594,10 +1590,6 @@ type ComponentLifecycleActions struct {
 	//
 	// Use Case:
 	// This action is invoked when the database's volume capacity nears its upper limit and space is about to be exhausted.
-	//
-	// The container executing this action has access to following environment variables:
-	//
-	// - KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.
 	//
 	// Expected action output:
 	// - On Failure: An error message, if applicable, indicating why the action failed.
@@ -1613,10 +1605,6 @@ type ComponentLifecycleActions struct {
 	// This action is used to bring back a replica that was previously in a read-only state,
 	// which restricted write operations, to its normal operational state where it can handle
 	// both read and write operations.
-	//
-	// The container executing this action has access to following environment variables:
-	//
-	// - KB_POD_FQDN: The FQDN of the replica pod whose role is being checked.
 	//
 	// Expected action output:
 	// - On Failure: An error message, if applicable, indicating why the action failed.

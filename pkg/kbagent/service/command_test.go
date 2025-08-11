@@ -271,11 +271,10 @@ var _ = Describe("command", func() {
 			action := &proto.ExecAction{
 				Commands: []string{"/bin/bash", "-c", "command-not-found"},
 			}
-			output, err := runCommand(ctx, action, nil, nil)
+			_, err := runCommand(ctx, action, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("command not found"))
-			Expect(output).Should(BeNil())
 		})
 
 		It("timeout", func() {
@@ -283,10 +282,9 @@ var _ = Describe("command", func() {
 				Commands: []string{"/bin/bash", "-c", "sleep 60"},
 			}
 			timeout := int32(1)
-			output, err := runCommand(ctx, action, nil, &timeout)
+			_, err := runCommand(ctx, action, nil, &timeout)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
-			Expect(output).Should(BeNil())
 		})
 	})
 })

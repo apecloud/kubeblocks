@@ -7887,6 +7887,70 @@ string
 </tr>
 <tr>
 <td>
+<code>request</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.GRPCRequest">
+GRPCRequest
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The request for the RPC.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>response</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.GRPCResponse">
+GRPCResponse
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The response for the RPC.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.GRPCRequest">GRPCRequest
+(<code>map[string]string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.GRPCAction">GRPCAction</a>)
+</p>
+<div>
+</div>
+<h3 id="apps.kubeblocks.io/v1.GRPCResponse">GRPCResponse
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.GRPCAction">GRPCAction</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The response status of the RPC.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>message</code><br/>
 <em>
 string
@@ -7894,7 +7958,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The request message for the RPC, provided as a JSON string.</p>
+<p>The response message for the RPC.</p>
 </td>
 </tr>
 </tbody>

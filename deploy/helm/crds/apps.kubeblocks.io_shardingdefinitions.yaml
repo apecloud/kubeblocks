@@ -300,10 +300,6 @@ spec:
                               The name of the host to connect to.
                               If not specified, the pod's IP address will be used.
                             type: string
-                          message:
-                            description: The request message for the RPC, provided
-                              as a JSON string.
-                            type: string
                           method:
                             description: The name of the method to call.
                             type: string
@@ -312,6 +308,21 @@ spec:
                               The port to access on the host. Can be a number or a name.
                               If a name is given, it will be looked up in the container's ports.
                             type: string
+                          request:
+                            additionalProperties:
+                              type: string
+                            description: The request for the RPC.
+                            type: object
+                          response:
+                            description: The response for the RPC.
+                            properties:
+                              message:
+                                description: The response message for the RPC.
+                                type: string
+                              status:
+                                description: The response status of the RPC.
+                                type: string
+                            type: object
                           service:
                             description: The fully qualified name of the service to
                               call.
@@ -711,10 +722,6 @@ spec:
                               The name of the host to connect to.
                               If not specified, the pod's IP address will be used.
                             type: string
-                          message:
-                            description: The request message for the RPC, provided
-                              as a JSON string.
-                            type: string
                           method:
                             description: The name of the method to call.
                             type: string
@@ -723,6 +730,21 @@ spec:
                               The port to access on the host. Can be a number or a name.
                               If a name is given, it will be looked up in the container's ports.
                             type: string
+                          request:
+                            additionalProperties:
+                              type: string
+                            description: The request for the RPC.
+                            type: object
+                          response:
+                            description: The response for the RPC.
+                            properties:
+                              message:
+                                description: The response message for the RPC.
+                                type: string
+                              status:
+                                description: The response status of the RPC.
+                                type: string
+                            type: object
                           service:
                             description: The fully qualified name of the service to
                               call.
@@ -1114,10 +1136,6 @@ spec:
                               The name of the host to connect to.
                               If not specified, the pod's IP address will be used.
                             type: string
-                          message:
-                            description: The request message for the RPC, provided
-                              as a JSON string.
-                            type: string
                           method:
                             description: The name of the method to call.
                             type: string
@@ -1126,6 +1144,21 @@ spec:
                               The port to access on the host. Can be a number or a name.
                               If a name is given, it will be looked up in the container's ports.
                             type: string
+                          request:
+                            additionalProperties:
+                              type: string
+                            description: The request for the RPC.
+                            type: object
+                          response:
+                            description: The response for the RPC.
+                            properties:
+                              message:
+                                description: The response message for the RPC.
+                                type: string
+                              status:
+                                description: The response status of the RPC.
+                                type: string
+                            type: object
                           service:
                             description: The fully qualified name of the service to
                               call.
@@ -1517,10 +1550,6 @@ spec:
                               The name of the host to connect to.
                               If not specified, the pod's IP address will be used.
                             type: string
-                          message:
-                            description: The request message for the RPC, provided
-                              as a JSON string.
-                            type: string
                           method:
                             description: The name of the method to call.
                             type: string
@@ -1529,6 +1558,21 @@ spec:
                               The port to access on the host. Can be a number or a name.
                               If a name is given, it will be looked up in the container's ports.
                             type: string
+                          request:
+                            additionalProperties:
+                              type: string
+                            description: The request for the RPC.
+                            type: object
+                          response:
+                            description: The response for the RPC.
+                            properties:
+                              message:
+                                description: The response message for the RPC.
+                                type: string
+                              status:
+                                description: The response status of the RPC.
+                                type: string
+                            type: object
                           service:
                             description: The fully qualified name of the service to
                               call.

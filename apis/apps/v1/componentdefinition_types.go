@@ -1981,12 +1981,31 @@ type GRPCAction struct {
 	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 
-	// The request message for the RPC, provided as a JSON string.
+	// The request for the RPC.
+	//
+	// +optional
+	Request GRPCRequest `json:"request,omitempty"`
+
+	// The response for the RPC.
+	//
+	// +optional
+	Response GRPCResponse `json:"response,omitempty"`
+
+	// TODO: TLS
+}
+
+type GRPCRequest map[string]string
+
+type GRPCResponse struct {
+	// The response status of the RPC.
+	//
+	// +optional
+	Status string `json:"status,omitempty"`
+
+	// The response message for the RPC.
 	//
 	// +optional
 	Message string `json:"message,omitempty"`
-
-	// TODO: TLS
 }
 
 // TargetPodSelector defines how to select pod(s) to execute an Action.

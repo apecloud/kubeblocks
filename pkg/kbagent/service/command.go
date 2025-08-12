@@ -35,26 +35,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
-const (
-	defaultBufferSize = 4096
-)
-
 type commandResult struct {
 	err    error
 	stdout *bytes.Buffer
 	stderr *bytes.Buffer
-}
-
-func gather[T interface{}](ch chan T) *T {
-	select {
-	case v, ok := <-ch:
-		if !ok {
-			return nil
-		}
-		return &v
-	default:
-		return nil
-	}
 }
 
 func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) ([]byte, error) {

@@ -26,6 +26,8 @@ import (
 type Action struct {
 	Name           string       `json:"name"`
 	Exec           *ExecAction  `json:"exec,omitempty"`
+	Http           *HttpAction  `json:"http,omitempty"`
+	Grpc           *GrpcAction  `json:"grpc,omitempty"`
 	TimeoutSeconds int32        `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy `json:"retryPolicy,omitempty"`
 }
@@ -33,6 +35,24 @@ type Action struct {
 type ExecAction struct {
 	Commands []string `json:"command,omitempty"`
 	Args     []string `json:"args,omitempty"`
+}
+
+type HttpAction struct {
+	Port   int32             `json:"port"`
+	Host   string            `json:"host,omitempty"`
+	Scheme string            `json:"scheme,omitempty"`
+	Path   string            `json:"path,omitempty"`
+	Method string            `json:"method,omitempty"`
+	Body   string            `json:"body,omitempty"`
+	Header map[string]string `json:"header,omitempty"`
+}
+
+type GrpcAction struct {
+	Port    int32  `json:"port"`
+	Host    string `json:"host,omitempty"`
+	Service string `json:"service"`
+	Method  string `json:"method"`
+	Message string `json:"message,omitempty"`
 }
 
 type RetryPolicy struct {

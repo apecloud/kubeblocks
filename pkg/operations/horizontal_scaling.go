@@ -22,6 +22,8 @@ package operations
 import (
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +35,8 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -129,6 +133,10 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 				horizontalScaling.ComponentName)
 			return intctrlutil.NewFatalError(errMsg)
 		}
+		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
+			// Wait for the persistent volume to be restored from backup before proceeding.
+			return nil
+		}
 		compSpec.Replicas = replicas
 		compSpec.Instances = instances
 		compSpec.OfflineInstances = offlineInstances
@@ -164,6 +172,43 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
+}
+
+func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
+	horizontalScaling opsv1alpha1.HorizontalScaling,
+	lastCompConfiguration opsv1alpha1.LastComponentConfiguration) (int32, int32, error) {
+	replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes, compSpecDeepyCopy,
+		lastCompConfiguration, horizontalScaling)
+	if err != nil {
+		return 0, 0, err
+	}
+	compSpecDeepyCopy.Replicas = replicas
+	compSpecDeepyCopy.Instances = instances
+	compSpecDeepyCopy.OfflineInstances = offlineInstances
+	createdPodSet, _, err := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpecDeepyCopy, horizontalScaling, pgRes.fullComponentName)
+	if err != nil {
+		return 0, 0, err
+	}
+	for podName, templateName := range createdPodSet {
+		idx := strings.LastIndex(podName, "-")
+		podIndex := podName[idx+1:]
+		podIndexInt, _ := strconv.Atoi(podIndex)
+
+		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, cli, opsRes.Cluster, model.GetScheme(), nil, 1, int32(podIndexInt))
+		if err := restoreMGR.BuildPrepareDataRestore(); err != nil {
+			return 0, 0, err
+		}
+	}
+
+	return 0, 0, nil
+}
+
+func (hs horizontalScalingOpsHandler) scaleOutComponentAfterRestoreData(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, error) {
+	return 0, 0, nil
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

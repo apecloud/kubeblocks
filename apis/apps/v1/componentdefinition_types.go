@@ -495,6 +495,7 @@ type ComponentDefinitionSpec struct {
 	//     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 	//   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 	//   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
+	//   - `availableProbe`: Defines the procedure which is invoked regularly to assess the availability of the component.
 	//   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 	//     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 	//     such as before planned maintenance or upgrades on the current leader node.
@@ -1701,6 +1702,7 @@ type ComponentLifecycleActions struct {
 //     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 //   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 //   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
+//   - `availableProbe`: Defines the procedure which is invoked regularly to assess the availability of the component.
 //   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 //   - `memberJoin`: Defines the procedure to add a new replica to the replication group.
 //   - `memberLeave`: Defines the method to remove a replica from the replication group.
@@ -1719,8 +1721,8 @@ type ComponentLifecycleActions struct {
 //     or database connection credentials.
 //     These variables provide a dynamic and context-aware mechanism for script execution.
 //   - HTTPAction: Performs an HTTP request.
-//     HTTPAction is to be implemented in future version.
-//   - GRPCAction: In future version, Actions will support initiating gRPC calls.
+//     For HTTP requests, the predefined environment variables will be carried over to the request headers.
+//   - GRPCAction: Performs a gRPC calls.
 //     This allows developers to implement Actions using plugins written in programming language like Go,
 //     providing greater flexibility and extensibility.
 //
@@ -1740,6 +1742,45 @@ type Action struct {
 	//
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty"`
+
+	// Defines the HTTP request to perform.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	HTTP *HTTPAction `json:"http,omitempty"`
+
+	// Defines the gRPC request to perform.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	GRPC *GRPCAction `json:"grpc,omitempty"`
+
+	// Defines the criteria used to select the target Pod(s) for executing the Action.
+	// This is useful when there is no default target replica identified.
+	// It allows for precise control over which Pod(s) the Action should run in.
+	//
+	// If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+	// to be removed or added; or a random pod if the Action is triggered at the component level, such as
+	// post-provision or pre-terminate of the component.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
+
+	// Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+	// The impact of this field depends on the `targetPodSelector` value:
+	//
+	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+	//   will be selected for the Action.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	MatchingKey string `json:"matchingKey,omitempty"`
 
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//
@@ -1856,6 +1897,96 @@ type ExecAction struct {
 	//
 	// +optional
 	Container string `json:"container,omitempty"`
+}
+
+// HTTPAction describes an Action that performs an HTTP request.
+type HTTPAction struct {
+	// The port to access on the host. Can be a number or a name.
+	// If a name is given, it will be looked up in the container's ports.
+	//
+	// +kubebuilder:validation:Required
+	Port string `json:"port"`
+
+	// The name of the host to connect to.
+	// If not specified, the pod's IP address will be used.
+	//
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// The scheme to use for connecting to the host.
+	// Defaults to "HTTP".
+	//
+	// +kubebuilder:validation:Enum={HTTP,HTTPS}
+	// +kubebuilder:default=HTTP
+	// +optional
+	Scheme string `json:"scheme,omitempty"`
+
+	// The path to access on the HTTP server.
+	//
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// The HTTP method to use.
+	// Defaults to "GET".
+	//
+	// +kubebuilder:validation:Enum={GET,POST,PUT,DELETE,HEAD,PATCH}
+	// +kubebuilder:default=GET
+	// +optional
+	Method string `json:"method,omitempty"`
+
+	// A string to use as the body of the HTTP request.
+	//
+	// +optional
+	Body string `json:"body,omitempty"`
+
+	// Custom headers to set in the request.
+	// The "Host" header will be set automatically based on the `Host` field.
+	//
+	// +optional
+	Headers []HTTPHeader `json:"headers,omitempty"`
+
+	// TODO: HTTPS
+}
+
+// HTTPHeader defines a single HTTP header.
+type HTTPHeader struct {
+	// The name of the header field.
+	Name string `json:"name"`
+
+	// The value of the header field.
+	Value string `json:"value"`
+}
+
+// GRPCAction describes an Action that performs a gRPC request.
+type GRPCAction struct {
+	// The port to access on the host. Can be a number or a name.
+	// If a name is given, it will be looked up in the container's ports.
+	//
+	// +kubebuilder:validation:Required
+	Port string `json:"port"`
+
+	// The name of the host to connect to.
+	// If not specified, the pod's IP address will be used.
+	//
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// The fully qualified name of the service to call.
+	//
+	// +kubebuilder:validation:Required
+	Service string `json:"service"`
+
+	// The name of the method to call.
+	//
+	// +kubebuilder:validation:Required
+	Method string `json:"method"`
+
+	// The request message for the RPC, provided as a JSON string.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// TODO: TLS
 }
 
 // TargetPodSelector defines how to select pod(s) to execute an Action.

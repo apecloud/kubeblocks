@@ -288,6 +288,118 @@ spec:
                             - Ordinal
                             type: string
                         type: object
+                      grpc:
+                        description: |-
+                          Defines the gRPC request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          message:
+                            description: The request message for the RPC, provided
+                              as a JSON string.
+                            type: string
+                          method:
+                            description: The name of the method to call.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          service:
+                            description: The fully qualified name of the service to
+                              call.
+                            type: string
+                        required:
+                        - method
+                        - port
+                        - service
+                        type: object
+                      http:
+                        description: |-
+                          Defines the HTTP request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          body:
+                            description: A string to use as the body of the HTTP request.
+                            type: string
+                          headers:
+                            description: |-
+                              Custom headers to set in the request.
+                              The "Host" header will be set automatically based on the `Host` field.
+                            items:
+                              description: HTTPHeader defines a single HTTP header.
+                              properties:
+                                name:
+                                  description: The name of the header field.
+                                  type: string
+                                value:
+                                  description: The value of the header field.
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          method:
+                            default: GET
+                            description: |-
+                              The HTTP method to use.
+                              Defaults to "GET".
+                            enum:
+                            - GET
+                            - POST
+                            - PUT
+                            - DELETE
+                            - HEAD
+                            - PATCH
+                            type: string
+                          path:
+                            description: The path to access on the HTTP server.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          scheme:
+                            default: HTTP
+                            description: |-
+                              The scheme to use for connecting to the host.
+                              Defaults to "HTTP".
+                            enum:
+                            - HTTP
+                            - HTTPS
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      matchingKey:
+                        description: |-
+                          Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                          The impact of this field depends on the `targetPodSelector` value:
+
+
+                          - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                          - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                            will be selected for the Action.
+
+
+                          This field cannot be updated.
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -334,6 +446,25 @@ spec:
                             format: int64
                             type: integer
                         type: object
+                      targetPodSelector:
+                        description: |-
+                          Defines the criteria used to select the target Pod(s) for executing the Action.
+                          This is useful when there is no default target replica identified.
+                          It allows for precise control over which Pod(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                          to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                          post-provision or pre-terminate of the component.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        - Role
+                        - Ordinal
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-
@@ -568,6 +699,118 @@ spec:
                             - Ordinal
                             type: string
                         type: object
+                      grpc:
+                        description: |-
+                          Defines the gRPC request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          message:
+                            description: The request message for the RPC, provided
+                              as a JSON string.
+                            type: string
+                          method:
+                            description: The name of the method to call.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          service:
+                            description: The fully qualified name of the service to
+                              call.
+                            type: string
+                        required:
+                        - method
+                        - port
+                        - service
+                        type: object
+                      http:
+                        description: |-
+                          Defines the HTTP request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          body:
+                            description: A string to use as the body of the HTTP request.
+                            type: string
+                          headers:
+                            description: |-
+                              Custom headers to set in the request.
+                              The "Host" header will be set automatically based on the `Host` field.
+                            items:
+                              description: HTTPHeader defines a single HTTP header.
+                              properties:
+                                name:
+                                  description: The name of the header field.
+                                  type: string
+                                value:
+                                  description: The value of the header field.
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          method:
+                            default: GET
+                            description: |-
+                              The HTTP method to use.
+                              Defaults to "GET".
+                            enum:
+                            - GET
+                            - POST
+                            - PUT
+                            - DELETE
+                            - HEAD
+                            - PATCH
+                            type: string
+                          path:
+                            description: The path to access on the HTTP server.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          scheme:
+                            default: HTTP
+                            description: |-
+                              The scheme to use for connecting to the host.
+                              Defaults to "HTTP".
+                            enum:
+                            - HTTP
+                            - HTTPS
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      matchingKey:
+                        description: |-
+                          Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                          The impact of this field depends on the `targetPodSelector` value:
+
+
+                          - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                          - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                            will be selected for the Action.
+
+
+                          This field cannot be updated.
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -614,6 +857,25 @@ spec:
                             format: int64
                             type: integer
                         type: object
+                      targetPodSelector:
+                        description: |-
+                          Defines the criteria used to select the target Pod(s) for executing the Action.
+                          This is useful when there is no default target replica identified.
+                          It allows for precise control over which Pod(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                          to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                          post-provision or pre-terminate of the component.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        - Role
+                        - Ordinal
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-
@@ -840,6 +1102,118 @@ spec:
                             - Ordinal
                             type: string
                         type: object
+                      grpc:
+                        description: |-
+                          Defines the gRPC request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          message:
+                            description: The request message for the RPC, provided
+                              as a JSON string.
+                            type: string
+                          method:
+                            description: The name of the method to call.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          service:
+                            description: The fully qualified name of the service to
+                              call.
+                            type: string
+                        required:
+                        - method
+                        - port
+                        - service
+                        type: object
+                      http:
+                        description: |-
+                          Defines the HTTP request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          body:
+                            description: A string to use as the body of the HTTP request.
+                            type: string
+                          headers:
+                            description: |-
+                              Custom headers to set in the request.
+                              The "Host" header will be set automatically based on the `Host` field.
+                            items:
+                              description: HTTPHeader defines a single HTTP header.
+                              properties:
+                                name:
+                                  description: The name of the header field.
+                                  type: string
+                                value:
+                                  description: The value of the header field.
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          method:
+                            default: GET
+                            description: |-
+                              The HTTP method to use.
+                              Defaults to "GET".
+                            enum:
+                            - GET
+                            - POST
+                            - PUT
+                            - DELETE
+                            - HEAD
+                            - PATCH
+                            type: string
+                          path:
+                            description: The path to access on the HTTP server.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          scheme:
+                            default: HTTP
+                            description: |-
+                              The scheme to use for connecting to the host.
+                              Defaults to "HTTP".
+                            enum:
+                            - HTTP
+                            - HTTPS
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      matchingKey:
+                        description: |-
+                          Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                          The impact of this field depends on the `targetPodSelector` value:
+
+
+                          - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                          - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                            will be selected for the Action.
+
+
+                          This field cannot be updated.
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -886,6 +1260,25 @@ spec:
                             format: int64
                             type: integer
                         type: object
+                      targetPodSelector:
+                        description: |-
+                          Defines the criteria used to select the target Pod(s) for executing the Action.
+                          This is useful when there is no default target replica identified.
+                          It allows for precise control over which Pod(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                          to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                          post-provision or pre-terminate of the component.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        - Role
+                        - Ordinal
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-
@@ -1112,6 +1505,118 @@ spec:
                             - Ordinal
                             type: string
                         type: object
+                      grpc:
+                        description: |-
+                          Defines the gRPC request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          message:
+                            description: The request message for the RPC, provided
+                              as a JSON string.
+                            type: string
+                          method:
+                            description: The name of the method to call.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          service:
+                            description: The fully qualified name of the service to
+                              call.
+                            type: string
+                        required:
+                        - method
+                        - port
+                        - service
+                        type: object
+                      http:
+                        description: |-
+                          Defines the HTTP request to perform.
+
+
+                          This field cannot be updated.
+                        properties:
+                          body:
+                            description: A string to use as the body of the HTTP request.
+                            type: string
+                          headers:
+                            description: |-
+                              Custom headers to set in the request.
+                              The "Host" header will be set automatically based on the `Host` field.
+                            items:
+                              description: HTTPHeader defines a single HTTP header.
+                              properties:
+                                name:
+                                  description: The name of the header field.
+                                  type: string
+                                value:
+                                  description: The value of the header field.
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                          host:
+                            description: |-
+                              The name of the host to connect to.
+                              If not specified, the pod's IP address will be used.
+                            type: string
+                          method:
+                            default: GET
+                            description: |-
+                              The HTTP method to use.
+                              Defaults to "GET".
+                            enum:
+                            - GET
+                            - POST
+                            - PUT
+                            - DELETE
+                            - HEAD
+                            - PATCH
+                            type: string
+                          path:
+                            description: The path to access on the HTTP server.
+                            type: string
+                          port:
+                            description: |-
+                              The port to access on the host. Can be a number or a name.
+                              If a name is given, it will be looked up in the container's ports.
+                            type: string
+                          scheme:
+                            default: HTTP
+                            description: |-
+                              The scheme to use for connecting to the host.
+                              Defaults to "HTTP".
+                            enum:
+                            - HTTP
+                            - HTTPS
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      matchingKey:
+                        description: |-
+                          Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                          The impact of this field depends on the `targetPodSelector` value:
+
+
+                          - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                          - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                            will be selected for the Action.
+
+
+                          This field cannot be updated.
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -1158,6 +1663,25 @@ spec:
                             format: int64
                             type: integer
                         type: object
+                      targetPodSelector:
+                        description: |-
+                          Defines the criteria used to select the target Pod(s) for executing the Action.
+                          This is useful when there is no default target replica identified.
+                          It allows for precise control over which Pod(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                          to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                          post-provision or pre-terminate of the component.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        - Role
+                        - Ordinal
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-

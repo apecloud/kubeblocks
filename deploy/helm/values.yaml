@@ -491,7 +491,6 @@ autoInstalledAddons:
   - "pulsar"
   - "qdrant"
   - "redis"
-  - "rabbitmq"
   - "snapshot-controller"
 
 ### snapshot-controller settings

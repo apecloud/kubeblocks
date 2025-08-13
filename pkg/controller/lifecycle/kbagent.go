@@ -396,37 +396,29 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 		return []*corev1.Pod{pod}, nil
 	}
 
+	readyPods := []*corev1.Pod{}
+	for _, pod := range pods {
+		if isKbAgentStarted(pod) {
+			readyPods = append(readyPods, pod)
+		}
+	}
+
 	anyPod := func() []*corev1.Pod {
-		readyPods := []*corev1.Pod{}
-		for _, pod := range pods {
-			if isKbAgentStarted(pod) {
-				readyPods = append(readyPods, pod)
-			}
-		}
-		if len(readyPods) == 0 {
-			return readyPods
-		}
 		i := rand.Int() % len(readyPods)
 		return []*corev1.Pod{readyPods[i]}
 	}
 
 	allPods := func() []*corev1.Pod {
-		readyPods := []*corev1.Pod{}
-		for _, pod := range pods {
-			if isKbAgentStarted(pod) {
-				readyPods = append(readyPods, pod)
-			}
-		}
 		return readyPods
 	}
 
 	podsWithRole := func() []*corev1.Pod {
 		roleName := spec.Exec.MatchingKey
 		var rolePods []*corev1.Pod
-		for i, pod := range pods {
+		for i, pod := range readyPods {
 			if len(pod.Labels) != 0 {
 				if pod.Labels[constant.RoleLabelKey] == roleName {
-					rolePods = append(rolePods, pods[i])
+					rolePods = append(rolePods, readyPods[i])
 				}
 			}
 		}

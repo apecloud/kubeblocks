@@ -229,8 +229,8 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	}
 	// TODO: close the client
 
-	url := fmt.Sprintf("%s://%s:%d%s", action.Scheme, action.Host, action.Port, action.Path)
-	req, err := http.NewRequestWithContext(ctx, action.Method, url, strings.NewReader(action.Body))
+	method, url := httpActionMethodNURL(action)
+	req, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(action.Body))
 	if err != nil {
 		return err
 	}
@@ -288,10 +288,33 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	return nil
 }
 
+func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
+	host, scheme, method, path := "127.0.0.1", "HTTP", "GET", "/"
+	if len(action.Host) > 0 {
+		host = action.Host
+	}
+	if len(action.Scheme) > 0 {
+		scheme = action.Scheme
+	}
+	if len(action.Method) > 0 {
+		method = action.Method
+	}
+	if len(action.Path) > 0 {
+		path = action.Path
+	}
+	// TODO: resolve the port
+	return method, fmt.Sprintf("%s://%s:%s%s", scheme, host, action.Port, path)
+}
+
 func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 	action *kbaproto.GRPCAction, parameters map[string]string, errChan chan error, _ io.Reader, stdoutWriter, stderrWriter io.Writer) error {
 	// TODO: grpc stub cache
-	remote := fmt.Sprintf("%s:%d", action.Host, action.Port)
+	host := "127.0.0.1"
+	if len(action.Host) > 0 {
+		host = action.Host
+	}
+	// TODO: resolve the port
+	remote := fmt.Sprintf("%s:%s", host, action.Port)
 	conn, err := grpc.DialContext(ctx, remote,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(), // wait for the connection to be established

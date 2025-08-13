@@ -397,7 +397,7 @@ spec:
                             host:
                               description: |-
                                 The name of the host to connect to.
-                                If not specified, the pod's IP address will be used.
+                                If not specified, the localhost (127.0.0.1) will be used.
                               type: string
                             method:
                               description: The name of the method to call.
@@ -410,10 +410,10 @@ spec:
                             request:
                               additionalProperties:
                                 type: string
-                              description: The request for the RPC.
+                              description: The request schema for the RPC method.
                               type: object
                             response:
-                              description: The response for the RPC.
+                              description: The response schema for the RPC method.
                               properties:
                                 message:
                                   description: The response message for the RPC.
@@ -443,9 +443,7 @@ spec:
                                 request.
                               type: string
                             headers:
-                              description: |-
-                                Custom headers to set in the request.
-                                The "Host" header will be set automatically based on the `Host` field.
+                              description: Custom headers to set in the request.
                               items:
                                 description: HTTPHeader defines a single HTTP header.
                                 properties:
@@ -463,7 +461,7 @@ spec:
                             host:
                               description: |-
                                 The name of the host to connect to.
-                                If not specified, the pod's IP address will be used.
+                                If not specified, the localhost (127.0.0.1) will be used.
                               type: string
                             method:
                               default: GET

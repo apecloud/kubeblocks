@@ -38,7 +38,7 @@ type ExecAction struct {
 }
 
 type HTTPAction struct {
-	Port    int32             `json:"port"`
+	Port    string            `json:"port"`
 	Host    string            `json:"host,omitempty"`
 	Scheme  string            `json:"scheme,omitempty"`
 	Path    string            `json:"path,omitempty"`
@@ -48,7 +48,7 @@ type HTTPAction struct {
 }
 
 type GRPCAction struct {
-	Port     int32             `json:"port"`
+	Port     string            `json:"port"`
 	Host     string            `json:"host,omitempty"`
 	Service  string            `json:"service"`
 	Method   string            `json:"method"`

@@ -347,7 +347,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 	}
 	if action.HTTP != nil {
 		a.HTTP = &proto.HTTPAction{
-			Port:    0, // action.HTTP.Port, // TODO: kbagent resolve port
+			Port:    action.HTTP.Port,
 			Host:    action.HTTP.Host,
 			Scheme:  action.HTTP.Scheme,
 			Path:    action.HTTP.Path,
@@ -361,7 +361,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 	}
 	if action.GRPC != nil {
 		a.GRPC = &proto.GRPCAction{
-			Port:     0, // action.GRPC.Port, // TODO: kbagent resolve port
+			Port:     action.GRPC.Port,
 			Host:     action.GRPC.Host,
 			Service:  action.GRPC.Service,
 			Method:   action.GRPC.Method,
@@ -380,7 +380,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 }
 
 func buildProbe4KBAgent(probe *appsv1.Probe, name, instance string) (*proto.Action, *proto.Probe) {
-	if !probe.Defined() {
+	if probe == nil || !probe.Defined() {
 		return nil, nil
 	}
 	a := buildAction4KBAgent(&probe.Action, name)
@@ -448,7 +448,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 			synthesizedComp.LifecycleActions.Reconfigure,
 			synthesizedComp.LifecycleActions.AccountProvision,
 		}...)
-		if synthesizedComp.LifecycleActions.RoleProbe.Defined() {
+		if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Defined() {
 			actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 		}
 	}

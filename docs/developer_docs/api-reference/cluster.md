@@ -7860,7 +7860,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>The name of the host to connect to.
-If not specified, the pod&rsquo;s IP address will be used.</p>
+If not specified, the localhost (127.0.0.1) will be used.</p>
 </td>
 </tr>
 <tr>
@@ -7896,7 +7896,7 @@ GRPCRequest
 </td>
 <td>
 <em>(Optional)</em>
-<p>The request for the RPC.</p>
+<p>The request schema for the RPC method.</p>
 </td>
 </tr>
 <tr>
@@ -7910,7 +7910,7 @@ GRPCResponse
 </td>
 <td>
 <em>(Optional)</em>
-<p>The response for the RPC.</p>
+<p>The response schema for the RPC method.</p>
 </td>
 </tr>
 </tbody>
@@ -8001,7 +8001,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>The name of the host to connect to.
-If not specified, the pod&rsquo;s IP address will be used.</p>
+If not specified, the localhost (127.0.0.1) will be used.</p>
 </td>
 </tr>
 <tr>
@@ -8065,8 +8065,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Custom headers to set in the request.
-The &ldquo;Host&rdquo; header will be set automatically based on the <code>Host</code> field.</p>
+<p>Custom headers to set in the request.</p>
 </td>
 </tr>
 </tbody>

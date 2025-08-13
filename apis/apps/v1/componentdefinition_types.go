@@ -1912,7 +1912,7 @@ type HTTPAction struct {
 	Port string `json:"port"`
 
 	// The name of the host to connect to.
-	// If not specified, the pod's IP address will be used.
+	// If not specified, the localhost (127.0.0.1) will be used.
 	//
 	// +optional
 	Host string `json:"host,omitempty"`
@@ -1944,7 +1944,6 @@ type HTTPAction struct {
 	Body string `json:"body,omitempty"`
 
 	// Custom headers to set in the request.
-	// The "Host" header will be set automatically based on the `Host` field.
 	//
 	// +optional
 	Headers []HTTPHeader `json:"headers,omitempty"`
@@ -1970,7 +1969,7 @@ type GRPCAction struct {
 	Port string `json:"port"`
 
 	// The name of the host to connect to.
-	// If not specified, the pod's IP address will be used.
+	// If not specified, the localhost (127.0.0.1) will be used.
 	//
 	// +optional
 	Host string `json:"host,omitempty"`
@@ -1985,12 +1984,12 @@ type GRPCAction struct {
 	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 
-	// The request for the RPC.
+	// The request schema for the RPC method.
 	//
 	// +optional
 	Request GRPCRequest `json:"request,omitempty"`
 
-	// The response for the RPC.
+	// The response schema for the RPC method.
 	//
 	// +optional
 	Response GRPCResponse `json:"response,omitempty"`

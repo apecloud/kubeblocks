@@ -513,12 +513,12 @@ type ReplicaChanger struct {
 type FromBackup struct {
 	// Specifies the name of the Backup name.
 	// +kubebuilder:validation:Required
-	name string `json:"name"`
+	Name string `json:"name"`
 
 	// Specifies the namespace of the Backup namespace.
 	// If not specified, the namespace of the OpsRequest will be used.
 	// +kubebuilder:validation:Required
-	namespace string `json:"namespace,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 
 	// Defines container environment variables for the restore process.
 	// merged with the ones specified in the Backup and ActionSet resources.
@@ -535,6 +535,14 @@ type FromBackup struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	RestoreEnv []corev1.EnvVar `json:"restoreEnv,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
+	// Specifies the point in time to which the restore should be performed.
+	// Supported time formats:
+	//
+	// - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
+	// - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
+	//
+	RestorePointInTime string `json:"restorePointInTime,omitempty"`
 }
 
 // InstanceReplicasTemplate defines the template for instance replicas.

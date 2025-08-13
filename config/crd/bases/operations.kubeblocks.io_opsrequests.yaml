@@ -760,9 +760,14 @@ spec:
                                 type: object
                               type: array
                               x-kubernetes-preserve-unknown-fields: true
-                            sourceBackupTargetName:
-                              description: When multiple source targets exist of the
-                                backup, you must specify the source target to restore.
+                            restorePointInTime:
+                              description: |-
+                                Specifies the point in time to which the restore should be performed.
+                                Supported time formats:
+
+
+                                - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
+                                - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
                               type: string
                           required:
                           - name

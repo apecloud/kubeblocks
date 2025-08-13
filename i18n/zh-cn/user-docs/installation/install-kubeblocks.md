@@ -186,26 +186,18 @@ kubectl logs -n kb-system deployment/snapshot-controller
 
 与 Kubernetes 中的其他资源相同，KubeBlocks 也可以通过 YAML 文件和 kubectl 命令进行安装。
 
-1. 创建安装所依赖的 CRDs，并指定您想要安装的版本。
+1. 获取 KubeBlocks 版本:
 
+   * 选项 A - 获取最新稳定版本(例如 v0.9.2):
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r | head -n 1
    ```
 
-   您可以通过 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 查看 KubeBlocks 的所有版本，包括 alpha 及 beta 版本。
-
-   也可通过执行以下命令，获取稳定版本：
-
-   ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
-   ```
-
-2. 从对应版本的 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 中的资产部分获取 `kubeblocks.yaml` 文件地址。
-
-3. 替换 YAML 文件地址，执行以下命令，安装 KubeBlocks。
-
+   * 选项 B - 查看所有可用版本(包括 alpha 和 beta 版本):
+      * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)。
+      * 或使用命令:
      ```bash
-     kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
+     curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
      ```
 
 2. 使用选择的版本创建所需的 CRDs:

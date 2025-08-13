@@ -235,7 +235,7 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 		return err
 	}
 
-	for k, v := range action.Header {
+	for k, v := range action.Headers {
 		req.Header.Add(k, v)
 	}
 	for k, v := range parameters {

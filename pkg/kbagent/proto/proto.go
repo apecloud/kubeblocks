@@ -38,13 +38,13 @@ type ExecAction struct {
 }
 
 type HTTPAction struct {
-	Port   int32             `json:"port"`
-	Host   string            `json:"host,omitempty"`
-	Scheme string            `json:"scheme,omitempty"`
-	Path   string            `json:"path,omitempty"`
-	Method string            `json:"method,omitempty"`
-	Body   string            `json:"body,omitempty"`
-	Header map[string]string `json:"header,omitempty"`
+	Port    int32             `json:"port"`
+	Host    string            `json:"host,omitempty"`
+	Scheme  string            `json:"scheme,omitempty"`
+	Path    string            `json:"path,omitempty"`
+	Method  string            `json:"method,omitempty"`
+	Body    string            `json:"body,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 type GRPCAction struct {

@@ -1822,6 +1822,10 @@ type Action struct {
 	PreCondition *PreConditionType `json:"preCondition,omitempty"`
 }
 
+func (a *Action) Defined() bool {
+	return a != nil && (a.Exec != nil || a.HTTP != nil || a.GRPC != nil)
+}
+
 // ExecAction describes an Action that executes a command inside a container.
 type ExecAction struct {
 	// Specifies the container image to be used for running the Action.

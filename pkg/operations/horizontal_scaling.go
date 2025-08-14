@@ -38,7 +38,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
@@ -209,7 +208,7 @@ func (hs horizontalScalingOpsHandler) getBackupObj(reqCtx intctrlutil.RequestCtx
 func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	synthesizedComponent *component.SynthesizedComponent,
+	synthesizedComponent *intctrlcomp.SynthesizedComponent,
 	restoreMGR *plan.RestoreManager,
 	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
 	backupObj *dpv1alpha1.Backup,
@@ -272,11 +271,11 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	if err != nil {
 		return err
 	}
-	comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName))
+	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName))
 	if err != nil {
 		return err
 	}
-	synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx.Ctx, cli, compDef, comp)
+	synthesizedComponent, err := intctrlcomp.BuildSynthesizedComponent(reqCtx.Ctx, cli, compDef, comp)
 	if err != nil {
 		return err
 	}

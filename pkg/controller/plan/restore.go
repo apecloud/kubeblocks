@@ -62,6 +62,7 @@ type RestoreManager struct {
 	startingIndex                     int32
 	replicas                          int32
 	restoreLabels                     map[string]string
+	RestoreNamePrefix                 string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -361,6 +362,9 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	}
 	if r.startingIndex != 0 {
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
+	}
+	if r.RestoreNamePrefix != "" {
+		name = fmt.Sprintf("%s-%s", r.RestoreNamePrefix, name)
 	}
 	if len(r.restoreLabels) == 0 {
 		r.restoreLabels = constant.GetCompLabels(r.Cluster.Name, comp.Name)

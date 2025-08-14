@@ -446,6 +446,7 @@ func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, obje
 				},
 			})
 		}
+		return requests
 	}
 	return r.getRunningOpsRequestsFromCluster(cluster)
 }

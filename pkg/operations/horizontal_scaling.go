@@ -230,7 +230,8 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 	if err != nil {
 		return err
 	}
-	if err := intctrlutil.SetOwnership(opsRes.OpsRequest, restore, model.GetScheme(), ""); err != nil {
+	scheme, _ := opsv1alpha1.SchemeBuilder.Build()
+	if err := intctrlutil.SetOwnership(opsRes.OpsRequest, restore, scheme, ""); err != nil {
 		return err
 	}
 	if err := cli.Create(reqCtx.Ctx, restore); err != nil {
@@ -248,7 +249,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) error {
-	restoreCompletedMsg := "Restore Data completed"
+	restoreCompletedMsg := "Restore Data Completed"
 	// check if restore completed
 	if compStatus.Message == restoreCompletedMsg {
 		return nil
@@ -294,7 +295,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: opsRes.Cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
 			if apierrors.IsNotFound(err) {
 				allRestoreCompleted = false
-				if err := hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, compSpecDeepyCopy, backupObj, templateName); err != nil {
+				if err = hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, compSpecDeepyCopy, backupObj, templateName); err != nil {
 					return err
 				}
 				continue
@@ -308,12 +309,13 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 			allRestoreCompleted = false
 		}
 	}
+	compStatus.Message = "Restore Data In Pogress"
 	if allRestoreCompleted {
 		if err := hs.scaleOutComponentAfterRestoreData(reqCtx, cli, opsRes, compSpecDeepyCopy); err != nil {
 			return err
 		}
 		// set restore completed message
-		compStatus.Message = "Restore Data completed"
+		compStatus.Message = restoreCompletedMsg
 	}
 	return nil
 }

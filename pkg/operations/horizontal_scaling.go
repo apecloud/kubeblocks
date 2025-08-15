@@ -309,7 +309,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 			allRestoreCompleted = false
 		}
 	}
-	compStatus.Message = "Restore Data In Pogress"
+	compStatus.Message = "Restore Data In Progress"
 	if allRestoreCompleted {
 		if err := hs.scaleOutComponentAfterRestoreData(reqCtx, cli, opsRes, compSpecDeepyCopy); err != nil {
 			return err

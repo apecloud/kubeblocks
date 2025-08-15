@@ -38,7 +38,7 @@ kbcli cluster create kafka NAME [flags]
       --monitor-enable                              Enable monitor for Kafka. (default true)
       --monitor.limit.cpu float                      (default 0.5)
       --monitor.limit.memory float                   (default 1)
-      --monitor.replicas int                        Number of replicas for the monitor component. Value range [1]. (default 1)
+      --monitor.replicas float                      Number of replicas for the monitor component. Value range [1]. (default 1)
       --monitor.request.cpu float                    (default 0.1)
       --monitor.request.memory float                 (default 0.2)
       --node-labels stringToString                  Node label selector (default [])

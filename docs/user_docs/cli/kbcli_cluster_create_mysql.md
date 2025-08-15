@@ -33,9 +33,9 @@ kbcli cluster create mysql NAME [flags]
       --orchestrator.service-reference.endpoint string              Endpoint name of the service reference, format: <host>:<port>
   -o, --output format                                               Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string                                    Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --proxysql.cpu float                                           (default 1)
-      --proxysql.memory float                                       Memory, the unit is Gi. (default 1)
-      --proxysql.replicas int                                        (default 1)
+      --proxysql.cpu float                                          Proxysql CPU cores. (default 1)
+      --proxysql.memory float                                       Proxysql Memory, the unit is Gi. (default 1)
+      --proxysql.replicas int                                       The number of replicas for Proxysql. (default 1)
       --replicas int                                                The number of replicas. Value range [1, 5]. (default 1)
       --storage float                                               Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --tenancy string                                              Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")

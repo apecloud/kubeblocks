@@ -50,6 +50,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -425,6 +426,11 @@ var _ = Describe("Component Controller", func() {
 				Status: corev1.ConditionTrue,
 			}}
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
+			pods[i].Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:  kbagent.ContainerName,
+				Ready: true,
+			}}
+			Expect(testCtx.Cli.Status().Update(testCtx.Ctx, pods[i])).Should(Succeed())
 		}
 		Expect(testapps.ChangeObjStatus(&testCtx, &itsList.Items[0], func() {
 			testk8s.MockInstanceSetReady(&itsList.Items[0], pods...)

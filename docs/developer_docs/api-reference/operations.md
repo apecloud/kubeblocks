@@ -610,34 +610,6 @@ Parameters match the schema specified in the <code>actionset.spec.parametersSche
 </tr>
 </tbody>
 </table>
-<h3 id="operations.kubeblocks.io/v1alpha1.BackupRefSpec">BackupRefSpec
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ref</code><br/>
-<em>
-<a href="#operations.kubeblocks.io/v1alpha1.RefNamespaceName">
-RefNamespaceName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to a reference backup that needs to be restored.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.CompletionProbe">CompletionProbe
 </h3>
 <p>
@@ -1079,6 +1051,84 @@ in each OpsService definition.</p>
 <td><p>FailurePolicyIgnore means that an error will be ignored but logged.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.FromBackup">FromBackup
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.ScaleOut">ScaleOut</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the Backup name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the namespace of the Backup namespace.
+If not specified, the namespace of the OpsRequest will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restoreEnv</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines container environment variables for the restore process.
+merged with the ones specified in the Backup and ActionSet resources.</p>
+<p>Merge priority: Restore env &gt; Backup env &gt; ActionSet env.</p>
+<p>Purpose: Some databases require different configurations when being restored as a standby
+compared to being restored as a primary.
+For example, when restoring MySQL as a replica, you need to set <code>skip_slave_start=&quot;ON&quot;</code> for 5.7
+or <code>skip_replica_start=&quot;ON&quot;</code> for 8.0.
+Allowing environment variables to be passed in makes it more convenient to control these behavioral differences
+during the restore process.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restorePointInTime</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the point in time to which the restore should be performed.
+Supported time formats:</p>
+<ul>
+<li>RFC3339 format, e.g. &ldquo;2023-11-25T18:52:53Z&rdquo;</li>
+<li>A human-readable date-time format, e.g. &ldquo;Jul 25,2023 18:52:53 UTC+0800&rdquo;</li>
+</ul>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling
 </h3>
@@ -3352,48 +3402,6 @@ or &lsquo;All&rsquo; (select all pods that match the podSelector).</p>
 </tr>
 </tbody>
 </table>
-<h3 id="operations.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>time</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
-Kubernetes meta/v1.Time
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the specific time point for restoration, with UTC as the time zone.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ref</code><br/>
-<em>
-<a href="#operations.kubeblocks.io/v1alpha1.RefNamespaceName">
-RefNamespaceName
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to a reference source cluster that needs to be restored.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.PreCheckResult">PreCheckResult
 </h3>
 <p>
@@ -3770,47 +3778,6 @@ This field is used to override or set the values of parameters without modifying
 </tr>
 </tbody>
 </table>
-<h3 id="operations.kubeblocks.io/v1alpha1.RefNamespaceName">RefNamespaceName
-</h3>
-<p>
-(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.BackupRefSpec">BackupRefSpec</a>, <a href="#operations.kubeblocks.io/v1alpha1.PointInTimeRefSpec">PointInTimeRefSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the specific name of the resource.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Refers to the specific namespace of the resource.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.ReplicaChanger">ReplicaChanger
 </h3>
 <p>
@@ -4078,6 +4045,22 @@ ReplicaChanger
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>fromBackup</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.FromBackup">
+FromBackup
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FromBackup specifies the configuration for creating new instances from an existing backup.
+This is only effective for non-sharding components.
+When specified, new instances will be created using data from the specified backup.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>ReplicaChanger</code><br/>

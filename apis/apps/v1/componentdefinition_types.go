@@ -1720,21 +1720,20 @@ type ComponentLifecycleActions struct {
 //     to access context information such as details about pods, components, the overall cluster state,
 //     or database connection credentials.
 //     These variables provide a dynamic and context-aware mechanism for script execution.
-//   - HTTPAction: Performs an HTTP request.
-//     For HTTP requests, the predefined environment variables will be carried over to the request headers.
-//   - GRPCAction: Performs a gRPC calls.
+//   - HTTPAction: Performs a single HTTP(S) request.
+//   - GRPCAction: Issues a unary gRPC call to a target service.
 //     This allows developers to implement Actions using plugins written in programming language like Go,
 //     providing greater flexibility and extensibility.
 //
-// An action is considered successful on returning 0, or HTTP 200 for status HTTP(s) Actions.
+// An action is considered successful on returning 0, or HTTP 2xx for status HTTP actions.
 // Any other return value or HTTP status codes indicate failure,
 // and the action may be retried based on the configured retry policy.
 //
 //   - If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
 //   - If an action produces any data as output, it should be written to stdout,
-//     or included in the HTTP response payload for HTTP(s) actions.
+//     or included in the HTTP response payload for HTTP actions.
 //   - If an action encounters any errors, error messages should be written to stderr,
-//     or detailed in the HTTP response with the appropriate non-200 status code.
+//     or detailed in the HTTP response with the appropriate non-2xx status code.
 type Action struct {
 	// Defines the command to run.
 	//
@@ -1750,7 +1749,7 @@ type Action struct {
 	// +optional
 	HTTP *HTTPAction `json:"http,omitempty"`
 
-	// Defines the gRPC request to perform.
+	// Defines the gRPC call to issue.
 	//
 	// This field cannot be updated.
 	//
@@ -1903,16 +1902,28 @@ type ExecAction struct {
 	Container string `json:"container,omitempty"`
 }
 
-// HTTPAction describes an Action that performs an HTTP request.
+// HTTPAction defines an action that performs a single HTTP(S) request.
+//
+// Behavior & templating:
+//   - The request body (`Body`) supports Go text/template syntax. It is rendered with predefined variables
+//     before the request is sent.
+//   - Custom headers (`Headers`) can be specified. Each header value can also use Go text/template
+//     syntax and will be rendered with the same predefined variables.
+//   - Not intended for streaming or large data-transfer workflows (e.g., dataLoad, dataDump).
+//     Designed for one-shot request/response scenarios.
+//
+// Success:
+//   - Any HTTP 2xx status code is considered success by default.
+//   - Non-2xx status codes are treated as failures.
 type HTTPAction struct {
-	// The port to access on the host. Can be a number or a name.
-	// If a name is given, it will be looked up in the container's ports.
+	// The port to access on the host.
+	// It may be a numeric string (e.g., "8080") or a named port defined in the container spec.
 	//
 	// +kubebuilder:validation:Required
 	Port string `json:"port"`
 
-	// The name of the host to connect to.
-	// If not specified, the localhost (127.0.0.1) will be used.
+	// The target host to connect to.
+	// Defaults to "127.0.0.1" if not specified.
 	//
 	// +optional
 	Host string `json:"host,omitempty"`
@@ -1925,7 +1936,7 @@ type HTTPAction struct {
 	// +optional
 	Scheme string `json:"scheme,omitempty"`
 
-	// The path to access on the HTTP server.
+	// The path to request on the HTTP server.
 	//
 	// +optional
 	Path string `json:"path,omitempty"`
@@ -1938,58 +1949,78 @@ type HTTPAction struct {
 	// +optional
 	Method string `json:"method,omitempty"`
 
-	// A string to use as the body of the HTTP request.
-	//
-	// +optional
-	Body string `json:"body,omitempty"`
-
 	// Custom headers to set in the request.
+	// Header values may use Go text/template syntax, rendered with predefined variables.
 	//
 	// +optional
 	Headers []HTTPHeader `json:"headers,omitempty"`
 
+	// Optional HTTP request body.
+	//
+	// Supports Go text/template syntax; rendered with predefined variables before sending.
+	//
+	// +optional
+	Body string `json:"body,omitempty"`
+
 	// TODO: HTTPS
 }
 
-// HTTPHeader defines a single HTTP header.
+// HTTPHeader represents a single HTTP header key/value pair.
 type HTTPHeader struct {
-	// The name of the header field.
+	// Name of the header field.
 	Name string `json:"name"`
 
-	// The value of the header field.
+	// Value of the header field.
 	Value string `json:"value"`
 }
 
-// GRPCAction describes an Action that performs a gRPC request.
+// GRPCAction describes an action that issues a unary gRPC call to a target service.
+//
+// Reflection & templating:
+//   - This implementation uses gRPC Server Reflection to discover service/method schemas at runtime.
+//     The target service MUST enable reflection. See: https://grpc.io/docs/guides/reflection/.
+//   - Request message field values in `Request` support Go text/template syntax and will be rendered
+//     with predefined action variables before marshaling into the request message.
+//   - Not intended for streaming or large data-transfer operations (e.g., dataLoad, dataDump).
+//     Only unary (non-streaming) RPCs are supported.
+//
+// Success & output:
+//   - After invocation, the `Status` field in `Response` (if set) is inspected; a non-empty value
+//     indicates failure.
+//   - The `Message` field in `Response` (if set) is written to stdout if the invocation succeeds,
+//     or to stderr if it fails.
 type GRPCAction struct {
-	// The port to access on the host. Can be a number or a name.
-	// If a name is given, it will be looked up in the container's ports.
+	// The port to access on the host.
+	// It may be a numeric string (e.g., "50051") or a named port defined in the container spec.
 	//
 	// +kubebuilder:validation:Required
 	Port string `json:"port"`
 
-	// The name of the host to connect to.
-	// If not specified, the localhost (127.0.0.1) will be used.
+	// The target host to connect to.
+	// Defaults to "127.0.0.1" if not specified.
 	//
 	// +optional
 	Host string `json:"host,omitempty"`
 
-	// The fully qualified name of the service to call.
+	// Fully-qualified name of the gRPC service to call.
 	//
 	// +kubebuilder:validation:Required
 	Service string `json:"service"`
 
-	// The name of the method to call.
+	// Name of the method to invoke on the gRPC service.
 	//
 	// +kubebuilder:validation:Required
 	Method string `json:"method"`
 
-	// The request schema for the RPC method.
+	// Request payload for the gRPC method.
+	//
+	// Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
+	// Templates are rendered with predefined action variables before the request is sent.
 	//
 	// +optional
 	Request GRPCRequest `json:"request,omitempty"`
 
-	// The response schema for the RPC method.
+	// Required response schema for the gRPC method.
 	//
 	// +optional
 	Response GRPCResponse `json:"response,omitempty"`
@@ -1997,15 +2028,19 @@ type GRPCAction struct {
 	// TODO: TLS
 }
 
+// GRPCRequest is a map of proto field names to their string values.
 type GRPCRequest map[string]string
 
+// GRPCResponse defines which fields in the gRPC response should be treated as status or output.
 type GRPCResponse struct {
-	// The response status of the RPC.
+	// Name of the string field in the response that carries status information.
+	// If non-empty, the action fails.
 	//
 	// +optional
 	Status string `json:"status,omitempty"`
 
-	// The response message for the RPC.
+	// Name of the field in the response whose value should be output.
+	// Printed to stdout on success, or stderr on failure.
 	//
 	// +optional
 	Message string `json:"message,omitempty"`

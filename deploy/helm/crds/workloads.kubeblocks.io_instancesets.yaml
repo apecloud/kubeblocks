@@ -294,41 +294,51 @@ spec:
                           type: object
                         grpc:
                           description: |-
-                            Defines the gRPC request to perform.
+                            Defines the gRPC call to issue.
 
 
                             This field cannot be updated.
                           properties:
                             host:
                               description: |-
-                                The name of the host to connect to.
-                                If not specified, the localhost (127.0.0.1) will be used.
+                                The target host to connect to.
+                                Defaults to "127.0.0.1" if not specified.
                               type: string
                             method:
-                              description: The name of the method to call.
+                              description: Name of the method to invoke on the gRPC
+                                service.
                               type: string
                             port:
                               description: |-
-                                The port to access on the host. Can be a number or a name.
-                                If a name is given, it will be looked up in the container's ports.
+                                The port to access on the host.
+                                It may be a numeric string (e.g., "50051") or a named port defined in the container spec.
                               type: string
                             request:
                               additionalProperties:
                                 type: string
-                              description: The request schema for the RPC method.
+                              description: |-
+                                Request payload for the gRPC method.
+
+
+                                Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
+                                Templates are rendered with predefined action variables before the request is sent.
                               type: object
                             response:
-                              description: The response schema for the RPC method.
+                              description: Required response schema for the gRPC method.
                               properties:
                                 message:
-                                  description: The response message for the RPC.
+                                  description: |-
+                                    Name of the field in the response whose value should be output.
+                                    Printed to stdout on success, or stderr on failure.
                                   type: string
                                 status:
-                                  description: The response status of the RPC.
+                                  description: |-
+                                    Name of the string field in the response that carries status information.
+                                    If non-empty, the action fails.
                                   type: string
                               type: object
                             service:
-                              description: The fully qualified name of the service
+                              description: Fully-qualified name of the gRPC service
                                 to call.
                               type: string
                           required:
@@ -344,19 +354,25 @@ spec:
                             This field cannot be updated.
                           properties:
                             body:
-                              description: A string to use as the body of the HTTP
-                                request.
+                              description: |-
+                                Optional HTTP request body.
+
+
+                                Supports Go text/template syntax; rendered with predefined variables before sending.
                               type: string
                             headers:
-                              description: Custom headers to set in the request.
+                              description: |-
+                                Custom headers to set in the request.
+                                Header values may use Go text/template syntax, rendered with predefined variables.
                               items:
-                                description: HTTPHeader defines a single HTTP header.
+                                description: HTTPHeader represents a single HTTP header
+                                  key/value pair.
                                 properties:
                                   name:
-                                    description: The name of the header field.
+                                    description: Name of the header field.
                                     type: string
                                   value:
-                                    description: The value of the header field.
+                                    description: Value of the header field.
                                     type: string
                                 required:
                                 - name
@@ -365,8 +381,8 @@ spec:
                               type: array
                             host:
                               description: |-
-                                The name of the host to connect to.
-                                If not specified, the localhost (127.0.0.1) will be used.
+                                The target host to connect to.
+                                Defaults to "127.0.0.1" if not specified.
                               type: string
                             method:
                               default: GET
@@ -382,12 +398,12 @@ spec:
                               - PATCH
                               type: string
                             path:
-                              description: The path to access on the HTTP server.
+                              description: The path to request on the HTTP server.
                               type: string
                             port:
                               description: |-
-                                The port to access on the host. Can be a number or a name.
-                                If a name is given, it will be looked up in the container's ports.
+                                The port to access on the host.
+                                It may be a numeric string (e.g., "8080") or a named port defined in the container spec.
                               type: string
                             scheme:
                               default: HTTP
@@ -2685,42 +2701,52 @@ spec:
                         type: object
                       grpc:
                         description: |-
-                          Defines the gRPC request to perform.
+                          Defines the gRPC call to issue.
 
 
                           This field cannot be updated.
                         properties:
                           host:
                             description: |-
-                              The name of the host to connect to.
-                              If not specified, the localhost (127.0.0.1) will be used.
+                              The target host to connect to.
+                              Defaults to "127.0.0.1" if not specified.
                             type: string
                           method:
-                            description: The name of the method to call.
+                            description: Name of the method to invoke on the gRPC
+                              service.
                             type: string
                           port:
                             description: |-
-                              The port to access on the host. Can be a number or a name.
-                              If a name is given, it will be looked up in the container's ports.
+                              The port to access on the host.
+                              It may be a numeric string (e.g., "50051") or a named port defined in the container spec.
                             type: string
                           request:
                             additionalProperties:
                               type: string
-                            description: The request schema for the RPC method.
+                            description: |-
+                              Request payload for the gRPC method.
+
+
+                              Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
+                              Templates are rendered with predefined action variables before the request is sent.
                             type: object
                           response:
-                            description: The response schema for the RPC method.
+                            description: Required response schema for the gRPC method.
                             properties:
                               message:
-                                description: The response message for the RPC.
+                                description: |-
+                                  Name of the field in the response whose value should be output.
+                                  Printed to stdout on success, or stderr on failure.
                                 type: string
                               status:
-                                description: The response status of the RPC.
+                                description: |-
+                                  Name of the string field in the response that carries status information.
+                                  If non-empty, the action fails.
                                 type: string
                             type: object
                           service:
-                            description: The fully qualified name of the service to
-                              call.
+                            description: Fully-qualified name of the gRPC service
+                              to call.
                             type: string
                         required:
                         - method
@@ -2735,18 +2761,25 @@ spec:
                           This field cannot be updated.
                         properties:
                           body:
-                            description: A string to use as the body of the HTTP request.
+                            description: |-
+                              Optional HTTP request body.
+
+
+                              Supports Go text/template syntax; rendered with predefined variables before sending.
                             type: string
                           headers:
-                            description: Custom headers to set in the request.
+                            description: |-
+                              Custom headers to set in the request.
+                              Header values may use Go text/template syntax, rendered with predefined variables.
                             items:
-                              description: HTTPHeader defines a single HTTP header.
+                              description: HTTPHeader represents a single HTTP header
+                                key/value pair.
                               properties:
                                 name:
-                                  description: The name of the header field.
+                                  description: Name of the header field.
                                   type: string
                                 value:
-                                  description: The value of the header field.
+                                  description: Value of the header field.
                                   type: string
                               required:
                               - name
@@ -2755,8 +2788,8 @@ spec:
                             type: array
                           host:
                             description: |-
-                              The name of the host to connect to.
-                              If not specified, the localhost (127.0.0.1) will be used.
+                              The target host to connect to.
+                              Defaults to "127.0.0.1" if not specified.
                             type: string
                           method:
                             default: GET
@@ -2772,12 +2805,12 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to access on the HTTP server.
+                            description: The path to request on the HTTP server.
                             type: string
                           port:
                             description: |-
-                              The port to access on the host. Can be a number or a name.
-                              If a name is given, it will be looked up in the container's ports.
+                              The port to access on the host.
+                              It may be a numeric string (e.g., "8080") or a named port defined in the container spec.
                             type: string
                           scheme:
                             default: HTTP

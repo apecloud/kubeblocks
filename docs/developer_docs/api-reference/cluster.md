@@ -2314,21 +2314,20 @@ A set of predefined environment variables are available and can be leveraged wit
 to access context information such as details about pods, components, the overall cluster state,
 or database connection credentials.
 These variables provide a dynamic and context-aware mechanism for script execution.</li>
-<li>HTTPAction: Performs an HTTP request.
-For HTTP requests, the predefined environment variables will be carried over to the request headers.</li>
-<li>GRPCAction: Performs a gRPC calls.
+<li>HTTPAction: Performs a single HTTP(S) request.</li>
+<li>GRPCAction: Issues a unary gRPC call to a target service.
 This allows developers to implement Actions using plugins written in programming language like Go,
 providing greater flexibility and extensibility.</li>
 </ul>
-<p>An action is considered successful on returning 0, or HTTP 200 for status HTTP(s) Actions.
+<p>An action is considered successful on returning 0, or HTTP 2xx for status HTTP actions.
 Any other return value or HTTP status codes indicate failure,
 and the action may be retried based on the configured retry policy.</p>
 <ul>
 <li>If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.</li>
 <li>If an action produces any data as output, it should be written to stdout,
-or included in the HTTP response payload for HTTP(s) actions.</li>
+or included in the HTTP response payload for HTTP actions.</li>
 <li>If an action encounters any errors, error messages should be written to stderr,
-or detailed in the HTTP response with the appropriate non-200 status code.</li>
+or detailed in the HTTP response with the appropriate non-2xx status code.</li>
 </ul>
 </div>
 <table>
@@ -2380,7 +2379,7 @@ GRPCAction
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the gRPC request to perform.</p>
+<p>Defines the gRPC call to issue.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -7828,7 +7827,19 @@ If empty, Prometheus uses the default value <code>http</code>.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
 </p>
 <div>
-<p>GRPCAction describes an Action that performs a gRPC request.</p>
+<p>GRPCAction describes an action that issues a unary gRPC call to a target service.</p>
+<p>Reflection &amp; templating:
+  - This implementation uses gRPC Server Reflection to discover service/method schemas at runtime.
+    The target service MUST enable reflection. See: <a href="https://grpc.io/docs/guides/reflection/">https://grpc.io/docs/guides/reflection/</a>.
+  - Request message field values in <code>Request</code> support Go text/template syntax and will be rendered
+    with predefined action variables before marshaling into the request message.
+  - Not intended for streaming or large data-transfer operations (e.g., dataLoad, dataDump).
+Only unary (non-streaming) RPCs are supported.</p>
+<p>Success &amp; output:
+  - After invocation, the <code>Status</code> field in <code>Response</code> (if set) is inspected; a non-empty value
+    indicates failure.
+  - The <code>Message</code> field in <code>Response</code> (if set) is written to stdout if the invocation succeeds,
+or to stderr if it fails.</p>
 </div>
 <table>
 <thead>
@@ -7846,8 +7857,8 @@ string
 </em>
 </td>
 <td>
-<p>The port to access on the host. Can be a number or a name.
-If a name is given, it will be looked up in the container&rsquo;s ports.</p>
+<p>The port to access on the host.
+It may be a numeric string (e.g., &ldquo;50051&rdquo;) or a named port defined in the container spec.</p>
 </td>
 </tr>
 <tr>
@@ -7859,8 +7870,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The name of the host to connect to.
-If not specified, the localhost (127.0.0.1) will be used.</p>
+<p>The target host to connect to.
+Defaults to &ldquo;127.0.0.1&rdquo; if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -7871,7 +7882,7 @@ string
 </em>
 </td>
 <td>
-<p>The fully qualified name of the service to call.</p>
+<p>Fully-qualified name of the gRPC service to call.</p>
 </td>
 </tr>
 <tr>
@@ -7882,7 +7893,7 @@ string
 </em>
 </td>
 <td>
-<p>The name of the method to call.</p>
+<p>Name of the method to invoke on the gRPC service.</p>
 </td>
 </tr>
 <tr>
@@ -7896,7 +7907,9 @@ GRPCRequest
 </td>
 <td>
 <em>(Optional)</em>
-<p>The request schema for the RPC method.</p>
+<p>Request payload for the gRPC method.</p>
+<p>Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
+Templates are rendered with predefined action variables before the request is sent.</p>
 </td>
 </tr>
 <tr>
@@ -7910,7 +7923,7 @@ GRPCResponse
 </td>
 <td>
 <em>(Optional)</em>
-<p>The response schema for the RPC method.</p>
+<p>Required response schema for the gRPC method.</p>
 </td>
 </tr>
 </tbody>
@@ -7921,6 +7934,7 @@ GRPCResponse
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.GRPCAction">GRPCAction</a>)
 </p>
 <div>
+<p>GRPCRequest is a map of proto field names to their string values.</p>
 </div>
 <h3 id="apps.kubeblocks.io/v1.GRPCResponse">GRPCResponse
 </h3>
@@ -7928,6 +7942,7 @@ GRPCResponse
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.GRPCAction">GRPCAction</a>)
 </p>
 <div>
+<p>GRPCResponse defines which fields in the gRPC response should be treated as status or output.</p>
 </div>
 <table>
 <thead>
@@ -7946,7 +7961,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The response status of the RPC.</p>
+<p>Name of the string field in the response that carries status information.
+If non-empty, the action fails.</p>
 </td>
 </tr>
 <tr>
@@ -7958,7 +7974,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The response message for the RPC.</p>
+<p>Name of the field in the response whose value should be output.
+Printed to stdout on success, or stderr on failure.</p>
 </td>
 </tr>
 </tbody>
@@ -7969,7 +7986,17 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
 </p>
 <div>
-<p>HTTPAction describes an Action that performs an HTTP request.</p>
+<p>HTTPAction defines an action that performs a single HTTP(S) request.</p>
+<p>Behavior &amp; templating:
+  - The request body (<code>Body</code>) supports Go text/template syntax. It is rendered with predefined variables
+    before the request is sent.
+  - Custom headers (<code>Headers</code>) can be specified. Each header value can also use Go text/template
+    syntax and will be rendered with the same predefined variables.
+  - Not intended for streaming or large data-transfer workflows (e.g., dataLoad, dataDump).
+Designed for one-shot request/response scenarios.</p>
+<p>Success:
+  - Any HTTP 2xx status code is considered success by default.
+- Non-2xx status codes are treated as failures.</p>
 </div>
 <table>
 <thead>
@@ -7987,8 +8014,8 @@ string
 </em>
 </td>
 <td>
-<p>The port to access on the host. Can be a number or a name.
-If a name is given, it will be looked up in the container&rsquo;s ports.</p>
+<p>The port to access on the host.
+It may be a numeric string (e.g., &ldquo;8080&rdquo;) or a named port defined in the container spec.</p>
 </td>
 </tr>
 <tr>
@@ -8000,8 +8027,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The name of the host to connect to.
-If not specified, the localhost (127.0.0.1) will be used.</p>
+<p>The target host to connect to.
+Defaults to &ldquo;127.0.0.1&rdquo; if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -8026,7 +8053,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The path to access on the HTTP server.</p>
+<p>The path to request on the HTTP server.</p>
 </td>
 </tr>
 <tr>
@@ -8044,18 +8071,6 @@ Defaults to &ldquo;GET&rdquo;.</p>
 </tr>
 <tr>
 <td>
-<code>body</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>A string to use as the body of the HTTP request.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>headers</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.HTTPHeader">
@@ -8065,7 +8080,21 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Custom headers to set in the request.</p>
+<p>Custom headers to set in the request.
+Header values may use Go text/template syntax, rendered with predefined variables.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>body</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Optional HTTP request body.</p>
+<p>Supports Go text/template syntax; rendered with predefined variables before sending.</p>
 </td>
 </tr>
 </tbody>
@@ -8076,7 +8105,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.HTTPAction">HTTPAction</a>)
 </p>
 <div>
-<p>HTTPHeader defines a single HTTP header.</p>
+<p>HTTPHeader represents a single HTTP header key/value pair.</p>
 </div>
 <table>
 <thead>
@@ -8094,7 +8123,7 @@ string
 </em>
 </td>
 <td>
-<p>The name of the header field.</p>
+<p>Name of the header field.</p>
 </td>
 </tr>
 <tr>
@@ -8105,7 +8134,7 @@ string
 </em>
 </td>
 <td>
-<p>The value of the header field.</p>
+<p>Value of the header field.</p>
 </td>
 </tr>
 </tbody>

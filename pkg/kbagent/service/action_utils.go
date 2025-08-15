@@ -30,8 +30,10 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -234,15 +236,21 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	// TODO: close the client
 
 	method, url := httpActionMethodNURL(action)
-	// TODO: render the body
-	req, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(action.Body))
-	if err != nil {
-		return err
+	body, err1 := renderTemplateData("http body", parameters, action.Body)
+	if err1 != nil {
+		return err1
+	}
+	req, err2 := http.NewRequestWithContext(ctx, method, url, strings.NewReader(body))
+	if err2 != nil {
+		return err2
 	}
 
-	// TODO: render the header values
 	for _, h := range action.Headers {
-		req.Header.Add(h.Name, h.Value)
+		val, err3 := renderTemplateData("http header", parameters, h.Value)
+		if err3 != nil {
+			return err3
+		}
+		req.Header.Add(h.Name, val)
 	}
 
 	go func() {
@@ -257,9 +265,9 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 			}
 		}
 
-		rsp, err1 := cli.Do(req)
-		if err1 != nil {
-			handleError(err1, "failed to issue http request")
+		rsp, err4 := cli.Do(req)
+		if err4 != nil {
+			handleError(err4, "failed to issue http request")
 			return
 		}
 		defer safeClose(rsp.Body)
@@ -272,16 +280,16 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 		//	return nil, fmt.Errorf("unexpected http status code: %s", rsp.Status)
 		// }
 
-		out, err2 := io.ReadAll(rsp.Body)
-		if err2 != nil {
-			handleError(err2, "failed to read http response")
+		out, err5 := io.ReadAll(rsp.Body)
+		if err5 != nil {
+			handleError(err5, "failed to read http response")
 			return
 		}
 
 		if len(out) > 0 {
-			_, err3 := stdoutWriter.Write(out)
-			if err3 != nil {
-				handleError(err3, "failed to write http response")
+			_, err6 := stdoutWriter.Write(out)
+			if err6 != nil {
+				handleError(err6, "failed to write http response")
 				return
 			}
 		}
@@ -333,9 +341,12 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 	}
 
 	reqMsg := dynamicpb.NewMessage(methodDesc.Input())
-	// TODO: render the request values
 	for k, v := range action.Request {
-		if err = setField(reqMsg, k, v); err != nil {
+		vv, err1 := renderTemplateData("grpc", parameters, v)
+		if err1 != nil {
+			return err1
+		}
+		if err = setField(reqMsg, k, vv); err != nil {
 			return err
 		}
 	}
@@ -520,3 +531,29 @@ func getField(msg *dynamicpb.Message, fieldName string) (string, error) {
 func safeClose(c io.Closer) { _ = c.Close() }
 
 func safeCloseF(c func() error) { _ = c() }
+
+func renderTemplateData(action string, parameters map[string]string, data string) (string, error) {
+	tpl := template.New(action).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
+	ptpl, err := tpl.Parse(data)
+	if err != nil {
+		return "", err
+	}
+	var buf strings.Builder
+	if err = ptpl.Execute(&buf, mergeEnvWith(parameters)); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func mergeEnvWith(parameters map[string]string) map[string]string {
+	if parameters == nil {
+		parameters = make(map[string]string)
+	}
+	for _, e := range os.Environ() {
+		kv := strings.Split(e, "=")
+		if _, ok := parameters[kv[0]]; !ok {
+			parameters[kv[0]] = kv[1]
+		}
+	}
+	return parameters
+}

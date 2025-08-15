@@ -448,7 +448,7 @@ func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycle
 	}
 	hasActionDefined := func(actions []*appsv1.Action) bool {
 		for _, action := range actions {
-			if action == nil || action.Exec == nil {
+			if !action.Defined() {
 				return false
 			}
 		}

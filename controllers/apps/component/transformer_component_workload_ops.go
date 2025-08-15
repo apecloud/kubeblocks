@@ -305,8 +305,8 @@ func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.P
 		return nil, err
 	}
 	if len(pods) > 0 {
-		if len(dataDump.Exec.TargetPodSelector) == 0 {
-			dataDump.Exec.TargetPodSelector = appsv1.AnyReplica
+		if len(dataDump.TargetPodSelector) == 0 && (dataDump.Exec == nil || len(dataDump.Exec.TargetPodSelector) == 0) {
+			dataDump.TargetPodSelector = appsv1.AnyReplica
 		}
 		pods, err = lifecycle.SelectTargetPods(pods, nil, dataDump)
 		if err != nil {

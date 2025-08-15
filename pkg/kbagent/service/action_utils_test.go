@@ -31,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-var _ = Describe("command", func() {
+var _ = Describe("action utils", func() {
 	wait := func(errChan chan error) {
 		Expect(errChan).ShouldNot(BeNil())
 		err, ok := <-errChan
@@ -46,23 +46,27 @@ var _ = Describe("command", func() {
 		return err
 	}
 
-	Context("runCommandX", func() {
+	Context("exec - x", func() {
 		It("simple", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n simple"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n simple"},
+				},
 			}
-			execErrorChan, err := runCommandX(ctx, action, nil, nil, nil, nil, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
 		})
 
 		It("stdout", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n stdout"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n stdout"},
+				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := runCommandX(ctx, action, nil, nil, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -70,12 +74,14 @@ var _ = Describe("command", func() {
 		})
 
 		It("stderr", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n stderr >&2"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n stderr >&2"},
+				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := runCommandX(ctx, action, nil, nil, nil, stdoutBuf, stderrBuf)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, stderrBuf)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -84,12 +90,14 @@ var _ = Describe("command", func() {
 		})
 
 		It("stdin", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "xargs echo -n"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "xargs echo -n"},
+				},
 			}
 			stdinBuf := bytes.NewBuffer([]byte{'s', 't', 'd', 'i', 'n'})
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := runCommandX(ctx, action, nil, nil, stdinBuf, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, stdinBuf, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -97,15 +105,17 @@ var _ = Describe("command", func() {
 		})
 
 		It("parameters", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n $PARAM"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n $PARAM"},
+				},
 			}
 			parameters := map[string]string{
 				"PARAM":   "parameters",
 				"useless": "useless",
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := runCommandX(ctx, action, parameters, nil, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -113,11 +123,13 @@ var _ = Describe("command", func() {
 		})
 
 		It("timeout", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 60"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "sleep 60"},
+				},
 			}
 			timeout := int32(1)
-			execErrorChan, err := runCommandX(ctx, action, nil, &timeout, nil, nil, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, &timeout, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -126,12 +138,14 @@ var _ = Describe("command", func() {
 		})
 
 		It("timeout and stdout", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 60 && echo -n timeout"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "sleep 60 && echo -n timeout"},
+				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			timeout := int32(1)
-			execErrorChan, err := runCommandX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -141,12 +155,14 @@ var _ = Describe("command", func() {
 		})
 
 		It("stdout and timeout", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n timeout && sleep 60"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n timeout && sleep 60"},
+				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			timeout := int32(1)
-			execErrorChan, err := runCommandX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -156,10 +172,12 @@ var _ = Describe("command", func() {
 		})
 
 		It("fail", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "command-not-exist"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "command-not-exist"},
+				},
 			}
-			execErrorChan, err := runCommandX(ctx, action, nil, nil, nil, nil, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -169,11 +187,13 @@ var _ = Describe("command", func() {
 		})
 
 		It("fail with stderr writer", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "command-not-found"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "command-not-found"},
+				},
 			}
 			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := runCommandX(ctx, action, nil, nil, nil, nil, stderrBuf)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stderrBuf)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -184,12 +204,14 @@ var _ = Describe("command", func() {
 		})
 	})
 
-	Context("runCommandNonBlocking", func() {
+	Context("exec - non-blocking", func() {
 		It("ok", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n ok"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n ok"},
+				},
 			}
-			resultChan, err := runCommandNonBlocking(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -199,13 +221,15 @@ var _ = Describe("command", func() {
 		})
 
 		It("parameters", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n $PARAM"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n $PARAM"},
+				},
 			}
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			resultChan, err := runCommandNonBlocking(ctx, action, parameters, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -215,10 +239,12 @@ var _ = Describe("command", func() {
 		})
 
 		It("fail", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "command-not-found"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "command-not-found"},
+				},
 			}
-			resultChan, err := runCommandNonBlocking(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -230,11 +256,13 @@ var _ = Describe("command", func() {
 		})
 
 		It("timeout", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 60"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "sleep 60"},
+				},
 			}
 			timeout := int32(1)
-			resultChan, err := runCommandNonBlocking(ctx, action, nil, &timeout)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, &timeout)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -245,33 +273,39 @@ var _ = Describe("command", func() {
 		})
 	})
 
-	Context("runCommand", func() {
+	Context("exec - blocking", func() {
 		It("ok", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n ok"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n ok"},
+				},
 			}
-			output, err := runCommand(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("ok")))
 		})
 
 		It("parameters", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "echo -n $PARAM"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "echo -n $PARAM"},
+				},
 			}
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			output, err := runCommand(ctx, action, parameters, nil)
+			output, err := blockingCallAction(ctx, action, parameters, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("parameters")))
 		})
 
 		It("fail", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "command-not-found"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "command-not-found"},
+				},
 			}
-			output, err := runCommand(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("command not found"))
@@ -279,14 +313,18 @@ var _ = Describe("command", func() {
 		})
 
 		It("timeout", func() {
-			action := &proto.ExecAction{
-				Commands: []string{"/bin/bash", "-c", "sleep 60"},
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", "sleep 60"},
+				},
 			}
 			timeout := int32(1)
-			output, err := runCommand(ctx, action, nil, &timeout)
+			output, err := blockingCallAction(ctx, action, nil, &timeout)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 			Expect(output).Should(BeNil())
 		})
 	})
+
+	// TODO: http and grpc
 })

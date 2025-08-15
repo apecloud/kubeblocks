@@ -332,16 +332,45 @@ func probeReportPeriodSeconds(periodSeconds int32) int32 {
 }
 
 func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
-	if action == nil || action.Exec == nil {
+	if !action.Defined() {
 		return nil
 	}
 	a := &proto.Action{
-		Name: name,
-		Exec: &proto.ExecAction{
+		Name:           name,
+		TimeoutSeconds: action.TimeoutSeconds,
+	}
+	if action.Exec != nil {
+		a.Exec = &proto.ExecAction{
 			Commands: action.Exec.Command,
 			Args:     action.Exec.Args,
-		},
-		TimeoutSeconds: action.TimeoutSeconds,
+		}
+	}
+	if action.HTTP != nil {
+		a.HTTP = &proto.HTTPAction{
+			Port:    action.HTTP.Port,
+			Host:    action.HTTP.Host,
+			Scheme:  action.HTTP.Scheme,
+			Path:    action.HTTP.Path,
+			Method:  action.HTTP.Method,
+			Body:    action.HTTP.Body,
+			Headers: make([]proto.HTTPHeader, 0),
+		}
+		for _, h := range action.HTTP.Headers {
+			a.HTTP.Headers = append(a.HTTP.Headers, proto.HTTPHeader{Name: h.Name, Value: h.Value})
+		}
+	}
+	if action.GRPC != nil {
+		a.GRPC = &proto.GRPCAction{
+			Port:    action.GRPC.Port,
+			Host:    action.GRPC.Host,
+			Service: action.GRPC.Service,
+			Method:  action.GRPC.Method,
+			Request: action.GRPC.Request,
+			Response: proto.GRPCResponse{
+				Status:  action.GRPC.Response.Status,
+				Message: action.GRPC.Response.Message,
+			},
+		}
 	}
 	if action.RetryPolicy != nil {
 		a.RetryPolicy = &proto.RetryPolicy{
@@ -353,7 +382,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 }
 
 func buildProbe4KBAgent(probe *appsv1.Probe, name, instance string) (*proto.Action, *proto.Probe) {
-	if probe == nil || probe.Exec == nil {
+	if probe == nil || !probe.Defined() {
 		return nil, nil
 	}
 	a := buildAction4KBAgent(&probe.Action, name)
@@ -421,7 +450,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 			synthesizedComp.LifecycleActions.Reconfigure,
 			synthesizedComp.LifecycleActions.AccountProvision,
 		}...)
-		if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
+		if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Defined() {
 			actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 		}
 	}

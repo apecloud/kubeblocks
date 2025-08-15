@@ -298,10 +298,12 @@ func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.C
 				return err
 			}
 		}
-
 	}
 	for _, spec := range cluster.Spec.Shardings {
 		if hScale, ok := hScaleMap[spec.Name]; ok {
+			if hScale.ScaleOut != nil && hScale.ScaleOut.FromBackup != nil {
+				return fmt.Errorf("sharding component %s does not support scaling out from backup", hScale.ComponentName)
+			}
 			// Default values if no limit is found
 			minNum, maxNum := 1, 2048
 			if spec.ShardingDef != "" {

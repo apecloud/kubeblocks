@@ -460,6 +460,12 @@ type HorizontalScaling struct {
 // ScaleOut defines the configuration for a scale-out operation.
 type ScaleOut struct {
 
+	// FromBackup specifies the configuration for creating new instances from an existing backup.
+	// This is only effective for non-sharding components.
+	// When specified, new instances will be created using data from the specified backup.
+	// +optional
+	FromBackup *FromBackup `json:"fromBackup,omitempty"`
+
 	// Modifies the replicas of the component and instance templates.
 	ReplicaChanger `json:",inline"`
 
@@ -502,6 +508,41 @@ type ReplicaChanger struct {
 	// +listMapKey=name
 	// +optional
 	Instances []InstanceReplicasTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+type FromBackup struct {
+	// Specifies the name of the Backup name.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the namespace of the Backup namespace.
+	// If not specified, the namespace of the OpsRequest will be used.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace,omitempty"`
+
+	// Defines container environment variables for the restore process.
+	// merged with the ones specified in the Backup and ActionSet resources.
+	//
+	// Merge priority: Restore env > Backup env > ActionSet env.
+	//
+	// Purpose: Some databases require different configurations when being restored as a standby
+	// compared to being restored as a primary.
+	// For example, when restoring MySQL as a replica, you need to set `skip_slave_start="ON"` for 5.7
+	// or `skip_replica_start="ON"` for 8.0.
+	// Allowing environment variables to be passed in makes it more convenient to control these behavioral differences
+	// during the restore process.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	RestoreEnv []corev1.EnvVar `json:"restoreEnv,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
+	// Specifies the point in time to which the restore should be performed.
+	// Supported time formats:
+	//
+	// - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
+	// - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
+	//
+	RestorePointInTime string `json:"restorePointInTime,omitempty"`
 }
 
 // InstanceReplicasTemplate defines the template for instance replicas.
@@ -762,32 +803,6 @@ type OpsService struct {
 	//
 	// +optional
 	IPFamilyPolicy *corev1.IPFamilyPolicy `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicy"`
-}
-
-type RefNamespaceName struct {
-	// Refers to the specific name of the resource.
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// Refers to the specific namespace of the resource.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-}
-
-type BackupRefSpec struct {
-	// Refers to a reference backup that needs to be restored.
-	// +optional
-	Ref RefNamespaceName `json:"ref,omitempty"`
-}
-
-type PointInTimeRefSpec struct {
-	// Refers to the specific time point for restoration, with UTC as the time zone.
-	// +optional
-	Time *metav1.Time `json:"time,omitempty"`
-
-	// Refers to a reference source cluster that needs to be restored.
-	// +optional
-	Ref RefNamespaceName `json:"ref,omitempty"`
 }
 
 type Backup struct {

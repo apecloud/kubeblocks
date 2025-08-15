@@ -79,6 +79,8 @@ type SynthesizedComponent struct {
 	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
 	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
 	Stop                             *bool
+	EnableInstanceAPI                *bool
+	InstanceAssistantObjects         []corev1.ObjectReference
 }
 
 type SynthesizedFileTemplate struct {

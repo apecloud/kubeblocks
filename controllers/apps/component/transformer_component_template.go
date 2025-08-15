@@ -33,7 +33,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -69,6 +68,10 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 
+	for _, obj := range protoObjs {
+		component.AddInstanceAssistantObject(transCtx.SynthesizeComponent, obj)
+	}
+
 	return t.buildPodVolumes(transCtx)
 }
 
@@ -85,17 +88,17 @@ func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx 
 	dag *graph.DAG, runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range toCreate {
-		graphCli.Create(dag, protoObjs[name], appsutil.InDataContext4G())
+		graphCli.Create(dag, protoObjs[name])
 	}
 	for name := range toDelete {
-		graphCli.Delete(dag, runningObjs[name], appsutil.InDataContext4G())
+		graphCli.Delete(dag, runningObjs[name])
 	}
 	for name := range toUpdate {
 		runningObj, protoObj := runningObjs[name], protoObjs[name]
 		if !reflect.DeepEqual(runningObj.Data, protoObj.Data) ||
 			!reflect.DeepEqual(runningObj.Labels, protoObj.Labels) ||
 			!reflect.DeepEqual(runningObj.Annotations, protoObj.Annotations) {
-			graphCli.Update(dag, runningObj, protoObj, appsutil.InDataContext4G())
+			graphCli.Update(dag, runningObj, protoObj)
 		}
 	}
 }

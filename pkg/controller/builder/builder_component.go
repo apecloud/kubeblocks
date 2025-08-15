@@ -201,3 +201,8 @@ func (builder *ComponentBuilder) SetSidecars(sidecars []appsv1.Sidecar) *Compone
 	builder.get().Spec.Sidecars = sidecars
 	return builder
 }
+
+func (builder *ComponentBuilder) SetEnableInstanceAPI(enable *bool) *ComponentBuilder {
+	builder.get().Spec.EnableInstanceAPI = enable
+	return builder
+}

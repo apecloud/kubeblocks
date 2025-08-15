@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -176,6 +178,72 @@ var _ = Describe("InstanceSet Controller", func() {
 			Expect(k8sClient.Delete(ctx, its)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(its), &workloads.InstanceSet{}, false)).
 				Should(Succeed())
+		})
+
+		// TODO: updatedPods -> updatingPods in updateReconciler
+		PIt("rolling", func() {
+			replicas := int32(3)
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(replicas).
+					SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+						Type: kbappsv1.RollingUpdateStrategyType,
+						RollingUpdate: &workloads.RollingUpdate{
+							Replicas: &intstr.IntOrString{
+								Type:   intstr.Int,
+								IntVal: 1, // one instance at a time
+							},
+						},
+					}).SetPodManagementPolicy(appsv1.ParallelPodManagement)
+			})
+
+			podsKey := []types.NamespacedName{
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-0", itsObj.Name),
+				},
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-1", itsObj.Name),
+				},
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-2", itsObj.Name),
+				},
+			}
+			mockPodReady(podsKey[0].Name, podsKey[1].Name, podsKey[2].Name)
+
+			By("check its ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("update its spec")
+			beforeUpdate := time.Now()
+			time.Sleep(1 * time.Second)
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+			})()).ShouldNot(HaveOccurred())
+
+			for i := replicas; i > 0; i-- {
+				By("wait new pod created")
+				podKey := podsKey[i-1]
+				Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+					g.Expect(pod.CreationTimestamp.After(beforeUpdate)).Should(BeTrue())
+				})).Should(Succeed())
+
+				// mock new pod ready
+				mockPodReady(podKey.Name)
+
+				By(fmt.Sprintf("check its status updated: %s", podKey.Name))
+				Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+					g.Expect(its.Status.UpdatedReplicas).Should(Equal(replicas - i + 1))
+				})).Should(Succeed())
+			}
+
+			By("check its ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
 		})
 	})
 

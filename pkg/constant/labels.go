@@ -41,18 +41,19 @@ const (
 	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"
 	AddonNameLabelKey             = "extensions.kubeblocks.io/addon-name"
 
-	KBAppComponentLabelKey    = "apps.kubeblocks.io/component-name"
-	KBAppShardingNameLabelKey = "apps.kubeblocks.io/sharding-name"
-
+	KBAppShardingNameLabelKey       = "apps.kubeblocks.io/sharding-name"
 	KBAppShardTemplateLabelKey      = "apps.kubeblocks.io/shard-template"
+	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	KBAppInstanceNameLabelKey       = "apps.kubeblocks.io/instance-name"
 	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
+	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
 	PVCNameLabelKey                 = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
-	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
 
-	RoleLabelKey           = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
 	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"
 	KBAppReleasePhaseKey   = "apps.kubeblocks.io/release-phase" // TODO: release or service phase?
+
+	RoleLabelKey = "kubeblocks.io/role"
 )
 
 func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {

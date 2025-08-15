@@ -70,7 +70,8 @@ func (v *valueManager) BuildValueTransformer(key string) core.ValueTransformerFu
 	index := generics.FindFirstFunc(v.paramsDefs, func(paramDef *parametersv1alpha1.ParametersDefinition) bool {
 		return paramDef.Spec.FileName == key
 	})
-	if index < 0 || v.paramsDefs[index].Spec.ParametersSchema == nil {
+	if index < 0 || v.paramsDefs[index].Spec.ParametersSchema == nil ||
+		v.paramsDefs[index].Spec.ParametersSchema.SchemaInJSON == nil {
 		return nil
 	}
 	schema := v.paramsDefs[index].Spec.ParametersSchema.SchemaInJSON
@@ -80,9 +81,7 @@ func (v *valueManager) BuildValueTransformer(key string) core.ValueTransformerFu
 	defaultTransformer := &defaultValueTransformer{
 		openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]),
 	}
-	return func(value string, fieldName string) (any, error) {
-		return defaultTransformer.resolveValueWithType(value, fieldName)
-	}
+	return defaultTransformer.resolveValueWithType
 }
 
 func NewValueManager(paramsDefs []*parametersv1alpha1.ParametersDefinition, configs []parametersv1alpha1.ComponentConfigDescription) *valueManager {

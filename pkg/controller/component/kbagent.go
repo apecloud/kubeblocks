@@ -353,21 +353,23 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 			Path:    action.HTTP.Path,
 			Method:  action.HTTP.Method,
 			Body:    action.HTTP.Body,
-			Headers: make(map[string]string),
+			Headers: make([]proto.HTTPHeader, 0),
 		}
 		for _, h := range action.HTTP.Headers {
-			a.HTTP.Headers[h.Name] = h.Value
+			a.HTTP.Headers = append(a.HTTP.Headers, proto.HTTPHeader{Name: h.Name, Value: h.Value})
 		}
 	}
 	if action.GRPC != nil {
 		a.GRPC = &proto.GRPCAction{
-			Port:     action.GRPC.Port,
-			Host:     action.GRPC.Host,
-			Service:  action.GRPC.Service,
-			Method:   action.GRPC.Method,
-			Messages: action.GRPC.Request,
-			Status:   action.GRPC.Response.Status,
-			Output:   action.GRPC.Response.Message,
+			Port:    action.GRPC.Port,
+			Host:    action.GRPC.Host,
+			Service: action.GRPC.Service,
+			Method:  action.GRPC.Method,
+			Request: action.GRPC.Request,
+			Response: proto.GRPCResponse{
+				Status:  action.GRPC.Response.Status,
+				Message: action.GRPC.Response.Message,
+			},
 		}
 	}
 	if action.RetryPolicy != nil {

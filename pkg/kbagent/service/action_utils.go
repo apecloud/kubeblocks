@@ -51,6 +51,10 @@ const (
 	defaultConnectTimeout    = 5 * time.Second
 	defaultActionCallTimeout = 30 * time.Second
 	maxActionCallTimeout     = 60 * time.Second
+	defaultHTTPHost          = "127.0.0.1"
+	defaultHTTPScheme        = "HTTP"
+	defaultHTTPMethod        = "GET"
+	defaultHTTPPath          = "/"
 )
 
 func gather[T interface{}](ch chan T) *T {
@@ -230,16 +234,15 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	// TODO: close the client
 
 	method, url := httpActionMethodNURL(action)
+	// TODO: render the body
 	req, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(action.Body))
 	if err != nil {
 		return err
 	}
 
-	for k, v := range action.Headers {
-		req.Header.Add(k, v)
-	}
-	for k, v := range parameters {
-		req.Header.Add(k, v)
+	// TODO: render the header values
+	for _, h := range action.Headers {
+		req.Header.Add(h.Name, h.Value)
 	}
 
 	go func() {
@@ -289,7 +292,7 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 }
 
 func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
-	host, scheme, method, path := "127.0.0.1", "HTTP", "GET", "/"
+	host, scheme, method, path := defaultHTTPHost, defaultHTTPScheme, defaultHTTPMethod, defaultHTTPPath
 	if len(action.Host) > 0 {
 		host = action.Host
 	}
@@ -309,7 +312,7 @@ func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
 func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 	action *kbaproto.GRPCAction, parameters map[string]string, errChan chan error, _ io.Reader, stdoutWriter, stderrWriter io.Writer) error {
 	// TODO: grpc stub cache
-	host := "127.0.0.1"
+	host := defaultHTTPHost
 	if len(action.Host) > 0 {
 		host = action.Host
 	}
@@ -330,12 +333,8 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 	}
 
 	reqMsg := dynamicpb.NewMessage(methodDesc.Input())
-	for k, v := range action.Messages {
-		if err = setField(reqMsg, k, v); err != nil {
-			return err
-		}
-	}
-	for k, v := range parameters {
+	// TODO: render the request values
+	for k, v := range action.Request {
 		if err = setField(reqMsg, k, v); err != nil {
 			return err
 		}
@@ -361,14 +360,14 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 			return
 		}
 
-		resStatus, err2 := getField(rspMsg, action.Status)
+		resStatus, err2 := getField(rspMsg, action.Response.Status)
 		if err2 != nil {
 			handleError(err2, "failed to decode `Status` from grpc response")
 			return
 		}
-		resOutput, err3 := getField(rspMsg, action.Output)
+		resOutput, err3 := getField(rspMsg, action.Response.Message)
 		if err3 != nil {
-			handleError(err3, "failed to decode `Output` from grpc response")
+			handleError(err3, "failed to decode `Message` from grpc response")
 			return
 		}
 

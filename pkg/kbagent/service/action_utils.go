@@ -51,6 +51,7 @@ import (
 const (
 	defaultBufferSize        = 4096
 	defaultConnectTimeout    = 5 * time.Second
+	defaultIdleConnTimeout   = 60 * time.Second
 	defaultActionCallTimeout = 30 * time.Second
 	maxActionCallTimeout     = 60 * time.Second
 	defaultHTTPHost          = "127.0.0.1"
@@ -227,6 +228,7 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	transport := &http.Transport{
 		DialContext:         dialer.DialContext,
 		TLSHandshakeTimeout: defaultConnectTimeout,
+		IdleConnTimeout:     defaultIdleConnTimeout,
 	}
 	cli := &http.Client{
 		// don't set timeout at client level

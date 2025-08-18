@@ -22,13 +22,14 @@ kbcli cluster create redis NAME [flags]
 
 ```
       --availability-policy string                     The availability policy of cluster. Legal values [none, node, zone]. (default "node")
-      --cpu float                                      CPU cores. Value range [0.5, 64]. (default 0.5)
+      --cpu float                                      CPU cores. Value range [0.5, 256]. (default 0.5)
       --custom-secret-name string                      the secret must contain keys named 'username' and 'password'
       --custom-secret-namespace string                 the secret must contain keys named 'username' and 'password'
       --disable-exporter                               Enable or disable monitor. (default true)
       --fixed-pod-ip-enabled                           Whether Fixed Pod IP is enabled, default is false
   -h, --help                                           help for redis
       --host-network-accessible                        Specify whether the cluster can be accessed from within the VPC.
+      --load-balancer-enabled                          Whether LoadBalancer service is enabled, default is false
       --memory float                                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
       --mode string                                    Cluster topology mode. Legal values [standalone, replication, cluster, replication-twemproxy]. (default "replication")
       --node-port-enabled                              Whether NodePort service is enabled, default is false
@@ -46,7 +47,6 @@ kbcli cluster create redis NAME [flags]
       --sentinel.memory float                          Sentinel component memory, the unit is Gi. Value range [0.1, 4]. (default 0.2)
       --sentinel.replicas float                        Sentinel component replicas Value range [1, 5]. (default 3)
       --sentinel.storage float                         Sentinel component storage size, the unit is Gi. Value range [1, 1024]. (default 20)
-      --sentinel.storage-class-name string             Sentinel component storage class name
       --storage float                                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --storage-class-name string                      Storage class name of the data volume
       --tenancy string                                 The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
@@ -56,7 +56,7 @@ kbcli cluster create redis NAME [flags]
       --twemproxy.memory float                         twemproxy component memory, the unit is Gi. Value range [0.1, 4]. (default 0.2)
       --twemproxy.replicas float                       twemproxy component replicas Value range [1, 5]. (default 3)
       --use-legacy-comp-def                            if useLegacyCompDef is false ,cluster will be rendered by compDef rather than componentDefRef in cluster definition
-      --version string                                 Cluster version. (default "7.2.7")
+      --version string                                 Cluster version. (default "redis-7.0.6")
 ```
 
 ### Options inherited from parent commands

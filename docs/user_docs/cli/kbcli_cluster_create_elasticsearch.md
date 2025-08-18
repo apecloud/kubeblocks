@@ -24,6 +24,7 @@ kbcli cluster create elasticsearch NAME [flags]
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
       --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
       --disable-exporter             Enable or disable monitor. (default true)
+      --enable-kibana                Whether to enable the Kibana
   -h, --help                         help for elasticsearch
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
       --memory float                 Memory, the unit is Gi. Value range [1, 1000]. (default 2)

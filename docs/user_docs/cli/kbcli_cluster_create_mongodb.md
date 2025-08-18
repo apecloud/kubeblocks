@@ -27,15 +27,16 @@ kbcli cluster create mongodb NAME [flags]
   -h, --help                         help for mongodb
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
       --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
-      --mode string                  Cluster topology mode. Legal values [standalone, replicaset]. (default "standalone")
+      --mode string                  Cluster topology mode. Legal values [standalone, replicaset, sharding]. (default "standalone")
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
       --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replicaset mode, the default replicas is 3. Value range [1, 5]. (default 1)
+      --shards int                   The number of shards, for sharding mode, the default shards is 3. Value range [2, 128]. (default 3)
       --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --storage-class-name string    Storage class name of the data volume
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               Cluster version. Legal values [8.0.4, 7.0.16, 7.0.12, 6.0.20, 6.0.16, 5.0.30, 5.0.28, 4.4.29, 4.2.24, 4.0.28]. (default "6.0.16")
+      --version string               Cluster version. Legal values [8.0.8, 7.0.18, 6.0.21, 5.0.29, 4.4.29, 4.2.25, 4.0.28]. (default "6.0.21")
 ```
 
 ### Options inherited from parent commands

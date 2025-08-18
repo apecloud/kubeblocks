@@ -21,7 +21,13 @@ package service
 
 import (
 	"bytes"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os/exec"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -326,5 +332,269 @@ var _ = Describe("action utils", func() {
 		})
 	})
 
-	// TODO: http and grpc
+	Context("http - x", func() {
+		var (
+			server *httptest.Server
+			port   string
+		)
+
+		BeforeEach(func() {
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("statusCode") != "" {
+					statusCode, _ := strconv.Atoi(r.Header.Get("statusCode"))
+					w.WriteHeader(statusCode)
+				}
+				body, _ := io.ReadAll(r.Body)
+				if len(body) > 0 {
+					_, _ = w.Write(body)
+				}
+			}))
+			url, _ := url.Parse(server.URL)
+			_, port, _ = net.SplitHostPort(url.Host)
+		})
+
+		AfterEach(func() {
+			server.Close()
+		})
+
+		It("simple", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+				},
+			}
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
+			Expect(err).Should(BeNil())
+
+			wait(errChan)
+		})
+
+		It("stdout", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "stdout",
+				},
+			}
+			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, nil)
+			Expect(err).Should(BeNil())
+
+			wait(errChan)
+			Expect(stdoutBuf.String()).Should(Equal("stdout"))
+		})
+
+		It("stderr", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "stderr",
+					Headers: []proto.HTTPHeader{
+						{
+							Name:  "statusCode",
+							Value: strconv.Itoa(http.StatusInternalServerError),
+						},
+					},
+				},
+			}
+			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, stderrBuf)
+			Expect(err).Should(BeNil())
+
+			err = waitError(errChan)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
+			Expect(stdoutBuf.String()).Should(HaveLen(0))
+			Expect(stderrBuf.String()).Should(Equal("stderr"))
+		})
+
+		It("parameters", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "{{ .PARAM }}",
+				},
+			}
+			parameters := map[string]string{
+				"PARAM":   "parameters",
+				"useless": "useless",
+			}
+			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
+			errChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, stdoutBuf, nil)
+			Expect(err).Should(BeNil())
+
+			wait(errChan)
+			Expect(stdoutBuf.String()).Should(Equal("parameters"))
+		})
+	})
+
+	Context("http - non-blocking", func() {
+		var (
+			server *httptest.Server
+			port   string
+		)
+
+		BeforeEach(func() {
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("statusCode") != "" {
+					statusCode, _ := strconv.Atoi(r.Header.Get("statusCode"))
+					w.WriteHeader(statusCode)
+				}
+				body, _ := io.ReadAll(r.Body)
+				if len(body) > 0 {
+					_, _ = w.Write(body)
+				}
+			}))
+			url, _ := url.Parse(server.URL)
+			_, port, _ = net.SplitHostPort(url.Host)
+		})
+
+		AfterEach(func() {
+			server.Close()
+		})
+
+		It("ok", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "ok",
+				},
+			}
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			Expect(err).Should(BeNil())
+
+			result := <-resultChan
+			Expect(result.err).Should(BeNil())
+			Expect(result.stdout.Bytes()).Should(Equal([]byte("ok")))
+			Expect(result.stderr.Bytes()).Should(HaveLen(0))
+		})
+
+		It("parameters", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "{{ .PARAM }}",
+				},
+			}
+			parameters := map[string]string{
+				"PARAM": "parameters",
+			}
+			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil)
+			Expect(err).Should(BeNil())
+
+			result := <-resultChan
+			Expect(result.err).Should(BeNil())
+			Expect(result.stdout.Bytes()).Should(Equal([]byte("parameters")))
+			Expect(result.stderr.Bytes()).Should(HaveLen(0))
+		})
+
+		It("fail", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "internal server error",
+					Headers: []proto.HTTPHeader{
+						{
+							Name:  "statusCode",
+							Value: strconv.Itoa(http.StatusInternalServerError),
+						},
+					},
+				},
+			}
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			Expect(err).Should(BeNil())
+
+			result := <-resultChan
+			Expect(result.err).ShouldNot(BeNil())
+			Expect(errors.Is(result.err, proto.ErrFailed)).Should(BeTrue())
+			Expect(result.stdout.Bytes()).Should(HaveLen(0))
+			Expect(result.stderr.Bytes()).Should(ContainSubstring("internal server error"))
+		})
+	})
+
+	Context("http - blocking", func() {
+		var (
+			server *httptest.Server
+			port   string
+		)
+
+		BeforeEach(func() {
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("statusCode") != "" {
+					statusCode, _ := strconv.Atoi(r.Header.Get("statusCode"))
+					w.WriteHeader(statusCode)
+				}
+				body, _ := io.ReadAll(r.Body)
+				if len(body) > 0 {
+					_, _ = w.Write(body)
+				}
+			}))
+			url, _ := url.Parse(server.URL)
+			_, port, _ = net.SplitHostPort(url.Host)
+		})
+
+		AfterEach(func() {
+			server.Close()
+		})
+
+		It("ok", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "ok",
+				},
+			}
+			output, err := blockingCallAction(ctx, action, nil, nil)
+			Expect(err).Should(BeNil())
+			Expect(output).Should(Equal([]byte("ok")))
+		})
+
+		It("parameters", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "{{ .PARAM }}",
+				},
+			}
+			parameters := map[string]string{
+				"PARAM": "parameters",
+			}
+			output, err := blockingCallAction(ctx, action, parameters, nil)
+			Expect(err).Should(BeNil())
+			Expect(output).Should(Equal([]byte("parameters")))
+		})
+
+		It("fail", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "internal server error",
+					Headers: []proto.HTTPHeader{
+						{
+							Name:  "statusCode",
+							Value: strconv.Itoa(http.StatusInternalServerError),
+						},
+					},
+				},
+			}
+			output, err := blockingCallAction(ctx, action, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("internal server error"))
+			Expect(output).Should(BeNil())
+		})
+	})
+
+	// TODO:  grpc
 })

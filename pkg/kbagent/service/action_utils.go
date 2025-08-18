@@ -30,6 +30,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -49,16 +50,50 @@ import (
 )
 
 const (
-	defaultBufferSize        = 4096
-	defaultConnectTimeout    = 5 * time.Second
-	defaultIdleConnTimeout   = 60 * time.Second
+	defaultBufferSize = 4096
+
+	defaultConnectTimeout            = 5 * time.Second
+	defaultKeepAliveTimeout          = 30 * time.Second
+	defaultIdleConnTimeout           = 90 * time.Second
+	defaultMaxIdleConnections        = 100
+	defaultMaxIdleConnectionsPerHost = 20
+
 	defaultActionCallTimeout = 30 * time.Second
 	maxActionCallTimeout     = 60 * time.Second
-	defaultHTTPHost          = "127.0.0.1"
-	defaultHTTPScheme        = "HTTP"
-	defaultHTTPMethod        = "GET"
-	defaultHTTPPath          = "/"
+
+	defaultHTTPHost   = "127.0.0.1"
+	defaultHTTPScheme = "HTTP"
+	defaultHTTPMethod = "GET"
+	defaultHTTPPath   = "/"
 )
+
+var (
+	clientCache sync.Map // map[string]<*http.Client|*grpc.ClientConn>
+
+	defaultHTTPTransport = &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   defaultConnectTimeout,
+			KeepAlive: defaultKeepAliveTimeout,
+		}).DialContext,
+		TLSHandshakeTimeout: defaultConnectTimeout,
+		IdleConnTimeout:     defaultIdleConnTimeout,
+		MaxIdleConns:        defaultMaxIdleConnections,
+		MaxIdleConnsPerHost: defaultMaxIdleConnectionsPerHost,
+	}
+)
+
+func CloseCachedClients() {
+	clientCache.Range(func(key, val interface{}) bool {
+		switch {
+		case strings.HasPrefix(key.(string), "http"):
+			closeHTTPClient(val)
+		case strings.HasPrefix(key.(string), "grpc"):
+			closeGRPCClient(val)
+		default:
+		}
+		return true
+	})
+}
 
 func gather[T interface{}](ch chan T) *T {
 	select {
@@ -219,25 +254,12 @@ func execActionCallX(ctx context.Context, cancel context.CancelFunc,
 }
 
 func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
-	action *kbaproto.HTTPAction, parameters map[string]string, errChan chan error, _ io.Reader, stdoutWriter, _ io.Writer) error {
-	// TODO: http client cache
-	// don't use default http-client
-	dialer := &net.Dialer{
-		Timeout: defaultConnectTimeout,
-	}
-	transport := &http.Transport{
-		DialContext:         dialer.DialContext,
-		TLSHandshakeTimeout: defaultConnectTimeout,
-		IdleConnTimeout:     defaultIdleConnTimeout,
-	}
-	cli := &http.Client{
-		// don't set timeout at client level
-		// Timeout:   time.Second * 30,
-		Transport: transport,
-	}
-	// TODO: close the client
-
-	method, url := httpActionMethodNURL(action)
+	action *kbaproto.HTTPAction, parameters map[string]string, errChan chan error, _ io.Reader, stdoutWriter, stderrWriter io.Writer) error {
+	var (
+		// TODO: resolve the port
+		cli         = httpClient(action.Host, action.Port)
+		method, url = httpActionMethodNURL(action)
+	)
 	body, err1 := renderTemplateData("http body", parameters, action.Body)
 	if err1 != nil {
 		return err1
@@ -274,31 +296,54 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 		}
 		defer safeClose(rsp.Body)
 
-		// TODO: rsp.StatusCode
-		// switch rsp.StatusCode {
-		// case http.StatusOK, http.StatusInternalServerError:
-		//	return rsp.Body, nil
-		// default:
-		//	return nil, fmt.Errorf("unexpected http status code: %s", rsp.Status)
-		// }
-
-		out, err5 := io.ReadAll(rsp.Body)
+		output, err5 := io.ReadAll(rsp.Body)
 		if err5 != nil {
 			handleError(err5, "failed to read http response")
 			return
 		}
 
-		if len(out) > 0 {
-			_, err6 := stdoutWriter.Write(out)
-			if err6 != nil {
-				handleError(err6, "failed to write http response")
-				return
+		succeed := rsp.StatusCode >= 200 && rsp.StatusCode < 300
+		if succeed {
+			if len(output) > 0 && stdoutWriter != nil {
+				_, err6 := stdoutWriter.Write(output)
+				if err6 != nil {
+					handleError(err6, "failed to write http response")
+					return
+				}
 			}
+			errChan <- nil
+		} else {
+			if len(output) > 0 && stderrWriter != nil {
+				_, err7 := stderrWriter.Write(output)
+				if err7 != nil {
+					handleError(err7, "failed to write http response")
+					return
+				}
+			}
+			errChan <- errors.Wrapf(kbaproto.ErrFailed, "http request failed, status: %s", rsp.Status)
 		}
-		errChan <- nil
 	}()
 
 	return nil
+}
+
+func httpClient(host, port string) *http.Client {
+	key := fmt.Sprintf("http://%s:%s", host, port)
+	if v, ok := clientCache.Load(key); ok {
+		return v.(*http.Client)
+	}
+	cli, _ := clientCache.LoadOrStore(key, &http.Client{
+		Transport: defaultHTTPTransport,
+	})
+	return cli.(*http.Client)
+}
+
+func closeHTTPClient(c interface{}) {
+	if cli, ok := c.(*http.Client); ok {
+		if transport, ok := cli.Transport.(*http.Transport); ok {
+			transport.CloseIdleConnections()
+		}
+	}
 }
 
 func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
@@ -321,23 +366,17 @@ func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
 
 func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 	action *kbaproto.GRPCAction, parameters map[string]string, errChan chan error, _ io.Reader, stdoutWriter, stderrWriter io.Writer) error {
-	// TODO: grpc stub cache
 	host := defaultHTTPHost
 	if len(action.Host) > 0 {
 		host = action.Host
 	}
 	// TODO: resolve the port
-	remote := fmt.Sprintf("%s:%s", host, action.Port)
-	conn, err := grpc.DialContext(ctx, remote,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(), // wait for the connection to be established
-	)
+	conn, err := grpcClientConnection(ctx, host, action.Port)
 	if err != nil {
 		return err
 	}
-	defer safeClose(conn)
 
-	methodDesc, err := getMethodDescriptor(ctx, conn, action.Service, action.Method)
+	methodDesc, err := getGRPCMethodDescriptor(ctx, conn, action.Service, action.Method)
 	if err != nil {
 		return fmt.Errorf("failed to get grpc method descriptor: %v", err)
 	}
@@ -348,7 +387,7 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 		if err1 != nil {
 			return err1
 		}
-		if err = setField(reqMsg, k, vv); err != nil {
+		if err = setGRPCMessageField(reqMsg, k, vv); err != nil {
 			return err
 		}
 	}
@@ -373,25 +412,25 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 			return
 		}
 
-		resStatus, err2 := getField(rspMsg, action.Response.Status)
+		status, err2 := getGRPCMessageField(rspMsg, action.Response.Status)
 		if err2 != nil {
 			handleError(err2, "failed to decode `Status` from grpc response")
 			return
 		}
-		resOutput, err3 := getField(rspMsg, action.Response.Message)
+		output, err3 := getGRPCMessageField(rspMsg, action.Response.Message)
 		if err3 != nil {
 			handleError(err3, "failed to decode `Message` from grpc response")
 			return
 		}
 
-		if len(resStatus) > 0 {
-			if len(resOutput) > 0 {
-				_, _ = stderrWriter.Write([]byte(resOutput))
+		if len(status) > 0 {
+			if len(output) > 0 && stderrWriter != nil {
+				_, _ = stderrWriter.Write([]byte(output))
 			}
-			errChan <- errors.New(resStatus)
+			errChan <- errors.Wrapf(kbaproto.ErrFailed, "grpc call failed: %s", status)
 		} else {
-			if len(resOutput) > 0 {
-				_, _ = stdoutWriter.Write([]byte(resOutput))
+			if len(output) > 0 && stdoutWriter != nil {
+				_, _ = stdoutWriter.Write([]byte(output))
 			}
 			errChan <- nil
 		}
@@ -400,7 +439,39 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 	return nil
 }
 
-func getMethodDescriptor(ctx context.Context, conn *grpc.ClientConn, serviceName, methodName string) (protoreflect.MethodDescriptor, error) {
+func grpcClientConnection(ctx context.Context, host, port string) (*grpc.ClientConn, error) {
+	key := fmt.Sprintf("grpc://%s:%s", host, port)
+	if v, ok := clientCache.Load(key); ok {
+		return v.(*grpc.ClientConn), nil
+	}
+
+	remote := fmt.Sprintf("%s:%s", host, port)
+	conn, err := grpc.DialContext(ctx, remote,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(16*1024*1024),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	actual, loaded := clientCache.LoadOrStore(key, conn)
+	if loaded {
+		_ = conn.Close()
+		return actual.(*grpc.ClientConn), nil
+	}
+	return conn, nil
+}
+
+func closeGRPCClient(c interface{}) {
+	if conn, ok := c.(*grpc.ClientConn); ok {
+		_ = conn.Close()
+	}
+}
+
+func getGRPCMethodDescriptor(ctx context.Context, conn *grpc.ClientConn, serviceName, methodName string) (protoreflect.MethodDescriptor, error) {
 	cli := grpc_reflection_v1.NewServerReflectionClient(conn)
 	stream, err := cli.ServerReflectionInfo(ctx, grpc.WaitForReady(true))
 	if err != nil {
@@ -429,7 +500,7 @@ func getMethodDescriptor(ctx context.Context, conn *grpc.ClientConn, serviceName
 		}
 		switch m := rsp.MessageResponse.(type) {
 		case *grpc_reflection_v1.ServerReflectionResponse_FileDescriptorResponse:
-			files, err := decodeFileDescriptors(m.FileDescriptorResponse.GetFileDescriptorProto())
+			files, err := decodeGRPCFileDescriptors(m.FileDescriptorResponse.GetFileDescriptorProto())
 			if err != nil {
 				return nil, err
 			}
@@ -453,7 +524,7 @@ func getMethodDescriptor(ctx context.Context, conn *grpc.ClientConn, serviceName
 	}
 }
 
-func decodeFileDescriptors(descBytes [][]byte) ([]protoreflect.FileDescriptor, error) {
+func decodeGRPCFileDescriptors(descBytes [][]byte) ([]protoreflect.FileDescriptor, error) {
 	var result []protoreflect.FileDescriptor
 	for _, b := range descBytes {
 		fdProto := &descriptorpb.FileDescriptorProto{}
@@ -469,7 +540,7 @@ func decodeFileDescriptors(descBytes [][]byte) ([]protoreflect.FileDescriptor, e
 	return result, nil
 }
 
-func setField(msg *dynamicpb.Message, fieldName, value string) error {
+func setGRPCMessageField(msg *dynamicpb.Message, fieldName, value string) error {
 	field := msg.Descriptor().Fields().ByTextName(fieldName)
 	if field == nil {
 		return fmt.Errorf("field %s not found", fieldName)
@@ -505,7 +576,7 @@ func setField(msg *dynamicpb.Message, fieldName, value string) error {
 	return nil
 }
 
-func getField(msg *dynamicpb.Message, fieldName string) (string, error) {
+func getGRPCMessageField(msg *dynamicpb.Message, fieldName string) (string, error) {
 	field := msg.Descriptor().Fields().ByTextName(fieldName)
 	if field == nil {
 		return "", fmt.Errorf("field %s not found", fieldName)
@@ -535,6 +606,9 @@ func safeClose(c io.Closer) { _ = c.Close() }
 func safeCloseF(c func() error) { _ = c() }
 
 func renderTemplateData(action string, parameters map[string]string, data string) (string, error) {
+	if len(data) == 0 {
+		return "", nil
+	}
 	tpl := template.New(action).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 	ptpl, err := tpl.Parse(data)
 	if err != nil {

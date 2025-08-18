@@ -509,7 +509,7 @@ func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.
 	return cli.Create(reqCtx.Ctx, newPVC)
 }
 
-// annotatePV annotates the persistentVolume with the opsRequest name and the reclaim policy of source pv.
+// reboundPV rebounds the PV to the source PVC if it is bound to another PVC.
 func (inPlaceHelper *inplaceRebuildHelper) reboundPV(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	sourcePvc *corev1.PersistentVolumeClaim,

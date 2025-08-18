@@ -515,7 +515,6 @@ func (inPlaceHelper *inplaceRebuildHelper) releasePV(reqCtx intctrlutil.RequestC
 	sourcePvc *corev1.PersistentVolumeClaim,
 	pv *corev1.PersistentVolume,
 	opsRequestName string) error {
-	patchPV := client.MergeFrom(pv.DeepCopy())
 	pv.Spec.ClaimRef = nil
 	if pv.Annotations == nil {
 		pv.Annotations = map[string]string{}
@@ -529,7 +528,7 @@ func (inPlaceHelper *inplaceRebuildHelper) releasePV(reqCtx intctrlutil.RequestC
 		}
 		pv.Annotations[sourcePVReclaimPolicyAnnotation] = string(sourcePV.Spec.PersistentVolumeReclaimPolicy)
 	}
-	return cli.Patch(reqCtx.Ctx, pv, patchPV)
+	return cli.Update(reqCtx.Ctx, pv)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) revertReclaimPolicy(reqCtx intctrlutil.RequestCtx,

@@ -373,10 +373,10 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 					return err
 				}
 			}
-			// 3. cleanup the tmp pvc firstly.
-			if err = inPlaceHelper.cleanupTmpPVC(reqCtx, cli, tmpPVC); err != nil {
-				return err
-			}
+		}
+		// 3. cleanup the tmp pvc firstly.
+		if err = inPlaceHelper.cleanupTmpPVC(reqCtx, cli, tmpPVC); err != nil {
+			return err
 		}
 		// set volumeName to tmp pvc, it will be used when recreating the source pvc.
 		tmpPVC.Spec.VolumeName = pv.Name
@@ -482,6 +482,9 @@ func (inPlaceHelper *inplaceRebuildHelper) retainAndAnnotatePV(reqCtx intctrluti
 func (inPlaceHelper *inplaceRebuildHelper) cleanupTmpPVC(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	tmpPVC *corev1.PersistentVolumeClaim) error {
+	if tmpPVC.UID == "" || tmpPVC.DeletionTimestamp != nil {
+		return nil
+	}
 	// if the tmp pvc exists, delete it.
 	if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, tmpPVC); err != nil {
 		return err

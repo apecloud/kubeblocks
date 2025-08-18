@@ -369,7 +369,7 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 			return err
 		}
 
-		// 4. release and annotate the pv with ['rebuildFromAnnotation', 'sourcePVReclaimPolicyAnnotation'].
+		// 5. release and annotate the pv with ['rebuildFromAnnotation', 'sourcePVReclaimPolicyAnnotation'].
 		if err = inPlaceHelper.reboundPV(reqCtx, cli, sourcePvc, pv, opsRequest.Name); err != nil {
 			return err
 		}

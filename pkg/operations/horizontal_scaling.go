@@ -283,7 +283,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	for podName, templateName := range createdPodSet {
 		idx := strings.LastIndex(podName, "-")
 		podIndex := podName[idx+1:]
-		podIndexInt, _ := strconv.Atoi(podIndex)
+		podIndexInt, _ := strconv.ParseInt(podIndex, 10, 32)
 		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, cli, opsRes.Cluster, model.GetScheme(), map[string]string{
 			constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
 		}, 1, int32(podIndexInt))

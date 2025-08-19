@@ -35,7 +35,7 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GeneratePassword(10, 5, 0, seed, "")
+		res, err := generatePassword(10, 5, 0, seed, "")
 		if err != nil {
 			t.Error(err)
 		}
@@ -53,11 +53,11 @@ func testGeneratorGeneratePassword(t *testing.T) {
 	t.Run("exceeds_length", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := GeneratePassword(0, 1, 0, "", ""); err != password.ErrExceedsTotalLength {
+		if _, err := generatePassword(0, 1, 0, "", ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 
-		if _, err := GeneratePassword(0, 0, 1, "", ""); err != password.ErrExceedsTotalLength {
+		if _, err := generatePassword(0, 0, 1, "", ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 	})
@@ -67,7 +67,7 @@ func testGeneratorGeneratePassword(t *testing.T) {
 
 		symbols := "!$_#"
 		for i := 0; i < N; i++ {
-			res, err := GeneratePassword(10, 0, 5, "", symbols)
+			res, err := generatePassword(10, 0, 5, "", symbols)
 			if err != nil {
 				t.Error(err)
 			}
@@ -89,7 +89,7 @@ func testGeneratorGeneratePassword(t *testing.T) {
 		resultSeedEachTime := ""
 		hasDiffPassword := false
 		for i := 0; i < N; i++ {
-			res, err := GeneratePassword(i%(len(password.LowerLetters)+len(password.UpperLetters)), 0, 0, "", "")
+			res, err := generatePassword(i%(len(password.LowerLetters)+len(password.UpperLetters)), 0, 0, "", "")
 			if err != nil {
 				t.Error(err)
 			}
@@ -148,11 +148,11 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 
 		// Generate multiple passwords and check they have both upper and lower letters.
 		for i := 0; i < 100; i++ {
-			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed, "")
+			pwd, err := generatePassword(length, numDigits, numSymbols, seed, "")
 			if err != nil {
 				t.Fatalf("unexpected error generating password: %v", err)
 			}
-			pwd, err = EnsureMixedCase(pwd, seed)
+			pwd, err = ensureMixedCase(pwd, seed)
 			if err != nil {
 				t.Fatalf("unexpected error Ensuring mixed-case password: %v", err)
 			}
@@ -170,11 +170,11 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 
 		var firstPwd string
 		for i := 0; i < 50; i++ {
-			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed, "")
+			pwd, err := generatePassword(length, numDigits, numSymbols, seed, "")
 			if err != nil {
 				t.Fatalf("unexpected error generating password with seed: %v", err)
 			}
-			pwd, err = EnsureMixedCase(pwd, seed)
+			pwd, err = ensureMixedCase(pwd, seed)
 			if err != nil {
 				t.Fatalf("unexpected error Ensuring mixed-case password: %v", err)
 			}

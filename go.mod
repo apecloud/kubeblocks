@@ -26,6 +26,7 @@ require (
 	github.com/google/cel-go v0.17.8
 	github.com/google/go-cmp v0.7.0
 	github.com/imdario/mergo v0.3.14
+	github.com/jhump/protoreflect v1.17.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/json-iterator/go v1.1.12
 	github.com/klauspost/compress v1.17.8
@@ -84,6 +85,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bhmj/xpression v0.9.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/containerd/log v0.1.0 // indirect

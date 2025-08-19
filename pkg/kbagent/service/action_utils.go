@@ -129,6 +129,9 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 			}
 			return nil, errors.Wrapf(kbaproto.ErrFailed, errMsg)
 		}
+		if errMsg := result.stderr.String(); len(errMsg) > 0 {
+			return nil, errors.Wrapf(err, errMsg)
+		}
 		return nil, err
 	}
 	return result.stdout.Bytes(), nil
@@ -360,7 +363,6 @@ func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
 	if len(action.Path) > 0 {
 		path = action.Path
 	}
-	// TODO: resolve the port
 	return method, fmt.Sprintf("%s://%s:%s%s", scheme, host, action.Port, path)
 }
 

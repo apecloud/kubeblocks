@@ -26,6 +26,9 @@ APP_DIR="kubeblocks/templates/applications"
 fetch_helm_charts() {
   helm template "${KB_CHART_DIR}" --output-dir "${MANIFESTS_DIR}" --set addonChartLocationBase="$1"
   # travel all addon manifests and get the helm charts
+  if [ ! -d "${MANIFESTS_DIR}$2" ]; then
+     return
+  fi
   for f in "${MANIFESTS_DIR}$2"/*; do
     if [ -d "${f}" ]; then
       continue

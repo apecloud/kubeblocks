@@ -107,6 +107,7 @@ func checkReconfigureUpdated(req *proto.ActionRequest) error {
 }
 
 func checkLocalFileExist(file string) (bool, error) {
+	// #nosec G304
 	_, err := os.Stat(file)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -118,6 +119,7 @@ func checkLocalFileExist(file string) (bool, error) {
 }
 
 func checkLocalFileUpToDate(file, checksum string) error {
+	// #nosec G304
 	content, err := os.ReadFile(file)
 	if err != nil {
 		return err

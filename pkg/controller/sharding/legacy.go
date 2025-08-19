@@ -132,7 +132,7 @@ func listShardingCompSpecs4Test(ctx context.Context, cli client.Reader,
 		return nil, err
 	}
 
-	compSpecList := make([]*appsv1.ClusterComponentSpec, 0, len(undeletedShardingComps)+len(deletingShardingComps))
+	compSpecList := make([]*appsv1.ClusterComponentSpec, 0)
 	shardTpl := sharding.Template
 
 	processComps := func(comps []appsv1.Component) error {

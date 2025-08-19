@@ -22,7 +22,7 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	mathrand "math/rand"
+	"math/rand"
 	"strings"
 	"time"
 	"unicode"
@@ -33,24 +33,24 @@ import (
 )
 
 const (
-	// DefaultSymbols is the list of default symbols to generate password.
-	DefaultSymbols = "!@#&*"
+	// defaultSymbols is the list of default symbols to generate password.
+	defaultSymbols = "!@#&*"
 )
 
-type PasswordReader struct {
-	rand *mathrand.Rand
+type passwordReader struct {
+	rand *rand.Rand
 }
 
-func (r *PasswordReader) Read(data []byte) (int, error) {
+func (r *passwordReader) Read(data []byte) (int, error) {
 	return r.rand.Read(data)
 }
 
-func (r *PasswordReader) Seed(seed int64) {
+func (r *passwordReader) Seed(seed int64) {
 	r.rand.Seed(seed)
 }
 
 func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
-	passwd, err := GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
+	passwd, err := generatePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
 	if err != nil {
 		return "", err
 	}
@@ -60,27 +60,27 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 	case appsv1.LowerCases:
 		passwd = strings.ToLower(passwd)
 	case appsv1.MixedCases:
-		passwd, err = EnsureMixedCase(passwd, config.Seed)
+		passwd, err = ensureMixedCase(passwd, config.Seed)
 	}
 	return passwd, err
 }
 
-// GeneratePassword generates a password with the given requirements and seed in lowercase.
-func GeneratePassword(length, numDigits, numSymbols int, seed string, symbols string) (string, error) {
-	rand, err := newRngFromSeed(seed)
+// generatePassword generates a password with the given requirements and seed in lowercase.
+func generatePassword(length, numDigits, numSymbols int, seed string, symbols string) (string, error) {
+	// #nosec G404
+	rand, err := newRandFromSeed(seed)
 	if err != nil {
 		return "", err
 	}
-	passwordReader := &PasswordReader{rand: rand}
 	if symbols == "" {
-		symbols = DefaultSymbols
+		symbols = defaultSymbols
 	}
 	gen, err := password.NewGenerator(&password.GeneratorInput{
 		LowerLetters: password.LowerLetters,
 		UpperLetters: password.UpperLetters,
 		Symbols:      symbols,
 		Digits:       password.Digits,
-		Reader:       passwordReader,
+		Reader:       &passwordReader{rand: rand},
 	})
 	if err != nil {
 		return "", err
@@ -88,10 +88,10 @@ func GeneratePassword(length, numDigits, numSymbols int, seed string, symbols st
 	return gen.Generate(length, numDigits, numSymbols, true, true)
 }
 
-// EnsureMixedCase randomizes the letter casing in the given string, ensuring
+// ensureMixedCase randomizes the letter casing in the given string, ensuring
 // that the result contains at least one uppercase and one lowercase letter.
 // If the give string only has one letter, it is returned unmodified.
-func EnsureMixedCase(in, seed string) (string, error) {
+func ensureMixedCase(in, seed string) (string, error) {
 	runes := []rune(in)
 	letterIndices := make([]int, 0, len(runes))
 	for i, r := range runes {
@@ -107,11 +107,11 @@ func EnsureMixedCase(in, seed string) (string, error) {
 
 	// Get a random number x in [1, 2^L - 2], whose binary list will be used to determine the letter casing.
 	// avoid the all-0 and all-1 patterns, which cause all-lowercase and all-uppercase password.
-	rng, err := newRngFromSeed(seed)
+	rand, err := newRandFromSeed(seed)
 	if err != nil {
 		return in, err
 	}
-	x := uint64(rng.Int63n(int64((1<<L)-2))) + 1
+	x := uint64(rand.Int63n(int64((1<<L)-2))) + 1
 
 	for i := 0; i < L; i++ {
 		bit := (x >> i) & 1
@@ -125,11 +125,9 @@ func EnsureMixedCase(in, seed string) (string, error) {
 	return string(runes), nil
 }
 
-// newRngFromSeed initializes a *mathrand.Rand from the given seed. If seed is empty,
-// it uses the current time, making the output non-deterministic.
-func newRngFromSeed(seed string) (*mathrand.Rand, error) {
+func newRandFromSeed(seed string) (*rand.Rand, error) {
 	if seed == "" {
-		return mathrand.New(mathrand.NewSource(time.Now().UnixNano())), nil
+		return rand.New(rand.NewSource(time.Now().UnixNano())), nil
 	}
 	// Convert seed string to a 64-bit integer via SHA-256
 	h := sha256.New()
@@ -138,5 +136,5 @@ func newRngFromSeed(seed string) (*mathrand.Rand, error) {
 	}
 	sum := h.Sum(nil)
 	uSeed := binary.BigEndian.Uint64(sum)
-	return mathrand.New(mathrand.NewSource(int64(uSeed))), nil
+	return rand.New(rand.NewSource(int64(uSeed))), nil
 }

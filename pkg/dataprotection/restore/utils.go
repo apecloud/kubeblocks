@@ -501,7 +501,8 @@ func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvV
 
 // getComponentNameFromObj gets the component name from the k8s object.
 func getComponentNameFromObj(obj client.Object) string {
-	if shardingName, ok := obj.GetLabels()[constant.KBAppShardingNameLabelKey]; ok {
+	shardingName := obj.GetLabels()[constant.KBAppShardingNameLabelKey]
+	if shardingName != "" {
 		return shardingName
 	}
 	return obj.GetLabels()[constant.KBAppComponentLabelKey]

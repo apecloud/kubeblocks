@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -81,19 +82,6 @@ var (
 		MaxIdleConnsPerHost: defaultMaxIdleConnectionsPerHost,
 	}
 )
-
-func CloseCachedClients() {
-	clientCache.Range(func(key, val interface{}) bool {
-		switch {
-		case strings.HasPrefix(key.(string), "http"):
-			closeHTTPClient(val)
-		case strings.HasPrefix(key.(string), "grpc"):
-			closeGRPCClient(val)
-		default:
-		}
-		return true
-	})
-}
 
 func gather[T interface{}](ch chan T) *T {
 	select {
@@ -162,28 +150,24 @@ func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, paramet
 
 func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
-	var timeoutCancel context.CancelFunc
+	var cancel context.CancelFunc
 	if timeout == nil {
-		ctx, timeoutCancel = context.WithTimeout(ctx, defaultActionCallTimeout)
+		ctx, cancel = context.WithTimeout(ctx, defaultActionCallTimeout)
 	} else if *timeout > 0 {
-		ctx, timeoutCancel = context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
-	}
-	cancelTimeout := func() {
-		if timeoutCancel != nil {
-			timeoutCancel()
-		}
+		ctx, cancel = context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
 	}
 
 	var err error
 	errChan := make(chan error, 1)
 	switch {
 	case action.Exec != nil:
-		err = execActionCallX(ctx, cancelTimeout, action.Exec, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
+		err = execActionCallX(ctx, cancel, action.Exec, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
 	case action.HTTP != nil:
-		err = httpActionCallX(ctx, cancelTimeout, action.HTTP, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
+		err = httpActionCallX(ctx, cancel, action.HTTP, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
 	case action.GRPC != nil:
-		err = grpcActionCallX(ctx, cancelTimeout, action.GRPC, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
+		err = grpcActionCallX(ctx, cancel, action.GRPC, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
 	default:
+		cancel() // cancel the context to release the resources
 		err = errors.Wrapf(kbaproto.ErrBadRequest, "invalid action type")
 	}
 	if err != nil {
@@ -260,7 +244,7 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	action *kbaproto.HTTPAction, parameters map[string]string, errChan chan error, _ io.Reader, stdoutWriter, stderrWriter io.Writer) error {
 	var (
 		// TODO: resolve the port
-		cli         = httpClient(action.Host, action.Port)
+		cli         = httpClient()
 		method, url = httpActionMethodNURL(action)
 	)
 	body, err1 := renderTemplateData("http body", parameters, action.Body)
@@ -330,8 +314,8 @@ func httpActionCallX(ctx context.Context, cancel context.CancelFunc,
 	return nil
 }
 
-func httpClient(host, port string) *http.Client {
-	key := fmt.Sprintf("http://%s:%s", host, port)
+func httpClient() *http.Client {
+	key := "http"
 	if v, ok := clientCache.Load(key); ok {
 		return v.(*http.Client)
 	}
@@ -339,14 +323,6 @@ func httpClient(host, port string) *http.Client {
 		Transport: defaultHTTPTransport,
 	})
 	return cli.(*http.Client)
-}
-
-func closeHTTPClient(c interface{}) {
-	if cli, ok := c.(*http.Client); ok {
-		if transport, ok := cli.Transport.(*http.Transport); ok {
-			transport.CloseIdleConnections()
-		}
-	}
 }
 
 func httpActionMethodNURL(action *kbaproto.HTTPAction) (string, string) {
@@ -414,15 +390,23 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 			return
 		}
 
-		status, err2 := getGRPCMessageField(rspMsg, action.Response.Status)
-		if err2 != nil {
-			handleError(err2, "failed to decode `Status` from grpc response")
-			return
+		var (
+			status, output string
+			err2, err3     error
+		)
+		if len(action.Response.Status) > 0 {
+			status, err2 = getGRPCMessageField(rspMsg, action.Response.Status)
+			if err2 != nil {
+				handleError(err2, "failed to decode `Status` from grpc response")
+				return
+			}
 		}
-		output, err3 := getGRPCMessageField(rspMsg, action.Response.Message)
-		if err3 != nil {
-			handleError(err3, "failed to decode `Message` from grpc response")
-			return
+		if len(action.Response.Message) > 0 {
+			output, err3 = getGRPCMessageField(rspMsg, action.Response.Message)
+			if err3 != nil {
+				handleError(err3, "failed to decode `Message` from grpc response")
+				return
+			}
 		}
 
 		if len(status) > 0 {
@@ -442,12 +426,12 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 }
 
 func grpcClientConnection(ctx context.Context, host, port string) (*grpc.ClientConn, error) {
-	key := fmt.Sprintf("grpc://%s:%s", host, port)
+	remote := fmt.Sprintf("%s:%s", host, port)
+	key := fmt.Sprintf("grpc://%s", remote)
 	if v, ok := clientCache.Load(key); ok {
 		return v.(*grpc.ClientConn), nil
 	}
 
-	remote := fmt.Sprintf("%s:%s", host, port)
 	conn, err := grpc.DialContext(ctx, remote,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
@@ -465,12 +449,6 @@ func grpcClientConnection(ctx context.Context, host, port string) (*grpc.ClientC
 		return actual.(*grpc.ClientConn), nil
 	}
 	return conn, nil
-}
-
-func closeGRPCClient(c interface{}) {
-	if conn, ok := c.(*grpc.ClientConn); ok {
-		_ = conn.Close()
-	}
 }
 
 func getGRPCMethodDescriptor(ctx context.Context, conn *grpc.ClientConn, serviceName, methodName string) (protoreflect.MethodDescriptor, error) {
@@ -624,14 +602,13 @@ func renderTemplateData(action string, parameters map[string]string, data string
 }
 
 func mergeEnvWith(parameters map[string]string) map[string]string {
-	if parameters == nil {
-		parameters = make(map[string]string)
-	}
+	result := make(map[string]string)
+	maps.Copy(result, parameters)
 	for _, e := range os.Environ() {
 		kv := strings.Split(e, "=")
-		if _, ok := parameters[kv[0]]; !ok {
-			parameters[kv[0]] = kv[1]
+		if _, ok := result[kv[0]]; !ok {
+			result[kv[0]] = kv[1]
 		}
 	}
-	return parameters
+	return result
 }

@@ -8053,7 +8053,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The path to request on the HTTP server.</p>
+<p>The path to request on the HTTP server.
+Defaults to &ldquo;/&rdquo; if not specified.</p>
 </td>
 </tr>
 <tr>

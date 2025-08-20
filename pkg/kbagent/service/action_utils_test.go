@@ -143,7 +143,7 @@ var _ = Describe("action utils", func() {
 		It("x - timeout", func() {
 			action := &proto.Action{
 				Exec: &proto.ExecAction{
-					Commands: []string{"/bin/bash", "-c", "sleep 60"},
+					Commands: []string{"/bin/bash", "-c", "sleep 3"},
 				},
 			}
 			timeout := int32(1)
@@ -158,7 +158,7 @@ var _ = Describe("action utils", func() {
 		It("x - timeout and stdout", func() {
 			action := &proto.Action{
 				Exec: &proto.ExecAction{
-					Commands: []string{"/bin/bash", "-c", "sleep 60 && echo -n timeout"},
+					Commands: []string{"/bin/bash", "-c", "sleep 3 && echo -n timeout"},
 				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
@@ -175,7 +175,7 @@ var _ = Describe("action utils", func() {
 		It("x - stdout and timeout", func() {
 			action := &proto.Action{
 				Exec: &proto.ExecAction{
-					Commands: []string{"/bin/bash", "-c", "echo -n timeout && sleep 60"},
+					Commands: []string{"/bin/bash", "-c", "echo -n timeout && sleep 3"},
 				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
@@ -274,7 +274,7 @@ var _ = Describe("action utils", func() {
 		It("non-blocking - timeout", func() {
 			action := &proto.Action{
 				Exec: &proto.ExecAction{
-					Commands: []string{"/bin/bash", "-c", "sleep 60"},
+					Commands: []string{"/bin/bash", "-c", "sleep 3"},
 				},
 			}
 			timeout := int32(1)
@@ -329,7 +329,7 @@ var _ = Describe("action utils", func() {
 		It("blocking - timeout", func() {
 			action := &proto.Action{
 				Exec: &proto.ExecAction{
-					Commands: []string{"/bin/bash", "-c", "sleep 60"},
+					Commands: []string{"/bin/bash", "-c", "sleep 3"},
 				},
 			}
 			timeout := int32(1)

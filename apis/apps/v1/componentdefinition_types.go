@@ -1937,7 +1937,10 @@ type HTTPAction struct {
 	Scheme string `json:"scheme,omitempty"`
 
 	// The path to request on the HTTP server.
+	// Defaults to "/" if not specified.
 	//
+	// +kubebuilder:validation:Pattern="^/.*"
+	// +kubebuilder:default="/"
 	// +optional
 	Path string `json:"path,omitempty"`
 

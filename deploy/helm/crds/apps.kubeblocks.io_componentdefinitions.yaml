@@ -4747,7 +4747,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -5182,7 +5186,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -5650,7 +5658,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -6093,7 +6105,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -6535,7 +6551,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -6979,7 +6999,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -7416,7 +7440,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -7853,7 +7881,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -8290,7 +8322,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -8729,7 +8765,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -9161,7 +9201,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -9615,7 +9659,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-
@@ -10077,7 +10125,11 @@ spec:
                             - PATCH
                             type: string
                           path:
-                            description: The path to request on the HTTP server.
+                            default: /
+                            description: |-
+                              The path to request on the HTTP server.
+                              Defaults to "/" if not specified.
+                            pattern: ^/.*
                             type: string
                           port:
                             description: |-

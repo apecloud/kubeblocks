@@ -66,7 +66,8 @@ func needValueTransformer(formatter appsv1beta1.CfgFileFormat) bool {
 
 func (v *valueManager) BuildValueTransformer() core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
-	if v.formatConfigs == nil || !needValueTransformer(v.formatConfigs.Format) || v.paramsDef.Spec.ParametersSchema == nil {
+	if v.formatConfigs == nil || !needValueTransformer(v.formatConfigs.Format) || v.paramsDef.Spec.ParametersSchema == nil ||
+		v.paramsDef.Spec.ParametersSchema.SchemaInJSON == nil {
 		return nil
 	}
 
@@ -77,9 +78,7 @@ func (v *valueManager) BuildValueTransformer() core.ValueTransformerFunc {
 	defaultTransformer := &defaultValueTransformer{
 		openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]),
 	}
-	return func(value string, fieldName string) (any, error) {
-		return defaultTransformer.resolveValueWithType(value, fieldName)
-	}
+	return defaultTransformer.resolveValueWithType
 }
 
 func NewValueManager(paramsDefs *appsv1beta1.ConfigConstraint) ValueTransformerBuilder {

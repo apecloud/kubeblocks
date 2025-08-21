@@ -266,6 +266,9 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+	if len(newReplicas) == 0 {
+		return nil
+	}
 
 	// replicas in provisioning that the data has not been loaded
 	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
@@ -275,17 +278,13 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 		return err
 	}
 
-	replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
-	if len(replicas) == 0 {
-		return nil
-	}
-
 	// the source replica
-	source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump)
+	source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump, provisioningReplicas)
 	if err != nil {
 		return err
 	}
 
+	replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
 	parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
 	if err != nil {
 		return err
@@ -300,16 +299,23 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
 }
 
-func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
+func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {
 	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
 		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return nil, err
 	}
+	if len(provisioningReplicas) > 0 {
+		// exclude provisioning replicas
+		pods = slices.DeleteFunc(pods, func(pod *corev1.Pod) bool {
+			return slices.Contains(provisioningReplicas, pod.Name)
+		})
+	}
 	if len(pods) > 0 {
 		if len(dataDump.Exec.TargetPodSelector) == 0 {
 			dataDump.Exec.TargetPodSelector = appsv1.AnyReplica
 		}
+		// TODO: idempotence for provisioning replicas
 		pods, err = lifecycle.SelectTargetPods(pods, nil, dataDump)
 		if err != nil {
 			return nil, err

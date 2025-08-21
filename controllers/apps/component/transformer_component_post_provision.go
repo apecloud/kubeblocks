@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -54,7 +55,11 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 	err := t.postProvision(transCtx)
 	if err != nil {
-		return lifecycle.IgnoreNotDefined(err)
+		err = lifecycle.IgnoreNotDefined(err)
+		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
+		}
+		return err
 	}
 	return t.markPostProvisionDone(transCtx, dag)
 }

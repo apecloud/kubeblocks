@@ -54,7 +54,7 @@ type RestoreManager struct {
 
 	// private
 	namespace                         string
-	restoreTime                       string
+	RestoreTime                       string
 	env                               []corev1.EnvVar
 	parameters                        []dpv1alpha1.ParameterPair
 	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
@@ -62,6 +62,7 @@ type RestoreManager struct {
 	startingIndex                     int32
 	replicas                          int32
 	restoreLabels                     map[string]string
+	RestoreNamePrefix                 string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -218,12 +219,12 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 				Namespace:        r.namespace,
 				SourceTargetName: sourceTargetName,
 			},
-			RestoreTime: r.restoreTime,
+			RestoreTime: r.RestoreTime,
 			Env:         r.env,
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
-				SchedulingSpec:                   r.buildSchedulingSpec(comp),
+				SchedulingSpec:                   r.buildSchedulingSpec(comp, template),
 				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
@@ -280,7 +281,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				Namespace:        r.namespace,
 				SourceTargetName: sourceTargetName,
 			},
-			RestoreTime: r.restoreTime,
+			RestoreTime: r.RestoreTime,
 			Env:         r.env,
 			Parameters:  r.parameters,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
@@ -328,7 +329,19 @@ func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStat
 	return requiredPolicy
 }
 
-func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) dpv1alpha1.SchedulingSpec {
+func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent, template *appsv1.InstanceTemplate) dpv1alpha1.SchedulingSpec {
+	// if instance template provided and scheduling policy is set, use it
+	if template != nil && template.SchedulingPolicy != nil {
+		return dpv1alpha1.SchedulingSpec{
+			Affinity:                  template.SchedulingPolicy.Affinity,
+			Tolerations:               template.SchedulingPolicy.Tolerations,
+			TopologySpreadConstraints: template.SchedulingPolicy.TopologySpreadConstraints,
+			NodeSelector:              template.SchedulingPolicy.NodeSelector,
+			SchedulerName:             template.SchedulingPolicy.SchedulerName,
+			NodeName:                  template.SchedulingPolicy.NodeName,
+		}
+	}
+	// otherwise, fallback to component's pod spec
 	if comp.PodSpec == nil {
 		return dpv1alpha1.SchedulingSpec{}
 	}
@@ -336,6 +349,9 @@ func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponen
 		Affinity:                  comp.PodSpec.Affinity,
 		Tolerations:               comp.PodSpec.Tolerations,
 		TopologySpreadConstraints: comp.PodSpec.TopologySpreadConstraints,
+		NodeSelector:              comp.PodSpec.NodeSelector,
+		SchedulerName:             comp.PodSpec.SchedulerName,
+		NodeName:                  comp.PodSpec.NodeName,
 	}
 }
 
@@ -346,6 +362,9 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	}
 	if r.startingIndex != 0 {
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
+	}
+	if r.RestoreNamePrefix != "" {
+		name = fmt.Sprintf("%s-%s", r.RestoreNamePrefix, name)
 	}
 	if len(r.restoreLabels) == 0 {
 		r.restoreLabels = constant.GetCompLabels(r.Cluster.Name, comp.Name)
@@ -381,7 +400,7 @@ func (r *RestoreManager) initFromAnnotation(comp *component.SynthesizedComponent
 	if volumeRestorePolicy := backupSource[constant.VolumeRestorePolicyKeyForRestore]; volumeRestorePolicy != "" {
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
-	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
+	r.RestoreTime = backupSource[constant.RestoreTimeKeyForRestore]
 	doReadyRestoreAfterClusterRunning := backupSource[constant.DoReadyRestoreAfterClusterRunning]
 	if doReadyRestoreAfterClusterRunning == "true" {
 		r.doReadyRestoreAfterClusterRunning = true
@@ -404,6 +423,8 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 	if len(restores) == 0 {
 		return nil
 	}
+	var errType intctrlutil.ErrorType
+	var msgs []string
 	for i := range restores {
 		restore := restores[i]
 		if r.Scheme != nil {
@@ -422,10 +443,25 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 		case dpv1alpha1.RestorePhaseCompleted:
 			continue
 		case dpv1alpha1.RestorePhaseFailed:
+			if r.volumeRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
+				errType = intctrlutil.ErrorTypeRestoreFailed
+				msgs = append(msgs, fmt.Sprintf(`restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName()))
+				continue
+			}
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `restore "%s" status is Failed, you can describe it and re-restore the cluster.`, restore.GetName())
 		default:
+			if r.volumeRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
+				if errType != intctrlutil.ErrorTypeRestoreFailed {
+					errType = intctrlutil.ErrorTypeNeedWaiting
+				}
+				msgs = append(msgs, fmt.Sprintf(`waiting for restore "%s" successfully`, restore.GetName()))
+				continue
+			}
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `waiting for restore "%s" successfully`, restore.GetName())
 		}
+	}
+	if errType != "" {
+		return intctrlutil.NewErrorf(errType, strings.Join(msgs, ";"))
 	}
 	return nil
 }

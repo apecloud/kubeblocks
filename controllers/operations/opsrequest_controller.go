@@ -21,7 +21,6 @@ package operations
 
 import (
 	"context"
-	"math"
 	"reflect"
 	"slices"
 	"strings"
@@ -94,7 +93,7 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&opsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 2,
 		}).
 		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
 		Watches(&workloads.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
@@ -432,6 +431,23 @@ func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1.
 
 func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, object client.Object) []reconcile.Request {
 	cluster := object.(*appsv1.Cluster)
+	if cluster.IsDeleting() {
+		// if the cluster is deleting, we should enqueue all the opsRequests in this cluster.
+		opsList := &opsv1alpha1.OpsRequestList{}
+		_ = r.Client.List(ctx, opsList, client.InNamespace(cluster.Namespace), client.MatchingFields{
+			constant.AppInstanceLabelKey: cluster.Name,
+		})
+		var requests []reconcile.Request
+		for i := range opsList.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cluster.Namespace,
+					Name:      opsList.Items[i].Name,
+				},
+			})
+		}
+		return requests
+	}
 	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 

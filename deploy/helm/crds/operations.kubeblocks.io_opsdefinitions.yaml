@@ -7925,6 +7925,29 @@ spec:
                         - "^mysql-8.0.\d{1,2}$": Matches all names starting with "mysql-8.0." followed by one or two digits.
                       maxLength: 32
                       type: string
+                    imageMappings:
+                      description: ImageMappings specifies the mapping from service
+                        versions to image addresses.
+                      items:
+                        properties:
+                          images:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              Images are the container image addresses to use for the matched service versions.
+                              Key is the container name, and value is the image address.
+                            type: object
+                          serviceVersions:
+                            description: ServiceVersions is a list of service versions
+                              that this mapping applies to.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - images
+                        - serviceVersions
+                        type: object
+                      type: array
                     serviceName:
                       description: |-
                         Specifies the name of the Service.

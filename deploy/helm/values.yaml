@@ -25,15 +25,20 @@ image:
 ##
 replicaCount: 1
 
-## MaxConcurrentReconciles for component, instanceSet and opsRequest controllers.
-##
+## MaxConcurrentReconciles for cluster, component and instanceSet controllers.
+## default is 32
 reconcileWorkers: ""
+
+## k8s cache configuration.
+cache:
+  # default is 300 seconds
+  syncTimeout: ""
 
 ## k8s client configuration.
 client:
-  # default is 20
+  # default is 128
   qps: ""
-  # default is 30
+  # default is 256
   burst: ""
 
 ## @param nameOverride
@@ -43,7 +48,6 @@ nameOverride: ""
 ## @param fullnameOverride
 ##
 fullnameOverride: ""
-
 
 ## KubeBlocks RBAC access priority setting
 ##
@@ -238,24 +242,15 @@ serviceMonitor:
 ## @param topologySpreadConstraints
 topologySpreadConstraints: []
 
-
 ## Resource settings
 ##
-## @param resources.limits
-## @param resources.requests
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+## @param resources.cpu
+## @param resources.memory
+resources:
   # TODO(user): Configure the resources accordingly based on the project requirements.
   # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-  # limits:
-  #   cpu: 500m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 10m
-#   memory: 64Mi
+  cpu: 500m
+  memory: 1Gi
 
 ## @param priorityClassName
 ##
@@ -348,7 +343,16 @@ webhooks:
 
 ## manager server settings
 manager:
-  leaderElectId: ""
+  ## leader election
+  leaderElection:
+    # default is "001c317f"
+    Id: ""
+    # default is 30 seconds
+    leaseDuration:
+    # default is 25 seconds
+    renewDeadline:
+    # default is 5 seconds
+    retryPeriod:
 
 ## Data protection settings
 ##
@@ -453,7 +457,7 @@ backupRepo:
     accessKeyId: ""
     secretAccessKey: ""
 
-  ## Addon controller settings, this will require cluster-admin clusterrole.
+  ## Addon controller settings
   ##
   ## @param addonController.enabled
   ## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.

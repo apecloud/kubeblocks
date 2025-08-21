@@ -56,15 +56,22 @@ type valueManager struct {
 	formatConfigs map[string]parametersv1alpha1.FileFormatConfig
 }
 
-func (v *valueManager) buildValueTransformer(key string) core.ValueTransformerFunc {
+func needValueTransformer(formatter parametersv1alpha1.CfgFileFormat) bool {
+	return formatter == parametersv1alpha1.JSON ||
+		formatter == parametersv1alpha1.YAML ||
+		formatter == parametersv1alpha1.TOML
+}
+
+func (v *valueManager) BuildValueTransformer(key string) core.ValueTransformerFunc {
 	// NODE: The JSON format requires distinguishing value types, and encode/decode will not perform automatic conversion.
-	if format, ok := v.formatConfigs[key]; !ok || format.Format != parametersv1alpha1.JSON {
+	if format, ok := v.formatConfigs[key]; !ok || !needValueTransformer(format.Format) {
 		return nil
 	}
 	index := generics.FindFirstFunc(v.paramsDefs, func(paramDef *parametersv1alpha1.ParametersDefinition) bool {
 		return paramDef.Spec.FileName == key
 	})
-	if index < 0 || v.paramsDefs[index].Spec.ParametersSchema == nil {
+	if index < 0 || v.paramsDefs[index].Spec.ParametersSchema == nil ||
+		v.paramsDefs[index].Spec.ParametersSchema.SchemaInJSON == nil {
 		return nil
 	}
 	schema := v.paramsDefs[index].Spec.ParametersSchema.SchemaInJSON
@@ -74,9 +81,7 @@ func (v *valueManager) buildValueTransformer(key string) core.ValueTransformerFu
 	defaultTransformer := &defaultValueTransformer{
 		openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]),
 	}
-	return func(value string, fieldName string) (any, error) {
-		return defaultTransformer.resolveValueWithType(value, fieldName)
-	}
+	return defaultTransformer.resolveValueWithType
 }
 
 func NewValueManager(paramsDefs []*parametersv1alpha1.ParametersDefinition, configs []parametersv1alpha1.ComponentConfigDescription) *valueManager {

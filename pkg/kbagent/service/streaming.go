@@ -101,7 +101,7 @@ func (s *streamingService) handshake(ctx context.Context, conn net.Conn) (*proto
 }
 
 func (s *streamingService) streaming(ctx context.Context, conn net.Conn, action *proto.Action, req *proto.ActionRequest) error {
-	errChan, err1 := runCommandX(ctx, action.Exec, req.Parameters, req.TimeoutSeconds, nil, conn, nil)
+	errChan, err1 := nonBlockingCallActionX(ctx, action, req.Parameters, req.TimeoutSeconds, nil, conn, nil)
 	if err1 != nil {
 		return err1
 	}

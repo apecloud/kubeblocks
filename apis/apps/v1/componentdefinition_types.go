@@ -487,6 +487,7 @@ type ComponentDefinitionSpec struct {
 	//     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 	//   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 	//   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
+	//   - `availableProbe`: Defines the procedure which is invoked regularly to assess the availability of the component.
 	//   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 	//     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 	//     such as before planned maintenance or upgrades on the current leader node.
@@ -1693,6 +1694,7 @@ type ComponentLifecycleActions struct {
 //     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 //   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 //   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
+//   - `availableProbe`: Defines the procedure which is invoked regularly to assess the availability of the component.
 //   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 //   - `memberJoin`: Defines the procedure to add a new replica to the replication group.
 //   - `memberLeave`: Defines the method to remove a replica from the replication group.
@@ -1710,21 +1712,20 @@ type ComponentLifecycleActions struct {
 //     to access context information such as details about pods, components, the overall cluster state,
 //     or database connection credentials.
 //     These variables provide a dynamic and context-aware mechanism for script execution.
-//   - HTTPAction: Performs an HTTP request.
-//     HTTPAction is to be implemented in future version.
-//   - GRPCAction: In future version, Actions will support initiating gRPC calls.
+//   - HTTPAction: Performs a single HTTP(S) request.
+//   - GRPCAction: Issues a unary gRPC call to a target service.
 //     This allows developers to implement Actions using plugins written in programming language like Go,
 //     providing greater flexibility and extensibility.
 //
-// An action is considered successful on returning 0, or HTTP 200 for status HTTP(s) Actions.
+// An action is considered successful on returning 0, or HTTP 2xx for status HTTP actions.
 // Any other return value or HTTP status codes indicate failure,
 // and the action may be retried based on the configured retry policy.
 //
 //   - If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.
 //   - If an action produces any data as output, it should be written to stdout,
-//     or included in the HTTP response payload for HTTP(s) actions.
+//     or included in the HTTP response payload for HTTP actions.
 //   - If an action encounters any errors, error messages should be written to stderr,
-//     or detailed in the HTTP response with the appropriate non-200 status code.
+//     or detailed in the HTTP response with the appropriate non-2xx status code.
 type Action struct {
 	// Defines the command to run.
 	//
@@ -1732,6 +1733,45 @@ type Action struct {
 	//
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty"`
+
+	// Defines the HTTP request to perform.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	HTTP *HTTPAction `json:"http,omitempty"`
+
+	// Defines the gRPC call to issue.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	GRPC *GRPCAction `json:"grpc,omitempty"`
+
+	// Defines the criteria used to select the target Pod(s) for executing the Action.
+	// This is useful when there is no default target replica identified.
+	// It allows for precise control over which Pod(s) the Action should run in.
+	//
+	// If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+	// to be removed or added; or a random pod if the Action is triggered at the component level, such as
+	// post-provision or pre-terminate of the component.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	TargetPodSelector TargetPodSelector `json:"targetPodSelector,omitempty"`
+
+	// Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+	// The impact of this field depends on the `targetPodSelector` value:
+	//
+	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+	//   will be selected for the Action.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	MatchingKey string `json:"matchingKey,omitempty"`
 
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//
@@ -1771,6 +1811,10 @@ type Action struct {
 	//
 	// +optional
 	PreCondition *PreConditionType `json:"preCondition,omitempty"`
+}
+
+func (a *Action) Defined() bool {
+	return a != nil && (a.Exec != nil || a.HTTP != nil || a.GRPC != nil)
 }
 
 // ExecAction describes an Action that executes a command inside a container.
@@ -1848,6 +1892,153 @@ type ExecAction struct {
 	//
 	// +optional
 	Container string `json:"container,omitempty"`
+}
+
+// HTTPAction defines an action that performs a single HTTP(S) request.
+//
+// Behavior & templating:
+//   - The request body (`Body`) supports Go text/template syntax. It is rendered with predefined variables
+//     before the request is sent.
+//   - Custom headers (`Headers`) can be specified. Each header value can also use Go text/template
+//     syntax and will be rendered with the same predefined variables.
+//   - Not intended for streaming or large data-transfer workflows (e.g., dataLoad, dataDump).
+//     Designed for one-shot request/response scenarios.
+//
+// Success:
+//   - Any HTTP 2xx status code is considered success by default.
+//   - Non-2xx status codes are treated as failures.
+type HTTPAction struct {
+	// The port to access on the host.
+	// It may be a numeric string (e.g., "8080") or a named port defined in the container spec.
+	//
+	// +kubebuilder:validation:Required
+	Port string `json:"port"`
+
+	// The target host to connect to.
+	// Defaults to "127.0.0.1" if not specified.
+	//
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// The scheme to use for connecting to the host.
+	// Defaults to "HTTP".
+	//
+	// +kubebuilder:validation:Enum={HTTP,HTTPS}
+	// +kubebuilder:default=HTTP
+	// +optional
+	Scheme string `json:"scheme,omitempty"`
+
+	// The path to request on the HTTP server.
+	// Defaults to "/" if not specified.
+	//
+	// +kubebuilder:validation:Pattern="^/.*"
+	// +kubebuilder:default="/"
+	// +optional
+	Path string `json:"path,omitempty"`
+
+	// The HTTP method to use.
+	// Defaults to "GET".
+	//
+	// +kubebuilder:validation:Enum={GET,POST,PUT,DELETE,HEAD,PATCH}
+	// +kubebuilder:default=GET
+	// +optional
+	Method string `json:"method,omitempty"`
+
+	// Custom headers to set in the request.
+	// Header values may use Go text/template syntax, rendered with predefined variables.
+	//
+	// +optional
+	Headers []HTTPHeader `json:"headers,omitempty"`
+
+	// Optional HTTP request body.
+	//
+	// Supports Go text/template syntax; rendered with predefined variables before sending.
+	//
+	// +optional
+	Body string `json:"body,omitempty"`
+
+	// TODO: HTTPS
+}
+
+// HTTPHeader represents a single HTTP header key/value pair.
+type HTTPHeader struct {
+	// Name of the header field.
+	Name string `json:"name"`
+
+	// Value of the header field.
+	Value string `json:"value"`
+}
+
+// GRPCAction describes an action that issues a unary gRPC call to a target service.
+//
+// Reflection & templating:
+//   - This implementation uses gRPC Server Reflection to discover service/method schemas at runtime.
+//     The target service MUST enable reflection. See: https://grpc.io/docs/guides/reflection/.
+//   - Request message field values in `Request` support Go text/template syntax and will be rendered
+//     with predefined action variables before marshaling into the request message.
+//   - Not intended for streaming or large data-transfer operations (e.g., dataLoad, dataDump).
+//     Only unary (non-streaming) RPCs are supported.
+//
+// Success & output:
+//   - After invocation, the `Status` field in `Response` (if set) is inspected; a non-empty value
+//     indicates failure.
+//   - The `Message` field in `Response` (if set) is written to stdout if the invocation succeeds,
+//     or to stderr if it fails.
+type GRPCAction struct {
+	// The port to access on the host.
+	// It may be a numeric string (e.g., "50051") or a named port defined in the container spec.
+	//
+	// +kubebuilder:validation:Required
+	Port string `json:"port"`
+
+	// The target host to connect to.
+	// Defaults to "127.0.0.1" if not specified.
+	//
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Fully-qualified name of the gRPC service to call.
+	//
+	// +kubebuilder:validation:Required
+	Service string `json:"service"`
+
+	// Name of the method to invoke on the gRPC service.
+	//
+	// +kubebuilder:validation:Required
+	Method string `json:"method"`
+
+	// Request payload for the gRPC method.
+	//
+	// Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
+	// Templates are rendered with predefined action variables before the request is sent.
+	//
+	// +optional
+	Request GRPCRequest `json:"request,omitempty"`
+
+	// Required response schema for the gRPC method.
+	//
+	// +optional
+	Response GRPCResponse `json:"response,omitempty"`
+
+	// TODO: TLS
+}
+
+// GRPCRequest is a map of proto field names to their string values.
+type GRPCRequest map[string]string
+
+// GRPCResponse defines which fields in the gRPC response should be treated as status or output.
+type GRPCResponse struct {
+	// Name of the string field in the response that carries status information.
+	// If non-empty, the action fails.
+	//
+	// +optional
+	Status string `json:"status,omitempty"`
+
+	// Name of the field in the response whose value should be output.
+	// Printed to stdout on success, or stderr on failure.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // TargetPodSelector defines how to select pod(s) to execute an Action.

@@ -21,6 +21,8 @@ package cluster
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -46,10 +48,6 @@ var _ graph.Transformer = &clusterComponentStatusTransformer{}
 func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	if transCtx.OrigCluster.IsDeleting() {
-		return nil
-	}
-
-	if !transCtx.OrigCluster.IsStatusUpdating() {
 		return nil
 	}
 	return t.transform(transCtx)
@@ -144,6 +142,8 @@ func (t *clusterComponentStatusTransformer) transformCompStatus(transCtx *cluste
 			Message: map[string]string{
 				"reason": "the component to be created",
 			},
+			ObservedGeneration: cluster.Generation,
+			UpToDate:           false,
 		}
 	}
 	for name := range deleteSet {
@@ -152,6 +152,8 @@ func (t *clusterComponentStatusTransformer) transformCompStatus(transCtx *cluste
 			Message: map[string]string{
 				"reason": "the component is under deleting",
 			},
+			ObservedGeneration: cluster.Generation,
+			UpToDate:           false,
 		}
 	}
 	for name := range updateSet {
@@ -167,10 +169,7 @@ func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clu
 	)
 
 	phase := status.Phase
-	if string(status.Phase) != string(comp.Status.Phase) {
-		status.Phase = comp.Status.Phase
-		status.Message = comp.Status.Message
-	}
+	status = t.clusterCompStatus(cluster, comp)
 
 	if phase != status.Phase {
 		msg := clusterCompNShardingPhaseTransitionMsg("component", compName, status.Phase)
@@ -180,6 +179,22 @@ func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clu
 		transCtx.GetLogger().Info(fmt.Sprintf("cluster component phase transition: %s -> %s (%s)", phase, status.Phase, msg))
 	}
 
+	return status
+}
+
+func (t *clusterComponentStatusTransformer) clusterCompStatus(cluster *appsv1.Cluster, comp *appsv1.Component) appsv1.ClusterComponentStatus {
+	status := appsv1.ClusterComponentStatus{
+		Phase:              comp.Status.Phase,
+		Message:            comp.Status.Message,
+		ObservedGeneration: 0,
+		UpToDate:           false,
+	}
+	generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+	if ok {
+		ig, _ := strconv.ParseInt(generation, 10, 64)
+		status.ObservedGeneration = ig
+		status.UpToDate = comp.Generation == comp.Status.ObservedGeneration && ig == cluster.Generation
+	}
 	return status
 }
 
@@ -211,6 +226,8 @@ func (t *clusterComponentStatusTransformer) transformShardingStatus(transCtx *cl
 			Message: map[string]string{
 				"reason": "the sharding to be created",
 			},
+			ObservedGeneration: cluster.Generation,
+			UpToDate:           false,
 		}
 	}
 	for name := range deleteSet {
@@ -219,6 +236,8 @@ func (t *clusterComponentStatusTransformer) transformShardingStatus(transCtx *cl
 			Message: map[string]string{
 				"reason": "the sharding is under deleting",
 			},
+			ObservedGeneration: cluster.Generation,
+			UpToDate:           false,
 		}
 	}
 	for name := range updateSet {
@@ -234,11 +253,7 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	)
 
 	phase := status.Phase
-	newPhase, newMessage := t.shardingPhaseNMessage(comps)
-	if status.Phase != newPhase {
-		status.Phase = newPhase
-		status.Message = newMessage
-	}
+	status = t.clusterShardingStatus(cluster, comps)
 
 	if phase != status.Phase {
 		msg := clusterCompNShardingPhaseTransitionMsg("sharding", shardingName, status.Phase)
@@ -251,20 +266,30 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	return status
 }
 
-func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv1.Component) (appsv1.ComponentPhase, map[string]string) {
-	statusList := make([]appsv1.ClusterComponentStatus, 0)
-	phasedMessage := map[appsv1.ComponentPhase]map[string]string{}
+func (t *clusterComponentStatusTransformer) clusterShardingStatus(cluster *appsv1.Cluster, comps []*appsv1.Component) appsv1.ClusterComponentStatus {
+	var (
+		statusList    = make([]appsv1.ClusterComponentStatus, 0)
+		phasedMessage = map[appsv1.ComponentPhase]map[string]string{}
+		generation    = int64(math.MaxInt64)
+		upToDate      = true
+	)
 	for _, comp := range comps {
-		phase := comp.Status.Phase
-		message := comp.Status.Message
-		if _, ok := phasedMessage[phase]; !ok {
-			phasedMessage[phase] = message
+		status := t.clusterCompStatus(cluster, comp)
+		statusList = append(statusList, status)
+		if _, ok := phasedMessage[status.Phase]; !ok {
+			phasedMessage[status.Phase] = status.Message
 		}
-		statusList = append(statusList, appsv1.ClusterComponentStatus{Phase: phase})
+		generation = min(status.ObservedGeneration, generation)
+		upToDate = upToDate && status.UpToDate
 	}
 	if len(phasedMessage) == 0 {
 		// ???
-		return "", map[string]string{"reason": "the component objects are not found"}
+		return appsv1.ClusterComponentStatus{
+			Phase:              "",
+			Message:            map[string]string{"reason": "the component objects are not found"},
+			ObservedGeneration: 0,
+			UpToDate:           false,
+		}
 	}
 
 	composedPhase := composeClusterPhase(statusList)
@@ -272,7 +297,12 @@ func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv
 		composedPhase = appsv1.FailedClusterPhase
 	}
 	phase := appsv1.ComponentPhase(composedPhase)
-	return phase, phasedMessage[phase]
+	return appsv1.ClusterComponentStatus{
+		Phase:              phase,
+		Message:            phasedMessage[phase],
+		ObservedGeneration: generation,
+		UpToDate:           upToDate,
+	}
 }
 
 func clusterCompNShardingPhaseTransitionMsg(kind, name string, phase appsv1.ComponentPhase) string {

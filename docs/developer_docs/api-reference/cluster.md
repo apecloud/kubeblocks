@@ -3316,6 +3316,7 @@ ComponentPhase
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the current state of the Component.</p>
 </td>
 </tr>
@@ -3328,8 +3329,31 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records detailed information about the Component in its current phase.
-The keys are either podName, deployName, or statefulSetName, formatted as &lsquo;ObjectKind/Name&rsquo;.</p>
+<p>Records detailed information about the Component in its current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the most recent generation of the component state observed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the component state observed is up-to-date with the desired state.</p>
 </td>
 </tr>
 </tbody>

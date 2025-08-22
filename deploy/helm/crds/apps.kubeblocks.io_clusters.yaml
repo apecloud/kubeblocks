@@ -13273,10 +13273,14 @@ spec:
                     message:
                       additionalProperties:
                         type: string
-                      description: |-
-                        Records detailed information about the Component in its current phase.
-                        The keys are either podName, deployName, or statefulSetName, formatted as 'ObjectKind/Name'.
+                      description: Records detailed information about the Component
+                        in its current phase.
                       type: object
+                    observedGeneration:
+                      description: Indicates the most recent generation of the component
+                        state observed.
+                      format: int64
+                      type: integer
                     phase:
                       description: Specifies the current state of the Component.
                       enum:
@@ -13289,6 +13293,10 @@ spec:
                       - Stopped
                       - Failed
                       type: string
+                    upToDate:
+                      description: Indicates whether the component state observed
+                        is up-to-date with the desired state.
+                      type: boolean
                   type: object
                 description: Records the current status information of all Components
                   within the Cluster.
@@ -13399,10 +13407,14 @@ spec:
                     message:
                       additionalProperties:
                         type: string
-                      description: |-
-                        Records detailed information about the Component in its current phase.
-                        The keys are either podName, deployName, or statefulSetName, formatted as 'ObjectKind/Name'.
+                      description: Records detailed information about the Component
+                        in its current phase.
                       type: object
+                    observedGeneration:
+                      description: Indicates the most recent generation of the component
+                        state observed.
+                      format: int64
+                      type: integer
                     phase:
                       description: Specifies the current state of the Component.
                       enum:
@@ -13415,6 +13427,10 @@ spec:
                       - Stopped
                       - Failed
                       type: string
+                    upToDate:
+                      description: Indicates whether the component state observed
+                        is up-to-date with the desired state.
+                      type: boolean
                   type: object
                 description: Records the current status information of all shardings
                   within the Cluster.

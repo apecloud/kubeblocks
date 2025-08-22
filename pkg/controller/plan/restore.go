@@ -54,7 +54,7 @@ type RestoreManager struct {
 
 	// private
 	namespace                         string
-	restoreTime                       string
+	RestoreTime                       string
 	env                               []corev1.EnvVar
 	parameters                        []dpv1alpha1.ParameterPair
 	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
@@ -62,6 +62,7 @@ type RestoreManager struct {
 	startingIndex                     int32
 	replicas                          int32
 	restoreLabels                     map[string]string
+	RestoreNamePrefix                 string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -218,7 +219,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 				Namespace:        r.namespace,
 				SourceTargetName: sourceTargetName,
 			},
-			RestoreTime: r.restoreTime,
+			RestoreTime: r.RestoreTime,
 			Env:         r.env,
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
@@ -280,7 +281,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				Namespace:        r.namespace,
 				SourceTargetName: sourceTargetName,
 			},
-			RestoreTime: r.restoreTime,
+			RestoreTime: r.RestoreTime,
 			Env:         r.env,
 			Parameters:  r.parameters,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
@@ -362,6 +363,9 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	if r.startingIndex != 0 {
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
 	}
+	if r.RestoreNamePrefix != "" {
+		name = fmt.Sprintf("%s-%s", r.RestoreNamePrefix, name)
+	}
 	if len(r.restoreLabels) == 0 {
 		r.restoreLabels = constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	}
@@ -396,7 +400,7 @@ func (r *RestoreManager) initFromAnnotation(comp *component.SynthesizedComponent
 	if volumeRestorePolicy := backupSource[constant.VolumeRestorePolicyKeyForRestore]; volumeRestorePolicy != "" {
 		r.volumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(volumeRestorePolicy)
 	}
-	r.restoreTime = backupSource[constant.RestoreTimeKeyForRestore]
+	r.RestoreTime = backupSource[constant.RestoreTimeKeyForRestore]
 	doReadyRestoreAfterClusterRunning := backupSource[constant.DoReadyRestoreAfterClusterRunning]
 	if doReadyRestoreAfterClusterRunning == "true" {
 		r.doReadyRestoreAfterClusterRunning = true

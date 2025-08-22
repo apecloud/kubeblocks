@@ -231,7 +231,7 @@ func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, err
 		templateName = podSuffix[0:lastDashIndex]
 		indexStr = podSuffix[lastDashIndex+1:]
 	}
-	index, err := strconv.Atoi(indexStr)
+	index, err := strconv.ParseInt(indexStr, 10, 32)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
 	}

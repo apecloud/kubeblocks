@@ -431,6 +431,23 @@ func (r *OpsRequestReconciler) getRunningOpsRequestsFromCluster(cluster *appsv1.
 
 func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, object client.Object) []reconcile.Request {
 	cluster := object.(*appsv1.Cluster)
+	if cluster.IsDeleting() {
+		// if the cluster is deleting, we should enqueue all the opsRequests in this cluster.
+		opsList := &opsv1alpha1.OpsRequestList{}
+		_ = r.Client.List(ctx, opsList, client.InNamespace(cluster.Namespace), client.MatchingFields{
+			constant.AppInstanceLabelKey: cluster.Name,
+		})
+		var requests []reconcile.Request
+		for i := range opsList.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cluster.Namespace,
+					Name:      opsList.Items[i].Name,
+				},
+			})
+		}
+		return requests
+	}
 	return r.getRunningOpsRequestsFromCluster(cluster)
 }
 

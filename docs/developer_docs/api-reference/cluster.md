@@ -32276,7 +32276,7 @@ Kubernetes core/v1.ServiceAccount
 </tr>
 <tr>
 <td>
-<code>clusterRole</code><br/>
+<code>role</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#role-v1-rbac">
 Kubernetes rbac/v1.Role

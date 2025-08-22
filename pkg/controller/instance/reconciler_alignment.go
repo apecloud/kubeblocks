@@ -23,9 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -51,22 +49,12 @@ func (r *alignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubeb
 func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 
-	newNameSet := sets.New[string](podName(inst))
+	// create pod
 	obj, err := tree.Get(podObj(inst))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-
-	oldNameSet := sets.New[string]()
-	oldPodList := tree.List(&corev1.Pod{})
-	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
-	for _, object := range oldPodList {
-		oldNameSet.Insert(object.GetName())
-	}
-	deleteNameSet := oldNameSet.Difference(newNameSet)
-
 	if obj == nil {
-		// create pod
 		newPod, err := buildInstancePod(inst, "")
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -74,52 +62,46 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
-
-		// create PVCs
-		pvcs, err := buildInstancePVCs(inst)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		for _, pvc := range pvcs {
-			switch oldPvc, err := tree.Get(pvc); {
-			case err != nil:
-				return kubebuilderx.Continue, err
-			case oldPvc == nil:
-				if err = tree.Add(pvc); err != nil {
-					return kubebuilderx.Continue, err
-				}
-			default:
-				// TODO: do not update PVC here
-				pvcObj := copyAndMerge(oldPvc, pvc)
-				if pvcObj != nil {
-					if err = tree.Update(pvcObj); err != nil {
-						return kubebuilderx.Continue, err
-					}
-				}
-			}
-		}
 	}
 
-	// delete useless pod & PVCs
-	for _, object := range oldPodList {
-		pod, _ := object.(*corev1.Pod)
-		if _, ok := deleteNameSet[pod.Name]; !ok {
-			continue
-		}
-		if err = tree.Delete(pod); err != nil {
+	// handle pvcs
+	newPVCList, err := buildInstancePVCs(inst)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
+
+	newPVCs, oldPVCs := map[string]*corev1.PersistentVolumeClaim{}, map[string]*corev1.PersistentVolumeClaim{}
+	newPVCNameSet, oldPVCNameSet := sets.New[string](), sets.New[string]()
+	for i, pvc := range newPVCList {
+		newPVCs[pvc.Name] = newPVCList[i]
+		newPVCNameSet.Insert(pvc.Name)
+	}
+	for i, pvc := range oldPVCList {
+		oldPVCs[pvc.GetName()] = oldPVCList[i].(*corev1.PersistentVolumeClaim)
+		oldPVCNameSet.Insert(pvc.GetName())
+	}
+
+	createSet := newPVCNameSet.Difference(oldPVCNameSet)
+	deleteSet := oldPVCNameSet.Difference(newPVCNameSet)
+	updateSet := newPVCNameSet.Intersection(oldPVCNameSet)
+
+	for pvcName := range deleteSet {
+		if err = tree.Delete(oldPVCs[pvcName]); err != nil {
 			return kubebuilderx.Continue, err
 		}
-
-		retentionPolicy := inst.Spec.PersistentVolumeClaimRetentionPolicy
-		// the default policy is `Delete`
-		if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
-			for _, pobj := range oldPVCList {
-				pvc := pobj.(*corev1.PersistentVolumeClaim)
-				if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {
-					if err = tree.Delete(pvc); err != nil {
-						return kubebuilderx.Continue, err
-					}
-				}
+	}
+	for pvcName := range createSet {
+		if err = tree.Add(newPVCs[pvcName]); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
+	for pvcName := range updateSet {
+		// TODO: do not update PVC here
+		pvcObj := copyAndMerge(oldPVCs[pvcName], newPVCs[pvcName])
+		if pvcObj != nil {
+			if err = tree.Update(pvcObj); err != nil {
+				return kubebuilderx.Continue, err
 			}
 		}
 	}

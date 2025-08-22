@@ -71,7 +71,11 @@ func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree
 	}
 	if err != nil || robj == nil {
 		labels := obj.GetLabels()
-		maps.Copy(labels, getMatchLabels(inst.Name))
+		if labels == nil {
+			labels = getMatchLabels(inst.Name)
+		} else {
+			maps.Copy(labels, getMatchLabels(inst.Name))
+		}
 		obj.SetLabels(labels)
 		if err := controllerutil.SetControllerReference(inst, obj, model.GetScheme()); err != nil {
 			return false, err

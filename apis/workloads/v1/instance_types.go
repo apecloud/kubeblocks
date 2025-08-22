@@ -189,6 +189,6 @@ type InstanceAssistantObject struct {
 	ConfigMap      *corev1.ConfigMap      `json:"configMap,omitempty"`
 	Secret         *corev1.Secret         `json:"secret,omitempty"`
 	ServiceAccount *corev1.ServiceAccount `json:"serviceAccount,omitempty"`
-	Role           *rbacv1.Role           `json:"clusterRole,omitempty"`
+	Role           *rbacv1.Role           `json:"role,omitempty"`
 	RoleBinding    *rbacv1.RoleBinding    `json:"roleBinding,omitempty"`
 }

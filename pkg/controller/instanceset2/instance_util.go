@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -220,112 +219,90 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.MinReadySeconds = newInst.Spec.MinReadySeconds
 
 	// merge pvcs
-	for i := range newInst.Spec.VolumeClaimTemplates {
-		newPVC := &newInst.Spec.VolumeClaimTemplates[i]
-		oldPVC := &targetInst.Spec.VolumeClaimTemplates[i]
-		mergeMap(&newPVC.Labels, &oldPVC.Labels)
-		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
-		// resources.request.storage and accessModes support in-place update.
-		// resources.request.storage only supports volume expansion.
-		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&
-			oldPVC.Spec.Resources.Requests.Storage().Cmp(*newPVC.Spec.Resources.Requests.Storage()) >= 0 {
-			continue
-		}
-		oldPVC.Spec.AccessModes = newPVC.Spec.AccessModes
-		if newPVC.Spec.Resources.Requests == nil {
-			continue
-		}
-		if _, ok := newPVC.Spec.Resources.Requests[corev1.ResourceStorage]; !ok {
-			continue
-		}
-		requests := oldPVC.Spec.Resources.Requests
-		if requests == nil {
-			requests = make(corev1.ResourceList)
-		}
-		requests[corev1.ResourceStorage] = *newPVC.Spec.Resources.Requests.Storage()
-		oldPVC.Spec.Resources.Requests = requests
-	}
+	targetInst.Spec.VolumeClaimTemplates = newInst.Spec.VolumeClaimTemplates
 	targetInst.Spec.PersistentVolumeClaimRetentionPolicy = newInst.Spec.PersistentVolumeClaimRetentionPolicy
 
-	copyAndMergeService := func(old, new *corev1.Service) client.Object {
-		mergeMap(&new.Labels, &old.Labels)
-		mergeMap(&new.Annotations, &old.Annotations)
-		old.Spec.Selector = new.Spec.Selector
-		old.Spec.Type = new.Spec.Type
-		old.Spec.PublishNotReadyAddresses = new.Spec.PublishNotReadyAddresses
-		old.Spec.Ports = new.Spec.Ports
-		return old
-	}
-
-	copyAndMergeCM := func(old, new *corev1.ConfigMap) client.Object {
-		mergeMap(&new.Labels, &old.Labels)
-		mergeMap(&new.Annotations, &old.Annotations)
-		old.Data = new.Data
-		old.BinaryData = new.BinaryData
-		return old
-	}
-
-	copyAndMergeSecret := func(old, new *corev1.Secret) client.Object {
-		mergeMap(&new.Labels, &old.Labels)
-		mergeMap(&new.Annotations, &old.Annotations)
-		old.Data = new.Data
-		old.StringData = new.StringData
-		return old
-	}
-
-	copyAndMergeSA := func(old, new *corev1.ServiceAccount) client.Object {
-		mergeMap(&new.Labels, &old.Labels)
-		mergeMap(&new.Annotations, &old.Annotations)
-		old.Secrets = new.Secrets
-		return old
-	}
-
-	copyAndMergeRole := func(old, new *rbacv1.Role) client.Object {
-		mergeMap(&new.Labels, &old.Labels)
-		mergeMap(&new.Annotations, &old.Annotations)
-		old.Rules = new.Rules
-		return old
-	}
-
-	copyAndMergeRoleBinding := func(old, new *rbacv1.RoleBinding) client.Object {
-		mergeMap(&new.Labels, &old.Labels)
-		mergeMap(&new.Annotations, &old.Annotations)
-		old.Subjects = new.Subjects
-		old.RoleRef = new.RoleRef
-		return old
-	}
-
-	copyNMergeAssistantObjects := func() {
-		for i := range newInst.Spec.InstanceAssistantObjects {
-			oldObj := &targetInst.Spec.InstanceAssistantObjects[i]
-			newObj := &newInst.Spec.InstanceAssistantObjects[i]
-			if newObj.Service != nil {
-				copyAndMergeService(oldObj.Service, newObj.Service)
-			}
-			if newObj.ConfigMap != nil {
-				copyAndMergeCM(oldObj.ConfigMap, newObj.ConfigMap)
-			}
-			if newObj.Secret != nil {
-				copyAndMergeSecret(oldObj.Secret, newObj.Secret)
-			}
-			if newObj.ServiceAccount != nil {
-				copyAndMergeSA(oldObj.ServiceAccount, newObj.ServiceAccount)
-			}
-			if newObj.Role != nil {
-				copyAndMergeRole(oldObj.Role, newObj.Role)
-			}
-			if newObj.RoleBinding != nil {
-				copyAndMergeRoleBinding(oldObj.RoleBinding, newObj.RoleBinding)
-			}
-		}
-	}
-
+	// copyAndMergeService := func(old, new *corev1.Service) client.Object {
+	//	mergeMap(&new.Labels, &old.Labels)
+	//	mergeMap(&new.Annotations, &old.Annotations)
+	//	old.Spec.Selector = new.Spec.Selector
+	//	old.Spec.Type = new.Spec.Type
+	//	old.Spec.PublishNotReadyAddresses = new.Spec.PublishNotReadyAddresses
+	//	old.Spec.Ports = new.Spec.Ports
+	//	return old
+	// }
+	//
+	// copyAndMergeCM := func(old, new *corev1.ConfigMap) client.Object {
+	//	mergeMap(&new.Labels, &old.Labels)
+	//	mergeMap(&new.Annotations, &old.Annotations)
+	//	old.Data = new.Data
+	//	old.BinaryData = new.BinaryData
+	//	return old
+	// }
+	//
+	// copyAndMergeSecret := func(old, new *corev1.Secret) client.Object {
+	//	mergeMap(&new.Labels, &old.Labels)
+	//	mergeMap(&new.Annotations, &old.Annotations)
+	//	old.Data = new.Data
+	//	old.StringData = new.StringData
+	//	return old
+	// }
+	//
+	// copyAndMergeSA := func(old, new *corev1.ServiceAccount) client.Object {
+	//	mergeMap(&new.Labels, &old.Labels)
+	//	mergeMap(&new.Annotations, &old.Annotations)
+	//	old.Secrets = new.Secrets
+	//	return old
+	// }
+	//
+	// copyAndMergeRole := func(old, new *rbacv1.Role) client.Object {
+	//	mergeMap(&new.Labels, &old.Labels)
+	//	mergeMap(&new.Annotations, &old.Annotations)
+	//	old.Rules = new.Rules
+	//	return old
+	// }
+	//
+	// copyAndMergeRoleBinding := func(old, new *rbacv1.RoleBinding) client.Object {
+	//	mergeMap(&new.Labels, &old.Labels)
+	//	mergeMap(&new.Annotations, &old.Annotations)
+	//	old.Subjects = new.Subjects
+	//	old.RoleRef = new.RoleRef
+	//	return old
+	// }
+	//
+	// copyNMergeAssistantObjects := func() {
+	//	for i := range newInst.Spec.InstanceAssistantObjects {
+	//		oldObj := &targetInst.Spec.InstanceAssistantObjects[i]
+	//		newObj := &newInst.Spec.InstanceAssistantObjects[i]
+	//		if newObj.Service != nil {
+	//			copyAndMergeService(oldObj.Service, newObj.Service)
+	//		}
+	//		if newObj.ConfigMap != nil {
+	//			copyAndMergeCM(oldObj.ConfigMap, newObj.ConfigMap)
+	//		}
+	//		if newObj.Secret != nil {
+	//			copyAndMergeSecret(oldObj.Secret, newObj.Secret)
+	//		}
+	//		if newObj.ServiceAccount != nil {
+	//			copyAndMergeSA(oldObj.ServiceAccount, newObj.ServiceAccount)
+	//		}
+	//		if newObj.Role != nil {
+	//			copyAndMergeRole(oldObj.Role, newObj.Role)
+	//		}
+	//		if newObj.RoleBinding != nil {
+	//			copyAndMergeRoleBinding(oldObj.RoleBinding, newObj.RoleBinding)
+	//		}
+	//	}
+	// }
+	//
+	//// merge assistant objects
+	// if len(targetInst.Spec.InstanceAssistantObjects) == 0 {
+	//	targetInst.Spec.InstanceAssistantObjects = newInst.Spec.InstanceAssistantObjects
+	// } else {
+	//	copyNMergeAssistantObjects()
+	// }
 	// merge assistant objects
-	if len(targetInst.Spec.InstanceAssistantObjects) == 0 {
-		targetInst.Spec.InstanceAssistantObjects = newInst.Spec.InstanceAssistantObjects
-	} else {
-		copyNMergeAssistantObjects()
-	}
+	targetInst.Spec.InstanceAssistantObjects = newInst.Spec.InstanceAssistantObjects
 
 	// other fields
 	targetInst.Spec.InstanceSetName = newInst.Spec.InstanceSetName

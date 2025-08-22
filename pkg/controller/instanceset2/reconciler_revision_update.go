@@ -45,20 +45,15 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
-	updatedReplicas, err := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
+	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	its.Status.UpdatedReplicas = updatedReplicas
-	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
-	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
-	// performing the computation only when the 'spec' is updated.
+
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil
 }
 
-func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) (int32, error) {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
@@ -66,5 +61,5 @@ func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.Insta
 			updatedReplicas++
 		}
 	}
-	return updatedReplicas, nil
+	return updatedReplicas
 }

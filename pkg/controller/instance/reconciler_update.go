@@ -38,8 +38,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// updateReconciler handles the updates of instances based on the UpdateStrategy.
-// Currently, two update strategies are supported: 'OnDelete' and 'RollingUpdate'.
 type updateReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}

@@ -48,7 +48,7 @@ const (
 var (
 	codecs         = serializer.NewCodecFactory(model.GetScheme())
 	patchCodec     = codecs.LegacyCodec(workloads.SchemeGroupVersion)
-	controllerKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKind = appsv1.SchemeGroupVersion.WithKind("Instance")
 )
 
 func newRevision(inst *workloads.Instance) (*appsv1.ControllerRevision, error) {

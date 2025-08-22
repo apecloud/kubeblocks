@@ -22,7 +22,6 @@ package instance
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -57,7 +56,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 		return err
 	}
 
-	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
+	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be handled
 	patch := client.MergeFrom(event.DeepCopy())
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string)
@@ -97,15 +96,6 @@ func (h *PodRoleEventHandler) handleRoleChangedEvent(cli client.Client, reqCtx i
 		return nil
 	}
 
-	snapshotVersion := strconv.FormatInt(event.EventTime.UnixMicro(), 10)
-	lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
-	if ok {
-		if snapshotVersion <= lastSnapshotVersion && !strings.Contains(lastSnapshotVersion, ":") {
-			reqCtx.Log.Info("stale role probe event received, ignore it")
-			return nil
-		}
-	}
-
 	var instName string
 	if pod.Labels != nil {
 		if n, ok := pod.Labels[constant.KBAppInstanceNameLabelKey]; ok {
@@ -119,11 +109,11 @@ func (h *PodRoleEventHandler) handleRoleChangedEvent(cli client.Client, reqCtx i
 
 	role := strings.ToLower(string(probeEvent.Output))
 	reqCtx.Log.Info("handle role change event", "pod", pod.Name, "role", role)
-	return h.updatePodRoleLabel(cli, reqCtx, inst, pod, role, snapshotVersion)
+	return h.updatePodRoleLabel(cli, reqCtx, inst, pod, role)
 }
 
 func (h *PodRoleEventHandler) updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	inst *workloads.Instance, pod *corev1.Pod, roleName string, snapshotVersion string) error {
+	inst *workloads.Instance, pod *corev1.Pod, roleName string) error {
 	var (
 		newPod  = pod.DeepCopy()
 		roleMap = composeRoleMap(inst)
@@ -136,10 +126,5 @@ func (h *PodRoleEventHandler) updatePodRoleLabel(cli client.Client, reqCtx intct
 	case false:
 		delete(newPod.Labels, constant.RoleLabelKey)
 	}
-
-	if newPod.Annotations == nil {
-		newPod.Annotations = map[string]string{}
-	}
-	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = snapshotVersion
 	return cli.Update(reqCtx.Ctx, newPod)
 }

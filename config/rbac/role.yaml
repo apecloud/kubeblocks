@@ -343,24 +343,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmap
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmap/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
   - configmaps
   verbs:
   - create

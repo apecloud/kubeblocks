@@ -14,7 +14,7 @@ require (
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/distribution/reference v0.6.0
-	github.com/docker/docker v26.1.5+incompatible
+	github.com/docker/docker v28.0.0+incompatible
 	github.com/evanphx/json-patch v5.7.0+incompatible
 	github.com/evanphx/json-patch/v5 v5.8.0
 	github.com/fasthttp/router v1.4.20
@@ -35,7 +35,6 @@ require (
 	github.com/magiconair/properties v1.8.7
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.36.3
-	github.com/opencontainers/image-spec v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/replicatedhq/troubleshoot v0.57.0
@@ -135,6 +134,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

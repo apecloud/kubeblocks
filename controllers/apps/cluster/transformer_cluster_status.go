@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"fmt"
+	"slices"
 
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,23 +40,10 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	switch {
-	case origCluster.IsUpdating():
-		transCtx.Logger.Info(fmt.Sprintf("update cluster status after applying resources, generation: %d", cluster.Generation))
-		cluster.Status.ObservedGeneration = cluster.Generation
-		t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster)
-	case origCluster.IsStatusUpdating():
-		defer func() { t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster) }()
-		// reconcile the phase and conditions of the cluster.status
-		if err := t.reconcileClusterStatus(transCtx, cluster); err != nil {
-			return err
-		}
-	case origCluster.IsDeleting():
-		return fmt.Errorf("unexpected cluster status: %s", origCluster.Status.Phase)
-	default:
-		panic(fmt.Sprintf("runtime error - unknown cluster status: %+v", origCluster))
+	defer func() { t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster) }()
+	if err := t.reconcileClusterStatus(cluster); err != nil {
+		return err
 	}
-
 	return nil
 }
 
@@ -66,17 +53,12 @@ func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.Gra
 	}
 }
 
-func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+func (t *clusterStatusTransformer) reconcileClusterStatus(cluster *appsv1.Cluster) error {
 	if len(cluster.Status.Components) == 0 && len(cluster.Status.Shardings) == 0 {
 		return nil
 	}
-
-	// t.removeDeletedCompNSharding(transCtx, cluster)
-
 	oldPhase := t.reconcileClusterPhase(cluster)
-
 	t.syncClusterConditions(cluster, oldPhase)
-
 	return nil
 }
 
@@ -94,6 +76,16 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster
 	if newPhase != "" {
 		cluster.Status.Phase = newPhase
 	}
+	cluster.Status.ObservedGeneration = slices.MinFunc(statusList, func(a, b appsv1.ClusterComponentStatus) int {
+		diff := a.ObservedGeneration - b.ObservedGeneration
+		if diff == 0 {
+			return 0
+		}
+		if diff < 0 {
+			return -1
+		}
+		return 1
+	}).ObservedGeneration
 	return phase
 }
 

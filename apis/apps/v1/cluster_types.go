@@ -868,11 +868,22 @@ const (
 // ClusterComponentStatus records Component status.
 type ClusterComponentStatus struct {
 	// Specifies the current state of the Component.
+	//
+	// +optional
 	Phase ComponentPhase `json:"phase,omitempty"`
 
 	// Records detailed information about the Component in its current phase.
-	// The keys are either podName, deployName, or statefulSetName, formatted as 'ObjectKind/Name'.
 	//
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
+
+	// Indicates the most recent generation of the component state observed.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Indicates whether the component state observed is up-to-date with the desired state.
+	//
+	// +optional
+	UpToDate bool `json:"upToDate,omitempty"`
 }

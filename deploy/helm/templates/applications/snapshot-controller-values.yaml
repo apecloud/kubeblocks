@@ -1,0 +1,22 @@
+{{- if has "snapshot-controller" .Values.autoInstalledAddons  }}
+{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snapshot-controller-chart-kubeblocks-values
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+data:
+  values-kubeblocks-override.yaml: |-
+    {{- $snapshotController := get .Values "snapshot-controller" }}
+    {{- $image := get $snapshotController "image" }}
+    {{- if not $image.repository }}
+       {{- $image = set $image  "repository" (printf "%s/apecloud/snapshot-controller" $imageRegistry) }}
+    {{- end }}
+    {{- $snapshotController = set $snapshotController "image" $image }}
+    {{- toYaml $snapshotController | nindent 4 }}
+{{- end }}

@@ -1,0 +1,22 @@
+{{- if has "apecloud-otel-collector" .Values.autoInstalledAddons  }}
+  {{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "addon.apecloud-otel-collector.name" . }}-chart-kubeblocks-values
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+data:
+  values-kubeblocks-override.yaml: |-
+    {{- $agamotto := get .Values "agamotto" }}
+    {{- $image := get $agamotto "image" }}
+    {{- if not $image.registry }}
+      {{- $image = set $image  "registry" $imageRegistry }}
+    {{- end }}
+    {{- $agamotto = set $agamotto "image" $image }}
+    {{- toYaml $agamotto | nindent 4 }}
+{{- end }}

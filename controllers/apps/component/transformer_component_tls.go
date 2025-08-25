@@ -26,6 +26,7 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,6 +79,12 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return err
 			}
 		}
+		component.AddInstanceAssistantObject(synthesizedComp, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: synthesizedComp.Namespace,
+				Name:      tlsSecretName(synthesizedComp.ClusterName, synthesizedComp.Name),
+			},
+		})
 		return t.updateVolumeNVolumeMount(compDef, synthesizedComp)
 	} else {
 		// the issuer and secretObj may be nil

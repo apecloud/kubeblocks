@@ -483,6 +483,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - serviceaccounts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - serviceaccounts/status
   verbs:
   - get
@@ -943,6 +949,12 @@ rules:
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
+  - rolebindings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
   - rolebindings/status
   verbs:
   - get
@@ -951,9 +963,19 @@ rules:
   resources:
   - roles
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles/finalizers
+  verbs:
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -1027,6 +1049,32 @@ rules:
   - trace.kubeblocks.io
   resources:
   - reconciliationtraces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - instances
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - instances/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - instances/status
   verbs:
   - get
   - patch

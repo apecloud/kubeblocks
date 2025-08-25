@@ -40,12 +40,21 @@ type ObjectOption interface {
 type ObjectOptions struct {
 	// if not empty, action should be done on the specified subresource
 	SubResource string
+
+	// if true, the object should not be reconciled
+	SkipToReconcile bool
 }
 
 type WithSubResource string
 
 func (w WithSubResource) ApplyToObject(opts *ObjectOptions) {
 	opts.SubResource = string(w)
+}
+
+type SkipToReconcile bool
+
+func (o SkipToReconcile) ApplyToObject(opts *ObjectOptions) {
+	opts.SkipToReconcile = bool(o)
 }
 
 type ObjectTree struct {
@@ -205,6 +214,10 @@ func (t *ObjectTree) GetSecondaryObjects() model.ObjectSnapshot {
 
 func (t *ObjectTree) Add(objects ...client.Object) error {
 	return t.replace(objects)
+}
+
+func (t *ObjectTree) AddWithOption(object client.Object, options ...ObjectOption) error {
+	return t.replace([]client.Object{object}, options...)
 }
 
 func (t *ObjectTree) Update(object client.Object, options ...ObjectOption) error {

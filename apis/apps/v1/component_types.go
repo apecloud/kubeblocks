@@ -323,6 +323,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Sidecars []Sidecar `json:"sidecars,omitempty"`
+
+	// Specifies whether to enable the new Instance API.
+	//
+	// +optional
+	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

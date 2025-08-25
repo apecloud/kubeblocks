@@ -6,7 +6,7 @@
   "name" "mongodb"
   "version" "0.9.3"
   "model" "document"
-  "provider" "community"
+  "provider" "apecloud"
   "description" "MongoDB is a document database designed for ease of application development and scaling."
   "autoInstall" true) . ) -}}
   {{- end }}

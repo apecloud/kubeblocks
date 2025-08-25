@@ -53,7 +53,7 @@ kubectl get addon {addonName} -o json | jq '{name: .metadata.name, resource_poli
 Error: UPGRADE FAILED: cannot patch "kubeblocks-dataprotection" with kind Deployment: Deployment.apps "kubeblocks-dataprotection" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"dataprotection", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable && cannot patch "kubeblocks" with kind Deployment: Deployment.apps "kubeblocks" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"apps", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 ```
 
-这是因为 KubeBlocks v0.9 修改了 KubeBlocks 和 KubeBlocks-DataProtection 的标签。
+这是因为 KubeBlocks v0.9 修改了 KubeBlocks 和 KubeBlocks-Dataprotection 的标签。
 
 如果出现这种错误，可以先手动删除 `kubeblocks` 和 `kubeblocks-dataprotection` 这两个 deployment，然后再执行 `helm upgrade` 升级到 KubeBlocks v0.9.x。
 
@@ -108,7 +108,7 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
    <TabItem value="kbcli" label="kbcli">
 
    ```bash
-   kbcli kb upgrade --version 0.9.2 \
+   kbcli kb upgrade --version 0.9.2 \ 
      --set admissionWebhooks.enabled=true \
      --set admissionWebhooks.ignoreReplicasCheck=true \
      --set image.registry=apecloud-registry.cn-xxx.xxx.com \
@@ -123,5 +123,5 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
    以下为上述命令的参数说明：
 
    - `--set image.registry=apecloud-registry.cn-xxx.xxx.com` 设置 KubeBlocks 镜像仓库。
-   - `--set dataProtection.image.registry=apecloud-registry.cn-xxx.xxx.com` 设置 KubeBlocks-DataProtection 镜像仓库。
+   - `--set dataProtection.image.registry=apecloud-registry.cn-xxx.xxx.com` 设置 KubeBlocks-Dataprotection 镜像仓库。
    - `--set addonChartsImage.registry=apecloud-registry.cn-xxx.xxx.com` 设置 addon Charts 镜像仓库。

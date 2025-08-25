@@ -57,7 +57,7 @@ type actionService struct {
 }
 
 type runningAction struct {
-	resultChan chan *commandResult
+	resultChan chan *asyncResult
 }
 
 var _ Service = &actionService{}
@@ -113,34 +113,30 @@ func (s *actionService) encode(out []byte, err error) []byte {
 }
 
 func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
-	if _, ok := s.actions[req.Action]; !ok {
+	action, ok := s.actions[req.Action]
+	if !ok {
 		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
 	}
-	action := s.actions[req.Action]
-	if action.Exec == nil {
-		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
+	if action.Exec == nil && action.HTTP == nil && action.GRPC == nil {
+		return nil, errors.Wrapf(proto.ErrBadRequest, "%s is invalid", req.Action)
 	}
 	// HACK: pre-check for the reconfigure action
 	if err := checkReconfigure(ctx, req); err != nil {
 		return nil, err
 	}
-	return s.handleExecAction(ctx, req, action)
-}
-
-func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
 	if req.NonBlocking == nil || !*req.NonBlocking {
-		return runCommand(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+		return blockingCallAction(ctx, action, req.Parameters, req.TimeoutSeconds)
 	}
-	return s.handleExecActionNonBlocking(ctx, req, action)
+	return s.handleRequestNonBlocking(ctx, req, action)
 }
 
-func (s *actionService) handleExecActionNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
+func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	running, ok := s.runningActions[req.Action]
 	if !ok {
-		resultChan, err := runCommandNonBlocking(ctx, action.Exec, req.Parameters, req.TimeoutSeconds)
+		resultChan, err := nonBlockingCallAction(ctx, action, req.Parameters, req.TimeoutSeconds)
 		if err != nil {
 			return nil, err
 		}

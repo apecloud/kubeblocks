@@ -141,7 +141,7 @@ func (a *kbagent) ignoreOutput(_ []byte, err error) error {
 }
 
 func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
-	if spec == nil || spec.Exec == nil {
+	if !spec.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
 	if err := a.precondition(ctx, cli, spec); err != nil {
@@ -152,7 +152,7 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 }
 
 func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec *appsv1.Probe, lfa lifecycleAction, opts *Options) ([]byte, error) {
-	if spec == nil || spec.Exec == nil {
+	if !spec.Action.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
 	return a.checkedCallAction(ctx, cli, &spec.Action, lfa, opts)
@@ -372,7 +372,14 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 }
 
 func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) ([]*corev1.Pod, error) {
-	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
+	selector := spec.TargetPodSelector
+	matchingKey := spec.MatchingKey
+	if len(selector) == 0 && spec.Exec != nil && len(spec.Exec.TargetPodSelector) > 0 {
+		// back-off to use spec.Exec
+		selector = spec.Exec.TargetPodSelector
+		matchingKey = spec.Exec.MatchingKey
+	}
+	if len(selector) == 0 {
 		return []*corev1.Pod{pod}, nil
 	}
 
@@ -386,7 +393,7 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 	}
 
 	podsWithRole := func() []*corev1.Pod {
-		roleName := spec.Exec.MatchingKey
+		roleName := matchingKey
 		var rolePods []*corev1.Pod
 		for i, pod := range pods {
 			if len(pod.Labels) != 0 {
@@ -398,7 +405,7 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 		return rolePods
 	}
 
-	switch spec.Exec.TargetPodSelector {
+	switch selector {
 	case appsv1.AnyReplica:
 		return anyPod(), nil
 	case appsv1.AllReplicas:
@@ -408,6 +415,6 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 	case appsv1.OrdinalSelector:
 		return nil, fmt.Errorf("ordinal selector is not supported")
 	default:
-		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
+		return nil, fmt.Errorf("unknown pod selector: %s", selector)
 	}
 }

@@ -42,6 +42,7 @@ func (t *componentMetaTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 	compDef := comp.Labels[constant.ComponentDefinitionLabelKey]
 	if compDef != comp.Spec.CompDef {
+		comp.Labels[constant.LastComponentDefinitionLabelKey] = compDef
 		comp.Labels[constant.ComponentDefinitionLabelKey] = comp.Spec.CompDef
 	}
 	controllerutil.AddFinalizer(comp, constant.DBComponentFinalizerName)

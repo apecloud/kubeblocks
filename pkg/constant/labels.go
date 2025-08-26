@@ -47,7 +47,6 @@ const (
 	KBAppInstanceNameLabelKey       = "apps.kubeblocks.io/instance-name"
 	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
 	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
-	PVCNameLabelKey                 = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
 
 	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"

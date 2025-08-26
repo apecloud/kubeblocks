@@ -26,8 +26,7 @@ const (
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
-	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
 	CfgKeyProvider                      = "KUBE_PROVIDER"
 	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
 	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"

@@ -36,7 +36,6 @@ const (
 
 	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
-	PVLastClaimPolicyAnnotationKey       = "apps.kubeblocks.io/pv-last-claim-policy"
 	LastRoleSnapshotVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey        = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 

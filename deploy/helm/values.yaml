@@ -511,13 +511,6 @@ autoInstalledAddons:
   - "redis"
   - "rabbitmq"
 
-## k8s cluster feature gates, ref: https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
-enabledAlphaFeatureGates:
-  ## @param enabledAlphaFeatureGates.recoverVolumeExpansionFailure -- Specifies whether feature gates RecoverVolumeExpansionFailure is enabled in k8s cluster.
-  ##
-  recoverVolumeExpansionFailure: false
-
-
 provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
 validProviders:
  - "aws"

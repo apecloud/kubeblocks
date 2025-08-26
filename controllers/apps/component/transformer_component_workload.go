@@ -308,9 +308,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentT
 	if err != nil {
 		return err
 	}
-	if err := cwo.expandVolume(); err != nil {
-		return err
-	}
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}

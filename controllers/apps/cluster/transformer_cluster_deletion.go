@@ -133,7 +133,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		if isOwnedByComp(o) || appsutil.IsOwnedByInstanceSet(o) {
 			continue
 		}
-		graphCli.Delete(dag, o, appsutil.InUniversalContext4G())
+		graphCli.Delete(dag, o)
 	}
 
 	// set cluster action to status until all the sub-resources deleted

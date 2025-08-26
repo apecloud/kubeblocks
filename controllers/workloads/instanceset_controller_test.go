@@ -641,18 +641,30 @@ var _ = Describe("InstanceSet Controller", func() {
 	})
 
 	Context("pod naming rule", func() {
-		checkPodOrdinal := func(ordinals []int, exist bool) {
+		checkPodOrdinal := func(ordinals []int, checkFunc func(podKey types.NamespacedName)) {
 			for _, ordinal := range ordinals {
 				podKey := types.NamespacedName{
 					Namespace: itsObj.Namespace,
 					Name:      fmt.Sprintf("%v-%v", itsObj.Name, ordinal),
 				}
-				if exist {
-					Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
-				} else {
-					Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
-				}
+				checkFunc(podKey)
 			}
+		}
+
+		eventuallyExist := func(podKey types.NamespacedName) {
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+		}
+
+		eventuallyNotExist := func(podKey types.NamespacedName) {
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+		}
+
+		consistentlyExist := func(podKey types.NamespacedName) {
+			Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+		}
+
+		consistentlyNotExist := func(podKey types.NamespacedName) {
+			Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
 		}
 
 		It("works with FlatInstanceOrdinal", func() {
@@ -662,29 +674,45 @@ var _ = Describe("InstanceSet Controller", func() {
 				f.SetReplicas(3)
 			})
 
-			checkPodOrdinal([]int{0, 1, 2}, true)
+			checkPodOrdinal([]int{0, 1, 2}, eventuallyExist)
 			mockPodReady(itsObj.Name+"-0", itsObj.Name+"-1", itsObj.Name+"-2")
+			By("check its status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.Ordinals).Should(HaveExactElements(int32(0), int32(1), int32(2)))
+			})).Should(Succeed())
 
 			// offline one instance
-			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Replicas = ptr.To[int32](2)
 				its.Spec.OfflineInstances = []string{itsObj.Name + "-1"}
+			})()).Should(Succeed())
+			checkPodOrdinal([]int{1}, eventuallyNotExist)
+			By("check its status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.Ordinals).Should(HaveExactElements(int32(0), int32(2)))
 			})).Should(Succeed())
-			checkPodOrdinal([]int{1}, false)
 
 			// scale up
-			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Replicas = ptr.To[int32](4)
-			})).Should(Succeed())
-			checkPodOrdinal([]int{0, 2, 3, 4}, true)
+			})()).Should(Succeed())
+			checkPodOrdinal([]int{0, 2, 3, 4}, eventuallyExist)
 			mockPodReady(itsObj.Name+"-3", itsObj.Name+"-4")
-
-			// delete OfflineInstances will not affect running instance
-			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.OfflineInstances = []string{}
+			By("check its status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.Ordinals).Should(HaveExactElements(int32(0), int32(2), int32(3), int32(4)))
 			})).Should(Succeed())
-			checkPodOrdinal([]int{0, 2, 3, 4}, true)
-			checkPodOrdinal([]int{1}, false)
+
+			// delete OfflineInstances will not affect running instances
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.OfflineInstances = []string{}
+			})()).Should(Succeed())
+			checkPodOrdinal([]int{0, 2, 3, 4}, consistentlyExist)
+			checkPodOrdinal([]int{1}, consistentlyNotExist)
+			By("check its status")
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.Ordinals).Should(HaveExactElements(int32(0), int32(2), int32(3), int32(4)))
+			})).Should(Succeed())
 		})
 	})
 })

@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1
 
+// InstanceListerExpansion allows custom methods to be added to
+// InstanceLister.
+type InstanceListerExpansion interface{}
+
+// InstanceNamespaceListerExpansion allows custom methods to be added to
+// InstanceNamespaceLister.
+type InstanceNamespaceListerExpansion interface{}
+
 // InstanceSetListerExpansion allows custom methods to be added to
 // InstanceSetLister.
 type InstanceSetListerExpansion interface{}

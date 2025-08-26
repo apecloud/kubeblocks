@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"k8s.io/utils/ptr"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -35,6 +38,10 @@ func (r *apiVersionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 
 func (r *apiVersionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	if !intctrlutil.ObjectAPIVersionSupported(tree.GetRoot()) {
+		return kubebuilderx.Commit, nil
+	}
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if ptr.Deref(its.Spec.EnableInstanceAPI, false) {
 		return kubebuilderx.Commit, nil
 	}
 	return kubebuilderx.Continue, nil

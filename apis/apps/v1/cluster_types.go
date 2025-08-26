@@ -527,6 +527,11 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies whether to enable the new Instance API.
+	//
+	// +optional
+	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
 }
 
 type ClusterComponentService struct {

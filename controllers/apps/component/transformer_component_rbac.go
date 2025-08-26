@@ -33,9 +33,9 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -104,9 +104,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 
+	objs := []client.Object{sa, role}
 	if sa != nil {
 		// serviceAccount should be created before roleBinding and role
 		for _, rb := range rbs {
+			objs = append(objs, rb)
 			graphCli.DependOn(dag, rb, sa, role)
 		}
 		// serviceAccount should be created before workload
@@ -116,7 +118,17 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
+	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+
 	return nil
+}
+
+func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {
+	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
+	for _, itsObj := range itsList {
+		its := itsObj.(*workloads.InstanceSet)
+		component.AddInstanceAssistantObjectsToITS(its, objs...)
+	}
 }
 
 func labelAndAnnotationEqual(old, new metav1.Object) bool {
@@ -143,7 +155,7 @@ func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformC
 	oldObj := PT(new(T))
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(obj), oldObj); err != nil {
 		if errors.IsNotFound(err) {
-			graphCli.Create(dag, obj, appsutil.InDataContext4G())
+			graphCli.Create(dag, obj)
 			return obj, nil
 		}
 		return nil, err
@@ -152,7 +164,7 @@ func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformC
 	if !cmpFn(oldObj, obj) || metav1.GetControllerOf(oldObj) == nil {
 		transCtx.Logger.V(1).Info("updating rbac resources",
 			"name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
-		graphCli.Update(dag, oldObj, obj, appsutil.InDataContext4G())
+		graphCli.Update(dag, oldObj, obj)
 	}
 	return obj, nil
 }

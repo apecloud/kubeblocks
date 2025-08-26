@@ -135,3 +135,8 @@ func (factory *MockInstanceSetFactory) SetPodManagementPolicy(podManagementPolic
 	factory.Get().Spec.PodManagementPolicy = podManagementPolicy
 	return factory
 }
+
+func (factory *MockInstanceSetFactory) SetEnableInstanceAPI(enable *bool) *MockInstanceSetFactory {
+	factory.Get().Spec.EnableInstanceAPI = enable
+	return factory
+}

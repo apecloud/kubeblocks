@@ -252,6 +252,30 @@ type InstanceSetSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	DisableDefaultHeadlessService bool `json:"disableDefaultHeadlessService,omitempty"`
+
+	// Specifies whether to enable the new Instance API.
+	//
+	// +optional
+	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
+
+	// Assistant objects that are necessary to run the instance.
+	//
+	// - Service:
+	//   - component service
+	// - ConfigMap:
+	//   - config & script templates
+	//   - env
+	//   - kbagent task
+	// - Secret:
+	//   - account
+	//   - TLS
+	// - RBAC:
+	//   - sa
+	//   - role
+	//   - rolebinding
+	//
+	// +optional
+	InstanceAssistantObjects []corev1.ObjectReference `json:"instanceAssistantObjects,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet

@@ -139,6 +139,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParametersDefinitions().Informer()}, nil
 
 		// Group=workloads.kubeblocks.io, Version=v1
+	case workloadsv1.SchemeGroupVersion.WithResource("instances"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().Instances().Informer()}, nil
 	case workloadsv1.SchemeGroupVersion.WithResource("instancesets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().InstanceSets().Informer()}, nil
 

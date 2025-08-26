@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -81,6 +80,12 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if err := createOrUpdateEnvConfigMap(transCtx, dag, envData); err != nil {
 		return err
 	}
+	component.AddInstanceAssistantObject(synthesizedComp, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: synthesizedComp.Namespace,
+			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+		},
+	})
 	return nil
 }
 
@@ -143,7 +148,7 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 		}
 
 		obj := &corev1.ConfigMap{}
-		err := transCtx.Client.Get(transCtx.Context, envKey, obj, appsutil.InDataContext4C())
+		err := transCtx.Client.Get(transCtx.Context, envKey, obj)
 		if err != nil {
 			return nil, nil, client.IgnoreNotFound(err)
 		}
@@ -172,7 +177,7 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
 			return err
 		}
-		graphCli.Create(dag, obj, appsutil.InDataContext4G())
+		graphCli.Create(dag, obj)
 		return nil
 	}
 
@@ -182,7 +187,7 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 		} else {
 			envObjCopy := envObj.DeepCopy()
 			envObjCopy.Data = newData
-			graphCli.Update(dag, envObj, envObjCopy, appsutil.InDataContext4G())
+			graphCli.Update(dag, envObj, envObjCopy)
 		}
 		return nil
 	}

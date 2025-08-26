@@ -22,7 +22,6 @@ package workloads
 import (
 	"context"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -33,10 +32,8 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/handler"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -61,12 +58,12 @@ type InstanceSetReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
-
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -99,51 +96,15 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	ctx := &handler.FinderContext{
-		Context: context.Background(),
-		Reader:  r.Client,
-		Scheme:  *r.Scheme,
-	}
-
-	if multiClusterMgr == nil {
-		return r.setupWithManager(mgr, ctx)
-	}
-	return r.setupWithMultiClusterManager(mgr, multiClusterMgr, ctx)
-}
-
-func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
-	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.InstanceSetKind, instanceset.WorkloadsInstanceLabelKey)
-	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
+func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Watches(&corev1.Pod{}, podHandler).
+		Owns(&corev1.Pod{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
-}
-
-func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
-	multiClusterMgr multicluster.Manager, ctx *handler.FinderContext) error {
-	nameLabels := []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
-	delegatorFinder := handler.NewDelegatorFinder(&workloads.InstanceSet{}, nameLabels)
-	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
-	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
-
-	b := intctrlutil.NewControllerManagedBy(mgr).
-		For(&workloads.InstanceSet{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
-		})
-
-	multiClusterMgr.Watch(b, &batchv1.Job{}, jobHandler).
-		Own(b, &corev1.Pod{}, &workloads.InstanceSet{}).
-		Own(b, &corev1.PersistentVolumeClaim{}, &workloads.InstanceSet{})
-
-	return b.Complete(r)
 }

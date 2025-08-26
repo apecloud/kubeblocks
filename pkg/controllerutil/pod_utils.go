@@ -318,7 +318,6 @@ func PodIsReadyWithLabel(pod corev1.Pod) bool {
 	if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
 		return false
 	}
-
 	return IsPodReady(&pod)
 }
 

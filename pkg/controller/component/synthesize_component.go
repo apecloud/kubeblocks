@@ -119,6 +119,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
+		EnableInstanceAPI:                comp.Spec.EnableInstanceAPI,
 	}
 
 	// build scheduling policy for workload

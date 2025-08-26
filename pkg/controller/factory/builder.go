@@ -68,7 +68,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, compDef)).
 		SetTemplate(getTemplate(synthesizedComp)).
-		SetSelectorMatchLabel(constant.GetCompLabels(clusterName, compName)).
+		SetSelectorMatchLabel(getTemplateLabels(synthesizedComp)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetVolumeClaimTemplates(defaultVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
@@ -83,7 +83,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
-		SetTemplateVars(synthesizedComp.TemplateVars)
+		SetTemplateVars(synthesizedComp.TemplateVars).
+		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
+		SetInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects)
 	if compDef != nil {
 		itsBuilder.SetDisableDefaultHeadlessService(compDef.Spec.DisableDefaultHeadlessService)
 	}
@@ -105,11 +107,10 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Labels)).
+		AddLabelsInMap(getTemplateLabels(synthesizedComp)).
 		AddLabelsInMap(map[string]string{
 			constant.AppComponentLabelKey:   synthesizedComp.CompDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
-			constant.KBAppReleasePhaseKey:   constant.ReleasePhaseStable,
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations)
@@ -117,6 +118,12 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
 	}
+}
+
+func getTemplateLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
+	labels := constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Labels)
+	labels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
+	return labels
 }
 
 func defaultVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {

@@ -22,15 +22,21 @@ package component
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -201,4 +207,57 @@ func ConfigTemplates(synthesizedComp *SynthesizedComponent) []appsv1.ComponentFi
 		}
 	}
 	return templates
+}
+
+func AddInstanceAssistantObject(synthesizedComp *SynthesizedComponent, object client.Object) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: synthesizedComp.Annotations,
+		},
+		Spec: workloads.InstanceSetSpec{
+			EnableInstanceAPI: synthesizedComp.EnableInstanceAPI,
+		},
+	}
+	if instanceAPINAssistantObjectsEnabled(its) {
+		synthesizedComp.InstanceAssistantObjects = addInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects, object)
+	}
+}
+
+func AddInstanceAssistantObjectsToITS(its *workloads.InstanceSet, objs ...client.Object) {
+	if instanceAPINAssistantObjectsEnabled(its) {
+		its.Spec.InstanceAssistantObjects = addInstanceAssistantObjects(its.Spec.InstanceAssistantObjects, objs...)
+	}
+}
+
+func instanceAPINAssistantObjectsEnabled(its *workloads.InstanceSet) bool {
+	if !ptr.Deref(its.Spec.EnableInstanceAPI, false) {
+		return false
+	}
+	return multicluster.Enabled4Object(its)
+}
+
+func addInstanceAssistantObjects(objectRefs []corev1.ObjectReference, objs ...client.Object) []corev1.ObjectReference {
+	if objectRefs == nil {
+		objectRefs = []corev1.ObjectReference{}
+	}
+	for _, obj := range objs {
+		if obj != nil && !reflect.ValueOf(obj).IsNil() {
+			gvk, _ := model.GetGVKName(obj)
+			objectRefs = append(objectRefs, corev1.ObjectReference{
+				Kind:      gvk.Kind,
+				Namespace: gvk.Namespace,
+				Name:      gvk.Name,
+			})
+		}
+	}
+	slices.SortFunc(objectRefs, func(a, b corev1.ObjectReference) int {
+		if a.Kind != b.Kind {
+			return strings.Compare(a.Kind, b.Kind)
+		}
+		if a.Namespace != b.Namespace {
+			return strings.Compare(a.Namespace, b.Namespace)
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	return objectRefs
 }

@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"slices"
 	"sort"
 	"time"
 
@@ -145,6 +146,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	its.Status.Replicas = replicas
 	its.Status.Ordinals = ordinals
+	slices.Sort(its.Status.Ordinals)
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
@@ -215,6 +217,7 @@ func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.Instanc
 		if len(templateName) == 0 {
 			continue
 		}
+		slices.Sort(templateStatus.Ordinals)
 		templatesStatus = append(templatesStatus, *templateStatus)
 	}
 	sort.Slice(templatesStatus, func(i, j int) bool {

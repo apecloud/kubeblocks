@@ -152,6 +152,10 @@ func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.
 		build(), nil
 }
 
+func (c *CreateVolumeSnapshotAction) Cleanup(actCtx ActionContext) error {
+	return nil
+}
+
 func (c *CreateVolumeSnapshotAction) validate() error {
 	if len(c.PersistentVolumeClaimWrappers) == 0 {
 		return errors.New("persistent volume claims are required")

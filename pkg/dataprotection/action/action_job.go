@@ -123,6 +123,24 @@ func (j *JobAction) Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, err
 	return handleErr(client.IgnoreAlreadyExists(actCtx.Client.Create(actCtx.Ctx, job)))
 }
 
+func (j *JobAction) Cleanup(actCtx ActionContext) error {
+	key := client.ObjectKey{
+		Namespace: j.ObjectMeta.Namespace,
+		Name:      j.ObjectMeta.Name,
+	}
+	job := batchv1.Job{}
+	exists, err := ctrlutil.CheckResourceExists(actCtx.Ctx, actCtx.Client, key, &job)
+	if err != nil {
+		return err
+	}
+	if exists {
+		if err := ctrlutil.BackgroundDeleteObject(actCtx.Client, actCtx.Ctx, &job); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (j *JobAction) validate() error {
 	if j.ObjectMeta.Name == "" {
 		return fmt.Errorf("name is required")

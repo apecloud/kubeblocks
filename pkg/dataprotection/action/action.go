@@ -39,6 +39,9 @@ type Action interface {
 
 	// Type returns the type of the action.
 	Type() dpv1alpha1.ActionType
+
+	// Cleanup cleans up external resources created by the action.
+	Cleanup(actCtx ActionContext) error
 }
 
 type ActionContext struct {

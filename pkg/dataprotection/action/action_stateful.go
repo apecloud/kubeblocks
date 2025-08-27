@@ -113,6 +113,10 @@ func (s *StatefulSetAction) Execute(ctx ActionContext) (actionStatus *dpv1alpha1
 	return actionStatus, nil
 }
 
+func (s *StatefulSetAction) Cleanup(actCtx ActionContext) error {
+	return nil
+}
+
 func (s *StatefulSetAction) createStatefulSet(ctx ActionContext, podSpec *corev1.PodSpec) error {
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: s.ObjectMeta,

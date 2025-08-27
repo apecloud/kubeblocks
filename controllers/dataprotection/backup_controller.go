@@ -613,6 +613,12 @@ func (r *BackupReconciler) handleRunningPhase(
 			// the backup actions for selected pod
 		targetPodBackupActions:
 			for _, act := range acts {
+				actionCompleted := isActionCompleted(request, act.GetName())
+				if actionCompleted {
+					// when the backup is completed, it will do another resource cleanup.
+					_ = act.Cleanup(actionCtx)
+					continue
+				}
 				status, err := act.Execute(actionCtx)
 				if err != nil {
 					return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
@@ -915,6 +921,15 @@ func PatchBackupObjectMeta(
 	}
 
 	return wait, request.Client.Patch(request.Ctx, request.Backup, client.MergeFrom(original))
+}
+
+func isActionCompleted(request *dpbackup.Request, name string) bool {
+	for _, action := range request.Status.Actions {
+		if action.Name == name {
+			return action.Phase == dpv1alpha1.ActionPhaseCompleted
+		}
+	}
+	return false
 }
 
 func mergeActionStatus(request *dpbackup.Request, status *dpv1alpha1.ActionStatus) {

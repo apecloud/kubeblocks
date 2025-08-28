@@ -169,10 +169,6 @@ spec:
             - name: KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY
               value: {{ .Values.addonChartsImage.pullPolicy | default "IfNotPresent" }}
             {{- end }}
-            {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
-            - name: RECOVER_VOLUME_EXPANSION_FAILURE
-              value: "true"
-            {{- end }}
             - name: DP_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:

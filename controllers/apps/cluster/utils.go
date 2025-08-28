@@ -30,7 +30,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -95,14 +94,14 @@ func getOwningNamespacedObjects(ctx context.Context,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
 	inNS := client.InNamespace(namespace)
-	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels, appsutil.InUniversalContext4C())
+	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels)
 }
 
 func getOwningNonNamespacedObjects(ctx context.Context,
 	cli client.Reader,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
-	return getOwningObjectsWithOptions(ctx, cli, kinds, labels, appsutil.InUniversalContext4C())
+	return getOwningObjectsWithOptions(ctx, cli, kinds, labels)
 }
 
 func getOwningObjectsWithOptions(ctx context.Context,

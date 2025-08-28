@@ -41,7 +41,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -190,18 +189,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
 		appsutil.RequeueDuration = time.Millisecond * time.Duration(retryDurationMS)
 	}
-	if multiClusterMgr == nil {
-		return r.setupWithManager(mgr)
-	}
-	return r.setupWithMultiClusterManager(mgr, multiClusterMgr)
-}
 
-func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.Component{}).
 		WithOptions(controller.Options{
@@ -211,34 +204,13 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
-		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.RoleBinding{}).
 			Owns(&rbacv1.Role{}).
 			Owns(&corev1.ServiceAccount{})
 	}
-
-	return b.Complete(r)
-}
-
-func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewControllerManagedBy(mgr).
-		For(&appsv1.Component{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
-		}).
-		Owns(&workloads.InstanceSet{}).
-		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
-
-	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
-	multiClusterMgr.Watch(b, &corev1.Service{}, eventHandler).
-		Watch(b, &corev1.Secret{}, eventHandler).
-		Watch(b, &corev1.ConfigMap{}, eventHandler).
-		Watch(b, &corev1.PersistentVolumeClaim{}, eventHandler).
-		Watch(b, &corev1.ServiceAccount{}, eventHandler).
-		Watch(b, &rbacv1.RoleBinding{}, eventHandler)
 
 	return b.Complete(r)
 }

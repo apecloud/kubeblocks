@@ -41,20 +41,8 @@ func IntoContext(ctx context.Context, placement string) context.Context {
 	return multicluster.IntoContext(ctx, placement)
 }
 
-func InDataContext4C() *multicluster.ClientOption {
-	return multicluster.InDataContext()
-}
-
-func InUniversalContext4C() *multicluster.ClientOption {
-	return multicluster.InUniversalContext()
-}
-
 func InDataContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InDataContext())
-}
-
-func InUniversalContext4G() model.GraphOption {
-	return model.WithClientOption(multicluster.InUniversalContext())
 }
 
 func ClientOption(v *model.ObjectVertex) *multicluster.ClientOption {

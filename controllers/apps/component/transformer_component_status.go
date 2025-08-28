@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -249,7 +248,7 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 // hasVolumeExpansionRunning checks if the volume expansion is running.
 func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
 	for _, vct := range t.runningITS.Spec.VolumeClaimTemplates {
-		volumes, err := getRunningVolumes(transCtx.Context, t.Client, t.synthesizeComp, t.runningITS, vct.Name)
+		volumes, err := t.getRunningVolumes(transCtx, vct.Name)
 		if err != nil {
 			return false, false, err
 		}
@@ -262,6 +261,25 @@ func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *compone
 		}
 	}
 	return running, failed, nil
+}
+
+func (t *componentStatusTransformer) getRunningVolumes(transCtx *componentTransformContext, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
+	synthesizedComp := t.synthesizeComp
+	pvcs, err := component.ListOwnedPVCs(transCtx.Context, t.Client, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
+	prefix := fmt.Sprintf("%s-%s", vctName, t.runningITS.Name)
+	for _, pvc := range pvcs {
+		if strings.HasPrefix(pvc.Name, prefix) {
+			matchedPVCs = append(matchedPVCs, pvc)
+		}
+	}
+	return matchedPVCs, nil
 }
 
 // hasFailedPod checks if the instance set has failed pod.
@@ -418,23 +436,4 @@ func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransf
 		}
 	}
 	return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the role %s is not present", *policy.WithRole)
-}
-
-func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
-	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-	pvcs, err := component.ListOwnedPVCs(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-	prefix := fmt.Sprintf("%s-%s", vctName, itsObj.Name)
-	for _, pvc := range pvcs {
-		if strings.HasPrefix(pvc.Name, prefix) {
-			matchedPVCs = append(matchedPVCs, pvc)
-		}
-	}
-	return matchedPVCs, nil
 }

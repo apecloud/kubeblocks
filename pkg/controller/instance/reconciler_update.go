@@ -37,12 +37,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type updateReconciler struct{}
+type updateReconciler struct {
+	pods []*corev1.Pod
+}
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}
 
-func NewUpdateReconciler() kubebuilderx.Reconciler {
-	return &updateReconciler{}
+func NewUpdateReconciler(pods []*corev1.Pod) kubebuilderx.Reconciler {
+	return &updateReconciler{pods: pods}
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {

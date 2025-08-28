@@ -66,6 +66,8 @@ const (
 	LastAppliedConfigsAnnotationKey = "dataprotection.kubeblocks.io/last-applied-configurations"
 	// SkipReconciliationAnnotationKey specifies whether to skip reconciliation.
 	SkipReconciliationAnnotationKey = "dataprotection.kubeblocks.io/skip-reconciliation"
+	// SkipRestorationCheckAnnotationKey specifies whether to skip restoration check.
+	SkipRestorationCheckAnnotationKey = "dataprotection.kubeblocks.io/skip-restoration-check"
 )
 
 // label keys

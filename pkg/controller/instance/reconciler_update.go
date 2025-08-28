@@ -210,7 +210,11 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 		}
 		return m
 	}()
-	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Spec.InstanceSetName, lifecycleActions, templateVars, pod)
+	pods := make([]*corev1.Pod, 0)
+	for _, object := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, object.(*corev1.Pod))
+	}
+	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Spec.InstanceSetName, lifecycleActions, templateVars, pod, pods)
 	if err != nil {
 		return err
 	}

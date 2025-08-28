@@ -34,7 +34,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -125,12 +124,14 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 }
 
 func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {
-	p := appsutil.Placement(comp)
-	if len(p) > 0 {
-		if its.Annotations == nil {
-			its.Annotations = make(map[string]string)
+	if comp.Annotations != nil {
+		placement := comp.Annotations[constant.KBAppMultiClusterPlacementKey]
+		if len(placement) > 0 {
+			if its.Annotations == nil {
+				its.Annotations = make(map[string]string)
+			}
+			its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement
 		}
-		its.Annotations[constant.KBAppMultiClusterPlacementKey] = p
 	}
 }
 

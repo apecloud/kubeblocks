@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -235,7 +236,14 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
-	}).SetupWithManager(k8sManager, nil)
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&workloads.InstanceEventReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("instance-event-controller"),
+	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&parameters.ComponentParameterReconciler{

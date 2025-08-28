@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -49,18 +48,15 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	if t.assigned(transCtx) {
-		transCtx.Context = appsutil.IntoContext(transCtx.Context, appsutil.Placement(transCtx.OrigCluster))
 		return nil
 	}
 
 	p := t.assign(transCtx)
-
 	cluster := transCtx.Cluster
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
 	cluster.Annotations[constant.KBAppMultiClusterPlacementKey] = strings.Join(p, ",")
-	transCtx.Context = appsutil.IntoContext(transCtx.Context, appsutil.Placement(cluster))
 
 	return nil
 }

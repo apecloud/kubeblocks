@@ -321,7 +321,7 @@ func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
 }
 
 func (c *clusterPlanBuilder) reconcileCreateObject(ctx context.Context, node *model.ObjectVertex) error {
-	err := c.cli.Create(ctx, node.Obj, appsutil.ClientOption(node))
+	err := c.cli.Create(ctx, node.Obj, multiClusterClientOption(node))
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -329,7 +329,7 @@ func (c *clusterPlanBuilder) reconcileCreateObject(ctx context.Context, node *mo
 }
 
 func (c *clusterPlanBuilder) reconcileUpdateObject(ctx context.Context, node *model.ObjectVertex) error {
-	err := c.cli.Update(ctx, node.Obj, appsutil.ClientOption(node))
+	err := c.cli.Update(ctx, node.Obj, multiClusterClientOption(node))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -338,7 +338,7 @@ func (c *clusterPlanBuilder) reconcileUpdateObject(ctx context.Context, node *mo
 
 func (c *clusterPlanBuilder) reconcilePatchObject(ctx context.Context, node *model.ObjectVertex) error {
 	patch := client.MergeFrom(node.OriObj)
-	err := c.cli.Patch(ctx, node.Obj, patch, appsutil.ClientOption(node))
+	err := c.cli.Patch(ctx, node.Obj, patch, multiClusterClientOption(node))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -347,7 +347,7 @@ func (c *clusterPlanBuilder) reconcilePatchObject(ctx context.Context, node *mod
 
 func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *model.ObjectVertex) error {
 	if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
-		err := c.cli.Update(ctx, node.Obj, appsutil.ClientOption(node))
+		err := c.cli.Update(ctx, node.Obj, multiClusterClientOption(node))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -357,7 +357,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 		deleteOptions := &client.DeleteOptions{
 			PropagationPolicy: &deletePropagation,
 		}
-		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, appsutil.ClientOption(node)); err != nil {
+		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, multiClusterClientOption(node)); err != nil {
 			return client.IgnoreNotFound(err)
 		}
 		return nil
@@ -374,7 +374,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 
 func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *model.ObjectVertex) error {
 	patch := client.MergeFrom(node.OriObj)
-	if err := c.cli.Status().Patch(ctx, node.Obj, patch, appsutil.ClientOption(node)); err != nil {
+	if err := c.cli.Status().Patch(ctx, node.Obj, patch, multiClusterClientOption(node)); err != nil {
 		return err
 	}
 	// handle condition and phase changing triggered events

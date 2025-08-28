@@ -1514,8 +1514,8 @@ type ComponentLifecycleActions struct {
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 	// In a typical consensus system, this action is used to transfer leader role to another replica.
 	//
-	// When a pod is about to be updated, a switchover action will be triggered to it. So addon implementation must determine
-	// if the pod's current role needs to be transferred. Due to this reason, targetPodSelector is not applicable for switchover action.
+	// When a pod is about to be updated, a switchover action will be triggered for it. So addon implementation must determine
+	// if the pod's current role needs to be transferred.
 	//
 	// The container executing this action has access to following variables:
 	//

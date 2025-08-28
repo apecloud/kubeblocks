@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash/fnv"
 	"reflect"
@@ -477,14 +476,6 @@ func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, r
 
 func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
-	if cmpd.Spec.LifecycleActions != nil {
-		switchover := cmpd.Spec.LifecycleActions.Switchover
-		if switchover != nil {
-			if switchover.TargetPodSelector != "" || (switchover.Exec != nil && switchover.Exec.TargetPodSelector != "") {
-				return errors.New("targetPodSelector is not applicable for switchover action")
-			}
-		}
-	}
 	return nil
 }
 

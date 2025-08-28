@@ -1698,7 +1698,7 @@ type ComponentLifecycleActions struct {
 // designed to be invoked at predetermined points within the lifecycle of a Component instance.
 // It provides a modular and extensible way to customize a Component's behavior through the execution of defined actions.
 //
-// Action should be idempotent if possiable. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
+// Action should be idempotent if possible. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
 // the action may be retried even after a success.
 //
 // Available Action triggers include:

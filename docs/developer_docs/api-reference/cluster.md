@@ -2301,7 +2301,7 @@ SidecarDefinitionStatus
 <p>Action defines a customizable hook or procedure tailored for different database engines,
 designed to be invoked at predetermined points within the lifecycle of a Component instance.
 It provides a modular and extensible way to customize a Component&rsquo;s behavior through the execution of defined actions.</p>
-<p>Action should be idempotent if possiable. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
+<p>Action should be idempotent if possible. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
 the action may be retried even after a success.</p>
 <p>Available Action triggers include:</p>
 <ul>

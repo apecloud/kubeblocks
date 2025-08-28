@@ -22,13 +22,13 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"reflect"
 	"slices"
 	"strings"
 
-	"github.com/pkg/errors"
 	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -259,7 +259,7 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 			continue
 		}
 		if err := component.ValidateDefNameRegexp(compDef); err != nil {
-			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
+			return fmt.Errorf("invalid reference to component definition name pattern: %s: %w", compDef, err)
 		}
 	}
 	return nil
@@ -477,6 +477,14 @@ func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, r
 
 func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
+	if cmpd.Spec.LifecycleActions != nil {
+		switchover := cmpd.Spec.LifecycleActions.Switchover
+		if switchover != nil {
+			if switchover.TargetPodSelector != "" || (switchover.Exec != nil && switchover.Exec.TargetPodSelector != "") {
+				return errors.New("targetPodSelector is not applicable for switchover action")
+			}
+		}
+	}
 	return nil
 }
 

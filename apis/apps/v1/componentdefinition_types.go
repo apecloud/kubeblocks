@@ -1514,6 +1514,9 @@ type ComponentLifecycleActions struct {
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 	// In a typical consensus system, this action is used to transfer leader role to another replica.
 	//
+	// When a pod is about to be updated, a switchover will be triggered to it. So addon implementation must determine
+	// if the pod has the correct role. Due to this reason, targetPodSelector is not applicable for switchover action.
+	//
 	// The container executing this action has access to following variables:
 	//
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role's candidate, which may not be specified (empty).
@@ -1694,6 +1697,9 @@ type ComponentLifecycleActions struct {
 // Action defines a customizable hook or procedure tailored for different database engines,
 // designed to be invoked at predetermined points within the lifecycle of a Component instance.
 // It provides a modular and extensible way to customize a Component's behavior through the execution of defined actions.
+//
+// Action should be idempotent if possiable. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
+// the action may be retried even after a success.
 //
 // Available Action triggers include:
 //

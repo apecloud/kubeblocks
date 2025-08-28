@@ -309,6 +309,20 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
+	Context("lifecycleaction", func() {
+		It("switchover action with targetPodSelector", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				SetLifecycleAction("Switchover", &kbappsv1.Action{
+					TargetPodSelector: "All",
+				}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+	})
+
 	Context("vars", func() {
 		It("ok", func() {
 			By("create a ComponentDefinition obj")

@@ -2301,6 +2301,8 @@ SidecarDefinitionStatus
 <p>Action defines a customizable hook or procedure tailored for different database engines,
 designed to be invoked at predetermined points within the lifecycle of a Component instance.
 It provides a modular and extensible way to customize a Component&rsquo;s behavior through the execution of defined actions.</p>
+<p>Action should be idempotent if possiable. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
+the action may be retried even after a success.</p>
 <p>Available Action triggers include:</p>
 <ul>
 <li><code>postProvision</code>: Defines the hook to be executed after the creation of a Component,
@@ -5819,6 +5821,8 @@ Action
 This approach aims to minimize downtime and maintain availability
 during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 In a typical consensus system, this action is used to transfer leader role to another replica.</p>
+<p>When a pod is about to be updated, a switchover will be triggered to it. So addon implementation must determine
+if the pod has the correct role. Due to this reason, targetPodSelector is not applicable for switchover action.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>

@@ -682,6 +682,9 @@ func (r *BackupReconciler) syncContinuousBackupEncryptionConfig(reqCtx intctrlut
 }
 
 func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (restoreInProgress bool, err error) {
+	if backup.Annotations[dptypes.SkipReconciliationAnnotationKey] == trueVal {
+		return false, nil
+	}
 	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
 	if !ok {
 		reqCtx.Log.V(2).Info("AppInstanceLabel not found")

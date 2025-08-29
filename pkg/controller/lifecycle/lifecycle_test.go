@@ -151,7 +151,7 @@ var _ = Describe("lifecycle", func() {
 		It("nil pod", func() {
 			_, err := New("", "", "", nil, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("either pod or pods must be provided to call lifecycle actions"))
+			Expect(err.Error()).Should(ContainSubstring("pods must be provided to call lifecycle actions"))
 		})
 
 		It("pod", func() {

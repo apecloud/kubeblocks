@@ -34,6 +34,7 @@ import (
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instance"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset2"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -89,6 +90,11 @@ type InstanceReconciler struct {
 func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("Instance", req.NamespacedName)
 
+	pods, err := r.listPods(ctx, req)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instance.NewTreeLoader()).
 		Do(instance.NewFixMetaReconciler()).
@@ -98,7 +104,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		// Do(instance.NewRevisionUpdateReconciler()).
 		Do(instance.NewAssistantObjectReconciler()).
 		Do(instance.NewAlignmentReconciler()).
-		Do(instance.NewUpdateReconciler()).
+		Do(instance.NewUpdateReconciler(pods)).
 		Commit()
 }
 
@@ -118,4 +124,26 @@ func (r *InstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)
+}
+
+func (r *InstanceReconciler) listPods(ctx context.Context, req ctrl.Request) ([]*corev1.Pod, error) {
+	instance := &workloadsv1.Instance{}
+	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+		return nil, err
+	}
+	matchingLabels := map[string]string{
+		constant.AppManagedByLabelKey:           constant.AppName,
+		instanceset2.WorkloadsManagedByLabelKey: workloadsv1.InstanceSetKind,
+		instanceset2.WorkloadsInstanceLabelKey:  instance.Labels[instanceset2.WorkloadsInstanceLabelKey],
+	}
+
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList, &client.ListOptions{Namespace: req.Namespace}, client.MatchingLabels(matchingLabels)); err != nil {
+		return nil, err
+	}
+	pods := make([]*corev1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pods = append(pods, &podList.Items[i])
+	}
+	return pods, nil
 }

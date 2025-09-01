@@ -532,8 +532,12 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 	// has available policy defined
 	if compDef.Spec.Available != nil {
 		policy := *compDef.Spec.Available
-		if policy.WithProbe != nil && policy.WithProbe.TimeWindowSeconds == nil {
-			policy.WithProbe.TimeWindowSeconds = timeWindowSeconds()
+		if policy.WithProbe != nil {
+			if policy.WithProbe.TimeWindowSeconds == nil {
+				policy.WithProbe.TimeWindowSeconds = timeWindowSeconds()
+			}
+			policy.WithPhases = nil
+			policy.WithRole = nil
 		}
 		return policy
 	}

@@ -1245,6 +1245,8 @@ type ComponentAvailable struct {
 
 	// Specifies the strategies for determining whether the component is available based on the available probe.
 	//
+	// If specified, it will take precedence over the WithPhases and WithRole fields.
+	//
 	// This field is immutable once set.
 	//
 	// +optional

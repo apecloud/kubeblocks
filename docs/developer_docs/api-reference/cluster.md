@@ -4612,6 +4612,7 @@ ComponentAvailableWithProbe
 <td>
 <em>(Optional)</em>
 <p>Specifies the strategies for determining whether the component is available based on the available probe.</p>
+<p>If specified, it will take precedence over the WithPhases and WithRole fields.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

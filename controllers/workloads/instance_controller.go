@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -129,12 +130,15 @@ func (r *InstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *InstanceReconciler) listPods(ctx context.Context, req ctrl.Request) ([]*corev1.Pod, error) {
 	instance := &workloadsv1.Instance{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+		if apierrors.IsNotFound(err) {
+			// pod may not be created yet
+			return nil, nil
+		}
 		return nil, err
 	}
 	matchingLabels := map[string]string{
-		constant.AppManagedByLabelKey:           constant.AppName,
-		instanceset2.WorkloadsManagedByLabelKey: workloadsv1.InstanceSetKind,
-		instanceset2.WorkloadsInstanceLabelKey:  instance.Labels[instanceset2.WorkloadsInstanceLabelKey],
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset2.WorkloadsInstanceLabelKey: instance.Labels[instanceset2.WorkloadsInstanceLabelKey],
 	}
 
 	podList := &corev1.PodList{}

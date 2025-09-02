@@ -247,9 +247,9 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		}
 		progressDetail.StartTime = metav1.Now()
 	case opsv1alpha1.ProcessingProgressStatus:
-		// check role
 		targetRole := progressDetail.Group
 		if switchover.CandidateName != "" {
+			// if candidate specified, we consider switchover is done once the candidate becomes the target role.
 			candidatePod, err := getPod(reqCtx, cli, switchover.CandidateName, synthesizedComp.Namespace)
 			if err != nil {
 				return err
@@ -259,14 +259,9 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 			}
 		} else {
-			fromInstance, err := getPod(reqCtx, cli, switchover.InstanceName, synthesizedComp.Namespace)
-			if err != nil {
-				return err
-			}
-			if currRole, ok := fromInstance.Labels[constant.RoleLabelKey]; ok && currRole != targetRole {
-				progressDetail.Message = "do switchover succeed"
-				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
-			}
+			// if no candidate specified, we consider switchover is done once doSwitchover returns without error.
+			progressDetail.Message = "do switchover succeed"
+			progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 		}
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)

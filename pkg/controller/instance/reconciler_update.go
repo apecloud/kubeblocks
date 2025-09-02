@@ -80,7 +80,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// podUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
-		updatePolicy, err := getPodUpdatePolicy(inst, pod)
+		updatePolicy, _, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -120,11 +120,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		updatePolicy, err := getPodUpdatePolicy(inst, pod)
+		updatePolicy, specUpdatePolicy, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if inst.Spec.PodUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType && updatePolicy == recreatePolicy {
+		if updatePolicy == recreatePolicy && specUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType {
 			message := fmt.Sprintf("Instance %s/%s blocks on update as the podUpdatePolicy is %s and the pod %s can not inplace update",
 				inst.Namespace, inst.Name, kbappsv1.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
@@ -133,6 +133,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			meta.SetStatusCondition(&inst.Status.Conditions, *buildBlockedCondition(inst, message))
 			isBlocked = true
 			break
+		}
+		if updatePolicy == inPlaceUpdatePolicy && specUpdatePolicy == kbappsv1.ReCreatePodUpdatePolicyType {
+			updatePolicy = recreatePolicy
 		}
 		if updatePolicy == inPlaceUpdatePolicy {
 			newPod, err := buildInstancePod(inst, getPodRevision(pod))

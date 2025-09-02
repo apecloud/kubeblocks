@@ -540,6 +540,9 @@ const (
 	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
 	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
+
+	// ReCreatePodUpdatePolicyType indicates that it will always recreate the Pod.
+	ReCreatePodUpdatePolicyType PodUpdatePolicyType = "ReCreate"
 )
 
 // InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.

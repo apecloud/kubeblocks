@@ -79,7 +79,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetRoles(synthesizedComp.Roles).
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
 		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
-		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
+		SetPodUpdatePolicy(synthesizedComp.PodUpdatePolicy).
+		SetPodUpgradePolicy(synthesizedComp.PodUpgradePolicy).
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
@@ -190,13 +191,6 @@ func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedC
 		return synthesizedComp.ParallelPodManagementConcurrency
 	}
 	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"} // default value
-}
-
-func getPodUpdatePolicy(synthesizedComp *component.SynthesizedComponent) workloads.PodUpdatePolicyType {
-	if synthesizedComp.PodUpdatePolicy != nil {
-		return *synthesizedComp.PodUpdatePolicy
-	}
-	return kbappsv1.PreferInPlacePodUpdatePolicyType // default value
 }
 
 func getInstanceUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.InstanceUpdateStrategy {

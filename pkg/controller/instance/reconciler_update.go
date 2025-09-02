@@ -212,7 +212,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 		}
 		return m
 	}()
-	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Spec.InstanceSetName, lifecycleActions, templateVars, pod, r.pods)
+	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod, r.pods)
 	if err != nil {
 		return err
 	}

@@ -284,7 +284,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	for _, object := range tree.List(&corev1.Pod{}) {
 		pods = append(pods, object.(*corev1.Pod))
 	}
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod, pods)
+	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod, pods)
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 	for _, object := range tree.List(&corev1.Pod{}) {
 		pods = append(pods, object.(*corev1.Pod))
 	}
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod, pods)
+	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod, pods)
 	if err != nil {
 		return err
 	}

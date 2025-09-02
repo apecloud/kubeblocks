@@ -277,22 +277,31 @@ func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.C
 		compOpsList[i] = v.ComponentOps
 		hScaleMap[v.ComponentName] = horizontalScalingList[i]
 	}
-	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
+	err := r.checkComponentExistence(cluster, compOpsList)
+	if err != nil {
 		return err
 	}
+	getMinAndMaxReplicas := func(compDefName string) (int, int, error) {
+		// Default values if no limit is found
+		minNum, maxNum := 1, 16384
+		if compDefName != "" {
+			compDef := &appsv1.ComponentDefinition{}
+			if err := cli.Get(ctx, client.ObjectKey{Name: compDefName, Namespace: r.Namespace}, compDef); err != nil {
+				return 0, 9, err
+			}
+			if compDef.Spec.ReplicasLimit != nil {
+				minNum = int(compDef.Spec.ReplicasLimit.MinReplicas)
+				maxNum = int(compDef.Spec.ReplicasLimit.MaxReplicas)
+			}
+		}
+		return minNum, maxNum, nil
+	}
+
 	for _, comSpec := range cluster.Spec.ComponentSpecs {
 		if hScale, ok := hScaleMap[comSpec.Name]; ok {
-			// Default values if no limit is found
-			minNum, maxNum := 1, 16384
-			if comSpec.ComponentDef != "" {
-				compDef := &appsv1.ComponentDefinition{}
-				if err := cli.Get(ctx, client.ObjectKey{Name: comSpec.ComponentDef, Namespace: r.Namespace}, compDef); err != nil {
-					return err
-				}
-				if compDef.Spec.ReplicasLimit != nil {
-					minNum = int(compDef.Spec.ReplicasLimit.MinReplicas)
-					maxNum = int(compDef.Spec.ReplicasLimit.MaxReplicas)
-				}
+			minNum, maxNum, err := getMinAndMaxReplicas(comSpec.ComponentDef)
+			if err != nil {
+				return err
 			}
 			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, false, maxNum, minNum); err != nil {
 				return err
@@ -306,14 +315,21 @@ func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.C
 			}
 			// Default values if no limit is found
 			minNum, maxNum := 1, 2048
-			if spec.ShardingDef != "" {
-				shardingDef := &appsv1.ShardingDefinition{}
-				if err := cli.Get(ctx, types.NamespacedName{Name: spec.ShardingDef, Namespace: r.Namespace}, shardingDef); err != nil {
-					return err
+			if hScale.Shards != nil {
+				if spec.ShardingDef != "" {
+					shardingDef := &appsv1.ShardingDefinition{}
+					if err := cli.Get(ctx, types.NamespacedName{Name: spec.ShardingDef, Namespace: r.Namespace}, shardingDef); err != nil {
+						return err
+					}
+					if shardingDef.Spec.ShardsLimit != nil {
+						minNum = int(shardingDef.Spec.ShardsLimit.MinShards)
+						maxNum = int(shardingDef.Spec.ShardsLimit.MaxShards)
+					}
 				}
-				if shardingDef.Spec.ShardsLimit != nil {
-					minNum = int(shardingDef.Spec.ShardsLimit.MinShards)
-					maxNum = int(shardingDef.Spec.ShardsLimit.MaxShards)
+			} else {
+				minNum, maxNum, err = getMinAndMaxReplicas(spec.Template.ComponentDef)
+				if err != nil {
+					return err
 				}
 			}
 			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true, maxNum, minNum); err != nil {

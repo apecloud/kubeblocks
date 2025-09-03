@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -79,6 +80,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			}
 			return err
 		}
+		synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
 	}
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonRBACManager, "RBAC manager is disabled")
@@ -87,14 +89,45 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
+	needRollbackServiceAccount := func() (bool, error) {
+		lastName, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
+		if !ok {
+			return false, nil
+		}
+
+		lastCmpdName := strings.Join(strings.Split(lastName, "-")[1:], "-")
+		lastCmpd, err := component.GetCompDefByName(transCtx.Context, transCtx.Client, lastCmpdName)
+		if err != nil {
+			return false, err
+		}
+
+		curLifecycleActionEnabled := synthesizedComp.LifecycleActions != nil
+		lastLifecycleActionEnabled := lastCmpd.Spec.LifecycleActions != nil
+		if equality.Semantic.DeepEqual(synthesizedComp.PolicyRules, lastCmpd.Spec.PolicyRules) &&
+			curLifecycleActionEnabled == lastLifecycleActionEnabled {
+			return true, nil
+		}
+		return false, nil
+	}
+
 	var err error
 	if serviceAccountName == "" {
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+		rollback, err := needRollbackServiceAccount()
+		if err != nil {
+			return err
+		}
+		if rollback {
+			// don't change anything, just return
+			return nil
+		}
 		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
 		sa, err = createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
 		if err != nil {
 			return err
 		}
+		synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
+		transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
 	}
 	role, err := createOrUpdateRole(transCtx, graphCli, dag)
 	if err != nil {

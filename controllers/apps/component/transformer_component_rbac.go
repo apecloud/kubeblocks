@@ -53,6 +53,7 @@ type componentRBACTransformer struct{}
 var _ graph.Transformer = &componentRBACTransformer{}
 
 const EventReasonRBACManager = "RBACManager"
+const EventReasonServiceAccountRollback = "ServiceAccountRollback"
 
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
@@ -89,35 +90,15 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	needRollbackServiceAccount := func() (bool, error) {
-		lastName, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
-		if !ok {
-			return false, nil
-		}
-
-		lastCmpdName := strings.Join(strings.Split(lastName, "-")[1:], "-")
-		lastCmpd, err := component.GetCompDefByName(transCtx.Context, transCtx.Client, lastCmpdName)
-		if err != nil {
-			return false, err
-		}
-
-		curLifecycleActionEnabled := synthesizedComp.LifecycleActions != nil
-		lastLifecycleActionEnabled := lastCmpd.Spec.LifecycleActions != nil
-		if equality.Semantic.DeepEqual(synthesizedComp.PolicyRules, lastCmpd.Spec.PolicyRules) &&
-			curLifecycleActionEnabled == lastLifecycleActionEnabled {
-			return true, nil
-		}
-		return false, nil
-	}
-
 	var err error
 	if serviceAccountName == "" {
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
-		rollback, err := needRollbackServiceAccount()
+		rollback, err := needRollbackServiceAccount(transCtx)
 		if err != nil {
 			return err
 		}
 		if rollback {
+			transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has rolled back to prevent pod restart")
 			// don't change anything, just return
 			return nil
 		}
@@ -156,6 +137,31 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
 
 	return nil
+}
+
+func needRollbackServiceAccount(transCtx *componentTransformContext) (bool, error) {
+	lastName, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
+	if !ok {
+		return false, nil
+	}
+
+	lastCmpdName := strings.Join(strings.Split(lastName, "-")[1:], "-")
+	if lastCmpdName == transCtx.CompDef.Name {
+		return false, nil
+	}
+
+	lastCmpd, err := component.GetCompDefByName(transCtx.Context, transCtx.Client, lastCmpdName)
+	if err != nil {
+		return false, err
+	}
+
+	curLifecycleActionEnabled := transCtx.SynthesizeComponent.LifecycleActions != nil
+	lastLifecycleActionEnabled := lastCmpd.Spec.LifecycleActions != nil
+	if equality.Semantic.DeepEqual(transCtx.SynthesizeComponent.PolicyRules, lastCmpd.Spec.PolicyRules) &&
+		curLifecycleActionEnabled == lastLifecycleActionEnabled {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {

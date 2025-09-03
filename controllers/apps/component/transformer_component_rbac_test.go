@@ -243,6 +243,79 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(reflect.DeepEqual(rb.RoleRef, cmpdRoleBinding.RoleRef)).To(BeTrue())
 		})
 	})
+
+	Context("tests serviceaccount rollback", func() {
+		It("tests needRollbackServiceAccount basic cases", func() {
+			init(true, false)
+			ctx := transCtx.(*componentTransformContext)
+
+			By("create another cmpd")
+			anotherCompDef := testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+
+			// Case 1: No label, should return false
+			needRollback, err := needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case 2: With label but component definitions are the same
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + compDefObj.Name
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case 3: Different cmpd, same spec
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + anotherCompDef.Name
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeTrue())
+
+			// Case 4: Different cmpd, different policy rules
+			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
+				cmpd.Spec.PolicyRules = []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+						Verbs:     []string{"get"},
+					},
+				}
+			})).Should(Succeed())
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case 5: Different cmpd, different lifecycle action
+			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
+				cmpd.Spec.PolicyRules = nil
+				cmpd.Spec.LifecycleActions = nil
+			})).Should(Succeed())
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+		})
+
+		It("tests needRollbackServiceAccount error cases", func() {
+			init(false, false)
+			ctx := transCtx.(*componentTransformContext)
+
+			// Case 1: Invalid label format
+			ctx.Component.Labels = map[string]string{
+				constant.ComponentLastServiceAccountNameLabelKey: "invalid-format",
+			}
+			_, err := needRollbackServiceAccount(ctx)
+			Expect(err).Should(HaveOccurred())
+
+			// Case 2: Component definition not found
+			ctx.Component.Labels = map[string]string{
+				constant.ComponentLastServiceAccountNameLabelKey: "kb-non-existent",
+			}
+			_, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(HaveOccurred())
+		})
+	})
 })
 
 func mockDAG(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {

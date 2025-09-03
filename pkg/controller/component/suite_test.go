@@ -83,7 +83,6 @@ var _ = BeforeSuite(func() {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
 		}))
 	}
-	viper.SetDefault(constant.EnableRBACManager, true)
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()

@@ -67,10 +67,6 @@ func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterNam
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Service, error) {
 	labels := constant.GetCompLabels(clusterName, compName)
-	if opts == nil {
-		opts = make([]client.ListOption, 0)
-	}
-	opts = append(opts, inDataContext())
 	return listObjWithLabelsInNamespace(ctx, cli, generics.ServiceSignature, namespace, labels, opts...)
 }
 

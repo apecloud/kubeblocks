@@ -418,7 +418,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 	}
 
 	objKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: objName}
-	if err := cli.Get(ctx, objKey, obj, inDataContext()); err != nil {
+	if err := cli.Get(ctx, objKey, obj); err != nil {
 		if apierrors.IsNotFound(err) && _optional() {
 			return nil, nil, nil
 		}
@@ -1022,7 +1022,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
 			}
 			obj := &corev1.Secret{}
-			err := cli.Get(ctx, key, obj, inDataContext())
+			err := cli.Get(ctx, key, obj)
 			return obj, err
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
@@ -1231,7 +1231,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 			Name:      constant.GenerateClusterComponentName(clusterName, compName),
 		}
 		comp = &appsv1.Component{}
-		err := cli.Get(ctx, key, comp, inDataContext())
+		err := cli.Get(ctx, key, comp)
 		if err != nil {
 			return "", err
 		}
@@ -1243,7 +1243,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		Namespace: namespace,
 		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
 	}
-	err := cli.Get(ctx, itsKey, its, inDataContext())
+	err := cli.Get(ctx, itsKey, its)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
@@ -1305,7 +1305,7 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 				Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
 			}
 			obj := &appsv1.Component{}
-			err := cli.Get(ctx, key, obj, inDataContext())
+			err := cli.Get(ctx, key, obj)
 			return obj, err // TODO: what if the component is being deleted?
 		}
 		return resolveReferentObjects(synthesizedComp, objRef, getter)

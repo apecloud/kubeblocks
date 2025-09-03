@@ -22,7 +22,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -55,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/controllers/parameters"
+	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"

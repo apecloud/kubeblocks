@@ -299,8 +299,8 @@ func (r *BackupReconciler) handleNewPhase(
 	}
 
 	// check if the cluster is ready
-	if ownerCluster.Status.Phase != kbappsv1.RunningClusterPhase {
-		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, fmt.Sprintf("wait cluster %s running, current is %s", ownerCluster.Name, ownerCluster.Status.Phase))
+	if ownerCluster.Status.Phase == kbappsv1.CreatingClusterPhase || ownerCluster.Status.Phase == kbappsv1.StoppedClusterPhase || ownerCluster.Status.Phase == kbappsv1.DeletingClusterPhase {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, fmt.Sprintf("cluster %s is %s", ownerCluster.Name, ownerCluster.Status.Phase))
 	}
 
 	request, err := r.prepareBackupRequest(reqCtx, backup)

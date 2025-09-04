@@ -366,6 +366,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		*out = new(PodUpdatePolicyType)
 		**out = **in
 	}
+	if in.PodUpgradePolicy != nil {
+		in, out := &in.PodUpgradePolicy, &out.PodUpgradePolicy
+		*out = new(PodUpdatePolicyType)
+		**out = **in
+	}
 	if in.InstanceUpdateStrategy != nil {
 		in, out := &in.InstanceUpdateStrategy, &out.InstanceUpdateStrategy
 		*out = new(InstanceUpdateStrategy)
@@ -1221,6 +1226,16 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = new(appsv1.PodManagementPolicyType)
 		**out = **in
 	}
+	if in.PodUpdatePolicy != nil {
+		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
+		*out = new(PodUpdatePolicyType)
+		**out = **in
+	}
+	if in.PodUpgradePolicy != nil {
+		in, out := &in.PodUpgradePolicy, &out.PodUpgradePolicy
+		*out = new(PodUpdatePolicyType)
+		**out = **in
+	}
 	if in.PolicyRules != nil {
 		in, out := &in.PolicyRules, &out.PolicyRules
 		*out = make([]rbacv1.PolicyRule, len(*in))
@@ -1519,6 +1534,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 	}
 	if in.PodUpdatePolicy != nil {
 		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
+		*out = new(PodUpdatePolicyType)
+		**out = **in
+	}
+	if in.PodUpgradePolicy != nil {
+		in, out := &in.PodUpgradePolicy, &out.PodUpgradePolicy
 		*out = new(PodUpdatePolicyType)
 		**out = **in
 	}

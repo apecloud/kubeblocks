@@ -286,25 +286,16 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
-	ownerCluster := &kbappsv1.Cluster{}
-	if backup.Labels != nil && backup.Labels[constant.AppInstanceLabelKey] != "" {
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-			Namespace: backup.Namespace,
-			Name:      backup.Labels[constant.AppInstanceLabelKey],
-		}, ownerCluster); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, fmt.Sprintf("fail to get back up %s owner cluster %s", backup.Name, backup.Labels[constant.AppInstanceLabelKey]))
-		}
-
-		// check if the cluster is ready
-		if ownerCluster.Status.Phase == kbappsv1.CreatingClusterPhase || ownerCluster.Status.Phase == kbappsv1.StoppedClusterPhase || ownerCluster.Status.Phase == kbappsv1.DeletingClusterPhase {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, fmt.Sprintf("cluster %s is %s", ownerCluster.Name, ownerCluster.Status.Phase))
-		}
-	}
-
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
+
+	// filter the cluster that is creating
+	if filterCreaingPITR(reqCtx, request, r.Client) {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, fmt.Sprintf("pitr backup %s will wait the cluster is not creating", backup.Name))
+	}
+
 	// record the status.target/status.targets infos for continuous backup.
 	if err = r.recordBackupStatusTargets(reqCtx, request); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
@@ -1110,4 +1101,27 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 		return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
 	}
 	return request, nil
+}
+
+// filterCreaingPITR will return true when the request is PITR backup and the cluster is creating
+func filterCreaingPITR(reqCtx intctrlutil.RequestCtx, request *dpbackup.Request, cli client.Client) bool {
+	backupType := request.GetBackupType()
+	if dpv1alpha1.BackupType(backupType) != dpv1alpha1.BackupTypeContinuous {
+		return false
+	}
+	if request.Labels != nil && request.Labels[constant.AppInstanceLabelKey] != "" {
+		ownerCluster := &kbappsv1.Cluster{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
+			Namespace: request.Namespace,
+			Name:      request.Labels[constant.AppInstanceLabelKey],
+		}, ownerCluster); err != nil {
+			return false
+		}
+
+		// filter the cluster that is creating
+		if ownerCluster.Status.Phase == kbappsv1.CreatingClusterPhase {
+			return true
+		}
+	}
+	return false
 }

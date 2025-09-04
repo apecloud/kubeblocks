@@ -287,11 +287,6 @@ func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 
-	// filter the cluster that is creating
-	if clusterIsCreating(reqCtx, backup, r.Client) {
-		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, fmt.Sprintf("Continuous backup %s will wait the cluster is not creating", backup.Name))
-	}
-
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
@@ -1050,6 +1045,10 @@ func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *kbappsv1.C
 
 // validateContinuousBackup validates the continuous backup.
 func validateContinuousBackup(backup *dpv1alpha1.Backup, reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	// filter the cluster that is creating when the backup is continuous
+	if clusterIsCreating(reqCtx, backup, cli) {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to wait for cluster %s creation to finish", backup.Labels[constant.AppInstanceLabelKey])
+	}
 	// validate if the continuous backup is created by a backupSchedule.
 	if _, ok := backup.Labels[dptypes.BackupScheduleLabelKey]; !ok {
 		return fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
@@ -1106,9 +1105,6 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 
 // clusterIsCreating will return true when the backup is Continuous backup and the cluster is creating
 func clusterIsCreating(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, cli client.Client) bool {
-	if backup.Labels == nil || backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
-		return false
-	}
 	if backup.Labels[constant.AppInstanceLabelKey] != "" {
 		ownerCluster := &kbappsv1.Cluster{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{

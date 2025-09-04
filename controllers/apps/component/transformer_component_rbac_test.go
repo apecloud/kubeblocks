@@ -245,7 +245,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 
 	Context("tests serviceaccount rollback", func() {
-		It("tests needRollbackServiceAccount basic cases", func() {
+		It("tests needRollbackServiceAccount", func() {
 			init(true, false)
 			ctx := transCtx.(*componentTransformContext)
 
@@ -256,24 +256,30 @@ var _ = Describe("object rbac transformer test.", func() {
 				Create(&testCtx).
 				GetObject()
 
-			// Case 1: No label, should return false
+			// Case: No label, should return false
 			needRollback, err := needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
 
-			// Case 2: With label but component definitions are the same
+			// Case: With label but component definitions are the same
 			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + compDefObj.Name
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
 
-			// Case 3: Different cmpd, same spec
+			// Case: with a non-exist cmpd
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-non-existent"
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case: Different cmpd, same spec
 			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + anotherCompDef.Name
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeTrue())
 
-			// Case 4: Different cmpd, different policy rules
+			// Case: Different cmpd, different policy rules
 			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
 				cmpd.Spec.PolicyRules = []rbacv1.PolicyRule{
 					{
@@ -287,7 +293,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
 
-			// Case 5: Different cmpd, different lifecycle action
+			// Case: Different cmpd, different lifecycle action
 			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
 				cmpd.Spec.PolicyRules = nil
 				cmpd.Spec.LifecycleActions = nil
@@ -295,25 +301,6 @@ var _ = Describe("object rbac transformer test.", func() {
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
-		})
-
-		It("tests needRollbackServiceAccount error cases", func() {
-			init(false, false)
-			ctx := transCtx.(*componentTransformContext)
-
-			// Case 1: Invalid label format
-			ctx.Component.Labels = map[string]string{
-				constant.ComponentLastServiceAccountNameLabelKey: "invalid-format",
-			}
-			_, err := needRollbackServiceAccount(ctx)
-			Expect(err).Should(HaveOccurred())
-
-			// Case 2: Component definition not found
-			ctx.Component.Labels = map[string]string{
-				constant.ComponentLastServiceAccountNameLabelKey: "kb-non-existent",
-			}
-			_, err = needRollbackServiceAccount(ctx)
-			Expect(err).Should(HaveOccurred())
 		})
 	})
 })

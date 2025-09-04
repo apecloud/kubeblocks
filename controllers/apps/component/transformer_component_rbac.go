@@ -145,6 +145,7 @@ func needRollbackServiceAccount(transCtx *componentTransformContext) (bool, erro
 		return false, nil
 	}
 
+	// this logic is in line with GenerateDefaultServiceAccountName
 	lastCmpdName := strings.Join(strings.Split(lastName, "-")[1:], "-")
 	if lastCmpdName == transCtx.CompDef.Name {
 		return false, nil
@@ -152,7 +153,7 @@ func needRollbackServiceAccount(transCtx *componentTransformContext) (bool, erro
 
 	lastCmpd, err := component.GetCompDefByName(transCtx.Context, transCtx.Client, lastCmpdName)
 	if err != nil {
-		return false, err
+		return false, client.IgnoreNotFound(err)
 	}
 
 	curLifecycleActionEnabled := transCtx.SynthesizeComponent.LifecycleActions != nil

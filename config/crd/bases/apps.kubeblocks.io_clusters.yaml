@@ -2832,6 +2832,7 @@ spec:
                           type: string
                       type: object
                     podUpdatePolicy:
+                      default: PreferInPlace
                       description: |-
                         PodUpdatePolicy indicates how pods should be updated
 
@@ -2841,6 +2842,16 @@ spec:
                         - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
                         If that fails, it will fall back to the ReCreate, where pod will be recreated.
                         Default value is "PreferInPlace"
+                      enum:
+                      - StrictInPlace
+                      - PreferInPlace
+                      type: string
+                    podUpgradePolicy:
+                      description: |-
+                        PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+
+
+                        If not specified, the value of PodUpdatePolicy will be used.
                       enum:
                       - StrictInPlace
                       - PreferInPlace
@@ -14071,6 +14082,7 @@ spec:
                               type: string
                           type: object
                         podUpdatePolicy:
+                          default: PreferInPlace
                           description: |-
                             PodUpdatePolicy indicates how pods should be updated
 
@@ -14080,6 +14092,16 @@ spec:
                             - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
                             If that fails, it will fall back to the ReCreate, where pod will be recreated.
                             Default value is "PreferInPlace"
+                          enum:
+                          - StrictInPlace
+                          - PreferInPlace
+                          type: string
+                        podUpgradePolicy:
+                          description: |-
+                            PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+
+
+                            If not specified, the value of PodUpdatePolicy will be used.
                           enum:
                           - StrictInPlace
                           - PreferInPlace

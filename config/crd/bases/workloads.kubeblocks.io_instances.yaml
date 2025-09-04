@@ -1565,6 +1565,9 @@ spec:
               podUpdatePolicy:
                 description: PodUpdatePolicy indicates how pods should be updated.
                 type: string
+              podUpgradePolicy:
+                description: PodUpdatePolicy indicates how pods should be upgraded.
+                type: string
               roles:
                 description: A list of roles defined in the system. Instanceset obtains
                   role through pods' role label `kubeblocks.io/role`.

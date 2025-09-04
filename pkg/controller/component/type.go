@@ -62,12 +62,13 @@ type SynthesizedComponent struct {
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
 	FlatInstanceOrdinal              bool
-	InstanceImages                   map[string]map[string]string        `json:"instanceImages,omitempty"`
-	OfflineInstances                 []string                            `json:"offlineInstances,omitempty"`
-	Roles                            []kbappsv1.ReplicaRole              `json:"roles,omitempty"`
-	PodManagementPolicy              *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
-	ParallelPodManagementConcurrency *intstr.IntOrString                 `json:"parallelPodManagementConcurrency,omitempty"`
-	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType       `json:"podUpdatePolicy,omitempty"`
+	InstanceImages                   map[string]map[string]string    `json:"instanceImages,omitempty"`
+	OfflineInstances                 []string                        `json:"offlineInstances,omitempty"`
+	Roles                            []kbappsv1.ReplicaRole          `json:"roles,omitempty"`
+	PodManagementPolicy              *appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
+	ParallelPodManagementConcurrency *intstr.IntOrString             `json:"parallelPodManagementConcurrency,omitempty"`
+	PodUpdatePolicy                  kbappsv1.PodUpdatePolicyType    `json:"podUpdatePolicy,omitempty"`
+	PodUpgradePolicy                 kbappsv1.PodUpdatePolicyType
 	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
 	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy    `json:"instanceUpdateStrategy,omitempty"`
 	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`

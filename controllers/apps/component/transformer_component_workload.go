@@ -354,6 +354,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.PersistentVolumeClaimRetentionPolicy = itsProto.Spec.PersistentVolumeClaimRetentionPolicy
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
+	itsObjCopy.Spec.PodUpgradePolicy = itsProto.Spec.PodUpgradePolicy
 	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Paused = itsProto.Spec.Paused

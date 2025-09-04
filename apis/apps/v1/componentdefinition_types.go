@@ -469,6 +469,21 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	PodManagementPolicy *appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
+	// Specifies the default update policy for pods when the Component is updated.
+	//
+	// +kubebuilder:validation:Enum={PreferInPlace,ReCreate}
+	// +kubebuilder:default=PreferInPlace
+	// +optional
+	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// Specifies the default update policy for pods when the Component is upgraded (the service version changes).
+	//
+	// If not specified, the default behavior is the same as `podUpdatePolicy`.
+	//
+	// +kubebuilder:validation:Enum={PreferInPlace,ReCreate}
+	// +optional
+	PodUpgradePolicy *PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
+
 	// Defines the namespaced policy rules required by the Component.
 	//
 	// The `policyRules` field is an array of `rbacv1.PolicyRule` objects that define the policy rules

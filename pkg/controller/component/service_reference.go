@@ -74,6 +74,8 @@ func buildServiceReferencesWithoutResolve(ctx context.Context, cli client.Reader
 			sd, err = handleServiceRefFromCluster(ctx, cli, namespace, *serviceRef, serviceRefDecl)
 		case serviceRef.ServiceDescriptor != "":
 			sd, err = handleServiceRefFromServiceDescriptor(ctx, cli, namespace, *serviceRef, serviceRefDecl)
+		default:
+			err = fmt.Errorf("either clusterServiceSelector or serviceDescriptor should be set for service-ref for %s", serviceRefDecl.Name)
 		}
 		if err != nil {
 			return err

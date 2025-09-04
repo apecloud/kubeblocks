@@ -1146,14 +1146,14 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 // clusterIsCreating will return true when the backup is Continuous backup and the cluster is creating
 func clusterIsCreating(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, cli client.Client) bool {
 	if backup.Labels[constant.AppInstanceLabelKey] != "" {
-		ownerCluster := &kbappsv1.Cluster{}
+		ownerCluster := &appsv1alpha1.Cluster{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
 			Namespace: backup.Namespace,
 			Name:      backup.Labels[constant.AppInstanceLabelKey],
 		}, ownerCluster); err != nil {
 			return false
 		}
-		if ownerCluster.Status.Phase == kbappsv1.CreatingClusterPhase {
+		if ownerCluster.Status.Phase == appsv1alpha1.CreatingClusterPhase {
 			return true
 		}
 	}

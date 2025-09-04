@@ -287,10 +287,12 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
 	}
+
 	// record the status.target/status.targets infos for continuous backup.
 	if err = r.recordBackupStatusTargets(reqCtx, request); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
@@ -1044,6 +1046,10 @@ func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *kbappsv1.C
 
 // validateContinuousBackup validates the continuous backup.
 func validateContinuousBackup(backup *dpv1alpha1.Backup, reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	// filter the cluster that is creating when the backup is continuous
+	if clusterIsCreating(reqCtx, backup, cli) {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to wait for cluster %s creation to finish", backup.Labels[constant.AppInstanceLabelKey])
+	}
 	// validate if the continuous backup is created by a backupSchedule.
 	if _, ok := backup.Labels[dptypes.BackupScheduleLabelKey]; !ok {
 		return fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
@@ -1096,4 +1102,21 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 		return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
 	}
 	return request, nil
+}
+
+// clusterIsCreating will return true when the backup is Continuous backup and the cluster is creating
+func clusterIsCreating(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, cli client.Client) bool {
+	if backup.Labels[constant.AppInstanceLabelKey] != "" {
+		ownerCluster := &kbappsv1.Cluster{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
+			Namespace: backup.Namespace,
+			Name:      backup.Labels[constant.AppInstanceLabelKey],
+		}, ownerCluster); err != nil {
+			return false
+		}
+		if ownerCluster.Status.Phase == kbappsv1.CreatingClusterPhase {
+			return true
+		}
+	}
+	return false
 }

@@ -286,14 +286,15 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+
+	// filter the cluster that is creating
+	if clusterIsCreating(reqCtx, backup, r.Client) {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, fmt.Sprintf("Continuous backup %s will wait the cluster is not creating", backup.Name))
+	}
+
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
-	}
-
-	// filter the cluster that is creating
-	if filterCreaingPITR(reqCtx, request, r.Client) {
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, fmt.Sprintf("pitr backup %s will wait the cluster is not creating", backup.Name))
 	}
 
 	// record the status.target/status.targets infos for continuous backup.
@@ -1103,22 +1104,19 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 	return request, nil
 }
 
-// filterCreaingPITR will return true when the request is PITR backup and the cluster is creating
-func filterCreaingPITR(reqCtx intctrlutil.RequestCtx, request *dpbackup.Request, cli client.Client) bool {
-	backupType := request.GetBackupType()
-	if dpv1alpha1.BackupType(backupType) != dpv1alpha1.BackupTypeContinuous {
+// clusterIsCreating will return true when the backup is Continuous backup and the cluster is creating
+func clusterIsCreating(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, cli client.Client) bool {
+	if backup.Labels == nil || backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
 		return false
 	}
-	if request.Labels != nil && request.Labels[constant.AppInstanceLabelKey] != "" {
+	if backup.Labels[constant.AppInstanceLabelKey] != "" {
 		ownerCluster := &kbappsv1.Cluster{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
-			Namespace: request.Namespace,
-			Name:      request.Labels[constant.AppInstanceLabelKey],
+			Namespace: backup.Namespace,
+			Name:      backup.Labels[constant.AppInstanceLabelKey],
 		}, ownerCluster); err != nil {
 			return false
 		}
-
-		// filter the cluster that is creating
 		if ownerCluster.Status.Phase == kbappsv1.CreatingClusterPhase {
 			return true
 		}

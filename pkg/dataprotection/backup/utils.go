@@ -30,6 +30,7 @@ import (
 	"golang.org/x/mod/semver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -335,8 +336,10 @@ func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *
 	}
 	sts := &appsv1.StatefulSet{}
 	stsName := GenerateBackupStatefulSetName(backup, targetName, BackupDataJobNamePrefix)
-	if err := cli.Get(ctx, client.ObjectKey{Name: stsName, Namespace: backup.Namespace}, sts); client.IgnoreNotFound(err) != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: stsName, Namespace: backup.Namespace}, sts); apierrors.IsNotFound(err) {
 		return nil
+	} else if err != nil {
+		return err
 	}
 	sts.Spec.Replicas = pointer.Int32(0)
 	return cli.Update(ctx, sts)

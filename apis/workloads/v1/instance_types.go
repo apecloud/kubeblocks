@@ -113,6 +113,11 @@ type InstanceSpec struct {
 	// +optional
 	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
+	// PodUpdatePolicy indicates how pods should be upgraded.
+	//
+	// +optional
+	PodUpgradePolicy PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
+
 	// A list of roles defined in the system. Instanceset obtains role through pods' role label `kubeblocks.io/role`.
 	//
 	// +optional

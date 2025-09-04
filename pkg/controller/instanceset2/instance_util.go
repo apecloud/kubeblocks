@@ -136,6 +136,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetInstanceTemplateName(template.Name).
 		SetInstanceUpdateStrategyType(its.Spec.InstanceUpdateStrategy).
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
+		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
 		SetMembershipReconfiguration(its.Spec.MembershipReconfiguration).
 		SetTemplateVars(its.Spec.TemplateVars)
@@ -309,6 +310,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.InstanceTemplateName = newInst.Spec.InstanceTemplateName
 	targetInst.Spec.InstanceUpdateStrategyType = newInst.Spec.InstanceUpdateStrategyType
 	targetInst.Spec.PodUpdatePolicy = newInst.Spec.PodUpdatePolicy
+	targetInst.Spec.PodUpgradePolicy = newInst.Spec.PodUpgradePolicy
 	targetInst.Spec.Roles = newInst.Spec.Roles
 	// targetInst.Spec.MembershipReconfiguration = newInst.Spec.MembershipReconfiguration
 	targetInst.Spec.TemplateVars = newInst.Spec.TemplateVars

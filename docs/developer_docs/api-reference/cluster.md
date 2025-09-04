@@ -764,6 +764,21 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpgradePolicy indicates how pods should be updated when the component is upgraded.</p>
+<p>If not specified, the value of PodUpdatePolicy will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceUpdateStrategy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
@@ -1555,6 +1570,35 @@ is ready before continuing. Pods are removed in reverse order when scaling down.
 <li><code>Parallel</code>: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
 when scaling down.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the default update policy for pods when the Component is updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the default update policy for pods when the Component is upgraded (the service version changes).</p>
+<p>If not specified, the default behavior is the same as <code>podUpdatePolicy</code>.</p>
 </td>
 </tr>
 <tr>
@@ -3328,6 +3372,21 @@ Any attempt to modify other fields will be rejected.</li>
 If that fails, it will fall back to the ReCreate, where pod will be recreated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpgradePolicy indicates how pods should be updated when the component is upgraded.</p>
+<p>If not specified, the value of PodUpdatePolicy will be used.</p>
 </td>
 </tr>
 <tr>
@@ -5452,6 +5511,35 @@ when scaling down.</li>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the default update policy for pods when the Component is updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the default update policy for pods when the Component is upgraded (the service version changes).</p>
+<p>If not specified, the default behavior is the same as <code>podUpdatePolicy</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>policyRules</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#policyrule-v1-rbac">
@@ -6552,6 +6640,21 @@ Any attempt to modify other fields will be rejected.</li>
 If that fails, it will fall back to the ReCreate, where pod will be recreated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpgradePolicy indicates how pods should be updated when the component is upgraded.</p>
+<p>If not specified, the value of PodUpdatePolicy will be used.</p>
 </td>
 </tr>
 <tr>
@@ -9503,7 +9606,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 <p>PodUpdatePolicyType indicates how pods should be updated</p>
@@ -9518,6 +9621,9 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 <tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
 <td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
 If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;ReCreate&#34;</p></td>
+<td><p>ReCreatePodUpdatePolicyType indicates that it will always recreate the Pod.</p>
 </td>
 </tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
 <td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
@@ -31557,6 +31663,20 @@ PodUpdatePolicyType
 </tr>
 <tr>
 <td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be upgraded.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -31916,14 +32036,21 @@ PodUpdatePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
+<p>PodUpdatePolicy indicates how pods should be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpgradePolicy indicates how pods should be upgraded.</p>
 </td>
 </tr>
 <tr>
@@ -32575,14 +32702,21 @@ PodUpdatePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
+<p>PodUpdatePolicy indicates how pods should be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpgradePolicy indicates how pods should be upgraded.</p>
 </td>
 </tr>
 <tr>
@@ -33127,6 +33261,20 @@ PodUpdatePolicyType
 <td>
 <em>(Optional)</em>
 <p>PodUpdatePolicy indicates how pods should be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpgradePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be upgraded.</p>
 </td>
 </tr>
 <tr>

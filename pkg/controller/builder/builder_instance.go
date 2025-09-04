@@ -196,6 +196,11 @@ func (builder *InstanceBuilder) SetPodUpdatePolicy(policy workloads.PodUpdatePol
 	return builder
 }
 
+func (builder *InstanceBuilder) SetPodUpgradePolicy(policy workloads.PodUpdatePolicyType) *InstanceBuilder {
+	builder.get().Spec.PodUpgradePolicy = policy
+	return builder
+}
+
 func (builder *InstanceBuilder) SetRoles(roles []workloads.ReplicaRole) *InstanceBuilder {
 	builder.get().Spec.Roles = roles
 	return builder

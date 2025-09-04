@@ -36,9 +36,9 @@ import (
 type podUpdatePolicy string
 
 const (
-	noOpsPolicy         podUpdatePolicy = "NoOps"
-	recreatePolicy      podUpdatePolicy = "Recreate"
-	inPlaceUpdatePolicy podUpdatePolicy = "InPlaceUpdate"
+	noOpsPolicy         podUpdatePolicy = "noOps"
+	recreatePolicy      podUpdatePolicy = "recreate"
+	inPlaceUpdatePolicy podUpdatePolicy = "inPlaceUpdate"
 )
 
 func supportPodVerticalScaling() bool {
@@ -283,41 +283,53 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePolicy, error) {
-	if getPodRevision(pod) != inst.Status.UpdateRevision {
-		if len(inst.Status.UpdateRevision) == 0 {
-			return noOpsPolicy, nil
-		}
-		return recreatePolicy, nil
-	}
-
+func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
 	newPod, err := buildInstancePod(inst, getPodRevision(pod))
 	if err != nil {
-		return noOpsPolicy, err
+		return noOpsPolicy, "", err
 	}
+
+	specUpdatePolicy := getPodUpdatePolicyInSpec(inst, pod, newPod)
+	if getPodRevision(pod) != inst.Status.UpdateRevision {
+		if len(inst.Status.UpdateRevision) == 0 {
+			return noOpsPolicy, "", nil
+		}
+		return recreatePolicy, specUpdatePolicy, nil
+	}
+
 	basicUpdate := !equalBasicInPlaceFields(pod, newPod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return inPlaceUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, nil
 		}
-		return noOpsPolicy, nil
+		return noOpsPolicy, "", nil
 	}
 
 	resourceUpdate := !equalResourcesInPlaceFields(pod, newPod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
-			return inPlaceUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, nil
 		}
-		return recreatePolicy, nil
+		return recreatePolicy, specUpdatePolicy, nil
 	}
 
 	if basicUpdate {
-		return inPlaceUpdatePolicy, nil
+		return inPlaceUpdatePolicy, specUpdatePolicy, nil
 	}
-	return noOpsPolicy, nil
+	return noOpsPolicy, "", nil
+}
+
+func getPodUpdatePolicyInSpec(inst *workloads.Instance, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
+	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) {
+		return inst.Spec.PodUpgradePolicy
+	}
+	if !equalField(old.Spec.Containers, new.Spec.Containers) {
+		return inst.Spec.PodUpgradePolicy
+	}
+	return inst.Spec.PodUpdatePolicy
 }
 
 func isPodUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-	policy, err := getPodUpdatePolicy(inst, pod)
+	policy, _, err := getPodUpdatePolicy(inst, pod)
 	return policy == noOpsPolicy, err
 }

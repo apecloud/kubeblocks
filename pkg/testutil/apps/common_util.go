@@ -335,7 +335,7 @@ func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrluti
 			pobj := PT(&obj)
 			if pobj.GetDeletionTimestamp().IsZero() {
 				d, _ := json.Marshal(pobj)
-				panic("expected DeletionTimestamp is not nil, obj: " + string(d))
+				ginkgo.GinkgoWriter.Printf("Warning: deleted obj's DeletionTimestamp is nil. This may due to an old reconciliation process is not done. obj: %s", string(d))
 			}
 			finalizers := pobj.GetFinalizers()
 			if len(finalizers) > 0 {

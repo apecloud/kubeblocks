@@ -286,6 +286,23 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 func (r *BackupReconciler) handleNewPhase(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	ownerCluster := &kbappsv1.Cluster{}
+	if backup.Labels == nil || backup.Labels[constant.AppInstanceLabelKey] == "" {
+		return intctrlutil.CheckedRequeueWithError(fmt.Errorf("backup %s has no owner cluster info in Labels", backup.Name), reqCtx.Log, "")
+	}
+
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: backup.Namespace,
+		Name:      backup.Labels[constant.AppInstanceLabelKey],
+	}, ownerCluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, fmt.Sprintf("fail to get back up %s owner cluster %s", backup.Name, backup.Labels[constant.AppInstanceLabelKey]))
+	}
+
+	// check if the cluster is ready
+	if ownerCluster.Status.Phase != kbappsv1.RunningClusterPhase {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, fmt.Sprintf("wait cluster %s running, current is %s", ownerCluster.Name, ownerCluster.Status.Phase))
+	}
+
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)

@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -42,7 +41,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -278,21 +276,15 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 	)
 
 	if service.Annotations != nil {
-		kind = service.Annotations[constant.MultiClusterServicePlacementKey]
-		delete(service.Annotations, constant.MultiClusterServicePlacementKey)
+		kind = service.Annotations[constant.KBAppMultiClusterServicePlacementKey]
+		delete(service.Annotations, constant.KBAppMultiClusterServicePlacementKey)
 	}
 	if podService && len(kind) > 0 && kind != multiClusterServicePlacementInMirror && kind != multiClusterServicePlacementInUnique {
 		return fmt.Errorf("invalid multi-cluster pod-service placement kind %s for service %s", kind, service.Name)
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		// create or update service in unique, by hacking the pod placement strategy.
-		ordinal := func() int {
-			subs := strings.Split(service.GetName(), "-")
-			o, _ := strconv.Atoi(subs[len(subs)-1])
-			return o
-		}
-		multicluster.Assign(ctx.GetContext(), service, ordinal)
+		service.Annotations[constant.KBAppMultiClusterObjectProvisionPolicyKey] = "ordinal" // HACK
 	}
 
 	createOrUpdateService := func(service *corev1.Service) error {

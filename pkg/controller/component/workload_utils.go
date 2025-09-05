@@ -60,7 +60,7 @@ func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterNam
 	if opts == nil {
 		opts = make([]client.ListOption, 0)
 	}
-	opts = append(opts, inDataContext())
+	opts = append(opts, inDataContext()) // TODO: pvc
 	return listObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, namespace, labels, opts...)
 }
 
@@ -99,7 +99,7 @@ func listPods(ctx context.Context, cli client.Reader, namespace, clusterName, co
 	if opts == nil {
 		opts = make([]client.ListOption, 0)
 	}
-	opts = append(opts, inDataContext())
+	opts = append(opts, inDataContext()) // TODO: pod
 	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels, opts...)
 }
 

@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -55,19 +59,21 @@ func (r *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	for _, obj := range inst.Spec.InstanceAssistantObjects {
-		_, err := r.createOrUpdate(tree, inst, obj)
-		if err != nil {
+		if err := r.createOrUpdate(tree, inst, obj); err != nil {
 			return kubebuilderx.Continue, err
 		}
 	}
 	return kubebuilderx.Continue, nil
 }
 
-func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, assistantObj workloads.InstanceAssistantObject) (bool, error) {
-	obj := r.instanceAssistantObject(assistantObj)
+func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, assistantObj workloads.InstanceAssistantObject) error {
+	obj := r.checkObjectProvisionPolicy(inst, r.instanceAssistantObject(assistantObj))
+	if obj == nil {
+		return nil // skip the object
+	}
 	robj, err := tree.Get(obj)
 	if err != nil && !errors.IsNotFound(err) {
-		return false, err
+		return err
 	}
 	if err != nil || robj == nil {
 		labels := obj.GetLabels()
@@ -78,14 +84,14 @@ func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree
 		}
 		obj.SetLabels(labels)
 		if err := controllerutil.SetControllerReference(inst, obj, model.GetScheme()); err != nil {
-			return false, err
+			return err
 		}
-		return true, tree.Add(obj)
+		return tree.Add(obj)
 	}
 	if merged := r.copyAndMerge(assistantObj, robj, obj); merged != nil {
-		return true, tree.Update(merged)
+		return tree.Update(merged)
 	}
-	return false, nil
+	return nil
 }
 
 func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
@@ -105,6 +111,26 @@ func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.Instan
 		return obj.Role
 	}
 	return obj.RoleBinding
+}
+
+func (r *assistantObjectReconciler) checkObjectProvisionPolicy(inst *workloads.Instance, obj client.Object) client.Object {
+	var policy string
+	if obj.GetAnnotations() != nil {
+		policy = obj.GetAnnotations()[constant.KBAppMultiClusterObjectProvisionPolicyKey]
+	}
+	if policy != "ordinal" { // HACK
+		return obj
+	}
+
+	ordinal := func() int {
+		subs := strings.Split(inst.GetName(), "-")
+		o, _ := strconv.Atoi(subs[len(subs)-1])
+		return o
+	}
+	if strings.HasSuffix(obj.GetName(), fmt.Sprintf("-%d", ordinal())) {
+		return obj
+	}
+	return nil
 }
 
 func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistantObject, oldObj, newObj client.Object) client.Object {

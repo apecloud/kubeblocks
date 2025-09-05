@@ -925,7 +925,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 	selector appsv1.ServiceVarSelector, option *appsv1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveObjs := func() (map[string]any, error) {
 		headlessGetter := func(compName string) (any, error) {
-			return headlessCompServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName)
+			return headlessServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName)
 		}
 		getter := func(compName string) (any, error) {
 			return compServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName, selector.Name)
@@ -944,7 +944,7 @@ func clusterServiceGetter(ctx context.Context, cli client.Reader, namespace, clu
 		Name:      constant.GenerateClusterServiceName(clusterName, name),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj, inDataContext())
+	err := cli.Get(ctx, key, obj, inDataContext()) // TODO: cluster service
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -975,18 +975,18 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 		Name:      svcName,
 	}
 	obj := &corev1.Service{}
-	err = cli.Get(ctx, key, obj, inDataContext())
+	err = cli.Get(ctx, key, obj, inDataContext()) // TODO: cmp service
 	if err == nil {
 		return &resolvedServiceObj{service: obj}, nil
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
 	// fall-back to list services and find the matched prefix
 	svcList := &corev1.ServiceList{}
 	matchingLabels := client.MatchingLabels(constant.GetCompLabels(clusterName, compName))
-	err = cli.List(ctx, svcList, matchingLabels, inDataContext())
+	err = cli.List(ctx, svcList, matchingLabels, inDataContext()) // TODO: cmp service
 	if err != nil {
 		return nil, err
 	}
@@ -1003,13 +1003,13 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 	return &resolvedServiceObj{podServices: objs}, nil
 }
 
-func headlessCompServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (any, error) {
+func headlessServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (any, error) {
 	key := types.NamespacedName{
 		Namespace: namespace,
 		Name:      constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj, inDataContext())
+	err := cli.Get(ctx, key, obj)
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -1268,7 +1268,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 
 func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	namespace, clusterName, compName, roles string, fqdn bool) (string, error) {
-	pods, err := ListOwnedPods(ctx, cli, namespace, clusterName, compName)
+	pods, err := ListOwnedPods(ctx, cli, namespace, clusterName, compName) // TODO: pod
 	if err != nil {
 		return "", err
 	}

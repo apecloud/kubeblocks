@@ -28,7 +28,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pkg/errors"
 	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -259,7 +258,7 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 			continue
 		}
 		if err := component.ValidateDefNameRegexp(compDef); err != nil {
-			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
+			return fmt.Errorf("invalid reference to component definition name pattern: %s: %w", compDef, err)
 		}
 	}
 	return nil

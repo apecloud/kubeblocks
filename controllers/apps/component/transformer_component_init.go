@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -36,9 +35,6 @@ func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *gr
 	// init dag
 	rootVertex := &model.ObjectVertex{Obj: transCtx.Component, OriObj: transCtx.ComponentOrig, Action: model.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
-
-	// init placement
-	transCtx.Context = appsutil.IntoContext(transCtx.Context, appsutil.Placement(transCtx.Component))
 
 	if !intctrlutil.ObjectAPIVersionSupported(transCtx.Component) {
 		return graph.ErrPrematureStop

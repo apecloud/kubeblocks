@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -189,7 +188,7 @@ func (c *componentPlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 }
 
 func (c *componentPlanBuilder) reconcileCreateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := c.cli.Create(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+	err := c.cli.Create(ctx, vertex.Obj)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -197,7 +196,7 @@ func (c *componentPlanBuilder) reconcileCreateObject(ctx context.Context, vertex
 }
 
 func (c *componentPlanBuilder) reconcileUpdateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := c.cli.Update(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+	err := c.cli.Update(ctx, vertex.Obj)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -206,7 +205,7 @@ func (c *componentPlanBuilder) reconcileUpdateObject(ctx context.Context, vertex
 
 func (c *componentPlanBuilder) reconcilePatchObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	patch := client.MergeFrom(vertex.OriObj)
-	err := c.cli.Patch(ctx, vertex.Obj, patch, appsutil.ClientOption(vertex))
+	err := c.cli.Patch(ctx, vertex.Obj, patch)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -220,7 +219,7 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
-			err := c.cli.Update(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+			err := c.cli.Update(ctx, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -229,7 +228,6 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 
 	if !model.IsObjectDeleting(vertex.Obj) {
 		var opts []client.DeleteOption
-		opts = append(opts, appsutil.ClientOption(vertex))
 		if len(vertex.PropagationPolicy) > 0 {
 			opts = append(opts, vertex.PropagationPolicy)
 		}
@@ -242,5 +240,5 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 }
 
 func (c *componentPlanBuilder) reconcileStatusObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	return c.cli.Status().Update(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+	return c.cli.Status().Update(ctx, vertex.Obj)
 }

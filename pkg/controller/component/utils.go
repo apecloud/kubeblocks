@@ -42,7 +42,7 @@ import (
 )
 
 func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
+	return multicluster.InDataContext() // TODO
 }
 
 func ValidateDefNameRegexp(defNamePattern string) error {
@@ -117,7 +117,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 		Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
 	}
 	comp := &appsv1.Component{}
-	if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
+	if err := cli.Get(ctx, compKey, comp); err != nil {
 		return false, err
 	}
 	if !hasHostNetworkEnabled(nil, comp, comp.Annotations, compName) {

@@ -69,13 +69,13 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	toCreateServices, toDeleteServices, toUpdateServices := mapDiff(services, protoServices)
 
 	for svc := range toCreateServices {
-		graphCli.Create(dag, protoServices[svc], appsutil.InDataContext4G())
+		graphCli.Create(dag, protoServices[svc], inDataContext4G())
 	}
 	for svc := range toUpdateServices {
 		t.updateService(dag, graphCli, services[svc], protoServices[svc])
 	}
 	for svc := range toDeleteServices {
-		graphCli.Delete(dag, services[svc], appsutil.InDataContext4G())
+		graphCli.Delete(dag, services[svc], inDataContext4G())
 	}
 	return nil
 }
@@ -229,6 +229,6 @@ func (t *clusterServiceTransformer) updateService(dag *graph.DAG, graphCli model
 	appsutil.ResolveServiceDefaultFields(&running.Spec, &newSvc.Spec)
 
 	if !reflect.DeepEqual(running, newSvc) {
-		graphCli.Update(dag, running, newSvc, appsutil.InDataContext4G())
+		graphCli.Update(dag, running, newSvc, inDataContext4G())
 	}
 }

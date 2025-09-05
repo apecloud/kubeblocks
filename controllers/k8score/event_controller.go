@@ -30,14 +30,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -75,7 +72,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	reqCtx.Log.V(1).Info("event watcher")
 
 	event := &corev1.Event{}
-	if err := r.Client.Get(ctx, req.NamespacedName, event, multicluster.InDataContextUnspecified()); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
@@ -84,7 +81,6 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	handlers := []eventHandler{
-		&instance.PodRoleEventHandler{},
 		&instanceset.PodRoleEventHandler{},
 		&component.AvailableEventHandler{},
 		&component.KBAgentTaskEventHandler{},
@@ -102,18 +98,13 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewControllerManagedBy(mgr).
+func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.Event{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
-		})
-
-	if multiClusterMgr != nil {
-		multiClusterMgr.Watch(b, &corev1.Event{}, &handler.EnqueueRequestForObject{})
-	}
-
-	return b.Complete(r)
+		}).
+		Complete(r)
 }
 
 func (r *EventReconciler) isEventHandled(event *corev1.Event) bool {
@@ -131,5 +122,5 @@ func (r *EventReconciler) eventHandled(ctx context.Context, event *corev1.Event)
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
-	return r.Client.Patch(ctx, event, patch, multicluster.InDataContextUnspecified())
+	return r.Client.Patch(ctx, event, patch)
 }

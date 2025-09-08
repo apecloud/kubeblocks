@@ -805,7 +805,6 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 	job.Name = reconCtx.preCheckResourceName()
 	job.Namespace = namespace
 	_, err = createObjectIfNotExist(reconCtx.Ctx, r.Client, job, func() error {
-		runAsUser := int64(0)
 		job.Spec = batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -823,7 +822,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 						}},
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: boolptr.False(),
-							RunAsUser:                &runAsUser,
+							RunAsNonRoot:             boolptr.True(),
 						},
 					}},
 					Volumes: []corev1.Volume{{
@@ -884,7 +883,6 @@ func (r *BackupRepoReconciler) runPreCheckJobForTool(reconCtx *reconcileContext,
 	job.Name = reconCtx.preCheckResourceName()
 	job.Namespace = namespace
 	_, err = createObjectIfNotExist(reconCtx.Ctx, r.Client, job, func() error {
-		runAsUser := int64(0)
 		job.Spec = batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -904,7 +902,7 @@ datasafed rm %s`, precheckFilePath, precheckFilePath, precheckFilePath),
 						},
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: boolptr.False(),
-							RunAsUser:                &runAsUser,
+							RunAsNonRoot:             boolptr.True(),
 						},
 					}},
 					ServiceAccountName: saName,

@@ -155,7 +155,6 @@ func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
 		VolumeMounts:    []corev1.VolumeMount{sharedVolumeMount},
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: boolptr.False(),
-			RunAsNonRoot:             boolptr.True(),
 		},
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&initContainer)

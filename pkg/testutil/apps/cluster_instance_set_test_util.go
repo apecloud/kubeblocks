@@ -377,7 +377,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		constant.KBAppComponentLabelKey: compName,
 	})).Should(gomega.Succeed())
 	currRevisions := map[string]string{}
-	newMembersStatus := make([]workloads.MemberStatus, 0)
+	instanceStatus := make([]workloads.InstanceStatus, 0)
 	notReadyPodNames := make([]string, 0)
 	for _, pod := range podList.Items {
 		currRevisions[pod.Name] = "revision"
@@ -395,12 +395,13 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 				break
 			}
 		}
-		// role can be nil
-		memberStatus := workloads.MemberStatus{
-			PodName:     pod.Name,
-			ReplicaRole: role,
+		status := workloads.InstanceStatus{
+			PodName: pod.Name,
 		}
-		newMembersStatus = append(newMembersStatus, memberStatus)
+		if role != nil {
+			status.Role = role.Name
+		}
+		instanceStatus = append(instanceStatus, status)
 	}
 	compSpec := cluster.Spec.GetComponentByName(compName)
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
@@ -408,7 +409,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		its.Status.UpdateRevisions = updateRevisions
 		its.Status.Replicas = compSpec.Replicas
 		its.Status.CurrentReplicas = int32(len(podList.Items))
-		its.Status.MembersStatus = newMembersStatus
+		its.Status.InstanceStatus = instanceStatus
 		if len(notReadyPodNames) > 0 {
 			msg, _ := json.Marshal(notReadyPodNames)
 			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{

@@ -50,7 +50,7 @@ func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
 		}
 		return roleMap
 	}
-	var membersStatus []workloads.MemberStatus
+	var instanceStatus []workloads.InstanceStatus
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
 		roleName := strings.ToLower(pod.Labels[constant.RoleLabelKey])
@@ -58,13 +58,13 @@ func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
 		if !ok {
 			continue
 		}
-		memberStatus := workloads.MemberStatus{
-			PodName:     pod.Name,
-			ReplicaRole: &role,
+		status := workloads.InstanceStatus{
+			PodName: pod.Name,
+			Role:    role.Name,
 		}
-		membersStatus = append(membersStatus, memberStatus)
+		instanceStatus = append(instanceStatus, status)
 	}
-	its.Status.MembersStatus = membersStatus
+	its.Status.InstanceStatus = instanceStatus
 }
 
 func ListAndCheckInstanceSet(testCtx *testutil.TestContext, key types.NamespacedName) *workloads.InstanceSetList {

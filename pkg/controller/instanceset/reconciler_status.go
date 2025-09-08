@@ -192,10 +192,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	// 4. set members status
-	setMembersStatus(its, podList)
-
-	// 5. set instance status
+	// 4. set instance status
 	setInstanceStatus(its, podList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
@@ -297,47 +294,6 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setMembersStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
-	// no roles defined
-	if its.Spec.Roles == nil {
-		return
-	}
-	// compose new status
-	newMembersStatus := make([]workloads.MemberStatus, 0)
-	roleMap := composeRoleMap(*its)
-	for _, pod := range pods {
-		if !intctrlutil.PodIsReadyWithLabel(*pod) {
-			continue
-		}
-		roleName := getRoleName(pod)
-		role, ok := roleMap[roleName]
-		if !ok {
-			continue
-		}
-		memberStatus := workloads.MemberStatus{
-			PodName:     pod.Name,
-			ReplicaRole: &role,
-		}
-		newMembersStatus = append(newMembersStatus, memberStatus)
-	}
-
-	// sort and set
-	rolePriorityMap := ComposeRolePriorityMap(its.Spec.Roles)
-	sortMembersStatus(newMembersStatus, rolePriorityMap)
-	its.Status.MembersStatus = newMembersStatus
-}
-
-func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
-	getRolePriorityFunc := func(i int) int {
-		role := membersStatus[i].ReplicaRole.Name
-		return rolePriorityMap[role]
-	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(membersStatus[i].PodName)
-	}
-	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
-}
-
 func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	// compose new instance status
 	newInstanceStatus := make([]workloads.InstanceStatus, 0)
@@ -348,10 +304,34 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 		newInstanceStatus = append(newInstanceStatus, instanceStatus)
 	}
 
+	syncMemberStatus(its, newInstanceStatus, pods)
+
 	syncInstanceConfigStatus(its, newInstanceStatus)
 
 	sortInstanceStatus(newInstanceStatus)
 	its.Status.InstanceStatus = newInstanceStatus
+}
+
+func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) {
+	if its.Spec.Roles != nil {
+		roleMap := composeRoleMap(*its)
+		for _, pod := range pods {
+			if !intctrlutil.PodIsReadyWithLabel(*pod) {
+				continue
+			}
+			roleName := getRoleName(pod)
+			role, ok := roleMap[roleName]
+			if !ok {
+				continue
+			}
+			for i, inst := range instanceStatus {
+				if inst.PodName == pod.Name {
+					instanceStatus[i].Role = role.Name
+					break
+				}
+			}
+		}
+	}
 }
 
 func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {

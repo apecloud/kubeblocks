@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -152,6 +153,10 @@ func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		Command:         []string{"/bin/sh", "-c", fmt.Sprintf("/scripts/install-datasafed.sh %s", datasafedBinMountPath)},
 		VolumeMounts:    []corev1.VolumeMount{sharedVolumeMount},
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: boolptr.False(),
+			RunAsNonRoot:             boolptr.True(),
+		},
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&initContainer)
 	podSpec.InitContainers = append(podSpec.InitContainers, initContainer)

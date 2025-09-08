@@ -822,7 +822,6 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 						}},
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: boolptr.False(),
-							RunAsNonRoot:             boolptr.True(),
 						},
 					}},
 					Volumes: []corev1.Volume{{
@@ -834,6 +833,9 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 						},
 					}},
 					ServiceAccountName: saName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: boolptr.True(),
+					},
 				},
 			},
 			BackoffLimit: pointer.Int32(2),
@@ -902,10 +904,12 @@ datasafed rm %s`, precheckFilePath, precheckFilePath, precheckFilePath),
 						},
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: boolptr.False(),
-							RunAsNonRoot:             boolptr.True(),
 						},
 					}},
 					ServiceAccountName: saName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: boolptr.True(),
+					},
 				},
 			},
 			BackoffLimit: pointer.Int32(2),

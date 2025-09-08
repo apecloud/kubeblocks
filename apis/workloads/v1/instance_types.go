@@ -123,15 +123,10 @@ type InstanceSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Provides actions to do membership dynamic reconfiguration.
+	// Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.
 	//
 	// +optional
-	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
-
-	// Provides variables which are used to call Actions.
-	//
-	// +optional
-	TemplateVars map[string]string `json:"templateVars,omitempty"`
+	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// Assistant objects that are necessary to run the instance.
 	//
@@ -201,4 +196,36 @@ type InstanceAssistantObject struct {
 	ServiceAccount *corev1.ServiceAccount `json:"serviceAccount,omitempty"`
 	Role           *rbacv1.Role           `json:"role,omitempty"`
 	RoleBinding    *rbacv1.RoleBinding    `json:"roleBinding,omitempty"`
+}
+
+type LifecycleActions struct {
+	// Provides variables which are used to call Actions.
+	//
+	// +optional
+	TemplateVars map[string]string `json:"templateVars,omitempty"`
+
+	// Defines the procedure for a controlled transition of a role to a new replica.
+	//
+	// +optional
+	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
+
+	// Defines the procedure to add a new replica.
+	//
+	// +optional
+	MemberJoin *kbappsv1.Action `json:"memberJoin,omitempty"`
+
+	// Defines the procedure to remove a replica.
+	//
+	// +optional
+	MemberLeave *kbappsv1.Action `json:"memberLeave,omitempty"`
+
+	// Defines the procedure for exporting the data from a replica.
+	//
+	// +optional
+	DataDump *kbappsv1.Action `json:"dataDump,omitempty"`
+
+	// Defines the procedure for importing data into a replica.
+	//
+	// +optional
+	DataLoad *kbappsv1.Action `json:"dataLoad,omitempty"`
 }

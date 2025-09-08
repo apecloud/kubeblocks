@@ -112,7 +112,7 @@ func (factory *MockInstanceFactory) SetRoles(roles []workloads.ReplicaRole) *Moc
 	return factory
 }
 
-func (factory *MockInstanceFactory) SetMembershipActions(actions *workloads.MembershipReconfiguration) *MockInstanceFactory {
-	factory.Get().Spec.MembershipReconfiguration = actions
+func (factory *MockInstanceFactory) SetLifecycleActions(actions *workloads.LifecycleActions) *MockInstanceFactory {
+	factory.Get().Spec.LifecycleActions = actions
 	return factory
 }

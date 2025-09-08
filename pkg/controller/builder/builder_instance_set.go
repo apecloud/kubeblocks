@@ -125,21 +125,23 @@ func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.M
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions) *InstanceSetBuilder {
-	if lifecycleActions != nil && lifecycleActions.Switchover != nil {
-		if builder.get().Spec.MembershipReconfiguration == nil {
-			builder.get().Spec.MembershipReconfiguration = &workloads.MembershipReconfiguration{}
+func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions, templateVars map[string]any) *InstanceSetBuilder {
+	if lifecycleActions != nil || templateVars != nil {
+		if builder.get().Spec.LifecycleActions == nil {
+			builder.get().Spec.LifecycleActions = &workloads.LifecycleActions{}
 		}
-		builder.get().Spec.MembershipReconfiguration.Switchover = lifecycleActions.Switchover
 	}
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetTemplateVars(templateVars map[string]any) *InstanceSetBuilder {
+	if lifecycleActions != nil {
+		builder.get().Spec.LifecycleActions.Switchover = lifecycleActions.Switchover
+		builder.get().Spec.LifecycleActions.MemberJoin = lifecycleActions.MemberJoin
+		builder.get().Spec.LifecycleActions.MemberLeave = lifecycleActions.MemberLeave
+		builder.get().Spec.LifecycleActions.DataDump = lifecycleActions.DataDump
+		builder.get().Spec.LifecycleActions.DataLoad = lifecycleActions.DataLoad
+	}
 	if templateVars != nil {
-		builder.get().Spec.TemplateVars = make(map[string]string)
+		builder.get().Spec.LifecycleActions.TemplateVars = make(map[string]string)
 		for k, v := range templateVars {
-			builder.get().Spec.TemplateVars[k] = v.(string)
+			builder.get().Spec.LifecycleActions.TemplateVars[k] = v.(string)
 		}
 	}
 	return builder

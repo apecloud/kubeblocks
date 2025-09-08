@@ -2339,7 +2339,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -31691,28 +31691,16 @@ PodUpdatePolicyType
 </tr>
 <tr>
 <td>
-<code>membershipReconfiguration</code><br/>
+<code>lifecycleActions</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
-MembershipReconfiguration
+<a href="#workloads.kubeblocks.io/v1.LifecycleActions">
+LifecycleActions
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>templateVars</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides variables which are used to call Actions.</p>
+<p>Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.</p>
 </td>
 </tr>
 <tr>
@@ -32102,28 +32090,16 @@ MemberUpdateStrategy
 </tr>
 <tr>
 <td>
-<code>membershipReconfiguration</code><br/>
+<code>lifecycleActions</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
-MembershipReconfiguration
+<a href="#workloads.kubeblocks.io/v1.LifecycleActions">
+LifecycleActions
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>templateVars</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides variables which are used to call Actions.</p>
+<p>Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.</p>
 </td>
 </tr>
 <tr>
@@ -32768,28 +32744,16 @@ MemberUpdateStrategy
 </tr>
 <tr>
 <td>
-<code>membershipReconfiguration</code><br/>
+<code>lifecycleActions</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
-MembershipReconfiguration
+<a href="#workloads.kubeblocks.io/v1.LifecycleActions">
+LifecycleActions
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>templateVars</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides variables which are used to call Actions.</p>
+<p>Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.</p>
 </td>
 </tr>
 <tr>
@@ -33279,28 +33243,16 @@ PodUpdatePolicyType
 </tr>
 <tr>
 <td>
-<code>membershipReconfiguration</code><br/>
+<code>lifecycleActions</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
-MembershipReconfiguration
+<a href="#workloads.kubeblocks.io/v1.LifecycleActions">
+LifecycleActions
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>templateVars</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides variables which are used to call Actions.</p>
+<p>Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.</p>
 </td>
 </tr>
 <tr>
@@ -33790,6 +33742,105 @@ indicated by UpdateRevisions.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>templateVars</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides variables which are used to call Actions.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>switchover</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for a controlled transition of a role to a new replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoin</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to add a new replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeave</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to remove a replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataDump</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for exporting the data from a replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoad</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for importing data into a replica.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.MemberUpdateStrategy">MemberUpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
@@ -33815,9 +33866,6 @@ indicated by UpdateRevisions.</p>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration
 </h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
-</p>
 <div>
 </div>
 <table>

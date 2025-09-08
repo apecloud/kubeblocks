@@ -226,15 +226,10 @@ type InstanceSetSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Provides actions to do membership dynamic reconfiguration.
+	// Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.
 	//
 	// +optional
-	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
-
-	// Provides variables which are used to call Actions.
-	//
-	// +optional
-	TemplateVars map[string]string `json:"templateVars,omitempty"`
+	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
 	//

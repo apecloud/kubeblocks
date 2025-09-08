@@ -262,7 +262,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
-	if its.Spec.MembershipReconfiguration == nil || its.Spec.MembershipReconfiguration.Switchover == nil {
+	if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.Switchover == nil {
 		return nil
 	}
 
@@ -271,14 +271,14 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		return err
 	}
 	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Switchover: its.Spec.MembershipReconfiguration.Switchover,
+		Switchover: its.Spec.LifecycleActions.Switchover,
 	}
 	templateVars := func() map[string]any {
-		if its.Spec.TemplateVars == nil {
+		if its.Spec.LifecycleActions.TemplateVars == nil {
 			return nil
 		}
 		m := make(map[string]any)
-		for k, v := range its.Spec.TemplateVars {
+		for k, v := range its.Spec.LifecycleActions.TemplateVars {
 			m[k] = v
 		}
 		return m
@@ -328,11 +328,11 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 		Reconfigure: config.Reconfigure,
 	}
 	templateVars := func() map[string]any {
-		if its.Spec.TemplateVars == nil {
+		if its.Spec.LifecycleActions.TemplateVars == nil {
 			return nil
 		}
 		m := make(map[string]any)
-		for k, v := range its.Spec.TemplateVars {
+		for k, v := range its.Spec.LifecycleActions.TemplateVars {
 			m[k] = v
 		}
 		return m

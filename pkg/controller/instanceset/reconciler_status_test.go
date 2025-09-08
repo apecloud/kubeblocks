@@ -399,7 +399,7 @@ var _ = Describe("status reconciler test", func() {
 			replicas := int32(3)
 			its.Spec.Replicas = &replicas
 			its.Status.InstanceStatus = oldInstanceStatus
-			setInstanceStatus(its, pods)
+			setInstanceStatus(nil, its, pods)
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))

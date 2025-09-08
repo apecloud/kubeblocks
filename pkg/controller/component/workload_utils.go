@@ -54,16 +54,6 @@ func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, cl
 	return listPods(ctx, cli, namespace, clusterName, compName, roleLabel, opts...)
 }
 
-func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
-	opts ...client.ListOption) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetCompLabels(clusterName, compName)
-	if opts == nil {
-		opts = make([]client.ListOption, 0)
-	}
-	opts = append(opts, inDataContext())
-	return listObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, namespace, labels, opts...)
-}
-
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Service, error) {
 	labels := constant.GetCompLabels(clusterName, compName)

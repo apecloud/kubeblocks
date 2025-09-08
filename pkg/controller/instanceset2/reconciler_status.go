@@ -287,8 +287,17 @@ func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instan
 
 	syncInstanceConfigStatus(its, instanceStatus)
 
+	syncInstancePVCStatus(its, instanceStatus, instances)
+
 	sortInstanceStatus(instanceStatus)
 	its.Status.InstanceStatus = instanceStatus
+}
+
+func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+	}
+	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }
 
 func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
@@ -350,9 +359,13 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 	}
 }
 
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+func syncInstancePVCStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+	for _, inst := range instances {
+		for i, status := range instanceStatus {
+			if status.PodName == inst.Name {
+				instanceStatus[i].VolumeExpansion = inst.Status.VolumeExpansion
+				break
+			}
+		}
 	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

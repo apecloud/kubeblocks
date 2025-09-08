@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -118,6 +121,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
+	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -191,4 +195,32 @@ func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 		}
 	}
 	return ""
+}
+
+func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
+	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
+	var pvcList []*corev1.PersistentVolumeClaim
+	for _, obj := range pvcs {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		pvcList = append(pvcList, pvc)
+	}
+	for _, vct := range inst.Spec.VolumeClaimTemplates {
+		prefix := fmt.Sprintf("%s-%s", vct.Name, inst.Name)
+		for _, pvc := range pvcList {
+			if !strings.HasPrefix(pvc.Name, prefix) {
+				continue
+			}
+			if pvc.Status.Capacity == nil || pvc.Status.Capacity.Storage().Cmp(pvc.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
+				continue
+			}
+			instName := ""
+			if pvc.Labels != nil {
+				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
+			}
+			if len(instName) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

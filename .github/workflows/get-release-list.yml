@@ -8,7 +8,7 @@ on:
       - '**'
 
 env:
-  GH: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 run-name: Get KubeBlocks Release List
 

@@ -308,7 +308,6 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	syncInstanceConfigStatus(its, instanceStatus)
 
 	sortInstanceStatus(instanceStatus)
-
 	its.Status.InstanceStatus = instanceStatus
 }
 

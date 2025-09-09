@@ -299,10 +299,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 	}
 
 	// all instances are in Ready condition, check role probe
-	if len(t.runningITS.Spec.Roles) == 0 {
-		return false, nil
-	}
-	if len(t.runningITS.Status.MembersStatus) == int(t.runningITS.Status.Replicas) {
+	if t.runningITS.IsRoleProbeDone() {
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
@@ -428,9 +425,9 @@ func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransf
 	if its == nil {
 		return metav1.ConditionFalse, "Unavailable", "the workload is not present"
 	}
-	for _, member := range its.Status.MembersStatus {
-		if member.ReplicaRole != nil {
-			if strings.EqualFold(member.ReplicaRole.Name, *policy.WithRole) {
+	for _, inst := range its.Status.InstanceStatus {
+		if len(inst.Role) > 0 {
+			if strings.EqualFold(inst.Role, *policy.WithRole) {
 				return metav1.ConditionTrue, "Available", fmt.Sprintf("the role %s is present", *policy.WithRole)
 			}
 		}

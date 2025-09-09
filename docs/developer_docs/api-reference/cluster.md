@@ -9855,7 +9855,7 @@ int32
 <h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 <p>ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.</p>
@@ -33050,20 +33050,6 @@ Used only when spec.roles set.</p>
 </tr>
 <tr>
 <td>
-<code>membersStatus</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberStatus">
-[]MemberStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides the status of each member in the cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instanceStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceStatus">
@@ -33369,6 +33355,18 @@ string
 </td>
 <td>
 <p>Represents the name of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the role of the instance observed.</p>
 </td>
 </tr>
 <tr>
@@ -33764,48 +33762,6 @@ int32
 <em>(Optional)</em>
 <p>UpdatedReplicas is the number of Pods created by the InstanceSet controller from the InstanceSet version
 indicated by UpdateRevisions.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.MemberStatus">MemberStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>podName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the name of the pod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>role</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRole">
-ReplicaRole
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the role of the replica in the cluster.</p>
 </td>
 </tr>
 </tbody>

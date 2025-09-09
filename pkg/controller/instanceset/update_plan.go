@@ -100,7 +100,14 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 			// potentially hide some uncertain risks.
 			memberUpdateStrategy := getMemberUpdateStrategy(&p.its)
 			serialUpdate := memberUpdateStrategy == workloads.SerialUpdateStrategy
-			hasRoleProbed := len(p.its.Status.MembersStatus) > 0
+			hasRoleProbed := func() bool {
+				for _, status := range p.its.Status.InstanceStatus {
+					if len(status.Role) > 0 {
+						return true
+					}
+				}
+				return false
+			}()
 			if !serialUpdate || hasRoleProbed {
 				return ErrWait
 			}

@@ -1,0 +1,20 @@
+name: CICD Push
+
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+
+env:
+  GH: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+
+jobs:
+  release-lits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: get release list
+        run: |
+          gh release list --repo ${{ github.repository }} --limit 500 --order desc|grep -v "alpha"|grep -v "beta"|grep -v "Pre-release"

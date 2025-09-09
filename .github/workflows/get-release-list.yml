@@ -12,7 +12,7 @@ env:
 
 
 jobs:
-  release-lits:
+  release-list:
     runs-on: ubuntu-latest
     steps:
       - name: get release list

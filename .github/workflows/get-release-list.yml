@@ -1,4 +1,4 @@
-name: CICD Push
+name: Get Release List
 
 on:
   push:

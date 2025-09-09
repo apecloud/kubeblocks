@@ -434,7 +434,7 @@ func (r *OpsRequestReconciler) parseRunningOpsRequests(ctx context.Context, obje
 	if cluster.IsDeleting() {
 		// if the cluster is deleting, we should enqueue all the opsRequests in this cluster.
 		opsList := &opsv1alpha1.OpsRequestList{}
-		_ = r.Client.List(ctx, opsList, client.InNamespace(cluster.Namespace), client.MatchingFields{
+		_ = r.Client.List(ctx, opsList, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 			constant.AppInstanceLabelKey: cluster.Name,
 		})
 		var requests []reconcile.Request

@@ -11299,7 +11299,7 @@ spec:
                       description: Represents the role of the instance observed.
                       type: string
                     volumeExpansion:
-                      description: Represents if the instance is in volume expansion.
+                      description: Represents whether the instance is in volume expansion.
                       type: boolean
                   required:
                   - podName

@@ -33378,7 +33378,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents if the instance is in volume expansion.</p>
+<p>Represents whether the instance is in volume expansion.</p>
 </td>
 </tr>
 <tr>
@@ -33522,7 +33522,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents if the instance is in volume expansion.</p>
+<p>Represents whether the instance is in volume expansion.</p>
 </td>
 </tr>
 </tbody>

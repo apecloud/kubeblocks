@@ -34,7 +34,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -298,25 +298,24 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
-	// compose new instance status
-	newInstanceStatus := make([]workloads.InstanceStatus, 0)
+	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, pod := range pods {
-		instanceStatus := workloads.InstanceStatus{
+		status := workloads.InstanceStatus{
 			PodName: pod.Name,
 		}
-		newInstanceStatus = append(newInstanceStatus, instanceStatus)
+		instanceStatus = append(instanceStatus, status)
 	}
 
-	syncMemberStatus(its, newInstanceStatus, pods)
+	syncMemberStatus(its, instanceStatus, pods)
 
-	syncInstanceConfigStatus(its, newInstanceStatus)
+	syncInstanceConfigStatus(its, instanceStatus)
 
 	if tree != nil {
-		syncInstancePVCStatus(tree, its, newInstanceStatus)
+		syncInstancePVCStatus(tree, its, instanceStatus)
 	}
 
-	sortInstanceStatus(newInstanceStatus)
-	its.Status.InstanceStatus = newInstanceStatus
+	sortInstanceStatus(instanceStatus)
+	its.Status.InstanceStatus = instanceStatus
 }
 
 func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {

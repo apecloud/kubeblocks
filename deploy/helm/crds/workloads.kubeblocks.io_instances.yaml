@@ -9545,7 +9545,7 @@ spec:
                   the Instance used to generate pod.
                 type: string
               volumeExpansion:
-                description: Represents if the instance is in volume expansion.
+                description: Represents whether the instance is in volume expansion.
                 type: boolean
             type: object
         type: object

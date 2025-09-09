@@ -35,7 +35,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 )
 
 var _ = Describe("instance util test", func() {

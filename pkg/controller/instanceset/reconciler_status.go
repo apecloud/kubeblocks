@@ -21,8 +21,10 @@ package instanceset
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -193,7 +196,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	setInstanceStatus(its, podList)
+	setInstanceStatus(tree, its, podList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -294,7 +297,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, pod := range pods {
 		status := workloads.InstanceStatus{
@@ -307,8 +310,19 @@ func setInstanceStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 
 	syncInstanceConfigStatus(its, instanceStatus)
 
+	if tree != nil {
+		syncInstancePVCStatus(tree, its, instanceStatus)
+	}
+
 	sortInstanceStatus(instanceStatus)
 	its.Status.InstanceStatus = instanceStatus
+}
+
+func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+	}
+	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }
 
 func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) {
@@ -370,9 +384,35 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 	}
 }
 
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
+	var pvcList []*corev1.PersistentVolumeClaim
+	for _, obj := range pvcs {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		pvcList = append(pvcList, pvc)
 	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
+	for _, vct := range its.Spec.VolumeClaimTemplates {
+		prefix := fmt.Sprintf("%s-%s", vct.Name, its.Name)
+		for _, pvc := range pvcList {
+			if !strings.HasPrefix(pvc.Name, prefix) {
+				continue
+			}
+			if pvc.Status.Capacity == nil || pvc.Status.Capacity.Storage().Cmp(pvc.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
+				continue
+			}
+			instName := ""
+			if pvc.Labels != nil {
+				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
+			}
+			if len(instName) > 0 {
+				for i, inst := range instanceStatus {
+					if inst.PodName == instName {
+						// TODO: how to check the expansion failed?
+						instanceStatus[i].VolumeExpansion = true
+						break
+					}
+				}
+			}
+		}
+	}
 }

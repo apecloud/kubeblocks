@@ -540,6 +540,11 @@ type InstanceStatus struct {
 	// +optional
 	Role string `json:"role,omitempty"`
 
+	// Represents whether the instance is in volume expansion.
+	//
+	// +optional
+	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
+
 	// The status of configs.
 	//
 	// +optional

@@ -115,6 +115,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	// mark component restore done
 	if compObj.Annotations != nil {
 		compObj.Annotations[constant.RestoreDoneAnnotationKey] = "true"
+		delete(compObj.Annotations, constant.RestoreFromBackupAnnotationKey)
 	}
 	// do clean up
 	return r.cleanupRestoreAnnotations(comp.Name)

@@ -125,7 +125,7 @@ func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.M
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions, templateVars map[string]any) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions, templateVars map[string]string) *InstanceSetBuilder {
 	if lifecycleActions != nil || templateVars != nil {
 		if builder.get().Spec.LifecycleActions == nil {
 			builder.get().Spec.LifecycleActions = &workloads.LifecycleActions{}
@@ -141,7 +141,7 @@ func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv
 	if templateVars != nil {
 		builder.get().Spec.LifecycleActions.TemplateVars = make(map[string]string)
 		for k, v := range templateVars {
-			builder.get().Spec.LifecycleActions.TemplateVars[k] = v.(string)
+			builder.get().Spec.LifecycleActions.TemplateVars[k] = v
 		}
 	}
 	return builder

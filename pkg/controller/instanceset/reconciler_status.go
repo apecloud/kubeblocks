@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -40,14 +41,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func NewStatusReconciler() kubebuilderx.Reconciler {
+	return &statusReconciler{}
+}
+
 // statusReconciler computes the current status
 type statusReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &statusReconciler{}
-
-func NewStatusReconciler() kubebuilderx.Reconciler {
-	return &statusReconciler{}
-}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
@@ -147,6 +148,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 	}
+	if its.Status.InitReplicas == nil {
+		its.Status.InitReplicas = ptr.To(ptr.Deref(its.Spec.Replicas, 0))
+	}
 	its.Status.Replicas = replicas
 	its.Status.Ordinals = ordinals
 	slices.Sort(its.Status.Ordinals)
@@ -155,7 +159,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
 	its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
-	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
+	its.Status.TemplatesStatus = r.buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)
 	if its.Spec.Replicas != nil {
@@ -172,20 +176,20 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := r.buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	availableCondition, err := r.buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
 
 	// 3. set InstanceFailure condition
-	failureCondition, err := buildFailureCondition(its, podList)
+	failureCondition, err := r.buildFailureCondition(its, podList)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -196,7 +200,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	setInstanceStatus(tree, its, podList)
+	r.setInstanceStatus(tree, its, podList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -204,14 +208,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func buildConditionMessageWithNames(podNames []string) ([]byte, error) {
-	baseSort(podNames, func(i int) (string, int) {
-		return parseParentNameAndOrdinal(podNames[i])
-	}, nil, true)
-	return json.Marshal(podNames)
-}
-
-func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.InstanceTemplateStatus) []workloads.InstanceTemplateStatus {
+func (r *statusReconciler) buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.InstanceTemplateStatus) []workloads.InstanceTemplateStatus {
 	var templatesStatus []workloads.InstanceTemplateStatus
 	for templateName, templateStatus := range template2TemplatesStatus {
 		if len(templateName) == 0 {
@@ -226,7 +223,7 @@ func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.Instanc
 	return templatesStatus
 }
 
-func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
+func (r *statusReconciler) buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames sets.Set[string]) (*metav1.Condition, error) {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceReady),
 		Status:             metav1.ConditionTrue,
@@ -236,7 +233,7 @@ func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames s
 	if !ready {
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = workloads.ReasonNotReady
-		message, err := buildConditionMessageWithNames(notReadyNames.UnsortedList())
+		message, err := r.buildConditionMessageWithNames(notReadyNames.UnsortedList())
 		if err != nil {
 			return nil, err
 		}
@@ -245,7 +242,7 @@ func buildReadyCondition(its *workloads.InstanceSet, ready bool, notReadyNames s
 	return condition, nil
 }
 
-func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
+func (r *statusReconciler) buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvailableNames sets.Set[string]) (*metav1.Condition, error) {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceAvailable),
 		Status:             metav1.ConditionTrue,
@@ -255,7 +252,7 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 	if !available {
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = workloads.ReasonNotAvailable
-		message, err := buildConditionMessageWithNames(notAvailableNames.UnsortedList())
+		message, err := r.buildConditionMessageWithNames(notAvailableNames.UnsortedList())
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +261,7 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 	return condition, nil
 }
 
-func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
+func (r *statusReconciler) buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
 		if isTerminating(pod) {
@@ -284,7 +281,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	if len(failureNames) == 0 {
 		return nil, nil
 	}
-	message, err := buildConditionMessageWithNames(failureNames)
+	message, err := r.buildConditionMessageWithNames(failureNames)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +294,14 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
+func (r *statusReconciler) buildConditionMessageWithNames(podNames []string) ([]byte, error) {
+	baseSort(podNames, func(i int) (string, int) {
+		return parseParentNameAndOrdinal(podNames[i])
+	}, nil, true)
+	return json.Marshal(podNames)
+}
+
+func (r *statusReconciler) setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, pod := range pods {
 		status := workloads.InstanceStatus{
@@ -306,26 +310,26 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		instanceStatus = append(instanceStatus, status)
 	}
 
-	syncMemberStatus(its, instanceStatus, pods)
+	r.syncMemberStatus(its, instanceStatus, pods)
 
-	syncInstanceConfigStatus(its, instanceStatus)
+	r.syncInstanceConfigStatus(its, instanceStatus)
 
 	if tree != nil {
-		syncInstancePVCStatus(tree, its, instanceStatus)
+		r.syncInstancePVCStatus(tree, its, instanceStatus)
 	}
 
-	sortInstanceStatus(instanceStatus)
+	r.sortInstanceStatus(instanceStatus)
 	its.Status.InstanceStatus = instanceStatus
 }
 
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+func (r *statusReconciler) sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
 	}
 	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }
 
-func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) {
+func (r *statusReconciler) syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) {
 	if its.Spec.Roles != nil {
 		roleMap := composeRoleMap(*its)
 		for _, pod := range pods {
@@ -347,7 +351,7 @@ func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.Ins
 	}
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+func (r *statusReconciler) syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
 	if its.Status.InstanceStatus == nil {
 		// initialize
 		configs := make([]workloads.InstanceConfigStatus, 0)
@@ -384,7 +388,7 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 	}
 }
 
-func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+func (r *statusReconciler) syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
 	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
 	var pvcList []*corev1.PersistentVolumeClaim
 	for _, obj := range pvcs {

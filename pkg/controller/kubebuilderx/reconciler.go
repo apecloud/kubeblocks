@@ -43,6 +43,9 @@ type ObjectOptions struct {
 
 	// if true, the object should not be reconciled
 	SkipToReconcile bool
+
+	// hooks are called before the object is manipulated
+	Hooks []func(client.Object) error
 }
 
 type WithSubResource string
@@ -57,9 +60,16 @@ func (o SkipToReconcile) ApplyToObject(opts *ObjectOptions) {
 	opts.SkipToReconcile = bool(o)
 }
 
+type WithHook func(client.Object) error
+
+func (o WithHook) ApplyToObject(opts *ObjectOptions) {
+	opts.Hooks = append(opts.Hooks, o)
+}
+
 type ObjectTree struct {
 	// TODO(free6om): should find a better place to hold these two params?
 	context.Context
+	client.Reader
 	record.EventRecorder
 	logr.Logger
 
@@ -252,8 +262,20 @@ func (t *ObjectTree) Delete(objects ...client.Object) error {
 	return nil
 }
 
-func (t *ObjectTree) DeleteSecondaryObjects() {
-	t.children = make(model.ObjectSnapshot)
+func (t *ObjectTree) DeleteWithOption(object client.Object, options ...ObjectOption) error {
+	name, err := model.GetGVKName(object)
+	if err != nil {
+		return err
+	}
+	delete(t.children, *name)
+	if len(options) > 0 {
+		option := ObjectOptions{}
+		for _, opt := range options {
+			opt.ApplyToObject(&option)
+		}
+		t.childrenOptions[*name] = option
+	}
+	return nil
 }
 
 func (t *ObjectTree) SetFinalizer(finalizer string) {

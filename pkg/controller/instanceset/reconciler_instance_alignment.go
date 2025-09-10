@@ -20,29 +20,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"errors"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
-// including horizontal scaling and recovering from unintended pod deletions etc.
-// only handle instance count, don't care instance revision.
-//
-// TODO(free6om): support membership reconfiguration
-type instanceAlignmentReconciler struct{}
-
 func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
 	return &instanceAlignmentReconciler{}
 }
+
+// instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
+// including horizontal scaling and recovering from unintended pod deletions etc.
+// only handle instance count, don't care instance revision.
+type instanceAlignmentReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
 
 func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
@@ -140,7 +145,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.Add(newPod); err != nil {
+		if err := tree.AddWithOption(newPod, r.joinMemberHook(tree, its, oldInstanceList, newPod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
@@ -193,7 +198,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
-		if err := tree.Delete(pod); err != nil {
+		if err := tree.DeleteWithOption(pod, r.leaveMemberHook(tree, its, oldInstanceList, pod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 
@@ -219,4 +224,110 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	return kubebuilderx.Continue, nil
 }
 
-var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
+func (r *instanceAlignmentReconciler) joinMemberHook(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithHook {
+	return func(obj client.Object) error {
+		if its.Status.InitReplicas == nil || its.Status.ReadyInitReplicas == nil ||
+			*its.Status.InitReplicas != *its.Status.ReadyInitReplicas {
+			return nil // init replicas
+		}
+		if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.MemberJoin == nil {
+			return nil // member join not defined
+		}
+		joined := false
+		for _, inst := range its.Status.InstanceStatus {
+			if inst.PodName == pod.Name {
+				joined = ptr.Deref(inst.Joined, false)
+			}
+		}
+		if joined {
+			return nil
+		}
+
+		// TODO: should wait for the data to be loaded before joining the member?
+
+		if err := r.joinMember(tree, its, pods, pod); err != nil {
+			return err
+		}
+		for i, inst := range its.Status.InstanceStatus {
+			if inst.PodName == pod.Name {
+				its.Status.InstanceStatus[i].Joined = ptr.To(true)
+			}
+		}
+		return nil
+	}
+}
+
+func (r *instanceAlignmentReconciler) joinMember(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+	lfa, err := newLifecycleAction(its, pods, pod)
+	if err != nil {
+		return err
+	}
+	if err = lfa.MemberJoin(tree.Context, tree.Reader, nil); err != nil {
+		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			return err
+		}
+	}
+	tree.Logger.Info("succeed to call member join action", "pod", pod.Name)
+	return nil
+}
+
+func (r *instanceAlignmentReconciler) leaveMemberHook(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithHook {
+	return func(obj client.Object) error {
+		hasMemberLeaveDefined := its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil
+		joined := func() bool {
+			for _, inst := range its.Status.InstanceStatus {
+				if inst.PodName == pod.Name {
+					return ptr.Deref(inst.Joined, true)
+				}
+			}
+			return false
+		}()
+		if !hasMemberLeaveDefined || !joined {
+			return nil
+		}
+		return r.leaveMember(tree, its, pods, pod)
+	}
+}
+
+func (r *instanceAlignmentReconciler) leaveMember(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+	switchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		if its.Spec.LifecycleActions.Switchover == nil {
+			return nil
+		}
+		err := lfa.Switchover(tree.Context, tree.Reader, nil, "")
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
+			}
+			return err
+		}
+		tree.Logger.Info("succeed to call switchover action before leave member", "pod", pod.Name)
+		return nil
+	}
+
+	memberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		err := lfa.MemberLeave(tree.Context, tree.Reader, nil)
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
+			}
+			return err
+		}
+		tree.Logger.Info("succeed to call leave member action", "pod", pod.Name)
+		return nil
+	}
+
+	lfa, err := newLifecycleAction(its, pods, pod)
+	if err != nil {
+		return err
+
+	}
+	if err = switchover(lfa, pod); err != nil {
+		tree.Logger.Error(err, "failed to call switchover action before leave member, ignore and continue", "pod", pod.Name)
+	}
+	return memberLeave(lfa, pod)
+}

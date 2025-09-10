@@ -32994,8 +32994,7 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Defines the initial number of instances when the cluster is first initialized.
-This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
-Used only when spec.roles set.</p>
+This value is set to spec.Replicas at the time of object creation and remains constant thereafter.</p>
 </td>
 </tr>
 <tr>
@@ -33007,9 +33006,8 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
-This value remains constant once it equals InitReplicas.
-Used only when spec.roles set.</p>
+<p>Represents the number of instances that have already reached the InstanceStatus during the cluster initialization stage.
+This value remains constant once it equals InitReplicas.</p>
 </td>
 </tr>
 <tr>
@@ -33345,6 +33343,18 @@ bool
 <td>
 <em>(Optional)</em>
 <p>The status of configs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>joined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Joined indicates whether the instance is joined.</p>
 </td>
 </tr>
 </tbody>
@@ -33837,6 +33847,20 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Defines the procedure for importing data into a replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure that update a replica with new configuration.</p>
 </td>
 </tr>
 </tbody>

@@ -22,7 +22,6 @@ package render
 import (
 	"encoding/json"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -61,8 +60,8 @@ func buildInComponentObjects(podSpec *corev1.PodSpec, component *component.Synth
 
 func builtinObjectsAsValues(builtin *builtInObjects) (*gotemplate.TplValues, error) {
 	vars := builtinCustomObjects(builtin)
-	if builtin.component.TemplateVars != nil {
-		maps.Copy(vars, builtin.component.TemplateVars)
+	for k, v := range builtin.component.TemplateVars {
+		vars[k] = v
 	}
 
 	b, err := json.Marshal(vars)

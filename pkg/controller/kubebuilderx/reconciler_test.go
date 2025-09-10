@@ -67,8 +67,6 @@ var _ = Describe("reconciler test", func() {
 			Expect(tree.Update(obj0Update)).Should(Succeed())
 			Expect(tree.List(&corev1.Pod{})[0]).Should(Equal(obj0Update))
 			Expect(tree.GetSecondaryObjects()).Should(HaveLen(1))
-			tree.DeleteSecondaryObjects()
-			Expect(tree.GetSecondaryObjects()).Should(HaveLen(0))
 
 			By("DeepCopy")
 			tree.SetRoot(root)

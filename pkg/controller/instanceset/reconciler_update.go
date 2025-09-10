@@ -33,7 +33,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
@@ -266,24 +265,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		return nil
 	}
 
-	clusterName, err := r.clusterName(its)
-	if err != nil {
-		return err
-	}
-	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Switchover: its.Spec.LifecycleActions.Switchover,
-	}
-	templateVars := func() map[string]any {
-		if its.Spec.LifecycleActions.TemplateVars == nil {
-			return nil
-		}
-		m := make(map[string]any)
-		for k, v := range its.Spec.LifecycleActions.TemplateVars {
-			m[k] = v
-		}
-		return m
-	}()
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod)
+	lfa, err := newLifecycleAction(its, nil, pod)
 	if err != nil {
 		return err
 	}
@@ -319,25 +301,12 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 		return nil // skip
 	}
 
-	clusterName, err := r.clusterName(its)
-	if err != nil {
-		return err
+	itsCopy := its.DeepCopy()
+	if itsCopy.Spec.LifecycleActions == nil {
+		itsCopy.Spec.LifecycleActions = &workloads.LifecycleActions{}
 	}
-
-	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Reconfigure: config.Reconfigure,
-	}
-	templateVars := func() map[string]any {
-		if its.Spec.LifecycleActions.TemplateVars == nil {
-			return nil
-		}
-		m := make(map[string]any)
-		for k, v := range its.Spec.LifecycleActions.TemplateVars {
-			m[k] = v
-		}
-		return m
-	}()
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod)
+	itsCopy.Spec.LifecycleActions.Reconfigure = config.Reconfigure
+	lfa, err := newLifecycleAction(its, nil, pod)
 	if err != nil {
 		return err
 	}
@@ -418,17 +387,6 @@ func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *core
 		}
 	}
 	return config.Generation <= 0
-}
-
-func (r *updateReconciler) clusterName(its *workloads.InstanceSet) (string, error) {
-	var clusterName string
-	if its.Labels != nil {
-		clusterName = its.Labels[constant.AppInstanceLabelKey]
-	}
-	if len(clusterName) == 0 {
-		return "", fmt.Errorf("InstanceSet %s/%s has no label %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
-	}
-	return clusterName, nil
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

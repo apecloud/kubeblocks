@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -34,8 +35,8 @@ import (
 
 // MockInstanceSetReady mocks the ITS workload to ready state.
 func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
-	its.Status.InitReplicas = *its.Spec.Replicas
-	its.Status.ReadyInitReplicas = *its.Spec.Replicas
+	its.Status.InitReplicas = ptr.To(ptr.Deref(its.Spec.Replicas, 0))
+	its.Status.ReadyInitReplicas = ptr.To(ptr.Deref(its.Spec.Replicas, 0))
 	its.Status.AvailableReplicas = *its.Spec.Replicas
 	its.Status.ObservedGeneration = its.Generation
 	its.Status.Replicas = *its.Spec.Replicas

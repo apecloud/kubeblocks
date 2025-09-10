@@ -326,17 +326,15 @@ type InstanceSetStatus struct {
 
 	// Defines the initial number of instances when the cluster is first initialized.
 	// This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
-	// Used only when spec.roles set.
 	//
 	// +optional
-	InitReplicas int32 `json:"initReplicas"`
+	InitReplicas *int32 `json:"initReplicas"`
 
-	// Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
+	// Represents the number of instances that have already reached the InstanceStatus during the cluster initialization stage.
 	// This value remains constant once it equals InitReplicas.
-	// Used only when spec.roles set.
 	//
 	// +optional
-	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
+	ReadyInitReplicas *int32 `json:"readyInitReplicas,omitempty"`
 
 	// Provides the status of each instance in the ITS.
 	//
@@ -544,6 +542,11 @@ type InstanceStatus struct {
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+
+	// Joined indicates whether the instance is joined.
+	//
+	// +optional
+	Joined *bool `json:"joined,omitempty"`
 }
 
 type InstanceConfigStatus struct {

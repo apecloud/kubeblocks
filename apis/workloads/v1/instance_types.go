@@ -228,4 +228,9 @@ type LifecycleActions struct {
 	//
 	// +optional
 	DataLoad *kbappsv1.Action `json:"dataLoad,omitempty"`
+
+	// Defines the procedure that update a replica with new configuration.
+	//
+	// +optional
+	Reconfigure *kbappsv1.Action `json:"reconfigure,omitempty"`
 }

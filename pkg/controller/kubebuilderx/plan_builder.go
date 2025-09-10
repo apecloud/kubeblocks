@@ -165,18 +165,29 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 			workloadVertices = append(workloadVertices, vertex)
 		}
 	}
+	graphOptions := func(options ObjectOptions) []model.GraphOption {
+		opts := []model.GraphOption{
+			inDataContext4G(),
+		}
+		for i := range options.Hooks {
+			opts = append(opts, model.WithHook(options.Hooks[i]))
+		}
+		return opts
+	}
 	createNewObjects := func() {
 		for name := range createSet {
-			if desiredTree.childrenOptions[name].SkipToReconcile {
+			options := desiredTree.childrenOptions[name]
+			if options.SkipToReconcile {
 				continue
 			}
-			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext4G())
+			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), graphOptions(options)...)
 			findAndAppend(v)
 		}
 	}
 	updateObjects := func() {
 		for name := range updateSet {
-			if desiredTree.childrenOptions[name].SkipToReconcile {
+			options := desiredTree.childrenOptions[name]
+			if options.SkipToReconcile {
 				continue
 			}
 			oldObj := oldSnapshot[name]
@@ -190,21 +201,23 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 				var v *model.ObjectVertex
 				subResource := desiredTree.childrenOptions[*name].SubResource
 				if subResource != "" {
-					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource(subResource))
+					opts := append(graphOptions(options), model.WithSubResource(subResource))
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), opts...)
 				} else {
-					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), graphOptions(options)...)
 				}
 				findAndAppend(v)
 			}
 		}
 	}
-	deleteOrphanObjects := func() {
+	deleteObjects := func() {
 		for name := range deleteSet {
-			if desiredTree.childrenOptions[name].SkipToReconcile {
+			options := desiredTree.childrenOptions[name]
+			if options.SkipToReconcile {
 				continue
 			}
 			object := oldSnapshot[name]
-			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), inDataContext4G())
+			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), graphOptions(options)...)
 			findAndAppend(v)
 		}
 	}
@@ -218,7 +231,7 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 	// objects to be updated
 	updateObjects()
 	// objects to be deleted
-	deleteOrphanObjects()
+	deleteObjects()
 	// handle object dependencies
 	handleDependencies()
 	return vertices
@@ -246,6 +259,9 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
+	if err := b.callHooks(vertex); err != nil {
+		return fmt.Errorf("vertex call hooks failed: %v, obj: %s, action: %v", err, vertex.Obj.GetName(), *vertex.Action)
+	}
 	ctx := b.transCtx.ctx
 	switch *vertex.Action {
 	case model.CREATE:
@@ -258,6 +274,15 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 		return b.deleteObject(ctx, vertex)
 	case model.STATUS:
 		return b.statusObject(ctx, vertex)
+	}
+	return nil
+}
+
+func (b *PlanBuilder) callHooks(vertex *model.ObjectVertex) error {
+	for i := range vertex.Hooks {
+		if err := vertex.Hooks[i](vertex.Obj); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package model
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 type GraphOptions struct {
 	replaceIfExisting     bool
@@ -27,6 +29,7 @@ type GraphOptions struct {
 	clientOpt             any
 	propagationPolicy     client.PropagationPolicy
 	subResource           string
+	hooks                 []func(client.Object) error
 }
 
 type GraphOption interface {
@@ -97,5 +100,21 @@ var _ GraphOption = &subResourceOption{}
 func WithSubResource(subResource string) GraphOption {
 	return &subResourceOption{
 		subResource: subResource,
+	}
+}
+
+type hookOption struct {
+	hook func(object client.Object) error
+}
+
+var _ GraphOption = &hookOption{}
+
+func (o *hookOption) ApplyTo(opts *GraphOptions) {
+	opts.hooks = append(opts.hooks, o.hook)
+}
+
+func WithHook(hook func(client.Object) error) GraphOption {
+	return &hookOption{
+		hook: hook,
 	}
 }

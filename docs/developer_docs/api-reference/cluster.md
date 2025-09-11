@@ -6967,6 +6967,20 @@ RoledVar
 The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reference to the service version of the component.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentVersionCompatibilityRule">ComponentVersionCompatibilityRule

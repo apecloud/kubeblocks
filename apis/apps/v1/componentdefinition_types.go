@@ -844,6 +844,11 @@ type ComponentVars struct {
 	//
 	// +optional
 	PodFQDNsForRole *RoledVar `json:"podFQDNsForRole,omitempty"`
+
+	// Reference to the service version of the component.
+	//
+	// +optional
+	ServiceVersion *VarOption `json:"serviceVersion,omitempty"`
 }
 
 // ClusterVarSelector selects a var from a Cluster.

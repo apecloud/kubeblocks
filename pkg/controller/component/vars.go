@@ -1145,6 +1145,8 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 		resolveFunc = resolveComponentPodsRef
 	case selector.PodNamesForRole != nil || selector.PodFQDNsForRole != nil:
 		resolveFunc = resolveComponentPodsForRoleRef
+	case selector.ServiceVersion != nil:
+		resolveFunc = resolveComponentServiceVersionRef
 	default:
 		return nil, nil, nil
 	}
@@ -1282,6 +1284,15 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 		}
 	}
 	return strings.Join(names, ","), nil
+}
+
+func resolveComponentServiceVersionRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveServiceVersion := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		comp := obj.(*appsv1.Component)
+		return &corev1.EnvVar{Name: defineKey, Value: comp.Spec.ServiceVersion}, nil, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.ServiceVersion, resolveServiceVersion)
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

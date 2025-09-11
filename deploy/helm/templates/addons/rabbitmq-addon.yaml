@@ -4,7 +4,7 @@
   "kbVersion" ">=1.0.0"
   "selectorLabels" $selectorLabels
   "name" "rabbitmq"
-  "version" "1.0.1-beta.0"
+  "version" "1.0.1"
   "model" "message"
   "provider" "community"
   "description" "RabbitMQ is a reliable and mature messaging and streaming broker."

@@ -142,7 +142,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 		})
 
-		It("member status", func() {
+		It("instance status", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetRoles([]workloads.ReplicaRole{
 					{
@@ -176,9 +176,9 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
-				g.Expect(len(its.Status.MembersStatus)).Should(Equal(int(replicas)))
+				g.Expect(len(its.Status.InstanceStatus)).Should(Equal(int(replicas)))
 				for i := int32(0); i < replicas; i++ {
-					g.Expect(its.Status.MembersStatus[i].ReplicaRole.Name).Should(Equal("leader"))
+					g.Expect(its.Status.InstanceStatus[i].Role).Should(Equal("leader"))
 				}
 			})).Should(Succeed())
 		})

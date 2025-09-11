@@ -35,7 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -52,16 +52,6 @@ func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, cl
 	opts ...client.ListOption) ([]*corev1.Pod, error) {
 	roleLabel := map[string]string{constant.RoleLabelKey: role}
 	return listPods(ctx, cli, namespace, clusterName, compName, roleLabel, opts...)
-}
-
-func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
-	opts ...client.ListOption) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetCompLabels(clusterName, compName)
-	if opts == nil {
-		opts = make([]client.ListOption, 0)
-	}
-	opts = append(opts, inDataContext()) // TODO: pvc
-	return listObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, namespace, labels, opts...)
 }
 
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,

@@ -458,7 +458,7 @@ func handleScaleOutProgressWithInstanceSet(
 	pgRes.opsMessageKey = "Create"
 	memberStatusMap := map[string]sets.Empty{}
 	if needToCheckRole(pgRes) {
-		for _, v := range its.Status.MembersStatus {
+		for _, v := range its.Status.InstanceStatus {
 			memberStatusMap[v.PodName] = sets.Empty{}
 		}
 	}

@@ -11295,76 +11295,12 @@ spec:
                       default: Unknown
                       description: Represents the name of the pod.
                       type: string
-                  required:
-                  - podName
-                  type: object
-                type: array
-              membersStatus:
-                description: Provides the status of each member in the cluster.
-                items:
-                  properties:
-                    podName:
-                      default: Unknown
-                      description: Represents the name of the pod.
-                      type: string
                     role:
-                      description: Defines the role of the replica in the cluster.
-                      properties:
-                        name:
-                          description: |-
-                            Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
-                            on the corresponding object to identify its role.
-
-
-                            For example, common role names include:
-                            - "leader": The primary/master instance that handles write operations
-                            - "follower": Secondary/replica instances that replicate data from the leader
-                            - "learner": Read-only instances that don't participate in elections
-
-
-                            This field is immutable once set.
-                          maxLength: 32
-                          pattern: ^.*[^\s]+.*$
-                          type: string
-                        participatesInQuorum:
-                          default: false
-                          description: |-
-                            ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
-                            This affects update strategies that need to maintain quorum for availability. Roles participate
-                            in quorum should have higher update priority than roles do not participate in quorum.
-                            The default value is false.
-
-
-                            For example, in a 5-pod component where:
-                            - 2 learner pods (participatesInQuorum=false)
-                            - 2 follower pods (participatesInQuorum=true)
-                            - 1 leader pod (participatesInQuorum=true)
-                            The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
-                            of 2 learners and 1 follower while maintaining quorum.
-
-
-                            This field is immutable once set.
-                          type: boolean
-                        updatePriority:
-                          default: 0
-                          description: |-
-                            UpdatePriority determines the order in which pods with different roles are updated.
-                            Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
-                            Roles with the highest priority will be updated last.
-                            The default priority is 0.
-
-
-                            For example:
-                            - Leader role may have priority 2 (updated last)
-                            - Follower role may have priority 1 (updated before leader)
-                            - Learner role may have priority 0 (updated first)
-
-
-                            This field is immutable once set.
-                          type: integer
-                      required:
-                      - name
-                      type: object
+                      description: Represents the role of the instance observed.
+                      type: string
+                    volumeExpansion:
+                      description: Represents whether the instance is in volume expansion.
+                      type: boolean
                   required:
                   - podName
                   type: object

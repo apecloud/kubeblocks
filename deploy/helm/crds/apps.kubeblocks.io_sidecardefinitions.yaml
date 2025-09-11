@@ -1762,6 +1762,13 @@ spec:
                               - Required
                               - Optional
                               type: string
+                            serviceVersion:
+                              description: Reference to the service version of the
+                                component.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
                             shortName:
                               description: Reference to the short name of the Component
                                 object.

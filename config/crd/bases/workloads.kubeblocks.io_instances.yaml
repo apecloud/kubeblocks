@@ -9544,6 +9544,9 @@ spec:
                 description: updateRevision, if not empty, indicates the version of
                   the Instance used to generate pod.
                 type: string
+              volumeExpansion:
+                description: Represents whether the instance is in volume expansion.
+                type: boolean
             type: object
         type: object
     served: true

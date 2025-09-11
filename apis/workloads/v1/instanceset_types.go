@@ -343,11 +343,6 @@ type InstanceSetStatus struct {
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
 
-	// Provides the status of each member in the cluster.
-	//
-	// +optional
-	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
-
 	// Provides the status of each instance in the ITS.
 	//
 	// +optional
@@ -533,25 +528,22 @@ type ConfigTemplate struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-type MemberStatus struct {
-	// Represents the name of the pod.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	PodName string `json:"podName"`
-
-	// Defines the role of the replica in the cluster.
-	//
-	// +optional
-	ReplicaRole *ReplicaRole `json:"role,omitempty"`
-}
-
 type InstanceStatus struct {
 	// Represents the name of the pod.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
+
+	// Represents the role of the instance observed.
+	//
+	// +optional
+	Role string `json:"role,omitempty"`
+
+	// Represents whether the instance is in volume expansion.
+	//
+	// +optional
+	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
 
 	// The status of configs.
 	//
@@ -675,17 +667,25 @@ func (r *InstanceSet) IsInstancesReady() bool {
 
 // IsInstanceSetReady gives InstanceSet level 'ready' state:
 // 1. all instances are available
-// 2. and all members have role set (if they are role-ful)
+// 2. and all instances have role set (if they are role-ful)
 func (r *InstanceSet) IsInstanceSetReady() bool {
 	instancesReady := r.IsInstancesReady()
 	if !instancesReady {
 		return false
 	}
+	return r.IsRoleProbeDone()
+}
 
-	// check whether role probe has done
+func (r *InstanceSet) IsRoleProbeDone() bool {
+	replicas := int(*r.Spec.Replicas)
 	if len(r.Spec.Roles) == 0 {
-		return true
+		replicas = 0
 	}
-	membersStatus := r.Status.MembersStatus
-	return len(membersStatus) == int(*r.Spec.Replicas)
+	cnt := 0
+	for _, inst := range r.Status.InstanceStatus {
+		if len(inst.Role) > 0 {
+			cnt++
+		}
+	}
+	return cnt == replicas
 }

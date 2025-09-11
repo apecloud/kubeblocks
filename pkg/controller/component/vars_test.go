@@ -1855,6 +1855,20 @@ var _ = Describe("vars", func() {
 							},
 						},
 					},
+					{
+						Name: "serviceVersion",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									ServiceVersion: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
 				}
 				podName := func(suffix string) string {
 					return fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name), suffix)
@@ -1868,8 +1882,9 @@ var _ = Describe("vars", func() {
 								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
 							},
 							Spec: appsv1.ComponentSpec{
-								CompDef:  synthesizedComp.CompDefName,
-								Replicas: 3,
+								CompDef:        synthesizedComp.CompDefName,
+								Replicas:       3,
+								ServiceVersion: "v3.6.5",
 							},
 						},
 						&corev1.Pod{
@@ -1936,6 +1951,7 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
 				checkEnvVarWithValue(envVars, "podFQDNs4Leader",
 					intctrlutil.PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
+				checkEnvVarWithValue(envVars, "serviceVersion", "v3.6.5")
 			})
 		})
 

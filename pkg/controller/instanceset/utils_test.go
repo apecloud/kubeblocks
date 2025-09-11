@@ -205,19 +205,19 @@ var _ = Describe("utils test", func() {
 			its.Spec.Roles = roles
 			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
-			By("set membersStatus to ready")
-			its.Status.MembersStatus = []workloads.MemberStatus{
+			By("set instanceStatus to ready")
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
-					PodName:     name + "-0",
-					ReplicaRole: &roles[0],
+					PodName: name + "-0",
+					Role:    roles[0].Name,
 				},
 				{
-					PodName:     name + "-1",
-					ReplicaRole: &roles[1],
+					PodName: name + "-1",
+					Role:    roles[1].Name,
 				},
 				{
-					PodName:     name + "-2",
-					ReplicaRole: &roles[2],
+					PodName: name + "-2",
+					Role:    roles[2].Name,
 				},
 			}
 			Expect(its.IsInstanceSetReady()).Should(BeTrue())

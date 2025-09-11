@@ -32,6 +32,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset2"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -204,6 +205,7 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 		AddLabelsInMap(labels).
 		AddLabels(constant.KBAppPodNameLabelKey, inst.Name). // used as a pod-service selector
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, inst.Spec.InstanceTemplateName).
+		AddLabels(instanceset2.WorkloadsInstanceLabelKey, inst.Labels[instanceset2.WorkloadsInstanceLabelKey]). // to select pods by instanceset
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
 		GetObject()

@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"errors"
+	"slices"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -145,7 +146,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.AddWithOption(newPod, r.joinMemberHook(tree, its, oldInstanceList, newPod)); err != nil {
+		if err := tree.AddWithOption(newPod, r.createInstance(tree, its, oldInstanceList, newPod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
@@ -198,7 +199,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
-		if err := tree.DeleteWithOption(pod, r.leaveMemberHook(tree, its, oldInstanceList, pod)); err != nil {
+		if err := tree.DeleteWithOption(pod, r.deleteInstance(tree, its, oldInstanceList, pod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 
@@ -224,37 +225,30 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	return kubebuilderx.Continue, nil
 }
 
-func (r *instanceAlignmentReconciler) joinMemberHook(tree *kubebuilderx.ObjectTree,
-	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithHook {
+func (r *instanceAlignmentReconciler) createInstance(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithPrevHook {
 	return func(obj client.Object) error {
-		if its.Status.InitReplicas == nil || its.Status.ReadyInitReplicas == nil ||
-			*its.Status.InitReplicas != *its.Status.ReadyInitReplicas {
-			return nil // init replicas
-		}
-		if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.MemberJoin == nil {
-			return nil // member join not defined
-		}
-		joined := false
-		for _, inst := range its.Status.InstanceStatus {
-			if inst.PodName == pod.Name {
-				joined = ptr.Deref(inst.Joined, false)
+		joinMember := func(inst workloads.InstanceStatus) error {
+			if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.MemberJoin == nil {
+				return nil
 			}
-		}
-		if joined {
-			return nil
-		}
-
-		// TODO: should wait for the data to be loaded before joining the member?
-
-		if err := r.joinMember(tree, its, pods, pod); err != nil {
-			return err
-		}
-		for i, inst := range its.Status.InstanceStatus {
-			if inst.PodName == pod.Name {
-				its.Status.InstanceStatus[i].Joined = ptr.To(true)
+			if ptr.Deref(inst.Joined, false) {
+				return nil
 			}
+			// TODO: should wait for the data to be loaded before joining the member?
+			return r.joinMember(tree, its, pods, pod)
 		}
-		return nil
+		idx := slices.IndexFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+			return status.PodName == pod.Name
+		})
+		var err error
+		if idx >= 0 {
+			err = joinMember(its.Status.InstanceStatus[idx])
+		}
+		if err == nil {
+			its.Status.InstanceStatus[idx].Joined = ptr.To(true)
+		}
+		return err
 	}
 }
 
@@ -273,22 +267,29 @@ func (r *instanceAlignmentReconciler) joinMember(tree *kubebuilderx.ObjectTree,
 	return nil
 }
 
-func (r *instanceAlignmentReconciler) leaveMemberHook(tree *kubebuilderx.ObjectTree,
-	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithHook {
+func (r *instanceAlignmentReconciler) deleteInstance(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithPostHook {
 	return func(obj client.Object) error {
-		hasMemberLeaveDefined := its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil
-		joined := func() bool {
-			for _, inst := range its.Status.InstanceStatus {
-				if inst.PodName == pod.Name {
-					return ptr.Deref(inst.Joined, true)
-				}
+		leaveMember := func(inst workloads.InstanceStatus) error {
+			if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.MemberLeave == nil {
+				return nil
 			}
-			return false
-		}()
-		if !hasMemberLeaveDefined || !joined {
-			return nil
+			if !ptr.Deref(inst.Joined, false) {
+				return nil
+			}
+			return r.leaveMember(tree, its, pods, pod)
 		}
-		return r.leaveMember(tree, its, pods, pod)
+		idx := slices.IndexFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+			return status.PodName == pod.Name
+		})
+		var err error
+		if idx >= 0 {
+			err = leaveMember(its.Status.InstanceStatus[idx])
+		}
+		if err == nil {
+			its.Status.InstanceStatus = slices.Delete(its.Status.InstanceStatus, idx, idx+1)
+		}
+		return err
 	}
 }
 

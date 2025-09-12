@@ -44,8 +44,9 @@ type ObjectOptions struct {
 	// if true, the object should not be reconciled
 	SkipToReconcile bool
 
-	// hooks are called before the object is manipulated
-	Hooks []func(client.Object) error
+	// hooks are called before or after the object is manipulated
+	PrevHooks []func(client.Object) error
+	PostHooks []func(client.Object) error
 }
 
 type WithSubResource string
@@ -60,10 +61,16 @@ func (o SkipToReconcile) ApplyToObject(opts *ObjectOptions) {
 	opts.SkipToReconcile = bool(o)
 }
 
-type WithHook func(client.Object) error
+type WithPrevHook func(client.Object) error
 
-func (o WithHook) ApplyToObject(opts *ObjectOptions) {
-	opts.Hooks = append(opts.Hooks, o)
+func (o WithPrevHook) ApplyToObject(opts *ObjectOptions) {
+	opts.PrevHooks = append(opts.PrevHooks, o)
+}
+
+type WithPostHook func(client.Object) error
+
+func (o WithPostHook) ApplyToObject(opts *ObjectOptions) {
+	opts.PostHooks = append(opts.PostHooks, o)
 }
 
 type ObjectTree struct {

@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -29,16 +32,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
+	return &revisionUpdateReconciler{}
+}
+
 // revisionUpdateReconciler is responsible for updating the expected instance names and their corresponding revisions in the status when there are changes in the spec.
 type revisionUpdateReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}
 
 type instanceRevision struct {
 	name     string
 	revision string
-}
-
-func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
-	return &revisionUpdateReconciler{}
 }
 
 func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -89,11 +94,14 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
 	its.Status.UpdateRevision = updateRevision
-	updatedReplicas, err := calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
+
+	updatedReplicas, err := r.calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdatedReplicas = updatedReplicas
+	r.initReplicasNInstanceStatus(its, instanceRevisionList)
+
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
 	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
 	// performing the computation only when the 'spec' is updated.
@@ -102,7 +110,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
 	updatedReplicas := int32(0)
 	for i := range pods {
 		pod, _ := pods[i].(*corev1.Pod)
@@ -113,9 +121,38 @@ func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) 
 		if updated {
 			updatedReplicas++
 		}
-
 	}
 	return updatedReplicas, nil
 }
 
-var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}
+func (r *revisionUpdateReconciler) initReplicasNInstanceStatus(its *workloads.InstanceSet, instances []instanceRevision) {
+	if its.Status.InitReplicas == nil && ptr.Deref(its.Spec.Replicas, 0) > 0 {
+		its.Status.InitReplicas = its.Spec.Replicas
+	}
+	if its.Status.InitReplicas == nil {
+		return // init replicas is not set or set to 0
+	}
+
+	init := false
+	if *its.Status.InitReplicas != ptr.Deref(its.Status.ReadyInitReplicas, 0) { // in init phase
+		init = true
+		// in case the replicas is changed in the middle of init phase
+		if ptr.Deref(its.Spec.Replicas, 0) == 0 {
+			its.Status.InitReplicas = nil
+		} else {
+			its.Status.InitReplicas = its.Spec.Replicas
+		}
+	}
+
+	for _, inst := range instances {
+		exist := slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
+			return status.PodName == inst.name
+		})
+		if !exist {
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+				PodName: inst.name,
+				Joined:  ptr.To(init),
+			})
+		}
+	}
+}

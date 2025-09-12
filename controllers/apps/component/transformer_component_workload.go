@@ -197,9 +197,6 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 		})
 	}
 
-	// if start {
-	//	return intctrlutil.NewDelayedRequeueError(time.Second, "workload is starting")
-	// }
 	return nil
 }
 

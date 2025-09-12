@@ -33335,18 +33335,6 @@ string
 </tr>
 <tr>
 <td>
-<code>volumeExpansion</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents whether the instance is in volume expansion.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceConfigStatus">
@@ -33368,7 +33356,19 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Joined indicates whether the instance is joined.</p>
+<p>Represents whether the instance is joined the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeExpansion</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is in volume expansion.</p>
 </td>
 </tr>
 </tbody>

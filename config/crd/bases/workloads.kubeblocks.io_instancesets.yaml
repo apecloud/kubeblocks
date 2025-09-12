@@ -13439,7 +13439,7 @@ spec:
                         type: object
                       type: array
                     joined:
-                      description: Joined indicates whether the instance is joined.
+                      description: Represents whether the instance is joined the cluster.
                       type: boolean
                     podName:
                       default: Unknown

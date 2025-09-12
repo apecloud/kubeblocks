@@ -29,7 +29,8 @@ type GraphOptions struct {
 	clientOpt             any
 	propagationPolicy     client.PropagationPolicy
 	subResource           string
-	hooks                 []func(client.Object) error
+	prevHooks             []func(client.Object) error
+	postHooks             []func(client.Object) error
 }
 
 type GraphOption interface {
@@ -104,17 +105,29 @@ func WithSubResource(subResource string) GraphOption {
 }
 
 type hookOption struct {
-	hook func(object client.Object) error
+	prevHook func(object client.Object) error
+	postHook func(object client.Object) error
 }
 
 var _ GraphOption = &hookOption{}
 
 func (o *hookOption) ApplyTo(opts *GraphOptions) {
-	opts.hooks = append(opts.hooks, o.hook)
+	if o.prevHook != nil {
+		opts.prevHooks = append(opts.prevHooks, o.prevHook)
+	}
+	if o.postHook != nil {
+		opts.postHooks = append(opts.postHooks, o.postHook)
+	}
 }
 
-func WithHook(hook func(client.Object) error) GraphOption {
+func WithPrevHook(hook func(client.Object) error) GraphOption {
 	return &hookOption{
-		hook: hook,
+		prevHook: hook,
+	}
+}
+
+func WithPostHook(hook func(client.Object) error) GraphOption {
+	return &hookOption{
+		postHook: hook,
 	}
 }

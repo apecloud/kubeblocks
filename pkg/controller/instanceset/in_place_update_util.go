@@ -34,12 +34,12 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-type PodUpdatePolicy string
+type podUpdatePolicy string
 
 const (
-	NoOpsPolicy         PodUpdatePolicy = "NoOps"
-	RecreatePolicy      PodUpdatePolicy = "Recreate"
-	InPlaceUpdatePolicy PodUpdatePolicy = "InPlaceUpdate"
+	noOpsPolicy         podUpdatePolicy = "noOps"
+	recreatePolicy      podUpdatePolicy = "recreate"
+	inPlaceUpdatePolicy podUpdatePolicy = "inPlaceUpdate"
 )
 
 func supportPodVerticalScaling() bool {
@@ -284,19 +284,15 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdatePolicy, error) {
+func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
-		return NoOpsPolicy, err
-	}
-
-	if getPodRevision(pod) != updateRevisions[pod.Name] {
-		return RecreatePolicy, nil
+		return noOpsPolicy, "", err
 	}
 
 	itsExt, err := buildInstanceSetExt(its, nil)
 	if err != nil {
-		return NoOpsPolicy, err
+		return noOpsPolicy, "", err
 	}
 	templateList := buildInstanceTemplateExts(itsExt)
 	parentName, _ := ParseParentNameAndOrdinal(pod.Name)
@@ -308,38 +304,54 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (PodUpdateP
 		return templateName == templateExt.Name
 	})
 	if index < 0 {
-		return NoOpsPolicy, fmt.Errorf("no corresponding template found for instance %s", pod.Name)
+		return noOpsPolicy, "", fmt.Errorf("no corresponding template found for instance %s", pod.Name)
 	}
 	inst, err := buildInstanceByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
 	if err != nil {
-		return NoOpsPolicy, err
+		return noOpsPolicy, "", err
 	}
+
+	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, inst.pod)
+	if getPodRevision(pod) != updateRevisions[pod.Name] {
+		return recreatePolicy, specUpdatePolicy, nil
+	}
+
 	basicUpdate := !equalBasicInPlaceFields(pod, inst.pod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return InPlaceUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, nil
 		}
-		return NoOpsPolicy, nil
+		return noOpsPolicy, "", nil
 	}
 
 	resourceUpdate := !equalResourcesInPlaceFields(pod, inst.pod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
-			return InPlaceUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, nil
 		}
-		return RecreatePolicy, nil
+		return recreatePolicy, specUpdatePolicy, nil
 	}
 
 	if basicUpdate {
-		return InPlaceUpdatePolicy, nil
+		return inPlaceUpdatePolicy, specUpdatePolicy, nil
 	}
-	return NoOpsPolicy, nil
+	return noOpsPolicy, "", nil
+}
+
+func getPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
+	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) {
+		return its.Spec.PodUpgradePolicy
+	}
+	if !equalField(old.Spec.Containers, new.Spec.Containers) {
+		return its.Spec.PodUpgradePolicy
+	}
+	return its.Spec.PodUpdatePolicy
 }
 
 // IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
 // as the pod template revision has been redefined in instanceset.
 func IsPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, err := getPodUpdatePolicy(its, pod)
-	return policy == NoOpsPolicy, err
+	policy, _, err := getPodUpdatePolicy(its, pod)
+	return policy == noOpsPolicy, err
 }

@@ -219,8 +219,18 @@ type ComponentSpec struct {
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
 	// Default value is "PreferInPlace"
 	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +kubebuilder:default=PreferInPlace
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+	//
+	// If not specified, the value of PodUpdatePolicy will be used.
+	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +optional
+	PodUpgradePolicy *PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
 
 	// Provides fine-grained control over the spec update process of all instances.
 	//

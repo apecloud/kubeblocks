@@ -114,7 +114,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Stop:                             comp.Spec.Stop,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
-		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		PodUpdatePolicy:                  getPodUpdatePolicy(comp, compDef),
+		PodUpgradePolicy:                 getPodUpgradePolicy(comp, compDef),
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 	}
@@ -497,4 +498,33 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
+}
+
+func getPodUpdatePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) appsv1.PodUpdatePolicyType {
+	policy := compDef.Spec.PodUpdatePolicy
+	if policy != nil && *policy == appsv1.ReCreatePodUpdatePolicyType {
+		return appsv1.ReCreatePodUpdatePolicyType
+	}
+	if comp.Spec.PodUpdatePolicy != nil {
+		return *comp.Spec.PodUpdatePolicy
+	}
+	return appsv1.PreferInPlacePodUpdatePolicyType // default
+}
+
+func getPodUpgradePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) appsv1.PodUpdatePolicyType {
+	policy := compDef.Spec.PodUpgradePolicy
+	if policy == nil {
+		policy = compDef.Spec.PodUpdatePolicy
+	}
+	if policy != nil && *policy == appsv1.ReCreatePodUpdatePolicyType {
+		return appsv1.ReCreatePodUpdatePolicyType
+	}
+	policy = comp.Spec.PodUpgradePolicy
+	if policy == nil {
+		policy = comp.Spec.PodUpdatePolicy
+	}
+	if policy != nil {
+		return *policy
+	}
+	return appsv1.PreferInPlacePodUpdatePolicyType // default
 }

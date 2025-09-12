@@ -65,17 +65,18 @@ type SynthesizedComponent struct {
 	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`
 	ParallelPodManagementConcurrency *intstr.IntOrString                    `json:"parallelPodManagementConcurrency,omitempty"`
-	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType          `json:"podUpdatePolicy,omitempty"`
-	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
-	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy       `json:"instanceUpdateStrategy,omitempty"`
-	PolicyRules                      []rbacv1.PolicyRule                    `json:"policyRules,omitempty"`
-	LifecycleActions                 *kbappsv1.ComponentLifecycleActions    `json:"lifecycleActions,omitempty"`
-	SystemAccounts                   []kbappsv1.SystemAccount               `json:"systemAccounts,omitempty"`
-	Volumes                          []kbappsv1.ComponentVolume             `json:"volumes,omitempty"`
-	HostNetwork                      *kbappsv1.HostNetwork                  `json:"hostNetwork,omitempty"`
-	ComponentServices                []kbappsv1.ComponentService            `json:"componentServices,omitempty"`
-	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
-	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
+	PodUpdatePolicy                  kbappsv1.PodUpdatePolicyType           `json:"podUpdatePolicy,omitempty"`
+	PodUpgradePolicy                 kbappsv1.PodUpdatePolicyType
+	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy    `json:"instanceUpdateStrategy,omitempty"`
+	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
+	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
+	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
+	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
+	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
+	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
+	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
 	Stop                             *bool
 }
 

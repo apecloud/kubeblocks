@@ -10313,6 +10313,24 @@ spec:
                   - `Parallel`: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
                   when scaling down.
                 type: string
+              podUpdatePolicy:
+                default: PreferInPlace
+                description: Specifies the default update policy for pods when the
+                  Component is updated.
+                enum:
+                - PreferInPlace
+                - ReCreate
+                type: string
+              podUpgradePolicy:
+                description: |-
+                  Specifies the default update policy for pods when the Component is upgraded (the service version changes).
+
+
+                  If not specified, the default behavior is the same as `podUpdatePolicy`.
+                enum:
+                - PreferInPlace
+                - ReCreate
+                type: string
               policyRules:
                 description: |-
                   Defines the namespaced policy rules required by the Component.

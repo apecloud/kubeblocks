@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -113,6 +114,8 @@ var _ = Describe("instance util test", func() {
 				SetMinReadySeconds(minReadySeconds).
 				SetRoles(roles).
 				SetPodManagementPolicy(appsv1.ParallelPodManagement).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
 				GetObject()
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
@@ -138,9 +141,10 @@ var _ = Describe("instance util test", func() {
 			Expect(objects).Should(HaveLen(3))
 			pod1, ok := objects[0].(*corev1.Pod)
 			Expect(ok).Should(BeTrue())
-			policy, err := getPodUpdatePolicy(its, pod1)
+			policy, specPolicy, err := getPodUpdatePolicy(its, pod1)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(NoOpsPolicy))
+			Expect(policy).Should(Equal(noOpsPolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
 
 			By("build a pod with revision updated")
 			pod2 := pod1.DeepCopy()
@@ -157,17 +161,19 @@ var _ = Describe("instance util test", func() {
 			})
 			pod2.Labels[appsv1.ControllerRevisionHashLabelKey] = "new-revision"
 			its.Status.UpdateRevisions[pod2.Name] = getPodRevision(pod2)
-			policy, err = getPodUpdatePolicy(its, pod2)
+			policy, specPolicy, err = getPodUpdatePolicy(its, pod2)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(RecreatePolicy))
+			Expect(policy).Should(Equal(recreatePolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 
 			By("build a pod without revision updated, with basic mutable fields updated")
 			pod3 := pod1.DeepCopy()
 			randStr = rand.String(16)
 			mergeMap(&map[string]string{key: randStr}, &pod3.Annotations)
-			policy, err = getPodUpdatePolicy(its, pod3)
+			policy, specPolicy, err = getPodUpdatePolicy(its, pod3)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
+			Expect(policy).Should(Equal(inPlaceUpdatePolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 
 			By("build a pod without revision updated, with basic mutable and resources fields updated")
 			pod4 := pod3.DeepCopy()
@@ -176,9 +182,10 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod4.Spec.Containers[0].Resources.Requests = requests
-			policy, err = getPodUpdatePolicy(its, pod4)
+			policy, specPolicy, err = getPodUpdatePolicy(its, pod4)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(RecreatePolicy))
+			Expect(policy).Should(Equal(recreatePolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 
 			By("build a pod without revision updated, with resources fields updated")
 			pod5 := pod1.DeepCopy()
@@ -187,17 +194,19 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod5.Spec.Containers[0].Resources.Requests = requests
-			policy, err = getPodUpdatePolicy(its, pod5)
+			policy, specPolicy, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(RecreatePolicy))
+			Expect(policy).Should(Equal(recreatePolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 
 			By("build a pod without revision updated, with resources fields updated, with IgnorePodVerticalScaling enabled")
 			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, true)
-			policy, err = getPodUpdatePolicy(its, pod5)
+			policy, specPolicy, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(NoOpsPolicy))
+			Expect(policy).Should(Equal(noOpsPolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
 
 			By("simulating a webhook to add an unknown container to the pod, with IgnorePodVerticalScaling disabled, it should use the in-place update policy")
 			pod6 := pod1.DeepCopy()
@@ -217,9 +226,10 @@ var _ = Describe("instance util test", func() {
 			ignorePodVerticalScaling = viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, false)
-			policy, err = getPodUpdatePolicy(its, pod6)
+			policy, specPolicy, err = getPodUpdatePolicy(its, pod6)
 			Expect(err).Should(BeNil())
-			Expect(policy).Should(Equal(InPlaceUpdatePolicy))
+			Expect(policy).Should(Equal(inPlaceUpdatePolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 		})
 	})
 })

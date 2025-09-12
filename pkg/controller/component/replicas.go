@@ -317,7 +317,7 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, 
 			Name:      constant.GetCompEnvCMName(its.Name),
 		}
 		obj := &corev1.ConfigMap{}
-		err := cli.Get(ctx, envKey, obj, inDataContext())
+		err := cli.Get(ctx, envKey, obj)
 		if err != nil {
 			return err
 		}
@@ -351,7 +351,7 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, 
 		for k, v := range parameters {
 			obj.Data[k] = v
 		}
-		return cli.Update(ctx, obj, inDataContext())
+		return cli.Update(ctx, obj)
 	}(); err != nil {
 		return err
 	}

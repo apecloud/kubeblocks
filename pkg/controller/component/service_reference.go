@@ -154,7 +154,7 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 	case len(selector.Service.Component) == 0:
 		obj, err = clusterServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Service)
 	case selector.Service.Service == "headless":
-		obj, err = headlessCompServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Component)
+		obj, err = headlessServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Component)
 	default:
 		obj, err = compServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Component, selector.Service.Service)
 	}

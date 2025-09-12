@@ -78,7 +78,7 @@ func (r *InstanceSetReconciler2) setupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
 		Owns(&workloads.Instance{}).
-		Owns(&corev1.Service{}).
+		Owns(&corev1.Service{}). // headless service
 		Complete(r)
 }
 
@@ -88,7 +88,7 @@ func (r *InstanceSetReconciler2) setupWithMultiClusterManager(mgr ctrl.Manager, 
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Owns(&corev1.Service{})
+		Owns(&corev1.Service{}) // headless service
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.instanceFilter)
 	multiClusterMgr.Watch(b, &workloads.Instance{}, eventHandler)

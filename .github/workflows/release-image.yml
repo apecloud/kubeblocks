@@ -206,7 +206,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-type: [ apecloud-mysql|asmysql|asmysql-proxy|asmysql-orc|asmysql-orc-proxy|kafka|mongodb|postgresql|redis|redis-cluster,
+        test-type: [ apecloud-mysql|asmysql|asmysql-proxy|asmysql-orc|asmysql-orc-proxy|kafka|mongodb|postgresql|postgresql-etcd|redis|redis-cluster,
                      damengdb|gaussdb|goldendb|kingbase|mssql|oceanbase-ent|oracle|starrocks-ent|tdsql|vastbase,
                      clickhouse|elasticsearch|etcd|nebula|qdrant|rocketmqe|greptimedb|polardbx|starrocks|vanilla-pg,
                      mariadb|mogdb|oceanbase|opensearch|orioledb|orchestrator|risingwave|weaviate|yashandb,

@@ -28,18 +28,19 @@ kbcli cluster create mongodb NAME [flags]
   -h, --help                           help for mongodb
       --hostnetwork string              Legal values [enabled, disabled]. (default "enabled")
       --memory float                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
-      --mode string                    Cluster topology mode. Legal values [standalone, replicaset]. (default "standalone")
+      --mode string                    Cluster topology mode. Legal values [standalone, replicaset, sharding]. (default "standalone")
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --replicas int                   The number of replicas, for standalone mode, the replicas is 1, for replicaset mode, the default replicas is 3. Value range [1, 5]. (default 1)
+      --shards int                     The number of shards, for sharding mode, the default shards is 3. Value range [1, 128]. (default 3)
       --storage float                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --storage-class-name string      Storage class name of the data volume
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Delete, WipeOut]. (default "Delete")
       --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
-      --version string                 Cluster version. Legal values [8.0.8, 8.0.6, 8.0.4, 7.0.19, 7.0.16, 7.0.12, 6.0.22, 6.0.20, 6.0.16, 5.0.30, 5.0.28, 4.4.29, 4.2.24, 4.0.28]. (default "6.0.16")
+      --version string                 Cluster version. Legal values [8.0.8, 7.0.18, 6.0.21, 5.0.29, 4.4.29, 4.2.25, 4.0.28]. (default "6.0.21")
 ```
 
 ### Options inherited from parent commands

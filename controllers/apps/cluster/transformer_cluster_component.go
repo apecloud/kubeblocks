@@ -1000,21 +1000,17 @@ func (h *clusterShardingHandler) buildShardSchedulingPolicy(transCtx *clusterTra
 	replace := func(terms1 []corev1.PodAffinityTerm, terms2 []corev1.WeightedPodAffinityTerm) bool {
 		found := false
 		for i := range terms1 {
-			for k, v := range terms1[i].LabelSelector.MatchLabels {
-				if k == constant.KBAppComponentLabelKey && len(v) == 0 {
-					terms1[i].LabelSelector.MatchLabels[k] = compName
-					found = true
-					break
-				}
+			val, ok := terms1[i].LabelSelector.MatchLabels[constant.KBAppComponentLabelKey]
+			if ok && len(val) == 0 {
+				terms1[i].LabelSelector.MatchLabels[constant.KBAppComponentLabelKey] = compName
+				found = true
 			}
 		}
 		for i := range terms2 {
-			for k, v := range terms2[i].PodAffinityTerm.LabelSelector.MatchLabels {
-				if k == constant.KBAppComponentLabelKey && len(v) == 0 {
-					terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[k] = compName
-					found = true
-					break
-				}
+			val, ok := terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[constant.KBAppComponentLabelKey]
+			if ok && len(val) == 0 {
+				terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[constant.KBAppComponentLabelKey] = compName
+				found = true
 			}
 		}
 		return found

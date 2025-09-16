@@ -947,7 +947,7 @@ func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
 			if err != nil {
 				return nil, err
 			}
-			h.buildShardPodAntiAffinity(transCtx, sharding.Name, spec.Name, obj)
+			h.buildShardSchedulingPolicy(transCtx, sharding.Name, spec.Name, obj)
 			objs = append(objs, obj)
 		}
 	}
@@ -984,6 +984,56 @@ func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformCont
 		}
 	}
 	return annotations
+}
+
+func (h *clusterShardingHandler) buildShardSchedulingPolicy(transCtx *clusterTransformContext,
+	shardingName, compName string, comp *appsv1.Component) {
+	var affinity *corev1.Affinity
+	if comp.Spec.SchedulingPolicy != nil {
+		affinity = comp.Spec.SchedulingPolicy.Affinity // topologySpreadConstraints?
+	}
+	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
+		h.buildShardPodAntiAffinity(transCtx, shardingName, compName, comp) // fallback
+		return
+	}
+
+	replace := func(terms1 []corev1.PodAffinityTerm, terms2 []corev1.WeightedPodAffinityTerm) bool {
+		found := false
+		for i := range terms1 {
+			for k, v := range terms1[i].LabelSelector.MatchLabels {
+				if k == constant.KBAppComponentLabelKey && len(v) == 0 {
+					terms1[i].LabelSelector.MatchLabels[k] = compName
+					found = true
+					break
+				}
+			}
+		}
+		for i := range terms2 {
+			for k, v := range terms2[i].PodAffinityTerm.LabelSelector.MatchLabels {
+				if k == constant.KBAppComponentLabelKey && len(v) == 0 {
+					terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[k] = compName
+					found = true
+					break
+				}
+			}
+		}
+		return found
+	}
+
+	found1, found2 := false, false
+	if affinity.PodAffinity != nil {
+		found1 = replace(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+
+	}
+	if affinity.PodAntiAffinity != nil {
+		found2 = replace(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+
+	if !found1 && !found2 {
+		h.buildShardPodAntiAffinity(transCtx, shardingName, compName, comp) // fallback
+	}
 }
 
 func (h *clusterShardingHandler) buildShardPodAntiAffinity(transCtx *clusterTransformContext,

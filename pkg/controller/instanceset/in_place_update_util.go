@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -289,6 +290,15 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return noOpsPolicy, "", err
+	}
+
+	// In case of the ITS is stopping and replicas is 0, we can't compose the instance template and instance
+	// to choose the update policy, so we use the pod update policy directly.
+	if ptr.Deref(its.Spec.Replicas, 0) == 0 {
+		// the update revisions will be empty
+		if getPodRevision(pod) != updateRevisions[pod.Name] {
+			return recreatePolicy, its.Spec.PodUpdatePolicy, nil
+		}
 	}
 
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)

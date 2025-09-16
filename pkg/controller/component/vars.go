@@ -55,7 +55,7 @@ func VarReferenceRegExp() *regexp.Regexp {
 }
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
-func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
 	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 }
 
@@ -95,14 +95,14 @@ func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []c
 }
 
 func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+	definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
 	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	formattedTemplateVars := func() map[string]any {
-		vars := make(map[string]any)
+	formattedTemplateVars := func() map[string]string {
+		vars := make(map[string]string)
 		for _, v := range templateVars {
 			vars[v.Name] = v.Value
 		}

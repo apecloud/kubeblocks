@@ -226,15 +226,10 @@ type InstanceSetSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Provides actions to do membership dynamic reconfiguration.
+	// Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.
 	//
 	// +optional
-	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
-
-	// Provides variables which are used to call Actions.
-	//
-	// +optional
-	TemplateVars map[string]string `json:"templateVars,omitempty"`
+	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
 	//
@@ -331,17 +326,15 @@ type InstanceSetStatus struct {
 
 	// Defines the initial number of instances when the cluster is first initialized.
 	// This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
-	// Used only when spec.roles set.
 	//
 	// +optional
-	InitReplicas int32 `json:"initReplicas"`
+	InitReplicas *int32 `json:"initReplicas"`
 
-	// Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
+	// Represents the number of instances that have already reached the InstanceStatus during the cluster initialization stage.
 	// This value remains constant once it equals InitReplicas.
-	// Used only when spec.roles set.
 	//
 	// +optional
-	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
+	ReadyInitReplicas *int32 `json:"readyInitReplicas,omitempty"`
 
 	// Provides the status of each instance in the ITS.
 	//
@@ -540,15 +533,20 @@ type InstanceStatus struct {
 	// +optional
 	Role string `json:"role,omitempty"`
 
-	// Represents whether the instance is in volume expansion.
-	//
-	// +optional
-	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
-
 	// The status of configs.
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+
+	// Represents whether the instance is joined the cluster.
+	//
+	// +optional
+	Joined *bool `json:"joined,omitempty"`
+
+	// Represents whether the instance is in volume expansion.
+	//
+	// +optional
+	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
 }
 
 type InstanceConfigStatus struct {

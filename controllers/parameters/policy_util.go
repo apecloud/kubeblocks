@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
@@ -40,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -119,7 +118,7 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 
 	errMessage := response.GetErrMessage()
 	if errMessage != "" {
-		return core.MakeError(errMessage)
+		return core.MakeError("%s", errMessage)
 	}
 	return nil
 }
@@ -153,7 +152,7 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 
 	errMessage := response.GetErrMessage()
 	if errMessage != "" {
-		return core.MakeError(errMessage)
+		return core.MakeError("%s", errMessage)
 	}
 	return nil
 }
@@ -204,45 +203,39 @@ func validIPv6Address(ip net.IP) bool {
 	return ip != nil && ip.To16() != nil
 }
 
-func restartWorkloadComponent[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, annotationKey, annotationValue string, obj PT, _ func(T, PT, L, PL)) error {
-	template := transformPodTemplate(obj)
-	if updatedVersion(template, annotationKey, annotationValue) {
+func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, cluster *appsv1.Cluster, compName string) error {
+	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+
+	var compSpec *appsv1.ClusterComponentSpec
+	for i := range cluster.Spec.ComponentSpecs {
+		componentSpec := &cluster.Spec.ComponentSpecs[i]
+		if componentSpec.Name == compName {
+			compSpec = componentSpec
+			break
+		}
+	}
+
+	if compSpec == nil {
+		return fmt.Errorf("component %s not found", compName)
+	}
+
+	if compSpec.Annotations == nil {
+		compSpec.Annotations = map[string]string{}
+	}
+
+	if compSpec.Annotations[cfgAnnotationKey] == newVersion {
 		return nil
 	}
 
-	patch := client.MergeFrom(PT(obj.DeepCopy()))
-	if template.Annotations == nil {
-		template.Annotations = map[string]string{}
-	}
-	template.Annotations[annotationKey] = annotationValue
-	if err := cli.Patch(ctx, obj, patch); err != nil {
+	compSpec.Annotations[cfgAnnotationKey] = newVersion
+	err := cli.Update(ctx.Ctx, cluster)
+	if err != nil {
 		return err
 	}
+	ctx.Recorder.Eventf(cluster,
+		corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRestart,
+		"restarting component[%s] in cluster[%s], version: %s", compName, cluster.Name, newVersion)
 	return nil
-}
-
-func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
-	var err error
-	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-	for _, obj := range objs {
-		switch w := obj.(type) {
-		case *workloads.InstanceSet:
-			err = restartWorkloadComponent(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.InstanceSetSignature)
-		default:
-			// ignore other types workload
-		}
-		if err != nil {
-			return obj, err
-		}
-		if recordEvent != nil {
-			recordEvent(obj)
-		}
-	}
-	return nil, nil
-}
-
-func updatedVersion(podTemplate *corev1.PodTemplateSpec, keyPath, expectedVersion string) bool {
-	return podTemplate.Annotations != nil && podTemplate.Annotations[keyPath] == expectedVersion
 }
 
 type ReloadAction interface {

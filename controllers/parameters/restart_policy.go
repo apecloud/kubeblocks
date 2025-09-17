@@ -20,12 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var restartPolicyInstance = &restartPolicy{}
@@ -39,14 +38,14 @@ func init() {
 func (s *restartPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
 	rctx.Log.V(1).Info("simple policy begin....")
 
-	return restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs(), fromWorkloadObjects(rctx))
+	return restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs())
 }
 
 func (s *restartPolicy) GetPolicyName() string {
 	return string(parametersv1alpha1.RestartPolicy)
 }
 
-func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
+func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	var (
 		newVersion = rctx.getTargetVersionHash()
 		configKey  = rctx.generateConfigIdentifier()
@@ -55,15 +54,12 @@ func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFunc
 		progress  = core.NotStarted
 	)
 
-	recordEvent := func(obj client.Object) {
-		rctx.Recorder.Eventf(obj,
-			corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRestart,
-			"restarting component[%s] in cluster[%s], version: %s", rctx.ClusterComponent.Name, rctx.Cluster.Name, newVersion)
+	if err := funcs.RestartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, rctx.Cluster, rctx.ClusterComponent.Name); err != nil {
+		return makeReturnedStatus(ESFailedAndRetry), err
 	}
-	if obj, err := funcs.RestartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, objs, recordEvent); err != nil {
-		rctx.Recorder.Eventf(obj,
-			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureRestartFailed,
-			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), rctx.Cluster.Name, newVersion)
+
+	comp := &appsv1.Component{}
+	if err := rctx.Client.Get(rctx.Ctx, client.ObjectKey{Name: constant.GenerateClusterComponentName(rctx.Cluster.Name, rctx.ClusterComponent.Name), Namespace: rctx.Cluster.Namespace}, comp); err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
@@ -71,11 +67,17 @@ func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFunc
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
+
 	if len(pods) != 0 {
 		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
 	}
+
 	if len(pods) == int(progress) {
-		retStatus = ESNone
+		if comp.Status.Phase != appsv1.RunningComponentPhase {
+			retStatus = ESRetry
+		} else {
+			retStatus = ESNone
+		}
 	}
 	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
 }

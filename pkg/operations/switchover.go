@@ -285,7 +285,7 @@ func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *compo
 	}
 
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}

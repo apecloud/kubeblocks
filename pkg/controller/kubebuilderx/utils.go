@@ -92,7 +92,7 @@ func placement(obj client.Object) string {
 
 func assign(ctx context.Context, obj client.Object) client.Object {
 	switch obj.(type) {
-	case *workloads.Instance: // TODO
+	case *workloads.Instance: // TODO: not hard code the instance type
 		ordinal := func() int {
 			subs := strings.Split(obj.GetName(), "-")
 			o, _ := strconv.Atoi(subs[len(subs)-1])

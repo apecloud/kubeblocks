@@ -479,7 +479,7 @@ func main() {
 		}
 
 		if err = (&component.ComponentReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-controller"),
 		}).SetupWithManager(mgr); err != nil {

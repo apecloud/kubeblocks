@@ -30,7 +30,7 @@ func inDataContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InDataContext())
 }
 
-func multiClusterClientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	if v.ClientOpt != nil {
 		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
 		if ok {

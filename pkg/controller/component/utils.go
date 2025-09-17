@@ -42,7 +42,7 @@ import (
 )
 
 func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext() // TODO
+	return multicluster.InDataContext()
 }
 
 func ValidateDefNameRegexp(defNamePattern string) error {

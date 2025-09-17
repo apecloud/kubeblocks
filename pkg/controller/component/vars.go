@@ -1271,8 +1271,13 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 
 func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	namespace, clusterName, compName, roles string, fqdn bool) (string, error) {
-	pods, err := ListOwnedPods(ctx, cli, namespace, clusterName, compName) // TODO: pod
-	if err != nil {
+	its := &workloadsv1.InstanceSet{}
+	itsKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
+	}
+	err := cli.Get(ctx, itsKey, its)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 
@@ -1280,13 +1285,10 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	targetRoles := strings.Split(roles, ",")
 
 	names := make([]string, 0)
-	for _, pod := range pods {
-		role := ""
-		if pod.Labels != nil {
-			role = pod.Labels[constant.RoleLabelKey]
-		}
+	for _, inst := range its.Status.InstanceStatus {
+		role := inst.Role
 		if slices.Index(targetRoles, role) >= 0 {
-			names = append(names, pod.Name)
+			names = append(names, inst.PodName)
 		}
 	}
 

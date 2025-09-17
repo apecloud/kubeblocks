@@ -20,9 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"fmt"
 	"math/rand"
 	"slices"
 	"strings"
+
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -43,30 +46,65 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if t.multiClusterMgr == nil {
-		return nil // do nothing
+	if !t.enabled(transCtx) {
+		return nil
+	}
+
+	if err := t.precheck(transCtx); err != nil {
+		return err
 	}
 
 	if t.assigned(transCtx) {
 		return nil
 	}
 
-	p := t.assign(transCtx)
+	contexts := t.assign(transCtx)
 	cluster := transCtx.Cluster
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
 	}
-	cluster.Annotations[constant.KBAppMultiClusterPlacementKey] = strings.Join(p, ",")
+	cluster.Annotations[constant.KBAppMultiClusterPlacementKey] = strings.Join(contexts, ",")
+
+	return nil
+}
+
+func (t *clusterPlacementTransformer) enabled(transCtx *clusterTransformContext) bool {
+	cluster := transCtx.OrigCluster
+	_, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
+	return ok
+}
+
+func (t *clusterPlacementTransformer) precheck(transCtx *clusterTransformContext) error {
+	if t.multiClusterMgr == nil {
+		return fmt.Errorf("intend to create a multi-cluster object, but the multi-cluster manager is not set up properly")
+	}
+
+	var components []string
+	for _, spec := range transCtx.components {
+		if !ptr.Deref(spec.EnableInstanceAPI, false) {
+			components = append(components, spec.Name)
+
+		}
+	}
+	if len(components) > 0 {
+		return fmt.Errorf("the multi-cluster object is only supported for components that enable the instance API: %s", strings.Join(components, ","))
+	}
+
+	var shardings []string
+	for _, spec := range transCtx.shardings {
+		if !ptr.Deref(spec.Template.EnableInstanceAPI, false) {
+			shardings = append(shardings, spec.Name)
+		}
+	}
+	if len(shardings) > 0 {
+		return fmt.Errorf("the multi-cluster object is only supported for shardings that enable the instance API: %s", strings.Join(shardings, ","))
+	}
 
 	return nil
 }
 
 func (t *clusterPlacementTransformer) assigned(transCtx *clusterTransformContext) bool {
 	cluster := transCtx.OrigCluster
-	if cluster.Annotations == nil {
-		return false
-	}
-
 	p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
 	return ok && len(strings.TrimSpace(p)) > 0
 }

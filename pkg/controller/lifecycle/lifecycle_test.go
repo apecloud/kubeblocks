@@ -206,7 +206,7 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).Should(BeNil())
+					Expect(req.Parameters).Should(BeEmpty())
 					Expect(req.NonBlocking).ShouldNot(BeNil())
 					Expect(*req.NonBlocking).Should(BeTrue())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
@@ -381,7 +381,7 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).Should(BeNil())
+					Expect(req.Parameters).Should(BeEmpty())
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})

@@ -88,7 +88,7 @@ func (r *InstanceSetReconciler2) setupWithMultiClusterManager(mgr ctrl.Manager, 
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
-		Owns(&corev1.Service{}) // headless service
+		Owns(&corev1.Service{}) // we don't create the headless service for multi-cluster objects
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.instanceFilter)
 	multiClusterMgr.Watch(b, &workloads.Instance{}, eventHandler)

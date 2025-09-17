@@ -286,6 +286,8 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		podIndexInt, _ := strconv.ParseInt(podIndex, 10, 32)
 		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, cli, opsRes.Cluster, model.GetScheme(), map[string]string{
 			constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
+			constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
+			constant.KBAppComponentLabelKey: pgRes.compOps.GetComponentName(),
 		}, 1, int32(podIndexInt))
 		restoreMGR.RestoreTime = fromBackup.RestorePointInTime
 		restoreMGR.RestoreNamePrefix = string(opsRes.OpsRequest.UID[:8])

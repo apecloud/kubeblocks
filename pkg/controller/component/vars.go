@@ -1035,10 +1035,11 @@ func resolveServiceRefVarRefLow(ctx context.Context, cli client.Reader, synthesi
 	resolveObjs := func() (map[string]any, error) {
 		getter := func(compName string) (any, error) {
 			if compName == synthesizedComp.Name {
-				if synthesizedComp.ServiceReferences == nil {
-					return nil, nil
+				descriptor, ok := synthesizedComp.ServiceReferences[selector.Name]
+				if ok && descriptor != nil { // the descriptor may be nil
+					return descriptor, nil
 				}
-				return synthesizedComp.ServiceReferences[selector.Name], nil
+				return nil, nil
 			}
 			// TODO: service ref about other components?
 			return nil, nil

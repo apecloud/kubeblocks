@@ -151,7 +151,7 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.Selector.MatchLabels[selectorKey4]).Should(Equal(selectorValue4))
 		Expect(its.Spec.Roles).Should(HaveLen(1))
 		Expect(its.Spec.Roles[0]).Should(Equal(role))
-		Expect(its.Spec.MembershipReconfiguration).Should(BeNil())
+		Expect(its.Spec.LifecycleActions).Should(BeNil())
 		Expect(its.Spec.Template).Should(Equal(template))
 		Expect(its.Spec.VolumeClaimTemplates).Should(HaveLen(2))
 		Expect(its.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))

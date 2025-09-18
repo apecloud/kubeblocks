@@ -396,7 +396,7 @@ var _ = Describe("lifecycle", func() {
 			key := "TEMPLATE_VAR1"
 			val := "template-vars1"
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, map[string]any{key: val}, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, map[string]string{key: val}, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 

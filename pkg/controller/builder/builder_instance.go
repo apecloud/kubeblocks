@@ -206,13 +206,8 @@ func (builder *InstanceBuilder) SetRoles(roles []workloads.ReplicaRole) *Instanc
 	return builder
 }
 
-func (builder *InstanceBuilder) SetMembershipReconfiguration(arg *workloads.MembershipReconfiguration) *InstanceBuilder {
-	builder.get().Spec.MembershipReconfiguration = arg
-	return builder
-}
-
-func (builder *InstanceBuilder) SetTemplateVars(vars map[string]string) *InstanceBuilder {
-	builder.get().Spec.TemplateVars = vars
+func (builder *InstanceBuilder) SetLifecycleActions(actions *workloads.LifecycleActions) *InstanceBuilder {
+	builder.get().Spec.LifecycleActions = actions
 	return builder
 }
 

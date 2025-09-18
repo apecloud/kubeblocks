@@ -106,7 +106,7 @@ func buildEnvVarsNData(vars []corev1.EnvVar) ([]corev1.EnvVar, map[string]string
 	return envVars, envData
 }
 
-func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
+func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]string, envVars []corev1.EnvVar) {
 	envSource := envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name)
 	synthesizedComp.TemplateVars = templateVars
 	synthesizedComp.EnvVars = envVars

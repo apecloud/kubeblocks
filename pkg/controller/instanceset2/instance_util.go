@@ -138,8 +138,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
 		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
-		SetMembershipReconfiguration(its.Spec.MembershipReconfiguration).
-		SetTemplateVars(its.Spec.TemplateVars)
+		SetLifecycleActions(its.Spec.LifecycleActions)
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).
@@ -312,8 +311,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.PodUpdatePolicy = newInst.Spec.PodUpdatePolicy
 	targetInst.Spec.PodUpgradePolicy = newInst.Spec.PodUpgradePolicy
 	targetInst.Spec.Roles = newInst.Spec.Roles
-	// targetInst.Spec.MembershipReconfiguration = newInst.Spec.MembershipReconfiguration
-	targetInst.Spec.TemplateVars = newInst.Spec.TemplateVars
+	targetInst.Spec.LifecycleActions = newInst.Spec.LifecycleActions
 
 	// object meta
 	mergeMap(&newInst.Labels, &targetInst.Labels)

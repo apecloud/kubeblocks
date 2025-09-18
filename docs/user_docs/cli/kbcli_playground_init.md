@@ -34,9 +34,6 @@ kbcli playground init [flags]
   kbcli exec -it mycluster-mysql-0 bash
   mysql -h 127.1 -u root -p$MYSQL_ROOT_PASSWORD
   
-  # view the Grafana
-  kbcli dashboard open kubeblocks-grafana
-  
   # destroy playground
   kbcli playground destroy
 ```

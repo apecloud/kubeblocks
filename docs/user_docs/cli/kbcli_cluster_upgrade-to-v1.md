@@ -1,33 +1,29 @@
 ---
-title: kbcli cluster custom-ops
+title: kbcli cluster upgrade-to-v1
 ---
 
-
+upgrade cluster to v1 api version.
 
 ```
-kbcli cluster custom-ops OpsDef --cluster <clusterName> <your custom params> [flags]
+kbcli cluster upgrade-to-v1 [NAME] [flags]
 ```
 
 ### Examples
 
 ```
-  # custom ops cli format
-  kbcli cluster custom-ops <opsDefName> --cluster <clusterName> <your params of this opsDef>
+  # upgrade a v1alpha1 cluster to v1 cluster
+  kbcli cluster upgrade-to-v1 mycluster
   
-  # example for kafka topic
-  kbcli cluster custom-ops kafka-topic --cluster mycluster --type create --topic test --partition 3 --replicas 3
-  
-  # example for kafka acl
-  kbcli cluster custom-ops kafka-user-acl --cluster mycluster --type add --operations "Read,Writer,Delete,Alter,Describe" --allowUsers client --topic "*"
-  
-  # example for kafka quota
-  kbcli cluster custom-ops kafka-quota --cluster mycluster --user client --producerByteRate 1024 --consumerByteRate 2048
+  # upgrade a v1alpha1 cluster with --dry-run
+  kbcli cluster upgrade-to-v1 mycluster --dry-run
 ```
 
 ### Options
 
 ```
-  -h, --help   help for custom-ops
+      --dry-run   dry run mode
+  -h, --help      help for upgrade-to-v1
+      --no-diff   only print the new cluster yaml
 ```
 
 ### Options inherited from parent commands
@@ -57,15 +53,6 @@ kbcli cluster custom-ops OpsDef --cluster <clusterName> <your custom params> [fl
 ### SEE ALSO
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli cluster custom-ops kafka-quota](kbcli_cluster_custom-ops_kafka-quota.md)	 - Create a custom ops with opsDef kafka-quota
-* [kbcli cluster custom-ops kafka-topic](kbcli_cluster_custom-ops_kafka-topic.md)	 - Create a custom ops with opsDef kafka-topic
-* [kbcli cluster custom-ops kafka-user-acl](kbcli_cluster_custom-ops_kafka-user-acl.md)	 - Create a custom ops with opsDef kafka-user-acl
-* [kbcli cluster custom-ops pg-update-standby-config](kbcli_cluster_custom-ops_pg-update-standby-config.md)	 - Create a custom ops with opsDef pg-update-standby-config
-* [kbcli cluster custom-ops redis-cluster-rebalance](kbcli_cluster_custom-ops_redis-cluster-rebalance.md)	 - Create a custom ops with opsDef redis-cluster-rebalance
-* [kbcli cluster custom-ops redis-master-account-ops](kbcli_cluster_custom-ops_redis-master-account-ops.md)	 - Create a custom ops with opsDef redis-master-account-ops
-* [kbcli cluster custom-ops redis-reset-master](kbcli_cluster_custom-ops_redis-reset-master.md)	 - Create a custom ops with opsDef redis-reset-master
-* [kbcli cluster custom-ops redis-sentinel-account-ops](kbcli_cluster_custom-ops_redis-sentinel-account-ops.md)	 - Create a custom ops with opsDef redis-sentinel-account-ops
-* [kbcli cluster custom-ops redis-shard-account-ops](kbcli_cluster_custom-ops_redis-shard-account-ops.md)	 - Create a custom ops with opsDef redis-shard-account-ops
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

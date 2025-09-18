@@ -1,33 +1,32 @@
 ---
-title: kbcli cluster custom-ops
+title: kbcli cluster custom-ops redis-reset-master
 ---
 
-
+Create a custom ops with opsDef redis-reset-master
 
 ```
-kbcli cluster custom-ops OpsDef --cluster <clusterName> <your custom params> [flags]
+kbcli cluster custom-ops redis-reset-master <ClusterName> [flags]
 ```
 
 ### Examples
 
 ```
-  # custom ops cli format
-  kbcli cluster custom-ops <opsDefName> --cluster <clusterName> <your params of this opsDef>
-  
-  # example for kafka topic
-  kbcli cluster custom-ops kafka-topic --cluster mycluster --type create --topic test --partition 3 --replicas 3
-  
-  # example for kafka acl
-  kbcli cluster custom-ops kafka-user-acl --cluster mycluster --type add --operations "Read,Writer,Delete,Alter,Describe" --allowUsers client --topic "*"
-  
-  # example for kafka quota
-  kbcli cluster custom-ops kafka-quota --cluster mycluster --user client --producerByteRate 1024 --consumerByteRate 2048
+  # Create a redis-reset-master ops
+  kbcli cluster custom-ops redis-reset-master <clusterName> --component <componentName>
 ```
 
 ### Options
 
 ```
-  -h, --help   help for custom-ops
+      --auto-approve                   Skip interactive approval before promote the instance
+      --component string               Specify the component name of the cluster. if not specified, using the first component which referenced the defined componentDefinition.
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
+  -h, --help                           help for redis-reset-master
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -56,16 +55,7 @@ kbcli cluster custom-ops OpsDef --cluster <clusterName> <your custom params> [fl
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli cluster custom-ops kafka-quota](kbcli_cluster_custom-ops_kafka-quota.md)	 - Create a custom ops with opsDef kafka-quota
-* [kbcli cluster custom-ops kafka-topic](kbcli_cluster_custom-ops_kafka-topic.md)	 - Create a custom ops with opsDef kafka-topic
-* [kbcli cluster custom-ops kafka-user-acl](kbcli_cluster_custom-ops_kafka-user-acl.md)	 - Create a custom ops with opsDef kafka-user-acl
-* [kbcli cluster custom-ops pg-update-standby-config](kbcli_cluster_custom-ops_pg-update-standby-config.md)	 - Create a custom ops with opsDef pg-update-standby-config
-* [kbcli cluster custom-ops redis-cluster-rebalance](kbcli_cluster_custom-ops_redis-cluster-rebalance.md)	 - Create a custom ops with opsDef redis-cluster-rebalance
-* [kbcli cluster custom-ops redis-master-account-ops](kbcli_cluster_custom-ops_redis-master-account-ops.md)	 - Create a custom ops with opsDef redis-master-account-ops
-* [kbcli cluster custom-ops redis-reset-master](kbcli_cluster_custom-ops_redis-reset-master.md)	 - Create a custom ops with opsDef redis-reset-master
-* [kbcli cluster custom-ops redis-sentinel-account-ops](kbcli_cluster_custom-ops_redis-sentinel-account-ops.md)	 - Create a custom ops with opsDef redis-sentinel-account-ops
-* [kbcli cluster custom-ops redis-shard-account-ops](kbcli_cluster_custom-ops_redis-shard-account-ops.md)	 - Create a custom ops with opsDef redis-shard-account-ops
+* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

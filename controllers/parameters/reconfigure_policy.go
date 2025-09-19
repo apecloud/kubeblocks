@@ -248,11 +248,3 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 	}
 	return ret
 }
-
-func fromWorkloadObjects(params reconfigureContext) []client.Object {
-	r := make([]client.Object, 0)
-	for _, unit := range params.InstanceSetUnits {
-		r = append(r, &unit)
-	}
-	return r
-}

@@ -22,6 +22,7 @@ package parameters
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,9 +68,24 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 			// mock client update caller
 			updateErr := core.MakeError("update failed!")
-			k8sMockClient.MockPatchMethod(
+			k8sMockClient.MockUpdateMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
+
+			componentFullName := constant.GenerateClusterComponentName(mockParam.Cluster.Name, mockParam.ClusterComponent.Name)
+			k8sMockClient.MockGetMethod(
+				testutil.WithGetReturned(
+					testutil.WithConstructSequenceResult(map[client.ObjectKey][]testutil.MockGetReturned{
+						{Namespace: mockParam.Cluster.Namespace, Name: componentFullName}: {
+							{
+								Object: newMockRunningComponent(),
+							},
+						},
+					}),
+				),
+				testutil.WithAnyTimes(),
+			)
+
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
@@ -123,7 +139,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 				}),
 				withClusterComponent(2))
 
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
@@ -134,6 +150,20 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 				}),
 				testutil.WithAnyTimes(),
 			))
+
+			componentFullName := constant.GenerateClusterComponentName(mockParam.Cluster.Name, mockParam.ClusterComponent.Name)
+			k8sMockClient.MockGetMethod(
+				testutil.WithGetReturned(
+					testutil.WithConstructSequenceResult(map[client.ObjectKey][]testutil.MockGetReturned{
+						{Namespace: mockParam.Cluster.Namespace, Name: componentFullName}: {
+							{
+								Object: newMockRunningComponent(),
+							},
+						},
+					}),
+				),
+				testutil.WithAnyTimes(),
+			)
 
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
@@ -157,9 +187,10 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 				withClusterComponent(2))
 
 			updateErr := core.MakeError("update failed!")
-			k8sMockClient.MockPatchMethod(
+			k8sMockClient.MockUpdateMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
+
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
@@ -176,6 +207,20 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 				}),
 				testutil.WithTimes(3),
 			))
+
+			componentFullName := constant.GenerateClusterComponentName(mockParam.Cluster.Name, mockParam.ClusterComponent.Name)
+			k8sMockClient.MockGetMethod(
+				testutil.WithGetReturned(
+					testutil.WithConstructSequenceResult(map[client.ObjectKey][]testutil.MockGetReturned{
+						{Namespace: mockParam.Cluster.Namespace, Name: componentFullName}: {
+							{
+								Object: newMockRunningComponent(),
+							},
+						},
+					}),
+				),
+				testutil.WithAnyTimes(),
+			)
 
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))

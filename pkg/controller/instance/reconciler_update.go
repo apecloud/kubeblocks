@@ -219,13 +219,11 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 	}
 
 	err = lfa.Switchover(tree.Context, nil, nil, "")
-	if err != nil {
-		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
-		}
-		return err
+	if err == nil {
+		tree.Logger.Info("succeed to call switchover action", "pod", pod.Name)
+	} else if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+		tree.Logger.Info("failed to call switchover action, ignore it", "pod", pod.Name, "error", err)
 	}
-	tree.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
 	return nil
 }
 

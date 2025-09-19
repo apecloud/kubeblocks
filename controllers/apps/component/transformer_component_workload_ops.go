@@ -196,22 +196,20 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		lifecycleActions = synthesizedComp.LifecycleActions
 	)
 
-	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+	switchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		if lifecycleActions.Switchover == nil {
 			return nil
 		}
 		err := lfa.Switchover(r.transCtx.Context, r.cli, nil, "")
-		if err != nil {
-			if errors.Is(err, lifecycle.ErrActionNotDefined) {
-				return nil
-			}
-			return err
+		if err == nil {
+			r.transCtx.Logger.Info("succeed to call switchover action", "pod", pod.Name)
+		} else if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			r.transCtx.Logger.Info("failed to call switchover action, ignore it", "pod", pod.Name, "error", err)
 		}
-		r.transCtx.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
 		return nil
 	}
 
-	tryMemberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+	leaveMember := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		if lifecycleActions.MemberLeave == nil {
 			return nil
 		}
@@ -222,7 +220,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			}
 			return err
 		}
-		r.transCtx.Logger.Info("successfully call leave member action for pod", "pod", pod.Name)
+		r.transCtx.Logger.Info("succeed to call leave member action", "pod", pod.Name)
 		return nil
 	}
 
@@ -236,14 +234,12 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	if err := trySwitchover(lfa, pod); err != nil {
+	if err = switchover(lfa, pod); err != nil {
 		return err
 	}
-
-	if err := tryMemberLeave(lfa, pod); err != nil {
+	if err = leaveMember(lfa, pod); err != nil {
 		return err
 	}
-
 	return nil
 }
 

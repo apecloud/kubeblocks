@@ -84,6 +84,14 @@ func newMockInstanceSet(replicas int, name string, labels map[string]string) wor
 	}
 }
 
+func newMockRunningComponent() *appsv1.Component {
+	return &appsv1.Component{
+		Status: appsv1.ComponentStatus{
+			Phase: appsv1.RunningComponentPhase,
+		},
+	}
+}
+
 type ParamsOps func(params *reconfigureContext)
 
 func withMockInstanceSet(replicas int, labels map[string]string) ParamsOps {
@@ -166,6 +174,12 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 	}
 	for _, customFn := range paramOps {
 		customFn(&params)
+	}
+
+	if params.ClusterComponent != nil {
+		params.Cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{
+			*params.ClusterComponent,
+		}
 	}
 	return params
 }

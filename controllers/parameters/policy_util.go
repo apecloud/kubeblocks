@@ -212,13 +212,7 @@ func getComponentSpecPtrByName(cluster *appsv1.Cluster, compName string) (*appsv
 	return nil, fmt.Errorf("component %s not found", compName)
 }
 
-func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, obj client.Object, compName string) error {
-	// parse obj to cluster, if obj is not a cluster, return error
-	if _, ok := obj.(*appsv1.Cluster); !ok {
-		return fmt.Errorf("obj is not a cluster")
-	}
-	cluster := obj.(*appsv1.Cluster)
-
+func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, cluster *appsv1.Cluster, compName string) error {
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 
 	compSpec, err := getComponentSpecPtrByName(cluster, compName)
@@ -235,6 +229,7 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 	}
 
 	compSpec.Annotations[cfgAnnotationKey] = newVersion
+
 	return cli.Update(ctx.Ctx, cluster)
 }
 

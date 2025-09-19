@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 )
 
 type simplePolicy struct {
@@ -72,8 +73,16 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 	if len(pods) != 0 {
 		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
 	}
+
 	if len(pods) == int(progress) {
+		// get component status
 		retStatus = ESNone
+		for _, its := range param.InstanceSetUnits {
+			if !instanceset.IsInstanceSetReady(&its) {
+				retStatus = ESRetry
+				break
+			}
+		}
 	}
 	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
 }

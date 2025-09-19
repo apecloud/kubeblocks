@@ -31,7 +31,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -192,28 +191,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) error {
-	if inst.Spec.MembershipReconfiguration == nil || inst.Spec.MembershipReconfiguration.Switchover == nil {
+	if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.Switchover == nil {
 		return nil
 	}
 
-	clusterName, err := r.clusterName(inst)
-	if err != nil {
-		return err
-	}
-	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Switchover: inst.Spec.MembershipReconfiguration.Switchover,
-	}
-	templateVars := func() map[string]any {
-		if inst.Spec.TemplateVars == nil {
-			return nil
-		}
-		m := make(map[string]any)
-		for k, v := range inst.Spec.TemplateVars {
-			m[k] = v
-		}
-		return m
-	}()
-	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod)
+	lfa, err := newLifecycleAction(inst, nil, pod)
 	if err != nil {
 		return err
 	}
@@ -347,17 +329,6 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 //	}
 //	return config.Generation <= 0
 // }
-
-func (r *updateReconciler) clusterName(inst *workloads.Instance) (string, error) {
-	var clusterName string
-	if inst.Labels != nil {
-		clusterName = inst.Labels[constant.AppInstanceLabelKey]
-	}
-	if len(clusterName) == 0 {
-		return "", fmt.Errorf("instance %s/%s has no label %s", inst.Namespace, inst.Name, constant.AppInstanceLabelKey)
-	}
-	return clusterName, nil
-}
 
 func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Condition {
 	return &metav1.Condition{

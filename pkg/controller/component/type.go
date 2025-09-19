@@ -57,7 +57,7 @@ type SynthesizedComponent struct {
 	Annotations                      map[string]string                      `json:"annotations,omitempty"`
 	StaticAnnotations                map[string]string                      // annotations defined by the component definition
 	DynamicAnnotations               map[string]string                      // annotations defined by the cluster and component API
-	TemplateVars                     map[string]any                         `json:"templateVars,omitempty"`
+	TemplateVars                     map[string]string                      `json:"templateVars,omitempty"`
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`

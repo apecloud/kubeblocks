@@ -83,8 +83,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetPodUpgradePolicy(synthesizedComp.PodUpgradePolicy).
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
-		SetLifecycleActions(synthesizedComp.LifecycleActions).
-		SetTemplateVars(synthesizedComp.TemplateVars).
+		SetLifecycleActions(synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars).
 		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
 		SetInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects)
 	if compDef != nil {

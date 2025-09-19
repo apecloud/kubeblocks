@@ -468,7 +468,7 @@ var _ = Describe("Instance Controller", func() {
 			defer kbacli.UnsetMockClient()
 
 			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
-				f.SetMembershipActions(&workloads.MembershipReconfiguration{
+				f.SetLifecycleActions(&workloads.LifecycleActions{
 					Switchover: &kbappsv1.Action{
 						Exec: &kbappsv1.ExecAction{},
 					},

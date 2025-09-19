@@ -49,7 +49,7 @@ type kbagent struct {
 	clusterName      string
 	compName         string
 	lifecycleActions *appsv1.ComponentLifecycleActions
-	templateVars     map[string]any
+	templateVars     map[string]string
 	pods             []*corev1.Pod
 	pod              *corev1.Pod
 }
@@ -273,7 +273,7 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 	m := map[string]string{}
 	for k, v := range a.templateVars {
-		m[k] = v.(string)
+		m[k] = v
 	}
 	return m, nil
 }

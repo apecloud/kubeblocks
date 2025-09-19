@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -207,7 +206,7 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
+					Expect(req.Parameters).Should(BeEmpty())
 					Expect(req.NonBlocking).ShouldNot(BeNil())
 					Expect(*req.NonBlocking).Should(BeTrue())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
@@ -382,8 +381,7 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
-					Expect(req.Parameters[hackedAllCompList]).Should(Equal(strings.Join([]string{compName, "another"}, ",")))
+					Expect(req.Parameters).Should(BeEmpty())
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})

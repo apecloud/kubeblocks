@@ -28,9 +28,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -590,45 +592,42 @@ var _ = Describe("service references", func() {
 						Cluster: etcdCluster,
 						PodFQDNs: &appsv1.ServiceRefPodFQDNsSelector{
 							Component: etcdComponent,
-							Role:      &[]string{"leader"}[0],
+							Role:      ptr.To("leader"),
 						},
 					},
 				},
 			}
+			leadPodName := fmt.Sprintf("%s-%s-%d", etcdCluster, etcdComponent, 1)
+			followerPodName := fmt.Sprintf("%s-%s-%d", etcdCluster, etcdComponent, 1)
 			reader := &mockReader{
 				cli: testCtx.Cli,
 				objs: []client.Object{
-					&corev1.Pod{
+					&workloads.InstanceSet{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: namespace,
-							Name:      fmt.Sprintf("%s-%s-%d", etcdCluster, etcdComponent, 0),
-							Labels: map[string]string{
-								constant.AppManagedByLabelKey:   constant.AppName,
-								constant.AppInstanceLabelKey:    etcdCluster,
-								constant.KBAppComponentLabelKey: etcdComponent,
-								constant.RoleLabelKey:           "follower",
+							Name:      constant.GenerateClusterComponentName(etcdCluster, etcdComponent),
+						},
+						Spec: workloads.InstanceSetSpec{
+							Replicas: ptr.To(int32(2)),
+						},
+						Status: workloads.InstanceSetStatus{
+							InstanceStatus: []workloads.InstanceStatus{
+								{
+									PodName: followerPodName,
+									Role:    "follower",
+								},
+								{
+									PodName: leadPodName,
+									Role:    "leader",
+								},
 							},
 						},
-						Spec: corev1.PodSpec{},
-					},
-					&corev1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Namespace: namespace,
-							Name:      fmt.Sprintf("%s-%s-%d", etcdCluster, etcdComponent, 1),
-							Labels: map[string]string{
-								constant.AppManagedByLabelKey:   constant.AppName,
-								constant.AppInstanceLabelKey:    etcdCluster,
-								constant.KBAppComponentLabelKey: etcdComponent,
-								constant.RoleLabelKey:           "leader",
-							},
-						},
-						Spec: corev1.PodSpec{},
 					},
 				},
 			}
 
 			compName := constant.GenerateClusterComponentName(etcdCluster, etcdComponent)
-			expectedPodFQDNs := intctrlutil.PodFQDN(namespace, compName, reader.objs[1].GetName())
+			expectedPodFQDNs := intctrlutil.PodFQDN(namespace, compName, leadPodName)
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())

@@ -26,11 +26,11 @@ import (
 	"strconv"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -92,8 +92,7 @@ func placement(obj client.Object) string {
 
 func assign(ctx context.Context, obj client.Object) client.Object {
 	switch obj.(type) {
-	// only handle Pod and PersistentVolumeClaim
-	case *corev1.Pod, *corev1.PersistentVolumeClaim:
+	case *workloads.Instance: // TODO: not hard code the instance type
 		ordinal := func() int {
 			subs := strings.Split(obj.GetName(), "-")
 			o, _ := strconv.Atoi(subs[len(subs)-1])

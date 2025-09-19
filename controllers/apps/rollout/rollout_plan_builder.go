@@ -32,7 +32,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -183,7 +182,7 @@ func (c *rolloutPlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 }
 
 func (c *rolloutPlanBuilder) reconcileCreateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := c.cli.Create(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+	err := c.cli.Create(ctx, vertex.Obj)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -191,7 +190,7 @@ func (c *rolloutPlanBuilder) reconcileCreateObject(ctx context.Context, vertex *
 }
 
 func (c *rolloutPlanBuilder) reconcileUpdateObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	err := c.cli.Update(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+	err := c.cli.Update(ctx, vertex.Obj)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -200,7 +199,7 @@ func (c *rolloutPlanBuilder) reconcileUpdateObject(ctx context.Context, vertex *
 
 func (c *rolloutPlanBuilder) reconcilePatchObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	patch := client.MergeFrom(vertex.OriObj)
-	err := c.cli.Patch(ctx, vertex.Obj, patch, appsutil.ClientOption(vertex))
+	err := c.cli.Patch(ctx, vertex.Obj, patch)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -211,7 +210,7 @@ func (c *rolloutPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex *
 	finalizers := []string{constant.RolloutFinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
-			err := c.cli.Update(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+			err := c.cli.Update(ctx, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -220,7 +219,6 @@ func (c *rolloutPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex *
 
 	if !model.IsObjectDeleting(vertex.Obj) {
 		var opts []client.DeleteOption
-		opts = append(opts, appsutil.ClientOption(vertex))
 		if len(vertex.PropagationPolicy) > 0 {
 			opts = append(opts, vertex.PropagationPolicy)
 		}
@@ -233,7 +231,7 @@ func (c *rolloutPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex *
 }
 
 func (c *rolloutPlanBuilder) reconcileStatusObject(ctx context.Context, vertex *model.ObjectVertex) error {
-	return c.cli.Status().Update(ctx, vertex.Obj, appsutil.ClientOption(vertex))
+	return c.cli.Status().Update(ctx, vertex.Obj)
 }
 
 func (p *rolloutPlan) Execute() error {

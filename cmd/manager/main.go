@@ -497,10 +497,10 @@ func main() {
 		}
 
 		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
 			os.Exit(1)
 		}
@@ -540,6 +540,15 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("instance-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Instance")
+			os.Exit(1)
+		}
+
+		if err = (&workloadscontrollers.InstanceEventReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("instance-event-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceEvent")
 			os.Exit(1)
 		}
 	}
@@ -675,16 +684,10 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParametersDefinitionReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
-			os.Exit(1)
-		}
 		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-driven-config-render-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ParamConfigRenderer")
 			os.Exit(1)
@@ -692,7 +695,7 @@ func main() {
 		if err = (&parameterscontrollers.ParameterTemplateExtensionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("parameter-extension"),
+			Recorder: mgr.GetEventRecorderFor("parameter-template-extension-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ParameterTemplateExtension")
 			os.Exit(1)

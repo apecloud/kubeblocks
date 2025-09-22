@@ -60,7 +60,7 @@ type Lifecycle interface {
 }
 
 func New(namespace, clusterName, compName string, lifecycleActions *appsv1.ComponentLifecycleActions,
-	templateVars map[string]any, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
+	templateVars map[string]string, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
 	if pod == nil && len(pods) == 0 {
 		return nil, fmt.Errorf("either pod or pods must be provided to call lifecycle actions")
 	}

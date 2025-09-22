@@ -487,13 +487,37 @@ const (
 // +kubebuilder:object:generate=false
 type ReplicaRole = kbappsv1.ReplicaRole
 
-type MembershipReconfiguration struct {
+// Action defines a customizable hook or procedure tailored for different database engines,
+// designed to be invoked at predetermined points within the lifecycle of a Component instance.
+//
+// +kubebuilder:object:generate=false
+type Action = kbappsv1.Action
+
+type LifecycleActions struct {
+	// Provides variables which are used to call Actions.
+	//
+	// +optional
+	TemplateVars map[string]string `json:"templateVars,omitempty"`
+
 	// Defines the procedure for a controlled transition of a role to a new replica.
 	//
 	// +optional
-	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
+	Switchover *Action `json:"switchover,omitempty"`
 
-	// TODO: member join/leave
+	// Defines the procedure to add a new replica.
+	//
+	// +optional
+	MemberJoin *Action `json:"memberJoin,omitempty"`
+
+	// Defines the procedure to remove a replica.
+	//
+	// +optional
+	MemberLeave *Action `json:"memberLeave,omitempty"`
+
+	// Defines the procedure that update a replica with new configuration.
+	//
+	// +optional
+	Reconfigure *Action `json:"reconfigure,omitempty"`
 }
 
 type ConfigTemplate struct {

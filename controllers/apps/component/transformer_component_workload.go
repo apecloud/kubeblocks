@@ -196,7 +196,6 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 			},
 		})
 	}
-
 	return nil
 }
 

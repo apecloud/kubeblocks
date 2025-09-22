@@ -273,13 +273,11 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	}
 
 	err = lfa.Switchover(tree.Context, nil, nil, "")
-	if err != nil {
-		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
-		}
-		return err
+	if err == nil {
+		tree.Logger.Info("succeed to call switchover action", "pod", pod.Name)
+	} else if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+		tree.Logger.Info("failed to call switchover action, ignore it", "pod", pod.Name, "error", err)
 	}
-	tree.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
 	return nil
 }
 
@@ -306,7 +304,7 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 		itsCopy.Spec.LifecycleActions = &workloads.LifecycleActions{}
 	}
 	itsCopy.Spec.LifecycleActions.Reconfigure = config.Reconfigure
-	lfa, err := newLifecycleAction(its, nil, pod)
+	lfa, err := newLifecycleAction(itsCopy, nil, pod)
 	if err != nil {
 		return err
 	}

@@ -359,7 +359,7 @@ func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *
 			Switchover:  inst.Spec.LifecycleActions.Switchover,
 			MemberJoin:  inst.Spec.LifecycleActions.MemberJoin,
 			MemberLeave: inst.Spec.LifecycleActions.MemberLeave,
-			// Reconfigure: Reconfigure: config.Reconfigure,
+			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
 		pods []*corev1.Pod
 	)

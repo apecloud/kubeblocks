@@ -2339,52 +2339,11 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
-designed to be invoked at predetermined points within the lifecycle of a Component instance.
-It provides a modular and extensible way to customize a Component&rsquo;s behavior through the execution of defined actions.</p>
-<p>Available Action triggers include:</p>
-<ul>
-<li><code>postProvision</code>: Defines the hook to be executed after the creation of a Component,
-with <code>preCondition</code> specifying when the action should be fired relative to the Component&rsquo;s lifecycle stages:
-<code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
-<li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
-<li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
-<li><code>availableProbe</code>: Defines the procedure which is invoked regularly to assess the availability of the component.</li>
-<li><code>switchover</code>: Defines the procedure for a controlled transition of a role to a new replica.</li>
-<li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
-<li><code>memberLeave</code>: Defines the method to remove a replica from the replication group.</li>
-<li><code>readOnly</code>: Defines the procedure to switch a replica into the read-only state.</li>
-<li><code>readWrite</code>: Defines the procedure to transition a replica from the read-only state back to the read-write state.</li>
-<li><code>dataDump</code>: Defines the procedure to export the data from a replica.</li>
-<li><code>dataLoad</code>: Defines the procedure to import data into a replica.</li>
-<li><code>reconfigure</code>: Defines the procedure that update a replica with new configuration.</li>
-<li><code>accountProvision</code>: Defines the procedure to generate a new database account.</li>
-</ul>
-<p>Actions can be executed in different ways:</p>
-<ul>
-<li>ExecAction: Executes a command inside a container.
-A set of predefined environment variables are available and can be leveraged within the <code>exec.command</code>
-to access context information such as details about pods, components, the overall cluster state,
-or database connection credentials.
-These variables provide a dynamic and context-aware mechanism for script execution.</li>
-<li>HTTPAction: Performs a single HTTP(S) request.</li>
-<li>GRPCAction: Issues a unary gRPC call to a target service.
-This allows developers to implement Actions using plugins written in programming language like Go,
-providing greater flexibility and extensibility.</li>
-</ul>
-<p>An action is considered successful on returning 0, or HTTP 2xx for status HTTP actions.
-Any other return value or HTTP status codes indicate failure,
-and the action may be retried based on the configured retry policy.</p>
-<ul>
-<li>If an action exceeds the specified timeout duration, it will be terminated, and the action is considered failed.</li>
-<li>If an action produces any data as output, it should be written to stdout,
-or included in the HTTP response payload for HTTP actions.</li>
-<li>If an action encounters any errors, error messages should be written to stderr,
-or detailed in the HTTP response with the appropriate non-2xx status code.</li>
-</ul>
+designed to be invoked at predetermined points within the lifecycle of a Component instance.</p>
 </div>
 <table>
 <thead>
@@ -33837,34 +33796,6 @@ Action
 </tr>
 <tr>
 <td>
-<code>dataDump</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the procedure for exporting the data from a replica.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>dataLoad</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the procedure for importing data into a replica.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>reconfigure</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -33901,34 +33832,6 @@ Action
 </tr><tr><td><p>&#34;Serial&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>switchover</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the procedure for a controlled transition of a role to a new replica.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

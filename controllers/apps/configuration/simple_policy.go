@@ -75,7 +75,7 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 	}
 
 	if len(pods) == int(progress) {
-		// get component status
+		// get its status
 		retStatus = ESNone
 		for _, its := range param.InstanceSetUnits {
 			if !instanceset.IsInstanceSetReady(&its) {

@@ -304,3 +304,39 @@ func newMockPod(podName string, podSpec *corev1.PodSpec) corev1.Pod {
 	pod.Spec = *podSpec.DeepCopy()
 	return pod
 }
+
+func mockInstanceSetReady(mockParam *reconfigureParams) {
+	for i := range mockParam.InstanceSetUnits {
+		its := &mockParam.InstanceSetUnits[i]
+		its.Spec.Roles = []workloads.ReplicaRole{
+			{
+				Name:     "leader",
+				IsLeader: true,
+			},
+			{
+				Name:     "follower",
+				IsLeader: false,
+			},
+		}
+		membersStatus := []workloads.MemberStatus{}
+		membersStatus = append(membersStatus, workloads.MemberStatus{
+			PodName:     its.Name + "-0",
+			ReplicaRole: &its.Spec.Roles[0],
+		})
+		for j := 1; j < int(*its.Spec.Replicas); j++ {
+			membersStatus = append(membersStatus, workloads.MemberStatus{
+				PodName:     its.Name + fmt.Sprintf("-%d", j),
+				ReplicaRole: &its.Spec.Roles[1],
+			})
+		}
+
+		its.Status.MembersStatus = membersStatus
+		its.Status.ReadyReplicas = *its.Spec.Replicas
+		its.Status.Replicas = *its.Spec.Replicas
+		its.Status.ObservedGeneration = its.Generation
+		its.Status.CurrentRevision = "mock-version"
+		its.Status.UpdateRevision = "mock-version"
+		its.Status.UpdatedReplicas = *its.Spec.Replicas
+		its.Status.AvailableReplicas = *its.Spec.Replicas
+	}
+}

@@ -197,10 +197,6 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 			},
 		})
 	}
-
-	// if start {
-	//	return intctrlutil.NewDelayedRequeueError(time.Second, "workload is starting")
-	// }
 	return nil
 }
 
@@ -344,8 +340,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Template = podTemplateCopy
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
-	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
-	itsObjCopy.Spec.TemplateVars = itsProto.Spec.TemplateVars
+	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.FlatInstanceOrdinal = itsProto.Spec.FlatInstanceOrdinal
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances

@@ -258,7 +258,7 @@ func renderFileTemplateData(transCtx *componentTransformContext,
 		rendered        = make(map[string]string)
 	)
 
-	variables := make(map[string]any)
+	variables := make(map[string]string)
 	if synthesizedComp.TemplateVars != nil {
 		maps.Copy(variables, synthesizedComp.TemplateVars)
 	}

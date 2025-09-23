@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -1887,43 +1888,30 @@ var _ = Describe("vars", func() {
 								ServiceVersion: "v3.6.5",
 							},
 						},
-						&corev1.Pod{
+						&workloads.InstanceSet{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: testCtx.DefaultNamespace,
-								Name:      podName("leader"),
-								Labels: map[string]string{
-									constant.AppManagedByLabelKey:   constant.AppName,
-									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
-									constant.KBAppComponentLabelKey: synthesizedComp.Name,
-									constant.RoleLabelKey:           "leader",
+								Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+							},
+							Spec: workloads.InstanceSetSpec{
+								Replicas: ptr.To(int32(3)),
+							},
+							Status: workloads.InstanceSetStatus{
+								InstanceStatus: []workloads.InstanceStatus{
+									{
+										PodName: podName("leader"),
+										Role:    "leader",
+									},
+									{
+										PodName: podName("follower"),
+										Role:    "follower",
+									},
+									{
+										PodName: podName("empty"),
+										Role:    "",
+									},
 								},
 							},
-							Spec: corev1.PodSpec{},
-						},
-						&corev1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: testCtx.DefaultNamespace,
-								Name:      podName("follower"),
-								Labels: map[string]string{
-									constant.AppManagedByLabelKey:   constant.AppName,
-									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
-									constant.KBAppComponentLabelKey: synthesizedComp.Name,
-									constant.RoleLabelKey:           "follower",
-								},
-							},
-							Spec: corev1.PodSpec{},
-						},
-						&corev1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: testCtx.DefaultNamespace,
-								Name:      podName("empty"),
-								Labels: map[string]string{
-									constant.AppManagedByLabelKey:   constant.AppName,
-									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
-									constant.KBAppComponentLabelKey: synthesizedComp.Name,
-								},
-							},
-							Spec: corev1.PodSpec{},
 						},
 					},
 				}

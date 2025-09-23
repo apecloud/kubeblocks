@@ -17,35 +17,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package util
+package cluster
 
 import (
-	"context"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
-func Placement(obj client.Object) string {
-	if obj == nil || obj.GetAnnotations() == nil {
-		return ""
-	}
-	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
-}
-
-func IntoContext(ctx context.Context, placement string) context.Context {
-	return multicluster.IntoContext(ctx, placement)
-}
-
-func InDataContext4G() model.GraphOption {
+func inDataContext4G() model.GraphOption {
 	return model.WithClientOption(multicluster.InDataContext())
 }
 
-func ClientOption(v *model.ObjectVertex) *multicluster.ClientOption {
+func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	if v.ClientOpt != nil {
 		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
 		if ok {

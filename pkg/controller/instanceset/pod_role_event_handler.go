@@ -36,7 +36,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -99,7 +98,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[roleChangedAnnotKey] = count
-	return cli.Patch(reqCtx.Ctx, event, patch, inDataContextUnspecified())
+	return cli.Patch(reqCtx.Ctx, event, patch)
 }
 
 func (h *PodRoleEventHandler) transformKBAgentProbeEvent(logger logr.Logger, event *corev1.Event) *corev1.Event {
@@ -152,7 +151,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 		}
 		// get pod
 		pod := &corev1.Pod{}
-		if err := cli.Get(reqCtx.Ctx, podName, pod, inDataContextUnspecified()); err != nil {
+		if err := cli.Get(reqCtx.Ctx, podName, pod); err != nil {
 			return pair.RoleName, err
 		}
 		// event belongs to old pod with the same name, ignore it
@@ -259,13 +258,5 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		newPod.Annotations = map[string]string{}
 	}
 	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Update(ctx, newPod, inDataContext())
-}
-
-func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
-}
-
-func inDataContextUnspecified() *multicluster.ClientOption {
-	return multicluster.InDataContextUnspecified()
+	return cli.Update(ctx, newPod)
 }

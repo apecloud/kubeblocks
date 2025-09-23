@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -121,7 +122,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
-	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
+	r.buildLifecycleStatus(inst, pod)
+	inst.Status.InVolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -195,6 +197,40 @@ func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 		}
 	}
 	return ""
+}
+
+func (r *statusReconciler) buildLifecycleStatus(inst *workloads.Instance, pod *corev1.Pod) {
+	dataLoaded := func() *bool {
+		if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.MemberJoin == nil { // TODO: data load action
+			return nil
+		}
+		if ptr.Deref(inst.Status.DataLoaded, false) {
+			return inst.Status.DataLoaded
+		}
+		loaded, ok := pod.Annotations[constant.RoleLabelKey] // TODO: data loaded annotation
+		if !ok {
+			return ptr.To(false)
+		}
+		return ptr.To(strings.ToLower(loaded) == "true")
+	}
+
+	memberJoined := func() *bool {
+		if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.MemberJoin == nil {
+			return nil
+		}
+		if ptr.Deref(inst.Status.MemberJoined, false) {
+			return inst.Status.MemberJoined
+		}
+		joined, ok := pod.Annotations[constant.RoleLabelKey] // TODO: member joined annotation
+		if !ok {
+			return ptr.To(false)
+		}
+		return ptr.To(strings.ToLower(joined) == "true")
+	}
+
+	inst.Status.Provisioned = true
+	inst.Status.DataLoaded = dataLoaded()
+	inst.Status.MemberJoined = memberJoined()
 }
 
 func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {

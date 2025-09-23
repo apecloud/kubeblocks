@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -130,18 +131,15 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	// check if the component has failed pod
 	hasFailedPod, messages := t.hasFailedPod()
 
-	// check if the component scale out failed
-	hasRunningScaleOut, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
-	if err != nil {
-		return err
-	}
+	// check if the component has scale out running
+	hasRunningScaleOut := t.hasScaleOutRunning()
 
 	// check if the volume expansion is running
 	hasRunningVolumeExpansion := t.hasVolumeExpansionRunning()
 
 	// check if the component has failure
 	hasFailure := func() bool {
-		return hasFailedPod || hasFailedScaleOut
+		return hasFailedPod
 	}()
 
 	// check if the component is in creating phase
@@ -219,35 +217,19 @@ func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 	return t.runningITS.IsInstanceSetReady()
 }
 
-// hasScaleOutRunning checks if the scale out is running.
-func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
+func (t *componentStatusTransformer) hasScaleOutRunning() bool {
 	if t.runningITS == nil || t.runningITS.Spec.Replicas == nil {
-		return false, false, nil
+		return false
 	}
-
-	replicas, err := component.GetReplicasStatusFunc(t.protoITS, func(status component.ReplicaStatus) bool {
-		return status.DataLoaded != nil && !*status.DataLoaded ||
-			status.MemberJoined != nil && !*status.MemberJoined
+	return slices.ContainsFunc(t.runningITS.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
+		return !ptr.Deref(inst.DataLoaded, true) || !ptr.Deref(inst.MemberJoined, true)
 	})
-	if err != nil {
-		return false, false, err
-	}
-	if len(replicas) == 0 {
-		return false, false, nil
-	}
-
-	// TODO: scale-out failed
-
-	return true, false, nil
 }
 
 func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
-	for _, inst := range t.runningITS.Status.InstanceStatus {
-		if inst.VolumeExpansion {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(t.runningITS.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
+		return inst.InVolumeExpansion
+	})
 }
 
 // hasFailedPod checks if the instance set has failed pod.

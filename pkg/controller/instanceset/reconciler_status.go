@@ -312,10 +312,9 @@ func (r *statusReconciler) buildConditionMessageWithNames(podNames []string) ([]
 }
 
 func (r *statusReconciler) buildInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
-	r.setInstanceRoleStatus(its, pods)
-	if tree != nil {
-		r.setInstancePVCStatus(tree, its)
-	}
+	r.buildInstanceRoleStatus(its, pods)
+	r.buildInstanceLifecycleStatus(its, pods)
+	r.buildInstancePVCStatus(tree, its)
 	r.sortInstanceStatus(its.Status.InstanceStatus)
 }
 
@@ -326,7 +325,7 @@ func (r *statusReconciler) sortInstanceStatus(instanceStatus []workloads.Instanc
 	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }
 
-func (r *statusReconciler) setInstanceRoleStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
+func (r *statusReconciler) buildInstanceRoleStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 	if its.Spec.Roles == nil {
 		return
 	}
@@ -353,7 +352,39 @@ func (r *statusReconciler) setInstanceRoleStatus(its *workloads.InstanceSet, pod
 	}
 }
 
-func (r *statusReconciler) setInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) {
+func (r *statusReconciler) buildInstanceLifecycleStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
+	dataLoaded := func(inst workloads.InstanceStatus, pod *corev1.Pod) *bool {
+		if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.DataLoad == nil {
+			return nil
+		}
+		if inst.DataLoaded == nil || *inst.DataLoaded {
+			return inst.DataLoaded
+		}
+		loaded, ok := pod.Annotations[constant.RoleLabelKey] // TODO: data loaded annotation
+		if !ok {
+			return ptr.To(false)
+		}
+		return ptr.To(strings.ToLower(loaded) == "true")
+	}
+
+	pm := make(map[string]*corev1.Pod)
+	for i, pod := range pods {
+		pm[pod.Name] = pods[i]
+	}
+	for i, inst := range its.Status.InstanceStatus {
+		pod, ok := pm[inst.PodName]
+		if !ok {
+			continue
+		}
+		its.Status.InstanceStatus[i].Provisioned = true
+		its.Status.InstanceStatus[i].DataLoaded = dataLoaded(inst, pod)
+	}
+}
+
+func (r *statusReconciler) buildInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) {
+	if tree == nil {
+		return
+	}
 	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
 	var pvcList []*corev1.PersistentVolumeClaim
 	for _, obj := range pvcs {
@@ -377,7 +408,7 @@ func (r *statusReconciler) setInstancePVCStatus(tree *kubebuilderx.ObjectTree, i
 				for i, inst := range its.Status.InstanceStatus {
 					if inst.PodName == instName {
 						// TODO: how to check the expansion failed?
-						its.Status.InstanceStatus[i].VolumeExpansion = true
+						its.Status.InstanceStatus[i].InVolumeExpansion = true
 						break
 					}
 				}

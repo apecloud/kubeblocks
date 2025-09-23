@@ -50,9 +50,7 @@ type componentWorkloadOps struct {
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
-	// runningITS is a snapshot of the InstanceSet that is already running
-	runningITS *workloads.InstanceSet
-	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
+	runningITS            *workloads.InstanceSet
 	protoITS              *workloads.InstanceSet
 	desiredCompPodNameSet sets.Set[string]
 	runningItsPodNameSet  sets.Set[string]
@@ -93,7 +91,7 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		in  = r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet)
 		out = r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
 	)
-	if err := r.buildDataReplicationTask(); err != nil {
+	if err := r.dataReplicationTask(); err != nil {
 		return err
 	}
 	if in.Len() != 0 || out.Len() != 0 {
@@ -106,7 +104,7 @@ func (r *componentWorkloadOps) horizontalScale() error {
 	return nil
 }
 
-func (r *componentWorkloadOps) buildDataReplicationTask() error {
+func (r *componentWorkloadOps) dataReplicationTask() error {
 	_, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
 	if !hasDataActionDefined {
 		return nil
@@ -119,11 +117,11 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	}
 
 	// replicas in provisioning that the data has not been loaded
-	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
-		return s.DataLoaded != nil && !*s.DataLoaded
-	})
-	if err != nil {
-		return err
+	var provisioningReplicas []string
+	for _, replica := range r.runningITS.Status.InstanceStatus {
+		if replica.DataLoaded != nil && !*replica.DataLoaded {
+			provisioningReplicas = append(provisioningReplicas, replica.PodName)
+		}
 	}
 
 	// choose the source replica

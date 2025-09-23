@@ -48,12 +48,6 @@ func ListOwnedPods(ctx context.Context, cli client.Reader, namespace, clusterNam
 	return listPods(ctx, cli, namespace, clusterName, compName, nil, opts...)
 }
 
-func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, clusterName, compName, role string,
-	opts ...client.ListOption) ([]*corev1.Pod, error) {
-	roleLabel := map[string]string{constant.RoleLabelKey: role}
-	return listPods(ctx, cli, namespace, clusterName, compName, roleLabel, opts...)
-}
-
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Service, error) {
 	labels := constant.GetCompLabels(clusterName, compName)

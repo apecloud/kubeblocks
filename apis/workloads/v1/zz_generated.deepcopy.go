@@ -463,8 +463,13 @@ func (in *InstanceStatus) DeepCopyInto(out *InstanceStatus) {
 		*out = make([]InstanceConfigStatus, len(*in))
 		copy(*out, *in)
 	}
-	if in.Joined != nil {
-		in, out := &in.Joined, &out.Joined
+	if in.DataLoaded != nil {
+		in, out := &in.DataLoaded, &out.DataLoaded
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MemberJoined != nil {
+		in, out := &in.MemberJoined, &out.MemberJoined
 		*out = new(bool)
 		**out = **in
 	}
@@ -489,6 +494,16 @@ func (in *InstanceStatus2) DeepCopyInto(out *InstanceStatus2) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.DataLoaded != nil {
+		in, out := &in.DataLoaded, &out.DataLoaded
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MemberJoined != nil {
+		in, out := &in.MemberJoined, &out.MemberJoined
+		*out = new(bool)
+		**out = **in
 	}
 }
 
@@ -610,6 +625,11 @@ func (in *LifecycleActions) DeepCopyInto(out *LifecycleActions) {
 	}
 	if in.MemberLeave != nil {
 		in, out := &in.MemberLeave, &out.MemberLeave
+		*out = new(appsv1.Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.DataLoad != nil {
+		in, out := &in.DataLoad, &out.DataLoad
 		*out = new(appsv1.Action)
 		(*in).DeepCopyInto(*out)
 	}

@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"slices"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -100,7 +98,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdatedReplicas = updatedReplicas
-	r.initReplicasNInstanceStatus(its, instanceRevisionList)
+	its.Status.InitReplicas = r.buildInitReplicas(its)
 
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
 	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
@@ -125,34 +123,22 @@ func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.Insta
 	return updatedReplicas, nil
 }
 
-func (r *revisionUpdateReconciler) initReplicasNInstanceStatus(its *workloads.InstanceSet, instances []instanceRevision) {
-	if its.Status.InitReplicas == nil && ptr.Deref(its.Spec.Replicas, 0) > 0 {
-		its.Status.InitReplicas = its.Spec.Replicas
+func (r *revisionUpdateReconciler) buildInitReplicas(its *workloads.InstanceSet) *int32 {
+	initReplicas := its.Status.InitReplicas
+	if initReplicas == nil && ptr.Deref(its.Spec.Replicas, 0) > 0 {
+		initReplicas = its.Spec.Replicas
 	}
-	if its.Status.InitReplicas == nil {
-		return // init replicas is not set or set to 0
+	if initReplicas == nil {
+		return nil // the replicas is not set or set to 0
 	}
 
-	init := false
-	if *its.Status.InitReplicas != ptr.Deref(its.Status.ReadyInitReplicas, 0) { // in init phase
-		init = true
+	if *initReplicas != ptr.Deref(its.Status.ReadyInitReplicas, 0) { // in init phase
 		// in case the replicas is changed in the middle of init phase
 		if ptr.Deref(its.Spec.Replicas, 0) == 0 {
-			its.Status.InitReplicas = nil
+			return nil
 		} else {
-			its.Status.InitReplicas = its.Spec.Replicas
+			return its.Spec.Replicas
 		}
 	}
-
-	for _, inst := range instances {
-		exist := slices.ContainsFunc(its.Status.InstanceStatus, func(status workloads.InstanceStatus) bool {
-			return status.PodName == inst.name
-		})
-		if !exist {
-			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
-				PodName: inst.name,
-				Joined:  ptr.To(init),
-			})
-		}
-	}
+	return initReplicas
 }

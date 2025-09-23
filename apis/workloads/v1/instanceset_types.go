@@ -514,6 +514,11 @@ type LifecycleActions struct {
 	// +optional
 	MemberLeave *Action `json:"memberLeave,omitempty"`
 
+	// Defines the procedure for importing data into a replica.
+	//
+	// +optional
+	DataLoad *Action `json:"dataLoad,omitempty"`
+
 	// Defines the procedure that update a replica with new configuration.
 	//
 	// +optional
@@ -562,15 +567,25 @@ type InstanceStatus struct {
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
 
+	// Represents whether the instance is provisioned.
+	//
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// Represents whether the instance data is loaded.
+	//
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
 	// Represents whether the instance is joined the cluster.
 	//
 	// +optional
-	Joined *bool `json:"joined,omitempty"`
+	MemberJoined *bool `json:"memberJoined,omitempty"`
 
 	// Represents whether the instance is in volume expansion.
 	//
 	// +optional
-	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
+	InVolumeExpansion bool `json:"inVolumeExpansion,omitempty"`
 }
 
 type InstanceConfigStatus struct {

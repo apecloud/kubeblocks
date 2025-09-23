@@ -110,6 +110,8 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(1)))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
 
+			// make all instance set ready
+			mockInstanceSetReady(&mockParam)
 			// succeed update pod
 			status, err = simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
@@ -152,7 +154,17 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 			status, err = simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
 			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
+
+			// make all instance set ready
+			mockInstanceSetReady(&mockParam)
+			// succeed update pod
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESNone))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
 		})
 	})
 
@@ -190,7 +202,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 						updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
 					})),
 				}),
-				testutil.WithTimes(3),
+				testutil.WithTimes(4),
 			))
 
 			status, err := simplePolicy.Upgrade(mockParam)
@@ -211,6 +223,15 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(1)))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
 
+			// succeed update pod
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+
+			// make all instance set ready
+			mockInstanceSetReady(&mockParam)
 			// succeed update pod
 			status, err = simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())

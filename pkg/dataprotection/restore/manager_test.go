@@ -442,7 +442,7 @@ var _ = Describe("RestoreManager Test", func() {
 
 				By("create restore manager")
 				reqCtx := getReqCtx()
-				restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme())
+				restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
 				backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
 				Expect(err).ShouldNot(HaveOccurred())
 
@@ -458,7 +458,7 @@ var _ = Describe("RestoreManager Test", func() {
 				})).Should(Succeed())
 
 				By("check length of backupsets")
-				restoreMGR = NewRestoreManager(restore, recorder, k8sClient.Scheme())
+				restoreMGR = NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
 				backupSet, err = restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
 				Expect(err).ShouldNot(HaveOccurred())
 

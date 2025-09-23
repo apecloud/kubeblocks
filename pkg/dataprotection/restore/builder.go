@@ -454,7 +454,7 @@ func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) {
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	checkIntervalSeconds := int32(1)
-	volumeName := "downward-volume"
+	volumeName := "downward-volume-sidecard"
 	mountPath := "/dp_downward"
 	fileName := "stop_restore_manager"
 

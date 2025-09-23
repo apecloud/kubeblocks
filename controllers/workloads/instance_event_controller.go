@@ -145,6 +145,9 @@ func (r *InstanceEventReconciler) updatePodRoleLabel(ctx context.Context, pod *c
 	if len(roleName) == 0 {
 		delete(newPod.Labels, constant.RoleLabelKey)
 	} else {
+		if newPod.Labels == nil {
+			newPod.Labels = make(map[string]string)
+		}
 		newPod.Labels[constant.RoleLabelKey] = roleName
 	}
 	if reflect.DeepEqual(newPod.Labels, pod.Labels) {

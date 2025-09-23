@@ -180,6 +180,8 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	var templates []dpv1alpha1.RestoreVolumeClaim
 	pvcLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	intctrlutil.MergeMetadataMapInplace(comp.Labels, &pvcLabels)
+	intctrlutil.MergeMetadataMapInplace(comp.StaticLabels, &pvcLabels)
+	intctrlutil.MergeMetadataMapInplace(comp.DynamicLabels, &pvcLabels)
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for _, v := range comp.VolumeClaimTemplates {
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {

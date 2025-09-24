@@ -54,9 +54,6 @@ func (r *membershipReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 
 func (r *membershipReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-	if its.Status.InitReplicas == nil || *its.Status.InitReplicas != ptr.Deref(its.Status.ReadyInitReplicas, 0) {
-		return kubebuilderx.Continue, nil
-	}
 
 	newNameSet := sets.New[string]()
 	for _, obj := range tree.List(&corev1.Pod{}) {
@@ -104,18 +101,21 @@ func (r *membershipReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 				return kubebuilderx.Continue, err
 			}
 		}
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus[:idx], its.Status.InstanceStatus[idx+1:]...)
+		its.Status.InstanceStatus = slices.Delete(its.Status.InstanceStatus, idx, idx+1)
 	}
 
 	for i, inst := range its.Status.InstanceStatus {
+		if createNameSet.Has(inst.PodName) {
+			continue
+		}
 		if !inst.Provisioned {
 			continue
 		}
 		if inst.DataLoaded != nil && !*inst.DataLoaded {
-			continue
+			continue // loading
 		}
 		if inst.MemberJoined == nil || *inst.MemberJoined {
-			continue
+			continue // joined or not defined
 		}
 		if err := r.joinMember(tree, its, nil, nil); err != nil { // TODO: pods & pod
 			return kubebuilderx.Continue, err

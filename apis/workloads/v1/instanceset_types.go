@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -677,7 +678,7 @@ func (r *InstanceSet) IsInstancesReady() bool {
 		return false
 	}
 	// check whether the cluster has been initialized
-	if r.Status.ReadyInitReplicas != r.Status.InitReplicas {
+	if ptr.Deref(r.Status.InitReplicas, 0) == 0 || ptr.Deref(r.Status.InitReplicas, 0) != ptr.Deref(r.Status.ReadyInitReplicas, 0) {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload

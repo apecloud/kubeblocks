@@ -360,7 +360,7 @@ func (r *statusReconciler) buildInstanceLifecycleStatus(its *workloads.InstanceS
 		if inst.DataLoaded == nil || *inst.DataLoaded {
 			return inst.DataLoaded
 		}
-		loaded, ok := pod.Annotations[constant.RoleLabelKey] // TODO: data loaded annotation
+		loaded, ok := pod.Annotations[constant.LifeCycleDataLoadedAnnotationKey]
 		if !ok {
 			return ptr.To(false)
 		}

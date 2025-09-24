@@ -201,36 +201,21 @@ func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 
 func (r *statusReconciler) buildLifecycleStatus(inst *workloads.Instance, pod *corev1.Pod) {
 	dataLoaded := func() *bool {
-		if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.MemberJoin == nil { // TODO: data load action
+		if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.DataLoad == nil {
 			return nil
 		}
-		if ptr.Deref(inst.Status.DataLoaded, false) {
+		if inst.Status.DataLoaded == nil || *inst.Status.DataLoaded {
 			return inst.Status.DataLoaded
 		}
-		loaded, ok := pod.Annotations[constant.RoleLabelKey] // TODO: data loaded annotation
+		loaded, ok := pod.Annotations[constant.LifeCycleDataLoadedAnnotationKey]
 		if !ok {
 			return ptr.To(false)
 		}
 		return ptr.To(strings.ToLower(loaded) == "true")
 	}
 
-	memberJoined := func() *bool {
-		if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.MemberJoin == nil {
-			return nil
-		}
-		if ptr.Deref(inst.Status.MemberJoined, false) {
-			return inst.Status.MemberJoined
-		}
-		joined, ok := pod.Annotations[constant.RoleLabelKey] // TODO: member joined annotation
-		if !ok {
-			return ptr.To(false)
-		}
-		return ptr.To(strings.ToLower(joined) == "true")
-	}
-
 	inst.Status.Provisioned = true
 	inst.Status.DataLoaded = dataLoaded()
-	inst.Status.MemberJoined = memberJoined()
 }
 
 func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {

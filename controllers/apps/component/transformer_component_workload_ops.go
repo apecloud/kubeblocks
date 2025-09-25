@@ -145,29 +145,32 @@ func (r *componentWorkloadOps) dataReplicationTask() error {
 	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
 }
 
-func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {
-	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
-		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
-	if err != nil {
-		return nil, err
+func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (lifecycle.Replica, error) {
+	var replicas []lifecycle.Replica
+	for i := range r.runningITS.Status.InstanceStatus {
+		replicas = append(replicas, &lifecycleReplica{
+			synthesizedComp: r.synthesizeComp,
+			instance:        r.runningITS.Status.InstanceStatus[i],
+		})
 	}
 	if len(provisioningReplicas) > 0 {
 		// exclude provisioning replicas
-		pods = slices.DeleteFunc(pods, func(pod *corev1.Pod) bool {
-			return slices.Contains(provisioningReplicas, pod.Name)
+		replicas = slices.DeleteFunc(replicas, func(replica lifecycle.Replica) bool {
+			return slices.Contains(provisioningReplicas, replica.Name())
 		})
 	}
-	if len(pods) > 0 {
+	if len(replicas) > 0 {
 		if len(dataDump.TargetPodSelector) == 0 && (dataDump.Exec == nil || len(dataDump.Exec.TargetPodSelector) == 0) {
 			dataDump.TargetPodSelector = appsv1.AnyReplica
 		}
 		// TODO: idempotence for provisioning replicas
-		pods, err = lifecycle.SelectTargetPods(pods, nil, dataDump)
+		var err error
+		replicas, err = lifecycle.SelectTargetPods(replicas, nil, dataDump)
 		if err != nil {
 			return nil, err
 		}
-		if len(pods) > 0 {
-			return pods[0], nil
+		if len(replicas) > 0 {
+			return replicas[0], nil
 		}
 	}
 	return nil, fmt.Errorf("no available pod to dump data")

@@ -38,7 +38,6 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -271,27 +270,29 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 // We consider a switchover action succeeds if the action returns without error. We don't need to know if a switchover is actually executed.
 func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) error {
-	pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		return err
-	}
+	// pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	// if err != nil {
+	//	return err
+	// }
+	//
+	// pod := &corev1.Pod{}
+	// for _, p := range pods {
+	//	if p.Name == switchover.InstanceName {
+	//		pod = p
+	//		break
+	//	}
+	// }
+	//
+	// lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+	//	synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+	// if err != nil {
+	//	return err
+	// }
+	//
+	//// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
+	// return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
 
-	pod := &corev1.Pod{}
-	for _, p := range pods {
-		if p.Name == switchover.InstanceName {
-			pod = p
-			break
-		}
-	}
-
-	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
-	if err != nil {
-		return err
-	}
-
-	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
-	return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
+	return fmt.Errorf("TODO: not support")
 }
 
 // setComponentSwitchoverProgressDetails sets component switchover progress details.

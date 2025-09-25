@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -83,26 +82,11 @@ func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *comp
 }
 
 func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTransformContext) error {
-	lfa, err := t.lifecycleAction4Component(transCtx)
+	lfa, err := newLifecycleAction("post-provision", transCtx.SynthesizeComponent, transCtx.RunningWorkload)
 	if err != nil {
 		return err
 	}
 	return lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
-}
-
-func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
-	synthesizedComp := transCtx.SynthesizeComponent
-	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		return nil, err
-	}
-	if len(pods) == 0 {
-		// TODO: (good-first-issue) we should handle the case that the component has no pods
-		return nil, fmt.Errorf("has no pods to running the post-provision action")
-	}
-	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
 }
 
 func checkPostProvisionDone(transCtx *componentTransformContext) bool {

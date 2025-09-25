@@ -29,8 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
@@ -40,8 +39,8 @@ const (
 	defaultNewReplicaTaskReportPeriodSeconds = 60
 )
 
-func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
-	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
+func NewReplicaTask(compName, uid string, source lifecycle.Replica, replicas []string) (map[string]string, error) {
+	host, port, err := source.StreamingEndpoint()
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +52,7 @@ func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string)
 		NotifyAtFinish:      true,
 		ReportPeriodSeconds: defaultNewReplicaTaskReportPeriodSeconds,
 		NewReplica: &proto.NewReplicaTask{
-			Remote:   intctrlutil.PodFQDN(source.Namespace, compName, source.Name),
+			Remote:   host,
 			Port:     port,
 			Replicas: strings.Join(replicas, ","),
 		},

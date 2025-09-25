@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 func podName(inst *workloads.Instance) string {
@@ -362,11 +364,41 @@ func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *
 			DataLoad:    inst.Spec.LifecycleActions.DataLoad,
 			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
-		pods []*corev1.Pod
+		replica = &lifecycleReplica{
+			Pod: *pod,
+		}
+		replicas []lifecycle.Replica
 	)
 	for i := range objects {
-		pods = append(pods, objects[i].(*corev1.Pod))
+		replicas = append(replicas, &lifecycleReplica{
+			Pod: *(objects[i].(*corev1.Pod)),
+		})
 	}
 	return lifecycle.New(inst.Namespace, clusterName, compName,
-		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods...)
+		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, replica, replicas...)
+}
+
+type lifecycleReplica struct {
+	corev1.Pod
+}
+
+func (r *lifecycleReplica) Namespace() string {
+	return r.ObjectMeta.Namespace
+}
+
+func (r *lifecycleReplica) Name() string {
+	return r.ObjectMeta.Name
+}
+
+func (r *lifecycleReplica) Role() string {
+	return r.ObjectMeta.Labels[constant.RoleLabelKey]
+}
+
+func (r *lifecycleReplica) Endpoint() (string, int32, error) {
+	port, err := intctrlutil.GetPortByName(r.Pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+	return r.Status.PodIP, port, err
+}
+
+func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
+	return "", 0, fmt.Errorf("not support")
 }

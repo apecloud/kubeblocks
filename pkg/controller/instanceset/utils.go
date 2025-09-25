@@ -36,6 +36,8 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 const defaultPriority = 0
@@ -214,11 +216,41 @@ func newLifecycleAction(its *workloads.InstanceSet, objects []client.Object, pod
 			DataLoad:    its.Spec.LifecycleActions.DataLoad,
 			Reconfigure: its.Spec.LifecycleActions.Reconfigure,
 		}
-		pods []*corev1.Pod
+		replica = &lifecycleReplica{
+			Pod: *pod,
+		}
+		replicas []lifecycle.Replica
 	)
 	for i := range objects {
-		pods = append(pods, objects[i].(*corev1.Pod))
+		replicas = append(replicas, &lifecycleReplica{
+			Pod: *(objects[i].(*corev1.Pod)),
+		})
 	}
 	return lifecycle.New(its.Namespace, clusterName, compName,
-		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, pod, pods...)
+		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, replica, replicas...)
+}
+
+type lifecycleReplica struct {
+	corev1.Pod
+}
+
+func (r *lifecycleReplica) Namespace() string {
+	return r.ObjectMeta.Namespace
+}
+
+func (r *lifecycleReplica) Name() string {
+	return r.ObjectMeta.Name
+}
+
+func (r *lifecycleReplica) Role() string {
+	return r.ObjectMeta.Labels[constant.RoleLabelKey]
+}
+
+func (r *lifecycleReplica) Endpoint() (string, int32, error) {
+	port, err := intctrlutil.GetPortByName(r.Pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+	return r.Status.PodIP, port, err
+}
+
+func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
+	return "", 0, fmt.Errorf("not support")
 }

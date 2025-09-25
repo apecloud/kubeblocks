@@ -40,6 +40,30 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
+type lifecycleReplica struct {
+	corev1.Pod
+}
+
+func (r *lifecycleReplica) Namespace() string {
+	return r.ObjectMeta.Namespace
+}
+
+func (r *lifecycleReplica) Name() string {
+	return r.ObjectMeta.Name
+}
+
+func (r *lifecycleReplica) Role() string {
+	return r.ObjectMeta.Labels[constant.RoleLabelKey]
+}
+
+func (r *lifecycleReplica) Endpoint() (string, int32, error) {
+	return r.Status.PodIP, 3306, nil
+}
+
+func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
+	return "", 0, fmt.Errorf("not support")
+}
+
 type mockReader struct {
 	cli  client.Reader
 	objs []client.Object
@@ -96,7 +120,7 @@ var _ = Describe("lifecycle", func() {
 		clusterName      string
 		compName         string
 		lifecycleActions *appsv1.ComponentLifecycleActions
-		pods             []*corev1.Pod
+		pods             []Replica
 	)
 
 	cleanEnv := func() {
@@ -137,7 +161,7 @@ var _ = Describe("lifecycle", func() {
 				FailureThreshold:    3,
 			},
 		}
-		pods = []*corev1.Pod{{}}
+		pods = []Replica{}
 	})
 
 	AfterEach(func() {
@@ -164,9 +188,9 @@ var _ = Describe("lifecycle", func() {
 			Expect(agent.clusterName).Should(Equal(clusterName))
 			Expect(agent.compName).Should(Equal(compName))
 			Expect(agent.lifecycleActions).Should(Equal(lifecycleActions))
-			Expect(agent.pod).Should(Equal(pod))
-			Expect(agent.pods).Should(HaveLen(1))
-			Expect(agent.pods[0]).Should(Equal(pod))
+			Expect(agent.replica).Should(Equal(pod))
+			Expect(agent.replicas).Should(HaveLen(1))
+			Expect(agent.replicas[0]).Should(Equal(pod))
 		})
 
 		It("pods", func() {
@@ -180,9 +204,9 @@ var _ = Describe("lifecycle", func() {
 			Expect(agent.clusterName).Should(Equal(clusterName))
 			Expect(agent.compName).Should(Equal(compName))
 			Expect(agent.lifecycleActions).Should(Equal(lifecycleActions))
-			Expect(agent.pod).Should(Equal(pod))
-			Expect(agent.pods).Should(HaveLen(1))
-			Expect(agent.pods[0]).Should(Equal(pod))
+			Expect(agent.replica).Should(Equal(pod))
+			Expect(agent.replicas).Should(HaveLen(1))
+			Expect(agent.replicas[0]).Should(Equal(pod))
 		})
 	})
 
@@ -477,37 +501,41 @@ var _ = Describe("lifecycle", func() {
 
 		It("pod selector - any", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AnyReplica
-			pods = []*corev1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      "pod-0",
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name: "kbagent",
-								Ports: []corev1.ContainerPort{
-									{
-										Name: "http",
+			pods = []Replica{
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-0",
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "kbagent",
+									Ports: []corev1.ContainerPort{
+										{
+											Name: "http",
+										},
 									},
 								},
 							},
 						},
 					},
 				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      "pod-1",
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name: "kbagent",
-								Ports: []corev1.ContainerPort{
-									{
-										Name: "http",
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-1",
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "kbagent",
+									Ports: []corev1.ContainerPort{
+										{
+											Name: "http",
+										},
 									},
 								},
 							},
@@ -532,43 +560,48 @@ var _ = Describe("lifecycle", func() {
 		It("pod selector - role", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"
-			pods = []*corev1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      "pod-0",
-						Labels: map[string]string{
-							constant.RoleLabelKey: "follower",
+			pods = []Replica{
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-0",
+							Labels: map[string]string{
+								constant.RoleLabelKey: "follower",
+							},
 						},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name: "kbagent",
-								Ports: []corev1.ContainerPort{
-									{
-										Name: "http",
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "kbagent",
+									Ports: []corev1.ContainerPort{
+										{
+											Name: "http",
+										},
 									},
 								},
 							},
 						},
 					},
 				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      "pod-1",
-						Labels: map[string]string{
-							constant.RoleLabelKey: "leader",
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-1",
+							Labels: map[string]string{
+								constant.RoleLabelKey: "leader",
+							},
 						},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name: "kbagent",
-								Ports: []corev1.ContainerPort{
-									{
-										Name: "http",
+
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "kbagent",
+									Ports: []corev1.ContainerPort{
+										{
+											Name: "http",
+										},
 									},
 								},
 							},
@@ -589,22 +622,26 @@ var _ = Describe("lifecycle", func() {
 		It("pod selector - has no matched", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"
-			pods = []*corev1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      "pod-0",
-						Labels: map[string]string{
-							constant.RoleLabelKey: "follower",
+			pods = []Replica{
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-0",
+							Labels: map[string]string{
+								constant.RoleLabelKey: "follower",
+							},
 						},
 					},
 				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      "pod-1",
-						Labels: map[string]string{
-							constant.RoleLabelKey: "follower",
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-1",
+							Labels: map[string]string{
+								constant.RoleLabelKey: "follower",
+							},
 						},
 					},
 				},

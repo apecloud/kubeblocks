@@ -59,8 +59,67 @@ jobs:
               exit 1
           fi
 
+  release-addons-version-check:
+    name: ${{ matrix.repo }}-version-check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: [ 'kubeblocks-addons', 'apecloud-addons' ]
+    outputs:
+      stable-release: ${{ steps.check_stable_version.outputs.stable-release }}
+    steps:
+      - name: check stable version
+        id: check_stable_version
+        run: |
+          RELEASE_VERSION="${{ inputs.release_version }}"
+          STABLE_RELEASE=0
+          if [[ "${RELEASE_VERSION}" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
+              STABLE_RELEASE=1
+          fi
+          echo stable-release="$STABLE_RELEASE" >> $GITHUB_OUTPUT
+
+      - name: checkout ${{ matrix.repo }} ${{ github.ref_name }} code
+        if: ${{ steps.check_stable_version.outputs.stable-release == '1' }}
+        uses: actions/checkout@v4
+        with:
+          token: ${{ env.GITHUB_TOKEN }}
+          repository: apecloud/${{ matrix.repo }}
+          path: ./
+          ref: ${{ github.ref_name }}
+
+      - name: check addon stable versions
+        if: ${{ steps.check_stable_version.outputs.stable-release == '1' }}
+        run: |
+          GIT_BRANCH="${{ github.ref_name }}"
+          RELEASE_VERSION="${{ inputs.release_version }}"
+          update_release_notes_script=".github/scripts/update_release_notes.py"
+          if [[ -f "${update_release_notes_script}" ]]; then
+              check_file_log="check_addon_stable_versions.log"
+              touch ${check_file_log} 
+              python3 ${update_release_notes_script} \
+                --git-branch "${GIT_BRANCH}" \
+                --git-tag "${RELEASE_VERSION}" \
+                --dry-run | tee -a ${check_file_log}
+              NO_STABLE_VERSION=$(cat "${check_file_log}" | (egrep "No stable addon versions found|Pre-release Versions" || true))
+              if [[ -n "${NO_STABLE_VERSION}" ]]; then
+                  echo "❌ $(tput -T xterm setaf 1)ERROR: No stable addon versions found!$(tput -T xterm sgr0)"
+                  exit 1
+              fi
+          fi
+
+  send-message-version-check:
+    needs: [ release-addons-version-check ]
+    if: ${{ (failure() || cancelled()) && needs.release-addons-version-check.outputs.stable-release == '1' }}
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.96
+    with:
+      TYPE: "2"
+      CONTENT: "No stable addon versions found, release error"
+      APECD_REF: "v0.1.96"
+    secrets: inherit
+
   release-branch:
-    needs: release-test
+    needs: [ release-test, release-addons-version-check ]
     uses: apecloud/apecloud-cd/.github/workflows/release-branch.yml@v0.1.38
     with:
       RELEASE_VERSION: "${{ inputs.release_version }}"

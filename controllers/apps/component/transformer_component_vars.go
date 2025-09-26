@@ -159,7 +159,7 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 	}
 
 	newData := func() map[string]string {
-		if envObjVertex == nil {
+		if envObj == nil {
 			return data
 		}
 		merged := maps.Clone(envObj.Data)

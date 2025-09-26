@@ -133,7 +133,7 @@ var _ = Describe("instance util test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
-			reconciler = NewReplicasAlignmentReconciler()
+			reconciler = NewInstanceAlignmentReconciler()
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))

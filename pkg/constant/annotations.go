@@ -50,6 +50,8 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
+
+	LifeCycleDataLoadedAnnotationKey = "apps.kubeblocks.io/lifecycle-data-loaded"
 )
 
 const (

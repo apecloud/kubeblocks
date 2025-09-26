@@ -52,7 +52,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
-			reconciler = NewReplicasAlignmentReconciler()
+			reconciler = NewInstanceAlignmentReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("prepare current tree")

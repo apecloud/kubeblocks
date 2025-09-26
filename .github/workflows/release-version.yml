@@ -103,7 +103,7 @@ jobs:
                 --dry-run | tee -a ${check_file_log}
               NO_STABLE_VERSION=$(cat "${check_file_log}" | (egrep "No stable addon versions found|Pre-release Versions" || true))
               if [[ -n "${NO_STABLE_VERSION}" ]]; then
-                  echo "❌ $(tput -T xterm setaf 1)ERROR: No stable addon versions found!$(tput -T xterm sgr0)"
+                  echo "$(tput -T xterm setaf 1)ERROR: No stable addon versions found!$(tput -T xterm sgr0)"
                   exit 1
               fi
           fi

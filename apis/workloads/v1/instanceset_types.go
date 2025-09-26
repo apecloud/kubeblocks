@@ -727,3 +727,7 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 	}
 	return cnt == replicas
 }
+
+func (r *InstanceSet) IsInInitializing() bool {
+	return r.Status.InitReplicas == nil || *r.Status.InitReplicas != ptr.Deref(r.Status.ReadyInitReplicas, 0)
+}

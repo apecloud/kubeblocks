@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -54,87 +55,80 @@ func (r *membershipReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 
 func (r *membershipReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(
+		itsExt, &instancetemplate.PodNameBuilderOpts{EventLogger: tree.EventRecorder},
+	)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	newNameSet := sets.New[string]()
-	for _, obj := range tree.List(&corev1.Pod{}) {
-		newNameSet.Insert(obj.GetName())
+	for name := range nameToTemplateMap {
+		newNameSet.Insert(name)
 	}
 	oldNameSet := sets.New[string]()
-	for _, inst := range its.Status.InstanceStatus {
-		oldNameSet.Insert(inst.PodName)
-	}
-	createNameSet := newNameSet.Difference(oldNameSet)
-	deleteNameSet := oldNameSet.Difference(newNameSet)
-
-	loadData := func() *bool {
-		if its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.DataLoad != nil {
-			return ptr.To(r.initReplica(its))
-		}
-		return nil
-	}
-	joinMember := func() *bool {
-		if its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil {
-			return ptr.To(r.initReplica(its))
-		}
-		return nil
+	pods := tree.List(&corev1.Pod{})
+	for _, pod := range pods {
+		oldNameSet.Insert(pod.GetName())
 	}
 
-	for name := range createNameSet {
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
-			PodName:      name,
-			Provisioned:  true,
-			DataLoaded:   loadData(),
-			MemberJoined: joinMember(),
-		})
-	}
-
-	for name := range deleteNameSet {
-		idx := slices.IndexFunc(its.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
-			return inst.PodName == name
-		})
-		if idx < 0 {
-			continue
-		}
-		inst := its.Status.InstanceStatus[idx]
-		if ptr.Deref(inst.MemberJoined, false) {
-			if err := r.leaveMember(tree, its, nil, nil); err != nil { // TODO: pods & pod
+	for _, pod := range pods {
+		if newNameSet.Has(pod.GetName()) {
+			if err = lifecycleCreateInstance(tree, its, pods, pod.(*corev1.Pod)); err != nil {
 				return kubebuilderx.Continue, err
 			}
 		}
-		its.Status.InstanceStatus = slices.Delete(its.Status.InstanceStatus, idx, idx+1)
 	}
 
-	for i, inst := range its.Status.InstanceStatus {
-		if createNameSet.Has(inst.PodName) {
-			continue
-		}
-		if !inst.Provisioned {
-			continue
-		}
-		if inst.DataLoaded != nil && !*inst.DataLoaded {
-			continue // loading
-		}
-		if inst.MemberJoined == nil || *inst.MemberJoined {
-			continue // joined or not defined
-		}
-		if err := r.joinMember(tree, its, nil, nil); err != nil { // TODO: pods & pod
-			return kubebuilderx.Continue, err
-		}
-		its.Status.InstanceStatus[i].MemberJoined = ptr.To(true)
-	}
+	its.Status.InstanceStatus = slices.DeleteFunc(its.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
+		// The pod has been deleted, but the subsequent update of ITS status failed. Remove it from InstanceStatus directly.
+		return !newNameSet.Has(inst.PodName) && !oldNameSet.Has(inst.PodName)
+	})
 
 	return kubebuilderx.Continue, nil
 }
 
-func (r *membershipReconciler) initReplica(its *workloads.InstanceSet) bool {
-	if its.Status.InitReplicas == nil || *its.Status.InitReplicas != ptr.Deref(its.Status.ReadyInitReplicas, 0) {
-		return true
+func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+	idx := slices.IndexFunc(its.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
+		return inst.PodName == pod.Name
+	})
+	if idx < 0 {
+		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+			PodName:      pod.Name,
+			Provisioned:  true,
+			DataLoaded:   shouldLoadData(its),
+			MemberJoined: shouldJoinMember(its),
+		})
+		idx = len(its.Status.InstanceStatus) - 1
 	}
-	return false
+
+	inst := its.Status.InstanceStatus[idx]
+	if !inst.Provisioned {
+		return nil
+	}
+	if inst.DataLoaded != nil && !*inst.DataLoaded {
+		return nil // loading
+	}
+	if inst.MemberJoined == nil || *inst.MemberJoined {
+		return nil // not defined or joined
+	}
+	if err := lifecycleJoinMember(tree, its, pods, pod); err != nil {
+		return err
+	}
+	its.Status.InstanceStatus[idx].MemberJoined = ptr.To(true)
+	return nil
 }
 
-func (r *membershipReconciler) joinMember(tree *kubebuilderx.ObjectTree,
-	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+func lifecycleJoinMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
 	lfa, err := newLifecycleAction(its, pods, pod)
 	if err != nil {
 		return err
@@ -148,8 +142,24 @@ func (r *membershipReconciler) joinMember(tree *kubebuilderx.ObjectTree,
 	return nil
 }
 
-func (r *membershipReconciler) leaveMember(tree *kubebuilderx.ObjectTree,
-	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+func lifecycleDeleteInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+	idx := slices.IndexFunc(its.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
+		return inst.PodName == pod.Name
+	})
+	if idx < 0 {
+		return nil
+	}
+	inst := its.Status.InstanceStatus[idx]
+	if ptr.Deref(inst.MemberJoined, false) {
+		if err := lifecycleLeaveMember(tree, its, pods, pod); err != nil {
+			return err
+		}
+	}
+	its.Status.InstanceStatus = slices.Delete(its.Status.InstanceStatus, idx, idx+1)
+	return nil
+}
+
+func lifecycleLeaveMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
 	switchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		if its.Spec.LifecycleActions.Switchover == nil {
 			return nil
@@ -186,4 +196,18 @@ func (r *membershipReconciler) leaveMember(tree *kubebuilderx.ObjectTree,
 		tree.Logger.Error(err, "failed to call switchover action before leave member, ignore and continue", "pod", pod.Name)
 	}
 	return memberLeave(lfa, pod)
+}
+
+func shouldLoadData(its *workloads.InstanceSet) *bool {
+	if its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.DataLoad != nil {
+		return ptr.To(its.IsInInitializing())
+	}
+	return nil
+}
+
+func shouldJoinMember(its *workloads.InstanceSet) *bool {
+	if its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberJoin != nil {
+		return ptr.To(its.IsInInitializing())
+	}
+	return nil
 }

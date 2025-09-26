@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -140,7 +141,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.Add(newPod); err != nil {
+		if err := tree.AddWithOption(newPod, r.createInstance(tree, its, oldInstanceList, newPod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
@@ -193,7 +194,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
-		if err := tree.Delete(pod); err != nil {
+		if err := tree.DeleteWithOption(pod, r.deleteInstance(tree, its, oldInstanceList, pod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 
@@ -217,4 +218,18 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+func (r *instanceAlignmentReconciler) createInstance(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithPostHook {
+	return func(obj client.Object) error {
+		return lifecycleCreateInstance(tree, its, pods, obj.(*corev1.Pod))
+	}
+}
+
+func (r *instanceAlignmentReconciler) deleteInstance(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithPrevHook {
+	return func(obj client.Object) error {
+		return lifecycleDeleteInstance(tree, its, pods, pod)
+	}
 }

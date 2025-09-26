@@ -110,27 +110,45 @@ func (r *componentWorkloadOps) dataReplicationTask() error {
 		return nil
 	}
 
-	// replicas to be created
-	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
-	if len(newReplicas) == 0 {
-		return nil
-	}
-
-	// replicas in provisioning that the data has not been loaded
-	var provisioningReplicas []string
+	var (
+		// new replicas to be submitted to InstanceSet
+		newReplicas = r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+		// replicas can be used as the source replica to dump data
+		sourceReplicas = sets.New[string]()
+		// replicas are in provisioning and the data has not been loaded
+		provisioningReplicas []string
+		// replicas are not provisioned
+		unprovisionedReplicas = r.runningItsPodNameSet.Clone()
+	)
 	for _, replica := range r.runningITS.Status.InstanceStatus {
+		if !r.runningItsPodNameSet.Has(replica.PodName) {
+			continue // to be deleted
+		}
+		if replica.Provisioned {
+			unprovisionedReplicas.Delete(replica.PodName)
+		}
 		if replica.DataLoaded != nil && !*replica.DataLoaded {
 			provisioningReplicas = append(provisioningReplicas, replica.PodName)
+			continue
+		}
+		if replica.MemberJoined == nil || *replica.MemberJoined {
+			sourceReplicas.Insert(replica.PodName)
 		}
 	}
 
+	if r.runningITS.IsInInitializing() || len(newReplicas) == 0 && unprovisionedReplicas.Len() == 0 && len(provisioningReplicas) == 0 {
+		return nil
+	}
+
 	// choose the source replica
-	source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump, provisioningReplicas)
+	source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump, sourceReplicas)
 	if err != nil {
 		return err
 	}
 
-	replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
+	replicas := slices.Clone(newReplicas)
+	replicas = append(replicas, unprovisionedReplicas.UnsortedList()...)
+	replicas = append(replicas, provisioningReplicas...)
 	parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
 	if err != nil {
 		return err
@@ -145,19 +163,15 @@ func (r *componentWorkloadOps) dataReplicationTask() error {
 	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
 }
 
-func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (lifecycle.Replica, error) {
+func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, sourceReplicas sets.Set[string]) (lifecycle.Replica, error) {
 	var replicas []lifecycle.Replica
-	for i := range r.runningITS.Status.InstanceStatus {
-		replicas = append(replicas, &lifecycleReplica{
-			synthesizedComp: r.synthesizeComp,
-			instance:        r.runningITS.Status.InstanceStatus[i],
-		})
-	}
-	if len(provisioningReplicas) > 0 {
-		// exclude provisioning replicas
-		replicas = slices.DeleteFunc(replicas, func(replica lifecycle.Replica) bool {
-			return slices.Contains(provisioningReplicas, replica.Name())
-		})
+	for i, inst := range r.runningITS.Status.InstanceStatus {
+		if sourceReplicas.Has(inst.PodName) {
+			replicas = append(replicas, &lifecycleReplica{
+				synthesizedComp: r.synthesizeComp,
+				instance:        r.runningITS.Status.InstanceStatus[i],
+			})
+		}
 	}
 	if len(replicas) > 0 {
 		if len(dataDump.TargetPodSelector) == 0 && (dataDump.Exec == nil || len(dataDump.Exec.TargetPodSelector) == 0) {

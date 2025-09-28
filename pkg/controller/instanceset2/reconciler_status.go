@@ -181,8 +181,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	// 4. set instance status
-	setInstanceStatus(its, instanceList)
+	// 4. build instance status
+	buildInstanceStatus(its, instanceList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -273,19 +273,19 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
-	// compose new instance status
+func buildInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, inst := range instances {
-		status := workloads.InstanceStatus{
+		instanceStatus = append(instanceStatus, workloads.InstanceStatus{
 			PodName: inst.Name,
-		}
-		instanceStatus = append(instanceStatus, status)
+		})
 	}
 
-	syncMemberStatus(its, instanceStatus, instances)
+	syncInstanceRoleStatus(its, instanceStatus, instances)
 
 	syncInstanceConfigStatus(its, instanceStatus)
+
+	syncInstanceLifecycleStatus(its, instanceStatus, instances)
 
 	syncInstancePVCStatus(its, instanceStatus, instances)
 
@@ -300,7 +300,7 @@ func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
 	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }
 
-func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+func syncInstanceRoleStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
 	if its.Spec.Roles != nil {
 		roleMap := composeRoleMap(*its)
 		for _, inst := range instances {
@@ -359,11 +359,27 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 	}
 }
 
+func syncInstanceLifecycleStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+	pm := make(map[string]*workloads.Instance)
+	for i, inst := range instances {
+		pm[inst.Name] = instances[i]
+	}
+	for i, status := range instanceStatus {
+		inst, ok := pm[status.PodName]
+		if !ok {
+			continue
+		}
+		instanceStatus[i].Provisioned = inst.Status.Provisioned
+		instanceStatus[i].DataLoaded = inst.Status.DataLoaded
+		instanceStatus[i].MemberJoined = inst.Status.MemberJoined
+	}
+}
+
 func syncInstancePVCStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
 	for _, inst := range instances {
 		for i, status := range instanceStatus {
 			if status.PodName == inst.Name {
-				instanceStatus[i].VolumeExpansion = inst.Status.VolumeExpansion
+				instanceStatus[i].InVolumeExpansion = inst.Status.InVolumeExpansion
 				break
 			}
 		}

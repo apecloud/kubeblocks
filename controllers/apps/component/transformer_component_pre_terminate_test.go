@@ -37,7 +37,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -65,10 +64,12 @@ var _ = Describe("pre-terminate transformer test", func() {
 	}
 
 	provisioned := func(its *workloads.InstanceSet) {
-		replicas := []string{
-			fmt.Sprintf("%s-0", its.Name),
+		its.Status.InstanceStatus = []workloads.InstanceStatus{
+			{
+				PodName:     fmt.Sprintf("%s-0", its.Name),
+				Provisioned: true,
+			},
 		}
-		Expect(component.StatusReplicasStatus(its, replicas, false, false)).Should(Succeed())
 	}
 
 	BeforeEach(func() {
@@ -199,12 +200,7 @@ var _ = Describe("pre-terminate transformer test", func() {
 
 		It("not provisioned", func() {
 			its := reader.Objects[1].(*workloads.InstanceSet)
-			Expect(component.UpdateReplicasStatusFunc(its, func(r *component.ReplicasStatus) error {
-				for i := range r.Status {
-					r.Status[i].Provisioned = false
-				}
-				return nil
-			})).Should(Succeed())
+			its.Status.InstanceStatus[0].Provisioned = false
 
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)

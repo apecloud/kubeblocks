@@ -48,7 +48,7 @@ func (h *KBAgentTaskEventHandler) Handle(cli client.Client, reqCtx intctrlutil.R
 
 func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {
 	return event.ReportingController == proto.ProbeEventReportingController &&
-		event.Reason == "task" && event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
+		(event.Reason == "task" || event.Reason == newReplicaTask) && event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
 func (h *KBAgentTaskEventHandler) handleEvent(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, event proto.TaskEvent) error {

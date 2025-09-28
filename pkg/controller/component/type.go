@@ -49,7 +49,6 @@ type SynthesizedComponent struct {
 	FileTemplates                    []SynthesizedFileTemplate
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
-	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	Labels                           map[string]string                      `json:"labels,omitempty"`
 	StaticLabels                     map[string]string                      // labels defined by the component definition

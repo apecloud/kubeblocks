@@ -39,6 +39,7 @@ var _ = Describe("vars transformer test", func() {
 	const (
 		clusterName = "test-cluster"
 		compName    = "comp"
+		taskEnvName = "KB_AGENT_TASK"
 	)
 
 	var (
@@ -183,6 +184,55 @@ var _ = Describe("vars transformer test", func() {
 			})
 			Expect(err).Should(BeNil())
 			checkEnvCM(model.ActionUpdatePtr(), map[string]string{"foo": "bar", "task": "nil"})
+		})
+
+		It("should allow explicit update of KB_AGENT_TASK", func() {
+			// mock the env CM object with KB_AGENT_TASK already set
+			reader.Objects = append(reader.Objects, &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+				},
+				Data: map[string]string{
+					"PEER_FQDNS": "pod-0,pod-1,pod-2",
+					taskEnvName:  `[{"task":"newReplica","replicas":"pod-3"}]`,
+				},
+			})
+
+			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
+				"PEER_FQDNS": "pod-0,pod-1,pod-2,pod-3",
+				taskEnvName:  `[]`, // Task completed, empty list
+			})
+			Expect(err).Should(BeNil())
+
+			checkEnvCM(model.ActionUpdatePtr(), map[string]string{
+				"PEER_FQDNS": "pod-0,pod-1,pod-2,pod-3",
+				taskEnvName:  `[]`,
+			})
+		})
+
+		It("should preserve KB_AGENT_TASK when CM not in DAG (envObjVertex==nil)", func() {
+			// This simulates the scenario where CM exists but not yet in DAG (envObjVertex == nil)
+			reader.Objects = append(reader.Objects, &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+				},
+				Data: map[string]string{
+					"PEER_FQDNS": "pod-0,pod-1,pod-2",
+					taskEnvName:  `[{"task":"newReplica","replicas":"pod-2"}]`,
+				},
+			})
+
+			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
+				"PEER_FQDNS": "pod-0,pod-1,pod-2,pod-3",
+			})
+			Expect(err).Should(BeNil())
+
+			checkEnvCM(model.ActionUpdatePtr(), map[string]string{
+				"PEER_FQDNS": "pod-0,pod-1,pod-2,pod-3",
+				taskEnvName:  `[{"task":"newReplica","replicas":"pod-2"}]`,
+			})
 		})
 	})
 })

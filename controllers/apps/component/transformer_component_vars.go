@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 // componentVarsTransformer resolves and builds vars for template and Env.
@@ -159,7 +160,18 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 	}
 
 	newData := func() map[string]string {
-		if envObj == nil || envObj.Data == nil {
+		if envObjVertex == nil {
+			if envObj == nil || envObj.Data == nil {
+				return data
+			}
+			// if cm is exists, should keep protected envs in original cm
+			for k, v := range envObj.Data {
+				if kbagent.IsProtectedEnvKey(k) {
+					if _, exists := data[k]; !exists {
+						data[k] = v
+					}
+				}
+			}
 			return data
 		}
 		merged := maps.Clone(envObj.Data)

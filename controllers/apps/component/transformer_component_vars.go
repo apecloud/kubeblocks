@@ -164,7 +164,7 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 			if envObj == nil || envObj.Data == nil {
 				return data
 			}
-			// if cm is exists, should keep protected envs in original cm
+			// preserve envs in original cm
 			for k, v := range envObj.Data {
 				if kbagent.IsProtectedEnvKey(k) {
 					if _, exists := data[k]; !exists {

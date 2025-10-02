@@ -52,6 +52,11 @@ const (
 	taskEnvName      = "KB_AGENT_TASK"
 )
 
+// IsProtectedEnvKey returns true if the key should not be overwritten by vars' envs
+func IsProtectedEnvKey(key string) bool {
+	return key == taskEnvName
+}
+
 func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streaming []string) ([]corev1.EnvVar, error) {
 	da, dp, err := serializeActionNProbe(actions, probes)
 	if err != nil {

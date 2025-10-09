@@ -283,10 +283,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		//  1. completedProgressCount is not equal to expectProgressCount.
 		//  2. the component phase is not a terminal phase or no completed progress if the ops
 		//  needs to wait for the component phase to reach a terminal state.
-		if expectCount != completedCount {
-			opsIsCompleted = false
-		} else if !pgResource.noWaitComponentCompleted &&
-			(!slices.Contains(componentTerminalPhases(), componentPhase) || completedCount == 0) {
+		if expectCount != completedCount ||
+			(!pgResource.noWaitComponentCompleted && !slices.Contains(componentTerminalPhases(), componentPhase)) {
 			opsIsCompleted = false
 		}
 		opsCompStatus.Phase = componentPhase

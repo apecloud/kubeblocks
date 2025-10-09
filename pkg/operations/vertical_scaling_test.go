@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -66,6 +67,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanEnv)
@@ -83,6 +85,20 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				corev1.ResourceCPU:    resource.MustParse("400m"),
 				corev1.ResourceMemory: resource.MustParse("300Mi"),
 			},
+		}
+
+		createPods := func(templateName string, ordinals ...int) []*corev1.Pod {
+			var pods []*corev1.Pod
+			prefix := ""
+			if templateName != "" {
+				prefix = "-" + templateName
+			}
+			for i := range ordinals {
+				podName := fmt.Sprintf("%s-%s%s-%d", clusterName, defaultCompName, prefix, ordinals[i])
+				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podName, "follower")
+				pods = append(pods, pod)
+			}
+			return pods
 		}
 
 		testVerticalScaling := func(verticalScaling []opsv1alpha1.VerticalScaling, instances []appsv1.InstanceTemplate) *OpsResource {
@@ -143,6 +159,58 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			}
 			opsRes := testVerticalScaling(verticalScaling, []appsv1.InstanceTemplate{{Name: templateName, Replicas: pointer.Int32(1)}})
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("0/3"))
+		})
+
+		It("vertical scaling the component which existing instance template with ordinal ranges", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			templateName := "foo-ranges"
+			verticalScaling := []opsv1alpha1.VerticalScaling{
+				{
+					ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ResourceRequirements: newResources,
+				},
+			}
+			opsRes := testVerticalScaling(verticalScaling, []appsv1.InstanceTemplate{{Name: templateName, Replicas: pointer.Int32(1), Ordinals: appsv1.Ordinals{Ranges: []appsv1.Range{{Start: 300, End: 600}}}}})
+			pods := make([]*corev1.Pod, 0)
+			pods = append(pods, createPods("", 0, 1)...)
+			pods = append(pods, createPods(templateName, 300)...)
+			By("mock ops running")
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
+			})).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("0/3"))
+			// wait 1 second for checking progress
+			time.Sleep(time.Second)
+			reCreatePod := func(pod *corev1.Pod) {
+				pod.Kind = constant.PodKind
+				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
+					pod.Name, "leader", newResources)
+			}
+
+			By("restarting 1 pod")
+			reCreatePod(pods[0])
+
+			By("reconcile opsRequest status")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/3"))
+
+			By("restarting remain 2 pods")
+			reCreatePod(pods[1])
+			reCreatePod(pods[2])
+
+			By("mock cluster running")
+			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+
+			By("reconcile opsRequest status")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
 		It("vertical scaling the replicas which instance template is empty", func() {

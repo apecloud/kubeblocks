@@ -161,6 +161,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 		horizontalScaling := pgRes.compOps.(opsv1alpha1.HorizontalScaling)
+		pgRes.noWaitComponentCompleted = true
 		if horizontalScaling.Shards != nil {
 			// horizontal scaling for shard count.
 			return handleComponentProgressForScalingShards(reqCtx, cli, opsRes, pgRes, compStatus)
@@ -177,7 +178,6 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		if err != nil {
 			return 0, 0, err
 		}
-		pgRes.noWaitComponentCompleted = true
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)

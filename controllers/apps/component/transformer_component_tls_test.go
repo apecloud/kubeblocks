@@ -68,7 +68,7 @@ var _ = Describe("TLS transformer test", func() {
 
 		tlsSecret4User = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testCtx.DefaultNamespace,
+				Namespace: "default", // testCtx hasn't been initialized yet
 				Name:      "tls-secret-4-user",
 			},
 			Data: map[string][]byte{

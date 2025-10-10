@@ -39,6 +39,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -137,9 +138,15 @@ func withConfigDescription(formatter *parametersv1alpha1.FileFormatConfig) Param
 	}
 }
 
-func withUpdatedParameters(patch map[string]string) ParamsOps {
+func withUpdatedParameters(patch *core.ConfigPatchInfo) ParamsOps {
 	return func(params *reconfigureContext) {
-		params.UpdatedParameters = patch
+		params.Patch = patch
+	}
+}
+
+func withParamDef(pd *parametersv1alpha1.ParametersDefinitionSpec) ParamsOps {
+	return func(params *reconfigureContext) {
+		params.ParametersDef = pd
 	}
 }
 

@@ -44,7 +44,7 @@ func (o *syncPolicy) GetPolicyName() string {
 }
 
 func (o *syncPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
-	updatedParameters := rctx.UpdatedParameters
+	updatedParameters := generateOnlineUpdateParams(rctx.Patch, rctx.ParametersDef, *rctx.ConfigDescription)
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}

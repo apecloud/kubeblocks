@@ -168,7 +168,8 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
 		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-			return requeueAfter, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+			return requeueAfter, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
+				opsv1alpha1.NewCancelFailedCondition(opsRequest, err), opsv1alpha1.NewValidateFailedCondition(opsv1alpha1.ReasonValidateFailed, err.Error()))
 		}
 		if err != nil {
 			return requeueAfter, err
@@ -177,7 +178,8 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&
 		!isOpsRequestFailedPhase(opsRequestPhase) {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-			return requeueAfter, patchFatalFailErrorCondition(reqCtx.Ctx, cli, opsRes, err)
+			return requeueAfter, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
+				opsv1alpha1.NewCancelFailedCondition(opsRequest, err), opsv1alpha1.NewFailedCondition(opsRequest, err))
 		}
 		// if the opsRequest phase is not failed, skipped
 		return requeueAfter, err

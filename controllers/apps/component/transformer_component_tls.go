@@ -285,6 +285,9 @@ func (i *tlsIssuerUserProvided) referenced(ctx context.Context, cli client.Reade
 		Namespace: secretRef.Namespace,
 		Name:      secretRef.Name,
 	}
+	if len(secretKey.Namespace) == 0 {
+		secretKey.Namespace = i.synthesizedComp.Namespace
+	}
 	secret := &corev1.Secret{}
 	if err := cli.Get(ctx, secretKey, secret); err != nil {
 		return nil, err

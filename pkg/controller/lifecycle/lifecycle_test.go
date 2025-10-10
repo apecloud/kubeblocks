@@ -61,7 +61,7 @@ func (r *lifecycleReplica) Endpoint() (string, int32, error) {
 }
 
 func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
-	return "", 0, fmt.Errorf("not support")
+	return "", 0, fmt.Errorf("NotSupported")
 }
 
 type mockReader struct {

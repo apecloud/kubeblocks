@@ -63,9 +63,10 @@ type Replica interface {
 	Name() string
 	Role() string
 
-	// Endpoint returns the host (e.g. IP) and port (e.g. HTTP port) to access the replica.
+	// Endpoint returns the host (e.g. IP) and port (e.g. HTTP port) to access the replica from the controller.
 	Endpoint() (string, int32, error)
 
+	// StreamingEndpoint returns the host (e.g. IP) and port (e.g. streaming port) to stream data from the replica.
 	StreamingEndpoint() (string, int32, error)
 }
 

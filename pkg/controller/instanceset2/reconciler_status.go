@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -133,6 +134,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		//	}
 		// }
 	}
+	its.Status.ReadyInitReplicas = r.buildReadyInitReplicas(its, readyReplicas)
 	its.Status.Replicas = replicas
 	its.Status.Ordinals = ordinals
 	slices.Sort(its.Status.Ordinals)
@@ -195,6 +197,17 @@ func buildConditionMessageWithNames(instanceNames []string) ([]byte, error) {
 		return parseParentNameAndOrdinal(instanceNames[i])
 	}, nil, true)
 	return json.Marshal(instanceNames)
+}
+
+func (r *statusReconciler) buildReadyInitReplicas(its *workloads.InstanceSet, readyReplicas int32) *int32 {
+	if its.Status.InitReplicas == nil {
+		return nil
+	}
+	// init replicas cannot be zero
+	if *its.Status.InitReplicas == ptr.Deref(its.Status.ReadyInitReplicas, 0) {
+		return its.Status.ReadyInitReplicas
+	}
+	return ptr.To(readyReplicas)
 }
 
 func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.InstanceTemplateStatus) []workloads.InstanceTemplateStatus {

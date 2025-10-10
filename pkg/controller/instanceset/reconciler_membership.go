@@ -122,9 +122,10 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 		return nil // not defined or joined
 	}
 	if err := lifecycleJoinMember(tree, its, pods, pod); err != nil {
-		return err
+		tree.Logger.Info("failed to join member", "pod", pod.Name, "error", err.Error())
+	} else {
+		its.Status.InstanceStatus[idx].MemberJoined = ptr.To(true)
 	}
-	its.Status.InstanceStatus[idx].MemberJoined = ptr.To(true)
 	return nil
 }
 

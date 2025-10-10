@@ -38,7 +38,9 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 // switchover constants
@@ -270,29 +272,26 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 // We consider a switchover action succeeds if the action returns without error. We don't need to know if a switchover is actually executed.
 func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) error {
-	// pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	// if err != nil {
-	//	return err
-	// }
-	//
-	// pod := &corev1.Pod{}
-	// for _, p := range pods {
-	//	if p.Name == switchover.InstanceName {
-	//		pod = p
-	//		break
-	//	}
-	// }
-	//
-	// lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-	//	synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
-	// if err != nil {
-	//	return err
-	// }
-	//
-	//// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
-	// return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
+	pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return err
+	}
 
-	return fmt.Errorf("TODO: not support")
+	pod := &corev1.Pod{}
+	for _, p := range pods {
+		if p.Name == switchover.InstanceName {
+			pod = p
+			break
+		}
+	}
+
+	lfa, err := newLifecycleAction(synthesizedComp, pods, pod)
+	if err != nil {
+		return err
+	}
+
+	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
+	return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
 }
 
 // setComponentSwitchoverProgressDetails sets component switchover progress details.
@@ -380,4 +379,43 @@ func handleProgressDetail(
 		}
 	}
 	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingComponentPhase, *progressDetail, compName)
+}
+
+func newLifecycleAction(synthesizedComp *component.SynthesizedComponent, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+	var (
+		replica = &lifecycleReplica{
+			Pod: *pod,
+		}
+		replicas []lifecycle.Replica
+	)
+	for i := range pods {
+		replicas = append(replicas, &lifecycleReplica{Pod: *pods[i]})
+	}
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, replica, replicas...)
+}
+
+type lifecycleReplica struct {
+	corev1.Pod
+}
+
+func (r *lifecycleReplica) Namespace() string {
+	return r.ObjectMeta.Namespace
+}
+
+func (r *lifecycleReplica) Name() string {
+	return r.ObjectMeta.Name
+}
+
+func (r *lifecycleReplica) Role() string {
+	return r.ObjectMeta.Labels[constant.RoleLabelKey]
+}
+
+func (r *lifecycleReplica) Endpoint() (string, int32, error) {
+	port, err := intctrlutil.GetPortByName(r.Pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+	return r.Status.PodIP, port, err
+}
+
+func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
+	return "", 0, fmt.Errorf("NotSupported")
 }

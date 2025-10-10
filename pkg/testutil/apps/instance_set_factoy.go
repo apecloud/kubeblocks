@@ -140,3 +140,25 @@ func (factory *MockInstanceSetFactory) SetEnableInstanceAPI(enable *bool) *MockI
 	factory.Get().Spec.EnableInstanceAPI = enable
 	return factory
 }
+
+func (factory *MockInstanceSetFactory) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions, templateVars map[string]string) *MockInstanceSetFactory {
+	if lifecycleActions != nil || templateVars != nil {
+		if factory.Get().Spec.LifecycleActions == nil {
+			factory.Get().Spec.LifecycleActions = &workloads.LifecycleActions{}
+		}
+	}
+	if lifecycleActions != nil {
+		factory.Get().Spec.LifecycleActions.Switchover = lifecycleActions.Switchover
+		factory.Get().Spec.LifecycleActions.MemberJoin = lifecycleActions.MemberJoin
+		factory.Get().Spec.LifecycleActions.MemberLeave = lifecycleActions.MemberLeave
+		factory.Get().Spec.LifecycleActions.DataLoad = lifecycleActions.DataLoad
+		factory.Get().Spec.LifecycleActions.Reconfigure = lifecycleActions.Reconfigure
+	}
+	if templateVars != nil {
+		factory.Get().Spec.LifecycleActions.TemplateVars = make(map[string]string)
+		for k, v := range templateVars {
+			factory.Get().Spec.LifecycleActions.TemplateVars[k] = v
+		}
+	}
+	return factory
+}

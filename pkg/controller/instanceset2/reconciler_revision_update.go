@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -45,8 +46,8 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
-	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
-	its.Status.UpdatedReplicas = updatedReplicas
+	its.Status.UpdatedReplicas = r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
+	its.Status.InitReplicas = r.buildInitReplicas(its)
 
 	its.Status.ObservedGeneration = its.Generation
 
@@ -62,4 +63,24 @@ func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.Insta
 		}
 	}
 	return updatedReplicas
+}
+
+func (r *revisionUpdateReconciler) buildInitReplicas(its *workloads.InstanceSet) *int32 {
+	initReplicas := its.Status.InitReplicas
+	if initReplicas == nil && ptr.Deref(its.Spec.Replicas, 0) > 0 {
+		initReplicas = its.Spec.Replicas
+	}
+	if initReplicas == nil {
+		return nil // the replicas is not set or set to 0
+	}
+
+	if *initReplicas != ptr.Deref(its.Status.ReadyInitReplicas, 0) { // in init phase
+		// in case the replicas is changed in the middle of init phase
+		if ptr.Deref(its.Spec.Replicas, 0) == 0 {
+			return nil
+		} else {
+			return its.Spec.Replicas
+		}
+	}
+	return initReplicas
 }

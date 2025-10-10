@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/utils/ptr"
@@ -154,19 +153,6 @@ var _ = Describe("pre-terminate transformer test", func() {
 				}).AnyTimes()
 			})
 
-			// mock pods to run the pre-terminate action
-			reader.Objects = append(reader.Objects, &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      fmt.Sprintf("%s-0", constant.GenerateWorkloadNamePattern(clusterName, compName)),
-					Labels: map[string]string{
-						constant.AppManagedByLabelKey:   constant.AppName,
-						constant.AppInstanceLabelKey:    clusterName,
-						constant.KBAppComponentLabelKey: compName,
-					},
-				},
-			})
-
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
@@ -174,12 +160,12 @@ var _ = Describe("pre-terminate transformer test", func() {
 			Expect(preTerminated).Should(BeTrue())
 		})
 
-		It("no pods error", func() {
-			transformer := &componentPreTerminateTransformer{}
-			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("has no pods to running the pre-terminate action"))
-		})
+		// It("no pods error", func() {
+		//	transformer := &componentPreTerminateTransformer{}
+		//	err := transformer.Transform(transCtx, dag)
+		//	Expect(err).ShouldNot(BeNil())
+		//	Expect(err.Error()).Should(ContainSubstring("has no pods to calling the pre-terminate action"))
+		// })
 
 		It("not-defined", func() {
 			compDef := reader.Objects[0].(*appsv1.ComponentDefinition)

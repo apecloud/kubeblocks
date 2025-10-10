@@ -104,7 +104,7 @@ func isCompDeleting(comp *appsv1.Component) bool {
 
 func newLifecycleAction(action string, synthesizedComp *component.SynthesizedComponent, obj client.Object) (lifecycle.Lifecycle, error) {
 	if obj == nil {
-		return nil, fmt.Errorf("the workload obj is nil")
+		return nil, fmt.Errorf("the workload obj is nil to calling the %s action", action)
 	}
 	its := obj.(*workloads.InstanceSet)
 	if len(its.Status.InstanceStatus) == 0 {

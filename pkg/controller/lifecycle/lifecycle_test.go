@@ -161,7 +161,7 @@ var _ = Describe("lifecycle", func() {
 				FailureThreshold:    3,
 			},
 		}
-		pods = []Replica{}
+		pods = []Replica{&lifecycleReplica{}}
 	})
 
 	AfterEach(func() {

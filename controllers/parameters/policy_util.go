@@ -338,10 +338,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 		ClusterComponent:         rctx.ClusterComObj,
 		SynthesizedComponent:     rctx.BuiltinComponent,
 		ReconfigureClientFactory: GetClientFactory(),
-	}
-
-	if reloadPolicy == parametersv1alpha1.SyncDynamicReloadPolicy {
-		reCtx.UpdatedParameters = generateOnlineUpdateParams(patch, &pd.Spec, *configDescription)
+		Patch:                    patch,
 	}
 
 	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}

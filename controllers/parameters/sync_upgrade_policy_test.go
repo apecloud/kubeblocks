@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -65,8 +66,10 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(map[string]string{
-					"a": "c b e f",
+				withUpdatedParameters(&core.ConfigPatchInfo{
+					UpdateConfig: map[string][]byte{
+						"for_test": []byte(`{"a":"c b e f"}`),
+					},
 				}),
 				withClusterComponent(3))
 
@@ -116,8 +119,10 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(map[string]string{
-					"a": "c b e f",
+				withUpdatedParameters(&core.ConfigPatchInfo{
+					UpdateConfig: map[string][]byte{
+						"for_test": []byte(`{"a":"c b e f"}`),
+					},
 				}),
 				withClusterComponent(3))
 

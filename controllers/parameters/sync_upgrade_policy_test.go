@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -28,8 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	mockproto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -67,9 +68,14 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
 				withUpdatedParameters(&core.ConfigPatchInfo{
+					IsModify: true,
 					UpdateConfig: map[string][]byte{
-						"for_test": []byte(`{"a":"c b e f"}`),
+						"for-test": []byte(`{"a":"c b e f"}`),
 					},
+				}),
+				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
+					MergeReloadAndRestart:           pointer.Bool(false),
+					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
 				}),
 				withClusterComponent(3))
 
@@ -120,22 +126,23 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
 				withUpdatedParameters(&core.ConfigPatchInfo{
+					IsModify: true,
 					UpdateConfig: map[string][]byte{
-						"for_test": []byte(`{"a":"c b e f"}`),
+						"for-test": []byte(`{"a":"c b e f"}`),
+					},
+				}),
+				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
+					MergeReloadAndRestart:           pointer.Bool(false),
+					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
+					ReloadAction: &parametersv1alpha1.ReloadAction{
+						TargetPodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"primary": "true",
+							},
+						},
 					},
 				}),
 				withClusterComponent(3))
-
-			// add selector
-			mockParam.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					TargetPodSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"primary": "true",
-						},
-					},
-				},
-			}
 
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(

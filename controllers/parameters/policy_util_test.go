@@ -144,6 +144,12 @@ func withUpdatedParameters(patch *core.ConfigPatchInfo) ParamsOps {
 	}
 }
 
+func withParamDef(pd *parametersv1alpha1.ParametersDefinitionSpec) ParamsOps {
+	return func(params *reconfigureContext) {
+		params.ParametersDef = pd
+	}
+}
+
 func newMockReconfigureParams(testName string, cli client.Client, paramOps ...ParamsOps) reconfigureContext {
 	params := reconfigureContext{
 		Client: cli,

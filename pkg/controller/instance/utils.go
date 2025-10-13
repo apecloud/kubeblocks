@@ -353,7 +353,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+func newLifecycleAction(inst *workloads.Instance, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = inst.Labels[constant.AppInstanceLabelKey]
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]
@@ -361,21 +361,14 @@ func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *
 			Switchover:  inst.Spec.LifecycleActions.Switchover,
 			MemberJoin:  inst.Spec.LifecycleActions.MemberJoin,
 			MemberLeave: inst.Spec.LifecycleActions.MemberLeave,
-			DataLoad:    inst.Spec.LifecycleActions.DataLoad,
 			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
 		replica = &lifecycleReplica{
 			Pod: *pod,
 		}
-		replicas []lifecycle.Replica
 	)
-	for i := range objects {
-		replicas = append(replicas, &lifecycleReplica{
-			Pod: *(objects[i].(*corev1.Pod)),
-		})
-	}
 	return lifecycle.New(inst.Namespace, clusterName, compName,
-		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, replica, replicas...)
+		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, replica)
 }
 
 type lifecycleReplica struct {

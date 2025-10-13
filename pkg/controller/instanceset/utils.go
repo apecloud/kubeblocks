@@ -213,7 +213,6 @@ func newLifecycleAction(its *workloads.InstanceSet, objects []client.Object, pod
 			Switchover:  its.Spec.LifecycleActions.Switchover,
 			MemberJoin:  its.Spec.LifecycleActions.MemberJoin,
 			MemberLeave: its.Spec.LifecycleActions.MemberLeave,
-			DataLoad:    its.Spec.LifecycleActions.DataLoad,
 			Reconfigure: its.Spec.LifecycleActions.Reconfigure,
 		}
 		replica = &lifecycleReplica{

@@ -498,18 +498,157 @@ var _ = Describe("Instance Controller", func() {
 		// It("reconfigure", func() {
 		//	// TODO
 		// })
-		//
-		// It("member join", func() {
-		//	// TODO
-		// })
-		//
-		// It("member leave", func() {
-		//	// TODO
-		// })
-		//
-		// It("data load (source ref)", func() {
-		//	// TODO
-		// })
+	})
+
+	Context("membership", func() {
+		var (
+			memberJoin                        = false
+			memberLeave                       = false
+			memberJoinError, memberLeaveError error
+		)
+
+		BeforeEach(func() {
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					rsp := kbagentproto.ActionResponse{}
+					switch req.Action {
+					case "memberJoin":
+						if memberJoinError != nil {
+							return rsp, memberJoinError
+						}
+						memberJoin = true
+					case "memberLeave":
+						if memberLeaveError != nil {
+							return rsp, memberLeaveError
+						}
+						memberLeave = true
+					}
+					return rsp, nil
+				}).AnyTimes()
+			})
+		})
+
+		AfterEach(func() {
+			kbacli.UnsetMockClient()
+			memberJoin = false
+			memberLeave = false
+			memberJoinError = nil
+			memberLeaveError = nil
+		})
+
+		setup := func(withMemberAction bool) {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				if withMemberAction {
+					f.SetLifecycleActions(&workloads.LifecycleActions{
+						MemberJoin:  testapps.NewLifecycleAction("member-join"),
+						MemberLeave: testapps.NewLifecycleAction("member-leave"),
+					})
+				}
+			})
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+			podKey := instKey
+			podObj := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, podKey, podObj)).Should(Succeed())
+		}
+
+		It("create - w/o member join", func() {
+			setup(false)
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Provisioned).Should(BeTrue())
+				g.Expect(inst.Status.MemberJoined).Should(BeNil())
+			})).Should(Succeed())
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoin).Should(BeFalse())
+		})
+
+		It("create - w/ member join", func() {
+			setup(true)
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Provisioned).Should(BeTrue())
+				g.Expect(inst.Status.MemberJoined).ShouldNot(BeNil())
+				g.Expect(*inst.Status.MemberJoined).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("check member join action be triggered")
+			Eventually(memberJoin).Should(BeTrue())
+		})
+
+		It("delete w/o member leave", func() {
+			setup(false)
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Provisioned).Should(BeTrue())
+				g.Expect(inst.Status.MemberJoined).Should(BeNil())
+			})).Should(Succeed())
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoin).Should(BeFalse())
+
+			By("delete instance")
+			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
+
+			By("wait for instance to be deleted")
+			Eventually(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, false)).Should(Succeed())
+
+			By("check member leave action NOT be triggered")
+			Consistently(memberLeave).Should(BeFalse())
+		})
+
+		It("delete w/ member leave - joined replicas", func() {
+			setup(true)
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Provisioned).Should(BeTrue())
+				g.Expect(inst.Status.MemberJoined).ShouldNot(BeNil())
+				g.Expect(*inst.Status.MemberJoined).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("check member join action be triggered")
+			Eventually(memberJoin).Should(BeTrue())
+
+			By("delete instance")
+			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
+
+			By("wait for instance to be deleted")
+			Eventually(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, false)).Should(Succeed())
+
+			By("check member leave action be triggered")
+			Eventually(memberLeave).Should(BeTrue())
+		})
+
+		It("delete w/ member leave - unjoined replicas", func() {
+			By("mock member-join action error")
+			memberJoinError = fmt.Errorf("mock member-join action error")
+
+			setup(true)
+
+			By("check instance status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Provisioned).Should(BeTrue())
+				g.Expect(inst.Status.MemberJoined).ShouldNot(BeNil())
+				g.Expect(*inst.Status.MemberJoined).Should(BeFalse())
+			})).Should(Succeed())
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoin).Should(BeFalse())
+
+			By("delete instance")
+			Expect(k8sClient.Delete(ctx, instObj)).Should(Succeed())
+
+			By("wait for instance to be deleted")
+			Eventually(testapps.CheckObjExists(&testCtx, instKey, &workloads.Instance{}, false)).Should(Succeed())
+
+			By("check member leave action NOT be triggered")
+			Consistently(memberLeave).Should(BeFalse())
+		})
 	})
 })
 

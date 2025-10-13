@@ -781,6 +781,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			kbacli.UnsetMockClient()
 			memberJoinReplicas.Clear()
 			memberLeaveReplicas.Clear()
+			memberJoinError = nil
+			memberLeaveError = nil
 		})
 
 		setup := func(initReplicas int32, withMemberAction bool) {

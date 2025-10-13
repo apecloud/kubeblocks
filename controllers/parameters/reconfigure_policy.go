@@ -104,7 +104,7 @@ type reconfigureContext struct {
 
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
 	ParametersDef     *parametersv1alpha1.ParametersDefinitionSpec
-	UpdatedParameters map[string]string
+	Patch             *core.ConfigPatchInfo
 }
 
 var (

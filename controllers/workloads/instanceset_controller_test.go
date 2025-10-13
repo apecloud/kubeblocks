@@ -1068,9 +1068,9 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			mockPodReady(scaledReplicas...)
 
-			By("check ITS as ready")
+			By("check ITS as NOT ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+				g.Expect(its.IsInstanceSetReady()).Should(BeFalse())
 			})).Should(Succeed())
 
 			By("check member join action NOT be triggered")
@@ -1098,6 +1098,11 @@ var _ = Describe("InstanceSet Controller", func() {
 				}
 				Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
 			}
+
+			By("check ITS as ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
 
 			By("check member leave action NOT be triggered")
 			Consistently(memberLeaveReplicas).Should(BeEmpty())

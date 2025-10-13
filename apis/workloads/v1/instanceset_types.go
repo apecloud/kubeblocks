@@ -700,12 +700,20 @@ func (r *InstanceSet) IsInstancesReady() bool {
 		return false
 	}
 
+	// check whether all instances are joined the cluster
+	for _, inst := range r.Status.InstanceStatus {
+		if !ptr.Deref(inst.MemberJoined, true) {
+			return false
+		}
+	}
+
 	return true
 }
 
 // IsInstanceSetReady gives InstanceSet level 'ready' state:
-// 1. all instances are available
-// 2. and all instances have role set (if they are role-ful)
+// 1. all instances are ready and available
+// 2. all instances are joined the cluster
+// 3. all instances have role set (if they are role-ful)
 func (r *InstanceSet) IsInstanceSetReady() bool {
 	instancesReady := r.IsInstancesReady()
 	if !instancesReady {

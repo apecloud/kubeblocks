@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
@@ -27,7 +29,9 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
@@ -209,6 +213,9 @@ func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.
 		synthesizedComp = transCtx.SynthesizeComponent
 	)
 
+	if err := handleCustomFileTemplate(transCtx, &tpl); err != nil {
+		return nil, err
+	}
 	data, err := buildFileTemplateData(transCtx, tpl)
 	if err != nil {
 		return nil, err
@@ -222,7 +229,7 @@ func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetData(data).
 		GetObject()
-	if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
+	if err = setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
 		return nil, err
 	}
 	return obj, nil
@@ -292,4 +299,52 @@ func fileTemplateNameFromObject(synthesizedComp *component.SynthesizedComponent,
 
 func isExternalManaged(tpl component.SynthesizedFileTemplate) bool {
 	return ptr.Deref(tpl.ExternalManaged, false)
+}
+
+type FileTemplateExtension struct {
+	TemplateRef string `json:"templateRef"`
+	Namespace   string `json:"namespace,omitempty"`
+}
+
+func handleCustomFileTemplate(transCtx *componentTransformContext, tpl *component.SynthesizedFileTemplate) error {
+	annotations := transCtx.Component.Spec.Annotations
+	if len(annotations) == 0 {
+		return nil
+	}
+	customParamsTpl := annotations[constant.CustomParameterTemplateAnnotationKey]
+	if customParamsTpl == "" {
+		return nil
+	}
+
+	var customTemplates map[string]FileTemplateExtension
+	if err := json.Unmarshal([]byte(customParamsTpl), &customTemplates); err != nil {
+		return errors.Wrap(err, "failed to unmarshal custom parameter template")
+	}
+	if err := validateCustomTemplate(transCtx.Context, transCtx.Client, customTemplates); err != nil {
+		return errors.Wrap(err, "failed to validate custom parameter template")
+	}
+
+	for tplName, custom := range customTemplates {
+		if tplName == tpl.Name {
+			tpl.Template = custom.TemplateRef
+			tpl.Namespace = custom.Namespace
+		}
+	}
+
+	return nil
+}
+
+func validateCustomTemplate(ctx context.Context, cli client.Reader, templates map[string]FileTemplateExtension) error {
+	for configSpec, custom := range templates {
+		cm := &corev1.ConfigMap{}
+		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s/%s] for custom template: %s",
+					custom.Namespace, custom.TemplateRef, configSpec)
+			}
+			return err
+		}
+	}
+	return nil
 }

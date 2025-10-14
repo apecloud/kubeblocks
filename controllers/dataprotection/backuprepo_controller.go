@@ -834,7 +834,9 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 					}},
 					ServiceAccountName: saName,
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: boolptr.True(),
+						// Set FSGroup to 65532 to ensure the mounted PVC has correct group ownership
+						// for the container user (65532:65532 defined in Dockerfile) to write files
+						FSGroup: pointer.Int64(65532),
 					},
 				},
 			},
@@ -908,7 +910,9 @@ datasafed rm %s`, precheckFilePath, precheckFilePath, precheckFilePath),
 					}},
 					ServiceAccountName: saName,
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: boolptr.True(),
+						// Set FSGroup to 65532 to ensure the mounted volumes have correct group ownership
+						// for the container user (65532:65532 defined in Dockerfile) to access files
+						FSGroup: pointer.Int64(65532),
 					},
 				},
 			},

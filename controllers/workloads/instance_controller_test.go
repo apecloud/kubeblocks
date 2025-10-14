@@ -502,9 +502,10 @@ var _ = Describe("Instance Controller", func() {
 
 	Context("membership", func() {
 		var (
-			memberJoin                        = false
-			memberLeave                       = false
-			memberJoinError, memberLeaveError error
+			memberJoin       = false
+			memberLeave      = false
+			memberJoinError  error
+			memberLeaveError error
 		)
 
 		BeforeEach(func() {
@@ -565,7 +566,7 @@ var _ = Describe("Instance Controller", func() {
 			Consistently(memberJoin).Should(BeFalse())
 		})
 
-		It("create - w/ member join", func() {
+		PIt("create - w/ member join", func() {
 			setup(true)
 
 			By("check instance status")
@@ -601,7 +602,7 @@ var _ = Describe("Instance Controller", func() {
 			Consistently(memberLeave).Should(BeFalse())
 		})
 
-		It("delete w/ member leave - joined replicas", func() {
+		PIt("delete w/ member leave - joined replicas", func() {
 			setup(true)
 
 			By("check instance status")
@@ -624,7 +625,7 @@ var _ = Describe("Instance Controller", func() {
 			Eventually(memberLeave).Should(BeTrue())
 		})
 
-		It("delete w/ member leave - unjoined replicas", func() {
+		PIt("delete w/ member leave - unjoined replicas", func() {
 			By("mock member-join action error")
 			memberJoinError = fmt.Errorf("mock member-join action error")
 

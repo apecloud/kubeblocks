@@ -149,6 +149,7 @@ func (r *componentWorkloadOps) dataReplicationTask() error {
 	replicas := slices.Clone(newReplicas)
 	replicas = append(replicas, unprovisionedReplicas.UnsortedList()...)
 	replicas = append(replicas, provisioningReplicas...)
+	slices.Sort(replicas)
 	parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
 	if err != nil {
 		return err

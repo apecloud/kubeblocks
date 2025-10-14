@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -347,6 +348,7 @@ var _ = Describe("Component Controller", func() {
 		for i := initReplicas; i < targetReplicas; i++ {
 			replicas = append(replicas, fmt.Sprintf("%s-%d", compKey.Name, i))
 		}
+		slices.Sort(replicas)
 		parameters, err := component.NewReplicaTask(compKey.Name, uid, source, replicas)
 		Expect(err).NotTo(HaveOccurred())
 

@@ -175,7 +175,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
 		}
-		if updatedPods >= replicas {
+		if updatingPods >= replicas {
 			break
 		}
 

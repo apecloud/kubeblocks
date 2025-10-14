@@ -213,7 +213,7 @@ var _ = Describe("update reconciler test", func() {
 			res, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
+			expectUpdatedPods(partitionTree, []string{"bar-foo-0", "bar-3"})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := tree.DeepCopy()

@@ -61,7 +61,8 @@ type valueManager struct {
 
 func needValueTransformer(formatter appsv1beta1.CfgFileFormat) bool {
 	return formatter == appsv1beta1.JSON ||
-		formatter == appsv1beta1.YAML
+		formatter == appsv1beta1.YAML ||
+		formatter == appsv1beta1.TOML
 }
 
 func (v *valueManager) BuildValueTransformer() core.ValueTransformerFunc {

@@ -124,3 +124,40 @@ func TestJSONFormat(t *testing.T) {
 	assert.EqualValues(t, jsonConfigObj.Get("name"), "test")
 
 }
+
+func TestTomlFormat(t *testing.T) {
+	const tomlContext = `
+[tick]
+## the tick interval when starting PD inside (default: "100ms")
+sim-tick-interval = "100ms"
+
+[store]
+## the capacity size of a new store in GB (default: 1024)
+store-capacity = 1024
+## the available size of a new store in GB (default: 1024)
+store-available = 1024
+## the io rate of a new store in MB/s (default: 40)
+store-io-per-second = 40
+## the version of a new store (default: "2.1.0")
+store-version = "2.1.0"
+`
+
+	tomlConfigObj, err := LoadConfig("toml_test", tomlContext, appsv1beta1.TOML)
+	assert.Nil(t, err)
+
+	assert.EqualValues(t, tomlConfigObj.Get("tick.sim-tick-interval"), "100ms")
+	assert.EqualValues(t, tomlConfigObj.Get("store.store-capacity"), 1024)
+	assert.Nil(t, tomlConfigObj.Update("store.test-int-field", 200))
+	assert.Nil(t, tomlConfigObj.Update("store.test-field", "test"))
+
+	dumpContext, err := tomlConfigObj.Marshal()
+	assert.Nil(t, err)
+	tomlConfigObj, err = LoadConfig("toml_test", dumpContext, appsv1beta1.TOML)
+	assert.Nil(t, err)
+	assert.EqualValues(t, tomlConfigObj.Get("store.test-field"), "test")
+	assert.EqualValues(t, tomlConfigObj.Get("store.test-int-field"), 200)
+
+	assert.EqualValues(t, tomlConfigObj.Get("store.store-io-per-second"), 40)
+	assert.Nil(t, tomlConfigObj.Update("store.store-io-per-second", 1000))
+	assert.EqualValues(t, tomlConfigObj.Get("store.store-io-per-second"), 1000)
+}

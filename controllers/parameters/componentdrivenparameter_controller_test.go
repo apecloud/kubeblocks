@@ -65,7 +65,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
-			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName).
+			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName, true).
 			Create(&testCtx).
 			GetObject()
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
@@ -153,7 +153,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			compDefObj := testapps.NewComponentDefinitionFactory(key.Name).
 				WithRandomName().
 				SetDefaultSpec().
-				AddConfigTemplate(configSpecName, configSpecName, testCtx.DefaultNamespace, configVolumeName).
+				AddConfigTemplate(configSpecName, configSpecName, testCtx.DefaultNamespace, configVolumeName, true).
 				Create(&testCtx).
 				GetObject()
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {

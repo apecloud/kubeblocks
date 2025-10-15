@@ -62,6 +62,10 @@ func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, pcr parameter
 	})
 
 	for _, config := range cmpd.Configs {
+		if config.ExternalManaged == nil || !*config.ExternalManaged {
+			continue
+		}
+
 		if slices.Contains(tpls, config.Name) {
 			templates = append(templates, config)
 		}

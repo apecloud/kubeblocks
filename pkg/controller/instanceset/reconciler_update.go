@@ -104,34 +104,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// handle 'RollingUpdate'
-	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(oldPodList))
+	rollingUpdateQuota, unavailableQuota, err := r.rollingUpdateQuota(its, oldPodList)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	currentUnavailable := 0
-	for _, pod := range oldPodList {
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-			currentUnavailable++
-		}
-	}
-	unavailable := maxUnavailable - currentUnavailable
 
-	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
-	updateCount := len(oldPodList)
-	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, oldPodList, r.isInstanceUpdated)
-		podsToBeUpdated, err := plan.Execute()
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		updateCount = len(podsToBeUpdated)
+	// handle 'MemberUpdate'
+	memberUpdateQuota, err := r.memberUpdateQuota(its, oldPodList)
+	if err != nil {
+		return kubebuilderx.Continue, err
 	}
 
-	updatingPods := 0
-	updatedPods := 0
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
-	isBlocked := false
-	needRetry := false
 	sortObjects(oldPodList, priorities, false)
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
@@ -148,38 +132,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	canBeUpdated := func(pod *corev1.Pod) bool {
-		if !isImageMatched(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
-			return false
-		}
-		if !intctrlutil.IsPodReady(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
-			return false
-		}
-		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
-			// no pod event will trigger the next reconciliation, so retry it
-			needRetry = true
-			return false
-		}
-		if !isRoleReady(pod, its.Spec.Roles) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
-			return false
-		}
-
-		return true
-	}
-
+	updatingPods := 0
+	isBlocked := false
+	needRetry := false
 	for _, pod := range oldPodList {
-		if updatingPods >= updateCount || updatingPods >= unavailable {
+		if updatingPods >= rollingUpdateQuota || updatingPods >= unavailableQuota {
 			break
 		}
-		if updatingPods >= replicas {
+		if updatingPods >= memberUpdateQuota {
 			break
 		}
-
-		if !canBeUpdated(pod) {
+		if canBeUpdated, retry := r.isPodCanBeUpdated(tree, its, pod); !canBeUpdated {
+			needRetry = retry
 			break
 		}
 
@@ -250,9 +214,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		// TODO: compose the status from pods but not the its spec and status
 		r.updateInstanceConfigStatus(its, pod)
-
-		updatedPods++
 	}
+
 	if !isBlocked {
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
 	}
@@ -260,6 +223,57 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second * time.Duration(its.Spec.MinReadySeconds)), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, int, error) {
+	// handle 'RollingUpdate'
+	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(podList))
+	if err != nil {
+		return -1, -1, err
+	}
+	currentUnavailable := 0
+	for _, pod := range podList {
+		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+			currentUnavailable++
+		}
+	}
+	unavailable := maxUnavailable - currentUnavailable
+	return replicas, unavailable, nil
+}
+
+func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, error) {
+	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
+	updateCount := len(podList)
+	if len(its.Spec.Roles) > 0 {
+		plan := NewUpdatePlan(*its, podList, r.isInstanceUpdated)
+		podsToBeUpdated, err := plan.Execute()
+		if err != nil {
+			return -1, err
+		}
+		updateCount = len(podsToBeUpdated)
+	}
+	return updateCount, nil
+}
+
+func (r *updateReconciler) isPodCanBeUpdated(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, bool) {
+	if !isImageMatched(pod) {
+		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
+		return false, false
+	}
+	if !intctrlutil.IsPodReady(pod) {
+		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
+		return false, false
+	}
+	if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+		// no pod event will trigger the next reconciliation, so retry it
+		return false, true
+	}
+	if !isRoleReady(pod, its.Spec.Roles) {
+		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
+		return false, false
+	}
+	return true, false
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {

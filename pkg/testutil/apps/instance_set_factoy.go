@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -122,5 +123,10 @@ func (factory *MockInstanceSetFactory) AddConfigs(config ...workloads.ConfigTemp
 
 func (factory *MockInstanceSetFactory) SetInstanceUpdateStrategy(instanceUpdateStrategy *workloads.InstanceUpdateStrategy) *MockInstanceSetFactory {
 	factory.Get().Spec.InstanceUpdateStrategy = instanceUpdateStrategy
+	return factory
+}
+
+func (factory *MockInstanceSetFactory) SetPodManagementPolicy(podManagementPolicy appsv1.PodManagementPolicyType) *MockInstanceSetFactory {
+	factory.Get().Spec.PodManagementPolicy = podManagementPolicy
 	return factory
 }

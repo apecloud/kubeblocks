@@ -1050,6 +1050,10 @@ type VarSource struct {
 	// +optional
 	CredentialVarRef *CredentialVarSelector `json:"credentialVarRef,omitempty"`
 
+	// Selects a defined var of the TLS.
+	// +optional
+	TLSVarRef *TLSVarSelector `json:"tlsVarRef,omitempty"`
+
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
@@ -1127,6 +1131,12 @@ type CredentialVars struct {
 	Password *VarOption `json:"password,omitempty"`
 }
 
+// TLSVars defines the vars that can be referenced from the TLS.
+type TLSVars struct {
+	// +optional
+	Enabled *VarOption `json:"enabled,omitempty"`
+}
+
 // ServiceRefVars defines the vars that can be referenced from a ServiceRef.
 type ServiceRefVars struct {
 	// +optional
@@ -1164,6 +1174,14 @@ type CredentialVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	CredentialVars `json:",inline"`
+}
+
+// TLSVarSelector selects a var from the TLS.
+type TLSVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	TLSVars `json:",inline"`
 }
 
 // ServiceRefVarSelector selects a var from a ServiceRefDeclaration.

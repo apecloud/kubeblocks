@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -174,12 +175,12 @@ var _ = Describe("utils test", func() {
 				SetReplicas(replicas).
 				GetObject()
 			its.Status = workloads.InstanceSetStatus{
-				InitReplicas: replicas,
+				InitReplicas: ptr.To(replicas),
 			}
 			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set its.status.observedGeneration to not equal generation")
-			its.Status.ReadyInitReplicas = replicas
+			its.Status.ReadyInitReplicas = ptr.To(replicas)
 			its.Generation = 1
 			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 

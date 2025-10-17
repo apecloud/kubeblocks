@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -59,16 +58,28 @@ type Lifecycle interface {
 	UserDefined(ctx context.Context, cli client.Reader, opts *Options, name string, action *appsv1.Action, args map[string]string) error
 }
 
+type Replica interface {
+	Namespace() string
+	Name() string
+	Role() string
+
+	// Endpoint returns the host (e.g. IP) and port (e.g. HTTP port) to access the replica from the controller.
+	Endpoint() (string, int32, error)
+
+	// StreamingEndpoint returns the host (e.g. IP) and port (e.g. streaming port) to stream data from the replica.
+	StreamingEndpoint() (string, int32, error)
+}
+
 func New(namespace, clusterName, compName string, lifecycleActions *appsv1.ComponentLifecycleActions,
-	templateVars map[string]string, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
-	if pod == nil && len(pods) == 0 {
+	templateVars map[string]string, replica Replica, replicas ...Replica) (Lifecycle, error) {
+	if replica == nil && len(replicas) == 0 {
 		return nil, fmt.Errorf("either pod or pods must be provided to call lifecycle actions")
 	}
-	if pod == nil {
-		pod = pods[0]
+	if replica == nil {
+		replica = replicas[0]
 	}
-	if len(pods) == 0 {
-		pods = []*corev1.Pod{pod}
+	if len(replicas) == 0 {
+		replicas = []Replica{replica}
 	}
 	return &kbagent{
 		namespace:        namespace,
@@ -76,7 +87,7 @@ func New(namespace, clusterName, compName string, lifecycleActions *appsv1.Compo
 		compName:         compName,
 		lifecycleActions: lifecycleActions,
 		templateVars:     templateVars,
-		pods:             pods,
-		pod:              pod,
+		replicas:         replicas,
+		replica:          replica,
 	}, nil
 }

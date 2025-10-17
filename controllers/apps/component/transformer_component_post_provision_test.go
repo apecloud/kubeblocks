@@ -27,13 +27,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -117,6 +117,7 @@ var _ = Describe("post-provision transformer test", func() {
 			Component:           comp,
 			ComponentOrig:       comp.DeepCopy(),
 			SynthesizeComponent: synthesizeComponent,
+			RunningWorkload:     &workloads.InstanceSet{},
 		}
 	})
 
@@ -137,17 +138,11 @@ var _ = Describe("post-provision transformer test", func() {
 					}).AnyTimes()
 				})
 
-				reader.Objects = append(reader.Objects, &corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: testCtx.DefaultNamespace,
-						Name:      fmt.Sprintf("%s-0", constant.GenerateWorkloadNamePattern(clusterName, compName)),
-						Labels: map[string]string{
-							constant.AppManagedByLabelKey:   constant.AppName,
-							constant.AppInstanceLabelKey:    clusterName,
-							constant.KBAppComponentLabelKey: compName,
-						},
+				transCtx.RunningWorkload.(*workloads.InstanceSet).Status.InstanceStatus = []workloads.InstanceStatus{
+					{
+						PodName: fmt.Sprintf("%s-0", constant.GenerateWorkloadNamePattern(clusterName, compName)),
 					},
-				})
+				}
 			})
 
 			It("ok", func() {
@@ -178,7 +173,7 @@ var _ = Describe("post-provision transformer test", func() {
 			transformer := &componentPostProvisionTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("has no pods to running the post-provision action"))
+			Expect(err.Error()).Should(ContainSubstring("has no pods to calling the post-provision action"))
 		})
 	})
 })

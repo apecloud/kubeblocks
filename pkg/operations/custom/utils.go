@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -375,10 +376,11 @@ func getTargetPods(
 			pods = append(pods, &podList.Items[i])
 		}
 	} else {
-		if podSelector.Role != "" {
-			pods, err = component.ListOwnedPodsWithRole(ctx, cli, cluster.Namespace, cluster.Name, compName, podSelector.Role)
-		} else {
-			pods, err = component.ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compName)
+		pods, err = component.ListOwnedPods(ctx, cli, cluster.Namespace, cluster.Name, compName)
+		if podSelector.Role != "" && err == nil {
+			pods = slices.DeleteFunc(pods, func(pod *corev1.Pod) bool {
+				return pod.Labels[constant.RoleLabelKey] != podSelector.Role
+			})
 		}
 	}
 	if err != nil {

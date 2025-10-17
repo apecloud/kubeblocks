@@ -22,7 +22,6 @@ package lifecycle
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -86,7 +85,7 @@ type memberJoin struct {
 	namespace   string
 	clusterName string
 	compName    string
-	pod         *corev1.Pod
+	podName     string
 }
 
 var _ lifecycleAction = &memberJoin{}
@@ -102,8 +101,8 @@ func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[str
 	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		joinMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.pod.Name),
-		joinMemberPodNameVar: a.pod.Name,
+		joinMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.podName),
+		joinMemberPodNameVar: a.podName,
 	}, nil
 }
 
@@ -111,7 +110,7 @@ type memberLeave struct {
 	namespace   string
 	clusterName string
 	compName    string
-	pod         *corev1.Pod
+	podName     string
 }
 
 var _ lifecycleAction = &memberLeave{}
@@ -127,7 +126,7 @@ func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[st
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		leaveMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.pod.Name),
-		leaveMemberPodNameVar: a.pod.Name,
+		leaveMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.podName),
+		leaveMemberPodNameVar: a.podName,
 	}, nil
 }

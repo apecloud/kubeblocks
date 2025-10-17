@@ -156,7 +156,7 @@ func (s *taskService) wait(ch chan error) error {
 func (s *taskService) notify(task proto.Task, event proto.TaskEvent, sync bool) error {
 	msg, err := json.Marshal(&event)
 	if err == nil {
-		return util.SendEventWithMessage(&s.logger, "task", string(msg), sync)
+		return util.SendEventWithMessage(&s.logger, event.Task, string(msg), sync)
 	} else {
 		s.logger.Error(err, fmt.Sprintf("failed to marshal task event, task: %v", task))
 		return err

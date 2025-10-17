@@ -107,35 +107,6 @@ var _ = Describe("InstanceSet Controller", func() {
 		).Should(Succeed())
 	}
 
-	mockPodReady := func(podNames ...string) {
-		By("mock pods ready")
-		for _, podName := range podNames {
-			podKey := types.NamespacedName{
-				Namespace: itsObj.Namespace,
-				Name:      podName,
-			}
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
-				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = []corev1.PodCondition{
-					{
-						Type:               corev1.PodReady,
-						Status:             corev1.ConditionTrue,
-						LastTransitionTime: metav1.Now(),
-					},
-				}
-				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-					{
-						Name: pod.Spec.Containers[0].Name,
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{},
-						},
-						Image: pod.Spec.Containers[0].Image,
-					},
-				}
-			})()).Should(Succeed())
-		}
-	}
-
 	Context("reconciliation", func() {
 		It("should reconcile well", func() {
 			name := "test-instance-set"
@@ -210,7 +181,7 @@ var _ = Describe("InstanceSet Controller", func() {
 					Name:      fmt.Sprintf("%s-2", itsObj.Name),
 				},
 			}
-			mockPodReady(podsKey[0].Name, podsKey[1].Name, podsKey[2].Name)
+			mockPodsReady(itsObj.Namespace, podsKey[0].Name, podsKey[1].Name, podsKey[2].Name)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -232,7 +203,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				})).Should(Succeed())
 
 				// mock new pod ready
-				mockPodReady(podKey.Name)
+				mockPodsReady(itsObj.Namespace, podKey.Name)
 
 				By(fmt.Sprintf("check its status updated: %s", podKey.Name))
 				Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -609,7 +580,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				}...)
 			})
 
-			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			mockPodsReady(itsObj.Namespace, fmt.Sprintf("%s-0", itsObj.Name))
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -707,7 +678,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			})
 
 			checkPodOrdinal([]int{0, 1, 2}, eventuallyExist)
-			mockPodReady(itsObj.Name+"-0", itsObj.Name+"-1", itsObj.Name+"-2")
+			mockPodsReady(itsObj.Namespace, itsObj.Name+"-0", itsObj.Name+"-1", itsObj.Name+"-2")
 			By("check its status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.Ordinals).Should(HaveExactElements(int32(0), int32(1), int32(2)))
@@ -729,7 +700,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				its.Spec.Replicas = ptr.To[int32](4)
 			})()).Should(Succeed())
 			checkPodOrdinal([]int{0, 2, 3, 4}, eventuallyExist)
-			mockPodReady(itsObj.Name+"-3", itsObj.Name+"-4")
+			mockPodsReady(itsObj.Namespace, itsObj.Name+"-3", itsObj.Name+"-4")
 			By("check its status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.Ordinals).Should(HaveExactElements(int32(0), int32(2), int32(3), int32(4)))
@@ -799,18 +770,11 @@ var _ = Describe("InstanceSet Controller", func() {
 				}
 			})
 
-			By("check init replicas")
 			replicas := make([]string, 0)
 			for i := int32(0); i < initReplicas; i++ {
-				podKey := types.NamespacedName{
-					Namespace: itsObj.Namespace,
-					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
-				}
-				replicas = append(replicas, podKey.Name)
-				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+				replicas = append(replicas, fmt.Sprintf("%s-%d", itsObj.Name, i))
 			}
-
-			mockPodReady(replicas...)
+			mockPodsReady(itsObj.Namespace, replicas...)
 
 			By("check ITS as ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -997,7 +961,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
 			}
 
-			mockPodReady(scaledReplicas...)
+			mockPodsReady(itsObj.Namespace, scaledReplicas...)
 
 			By("check ITS as ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -1065,7 +1029,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
 			}
 
-			mockPodReady(scaledReplicas...)
+			mockPodsReady(itsObj.Namespace, scaledReplicas...)
 
 			By("check ITS as NOT ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {

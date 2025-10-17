@@ -685,6 +685,13 @@ func mockPodReady(namespace, podName string) {
 	mockPodStatusReady(namespace, podName, metav1.Now())
 }
 
+func mockPodsReady(namespace string, podNames ...string) {
+	By(fmt.Sprintf("mock pods ready: %s", strings.Join(podNames, ",")))
+	for _, podName := range podNames {
+		mockPodStatusReady(namespace, podName, metav1.Now())
+	}
+}
+
 func mockPodReadyNAvailable(namespace, podName string, minReadySeconds int32) {
 	By(fmt.Sprintf("mock pod ready & available: %s", podName))
 	mockPodStatusReady(namespace, podName, metav1.NewTime(time.Now().Add(time.Duration(-1*(minReadySeconds+1))*time.Second)))
@@ -700,4 +707,18 @@ func mockPodReadyNAvailableWithRole(namespace, podName, role string, minReadySec
 	Eventually(testapps.GetAndChangeObj(&testCtx, podKey, func(pod *corev1.Pod) {
 		pod.Labels[constant.RoleLabelKey] = role
 	})()).Should(Succeed())
+}
+
+func mockPodsReadyNAvailableWithRole(namespace, role string, minReadySeconds int32, podNames ...string) {
+	By(fmt.Sprintf("mock pods ready & available with role: %s, %s", strings.Join(podNames, ","), role))
+	for _, podName := range podNames {
+		mockPodStatusReady(namespace, podName, metav1.NewTime(time.Now().Add(time.Duration(-1*(minReadySeconds+1))*time.Second)))
+		podKey := types.NamespacedName{
+			Namespace: namespace,
+			Name:      podName,
+		}
+		Eventually(testapps.GetAndChangeObj(&testCtx, podKey, func(pod *corev1.Pod) {
+			pod.Labels[constant.RoleLabelKey] = role
+		})()).Should(Succeed())
+	}
 }

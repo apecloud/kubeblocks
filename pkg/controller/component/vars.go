@@ -491,6 +491,8 @@ func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesi
 		return resolveServiceVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceVarRef)
 	case source.CredentialVarRef != nil:
 		return resolveCredentialVarRef(ctx, cli, synthesizedComp, defineKey, *source.CredentialVarRef)
+	case source.TLSVarRef != nil:
+		return resolveTLSVarRef(ctx, cli, synthesizedComp, defineKey, *source.TLSVarRef)
 	case source.ServiceRefVarRef != nil:
 		return resolveServiceRefVarRef(ctx, cli, synthesizedComp, defineKey, *source.ServiceRefVarRef)
 	case source.ComponentVarRef != nil:
@@ -873,6 +875,34 @@ func resolveCredentialPasswordRef(ctx context.Context, cli client.Reader, synthe
 	return resolveCredentialVarRefLow(ctx, cli, synthesizedComp, selector, selector.Password, resolvePassword)
 }
 
+func resolveTLSVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.TLSVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.TLSVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
+	switch {
+	case selector.Enabled != nil:
+		resolveFunc = resolveTLSEnabledRef
+	default:
+		return nil, nil, nil
+	}
+	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
+}
+
+func resolveTLSEnabledRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1alpha1.TLSVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveEnabled := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		comp := obj.(*appsv1alpha1.Component)
+		if comp.Spec.TLSConfig == nil {
+			return nil, nil, nil
+		}
+		enabled := "false"
+		if comp.Spec.TLSConfig.Enable {
+			enabled = "true"
+		}
+		return &corev1.EnvVar{Name: defineKey, Value: enabled}, nil, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Enabled, resolveEnabled)
+}
+
 func resolveServiceRefVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1alpha1.ServiceRefVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1alpha1.ServiceRefVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
@@ -1141,7 +1171,7 @@ func resolveComponentNameRef(ctx context.Context, cli client.Reader, synthesized
 		comp := obj.(*appsv1alpha1.Component)
 		return &corev1.EnvVar{Name: defineKey, Value: comp.Name}, nil, nil
 	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.ComponentName, resolveComponentName)
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.ComponentName, resolveComponentName)
 }
 
 func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -1150,7 +1180,7 @@ func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthes
 		comp := obj.(*appsv1alpha1.Component)
 		return &corev1.EnvVar{Name: defineKey, Value: strconv.Itoa(int(comp.Spec.Replicas))}, nil, nil
 	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.Replicas, resolveReplicas)
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Replicas, resolveReplicas)
 }
 
 func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -1167,7 +1197,7 @@ func resolveComponentInstanceNamesRef(ctx context.Context, cli client.Reader, sy
 		}
 		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(instanceNameList, ",")}, nil, nil
 	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.InstanceNames, resolveInstanceNames)
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.InstanceNames, resolveInstanceNames)
 }
 
 func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -1193,11 +1223,11 @@ func resolveComponentPodFQDNsRef(ctx context.Context, cli client.Reader, synthes
 		}
 		return &corev1.EnvVar{Name: defineKey, Value: strings.Join(names, ",")}, nil, nil
 	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector, selector.PodFQDNs, resolveFQDNList)
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.PodFQDNs, resolveFQDNList)
 }
 
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1alpha1.ComponentVarSelector, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveObjs := func() (map[string]any, error) {
 		getter := func(compName string) (any, error) {
 			key := types.NamespacedName{
@@ -1208,9 +1238,9 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 			err := cli.Get(ctx, key, obj, inDataContext())
 			return obj, err
 		}
-		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
+		return resolveReferentObjects(synthesizedComp, objRef, getter)
 	}
-	return resolveClusterObjectVars("Component", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
+	return resolveClusterObjectVars("Component", objRef, option, resolveObjs, resolveVar)
 }
 
 func resolveReferentObjects(synthesizedComp *SynthesizedComponent,

@@ -6439,7 +6439,7 @@ bool
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVarSelector">ServiceVarSelector</a>, <a href="#apps.kubeblocks.io/v1alpha1.TLSVarSelector">TLSVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
@@ -21914,6 +21914,86 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1alpha1.TLSVarSelector">TLSVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>TLSVarSelector selects a var from the TLS.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>TLSVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TLSVars">
+TLSVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>TLSVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1alpha1.TLSVars">TLSVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.TLSVarSelector">TLSVarSelector</a>)
+</p>
+<div>
+<p>TLSVars defines the vars that can be referenced from the TLS.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>enabled</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance
 </h3>
 <p>
@@ -22561,7 +22641,7 @@ string
 <h3 id="apps.kubeblocks.io/v1alpha1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.ServiceVars">ServiceVars</a>, <a href="#apps.kubeblocks.io/v1alpha1.TLSVars">TLSVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -22650,6 +22730,20 @@ CredentialVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a Credential (SystemAccount).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tlsVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.TLSVarSelector">
+TLSVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of the TLS.</p>
 </td>
 </tr>
 <tr>

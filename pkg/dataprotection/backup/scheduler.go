@@ -180,6 +180,9 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 	}
 
 	controllerutil.AddFinalizer(cronjob, dptypes.DataProtectionFinalizerName)
+	if err = controllerutil.SetControllerReference(s.BackupSchedule, cronjob, s.Scheme); err != nil {
+		return nil, err
+	}
 	// set labels
 	for k, v := range s.BackupSchedule.Labels {
 		cronjob.Labels[k] = v

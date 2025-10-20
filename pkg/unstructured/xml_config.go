@@ -41,6 +41,8 @@ func init() {
 	mxjv2.CastValuesToBool(true)
 	// enable cast to int
 	mxjv2.CastValuesToInt(true)
+	// enable XML escape chars decoder
+	mxjv2.XMLEscapeCharsDecoder()
 
 	CfgObjectRegistry().RegisterConfigCreator(parametersv1alpha1.XML, func(name string) ConfigObject {
 		return &xmlConfig{name: name}

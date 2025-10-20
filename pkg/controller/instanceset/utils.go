@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/integer"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -203,7 +202,7 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 	return updateStrategy
 }
 
-func newLifecycleAction(its *workloads.InstanceSet, objects []client.Object, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+func newLifecycleAction(its *workloads.InstanceSet, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = its.Labels[constant.AppInstanceLabelKey]
 		compName         = its.Labels[constant.KBAppComponentLabelKey]
@@ -211,11 +210,7 @@ func newLifecycleAction(its *workloads.InstanceSet, objects []client.Object, pod
 			Switchover:  its.Spec.LifecycleActions.Switchover,
 			Reconfigure: its.Spec.LifecycleActions.Reconfigure,
 		}
-		pods []*corev1.Pod
 	)
-	for i := range objects {
-		pods = append(pods, objects[i].(*corev1.Pod))
-	}
 	return lifecycle.New(its.Namespace, clusterName, compName,
-		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, pod, pods...)
+		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, pod, pods)
 }

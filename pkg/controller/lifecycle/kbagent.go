@@ -51,7 +51,7 @@ type kbagent struct {
 	lifecycleActions *appsv1.ComponentLifecycleActions
 	templateVars     map[string]string
 	pods             []*corev1.Pod // available pods to execute action, typically all pods of the component
-	pod              *corev1.Pod   // target pod the action will be effective on
+	pod              *corev1.Pod   // target pod the action will be effective on. Some actions, like postprovision, does not care about this field.
 }
 
 var _ Lifecycle = &kbagent{}

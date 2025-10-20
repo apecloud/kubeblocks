@@ -526,7 +526,34 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - all", func() {
-			// TODO: impl
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-1",
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
 		})
 
 		It("pod selector - role", func() {

@@ -143,5 +143,27 @@ var _ = Describe("component hostnetwork transformer test", func() {
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[0].ContainerPort).ShouldNot(Equal(3501))
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[1].ContainerPort).ShouldNot(Equal(3502))
 		})
+
+		It("should preserve all predefined host ports when all are specified", func() {
+			// Setup: All ports have predefined HostPort values
+			transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports[0].HostPort = 30306
+			transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[0].HostPort = 30501
+			transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[1].HostPort = 30502
+
+			transformer := &componentHostNetworkTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// Verify HostNetwork is enabled
+			Expect(transCtx.SynthesizeComponent.PodSpec.HostNetwork).Should(BeTrue())
+
+			// All ports should preserve their predefined values
+			mysqlContainer := transCtx.SynthesizeComponent.PodSpec.Containers[0]
+			Expect(mysqlContainer.Ports[0].ContainerPort).Should(Equal(int32(30306)))
+
+			kbagentContainer := transCtx.SynthesizeComponent.PodSpec.Containers[1]
+			Expect(kbagentContainer.Ports[0].ContainerPort).Should(Equal(int32(30501)))
+			Expect(kbagentContainer.Ports[1].ContainerPort).Should(Equal(int32(30502)))
+		})
 	})
 })

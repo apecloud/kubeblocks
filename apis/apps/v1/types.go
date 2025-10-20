@@ -256,6 +256,12 @@ type ComponentNetwork struct {
 	//
 	// +optional
 	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
+
+	// The list of container ports that are required by the component.
+	// This will override the container ports defined in component definition.
+	//
+	// +optional
+	HostPorts []HostPortPort `json:"hostPorts,omitempty"`
 }
 
 type Service struct {
@@ -825,4 +831,18 @@ type Range struct {
 type Ordinals struct {
 	Ranges   []Range `json:"ranges,omitempty"`
 	Discrete []int32 `json:"discrete,omitempty"`
+}
+
+type HostPortPort struct {
+	// Name of the host port.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Port number of the host port.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Required
+	Port int32 `json:"port"`
 }

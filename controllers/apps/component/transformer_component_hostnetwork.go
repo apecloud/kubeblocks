@@ -57,11 +57,31 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]bool{}
 	for _, c := range synthesizedComp.HostNetwork.ContainerPorts {
+		var originalContainer *corev1.Container
+		for _, container := range synthesizedComp.PodSpec.Containers {
+			if container.Name == c.Container {
+				originalContainer = &container
+				break
+			}
+		}
 		for _, p := range c.Ports {
 			if _, ok := ports[c.Container]; !ok {
 				ports[c.Container] = map[string]bool{}
 			}
-			ports[c.Container][p] = true
+			var originalPort *corev1.ContainerPort
+			if originalContainer != nil {
+				for _, port := range originalContainer.Ports {
+					if port.Name == p {
+						originalPort = &port
+						break
+					}
+				}
+			}
+			if originalPort != nil && originalPort.HostPort > 0 {
+				ports[c.Container][p] = false
+			} else {
+				ports[c.Container][p] = true
+			}
 		}
 	}
 

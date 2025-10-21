@@ -252,10 +252,30 @@ type ComponentNetwork struct {
 	// +optional
 	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 
-	// Specifies the DNS parameters of a pod.
+	// Specifies the DNS parameters of the pod.
 	//
 	// +optional
 	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
+
+	// Specifies the host ports of the pod[ explicitly.
+	// It's valid if and only if the `hostNetwork` is enabled.
+	//
+	// +optional
+	HostPorts []HostPort `json:"hostPorts,omitempty"`
+}
+
+type HostPort struct {
+	// Name is the name of the host port.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Port is the port number of the host port.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Required
+	Port int32 `json:"port"`
 }
 
 type Service struct {

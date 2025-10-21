@@ -36,6 +36,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -420,6 +421,9 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 		for _, c := range cc {
 			// skip the kb-agent container
 			if component.IsKBAgentContainer(&c) {
+				continue
+			}
+			if configctrl.IsConfigManagerContainer(c.Name) {
 				continue
 			}
 			images[i][c.Name] = c.Image

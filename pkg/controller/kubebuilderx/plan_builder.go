@@ -281,7 +281,7 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 		err = b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		reason = "SuccessfulUpdate"
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
 		return err
 	}
 	b.emitEvent(vertex.Obj, reason, model.UPDATE)
@@ -299,7 +299,7 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 		err = b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
 		reason = "SuccessfulPatch"
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
 		return err
 	}
 	b.emitEvent(vertex.Obj, reason, model.PATCH)

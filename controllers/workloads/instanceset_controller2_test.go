@@ -41,6 +41,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -72,6 +73,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -458,21 +460,13 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			memberLeaveError = nil
 		})
 
-		setup := func(initReplicas int32, withMemberAction, withDataAction bool) {
+		setup := func(initReplicas int32, withMemberAction bool, processors ...func(factory *testapps.MockInstanceSetFactory)) {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetReplicas(initReplicas).
 					SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
 						Type: kbappsv1.RollingUpdateStrategyType,
 					})
-				if withMemberAction && withDataAction {
-					f.SetLifecycleActions(&kbappsv1.ComponentLifecycleActions{
-						MemberJoin:  testapps.NewLifecycleAction("member-join"),
-						MemberLeave: testapps.NewLifecycleAction("member-leave"),
-						DataLoad:    testapps.NewLifecycleAction("data-load"),
-						DataDump:    testapps.NewLifecycleAction("data-dump"),
-					}, nil)
-				}
-				if withMemberAction && !withDataAction {
+				if withMemberAction {
 					f.SetLifecycleActions(&kbappsv1.ComponentLifecycleActions{
 						MemberJoin:  testapps.NewLifecycleAction("member-join"),
 						MemberLeave: testapps.NewLifecycleAction("member-leave"),
@@ -497,7 +491,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				initReplicas = int32(1)
 			)
 
-			setup(initReplicas, false, false)
+			setup(initReplicas, false)
 
 			By("check instance spec")
 			for i := int32(0); i < initReplicas; i++ {
@@ -519,7 +513,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				initReplicas = int32(1)
 			)
 
-			setup(initReplicas, true, false)
+			setup(initReplicas, true)
 
 			By("check instance spec")
 			for i := int32(0); i < initReplicas; i++ {
@@ -542,7 +536,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				targetReplicas = int32(2)
 			)
 
-			setup(initReplicas, false, false)
+			setup(initReplicas, false)
 
 			By("scale-out")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
@@ -577,7 +571,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				targetReplicas = int32(2)
 			)
 
-			setup(initReplicas, true, false)
+			setup(initReplicas, true)
 
 			By("scale-out")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
@@ -614,7 +608,35 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				targetReplicas = int32(2)
 			)
 
-			setup(initReplicas, true, true)
+			By("mock assistant objects")
+			assistantObj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-env", itsObj.Name),
+				},
+				Data: map[string]string{
+					"version": "v1.0.0",
+				},
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, assistantObj)).Should(Succeed())
+			gvk, _ := model.GetGVKName(assistantObj)
+			assistantObjs := []corev1.ObjectReference{
+				{
+					APIVersion: gvk.Version,
+					Kind:       gvk.Kind,
+					Name:       gvk.Name,
+				},
+			}
+
+			setup(initReplicas, true, func(f *testapps.MockInstanceSetFactory) {
+				f.SetLifecycleActions(&kbappsv1.ComponentLifecycleActions{
+					MemberJoin:  testapps.NewLifecycleAction("member-join"),
+					MemberLeave: testapps.NewLifecycleAction("member-leave"),
+					DataDump:    testapps.NewLifecycleAction("data-dump"),
+					DataLoad:    testapps.NewLifecycleAction("data-load"),
+				}, nil).
+					SetInstanceAssistantObjects(assistantObjs)
+			})
 
 			By("scale-out")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
@@ -651,7 +673,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				targetReplicas = int32(2)
 			)
 
-			setup(initReplicas, false, false)
+			setup(initReplicas, false)
 
 			By("scale-out first")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
@@ -712,7 +734,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				targetReplicas = int32(2)
 			)
 
-			setup(initReplicas, true, false)
+			setup(initReplicas, true)
 
 			By("scale-out first")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {

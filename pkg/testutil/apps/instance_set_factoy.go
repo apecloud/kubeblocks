@@ -141,6 +141,11 @@ func (factory *MockInstanceSetFactory) SetEnableInstanceAPI(enable *bool) *MockI
 	return factory
 }
 
+func (factory *MockInstanceSetFactory) SetInstanceAssistantObjects(objs []corev1.ObjectReference) *MockInstanceSetFactory {
+	factory.Get().Spec.InstanceAssistantObjects = objs
+	return factory
+}
+
 func (factory *MockInstanceSetFactory) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions, templateVars map[string]string) *MockInstanceSetFactory {
 	if lifecycleActions != nil || templateVars != nil {
 		if factory.Get().Spec.LifecycleActions == nil {

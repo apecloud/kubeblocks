@@ -109,7 +109,6 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
 	client := &http.Client{
-		Timeout:   time.Second * 30,
 		Transport: netTransport,
 	}
 
@@ -139,7 +138,6 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
 	client := &http.Client{
-		Timeout:   time.Second * 30,
 		Transport: netTransport,
 	}
 

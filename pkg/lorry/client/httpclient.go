@@ -101,6 +101,7 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 	}
 
 	// don't use default http-client
+	requestTimeout := 300 * time.Second
 	dialer := &net.Dialer{
 		Timeout: 5 * time.Second,
 	}
@@ -109,7 +110,7 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
 	client := &http.Client{
-		Timeout:   time.Second * 30,
+		Timeout:   requestTimeout,
 		Transport: netTransport,
 	}
 
@@ -117,7 +118,7 @@ func NewHTTPClientWithPod(pod *corev1.Pod) (*HTTPClient, error) {
 		Client:           client,
 		URL:              fmt.Sprintf(urlTemplate, ip, port),
 		CacheTTL:         1800 * time.Second,
-		RequestTimeout:   300 * time.Second,
+		RequestTimeout:   requestTimeout,
 		ReconcileTimeout: 500 * time.Millisecond,
 		logger:           ctrl.Log.WithName("Lorry HTTP client"),
 	}
@@ -131,6 +132,7 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 	}
 
 	// don't use default http-client
+	requestTimeout := 300 * time.Second
 	dialer := &net.Dialer{
 		Timeout: 5 * time.Second,
 	}
@@ -139,7 +141,7 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
 	client := &http.Client{
-		Timeout:   time.Second * 30,
+		Timeout:   requestTimeout,
 		Transport: netTransport,
 	}
 
@@ -147,7 +149,7 @@ func NewHTTPClientWithURL(url string) (*HTTPClient, error) {
 		Client:           client,
 		URL:              url,
 		CacheTTL:         1800 * time.Second,
-		RequestTimeout:   300 * time.Second,
+		RequestTimeout:   requestTimeout,
 		ReconcileTimeout: 500 * time.Millisecond,
 	}
 	operationClient.lorryClient = lorryClient{requester: operationClient}

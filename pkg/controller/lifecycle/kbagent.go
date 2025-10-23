@@ -25,7 +25,6 @@ import (
 	"math/rand"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,8 +32,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	kbagt "github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -50,8 +47,8 @@ type kbagent struct {
 	compName         string
 	lifecycleActions *appsv1.ComponentLifecycleActions
 	templateVars     map[string]string
-	pods             []*corev1.Pod
-	pod              *corev1.Pod
+	replicas         []Replica
+	replica          Replica
 }
 
 var _ Lifecycle = &kbagent{}
@@ -81,13 +78,12 @@ func (a *kbagent) RoleProbe(ctx context.Context, cli client.Reader, opts *Option
 }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
-	roleName := a.pod.Labels[constant.RoleLabelKey]
 	lfa := &switchover{
 		namespace:    a.namespace,
 		clusterName:  a.clusterName,
 		compName:     a.compName,
-		role:         roleName,
-		currentPod:   a.pod.Name,
+		role:         a.replica.Role(),
+		currentPod:   a.replica.Name(),
 		candidatePod: candidate,
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Switchover, lfa, opts))
@@ -98,7 +94,7 @@ func (a *kbagent) MemberJoin(ctx context.Context, cli client.Reader, opts *Optio
 		namespace:   a.namespace,
 		clusterName: a.clusterName,
 		compName:    a.compName,
-		pod:         a.pod,
+		podName:     a.replica.Name(),
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberJoin, lfa, opts))
 }
@@ -108,7 +104,7 @@ func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Opti
 		namespace:   a.namespace,
 		clusterName: a.clusterName,
 		compName:    a.compName,
-		pod:         a.pod,
+		podName:     a.replica.Name(),
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, lfa, opts))
 }
@@ -279,11 +275,11 @@ func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 }
 
 func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction, req *proto.ActionRequest) ([]byte, error) {
-	pods, err := a.selectTargetPods(spec)
+	replicas, err := a.selectTargetPods(spec)
 	if err != nil {
 		return nil, err
 	}
-	if len(pods) == 0 {
+	if len(replicas) == 0 {
 		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
 
@@ -291,11 +287,11 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	//  - back-off to retry
 	//  - timeout
 	var output []byte
-	for _, pod := range pods {
+	for _, replica := range replicas {
 		endpoint := func() (string, int32, error) {
-			host, port, err := a.serverEndpoint(pod)
+			host, port, err := a.serverEndpoint(replica)
 			if err != nil {
-				return "", 0, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
+				return "", 0, errors.Wrapf(err, "pod %s is unavailable to execute action %s", replica.Name(), lfa.name())
 			}
 			return host, port, nil
 		}
@@ -304,7 +300,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		if err != nil {
 			// If kb is not run in a k8s cluster, using pod ip to call kb-agent would fail.
 			// So we use a client that utilizes k8s' portforward ability.
-			cli, err = kbacli.NewPortForwardClient(pod, endpoint)
+			cli, err = kbacli.NewPortForwardClient(replica.Namespace(), replica.Name(), endpoint)
 		} else {
 			cli, err = kbacli.NewClient(endpoint)
 		}
@@ -319,7 +315,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		_ = cli.Close()
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), pod.Name)
+			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), replica.Name())
 		}
 		if len(rsp.Error) > 0 {
 			return nil, a.formatError(lfa, rsp)
@@ -332,19 +328,18 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	return output, nil
 }
 
-func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
-	return SelectTargetPods(a.pods, a.pod, spec)
+func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]Replica, error) {
+	return SelectTargetPods(a.replicas, a.replica, spec)
 }
 
-func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
-	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultHTTPPortName)
+func (a *kbagent) serverEndpoint(replica Replica) (string, int32, error) {
+	host, port, err := replica.Endpoint()
 	if err != nil {
 		// has no kb-agent defined
 		return "", 0, nil
 	}
-	host := pod.Status.PodIP
 	if host == "" {
-		return "", 0, fmt.Errorf("pod %v has no ip", pod.Name)
+		return "", 0, fmt.Errorf("pod %v has no ip", replica.Name())
 	}
 	return host, port, nil
 }
@@ -380,7 +375,7 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 	}
 }
 
-func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) ([]*corev1.Pod, error) {
+func SelectTargetPods(replicas []Replica, replica Replica, spec *appsv1.Action) ([]Replica, error) {
 	selector := spec.TargetPodSelector
 	matchingKey := spec.MatchingKey
 	if len(selector) == 0 && spec.Exec != nil && len(spec.Exec.TargetPodSelector) > 0 {
@@ -389,26 +384,24 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 		matchingKey = spec.Exec.MatchingKey
 	}
 	if len(selector) == 0 {
-		return []*corev1.Pod{pod}, nil
+		return []Replica{replica}, nil
 	}
 
-	anyPod := func() []*corev1.Pod {
-		i := rand.Int() % len(pods)
-		return []*corev1.Pod{pods[i]}
+	anyPod := func() []Replica {
+		i := rand.Int() % len(replicas)
+		return []Replica{replicas[i]}
 	}
 
-	allPods := func() []*corev1.Pod {
-		return pods
+	allPods := func() []Replica {
+		return replicas
 	}
 
-	podsWithRole := func() []*corev1.Pod {
+	podsWithRole := func() []Replica {
 		roleName := matchingKey
-		var rolePods []*corev1.Pod
-		for i, pod := range pods {
-			if len(pod.Labels) != 0 {
-				if pod.Labels[constant.RoleLabelKey] == roleName {
-					rolePods = append(rolePods, pods[i])
-				}
+		var rolePods []Replica
+		for i, r := range replicas {
+			if r.Role() == roleName {
+				rolePods = append(rolePods, replicas[i])
 			}
 		}
 		return rolePods

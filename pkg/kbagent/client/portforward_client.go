@@ -27,7 +27,6 @@ import (
 	"net/url"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -39,10 +38,11 @@ import (
 )
 
 type portForwardClient struct {
-	pod    *corev1.Pod
-	port   string
-	config *rest.Config
-	logger logr.Logger
+	namespace string
+	podName   string
+	port      string
+	config    *rest.Config
+	logger    logr.Logger
 }
 
 var _ Client = &portForwardClient{}
@@ -134,8 +134,8 @@ func (pf *portForwardClient) newPortForwarder(readyCh, stopCh chan struct{}, out
 	}
 	req := clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
-		Namespace(pf.pod.Namespace).
-		Name(pf.pod.Name).
+		Namespace(pf.namespace).
+		Name(pf.podName).
 		SubResource("portforward")
 	dialer, err := pf.createDialer("POST", req.URL(), pf.config)
 	if err != nil {
@@ -149,7 +149,7 @@ func (pf *portForwardClient) newPortForwarder(readyCh, stopCh chan struct{}, out
 	return fw, nil
 }
 
-func NewPortForwardClient(pod *corev1.Pod, endpoint func() (string, int32, error)) (Client, error) {
+func NewPortForwardClient(namespace, podName string, endpoint func() (string, int32, error)) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
 	}
@@ -161,9 +161,10 @@ func NewPortForwardClient(pod *corev1.Pod, endpoint func() (string, int32, error
 
 	config := ctrl.GetConfigOrDie()
 	return &portForwardClient{
-		pod:    pod,
-		port:   fmt.Sprint(port),
-		config: config,
-		logger: ctrl.Log.WithName("portforward"),
+		namespace: namespace,
+		podName:   podName,
+		port:      fmt.Sprint(port),
+		config:    config,
+		logger:    ctrl.Log.WithName("portforward"),
 	}, nil
 }

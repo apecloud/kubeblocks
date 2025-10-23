@@ -72,6 +72,8 @@ type ObjectVertex struct {
 	SubResource       string
 	ClientOpt         any
 	PropagationPolicy client.PropagationPolicy
+	PrevHooks         []func(client.Object) error
+	PostHooks         []func(client.Object) error
 }
 
 func (v *ObjectVertex) String() string {
@@ -92,6 +94,8 @@ func NewObjectVertex(oldObj, newObj client.Object, action *Action, opts ...Graph
 		Action:      action,
 		SubResource: graphOpts.subResource,
 		ClientOpt:   graphOpts.clientOpt,
+		PrevHooks:   graphOpts.prevHooks,
+		PostHooks:   graphOpts.postHooks,
 	}
 }
 

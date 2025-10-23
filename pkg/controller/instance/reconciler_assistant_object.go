@@ -30,7 +30,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -71,27 +70,17 @@ func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree
 	if obj == nil {
 		return nil // skip the object
 	}
+	r.withInstAnnotationsNLabels(inst, obj)
+
 	robj, err := tree.Get(obj)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err != nil || robj == nil {
-		labels := obj.GetLabels()
-		if labels == nil {
-			labels = getMatchLabels(inst.Name)
-		} else {
-			maps.Copy(labels, getMatchLabels(inst.Name))
-		}
-		obj.SetLabels(labels)
-		if err := controllerutil.SetControllerReference(inst, obj, model.GetScheme()); err != nil {
-			return err
-		}
-		return tree.Add(obj)
+		return r.create(tree, inst, obj)
 	}
-	if merged := r.copyAndMerge(assistantObj, robj, obj); merged != nil {
-		return tree.Update(merged)
-	}
-	return nil
+	return r.update(tree, assistantObj, robj, obj)
 }
 
 func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
@@ -133,9 +122,58 @@ func (r *assistantObjectReconciler) checkObjectProvisionPolicy(inst *workloads.I
 	return nil
 }
 
+func (r *assistantObjectReconciler) withInstAnnotationsNLabels(inst *workloads.Instance, obj client.Object) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[constant.KubeBlocksGenerationKey] = inst.Annotations[constant.KubeBlocksGenerationKey]
+	obj.SetAnnotations(annotations)
+
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = getMatchLabels(inst.Name)
+	} else {
+		maps.Copy(labels, getMatchLabels(inst.Name))
+	}
+	obj.SetLabels(labels)
+}
+
+func (r *assistantObjectReconciler) create(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, obj client.Object) error {
+	// TODO: shared assistant objects
+	// if err := controllerutil.SetControllerReference(inst, obj, model.GetScheme()); err != nil {
+	//	return err
+	// }
+	tree.Logger.Info("create object", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "labels", obj.GetLabels())
+	return tree.Add(obj)
+}
+
+func (r *assistantObjectReconciler) update(tree *kubebuilderx.ObjectTree, assistantObj workloads.InstanceAssistantObject, robj, obj client.Object) error {
+	ng, og := r.generation(obj), r.generation(robj)
+	if ng > 0 && og > 0 && ng < og {
+		tree.Logger.Info("skip update object", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "labels", obj.GetLabels())
+		return nil
+	}
+	merged := r.copyAndMerge(assistantObj, robj, obj)
+	if merged == nil {
+		return nil
+	}
+	tree.Logger.Info("update object", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "labels", obj.GetLabels())
+	return tree.Update(merged)
+}
+
+func (r *assistantObjectReconciler) generation(obj client.Object) int64 {
+	g := int64(-1)
+	s := obj.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	if len(s) > 0 {
+		g, _ = strconv.ParseInt(s, 10, 64)
+	}
+	return g
+}
+
 func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistantObject, oldObj, newObj client.Object) client.Object {
 	service := func() client.Object {
-		return copyAndMergeAssistantObject(oldObj, newObj,
+		return r.copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
 				o1 := o.(*corev1.Service)
 				n1 := n.(*corev1.Service)
@@ -154,7 +192,7 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 			})
 	}
 	cm := func() client.Object {
-		return copyAndMergeAssistantObject(oldObj, newObj,
+		return r.copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
 				return reflect.DeepEqual(o.(*corev1.ConfigMap).Data, n.(*corev1.ConfigMap).Data)
 			},
@@ -163,7 +201,7 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 			})
 	}
 	secret := func() client.Object {
-		return copyAndMergeAssistantObject(oldObj, newObj,
+		return r.copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
 				return reflect.DeepEqual(o.(*corev1.Secret).Data, n.(*corev1.Secret).Data)
 			},
@@ -172,7 +210,7 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 			})
 	}
 	sa := func() client.Object {
-		return copyAndMergeAssistantObject(oldObj, newObj,
+		return r.copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
 				return reflect.DeepEqual(o.(*corev1.ServiceAccount).Secrets, n.(*corev1.ServiceAccount).Secrets)
 			},
@@ -181,7 +219,7 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 			})
 	}
 	role := func() client.Object {
-		return copyAndMergeAssistantObject(oldObj, newObj,
+		return r.copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
 				return reflect.DeepEqual(o.(*rbacv1.Role).Rules, n.(*rbacv1.Role).Rules)
 			},
@@ -190,7 +228,7 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 			})
 	}
 	roleBinding := func() client.Object {
-		return copyAndMergeAssistantObject(oldObj, newObj,
+		return r.copyAndMergeAssistantObject(oldObj, newObj,
 			func(o, n client.Object) bool {
 				o1 := o.(*rbacv1.RoleBinding)
 				n1 := n.(*rbacv1.RoleBinding)
@@ -221,7 +259,7 @@ func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistant
 	return roleBinding()
 }
 
-func copyAndMergeAssistantObject(oldObj, newObj client.Object, equal func(o, n client.Object) bool, set func(o, n client.Object)) client.Object {
+func (r *assistantObjectReconciler) copyAndMergeAssistantObject(oldObj, newObj client.Object, equal func(o, n client.Object) bool, set func(o, n client.Object)) client.Object {
 	if reflect.DeepEqual(oldObj.GetLabels(), newObj.GetLabels()) &&
 		reflect.DeepEqual(oldObj.GetAnnotations(), newObj.GetAnnotations()) &&
 		equal(oldObj, newObj) {

@@ -131,10 +131,13 @@ func instanceAssistantObject(obj client.Object) workloads.InstanceAssistantObjec
 		}
 	}
 	if service, ok := obj.(*corev1.Service); ok {
+		spec := service.Spec.DeepCopy()
+		spec.ClusterIP = ""
+		spec.ClusterIPs = nil
 		return workloads.InstanceAssistantObject{
 			Service: &corev1.Service{
 				ObjectMeta: objectMeta(),
-				Spec:       service.Spec,
+				Spec:       *spec,
 			},
 		}
 	}

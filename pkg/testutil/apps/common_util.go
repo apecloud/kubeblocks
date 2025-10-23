@@ -373,6 +373,14 @@ func ClearClusterResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContex
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentVersionSignature, true, hasLabels)
 }
 
+func ClearComponentResources(testCtx *testutil.TestContext) {
+	inNs := client.InNamespace(testCtx.DefaultNamespace)
+	hasLabels := client.HasLabels{testCtx.TestObjLabelKey}
+	ClearResources(testCtx, intctrlutil.ComponentSignature, inNs, hasLabels)
+	ClearResources(testCtx, intctrlutil.ComponentDefinitionSignature, hasLabels)
+	ClearResources(testCtx, intctrlutil.ComponentVersionSignature, hasLabels)
+}
+
 // ClearComponentResourcesWithRemoveFinalizerOption clears all dependent resources belonging to existing components.
 func ClearComponentResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContext) {
 	inNs := client.InNamespace(testCtx.DefaultNamespace)

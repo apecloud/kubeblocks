@@ -363,6 +363,19 @@ func mergeNetworkSetting(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 			synthesizedComp.PodSpec.DNSPolicy = *comp.Spec.Network.DNSPolicy
 		}
 		synthesizedComp.PodSpec.DNSConfig = comp.Spec.Network.DNSConfig
+		if comp.Spec.Network.HostPorts != nil {
+			for i, c := range synthesizedComp.PodSpec.Containers {
+				for _, hP := range comp.Spec.Network.HostPorts {
+					// find iP in container ports
+					for j, cP := range c.Ports {
+						if hP.Name == cP.Name {
+							synthesizedComp.PodSpec.Containers[i].Ports[j].HostPort = hP.Port
+							synthesizedComp.PodSpec.Containers[i].Ports[j].ContainerPort = hP.Port
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

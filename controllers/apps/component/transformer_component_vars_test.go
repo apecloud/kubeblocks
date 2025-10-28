@@ -110,7 +110,7 @@ var _ = Describe("vars transformer test", func() {
 		It("vars env", func() {
 			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
 				"foo": "bar",
-			})
+			}, nil)
 			Expect(err).Should(BeNil())
 			checkEnvCM(model.ActionCreatePtr(), map[string]string{"foo": "bar"})
 		})
@@ -118,11 +118,11 @@ var _ = Describe("vars transformer test", func() {
 		It("vars env + task env", func() {
 			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
 				"foo": "bar",
-			})
+			}, nil)
 			Expect(err).Should(BeNil())
 			checkEnvCM(model.ActionCreatePtr(), map[string]string{"foo": "bar"})
 
-			err = createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
+			err = createOrUpdateEnvConfigMap(transCtx, dag, nil, map[string]string{
 				"task": "scale-out",
 			})
 			Expect(err).Should(BeNil())
@@ -133,11 +133,11 @@ var _ = Describe("vars transformer test", func() {
 			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
 				"foo":  "bar",
 				"task": "nil",
-			})
+			}, nil)
 			Expect(err).Should(BeNil())
 			checkEnvCM(model.ActionCreatePtr(), map[string]string{"foo": "bar", "task": "nil"})
 
-			err = createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
+			err = createOrUpdateEnvConfigMap(transCtx, dag, nil, map[string]string{
 				"task": "scale-out",
 			})
 			Expect(err).Should(BeNil())
@@ -159,7 +159,7 @@ var _ = Describe("vars transformer test", func() {
 			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
 				"foo":  "bingo",
 				"task": "nil",
-			})
+			}, nil)
 			Expect(err).Should(BeNil())
 			checkEnvCM(model.ActionUpdatePtr(), map[string]string{"foo": "bingo", "task": "nil"})
 		})
@@ -180,7 +180,7 @@ var _ = Describe("vars transformer test", func() {
 			err := createOrUpdateEnvConfigMap(transCtx, dag, map[string]string{
 				"foo":  "bar",
 				"task": "nil",
-			})
+			}, nil)
 			Expect(err).Should(BeNil())
 			checkEnvCM(model.ActionUpdatePtr(), map[string]string{"foo": "bar", "task": "nil"})
 		})

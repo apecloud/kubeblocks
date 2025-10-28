@@ -161,7 +161,7 @@ func (r *componentWorkloadOps) dataReplicationTask() error {
 		SynthesizeComponent: r.synthesizeComp,
 		Component:           r.component,
 	}
-	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
+	return createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, sourceReplicas sets.Set[string]) (lifecycle.Replica, error) {

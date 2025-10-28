@@ -144,21 +144,18 @@ func (r *assistantObjectReconciler) create(tree *kubebuilderx.ObjectTree, inst *
 	// if err := controllerutil.SetControllerReference(inst, obj, model.GetScheme()); err != nil {
 	//	return err
 	// }
-	tree.Logger.Info("create object", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "labels", obj.GetLabels())
 	return tree.Add(obj)
 }
 
 func (r *assistantObjectReconciler) update(tree *kubebuilderx.ObjectTree, assistantObj workloads.InstanceAssistantObject, robj, obj client.Object) error {
 	ng, og := r.generation(obj), r.generation(robj)
 	if ng > 0 && og > 0 && ng < og {
-		tree.Logger.Info("skip update object", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "labels", obj.GetLabels())
 		return nil
 	}
 	merged := r.copyAndMerge(assistantObj, robj, obj)
 	if merged == nil {
 		return nil
 	}
-	tree.Logger.Info("update object", "kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "labels", obj.GetLabels())
 	return tree.Update(merged)
 }
 

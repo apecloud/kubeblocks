@@ -255,7 +255,7 @@ func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterNam
 func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsResource) []*corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
-	pods, err := intctrlcomp.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, defaultCompName)
+	pods, err := listCompPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, defaultCompName)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.

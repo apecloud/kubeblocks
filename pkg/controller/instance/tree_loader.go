@@ -67,27 +67,29 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 
 func (r *treeLoader) readAssociatedObjects(ctx context.Context, reader client.Reader, req ctrl.Request, tree *kubebuilderx.ObjectTree) error {
 	root := tree.GetRoot()
-	inNS := client.InNamespace(req.Namespace)
-	ml := client.MatchingLabels(map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    root.GetLabels()[constant.AppInstanceLabelKey],
-		constant.KBAppComponentLabelKey: root.GetLabels()[constant.KBAppComponentLabelKey],
-	})
-	for _, list := range r.associatedObjectKinds() {
-		if err := reader.List(ctx, list, inNS, ml); err != nil {
-			return err
-		}
-		// reflect get list.Items
-		items := reflect.ValueOf(list).Elem().FieldByName("Items")
-		l := items.Len()
-		for i := 0; i < l; i++ {
-			// get the underlying object
-			object := items.Index(i).Addr().Interface().(client.Object)
-			if len(object.GetOwnerReferences()) > 0 && !model.IsOwnerOf(root, object) {
-				continue
-			}
-			if err := tree.Add(object); err != nil {
+	if root != nil {
+		inNS := client.InNamespace(req.Namespace)
+		ml := client.MatchingLabels(map[string]string{
+			constant.AppManagedByLabelKey:   constant.AppName,
+			constant.AppInstanceLabelKey:    root.GetLabels()[constant.AppInstanceLabelKey],
+			constant.KBAppComponentLabelKey: root.GetLabels()[constant.KBAppComponentLabelKey],
+		})
+		for _, list := range r.associatedObjectKinds() {
+			if err := reader.List(ctx, list, inNS, ml); err != nil {
 				return err
+			}
+			// reflect get list.Items
+			items := reflect.ValueOf(list).Elem().FieldByName("Items")
+			l := items.Len()
+			for i := 0; i < l; i++ {
+				// get the underlying object
+				object := items.Index(i).Addr().Interface().(client.Object)
+				if len(object.GetOwnerReferences()) > 0 && !model.IsOwnerOf(root, object) {
+					continue
+				}
+				if err := tree.Add(object); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -103,6 +105,7 @@ func (r *treeLoader) ownedKinds() []client.ObjectList {
 
 func (r *treeLoader) associatedObjectKinds() []client.ObjectList {
 	return []client.ObjectList{
+		&corev1.ServiceList{},
 		&corev1.ConfigMapList{}, // config & script, env
 		&corev1.SecretList{},    // account, tls
 		&corev1.ServiceAccountList{},

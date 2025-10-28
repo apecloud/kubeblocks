@@ -41,10 +41,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
-}
-
 func ValidateDefNameRegexp(defNamePattern string) error {
 	_, err := regexp.Compile(defNamePattern)
 	return err

@@ -137,5 +137,5 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, 
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[constant.LifeCycleDataLoadedAnnotationKey] = "true"
-	return cli.Status().Update(ctx, pod)
+	return cli.Update(ctx, pod)
 }

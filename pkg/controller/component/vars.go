@@ -944,7 +944,7 @@ func clusterServiceGetter(ctx context.Context, cli client.Reader, namespace, clu
 		Name:      constant.GenerateClusterServiceName(clusterName, name),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj, inDataContext()) // TODO: cluster service
+	err := cli.Get(ctx, key, obj) // TODO: cluster service
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -975,7 +975,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 		Name:      svcName,
 	}
 	obj := &corev1.Service{}
-	err = cli.Get(ctx, key, obj, inDataContext()) // TODO: cmp service
+	err = cli.Get(ctx, key, obj) // TODO: cmp service
 	if err == nil {
 		return &resolvedServiceObj{service: obj}, nil
 	}
@@ -986,7 +986,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 	// fall-back to list services and find the matched prefix
 	svcList := &corev1.ServiceList{}
 	matchingLabels := client.MatchingLabels(constant.GetCompLabels(clusterName, compName))
-	err = cli.List(ctx, svcList, matchingLabels, inDataContext()) // TODO: cmp service
+	err = cli.List(ctx, svcList, matchingLabels) // TODO: cmp service
 	if err != nil {
 		return nil, err
 	}
@@ -1241,22 +1241,22 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		// TODO: what if the component is being deleted?
 	}
 
-	its := &workloadsv1.InstanceSet{}
-	itsKey := types.NamespacedName{
-		Namespace: namespace,
-		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
-	}
-	err := cli.Get(ctx, itsKey, its)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
-	}
+	// its := &workloadsv1.InstanceSet{}
+	// itsKey := types.NamespacedName{
+	//	Namespace: namespace,
+	//	Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
+	// }
+	// err := cli.Get(ctx, itsKey, its)
+	// if err != nil && !apierrors.IsNotFound(err) {
+	//	return "", err
+	// }
 
-	var names []string
-	if err == nil {
-		names, err = GeneratePodNamesByITS(its)
-	} else {
-		names, err = GeneratePodNamesByComp(comp)
-	}
+	// var names []string
+	// if err == nil {
+	//	names, err = GeneratePodNamesByITS(its)
+	// } else {
+	names, err := GeneratePodNamesByComp(comp)
+	// }
 	if err != nil {
 		return "", err
 	}

@@ -249,6 +249,18 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 			checkedAppend(&synthesizedComp.LifecycleActions.RoleProbe.Action)
 		}
 	}
+
+	if synthesizedComp.ShardingLifecycleActions != nil {
+		for _, action := range []*appsv1.Action{
+			synthesizedComp.ShardingLifecycleActions.PostProvision,
+			synthesizedComp.ShardingLifecycleActions.PreTerminate,
+			synthesizedComp.ShardingLifecycleActions.ShardAdd,
+			synthesizedComp.ShardingLifecycleActions.ShardRemove,
+		} {
+			checkedAppend(action)
+		}
+	}
+
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
 		checkedAppend(action)
 	})
@@ -317,6 +329,21 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 			actions = append(actions, *a)
 		}
 	})
+
+	if synthesizedComp.ShardingLifecycleActions != nil {
+		if a := buildAction4KBAgent(synthesizedComp.ShardingLifecycleActions.PostProvision, "shardPostProvision"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.ShardingLifecycleActions.PreTerminate, "shardPreTerminate"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.ShardingLifecycleActions.ShardAdd, "shardAdd"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.ShardingLifecycleActions.ShardRemove, "shardRemove"); a != nil {
+			actions = append(actions, *a)
+		}
+	}
 
 	return kbagent.BuildEnv4Server(actions, probes, streaming)
 }
@@ -457,6 +484,15 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
 		actions = append(actions, action)
 	})
+
+	if synthesizedComp.ShardingLifecycleActions != nil {
+		actions = append(actions, []*appsv1.Action{
+			synthesizedComp.ShardingLifecycleActions.PostProvision,
+			synthesizedComp.ShardingLifecycleActions.PreTerminate,
+			synthesizedComp.ShardingLifecycleActions.ShardAdd,
+			synthesizedComp.ShardingLifecycleActions.ShardRemove,
+		}...)
+	}
 
 	var image, container string
 	for _, action := range actions {

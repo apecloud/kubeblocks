@@ -125,6 +125,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
+			// handle sharding pre terminate
+			&clusterShardingPreTerminateTransformer{},
+			// handle cluster termination policy
 			&clusterTerminationPolicyTransformer{},
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
@@ -150,6 +153,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterOwnershipTransformer{},
 			// update cluster status
 			&clusterStatusTransformer{},
+			// handle sharding post provision
+			&clusterShardingPostProvisionTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()

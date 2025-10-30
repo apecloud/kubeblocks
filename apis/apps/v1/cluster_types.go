@@ -623,9 +623,9 @@ type ClusterSharding struct {
 	// between the desired and actual number of shards.
 	// KubeBlocks provides lifecycle management for sharding, including:
 	//
-	// - Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+	// - Executing the shardAdd Action defined in the ShardingDefinition when the number of shards increases.
 	//   This allows for custom actions to be performed after a new shard is provisioned.
-	// - Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+	// - Executing the shardRemove Action defined in the ShardingDefinition when the number of shards decreases.
 	//   This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 	//   Resources and data associated with the corresponding Component will also be deleted.
 	//

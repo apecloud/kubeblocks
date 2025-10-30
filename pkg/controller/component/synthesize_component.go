@@ -153,6 +153,11 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
 
+	// build sharding lifecycle action
+	if err = buildShardingLifecycleActions(ctx, cli, synthesizeComp, comp); err != nil {
+		return nil, errors.Wrap(err, "build sharding lifecycle actions failed")
+	}
+
 	if err = buildSidecars(ctx, cli, synthesizeComp, comp); err != nil {
 		return nil, err
 	}
@@ -529,6 +534,49 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
+}
+
+func buildShardingLifecycleActions(ctx context.Context, cli client.Reader, synthesizeComp *SynthesizedComponent, comp *appsv1.Component) error {
+	shardName := comp.Labels[constant.KBAppShardingNameLabelKey]
+	if shardName == "" {
+		return nil
+	}
+
+	getCluster := func() (*appsv1.Cluster, error) {
+		clusterKey := types.NamespacedName{
+			Name:      synthesizeComp.ClusterName,
+			Namespace: comp.Namespace,
+		}
+		cluster := &appsv1.Cluster{}
+		err := cli.Get(ctx, clusterKey, cluster)
+		return cluster, err
+	}
+
+	getShardingLifecycleAction := func() (*appsv1.ShardingLifecycleActions, error) {
+		shardingDefKey := types.NamespacedName{
+			Name: shardName,
+		}
+		shardingDef := &appsv1.ShardingDefinition{}
+		err := cli.Get(ctx, shardingDefKey, shardingDef)
+		if err != nil {
+			return nil, err
+		}
+		return shardingDef.Spec.LifecycleActions, err
+	}
+
+	cluster, err := getCluster()
+	if err != nil {
+		return err
+	}
+	for _, sharding := range cluster.Spec.Shardings {
+		if sharding.Name == shardName {
+			synthesizeComp.ShardingLifecycleActions, err = getShardingLifecycleAction()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func getPodUpdatePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) appsv1.PodUpdatePolicyType {

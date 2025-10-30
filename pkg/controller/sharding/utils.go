@@ -35,10 +35,10 @@ import (
 )
 
 func BuildShardingCompSpecs(ctx context.Context, cli client.Reader,
-	namespace, clusterName string, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	namespace, clusterName string, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, []appsv1.Component, error) {
 	shardingComps, err := listShardingComponents(ctx, cli, namespace, clusterName, sharding.Name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return buildShardingCompSpecs(clusterName, sharding, shardingComps)
 }
@@ -56,9 +56,9 @@ func listShardingComponents(ctx context.Context, cli client.Reader, namespace, c
 	return compList.Items, nil
 }
 
-func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) (map[string][]*appsv1.ClusterComponentSpec, error) {
+func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) (map[string][]*appsv1.ClusterComponentSpec, []appsv1.Component, error) {
 	if err := precheck(sharding); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	compNames := make([]string, 0)
@@ -76,7 +76,7 @@ func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding
 	templates := buildShardTemplates(clusterName, sharding, shardingComps)
 	for i := range templates {
 		if err := templates[i].align(generator); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -84,7 +84,7 @@ func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding
 	for i, tpl := range templates {
 		shards[tpl.name] = templates[i].shards
 	}
-	return shards, nil
+	return shards, shardingComps, nil
 }
 
 func precheck(sharding *appsv1.ClusterSharding) error {

@@ -73,6 +73,7 @@ type SynthesizedComponent struct {
 	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy    `json:"instanceUpdateStrategy,omitempty"`
 	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
 	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	ShardingLifecycleActions         *kbappsv1.ShardingLifecycleActions  `json:"shardingLifecycleActions,omitempty"`
 	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
 	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
 	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`

@@ -35,7 +35,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -93,7 +92,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
-	lfa, err2 := t.lifecycleAction(transCtx)
+	lfa, err2 := newLifecycleAction("account-provision", transCtx.SynthesizeComponent, transCtx.RunningWorkload)
 	if err2 != nil {
 		return err2
 	}
@@ -132,21 +131,6 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	}
 
 	return err3
-}
-
-func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
-	synthesizedComp := transCtx.SynthesizeComponent
-	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		return nil, err
-	}
-	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
-	if err != nil {
-		return nil, err
-	}
-	return lfa, nil
 }
 
 func (t *componentAccountProvisionTransformer) createAccount(transCtx *componentTransformContext,

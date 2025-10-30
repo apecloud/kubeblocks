@@ -99,6 +99,8 @@ func objectReferenceToObject(objRef corev1.ObjectReference) (client.Object, erro
 		Name:      objRef.Name,
 	}
 	switch objRef.Kind {
+	case objectKind(&corev1.Service{}):
+		return &corev1.Service{ObjectMeta: meta}, nil
 	case objectKind(&corev1.ConfigMap{}):
 		return &corev1.ConfigMap{ObjectMeta: meta}, nil
 	case objectKind(&corev1.Secret{}):
@@ -129,10 +131,13 @@ func instanceAssistantObject(obj client.Object) workloads.InstanceAssistantObjec
 		}
 	}
 	if service, ok := obj.(*corev1.Service); ok {
+		spec := service.Spec.DeepCopy()
+		spec.ClusterIP = ""
+		spec.ClusterIPs = nil
 		return workloads.InstanceAssistantObject{
 			Service: &corev1.Service{
 				ObjectMeta: objectMeta(),
-				Spec:       service.Spec,
+				Spec:       *spec,
 			},
 		}
 	}

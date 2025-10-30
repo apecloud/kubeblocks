@@ -106,18 +106,18 @@ func buildKBAgentTaskEnv(task proto.Task) (map[string]string, error) {
 	}, nil
 }
 
-func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.Task) (map[string]string, error) {
-	envVar, err := kbagent.UpdateEnv4Worker(envVars, f)
-	if err != nil {
-		return nil, err
-	}
-	if envVar == nil {
-		return nil, nil
-	}
-	return map[string]string{
-		envVar.Name: envVar.Value,
-	}, nil
-}
+// func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.Task) (map[string]string, error) {
+//	envVar, err := kbagent.UpdateEnv4Worker(envVars, f)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if envVar == nil {
+//		return nil, nil
+//	}
+//	return map[string]string{
+//		envVar.Name: envVar.Value,
+//	}, nil
+// }
 
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if !hasActionDefined(synthesizedComp) {

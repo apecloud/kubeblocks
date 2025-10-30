@@ -22,12 +22,18 @@ package component
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 const (
@@ -94,4 +100,60 @@ func isCompDeleting(comp *appsv1.Component) bool {
 		return false
 	}
 	return comp.Spec.TerminationPolicy != appsv1.DoNotTerminate
+}
+
+func newLifecycleAction(action string, synthesizedComp *component.SynthesizedComponent, obj client.Object) (lifecycle.Lifecycle, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("the workload obj is nil to calling the %s action", action)
+	}
+	its := obj.(*workloads.InstanceSet)
+	if len(its.Status.InstanceStatus) == 0 {
+		// TODO: (good-first-issue) we should handle the case that the component has no pods
+		return nil, fmt.Errorf("has no pods to calling the %s action", action)
+	}
+	var replicas []lifecycle.Replica
+	for i := range its.Status.InstanceStatus {
+		replicas = append(replicas, &lifecycleReplica{
+			synthesizedComp: synthesizedComp,
+			instance:        its.Status.InstanceStatus[i],
+		})
+	}
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, replicas...)
+}
+
+type lifecycleReplica struct {
+	synthesizedComp *component.SynthesizedComponent
+	instance        workloads.InstanceStatus
+}
+
+func (r *lifecycleReplica) Namespace() string {
+	return r.synthesizedComp.Namespace
+}
+
+func (r *lifecycleReplica) Name() string {
+	return r.instance.PodName
+}
+
+func (r *lifecycleReplica) Role() string {
+	return r.instance.Role
+}
+
+func (r *lifecycleReplica) Endpoint() (string, int32, error) {
+	host := intctrlutil.PodFQDN(r.synthesizedComp.Namespace, r.synthesizedComp.FullCompName, r.instance.PodName)
+	pod := corev1.Pod{
+		Spec: *r.synthesizedComp.PodSpec, // TODO: ports for the host-network have been written back to the pod spec?
+	}
+	port, err := intctrlutil.GetPortByName(pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+	return host, port, err
+}
+
+func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
+	// TODO: should use a component service
+	host := intctrlutil.PodFQDN(r.synthesizedComp.Namespace, r.synthesizedComp.FullCompName, r.instance.PodName)
+	pod := corev1.Pod{
+		Spec: *r.synthesizedComp.PodSpec, // TODO: ports for the host-network have been written back to the pod spec?
+	}
+	port, err := intctrlutil.GetPortByName(pod, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
+	return host, port, err
 }

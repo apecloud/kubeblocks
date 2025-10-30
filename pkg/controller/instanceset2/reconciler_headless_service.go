@@ -21,6 +21,7 @@ package instanceset2
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,15 +36,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewAssistantObjectReconciler() kubebuilderx.Reconciler {
-	return &assistantObjectReconciler{}
+func NewHeadlessServiceReconciler() kubebuilderx.Reconciler {
+	return &headlessServiceReconciler{}
 }
 
-type assistantObjectReconciler struct{}
+type headlessServiceReconciler struct{}
 
-var _ kubebuilderx.Reconciler = &assistantObjectReconciler{}
+var _ kubebuilderx.Reconciler = &headlessServiceReconciler{}
 
-func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *headlessServiceReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
@@ -53,70 +54,79 @@ func (a *assistantObjectReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	var (
-		objects []client.Object
-		its, _  = tree.GetRoot().(*workloads.InstanceSet)
-	)
-
-	if !its.Spec.DisableDefaultHeadlessService && !shouldCloneInstanceAssistantObjects(its) {
+func (r *headlessServiceReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	var headlessService *corev1.Service
+	if !its.Spec.DisableDefaultHeadlessService {
 		labels := getMatchLabels(its.Name)
 		headlessSelectors := getHeadlessSvcSelector(its)
-		headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
-		objects = append(objects, headLessSvc)
+		headlessService = buildHeadlessSvc(*its, labels, headlessSelectors)
 	}
-	for _, object := range objects {
-		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
+	if headlessService != nil {
+		if err := intctrlutil.SetOwnership(its, headlessService, model.GetScheme(), finalizer); err != nil {
 			return kubebuilderx.Continue, err
 		}
 	}
 
-	// compute create/update/delete set
-	newSnapshot := make(map[model.GVKNObjKey]client.Object)
-	for _, object := range objects {
-		name, err := model.GetGVKName(object)
-		if err != nil {
+	oldHeadlessService, err := tree.Get(buildHeadlessSvc(*its, nil, nil))
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	skipToReconcileOpt := kubebuilderx.SkipToReconcile(shouldCloneInstanceAssistantObjects(its))
+	if oldHeadlessService == nil && headlessService != nil {
+		if err := tree.AddWithOption(headlessService, skipToReconcileOpt); err != nil {
 			return kubebuilderx.Continue, err
 		}
-		newSnapshot[*name] = object
 	}
-	oldSnapshot := make(map[model.GVKNObjKey]client.Object)
-	svcList := tree.List(&corev1.Service{})
-	for _, objectList := range [][]client.Object{svcList} {
-		for _, object := range objectList {
-			name, err := model.GetGVKName(object)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			oldSnapshot[*name] = object
+	if oldHeadlessService != nil && headlessService != nil {
+		newObj := copyAndMerge(oldHeadlessService, headlessService)
+		if err := tree.Update(newObj, skipToReconcileOpt); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
+	if oldHeadlessService != nil && headlessService == nil {
+		if err := tree.DeleteWithOption(oldHeadlessService, skipToReconcileOpt); err != nil {
+			return kubebuilderx.Continue, err
 		}
 	}
 
-	// now compute the diff between old and target snapshot and generate the plan
-	oldNameSet := sets.KeySet(oldSnapshot)
-	newNameSet := sets.KeySet(newSnapshot)
+	if headlessService != nil {
+		r.addHeadlessService(its, headlessService)
+	} else {
+		r.deleteHeadlessService(its, oldHeadlessService)
+	}
 
-	createSet := newNameSet.Difference(oldNameSet)
-	updateSet := newNameSet.Intersection(oldNameSet)
-	deleteSet := oldNameSet.Difference(newNameSet)
-	for name := range createSet {
-		if err := tree.Add(newSnapshot[name]); err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
-	for name := range updateSet {
-		oldObj := oldSnapshot[name]
-		newObj := copyAndMerge(oldObj, newSnapshot[name])
-		if err := tree.Update(newObj); err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
-	for name := range deleteSet {
-		if err := tree.Delete(oldSnapshot[name]); err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *headlessServiceReconciler) addHeadlessService(its *workloads.InstanceSet, svc *corev1.Service) {
+	if shouldCloneInstanceAssistantObjects(its) && svc != nil {
+		if its.Spec.InstanceAssistantObjects == nil {
+			its.Spec.InstanceAssistantObjects = make([]corev1.ObjectReference, 0)
+		}
+		gvk, _ := model.GetGVKName(svc)
+		its.Spec.InstanceAssistantObjects = append(its.Spec.InstanceAssistantObjects,
+			corev1.ObjectReference{
+				Kind:      gvk.Kind,
+				Namespace: gvk.Namespace,
+				Name:      gvk.Name,
+			})
+	}
+}
+
+func (r *headlessServiceReconciler) deleteHeadlessService(its *workloads.InstanceSet, obj client.Object) {
+	var svc *corev1.Service
+	if obj != nil {
+		svc = obj.(*corev1.Service)
+	}
+	if svc != nil {
+		gvk, _ := model.GetGVKName(svc)
+		its.Spec.InstanceAssistantObjects = slices.DeleteFunc(its.Spec.InstanceAssistantObjects,
+			func(o corev1.ObjectReference) bool {
+				return o.Kind == gvk.Kind && o.Namespace == gvk.Namespace && o.Name == gvk.Name
+			})
+	}
 }
 
 func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {

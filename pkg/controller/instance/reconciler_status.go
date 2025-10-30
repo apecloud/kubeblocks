@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -65,11 +66,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	ready, available, updated := false, false, false
 	notReadyName, notAvailableName := "", ""
 
-	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-
 	if isCreated(pod) {
 		notReadyName = pod.Name
 	}
@@ -88,16 +84,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 	}
-
-	// TODO: ???
-	// if nodeName, ok := podToNodeMapping[pod.Name]; ok {
-	//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-	//	if pod.Spec.NodeName == nodeName {
-	//		if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
-	//			return kubebuilderx.Continue, err
-	//		}
-	//	}
-	// }
 
 	inst.Status.CurrentRevision = getPodRevision(pod)
 	if updated {
@@ -121,7 +107,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
-	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
+	r.buildLifecycleStatus(inst, pod)
+	inst.Status.InVolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -195,6 +182,25 @@ func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 		}
 	}
 	return ""
+}
+
+func (r *statusReconciler) buildLifecycleStatus(inst *workloads.Instance, pod *corev1.Pod) {
+	dataLoaded := func() *bool {
+		if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.DataLoad == nil {
+			return nil
+		}
+		if inst.Status.DataLoaded == nil || *inst.Status.DataLoaded {
+			return inst.Status.DataLoaded
+		}
+		loaded, ok := pod.Annotations[constant.LifeCycleDataLoadedAnnotationKey]
+		if !ok {
+			return ptr.To(false)
+		}
+		return ptr.To(strings.ToLower(loaded) == "true")
+	}
+
+	inst.Status.Provisioned = true
+	inst.Status.DataLoaded = dataLoaded()
 }
 
 func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {

@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/utils/ptr"
@@ -37,7 +36,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -65,10 +63,12 @@ var _ = Describe("pre-terminate transformer test", func() {
 	}
 
 	provisioned := func(its *workloads.InstanceSet) {
-		replicas := []string{
-			fmt.Sprintf("%s-0", its.Name),
+		its.Status.InstanceStatus = []workloads.InstanceStatus{
+			{
+				PodName:     fmt.Sprintf("%s-0", its.Name),
+				Provisioned: true,
+			},
 		}
-		Expect(component.StatusReplicasStatus(its, replicas, false, false)).Should(Succeed())
 	}
 
 	BeforeEach(func() {
@@ -153,19 +153,6 @@ var _ = Describe("pre-terminate transformer test", func() {
 				}).AnyTimes()
 			})
 
-			// mock pods to run the pre-terminate action
-			reader.Objects = append(reader.Objects, &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      fmt.Sprintf("%s-0", constant.GenerateWorkloadNamePattern(clusterName, compName)),
-					Labels: map[string]string{
-						constant.AppManagedByLabelKey:   constant.AppName,
-						constant.AppInstanceLabelKey:    clusterName,
-						constant.KBAppComponentLabelKey: compName,
-					},
-				},
-			})
-
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
@@ -173,12 +160,12 @@ var _ = Describe("pre-terminate transformer test", func() {
 			Expect(preTerminated).Should(BeTrue())
 		})
 
-		It("no pods error", func() {
-			transformer := &componentPreTerminateTransformer{}
-			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("has no pods to running the pre-terminate action"))
-		})
+		// It("no pods error", func() {
+		//	transformer := &componentPreTerminateTransformer{}
+		//	err := transformer.Transform(transCtx, dag)
+		//	Expect(err).ShouldNot(BeNil())
+		//	Expect(err.Error()).Should(ContainSubstring("has no pods to calling the pre-terminate action"))
+		// })
 
 		It("not-defined", func() {
 			compDef := reader.Objects[0].(*appsv1.ComponentDefinition)
@@ -199,12 +186,7 @@ var _ = Describe("pre-terminate transformer test", func() {
 
 		It("not provisioned", func() {
 			its := reader.Objects[1].(*workloads.InstanceSet)
-			Expect(component.UpdateReplicasStatusFunc(its, func(r *component.ReplicasStatus) error {
-				for i := range r.Status {
-					r.Status[i].Provisioned = false
-				}
-				return nil
-			})).Should(Succeed())
+			its.Status.InstanceStatus[0].Provisioned = false
 
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)

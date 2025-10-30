@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"fmt"
 	"maps"
 
 	corev1 "k8s.io/api/core/v1"
@@ -58,6 +59,11 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 		retainPVC = pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenScaled == appsv1.RetainPersistentVolumeClaimRetentionPolicyType
 	}
 
+	// call the lifecycle action before delete resources
+	if call, err := r.lifecycleDeleteInstance(tree, inst); call || err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	// delete secondary objects first
 	if has, err := r.deleteSecondaryObjects(tree, retainPVC); has {
 		return kubebuilderx.Continue, err
@@ -66,6 +72,22 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	// delete root object
 	tree.DeleteRoot()
 	return kubebuilderx.Continue, nil
+}
+
+func (r *deletionReconciler) lifecycleDeleteInstance(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (bool, error) {
+	pods := tree.List(&corev1.Pod{})
+	if len(pods) == 0 && ptr.Deref(inst.Status.MemberJoined, false) {
+		return false, fmt.Errorf("there is no pod to call the member-leave action")
+	}
+
+	if len(pods) > 0 && ptr.Deref(inst.Status.MemberJoined, false) {
+		if err := lifecycleDeleteInstance(tree, inst, pods[0].(*corev1.Pod)); err != nil {
+			return false, err
+		}
+		inst.Status.MemberJoined = ptr.To(false)
+		return true, nil
+	}
+	return false, nil
 }
 
 func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, retainPVC bool) (bool, error) {

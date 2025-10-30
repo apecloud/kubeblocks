@@ -22,7 +22,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"maps"
 	"reflect"
 	"strconv"
 	"strings"
@@ -41,17 +40,6 @@ import (
 
 func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
 	return listWorkloads(ctx, cli, namespace, clusterName, compName)
-}
-
-func ListOwnedPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
-	opts ...client.ListOption) ([]*corev1.Pod, error) {
-	return listPods(ctx, cli, namespace, clusterName, compName, nil, opts...)
-}
-
-func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, clusterName, compName, role string,
-	opts ...client.ListOption) ([]*corev1.Pod, error) {
-	roleLabel := map[string]string{constant.RoleLabelKey: role}
-	return listPods(ctx, cli, namespace, clusterName, compName, roleLabel, opts...)
 }
 
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
@@ -77,20 +65,6 @@ func GetMinReadySeconds(ctx context.Context, cli client.Client, cluster appsv1.C
 func listWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
 	labels := constant.GetCompLabels(clusterName, compName)
 	return listObjWithLabelsInNamespace(ctx, cli, generics.InstanceSetSignature, namespace, labels)
-}
-
-func listPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
-	labels map[string]string, opts ...client.ListOption) ([]*corev1.Pod, error) {
-	if labels == nil {
-		labels = constant.GetCompLabels(clusterName, compName)
-	} else {
-		maps.Copy(labels, constant.GetCompLabels(clusterName, compName))
-	}
-	if opts == nil {
-		opts = make([]client.ListOption, 0)
-	}
-	opts = append(opts, inDataContext()) // TODO: pod
-	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels, opts...)
 }
 
 func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](

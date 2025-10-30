@@ -32,7 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -70,21 +69,18 @@ func (t *clusterShardingPreTerminateTransformer) reconcileShardingPreTerminate(t
 			continue
 		}
 
-		comps, err := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, shard.Name)
-		if err != nil {
-			return err
-		}
-		unfinishedComps := checkPreTerminateDone(comps)
-		if len(unfinishedComps) == 0 {
+		components := transCtx.shardingComponents[shard.Name]
+		unfinishedComponents := checkPreTerminateDone(components)
+		if len(unfinishedComponents) == 0 {
 			continue
 		}
 
-		finishedComps, err := t.shardingPreTerminate(transCtx, unfinishedComps, shardDef.Spec.LifecycleActions)
+		finishedComponents, err := t.shardingPreTerminate(transCtx, unfinishedComponents, shardDef.Spec.LifecycleActions)
 		if err != nil {
 			return lifecycle.IgnoreNotDefined(err)
 		}
 
-		t.markShardingPreTerminateDone(transCtx, finishedComps)
+		t.markShardingPreTerminateDone(transCtx, finishedComponents)
 	}
 	return nil
 }

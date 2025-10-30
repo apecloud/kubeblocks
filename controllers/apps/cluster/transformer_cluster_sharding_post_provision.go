@@ -31,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -69,16 +68,13 @@ func (t *clusterShardingPostProvisionTransformer) reconcileShardingPostProvision
 			continue
 		}
 
-		comps, err := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, shard.Name)
-		if err != nil {
-			return err
-		}
-		unfinishedComps := checkPostProvisionDone(comps)
-		if len(unfinishedComps) == 0 {
+		components := transCtx.shardingComponents[shard.Name]
+		unfinishedComponents := checkPreTerminateDone(components)
+		if len(unfinishedComponents) == 0 {
 			continue
 		}
 
-		finishedComps, err := t.shardingPostProvision(transCtx, unfinishedComps, shardDef.Spec.LifecycleActions)
+		finishedCompnents, err := t.shardingPostProvision(transCtx, unfinishedComponents, shardDef.Spec.LifecycleActions)
 		if err != nil {
 			err = lifecycle.IgnoreNotDefined(err)
 			if errors.Is(err, lifecycle.ErrPreconditionFailed) {
@@ -87,7 +83,7 @@ func (t *clusterShardingPostProvisionTransformer) reconcileShardingPostProvision
 			return err
 		}
 
-		t.markShardingPostProvisionDone(transCtx, finishedComps)
+		t.markShardingPostProvisionDone(transCtx, finishedCompnents)
 	}
 	return nil
 }

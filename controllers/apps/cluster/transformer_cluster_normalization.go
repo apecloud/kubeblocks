@@ -80,7 +80,7 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	// build component specs for shardings after resolving definitions
-	transCtx.shardingComps, transCtx.shardingCompsWithTpl, err = t.buildShardingComps(transCtx)
+	transCtx.shardingComps, transCtx.shardingCompsWithTpl, transCtx.shardingComponents, err = t.buildShardingComps(transCtx)
 	if err != nil {
 		return err
 	}
@@ -488,23 +488,25 @@ func (t *clusterNormalizationTransformer) checkTemplateUpgrade(serviceVersion, c
 	return serviceVersion != runningTpl.ServiceVersion || compDefName != runningTpl.CompDef
 }
 
-func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, map[string]map[string][]*appsv1.ClusterComponentSpec, error) {
+func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, map[string]map[string][]*appsv1.ClusterComponentSpec, map[string][]appsv1.Component, error) {
 	cluster := transCtx.Cluster
 	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec)
 	shardingCompsWithTpl := make(map[string]map[string][]*appsv1.ClusterComponentSpec)
+	shardingComponents := make(map[string][]appsv1.Component)
 	for _, spec := range transCtx.shardings {
-		tplComps, err := sharding.BuildShardingCompSpecs(transCtx.Context, transCtx.Client, cluster.Namespace, cluster.Name, spec)
+		tplComps, components, err := sharding.BuildShardingCompSpecs(transCtx.Context, transCtx.Client, cluster.Namespace, cluster.Name, spec)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		shardingCompsWithTpl[spec.Name] = tplComps
+		shardingComponents[spec.Name] = components
 		for tpl, comps := range tplComps {
 			if len(comps) > 0 {
 				shardingComps[spec.Name] = append(shardingComps[spec.Name], tplComps[tpl]...)
 			}
 		}
 	}
-	return shardingComps, shardingCompsWithTpl, nil
+	return shardingComps, shardingCompsWithTpl, shardingComponents, nil
 }
 
 func (t *clusterNormalizationTransformer) postcheck(transCtx *clusterTransformContext) error {

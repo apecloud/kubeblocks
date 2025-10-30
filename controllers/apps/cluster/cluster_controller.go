@@ -125,8 +125,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle sharding pre terminate
-			&clusterShardingPreTerminateTransformer{},
 			// handle cluster termination policy
 			&clusterTerminationPolicyTransformer{},
 			// handle cluster deletion
@@ -137,6 +135,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterValidationTransformer{},
 			// normalize the cluster spec
 			&clusterNormalizationTransformer{},
+			// handle sharding pre terminate
+			&clusterShardingPreTerminateTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster shared account

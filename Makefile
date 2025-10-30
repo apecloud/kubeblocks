@@ -472,6 +472,48 @@ ifneq ($(shell $(OPERATOR_SDK) version 2>/dev/null | awk -F '"' '{print $$2}'), 
 	}
 endif
 
+##@ OLM Bundle
+
+BUNDLE_VERSION ?= $(VERSION)
+BUNDLE_IMG ?= docker.io/apecloud/kubeblocks-bundle:$(BUNDLE_VERSION)
+DATAPROTECTION_IMG ?= docker.io/apecloud/kubeblocks-dataprotection:$(VERSION)
+CHANNELS ?= stable
+DEFAULT_CHANNEL ?= stable
+OPENSHIFT_VERSIONS ?= "v4.17"
+BUNDLE_METADATA_OPTS ?= --channels=$(CHANNELS) --default-channel=$(DEFAULT_CHANNEL)
+
+.PHONY: olm-bundle
+olm-bundle: manifests kustomize operator-sdk ## Generate complete OLM bundle (all-in-one)
+	@echo "==> Generating OLM bundle for version $(BUNDLE_VERSION)"
+	set -xeEuo pipefail ;\
+	CONFIG_TMP_DIR=$$(mktemp -d) ;\
+	cp -r config "$${CONFIG_TMP_DIR}" ;\
+	echo "==> Setting controller images:" ;\
+	echo "    - Manager: $(IMG)" ;\
+	echo "    - DataProtection: $(DATAPROTECTION_IMG)" ;\
+	( \
+		cd "$${CONFIG_TMP_DIR}/config/manager" ;\
+		$(KUSTOMIZE) edit set image controller="$(IMG)" ;\
+		cd "$${CONFIG_TMP_DIR}/config/dataprotection" ;\
+		$(KUSTOMIZE) edit set image dataprotection="$(DATAPROTECTION_IMG)" ;\
+	) ;\
+	rm -fr bundle bundle.Dockerfile ;\
+	echo "==> Building bundle manifests with image digests" ;\
+	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-default") | \
+	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata \
+		--package kubeblocks \
+		--channels $(CHANNELS) \
+		--default-channel $(DEFAULT_CHANNEL) \
+		--plugins=go.kubebuilder.io/v4 \
+		--use-image-digests \
+		--version "$(BUNDLE_VERSION)" ;\
+	echo "==> Adding OpenShift annotations" ;\
+	echo "" >> bundle/metadata/annotations.yaml ;\
+	echo "  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
+	rm -rf "$${CONFIG_TMP_DIR}" ;\
+	echo "==> Bundle generated successfully at ./bundle"
+
 # NOTE: include must be placed at the end
 include docker/docker.mk
 include cmd/cmd.mk

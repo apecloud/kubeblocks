@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dataprotection
+  namespace: system
+  labels:
+    control-plane: dataprotection
+    app.kubernetes.io/component: dataprotection
+spec:
+  selector:
+    matchLabels:
+      control-plane: dataprotection
+      app.kubernetes.io/component: dataprotection
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: dataprotection
+      labels:
+        control-plane: dataprotection
+        app.kubernetes.io/component: dataprotection
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - command:
+        - /dataprotection
+        args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:8080
+        - --leader-elect
+        image: dataprotection:latest
+        name: dataprotection
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - "ALL"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: controller-manager
+      terminationGracePeriodSeconds: 10
+

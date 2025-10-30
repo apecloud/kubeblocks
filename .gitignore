@@ -73,6 +73,9 @@ pkg/cli/cluster/charts/
 # ignore client-sdk-gen temp directory
 hack/github.com/
 
+# ignore OLM bundle directory
+bundle
+bundle.Dockerfile
 
 # ignore kubeblocks-docs directory
 docs/kubeblocks-docs

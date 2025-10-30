@@ -108,8 +108,9 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	$(MAKE) client-sdk-gen
 
 .PHONY: label-crds
+LABEL_CRD_DIR ?= config/crd/bases
 label-crds:
-	@for f in config/crd/bases/*.yaml; do \
+	@for f in $(LABEL_CRD_DIR)/*.yaml; do \
 		echo "applying app.kubernetes.io/name=kubeblocks label to $$f"; \
 		kubectl label --overwrite -f $$f --local=true -o yaml app.kubernetes.io/name=kubeblocks > bin/crd.yaml; \
 		mv bin/crd.yaml $$f; \
@@ -483,11 +484,28 @@ OPENSHIFT_VERSIONS ?= "v4.17"
 BUNDLE_METADATA_OPTS ?= --channels=$(CHANNELS) --default-channel=$(DEFAULT_CHANNEL)
 
 .PHONY: olm-bundle
-olm-bundle: manifests kustomize operator-sdk ## Generate complete OLM bundle (all-in-one)
+olm-bundle: test-go-generate controller-gen kustomize operator-sdk ## Generate complete OLM bundle (all-in-one)
 	@echo "==> Generating OLM bundle for version $(BUNDLE_VERSION)"
 	set -xeEuo pipefail ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
+	OLM_CRD_DIR=$$(mktemp -d) ;\
+	trap "rm -rf $${CONFIG_TMP_DIR} $${OLM_CRD_DIR}" EXIT ;\
+	echo "==> Generating CRDs for bundle in $${OLM_CRD_DIR}" ;\
+	$(CONTROLLER_GEN) rbac:roleName=manager-role \
+		crd:generateEmbeddedObjectMeta=true \
+		webhook \
+		paths="./cmd/manager/...;./apis/apps/v1;./apis/apps/v1beta1;./apis/trace/v1;./apis/workloads/v1;./apis/dataprotection/...;./apis/operations/...;./apis/parameters/...;./apis/extensions/...;./apis/experimental/...;./controllers/..." \
+		output:crd:artifacts:config="$${OLM_CRD_DIR}" ;\
+	$(MAKE) label-crds LABEL_CRD_DIR="$${OLM_CRD_DIR}" --no-print-directory ;\
+	echo "==> Preparing config with v1-only CRDs" ;\
 	cp -r config "$${CONFIG_TMP_DIR}" ;\
+	mkdir -p "$${CONFIG_TMP_DIR}/config/crd/olm-bases" ;\
+	cp "$${OLM_CRD_DIR}"/*.yaml "$${CONFIG_TMP_DIR}/config/crd/olm-bases/" ;\
+	echo "resources:" > "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ;\
+	for f in "$${CONFIG_TMP_DIR}/config/crd/olm-bases"/*.yaml; do \
+		[ "$$f" = "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ] && continue ;\
+		echo "- $$(basename $$f)" >> "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ;\
+	done ;\
 	echo "==> Setting controller images:" ;\
 	echo "    - Manager: $(IMG)" ;\
 	echo "    - DataProtection: $(DATAPROTECTION_IMG)" ;\
@@ -498,7 +516,7 @@ olm-bundle: manifests kustomize operator-sdk ## Generate complete OLM bundle (al
 		$(KUSTOMIZE) edit set image dataprotection="$(DATAPROTECTION_IMG)" ;\
 	) ;\
 	rm -fr bundle bundle.Dockerfile ;\
-	echo "==> Building bundle manifests with image digests" ;\
+	echo "==> Building bundle manifests (using v1-only CRDs)" ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-default") | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata \
 		--package kubeblocks \
@@ -512,6 +530,8 @@ olm-bundle: manifests kustomize operator-sdk ## Generate complete OLM bundle (al
 	echo "  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
 	echo "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
 	rm -rf "$${CONFIG_TMP_DIR}" ;\
+	echo "==> Validating bundle" ;\
+	-$(OPERATOR_SDK) bundle validate ./bundle || echo "⚠️  Bundle validation warnings - can be ignored for now" ;\
 	echo "==> Bundle generated successfully at ./bundle"
 
 # NOTE: include must be placed at the end

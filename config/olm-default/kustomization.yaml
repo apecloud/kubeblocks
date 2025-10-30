@@ -10,7 +10,3 @@ resources:
 - ../rbac
 - ../manager
 - ../dataprotection
-
-patchesStrategicMerge:
-- ../default/manager_webhook_patch.yaml
-- ../default/webhookcainjection_patch.yaml

@@ -243,6 +243,66 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(reflect.DeepEqual(rb.RoleRef, cmpdRoleBinding.RoleRef)).To(BeTrue())
 		})
 	})
+
+	Context("tests serviceaccount rollback", func() {
+		It("tests needRollbackServiceAccount", func() {
+			init(true, false)
+			ctx := transCtx.(*componentTransformContext)
+
+			By("create another cmpd")
+			anotherCompDef := testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+
+			// Case: No label, should return false
+			needRollback, err := needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case: With label but component definitions are the same
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + compDefObj.Name
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case: with a non-exist cmpd
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-non-existent"
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case: Different cmpd, same spec
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + anotherCompDef.Name
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeTrue())
+
+			// Case: Different cmpd, different policy rules
+			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
+				cmpd.Spec.PolicyRules = []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+						Verbs:     []string{"get"},
+					},
+				}
+			})).Should(Succeed())
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+
+			// Case: Different cmpd, different lifecycle action
+			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
+				cmpd.Spec.PolicyRules = nil
+				cmpd.Spec.LifecycleActions = nil
+			})).Should(Succeed())
+			needRollback, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+		})
+	})
 })
 
 func mockDAG(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {

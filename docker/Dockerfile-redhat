@@ -75,6 +75,7 @@ LABEL maintainer="Hangzhou ApeCloud Co., Ltd"
 LABEL name="KubeBlocks"
 LABEL summary="KubeBlocks is an operator for databases enabling users to run and manage multiple types of databases on Kubernetes."
 LABEL description="KubeBlocks is a Kubernetes Operator designed to manage a variety of databases and streaming systems, including MySQL, PostgreSQL, MongoDB, Redis, RabbitMQ, RocketMQ, and more, within Kubernetes environments."
+LABEL io.k8s.description="KubeBlocks is a Kubernetes Operator designed to manage a variety of databases and streaming systems, including MySQL, PostgreSQL, MongoDB, Redis, RabbitMQ, RocketMQ, and more, within Kubernetes environments."
 LABEL version="${VERSION}"
 
 RUN mkdir -p /licenses

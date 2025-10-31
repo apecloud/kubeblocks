@@ -9,4 +9,3 @@ resources:
 - ../crd/olm-bases
 - ../rbac
 - ../manager
-- ../dataprotection

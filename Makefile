@@ -477,7 +477,6 @@ endif
 
 BUNDLE_VERSION ?= $(VERSION)
 BUNDLE_IMG ?= docker.io/apecloud/kubeblocks-bundle:$(BUNDLE_VERSION)
-DATAPROTECTION_IMG ?= docker.io/apecloud/kubeblocks-dataprotection:$(VERSION)
 CHANNELS ?= stable
 DEFAULT_CHANNEL ?= stable
 OPENSHIFT_VERSIONS ?= "v4.17"
@@ -497,7 +496,6 @@ olm-bundle: test-go-generate controller-gen kustomize operator-sdk ## Generate c
 		paths="./cmd/manager/...;./apis/apps/v1;./apis/apps/v1beta1;./apis/trace/v1;./apis/workloads/v1;./apis/dataprotection/...;./apis/operations/...;./apis/parameters/...;./apis/extensions/...;./apis/experimental/...;./controllers/..." \
 		output:crd:artifacts:config="$${OLM_CRD_DIR}" ;\
 	$(MAKE) label-crds LABEL_CRD_DIR="$${OLM_CRD_DIR}" --no-print-directory ;\
-	echo "==> Preparing config with v1-only CRDs" ;\
 	cp -r config "$${CONFIG_TMP_DIR}" ;\
 	mkdir -p "$${CONFIG_TMP_DIR}/config/crd/olm-bases" ;\
 	cp "$${OLM_CRD_DIR}"/*.yaml "$${CONFIG_TMP_DIR}/config/crd/olm-bases/" ;\
@@ -506,18 +504,13 @@ olm-bundle: test-go-generate controller-gen kustomize operator-sdk ## Generate c
 		[ "$$f" = "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ] && continue ;\
 		echo "- $$(basename $$f)" >> "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ;\
 	done ;\
-	echo "==> Setting controller images:" ;\
 	echo "    - Manager: $(IMG)" ;\
-	echo "    - DataProtection: $(DATAPROTECTION_IMG)" ;\
 	( \
 		cd "$${CONFIG_TMP_DIR}/config/manager" ;\
 		$(KUSTOMIZE) edit set image controller="$(IMG)" ;\
-		cd "$${CONFIG_TMP_DIR}/config/dataprotection" ;\
-		$(KUSTOMIZE) edit set image dataprotection="$(DATAPROTECTION_IMG)" ;\
 	) ;\
 	rm -fr bundle bundle.Dockerfile ;\
-	echo "==> Building bundle manifests (using v1-only CRDs)" ;\
-	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-default") | \
+	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata \
 		--package kubeblocks \
 		--channels $(CHANNELS) \
@@ -525,13 +518,11 @@ olm-bundle: test-go-generate controller-gen kustomize operator-sdk ## Generate c
 		--plugins=go.kubebuilder.io/v4 \
 		--use-image-digests \
 		--version "$(BUNDLE_VERSION)" ;\
-	echo "==> Adding OpenShift annotations" ;\
 	echo "" >> bundle/metadata/annotations.yaml ;\
 	echo "  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
 	echo "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
 	rm -rf "$${CONFIG_TMP_DIR}" ;\
-	echo "==> Validating bundle" ;\
-	-$(OPERATOR_SDK) bundle validate ./bundle || echo "⚠️  Bundle validation warnings - can be ignored for now" ;\
+	$(OPERATOR_SDK) bundle validate --plugins=go.kubebuilder.io/v4  ./bundle ;\
 	echo "==> Bundle generated successfully at ./bundle"
 
 # NOTE: include must be placed at the end

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../olm-default
+- bases/kubeblocks.clusterserviceversion.yaml
+# Replace containerImage annotation with controller-manager deployment image
+replacements:
+- source:
+    kind: Deployment
+    name: kubeblocks-controller-manager
+    fieldPath: spec.template.spec.containers.0.image
+  targets:
+  - select:
+      kind: ClusterServiceVersion
+    fieldPaths:
+    - metadata.annotations.containerImage
+    options:
+      create: true

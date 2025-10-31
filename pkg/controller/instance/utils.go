@@ -33,6 +33,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset2"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -206,6 +207,7 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 		AddLabelsInMap(labels).
 		AddLabels(constant.KBAppPodNameLabelKey, inst.Name). // used as a pod-service selector
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, inst.Spec.InstanceTemplateName).
+		AddLabels(instanceset2.WorkloadsInstanceLabelKey, inst.Labels[instanceset2.WorkloadsInstanceLabelKey]). // to select pods by instanceset
 		AddControllerRevisionHashLabel(revision).
 		SetPodSpec(*inst.Spec.Template.Spec.DeepCopy()).
 		GetObject()
@@ -351,7 +353,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+func newLifecycleAction(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = inst.Labels[constant.AppInstanceLabelKey]
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]
@@ -359,11 +361,7 @@ func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *
 			Switchover:  inst.Spec.LifecycleActions.Switchover,
 			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
-		pods []*corev1.Pod
 	)
-	for i := range objects {
-		pods = append(pods, objects[i].(*corev1.Pod))
-	}
 	return lifecycle.New(inst.Namespace, clusterName, compName,
-		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods...)
+		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods)
 }

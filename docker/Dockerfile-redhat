@@ -64,6 +64,9 @@ RUN --mount=type=bind,target=. \
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM ${DIST_IMG} AS dist
 
+ARG VERSION
+ENV VERSION=${VERSION}
+
 WORKDIR /
 COPY --from=builder /out/manager .
 

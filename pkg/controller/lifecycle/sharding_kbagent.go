@@ -67,7 +67,7 @@ func (a *shardingAgent) PreTerminate(ctx context.Context, cli client.Reader, opt
 			action:      a.shardingLifecycleActions.PreTerminate,
 		}
 
-		err := compAgent.ignoreOutput(compAgent.nonPreconditionCallAction(ctx, cli, lfa.action, lfa, opts))
+		err := compAgent.ignoreOutput(compAgent.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func (a *shardingAgent) ShardAdd(ctx context.Context, cli client.Reader, opts *O
 			action:      a.shardingLifecycleActions.ShardAdd,
 		}
 
-		err := compAgent.ignoreOutput(compAgent.nonPreconditionCallAction(ctx, cli, lfa.action, lfa, opts))
+		err := compAgent.ignoreOutput(compAgent.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func (a *shardingAgent) ShardRemove(ctx context.Context, cli client.Reader, opts
 			action:      a.shardingLifecycleActions.ShardRemove,
 		}
 
-		err := compAgent.ignoreOutput(compAgent.nonPreconditionCallAction(ctx, cli, lfa.action, lfa, opts))
+		err := compAgent.ignoreOutput(compAgent.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 		if err != nil {
 			return err
 		}

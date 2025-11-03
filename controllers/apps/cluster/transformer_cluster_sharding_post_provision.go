@@ -31,11 +31,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-)
-
-const (
-	kbShardingPostProvisionDoneKey = "kubeblocks.io/sharding-post-provision-done"
 )
 
 type clusterShardingPostProvisionTransformer struct{}
@@ -57,7 +54,7 @@ func (t *clusterShardingPostProvisionTransformer) Transform(ctx graph.TransformC
 	return t.reconcileShardingPostProvision(transCtx, dag)
 }
 
-func (t *clusterShardingPostProvisionTransformer) reconcileShardingPostProvision(transCtx *clusterTransformContext, _ *graph.DAG) error {
+func (t *clusterShardingPostProvisionTransformer) reconcileShardingPostProvision(transCtx *clusterTransformContext, dag *graph.DAG) error {
 	for _, shard := range transCtx.shardings {
 		shardDef, ok := transCtx.shardingDefs[shard.ShardingDef]
 		if !ok {
@@ -68,22 +65,26 @@ func (t *clusterShardingPostProvisionTransformer) reconcileShardingPostProvision
 			continue
 		}
 
-		components := transCtx.shardingComponents[shard.Name]
-		unfinishedComponents := checkPreTerminateDone(components)
+		runningComps, err := sharding.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, shard.Name)
+		if err != nil {
+			return err
+		}
+
+		unfinishedComponents := checkPostProvisionDone(runningComps)
 		if len(unfinishedComponents) == 0 {
 			continue
 		}
 
-		finishedCompnents, err := t.shardingPostProvision(transCtx, unfinishedComponents, shardDef.Spec.LifecycleActions)
+		finishedComponents, err := t.shardingPostProvision(transCtx, unfinishedComponents, shardDef.Spec.LifecycleActions)
 		if err != nil {
 			err = lifecycle.IgnoreNotDefined(err)
 			if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-				err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
+				err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for sharding lifecycle action precondition"), err)
 			}
 			return err
 		}
 
-		t.markShardingPostProvisionDone(transCtx, finishedCompnents)
+		t.markShardingPostProvisionDone(transCtx, dag, finishedComponents, runningComps)
 	}
 	return nil
 }
@@ -100,8 +101,8 @@ func checkPostProvisionDone(comps []v1.Component) []v1.Component {
 			continue
 		}
 
-		_, ok := comp.Annotations[kbShardingPostProvisionDoneKey]
-		if !ok {
+		needPostProvision, ok := comp.Annotations[kbShardingPostProvisionKey]
+		if ok && needPostProvision == "true" {
 			unfinished = append(unfinished, comp)
 		}
 	}
@@ -109,38 +110,32 @@ func checkPostProvisionDone(comps []v1.Component) []v1.Component {
 }
 
 func (t *clusterShardingPostProvisionTransformer) shardingPostProvision(transCtx *clusterTransformContext, comps []v1.Component, lifecycleAction *v1.ShardingLifecycleActions) ([]string, error) {
-	lfa, err := t.lifecycleAction4Sharding(transCtx, comps, lifecycleAction)
+	lfa, err := lifecycleAction4Sharding(transCtx, comps, lifecycleAction)
 	if err != nil {
 		return nil, err
 	}
 	return lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
 }
 
-func (t *clusterShardingPostProvisionTransformer) lifecycleAction4Sharding(transCtx *clusterTransformContext, comps []v1.Component, lifecycleAction *v1.ShardingLifecycleActions) (lifecycle.ShardingLifecycle, error) {
-	compTemplateVarsMap, compPodsMap, err := buildCompMaps(transCtx, comps)
-	if err != nil {
-		return nil, err
+func (t *clusterShardingPostProvisionTransformer) markShardingPostProvisionDone(transCtx *clusterTransformContext, dag *graph.DAG, comps []string, runningComps []v1.Component) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	compsMap := make(map[string]*v1.Component)
+	for _, comp := range runningComps {
+		compsMap[comp.Name] = &comp
 	}
 
-	return lifecycle.NewShardingLifecycle(transCtx.Cluster.Namespace, transCtx.Cluster.Name, lifecycleAction, compTemplateVarsMap, nil, compPodsMap)
-}
-
-func (t *clusterShardingPostProvisionTransformer) markShardingPostProvisionDone(transCtx *clusterTransformContext, comps []string) {
-	now := time.Now().Format(time.RFC3339Nano)
-
 	for _, comp := range comps {
-		if transCtx.annotations == nil {
-			transCtx.annotations = make(map[string]map[string]string)
-		}
-		if transCtx.annotations[comp] == nil {
-			transCtx.annotations[comp] = make(map[string]string)
+		compCopyObj := compsMap[comp].DeepCopy()
+		if compCopyObj.Annotations == nil {
+			compCopyObj.Annotations = make(map[string]string)
 		}
 
-		_, ok := transCtx.annotations[comp][kbShardingPostProvisionDoneKey]
-		if ok {
+		_, ok := compCopyObj.Annotations[kbShardingPostProvisionKey]
+		if !ok {
 			return
 		}
 
-		transCtx.annotations[comp][kbShardingPostProvisionDoneKey] = now
+		compCopyObj.Annotations[kbShardingPostProvisionKey] = "false"
+		graphCli.Update(dag, compsMap[comp], compCopyObj)
 	}
 }

@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -38,9 +39,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -809,24 +812,41 @@ type clusterShardingHandler struct {
 	scaleIn *bool
 }
 
+// kbShardingPostProvisionKey is an annotation key to mark the sharding components which need post-provision
+const kbShardingPostProvisionKey = "kubeblocks.io/sharding-post-provision"
+
 func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
 	protoComps, err := h.protoComps(transCtx, name, nil)
 	if err != nil {
 		return err
 	}
+
+	shardingDef := transCtx.shardingDefs[name]
+	addPostProvisionAnnotation := func(comp *appsv1.Component) {
+		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
+			return
+		}
+
+		if comp.Annotations == nil {
+			comp.Annotations = make(map[string]string)
+		}
+		comp.Annotations[kbShardingPostProvisionKey] = "true"
+	}
+
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range protoComps {
+		addPostProvisionAnnotation(protoComps[i])
 		graphCli.Create(dag, protoComps[i])
 	}
 
 	// initClusterCompNShardingStatus(transCtx, name)
 
-	// TODO:
-	//  1. sharding post-provision
-	//  2. provision strategy
+	// TODO: provision strategy
 
 	return nil
 }
+
+const kbShardingPreTerminateDoneKey = "kubeblocks.io/sharding-pre-terminate-done"
 
 // delete handles the sharding component deletion when cluster is Deleting
 func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
@@ -835,7 +855,10 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
-	// TODO: sharding pre-terminate
+	err = doShardingPreTerminate(transCtx, dag, transCtx.shardingDefs[name], runningComps)
+	if err != nil {
+		return err
+	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range runningComps {
@@ -888,9 +911,11 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 
 	toCreate, toDelete, toUpdate := mapDiff(runningCompsMap, protoCompsMap)
 
+	shardingDef := transCtx.shardingDefs[name]
+
 	// TODO: update strategy
 	h.deleteComps(transCtx, dag, runningCompsMap, toDelete)
-	h.updateComps(transCtx, dag, runningCompsMap, protoCompsMap, toUpdate)
+	h.updateComps(transCtx, dag, runningCompsMap, protoCompsMap, toUpdate, shardingDef)
 	h.createComps(transCtx, dag, protoCompsMap, toCreate)
 
 	return nil
@@ -901,7 +926,7 @@ func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range createSet {
 		graphCli.Create(dag, protoComps[name])
-		// TODO: shard post-provision
+		// TODO: shard add
 	}
 }
 
@@ -915,7 +940,7 @@ func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, 
 }
 
 func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, dag *graph.DAG,
-	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string]) {
+	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string], shardingDef *appsv1.ShardingDefinition) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range updateSet {
 		running, proto := runningComps[name], protoComps[name]
@@ -1261,4 +1286,115 @@ func buildComponentSidecar(proto, running *appsv1.Component, sidecarName string,
 		SidecarDef: sidecarDef.Name,
 	}
 	return checkedAppend(sidecar, sidecarDef)
+}
+
+func doShardingPreTerminate(transCtx *clusterTransformContext, dag *graph.DAG, shardingDef *appsv1.ShardingDefinition, runningComps []appsv1.Component) error {
+	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.PreTerminate == nil {
+		return nil
+	}
+
+	unfinishedComponents := checkPreTerminateDone(runningComps)
+	if len(unfinishedComponents) == 0 {
+		return nil
+	}
+
+	finishedComponents, err := shardingPreTerminate(transCtx, unfinishedComponents, shardingDef.Spec.LifecycleActions)
+	if err != nil {
+		return lifecycle.IgnoreNotDefined(err)
+	}
+
+	markShardingPreTerminateDone(transCtx, dag, finishedComponents, runningComps)
+	return ictrlutil.NewErrorf(ictrlutil.ErrorTypeRequeue, "requeue to waiting for sharding pre-terminate annotation to be set")
+}
+
+func checkPreTerminateDone(comps []appsv1.Component) []appsv1.Component {
+	var unfinished []appsv1.Component
+	for _, comp := range comps {
+		if comp.Annotations == nil {
+			unfinished = append(unfinished, comp)
+			continue
+		}
+
+		_, ok := comp.Annotations[kbShardingPreTerminateDoneKey]
+		if !ok {
+			unfinished = append(unfinished, comp)
+		}
+	}
+	return unfinished
+}
+
+func shardingPreTerminate(transCtx *clusterTransformContext, comps []appsv1.Component, lifecycleAction *appsv1.ShardingLifecycleActions) ([]string, error) {
+	lfa, err := lifecycleAction4Sharding(transCtx, comps, lifecycleAction)
+	if err != nil {
+		return nil, err
+	}
+	return lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
+}
+
+func lifecycleAction4Sharding(transCtx *clusterTransformContext, comps []appsv1.Component, lifecycleAction *appsv1.ShardingLifecycleActions) (lifecycle.ShardingLifecycle, error) {
+	compTemplateVarsMap, compPodsMap, err := buildCompMaps(transCtx, comps)
+	if err != nil {
+		return nil, err
+	}
+
+	return lifecycle.NewShardingLifecycle(transCtx.Cluster.Namespace, transCtx.Cluster.Name, lifecycleAction, compTemplateVarsMap, nil, compPodsMap)
+}
+
+func markShardingPreTerminateDone(transCtx *clusterTransformContext, dag *graph.DAG, comps []string, runningComps []appsv1.Component) {
+	now := time.Now().Format(time.RFC3339Nano)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+
+	compsMap := make(map[string]*appsv1.Component)
+	for _, comp := range runningComps {
+		compsMap[comp.Name] = &comp
+	}
+
+	for _, comp := range comps {
+		compCopyObj := compsMap[comp].DeepCopy()
+		if compCopyObj.Annotations == nil {
+			compCopyObj.Annotations = make(map[string]string)
+		}
+
+		_, ok := compCopyObj.Annotations[kbShardingPreTerminateDoneKey]
+		if ok {
+			return
+		}
+
+		transCtx.annotations[comp][kbShardingPreTerminateDoneKey] = now
+		graphCli.Update(dag, compsMap[comp], compCopyObj)
+	}
+}
+
+func buildCompMaps(transCtx *clusterTransformContext, comps []appsv1.Component) (map[string]map[string]string, map[string][]*corev1.Pod, error) {
+	compTemplateVarsMap := make(map[string]map[string]string)
+	compPodsMap := make(map[string][]*corev1.Pod)
+
+	for _, comp := range comps {
+		synthesizedComp, err := synthesizedComponent(transCtx, &comp)
+		if err != nil {
+			return nil, nil, err
+		}
+		compTemplateVarsMap[comp.Name] = synthesizedComp.TemplateVars
+
+		pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
+			synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		compPodsMap[comp.Name] = pods
+	}
+	return compTemplateVarsMap, compPodsMap, nil
+}
+
+func synthesizedComponent(transCtx *clusterTransformContext, comp *appsv1.Component) (*component.SynthesizedComponent, error) {
+	synthesizedComp, err := component.BuildSynthesizedComponent(transCtx.Context, transCtx.Client, transCtx.componentDefs[comp.Spec.CompDef], comp)
+	if err != nil {
+		return nil, ictrlutil.NewRequeueError(appsutil.RequeueDuration,
+			fmt.Sprintf("build synthesized component failed at pre-terminate: %s", err.Error()))
+	}
+	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(transCtx.Context, transCtx.Client, synthesizedComp, transCtx.componentDefs[comp.Spec.CompDef].Spec.Vars)
+	if err != nil {
+		return nil, err
+	}
+	return synthesizedComp, nil
 }

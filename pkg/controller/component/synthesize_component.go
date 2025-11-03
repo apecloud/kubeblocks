@@ -542,14 +542,14 @@ func buildShardingLifecycleActions(ctx context.Context, cli client.Reader, synth
 		return nil
 	}
 
-	getCluster := func() (*appsv1.Cluster, error) {
-		clusterKey := types.NamespacedName{
-			Name:      synthesizeComp.ClusterName,
-			Namespace: comp.Namespace,
-		}
-		cluster := &appsv1.Cluster{}
-		err := cli.Get(ctx, clusterKey, cluster)
-		return cluster, err
+	clusterKey := types.NamespacedName{
+		Namespace: synthesizeComp.Namespace,
+		Name:      synthesizeComp.ClusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	err := cli.Get(ctx, clusterKey, cluster)
+	if err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
 	getShardingLifecycleAction := func() (*appsv1.ShardingLifecycleActions, error) {
@@ -564,10 +564,6 @@ func buildShardingLifecycleActions(ctx context.Context, cli client.Reader, synth
 		return shardingDef.Spec.LifecycleActions, err
 	}
 
-	cluster, err := getCluster()
-	if err != nil {
-		return err
-	}
 	for _, sharding := range cluster.Spec.Shardings {
 		if sharding.Name == shardName {
 			synthesizeComp.ShardingLifecycleActions, err = getShardingLifecycleAction()

@@ -37,14 +37,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type updateReconciler struct {
-	pods []*corev1.Pod
-}
+type updateReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}
 
-func NewUpdateReconciler(pods []*corev1.Pod) kubebuilderx.Reconciler {
-	return &updateReconciler{pods: pods}
+func NewUpdateReconciler() kubebuilderx.Reconciler {
+	return &updateReconciler{}
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -197,7 +195,8 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 		return nil
 	}
 
-	lfa, err := newLifecycleAction(inst, r.pods, pod)
+	// FIXME: select all available pods
+	lfa, err := newLifecycleAction(inst, []*corev1.Pod{pod}, pod)
 	if err != nil {
 		return err
 	}

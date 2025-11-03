@@ -220,7 +220,7 @@ jobs:
       matrix:
         test-type: [ asmysql|apecloud-mysql|postgresql|mongodb|mongodb-shard|kafka|redis|redis-cluster|elasticsearch|rabbitmq|rocketmq,
                      clickhouse|etcd|influxdb|loki|nebula|milvus|minio|qdrant|tdengine|tidb|victoria-metrics|zookeeper,
-                     damengdb|gaussdb|goldendb|greatdb|kingbase|mssql|oceanbase-ent|oracle|starrocks-ent|tdsql|vastbase,
+                     damengdb|gaussdb|goldendb|greatdb|kingbase|mssql|oceanbase-ent|oracle|starrocks-ent|tdsql|vastbase|oceanbase-proxy,
                      pulsar|starrocks|oceanbase|mariadb|mogdb|openldap|orchestrator|risingwave|dmdb|solr|flink|yashandb,
                      greatsql|vanilla-pg|opengauss|greptimedb|opensearch|weaviate|orioledb|polardbx|ggml|vllm|xinference ]
     with:

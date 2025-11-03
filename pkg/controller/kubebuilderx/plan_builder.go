@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -265,7 +264,7 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 
 func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	err := b.cli.Create(ctx, vertex.Obj, clientOption(vertex))
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if err != nil {
 		return fmt.Errorf("create %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
 	b.emitEvent(vertex.Obj, "SuccessfulCreate", model.CREATE)
@@ -314,14 +313,13 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 	}
 	if len(finalizer) > 0 && controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
-		if err != nil && !apierrors.IsNotFound(err) {
-			b.transCtx.logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, klog.KObj(vertex.Obj)))
+		if err != nil {
 			return fmt.Errorf("delete %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 		}
 	}
 	if !model.IsObjectDeleting(vertex.Obj) {
 		err := b.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
-		if err != nil && !apierrors.IsNotFound(err) {
+		if err != nil {
 			return fmt.Errorf("delete %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 		}
 		b.emitEvent(vertex.Obj, "SuccessfulDelete", model.DELETE)
@@ -331,7 +329,7 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 
 func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	if err := b.cli.Status().Update(ctx, vertex.Obj, clientOption(vertex)); err != nil {
-		return err
+		return fmt.Errorf("status %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
 	return nil
 }

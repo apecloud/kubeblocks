@@ -34,6 +34,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 )
 
@@ -202,7 +203,7 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 	return updateStrategy
 }
 
-func newLifecycleAction(its *workloads.InstanceSet, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+func newLifecycleAction(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = its.Labels[constant.AppInstanceLabelKey]
 		compName         = its.Labels[constant.KBAppComponentLabelKey]
@@ -211,6 +212,10 @@ func newLifecycleAction(its *workloads.InstanceSet, pods []*corev1.Pod, pod *cor
 			Reconfigure: its.Spec.LifecycleActions.Reconfigure,
 		}
 	)
+	pods := make([]*corev1.Pod, 0)
+	for _, object := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, object.(*corev1.Pod))
+	}
 	return lifecycle.New(its.Namespace, clusterName, compName,
 		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, pod, pods)
 }

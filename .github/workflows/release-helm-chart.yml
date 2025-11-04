@@ -129,6 +129,62 @@ jobs:
       APECD_REF: "v0.1.86"
     secrets: inherit
 
+  release-result:
+    if: github.event.action == 'published'
+    needs: [ release-message ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, chart]
+    steps:
+      - name: Restore ${{ matrix.type }} Artifact
+        id: cache-artifact-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+          key: ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+
+      - name: check release result
+        run: |
+          release_result=$( cat ${{ env.RELEASE_VERSION }}-${{ matrix.type }} )
+          if [[ "$release_result" != "success" ]]; then
+              exit 1
+          fi
+
+  e2e-kbcli:
+    needs: [ release-message, release-result ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.35
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [ apecloud-mysql|asmysql|asmysql-proxy|asmysql-orc|asmysql-orc-proxy|kafka|mongodb|mongodb-shard|postgresql|postgresql-etcd|redis|redis-cluster,
+                     damengdb|gaussdb|goldendb|greatdb|kingbase|mssql|oceanbase-ent|oracle|starrocks-ent|tdsql|vastbase|oceanbase-proxy,
+                     clickhouse|elasticsearch|etcd|nebula|qdrant|rocketmqe|greptimedb|polardbx|starrocks|vanilla-pg,
+                     mariadb|mogdb|oceanbase|opensearch|orioledb|orchestrator|risingwave|weaviate|yashandb|doris,
+                     influxdb|loki|minio|milvus|rabbitmq|tdengine|tidb|victoria-metrics|zookeeper|hadoop|hive ]
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks"
+      BRANCH_NAME: "main"
+      WORKFLOW_ID: "e2e-kbcli.yml"
+      APECD_REF: "v0.1.35"
+      VERSION: "${{ needs.release-message.outputs.release-version }}"
+      EXTRA_ARGS: "TEST_TYPE=${{ matrix.test-type }}#CLOUD_PROVIDER=${{ vars.CLOUD_PROVIDER }}"
+    secrets: inherit
+
+  delete-cache:
+    needs: [ e2e-kbcli ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, chart]
+    steps:
+      - uses: actions/checkout@v4
+      - name: delete ${{ matrix.type }} cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ env.RELEASE_VERSION }}-${{ matrix.type }}"
+
   get-addons-chart-dir:
     runs-on: ubuntu-latest
     outputs:
@@ -220,4 +276,35 @@ jobs:
       CHART_DIR: "addons"
       SPECIFY_CHART: "${{ matrix.addon-name }}"
       APECD_REF: "v0.1.96"
+    secrets: inherit
+
+  release-branch:
+    needs: [ release-message, release-result ]
+    uses: apecloud/apecloud-cd/.github/workflows/release-branch.yml@v0.1.96
+    with:
+      RELEASE_VERSION: "${{ needs.release-message.outputs.release-version }}"
+      RELEASE_BRANCH: "default"
+      APECD_REF: "v0.1.96"
+    secrets: inherit
+
+  update-addons-release-notes:
+    needs: [ release-message, release-branch ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.96
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks-addons"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "update-release-notes.yml"
+      APECD_REF: "v0.1.96"
+      VERSION: "${{ needs.release-message.outputs.release-version }}"
+    secrets: inherit
+
+  update-addons-release-notes-ent:
+    needs: [ release-message, release-branch ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.96
+    with:
+      GITHUB_REPO: "apecloud/apecloud-addons"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "update-release-notes.yml"
+      APECD_REF: "v0.1.96"
+      VERSION: "${{ needs.release-message.outputs.release-version }}"
     secrets: inherit

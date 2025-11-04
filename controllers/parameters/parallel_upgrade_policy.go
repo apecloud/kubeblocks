@@ -26,15 +26,13 @@ import (
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var restartContainerPolicyInstance = &restartContainerUpgradePolicy{}
+func init() {
+	registerPolicy(parametersv1alpha1.RestartContainerPolicy, &restartContainerUpgradePolicy{})
+}
 
 type restartContainerUpgradePolicy struct{}
 
-func init() {
-	registerPolicy(parametersv1alpha1.RestartContainerPolicy, restartContainerPolicyInstance)
-}
-
-func (p *restartContainerUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+func (p *restartContainerUpgradePolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	funcs := GetInstanceSetRollingUpgradeFuncs()
 	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
@@ -44,11 +42,7 @@ func (p *restartContainerUpgradePolicy) Upgrade(rctx reconfigureContext) (Return
 	return p.restartPods(rctx, pods, funcs)
 }
 
-func (p *restartContainerUpgradePolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.RestartContainerPolicy)
-}
-
-func (p *restartContainerUpgradePolicy) restartPods(rctx reconfigureContext, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func (p *restartContainerUpgradePolicy) restartPods(rctx reconfigureContext, pods []corev1.Pod, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	var configKey = rctx.generateConfigIdentifier()
 	var configVersion = rctx.getTargetVersionHash()
 

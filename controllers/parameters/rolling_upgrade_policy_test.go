@@ -90,8 +90,6 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	// TODO(component)
 	Context("consensus rolling reconfigure policy test", func() {
 		It("Should success without error", func() {
-			Expect(rollingPolicy.GetPolicyName()).Should(BeEquivalentTo("rolling"))
-
 			mockLeaderLabel := func(pod *corev1.Pod, i int) {
 				if pod.Labels == nil {
 					pod.Labels = make(map[string]string, 1)

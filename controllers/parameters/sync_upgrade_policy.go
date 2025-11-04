@@ -39,11 +39,7 @@ func init() {
 	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicyInstance)
 }
 
-func (o *syncPolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.SyncDynamicReloadPolicy)
-}
-
-func (o *syncPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	updatedParameters := generateOnlineUpdateParams(rctx.Patch, rctx.ParametersDef, *rctx.ConfigDescription)
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
@@ -72,7 +68,7 @@ func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod
 	return result, nil
 }
 
-func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	var (
 		r        = ESNone
 		total    = int32(len(pods))

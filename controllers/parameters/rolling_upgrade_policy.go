@@ -49,19 +49,15 @@ func init() {
 }
 
 // Upgrade performs a rolling upgrade based on the provided parameters.
-func (r *rollingUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+func (r *rollingUpgradePolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	return performRollingUpgrade(rctx, GetInstanceSetRollingUpgradeFuncs())
-}
-
-func (r *rollingUpgradePolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.RollingPolicy)
 }
 
 func canPerformUpgrade(pods []corev1.Pod, params reconfigureContext) bool {
 	return len(pods) == params.getTargetReplicas()
 }
 
-func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err

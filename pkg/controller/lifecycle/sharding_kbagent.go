@@ -37,7 +37,7 @@ type shardingAgent struct {
 }
 
 func (a *shardingAgent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &postProvision{
+	lfa := &shardPostProvision{
 		namespace:   a.namespace,
 		clusterName: a.clusterName,
 		compName:    a.compName,
@@ -48,7 +48,7 @@ func (a *shardingAgent) PostProvision(ctx context.Context, cli client.Reader, op
 }
 
 func (a *shardingAgent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &preTerminate{
+	lfa := &shardPreTerminate{
 		namespace:   a.namespace,
 		clusterName: a.clusterName,
 		compName:    a.compName,

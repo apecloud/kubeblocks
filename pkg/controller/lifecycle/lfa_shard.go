@@ -62,3 +62,37 @@ func (a *shardRemove) name() string {
 func (a *shardRemove) parameters(context.Context, client.Reader) (map[string]string, error) {
 	return nil, nil
 }
+
+type shardPostProvision struct {
+	namespace   string
+	clusterName string
+	compName    string
+	action      *appsv1.Action
+}
+
+var _ lifecycleAction = &shardPostProvision{}
+
+func (a *shardPostProvision) name() string {
+	return "shardPostProvision"
+}
+
+func (a *shardPostProvision) parameters(context.Context, client.Reader) (map[string]string, error) {
+	return nil, nil
+}
+
+type shardPreTerminate struct {
+	namespace   string
+	clusterName string
+	compName    string
+	action      *appsv1.Action
+}
+
+var _ lifecycleAction = &shardPreTerminate{}
+
+func (a *shardPreTerminate) name() string {
+	return "shardPreTerminate"
+}
+
+func (a *shardPreTerminate) parameters(context.Context, client.Reader) (map[string]string, error) {
+	return nil, nil
+}

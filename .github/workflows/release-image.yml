@@ -194,34 +194,3 @@ jobs:
       CONTENT: "release image ${{ needs.release-message.outputs.release-version }} ${{ needs.release-message.outputs.content-result }}"
       APECD_REF: "v0.1.38"
     secrets: inherit
-
-  release-branch:
-    needs: [ release-message, release-result ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-branch.yml@v0.1.96
-    with:
-      RELEASE_VERSION: "${{ needs.release-message.outputs.release-version }}"
-      RELEASE_BRANCH: "default"
-      APECD_REF: "v0.1.96"
-    secrets: inherit
-
-  update-addons-release-notes:
-    needs: [ release-message, release-branch ]
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.96
-    with:
-      GITHUB_REPO: "apecloud/kubeblocks-addons"
-      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
-      WORKFLOW_ID: "update-release-notes.yml"
-      APECD_REF: "v0.1.96"
-      VERSION: "${{ needs.release-message.outputs.release-version }}"
-    secrets: inherit
-
-  update-addons-release-notes-ent:
-    needs: [ release-message, release-branch ]
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.96
-    with:
-      GITHUB_REPO: "apecloud/apecloud-addons"
-      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
-      WORKFLOW_ID: "update-release-notes.yml"
-      APECD_REF: "v0.1.96"
-      VERSION: "${{ needs.release-message.outputs.release-version }}"
-    secrets: inherit

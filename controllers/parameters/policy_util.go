@@ -122,40 +122,6 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 	return nil
 }
 
-func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerNames []string, createClient createReconfigureClient) error {
-	containerIDs := make([]string, 0, len(containerNames))
-	for _, name := range containerNames {
-		containerID := intctrlutil.GetContainerID(pod, name)
-		if containerID == "" {
-			return core.MakeError("failed to find container in pod[%s], name=%s", name, pod.Name)
-		}
-		containerIDs = append(containerIDs, containerID)
-	}
-
-	address, err := resolveReloadServerGrpcURL(pod)
-	if err != nil {
-		return err
-	}
-	// stop container
-	client, err := createClient(address)
-	if err != nil {
-		return err
-	}
-
-	response, err := client.StopContainer(ctx, &cfgproto.StopContainerRequest{
-		ContainerIDs: containerIDs,
-	})
-	if err != nil {
-		return err
-	}
-
-	errMessage := response.GetErrMessage()
-	if errMessage != "" {
-		return core.MakeError("%s", errMessage)
-	}
-	return nil
-}
-
 func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
 	if pod.Spec.HostNetwork {

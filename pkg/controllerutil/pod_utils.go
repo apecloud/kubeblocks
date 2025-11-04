@@ -22,14 +22,12 @@ package controllerutil
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -238,20 +236,6 @@ func IsPodAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now()) && !isTerminating(pod)
 }
 
-// GetContainerID gets the containerID from pod by name
-func GetContainerID(pod *corev1.Pod, containerName string) string {
-	const containerSep = "//"
-
-	// container id is present in the form of <runtime>://<container-id>
-	// e.g: containerID: docker://27d1586d53ef9a6af5bd983831d13b6a38128119fadcdc22894d7b2397758eb5
-	for _, container := range pod.Status.ContainerStatuses {
-		if container.Name == containerName {
-			return strings.Split(container.ContainerID, containerSep)[1]
-		}
-	}
-	return ""
-}
-
 func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
 	if status == nil {
 		return nil
@@ -278,25 +262,6 @@ func IsMatchConfigVersion(obj client.Object, labelKey string, version string) bo
 		return true
 	}
 	return false
-}
-
-func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
-	if intOrStr.Type == metautil.Int {
-		return intOrStr.IntValue(), false, nil
-	}
-
-	// parse string
-	s := intOrStr.StrVal
-	if strings.HasSuffix(s, "%") {
-		s = strings.TrimSuffix(intOrStr.StrVal, "%")
-	} else {
-		return 0, false, fmt.Errorf("failed to parse percentage. [%s]", intOrStr.StrVal)
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to atoi [%s], error: %v", intOrStr.StrVal, err)
-	}
-	return v, true, nil
 }
 
 func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {

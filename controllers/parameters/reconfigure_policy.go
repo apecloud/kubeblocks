@@ -20,13 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"math"
 	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -35,10 +33,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ExecStatus defines running result for Reconfiguring policy (fsm).
@@ -149,52 +145,8 @@ func (param *reconfigureContext) getTargetVersionHash() string {
 	return hash
 }
 
-func (param *reconfigureContext) maxRollingReplicas() int32 {
-	var (
-		defaultRolling int32 = 1
-		r              int32
-		replicas       = param.getTargetReplicas()
-	)
-
-	if param.SynthesizedComponent == nil {
-		return defaultRolling
-	}
-
-	var maxUnavailable *intstr.IntOrString
-	for _, its := range param.InstanceSetUnits {
-		if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
-			maxUnavailable = its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
-		}
-		if maxUnavailable != nil {
-			break
-		}
-	}
-
-	if maxUnavailable == nil {
-		return defaultRolling
-	}
-
-	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(maxUnavailable)
-	if err != nil {
-		param.Log.Error(err, "failed to get maxUnavailable!")
-		return defaultRolling
-	}
-
-	if isPercentage {
-		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
-	} else {
-		r = util.Safe2Int32(min(v, param.getTargetReplicas()))
-	}
-	return max(r, defaultRolling)
-}
-
 func (param *reconfigureContext) getTargetReplicas() int {
 	return int(param.ClusterComponent.Replicas)
-}
-
-func (param *reconfigureContext) podMinReadySeconds() int32 {
-	minReadySeconds := param.SynthesizedComponent.MinReadySeconds
-	return max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {

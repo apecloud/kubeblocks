@@ -835,6 +835,7 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 	}
 
 	shardingDef := transCtx.shardingDefs[name]
+	now := time.Now().Format(time.RFC3339Nano)
 	addPostProvisionAnnotation := func(comp *appsv1.Component) {
 		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
 			return
@@ -843,7 +844,7 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 		if comp.Annotations == nil {
 			comp.Annotations = make(map[string]string)
 		}
-		comp.Annotations[kbShardingPostProvisionKey] = "true"
+		comp.Annotations[kbShardingPostProvisionKey] = now
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
@@ -935,6 +936,7 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, dag *graph.DAG,
 	protoComps map[string]*appsv1.Component, createSet sets.Set[string], shardingName string) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+	now := time.Now().Format(time.RFC3339Nano)
 	addShardAddAnnotation := func(comp *appsv1.Component) {
 		shardingDef := transCtx.shardingDefs[shardingName]
 		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
@@ -944,7 +946,7 @@ func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, 
 		if comp.Annotations == nil {
 			comp.Annotations = make(map[string]string)
 		}
-		comp.Annotations[kbShardingAddKey] = "true"
+		comp.Annotations[kbShardingAddKey] = now
 	}
 
 	for name := range createSet {

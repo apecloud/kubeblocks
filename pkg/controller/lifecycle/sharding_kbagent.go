@@ -23,10 +23,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type shardingAgent struct {
@@ -117,4 +118,15 @@ func (a *shardingAgent) compReadyCheck(ctx context.Context, cli client.Reader) e
 		}
 	}
 	return nil
+}
+
+func (a *shardingAgent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
+	if !spec.Defined() {
+		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
+	}
+	if err := a.precondition(ctx, cli, spec); err != nil {
+		return nil, err
+	}
+	// TODO: exactly once
+	return a.callAction(ctx, cli, spec, lfa, opts)
 }

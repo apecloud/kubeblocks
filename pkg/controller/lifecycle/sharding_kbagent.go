@@ -23,94 +23,62 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type shardingAgent struct {
-	compAgents               []kbagent
+	*kbagent
+	shardingName             string
 	shardingLifecycleActions *appsv1.ShardingLifecycleActions
 }
 
-func (a *shardingAgent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) ([]string, error) {
-	err := a.precondition(ctx, cli, a.shardingLifecycleActions.PostProvision)
-	if err != nil {
-		return nil, err
+func (a *shardingAgent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
+	lfa := &postProvision{
+		namespace:   a.namespace,
+		clusterName: a.clusterName,
+		compName:    a.compName,
+		action:      a.shardingLifecycleActions.PostProvision,
 	}
 
-	finishedComps := make([]string, 0)
-	for _, compAgent := range a.compAgents {
-		lfa := &postProvision{
-			namespace:   compAgent.namespace,
-			clusterName: compAgent.clusterName,
-			compName:    compAgent.compName,
-			action:      a.shardingLifecycleActions.PostProvision,
-		}
-
-		err = compAgent.ignoreOutput(compAgent.nonPreconditionCallAction(ctx, cli, lfa.action, lfa, opts))
-		if err != nil {
-			return nil, err
-		}
-		finishedComps = append(finishedComps, compAgent.compName)
-	}
-	return finishedComps, nil
+	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 }
 
-func (a *shardingAgent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) ([]string, error) {
-	finishedComps := make([]string, 0)
-	for _, compAgent := range a.compAgents {
-		lfa := &preTerminate{
-			namespace:   compAgent.namespace,
-			clusterName: compAgent.clusterName,
-			compName:    compAgent.compName,
-			action:      a.shardingLifecycleActions.PreTerminate,
-		}
-
-		err := compAgent.ignoreOutput(compAgent.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
-		if err != nil {
-			return nil, err
-		}
-		finishedComps = append(finishedComps, compAgent.compName)
+func (a *shardingAgent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error {
+	lfa := &preTerminate{
+		namespace:   a.namespace,
+		clusterName: a.clusterName,
+		compName:    a.compName,
+		action:      a.shardingLifecycleActions.PreTerminate,
 	}
 
-	return finishedComps, nil
+	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 }
 
 func (a *shardingAgent) ShardAdd(ctx context.Context, cli client.Reader, opts *Options) error {
-	for _, compAgent := range a.compAgents {
-		lfa := &shardAdd{
-			namespace:   compAgent.namespace,
-			clusterName: compAgent.clusterName,
-			compName:    compAgent.compName,
-			action:      a.shardingLifecycleActions.ShardAdd,
-		}
-
-		err := compAgent.ignoreOutput(compAgent.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
-		if err != nil {
-			return err
-		}
+	lfa := &shardAdd{
+		namespace:    a.namespace,
+		clusterName:  a.clusterName,
+		compName:     a.compName,
+		shardingName: a.shardingName,
+		action:       a.shardingLifecycleActions.ShardAdd,
 	}
 
-	return nil
+	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 }
 
 func (a *shardingAgent) ShardRemove(ctx context.Context, cli client.Reader, opts *Options) error {
-	for _, compAgent := range a.compAgents {
-		lfa := &shardRemove{
-			namespace:   compAgent.namespace,
-			clusterName: compAgent.clusterName,
-			compName:    compAgent.compName,
-			action:      a.shardingLifecycleActions.ShardRemove,
-		}
-
-		err := compAgent.ignoreOutput(compAgent.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
-		if err != nil {
-			return err
-		}
+	lfa := &shardRemove{
+		namespace:    a.namespace,
+		clusterName:  a.clusterName,
+		compName:     a.compName,
+		shardingName: a.shardingName,
+		action:       a.shardingLifecycleActions.ShardRemove,
 	}
 
-	return nil
+	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
 }
 
 func (a *shardingAgent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action) error {
@@ -120,17 +88,33 @@ func (a *shardingAgent) precondition(ctx context.Context, cli client.Reader, spe
 	switch *spec.PreCondition {
 	case appsv1.ImmediatelyPreConditionType:
 		return nil
+	case appsv1.RuntimeReadyPreConditionType:
+		return a.runtimeReadyCheck(ctx, cli)
 	case appsv1.ComponentReadyPreConditionType:
-		for _, compAgent := range a.compAgents {
-			err := compAgent.compReadyCheck(ctx, cli)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+		return a.compReadyCheck(ctx, cli)
 	case appsv1.ClusterReadyPreConditionType:
-		return a.compAgents[0].clusterReadyCheck(ctx, cli)
+		return a.clusterReadyCheck(ctx, cli)
 	default:
 		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
 	}
+}
+
+func (a *shardingAgent) compReadyCheck(ctx context.Context, cli client.Reader) error {
+	compList := &appsv1.ComponentList{}
+	labels := constant.GetClusterLabels(a.clusterName, map[string]string{constant.KBAppShardingNameLabelKey: a.shardingName})
+	if err := cli.List(ctx, compList, client.InNamespace(a.namespace), client.MatchingLabels(labels)); err != nil {
+		return err
+	}
+
+	ready := func(object client.Object) bool {
+		comp := object.(*appsv1.Component)
+		return comp.Status.Phase == appsv1.RunningComponentPhase
+	}
+
+	for _, comp := range compList.Items {
+		if !ready(&comp) {
+			return fmt.Errorf("%w: component is not ready", ErrPreconditionFailed)
+		}
+	}
+	return nil
 }

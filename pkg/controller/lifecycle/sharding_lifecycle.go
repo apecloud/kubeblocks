@@ -29,41 +29,25 @@ import (
 )
 
 type ShardingLifecycle interface {
-	PostProvision(ctx context.Context, cli client.Reader, opts *Options) ([]string, error)
+	PostProvision(ctx context.Context, cli client.Reader, opts *Options) error
 
-	PreTerminate(ctx context.Context, cli client.Reader, opts *Options) ([]string, error)
+	PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error
 
 	ShardAdd(ctx context.Context, cli client.Reader, opts *Options) error
 
 	ShardRemove(ctx context.Context, cli client.Reader, opts *Options) error
 }
 
-func NewShardingLifecycle(namespace, clusterName string,
-	lifecycleActions *appsv1.ShardingLifecycleActions,
-	compTemplateVarsMap map[string]map[string]string,
-	compPodMap map[string]*corev1.Pod,
-	compPodsMap map[string][]*corev1.Pod) (ShardingLifecycle, error) {
-	agents := make([]kbagent, 0)
-
-	for comp, templateVars := range compTemplateVarsMap {
-		agent := kbagent{
-			namespace:    namespace,
-			clusterName:  clusterName,
-			compName:     comp,
-			templateVars: templateVars,
-		}
-
-		if compPodMap != nil {
-			agent.pod = compPodMap[comp]
-		}
-		if compPodsMap != nil {
-			agent.pods = compPodsMap[comp]
-		}
-		agents = append(agents, agent)
+func NewShardingLifecycle(namespace, clusterName, compName, shardingName string, lifecycleActions *appsv1.ShardingLifecycleActions,
+	templateVars map[string]string, pod *corev1.Pod, pods ...*corev1.Pod) (ShardingLifecycle, error) {
+	agent, err := New(namespace, clusterName, compName, nil, templateVars, pod, pods...)
+	if err != nil {
+		return nil, err
 	}
 
 	return &shardingAgent{
-		compAgents:               agents,
+		kbagent:                  agent.(*kbagent),
+		shardingName:             shardingName,
 		shardingLifecycleActions: lifecycleActions,
 	}, nil
 }

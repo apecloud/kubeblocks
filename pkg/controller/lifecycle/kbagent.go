@@ -152,14 +152,6 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	return a.callAction(ctx, cli, spec, lfa, opts)
 }
 
-func (a *kbagent) nonPreconditionCallAction(ctx context.Context, cli client.Reader, spec *appsv1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
-	if !spec.Defined() {
-		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
-	}
-
-	return a.callAction(ctx, cli, spec, lfa, opts)
-}
-
 func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec *appsv1.Probe, lfa lifecycleAction, opts *Options) ([]byte, error) {
 	if !spec.Action.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())

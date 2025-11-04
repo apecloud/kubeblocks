@@ -151,8 +151,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterOwnershipTransformer{},
 			// update cluster status
 			&clusterStatusTransformer{},
-			// handle sharding post provision
-			&clusterShardingPostProvisionTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()

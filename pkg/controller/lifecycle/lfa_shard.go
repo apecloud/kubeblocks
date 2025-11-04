@@ -28,10 +28,11 @@ import (
 )
 
 type shardAdd struct {
-	namespace   string
-	clusterName string
-	compName    string
-	action      *appsv1.Action
+	namespace    string
+	clusterName  string
+	compName     string
+	shardingName string
+	action       *appsv1.Action
 }
 
 var _ lifecycleAction = &shardAdd{}
@@ -45,10 +46,11 @@ func (a *shardAdd) parameters(context.Context, client.Reader) (map[string]string
 }
 
 type shardRemove struct {
-	namespace   string
-	clusterName string
-	compName    string
-	action      *appsv1.Action
+	namespace    string
+	clusterName  string
+	compName     string
+	shardingName string
+	action       *appsv1.Action
 }
 
 var _ lifecycleAction = &shardRemove{}

@@ -115,10 +115,10 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
-			return nil, errors.Wrapf(kbaproto.ErrFailed, errMsg)
+			return nil, errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg)
 		}
 		if errMsg := result.stderr.String(); len(errMsg) > 0 {
-			return nil, errors.Wrapf(err, errMsg)
+			return nil, errors.Wrapf(err, "%s", errMsg)
 		}
 		return nil, err
 	}

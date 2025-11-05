@@ -10,7 +10,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.24"
 
 jobs:
   trigger-mode:
@@ -136,7 +136,7 @@ jobs:
     with:
       MAKE_OPS_PRE: "generate"
       IMG: "apecloud/kubeblocks"
-      GO_VERSION: "1.23"
+      GO_VERSION: "1.24"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile"
       BUILDX_ARGS: |
@@ -152,7 +152,7 @@ jobs:
     with:
       MAKE_OPS_PRE: "module generate test-go-generate"
       IMG: "apecloud/kubeblocks-tools"
-      GO_VERSION: "1.23"
+      GO_VERSION: "1.24"
       BUILDX_PLATFORMS: "linux/amd64"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
@@ -179,7 +179,7 @@ jobs:
       CHART_DIR: "deploy/helm"
       APECD_REF: "v0.1.43"
       MAKE_OPS_POST: "install"
-      GO_VERSION: "1.23"
+      GO_VERSION: "1.24"
     secrets: inherit
 
   pr-check:

@@ -191,7 +191,7 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 			if needWaitPreConditionDeadline(opsRes.OpsRequest) {
 				return intctrlutil.NewRequeueError(time.Second, rule.Message)
 			}
-			return fmt.Errorf(rule.Message)
+			return fmt.Errorf("%s", rule.Message)
 		}
 	}
 	return nil

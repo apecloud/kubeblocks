@@ -464,7 +464,7 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 		}
 	}
 	if errType != "" {
-		return intctrlutil.NewErrorf(errType, strings.Join(msgs, ";"))
+		return intctrlutil.NewErrorf(errType, "%s", strings.Join(msgs, ";"))
 	}
 	return nil
 }

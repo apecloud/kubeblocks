@@ -43,14 +43,14 @@ func NewRuntime(cueString string) (*Runtime, error) {
 	insts := load.Instances([]string{"-"}, cueOption)
 	for _, ins := range insts {
 		if err := ins.Err; err != nil {
-			return nil, core.MakeError(errors.Details(err, nil))
+			return nil, core.MakeError("%s", errors.Details(err, nil))
 		}
 	}
 
 	inst := insts[0]
 	rt := cuecontext.New().BuildInstance(inst)
 	if err := rt.Validate(cue.All()); err != nil {
-		return nil, core.MakeError(errors.Details(err, nil))
+		return nil, core.MakeError("%s", errors.Details(err, nil))
 	}
 
 	return &Runtime{

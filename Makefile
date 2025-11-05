@@ -173,7 +173,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.23
+	$(GO) mod tidy -compat=1.24
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...

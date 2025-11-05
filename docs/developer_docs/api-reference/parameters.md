@@ -2568,11 +2568,7 @@ reload.</p>
 <td></td>
 </tr><tr><td><p>&#34;none&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;restartContainer&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;restart&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;rolling&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;syncReload&#34;</p></td>
 <td></td>

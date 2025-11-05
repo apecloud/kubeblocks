@@ -119,7 +119,7 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 
 func checkAndCreateService(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcore.ConfigHandler) error {
 	serviceOpt := opt.ServiceOpt
-	if !serviceOpt.ContainerRuntimeEnable && !serviceOpt.RemoteOnlineUpdateEnable {
+	if !serviceOpt.RemoteOnlineUpdateEnable {
 		return nil
 	}
 	if err := startGRPCService(opt, ctx, handler); err != nil {

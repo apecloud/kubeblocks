@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/pflag"
 
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/container"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -89,12 +88,8 @@ type ReconfigureServiceOptions struct {
 
 	// EnableRemoteOnlineUpdate enables remote online update
 	RemoteOnlineUpdateEnable bool
-	// EnableContainerRuntime enables container runtime
-	ContainerRuntimeEnable bool
 
-	DebugMode        bool
-	ContainerRuntime cfgutil.CRIType
-	RuntimeEndpoint  string
+	DebugMode bool
 }
 
 type VolumeWatcherOpts struct {
@@ -115,9 +110,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 		ServiceOpt: ReconfigureServiceOptions{
 			GrpcPort:                 configManagerDefaultPort,
 			PodIP:                    viper.GetString(configPodIPEnvName),
-			ContainerRuntime:         cfgutil.AutoType,
 			DebugMode:                false,
-			ContainerRuntimeEnable:   false,
 			RemoteOnlineUpdateEnable: false,
 		},
 		LogLevel: "info",
@@ -129,42 +122,6 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"volume-dir",
 		opt.VolumeDirs,
 		"the config map volume directory to be watched for updates; may be used multiple times.")
-
-	// flags.Var(&opt.NotifyHandType,
-	//	"notify-type",
-	//	"the config describes how to process notification messages.",
-	// )
-	//
-	// for signal handle
-	// flags.StringVar(&opt.ProcessName,
-	//	"process",
-	//	opt.ProcessName,
-	//	"the config describes what db program is.")
-	// flags.StringVar((*string)(&opt.Signal),
-	//	"signal",
-	//	string(opt.Signal),
-	//	"the config describes the reload unix signal.")
-	//
-	// for exec handle
-	// flags.StringVar(&opt.Command,
-	//	"command",
-	//	opt.Command,
-	//	"the config describes reload command. ")
-	//
-	// for exec tpl scripts
-	// flags.StringVar(&opt.TPLConfig,
-	//	"tpl-config",
-	//	opt.TPLConfig,
-	//	"the config describes reload behaviors by tpl script.")
-	// flags.StringVar(&opt.BackupPath,
-	//	"backup-path",
-	//	opt.BackupPath,
-	//	"the config describes backup path.")
-	// flags.StringVar(&opt.FileRegex,
-	//	"regex",
-	//	opt.FileRegex,
-	//	"the config sets filter config file.")
-
 	flags.StringVar(&opt.LogLevel,
 		"log-level",
 		opt.LogLevel,
@@ -181,23 +138,10 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"debug",
 		opt.ServiceOpt.DebugMode,
 		"the config sets debug mode.")
-	flags.StringVar((*string)(&opt.ServiceOpt.ContainerRuntime),
-		"container-runtime",
-		string(opt.ServiceOpt.ContainerRuntime),
-		"the config sets cri runtime type.")
-	flags.StringVar(&opt.ServiceOpt.RuntimeEndpoint,
-		"runtime-endpoint",
-		opt.ServiceOpt.RuntimeEndpoint,
-		"the config sets cri runtime endpoint.")
-
-	flags.BoolVar(&opt.ServiceOpt.ContainerRuntimeEnable,
-		"cri-enable",
-		opt.ServiceOpt.ContainerRuntimeEnable,
-		"the config sets enable cri.")
 
 	flags.BoolVar(&opt.ServiceOpt.RemoteOnlineUpdateEnable,
 		"operator-update-enable",
-		opt.ServiceOpt.ContainerRuntimeEnable,
+		opt.ServiceOpt.RemoteOnlineUpdateEnable,
 		"the config sets enable operator update parameter.")
 
 	// for multi handler

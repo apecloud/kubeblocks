@@ -33,16 +33,13 @@ Usage:
   reloader [flags]
 
 Flags:
-      --container-runtime string   the config set cri runtime type. (default "auto")
       --debug                      the config set debug.
-      --disable-runtime            the config set disable runtime.
   -h, --help                       help for reloader
       --log-level string           the config set log level. enum: [error, info, debug] (default "info")
       --notify-type notifyType     the config describe how to process notification messages. (default signal)
       --pod-ip string              the config set pod ip address. (default "127.0.0.1")
       --process string             the config describe what is db program.
       --regex string               the config set filter config file.
-      --runtime-endpoint string    the config set cri runtime endpoint.
       --signal string              the config describe reload unix signal. (default "SIGHUP")
       --tcp int                    the config set service port. (default 9901)
       --volume-dir stringArray     the config map volume directory to watch for updates; may be used multiple times.
@@ -50,7 +47,7 @@ Flags:
 ```
 
 ```shell
-./bin/reloader --disable-runtime --log-level debug --process mysqld --signal SIGHUP --volume-dir /opt/mysql --volume-dir /etc/mysql
+./bin/reloader --log-level debug --process mysqld --signal SIGHUP --volume-dir /opt/mysql --volume-dir /etc/mysql
 
 ```
 

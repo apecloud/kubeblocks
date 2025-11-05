@@ -552,21 +552,21 @@ func buildShardingLifecycleActions(ctx context.Context, cli client.Reader, synth
 		return client.IgnoreNotFound(err)
 	}
 
-	getShardingLifecycleAction := func() (*appsv1.ShardingLifecycleActions, error) {
+	getShardingLifecycleAction := func(shardingDefName string) (*appsv1.ShardingLifecycleActions, error) {
 		shardingDefKey := types.NamespacedName{
-			Name: shardName,
+			Name: shardingDefName,
 		}
 		shardingDef := &appsv1.ShardingDefinition{}
-		err := cli.Get(ctx, shardingDefKey, shardingDef)
+		err = cli.Get(ctx, shardingDefKey, shardingDef)
 		if err != nil {
 			return nil, err
 		}
-		return shardingDef.Spec.LifecycleActions, err
+		return shardingDef.Spec.LifecycleActions, nil
 	}
 
 	for _, sharding := range cluster.Spec.Shardings {
-		if sharding.Name == shardName {
-			synthesizeComp.ShardingLifecycleActions, err = getShardingLifecycleAction()
+		if sharding.Name == shardName && sharding.ShardingDef != "" {
+			synthesizeComp.ShardingLifecycleActions, err = getShardingLifecycleAction(sharding.ShardingDef)
 			if err != nil {
 				return err
 			}

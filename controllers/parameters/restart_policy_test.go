@@ -57,8 +57,6 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 	Context("simple reconfigure policy test", func() {
 		It("Should success without error", func() {
-			Expect(simplePolicy.GetPolicyName()).Should(BeEquivalentTo("restart"))
-
 			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{

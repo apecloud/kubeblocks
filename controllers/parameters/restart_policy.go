@@ -35,17 +35,13 @@ func init() {
 	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInstance)
 }
 
-func (s *restartPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	rctx.Log.V(1).Info("simple policy begin....")
 
-	return restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs())
+	return s.restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs())
 }
 
-func (s *restartPolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.RestartPolicy)
-}
-
-func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	var (
 		newVersion = rctx.getTargetVersionHash()
 		configKey  = rctx.generateConfigIdentifier()

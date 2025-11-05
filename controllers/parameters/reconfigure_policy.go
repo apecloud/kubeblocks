@@ -58,21 +58,11 @@ const (
 	ESFailedAndRetry ExecStatus = "FailedAndRetry"
 )
 
-type ReturnedStatus struct {
+type returnedStatus struct {
 	Status        ExecStatus
 	SucceedCount  int32
 	ExpectedCount int32
 }
-
-type reconfigurePolicy interface {
-	// Upgrade is to enable the configuration to take effect.
-	Upgrade(rctx reconfigureContext) (ReturnedStatus, error)
-
-	// GetPolicyName returns name of policy.
-	GetPolicyName() string
-}
-
-type AutoReloadPolicy struct{}
 
 type reconfigureContext struct {
 	intctrlutil.RequestCtx
@@ -107,6 +97,11 @@ type reconfigureContext struct {
 	Patch             *core.ConfigPatchInfo
 }
 
+type reconfigurePolicy interface {
+	// Upgrade is to enable the configuration to take effect.
+	Upgrade(rctx reconfigureContext) (returnedStatus, error)
+}
+
 var (
 	// lazy creation of grpc connection
 	// TODO support connection pool
@@ -117,17 +112,17 @@ var (
 		}
 		return cfgproto.NewReconfigureClient(conn), nil
 	}
+
+	upgradePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
 )
 
-var upgradePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
-
-func init() {
-	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, &AutoReloadPolicy{})
+// getClientFactory support ut mock
+func getClientFactory() createReconfigureClient {
+	return newGRPCClient
 }
 
-// GetClientFactory support ut mock
-func GetClientFactory() createReconfigureClient {
-	return newGRPCClient
+func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
+	upgradePolicyMap[policy] = action
 }
 
 func (param *reconfigureContext) generateConfigIdentifier() string {
@@ -197,19 +192,6 @@ func (param *reconfigureContext) podMinReadySeconds() int32 {
 	return max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
-func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
-	upgradePolicyMap[policy] = action
-}
-
-func (receiver AutoReloadPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
-	_ = params
-	return makeReturnedStatus(ESNone), nil
-}
-
-func (receiver AutoReloadPolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.AsyncDynamicReloadPolicy)
-}
-
 func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
 	if reloadAction == nil {
 		return false
@@ -225,20 +207,20 @@ func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
 	return false
 }
 
-func withSucceed(succeedCount int32) func(status *ReturnedStatus) {
-	return func(status *ReturnedStatus) {
+func withSucceed(succeedCount int32) func(status *returnedStatus) {
+	return func(status *returnedStatus) {
 		status.SucceedCount = succeedCount
 	}
 }
 
-func withExpected(expectedCount int32) func(status *ReturnedStatus) {
-	return func(status *ReturnedStatus) {
+func withExpected(expectedCount int32) func(status *returnedStatus) {
+	return func(status *returnedStatus) {
 		status.ExpectedCount = expectedCount
 	}
 }
 
-func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
-	ret := ReturnedStatus{
+func makeReturnedStatus(status ExecStatus, ops ...func(status *returnedStatus)) returnedStatus {
+	ret := returnedStatus{
 		Status:        status,
 		SucceedCount:  core.Unconfirmed,
 		ExpectedCount: core.Unconfirmed,

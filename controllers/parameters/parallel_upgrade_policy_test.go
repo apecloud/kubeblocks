@@ -51,8 +51,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 	Context("parallel reconfigure policy test", func() {
 		It("Should success without error", func() {
-			Expect(parallelPolicy.GetPolicyName()).Should(BeEquivalentTo("restartContainer"))
-
 			// mock client update caller
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithTimes(3)))
 

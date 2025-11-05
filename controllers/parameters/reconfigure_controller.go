@@ -236,7 +236,7 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 
 func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
 	var err error
-	var returnedStatus ReturnedStatus
+	var returnedStatus returnedStatus
 	var reloadType string
 
 	for _, task := range reloadTasks {
@@ -249,7 +249,7 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTas
 	return r.succeed(rctx, reloadType, returnedStatus)
 }
 
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus ReturnedStatus, policy string, err error) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus returnedStatus, policy string, err error) (ctrl.Result, error) {
 	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
 		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(returnedStatus, policy, phase, options...))
 	}
@@ -268,7 +268,7 @@ func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus Re
 	}
 }
 
-func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus ReturnedStatus) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus returnedStatus) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,

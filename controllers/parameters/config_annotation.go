@@ -37,7 +37,7 @@ import (
 
 type options = func(*intctrlutil.Result)
 
-func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) intctrlutil.Result {
+func reconciled(status returnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) intctrlutil.Result {
 	result := intctrlutil.Result{
 		Policy:        policy,
 		Phase:         phase,

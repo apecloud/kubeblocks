@@ -200,7 +200,7 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 }
 
 type ReloadAction interface {
-	ExecReload() (ReturnedStatus, error)
+	ExecReload() (returnedStatus, error)
 	ReloadType() string
 }
 
@@ -213,12 +213,12 @@ func (r reconfigureTask) ReloadType() string {
 	return string(r.ReloadPolicy)
 }
 
-func (r reconfigureTask) ExecReload() (ReturnedStatus, error) {
+func (r reconfigureTask) ExecReload() (returnedStatus, error) {
 	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
 
-	return ReturnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
+	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
 }
 
 func resolveReloadActionPolicy(jsonPatch string,
@@ -303,7 +303,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 		InstanceSetUnits:         rctx.InstanceSetList,
 		ClusterComponent:         rctx.ClusterComObj,
 		SynthesizedComponent:     rctx.BuiltinComponent,
-		ReconfigureClientFactory: GetClientFactory(),
+		ReconfigureClientFactory: getClientFactory(),
 		Patch:                    patch,
 	}
 

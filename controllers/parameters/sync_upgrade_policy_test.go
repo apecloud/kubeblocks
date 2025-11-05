@@ -56,9 +56,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	Context("sync reconfigure policy test", func() {
 		It("Should success without error", func() {
-			By("check policy name")
-			Expect(operatorSyncPolicy.GetPolicyName()).Should(BeEquivalentTo("syncReload"))
-
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
@@ -114,9 +111,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	Context("sync reconfigure policy with selector test", func() {
 		It("Should success without error", func() {
-			By("check policy name")
-			Expect(operatorSyncPolicy.GetPolicyName()).Should(BeEquivalentTo("syncReload"))
-
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {

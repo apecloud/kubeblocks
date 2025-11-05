@@ -21,7 +21,7 @@ package parameters
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -62,14 +62,14 @@ func (f *MockParamConfigRendererFactory) SetComponentDefinition(cmpd string) *Mo
 }
 
 func (f *MockParamConfigRendererFactory) safeGetConfigDescription(key string) *parametersv1alpha1.ComponentConfigDescription {
-	desc := intctrlutil.GetComponentConfigDescription(&f.Get().Spec, key)
+	desc := parameters.GetComponentConfigDescription(&f.Get().Spec, key)
 	if desc != nil {
 		return desc
 	}
 	f.Get().Spec.Configs = append(f.Get().Spec.Configs, parametersv1alpha1.ComponentConfigDescription{
 		Name: key,
 	})
-	return intctrlutil.GetComponentConfigDescription(&f.Get().Spec, key)
+	return parameters.GetComponentConfigDescription(&f.Get().Spec, key)
 }
 
 func (f *MockParamConfigRendererFactory) SetConfigDescription(key, tpl string, formatter parametersv1alpha1.FileFormatConfig) *MockParamConfigRendererFactory {

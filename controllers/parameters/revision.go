@@ -28,16 +28,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 type ConfigurationRevision struct {
 	Revision    int64
 	StrRevision string
 	Phase       parametersv1alpha1.ParameterPhase
-	Result      intctrlutil.Result
+	Result      parameters.Result
 }
 
 const revisionHistoryLimit = 10
@@ -105,8 +105,8 @@ func parseRevision(revision string, data string) (ConfigurationRevision, error) 
 	}, nil
 }
 
-func parseResult(data string, revision string) intctrlutil.Result {
-	result := intctrlutil.Result{
+func parseResult(data string, revision string) parameters.Result {
+	result := parameters.Result{
 		Revision: revision,
 	}
 	data = strings.TrimSpace(data)

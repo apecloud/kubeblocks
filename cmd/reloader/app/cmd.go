@@ -36,9 +36,9 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )
 
 const (

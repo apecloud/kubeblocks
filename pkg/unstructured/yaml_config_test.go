@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 

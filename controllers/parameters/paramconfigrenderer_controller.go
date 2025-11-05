@@ -33,9 +33,9 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 // ParameterDrivenConfigRenderReconciler reconciles a ParamConfigRenderer object
@@ -84,7 +84,7 @@ func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manage
 }
 
 func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParamConfigRenderer) (ctrl.Result, error) {
-	if intctrlutil.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
+	if parameters.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
 	cmpd := &appsv1.ComponentDefinition{}
@@ -155,7 +155,7 @@ func fillParameterTemplate(reqCtx intctrlutil.RequestCtx, cli client.Client, tem
 	if generics.CountFunc(template.Spec.Configs, match) == 0 {
 		return nil
 	}
-	if tpls, err = configctrl.ResolveComponentTemplate(reqCtx.Ctx, cli, cmpd); err != nil {
+	if tpls, err = parameters.ResolveComponentTemplate(reqCtx.Ctx, cli, cmpd); err != nil {
 		return err
 	}
 	deepCopy := template.DeepCopy()

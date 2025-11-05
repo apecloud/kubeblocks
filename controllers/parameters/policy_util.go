@@ -32,13 +32,13 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -125,7 +125,7 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
 	if pod.Spec.HostNetwork {
-		containerPort, err := configuration.ResolveReloadServerGRPCPort(pod.Spec.Containers)
+		containerPort, err := parameters.ResolveReloadServerGRPCPort(pod.Spec.Containers)
 		if err != nil {
 			return "", err
 		}
@@ -232,7 +232,7 @@ func resolveReloadActionPolicy(jsonPatch string,
 
 	// make decision
 	switch {
-	case !dynamicUpdate && intctrlutil.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
+	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
 		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = parametersv1alpha1.RestartPolicy
@@ -258,7 +258,7 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 
 	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
 	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
-		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && intctrlutil.NeedDynamicReloadAction(&pd.Spec))
+		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
 	}
 
 	for key, jsonPatch := range patch.UpdateConfig {
@@ -267,7 +267,7 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 		if !ok || pd.Spec.ReloadAction == nil {
 			continue
 		}
-		configFormat := intctrlutil.GetComponentConfigDescription(&rctx.ConfigRender.Spec, key)
+		configFormat := parameters.GetComponentConfigDescription(&rctx.ConfigRender.Spec, key)
 		if configFormat == nil || configFormat.FileFormatConfig == nil {
 			continue
 		}
@@ -328,8 +328,8 @@ func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *Reconc
 
 func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
 	params := make(map[string]string)
-	dynamicAction := intctrlutil.NeedDynamicReloadAction(paramDef)
-	needReloadStaticParams := intctrlutil.ReloadStaticParameters(paramDef)
+	dynamicAction := parameters.NeedDynamicReloadAction(paramDef)
+	needReloadStaticParams := parameters.ReloadStaticParameters(paramDef)
 	visualizedParams := core.GenerateVisualizedParamsList(configPatch, []parametersv1alpha1.ComponentConfigDescription{description})
 
 	for _, key := range visualizedParams {

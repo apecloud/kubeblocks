@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

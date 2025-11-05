@@ -4,7 +4,6 @@
 # ignore go generate code files
 pkg/testutil/k8s/mocks/*_mocks.go
 pkg/configuration/proto/mocks/*_mocks.go
-pkg/configuration/container/mocks/*_mocks.go
 # pkg/configuration/proto/*.pb.go
 
 # ignore go mock temporary files

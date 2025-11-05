@@ -17,7 +17,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package mocks
+package parameters
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination dockerclient_mocks.go github.com/docker/docker/client ContainerAPIClient
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination criclient_mocks.go k8s.io/cri-api/pkg/apis/runtime/v1 RuntimeServiceClient
+import (
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+)
+
+func init() {
+	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, &autoReloadPolicy{})
+}
+
+type autoReloadPolicy struct{}
+
+func (receiver autoReloadPolicy) Upgrade(params reconfigureContext) (returnedStatus, error) {
+	_ = params
+	return makeReturnedStatus(ESNone), nil
+}

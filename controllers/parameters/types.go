@@ -41,17 +41,15 @@ type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient
 // Node: Distinguish between implementation and interface.
 
 type RollingUpgradeFuncs struct {
-	GetPodsFunc          GetPodsFunc
-	RestartContainerFunc RestartContainerFunc
-	OnlineUpdatePodFunc  OnlineUpdatePodFunc
-	RestartComponent     RestartComponent
+	GetPodsFunc         GetPodsFunc
+	OnlineUpdatePodFunc OnlineUpdatePodFunc
+	RestartComponent    RestartComponent
 }
 
 func GetInstanceSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
-		GetPodsFunc:          getPodsForOnlineUpdate,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartComponent,
+		GetPodsFunc:         getPodsForOnlineUpdate,
+		OnlineUpdatePodFunc: commonOnlineUpdateWithPod,
+		RestartComponent:    restartComponent,
 	}
 }

@@ -122,40 +122,6 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 	return nil
 }
 
-func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerNames []string, createClient createReconfigureClient) error {
-	containerIDs := make([]string, 0, len(containerNames))
-	for _, name := range containerNames {
-		containerID := intctrlutil.GetContainerID(pod, name)
-		if containerID == "" {
-			return core.MakeError("failed to find container in pod[%s], name=%s", name, pod.Name)
-		}
-		containerIDs = append(containerIDs, containerID)
-	}
-
-	address, err := resolveReloadServerGrpcURL(pod)
-	if err != nil {
-		return err
-	}
-	// stop container
-	client, err := createClient(address)
-	if err != nil {
-		return err
-	}
-
-	response, err := client.StopContainer(ctx, &cfgproto.StopContainerRequest{
-		ContainerIDs: containerIDs,
-	})
-	if err != nil {
-		return err
-	}
-
-	errMessage := response.GetErrMessage()
-	if errMessage != "" {
-		return core.MakeError("%s", errMessage)
-	}
-	return nil
-}
-
 func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
 	if pod.Spec.HostNetwork {
@@ -234,7 +200,7 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 }
 
 type ReloadAction interface {
-	ExecReload() (ReturnedStatus, error)
+	ExecReload() (returnedStatus, error)
 	ReloadType() string
 }
 
@@ -247,12 +213,12 @@ func (r reconfigureTask) ReloadType() string {
 	return string(r.ReloadPolicy)
 }
 
-func (r reconfigureTask) ExecReload() (ReturnedStatus, error) {
+func (r reconfigureTask) ExecReload() (returnedStatus, error) {
 	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
 
-	return ReturnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
+	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
 }
 
 func resolveReloadActionPolicy(jsonPatch string,
@@ -337,7 +303,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 		InstanceSetUnits:         rctx.InstanceSetList,
 		ClusterComponent:         rctx.ClusterComObj,
 		SynthesizedComponent:     rctx.BuiltinComponent,
-		ReconfigureClientFactory: GetClientFactory(),
+		ReconfigureClientFactory: getClientFactory(),
 		Patch:                    patch,
 	}
 

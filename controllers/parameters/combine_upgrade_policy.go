@@ -38,12 +38,8 @@ func init() {
 	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combineUpgradePolicyInstance)
 }
 
-func (h *combineUpgradePolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.DynamicReloadAndRestartPolicy)
-}
-
-func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
-	var ret ReturnedStatus
+func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
+	var ret returnedStatus
 	for _, executor := range h.policyExecutors {
 		retStatus, err := executor.Upgrade(rctx)
 		if err != nil {

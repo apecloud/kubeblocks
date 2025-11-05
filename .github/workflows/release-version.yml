@@ -12,7 +12,7 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.24"
 
 jobs:
   release-message:

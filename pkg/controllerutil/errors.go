@@ -111,5 +111,5 @@ func IsNotFound(err error) bool {
 
 // NewFatalError returns a new Error with ErrorTypeFatal
 func NewFatalError(message string) *Error {
-	return NewErrorf(ErrorTypeFatal, message)
+	return NewErrorf(ErrorTypeFatal, "%s", message)
 }

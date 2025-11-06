@@ -29,7 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 

@@ -21,7 +21,7 @@ package parameters
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -62,14 +62,14 @@ func (f *MockParamConfigRendererFactory) SetComponentDefinition(cmpd string) *Mo
 }
 
 func (f *MockParamConfigRendererFactory) safeGetConfigDescription(key string) *parametersv1alpha1.ComponentConfigDescription {
-	desc := parameters.GetComponentConfigDescription(&f.Get().Spec, key)
+	desc := f.getComponentConfigDescription(&f.Get().Spec, key)
 	if desc != nil {
 		return desc
 	}
 	f.Get().Spec.Configs = append(f.Get().Spec.Configs, parametersv1alpha1.ComponentConfigDescription{
 		Name: key,
 	})
-	return parameters.GetComponentConfigDescription(&f.Get().Spec, key)
+	return f.getComponentConfigDescription(&f.Get().Spec, key)
 }
 
 func (f *MockParamConfigRendererFactory) SetConfigDescription(key, tpl string, formatter parametersv1alpha1.FileFormatConfig) *MockParamConfigRendererFactory {
@@ -101,4 +101,14 @@ func (f *MockParamConfigRendererFactory) VScaleEnabled() *MockParamConfigRendere
 	desc := f.safeGetConfigDescription(MysqlConfigFile)
 	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentVScaleType)
 	return f
+}
+
+func (f *MockParamConfigRendererFactory) getComponentConfigDescription(pdcr *parametersv1alpha1.ParamConfigRendererSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
+	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
+		return desc.Name == name
+	}
+	if index := generics.FindFirstFunc(pdcr.Configs, match); index >= 0 {
+		return &pdcr.Configs[index]
+	}
+	return nil
 }

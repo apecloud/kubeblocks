@@ -120,8 +120,16 @@ func buildReconfigureParameter(ops *opsv1alpha1.OpsRequest) *parametersv1alpha1.
 		ClusterRef(ops.Spec.ClusterName)
 	for _, reconfigure := range ops.Spec.Reconfigures {
 		if len(reconfigure.Parameters) != 0 {
-			paramBuilder.SetComponentParameters(reconfigure.ComponentName, parameters.TransformComponentParameters(reconfigure.Parameters))
+			paramBuilder.SetComponentParameters(reconfigure.ComponentName, transformComponentParameters(reconfigure.Parameters))
 		}
 	}
 	return paramBuilder.GetObject()
+}
+
+func transformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
+	ret := make(parametersv1alpha1.ComponentParameters, len(params))
+	for _, param := range params {
+		ret[param.Key] = param.Value
+	}
+	return ret
 }

@@ -36,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"

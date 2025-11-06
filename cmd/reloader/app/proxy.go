@@ -24,7 +24,7 @@ import (
 
 	"go.uber.org/zap"
 
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )

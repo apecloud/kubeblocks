@@ -180,11 +180,11 @@ func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters
 	}
 }
 
-func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, parameters map[string]*parametersv1alpha1.ParametersInFile) error {
+func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, params map[string]*parametersv1alpha1.ParametersInFile) error {
 	if len(parametersDefs) == 0 || len(descs) == 0 {
 		return nil
 	}
-	_, err := parameters.DoMerge(resolveBaseData(parameters), parameters.DerefMapValues(parameters), parametersDefs, descs)
+	_, err := parameters.DoMerge(resolveBaseData(params), parameters.DerefMapValues(params), parametersDefs, descs)
 	return err
 }
 

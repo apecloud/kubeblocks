@@ -35,7 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )

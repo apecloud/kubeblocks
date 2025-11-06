@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -43,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	configmanager "github.com/apecloud/kubeblocks/pkg/parameters/config_manager"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 	"github.com/apecloud/kubeblocks/pkg/parameters/validate"
@@ -332,20 +331,12 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 	return false
 }
 
-func TransformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
-	ret := make(parametersv1alpha1.ComponentParameters, len(params))
-	for _, param := range params {
-		ret[param.Key] = param.Value
-	}
-	return ret
-}
-
 // BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
 func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) error {
 	var (
 		err         error
-		buildParams *configmanager.CfgManagerBuildParams
+		buildParams *cfgcm.CfgManagerBuildParams
 
 		podSpec      = synthesizedComp.PodSpec
 		configSpecs  = component.ConfigTemplates(synthesizedComp)
@@ -364,13 +355,13 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 		return nil
 	}
 
-	configSpecMetas, err := configmanager.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
+	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
 	if err != nil {
 		return err
 	}
 	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
 	// The files are being updated on the host VM, but can't be updated in the container.
-	configSpecMetas = configmanager.FilterSupportReloadActionConfigSpecs(configSpecMetas, volumeDirs)
+	configSpecMetas = cfgcm.FilterSupportReloadActionConfigSpecs(configSpecMetas, volumeDirs)
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
@@ -406,33 +397,33 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	return nil
 }
 
-func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *configmanager.CfgManagerBuildParams, configSpecMetas []configmanager.ConfigSpecMeta) {
-	shared := configmanager.NeedSharedProcessNamespace(configSpecMetas)
+func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
+	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
 	if shared {
 		podSpec.ShareProcessNamespace = util.ToPointer(true)
 	}
 	buildParams.ShareProcessNamespace = shared
 }
 
-func updateEnvPath(container *corev1.Container, params *configmanager.CfgManagerBuildParams) {
+func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
 	if len(params.ScriptVolume) == 0 {
 		return
 	}
 	scriptPath := make([]string, 0, len(params.ScriptVolume))
 	for _, volume := range params.ScriptVolume {
-		if vm := configmanager.FindVolumeMount(params.Volumes, volume.Name); vm != nil {
+		if vm := cfgcm.FindVolumeMount(params.Volumes, volume.Name); vm != nil {
 			scriptPath = append(scriptPath, vm.MountPath)
 		}
 	}
 	if len(scriptPath) != 0 {
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  configmanager.KBConfigManagerPathEnv,
+			Name:  cfgcm.KBConfigManagerPathEnv,
 			Value: strings.Join(scriptPath, ":"),
 		})
 	}
 }
 
-func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *configmanager.CfgManagerBuildParams) {
+func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
 	scriptVolumes := configManager.ScriptVolume
 	if len(scriptVolumes) == 0 && len(configManager.CMConfigVolumes) == 0 {
 		return
@@ -486,8 +477,9 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 	return volumeDirs, usingConfigSpecs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []configmanager.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*configmanager.CfgManagerBuildParams, error) {
-	cfgManagerParams := &configmanager.CfgManagerBuildParams{
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster,
+	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
+	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:            constant.ConfigSidecarName,
 		ComponentName:          comp.Name,
 		Image:                  viper.GetString(constant.KBToolsImage),
@@ -505,7 +497,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		cfgManagerParams.ContainerPort = containerPort
 	}
 
-	if err := configmanager.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
+	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
 	if err := buildReloadToolsContainer(cfgManagerParams, podSpec); err != nil {

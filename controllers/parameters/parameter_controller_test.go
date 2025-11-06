@@ -31,11 +31,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
@@ -88,7 +88,7 @@ var _ = Describe("Parameter Controller", func() {
 
 			By("check component parameters cr")
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
 				Expect(item).ShouldNot(BeNil())
 				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
 				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
@@ -109,7 +109,7 @@ var _ = Describe("Parameter Controller", func() {
 
 			By("check component parameter")
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
 				Expect(item).ShouldNot(BeNil())
 				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("2000")))
 				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("gtid_mode", pointer.String("OFF")))

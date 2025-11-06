@@ -30,9 +30,9 @@ import (
 	"k8s.io/utils/pointer"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
-	mockproto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
+	mockproto "github.com/apecloud/kubeblocks/pkg/parameters/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 

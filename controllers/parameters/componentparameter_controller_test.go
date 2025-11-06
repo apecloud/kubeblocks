@@ -26,9 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -49,13 +49,13 @@ var _ = Describe("ComponentParameter Controller", func() {
 
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, componentParameter *parametersv1alpha1.ComponentParameter) {
 				g.Expect(componentParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-				itemStatus := intctrlutil.GetItemStatus(&componentParameter.Status, configSpecName)
+				itemStatus := parameters.GetItemStatus(&componentParameter.Status, configSpecName)
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 
 			By("reconfiguring parameters.")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
 				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
@@ -67,7 +67,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
-				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
+				itemStatus := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))

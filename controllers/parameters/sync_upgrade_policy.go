@@ -29,8 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var syncPolicyInstance = &syncPolicy{}
@@ -81,7 +82,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 		ctx         = rctx.Ctx
 		configKey   = rctx.generateConfigIdentifier()
 		versionHash = rctx.getTargetVersionHash()
-		selector    = intctrlutil.GetPodSelector(rctx.ParametersDef)
+		selector    = parameters.GetPodSelector(rctx.ParametersDef)
 		fileName    string
 	)
 

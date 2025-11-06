@@ -33,18 +33,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
 type Task struct {
-	configctrl.ResourceFetcher[Task]
+	parameters.ResourceFetcher[Task]
 
 	Status *parametersv1alpha1.ConfigTemplateItemDetailStatus
 	Name   string
@@ -121,7 +121,7 @@ func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 			}
 			// Do reconcile for config template
 			configMap := resource.ConfigMapObj
-			switch intctrlutil.GetUpdatedParametersReconciledPhase(configMap, item, status) {
+			switch parameters.GetUpdatedParametersReconciledPhase(configMap, item, status) {
 			default:
 				return syncStatus(configMap, status)
 			case parametersv1alpha1.CInitPhase,
@@ -142,7 +142,7 @@ func syncImpl(taskCtx *TaskContext,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
-	if intctrlutil.IsApplyUpdatedParameters(configMap, item) {
+	if parameters.IsApplyUpdatedParameters(configMap, item) {
 		return syncStatus(configMap, status)
 	}
 
@@ -162,7 +162,7 @@ func syncImpl(taskCtx *TaskContext,
 
 	var baseConfig = configMap
 	var updatedConfig *corev1.ConfigMap
-	if intctrlutil.IsRerender(configMap, item) {
+	if parameters.IsRerender(configMap, item) {
 		log.FromContext(taskCtx.ctx).
 			WithName("ParameterReconcileTask").
 			WithValues("cluster", taskCtx.component.ClusterName,
@@ -173,13 +173,13 @@ func syncImpl(taskCtx *TaskContext,
 				"revision", revision,
 				"configMeta", item,
 			)
-		if baseConfig, err = configctrl.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+		if baseConfig, err = parameters.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
 		updatedConfig = baseConfig
 	}
 	if len(item.ConfigFileParams) != 0 {
-		if updatedConfig, err = configctrl.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
 	}

@@ -264,7 +264,7 @@ type ClusterComponentSpec struct {
 	// but required otherwise.
 	//
 	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^$|^[a-z]([a-z0-9-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name"`
 

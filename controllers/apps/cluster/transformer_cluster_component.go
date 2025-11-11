@@ -837,7 +837,7 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 	shardingDef := transCtx.shardingDefs[name]
 	now := time.Now().Format(time.RFC3339Nano)
 	addPostProvisionAnnotation := func(comp *appsv1.Component) {
-		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
+		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.PostProvision == nil {
 			return
 		}
 
@@ -1337,6 +1337,9 @@ func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Co
 	if err != nil {
 		return nil, err
 	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("has no pods to running the sharding lifecycle action")
+	}
 
 	return lifecycle.NewShardingLifecycle(transCtx.Cluster.Namespace, transCtx.Cluster.Name, synthesizedComp.Name, shardingName, lifecycleAction, synthesizedComp.TemplateVars, nil, pods...)
 }
@@ -1457,7 +1460,7 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 	}
 
 	markShardingActionDone(transCtx, dag, comp, checkAnnotationExist, annotation)
-	return nil
+	return ictrlutil.NewErrorf(ictrlutil.ErrorTypeRequeue, "requeue to waiting for %s annotation to be set", actionName)
 }
 
 func checkShardingActionDone(comp *appsv1.Component, checkExist bool, annotation string) bool {

@@ -20,15 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -57,6 +61,7 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyShardingNComp                = "test-topology-sharding-comp"
 		clusterTopologyCompNShardingOOD             = "test-topology-ood-comp-sharding"
 		clusterTopologyShardingNCompOOD             = "test-topology-ood-sharding-comp"
+		clusterTopologyShardingOnly                 = "test-topology-sharding-only"
 		compDefName                                 = "test-compdef"
 		shardingDefName                             = "test-shardingdef"
 		clusterName                                 = "test-cluster"
@@ -393,6 +398,15 @@ var _ = Describe("cluster component transformer test", func() {
 				Orders: &appsv1.ClusterTopologyOrders{
 					Provision: []string{sharding1aName, comp1aName},
 					Update:    []string{comp1aName, sharding1aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopologyShardingOnly,
+				Shardings: []appsv1.ClusterTopologySharding{
+					{
+						Name:        sharding1aName,
+						ShardingDef: shardingDefName,
+					},
 				},
 			}).
 			GetObject()
@@ -1856,6 +1870,231 @@ var _ = Describe("cluster component transformer test", func() {
 			Expect(result.Labels).To(HaveKeyWithValue("app", "test"))
 			Expect(result.Spec.Resources.Limits[corev1.ResourceCPU]).To(Equal(resource.MustParse("2")))
 			Expect(result.Spec.Replicas).To(Equal(int32(3)))
+		})
+	})
+
+	Context("sharding lifecycle actions", func() {
+		var (
+			transformer graph.Transformer
+			transCtx    *clusterTransformContext
+			dag         *graph.DAG
+			actionDone  bool
+		)
+		BeforeEach(func() {
+			actionDone = false
+			transformer, transCtx, dag = newTransformerNCtx(clusterTopologyShardingOnly, func(f *testapps.MockClusterFactory) {
+				f.AddSharding(sharding1aName, shardingDefName, compDefName)
+			})
+			transCtx.shardingDefs = map[string]*appsv1.ShardingDefinition{
+				sharding1aName: testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject(),
+			}
+			transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{
+				compDefName: testapps.NewComponentDefinitionFactory(compDefName).GetObject(),
+			}
+		})
+
+		mockShardCompWithPod := func(phase appsv1.ComponentPhase, annotation map[string]string) (*appsv1.Component, *corev1.Pod) {
+			shardComp := mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
+				comp.Status.Phase = phase
+				comp.Annotations = annotation
+			})
+			shortName, _ := component.ShortName(transCtx.Cluster.Name, shardComp.Name)
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      fmt.Sprintf("%s-0", constant.GenerateWorkloadNamePattern(transCtx.Cluster.Name, shortName)),
+					Labels: map[string]string{
+						constant.AppManagedByLabelKey:   constant.AppName,
+						constant.AppInstanceLabelKey:    transCtx.Cluster.Name,
+						constant.KBAppComponentLabelKey: shortName,
+					},
+				},
+			}
+			return shardComp, pod
+		}
+
+		Context("shard post provision", func() {
+			BeforeEach(func() {
+				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PostProvision: testapps.NewLifecycleAction("shard-post-provision"),
+				}
+			})
+
+			It("add post-provision annotation", func() {
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(comp.Annotations[kbShardingPostProvisionKey]).ShouldNot(BeEmpty())
+			})
+
+			It("do post-provision action successfully", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					kbShardingPostProvisionKey:  "test",
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+						if req.Action == "shardPostProvision" {
+							actionDone = true
+						}
+						return kbagentproto.ActionResponse{}, nil
+					}).AnyTimes()
+				})
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+				Expect(actionDone).Should(BeTrue())
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(comp.Annotations[kbShardingPostProvisionKey]).Should(BeEmpty())
+			})
+		})
+
+		Context("shard pre terminate", func() {
+			BeforeEach(func() {
+				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PreTerminate: testapps.NewLifecycleAction("shard-pre-terminate"),
+				}
+			})
+
+			It("do pre-terminate action successfully", func() {
+				transCtx.shardings = nil
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+						if req.Action == "shardPreTerminate" {
+							actionDone = true
+						}
+						return kbagentproto.ActionResponse{}, nil
+					}).AnyTimes()
+				})
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(comp.Annotations[kbShardingPreTerminateDoneKey]).ShouldNot(BeEmpty())
+				Expect(actionDone).Should(BeTrue())
+			})
+		})
+
+		Context("shard add", func() {
+			BeforeEach(func() {
+				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd: testapps.NewLifecycleAction("shard-add"),
+				}
+			})
+
+			It("add shard add annotation", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				shardSpec := transCtx.shardingCompsWithTpl[sharding1aName][""][0].DeepCopy()
+				shardSpec.Name = "test"
+				transCtx.shardingCompsWithTpl[sharding1aName][""] = append(transCtx.shardingCompsWithTpl[sharding1aName][""], shardSpec)
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(2))
+				for _, obj := range objs {
+					comp := obj.(*appsv1.Component)
+					if comp.Name == component.FullName(transCtx.Cluster.Name, "test") {
+						Expect(comp.Annotations[kbShardingAddKey]).ShouldNot(BeEmpty())
+					}
+				}
+			})
+
+			It("do shard add action successfully", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+					kbShardingAddKey:            "test",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+						if req.Action == "shardAdd" {
+							actionDone = true
+						}
+						return kbagentproto.ActionResponse{}, nil
+					}).AnyTimes()
+				})
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(comp.Annotations[kbShardingAddKey]).Should(BeEmpty())
+				Expect(actionDone).Should(BeTrue())
+			})
+		})
+
+		Context("shard remove", func() {
+			BeforeEach(func() {
+				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardRemove: testapps.NewLifecycleAction("shard-remove"),
+				}
+			})
+
+			It("do shard remove action successfully", func() {
+				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+						if req.Action == "shardRemove" {
+							actionDone = true
+						}
+						return kbagentproto.ActionResponse{}, nil
+					}).AnyTimes()
+				})
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(comp.Annotations[kbShardingRemoveDoneKey]).ShouldNot(BeEmpty())
+				Expect(actionDone).Should(BeTrue())
+			})
 		})
 	})
 })

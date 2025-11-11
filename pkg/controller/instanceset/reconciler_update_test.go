@@ -298,6 +298,38 @@ var _ = Describe("update reconciler test", func() {
 			expectUpdatedPods(tree, []string{lastPod.GetName()})
 		})
 
+		It("updates crashed/unavailable pod", func() {
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(3))
+			targetPod := pods[0]
+			for i, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				// mark the first pod as running but not ready, with old revision (simulate crash/unavailable)
+				if i == 0 {
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
+					pod.Status.Phase = corev1.PodRunning
+					// no ready/available conditions -> unavailable
+					continue
+				}
+				// mark the others available
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{targetPod.GetName()})
+		})
+
 		It("respects maxUnavailable with pending pods", func() {
 			// update order: bar-2, bar-1, bar-0
 			tree := kubebuilderx.NewObjectTree()

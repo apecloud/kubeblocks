@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -328,13 +329,13 @@ type InstanceSetStatus struct {
 	// This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
 	//
 	// +optional
-	InitReplicas int32 `json:"initReplicas"`
+	InitReplicas *int32 `json:"initReplicas"`
 
 	// Represents the number of instances that have already reached the InstanceStatus during the cluster initialization stage.
 	// This value remains constant once it equals InitReplicas.
 	//
 	// +optional
-	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
+	ReadyInitReplicas *int32 `json:"readyInitReplicas,omitempty"`
 
 	// Provides the status of each instance in the ITS.
 	//
@@ -504,6 +505,21 @@ type LifecycleActions struct {
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
+	// Defines the procedure to add a new replica.
+	//
+	// +optional
+	MemberJoin *Action `json:"memberJoin,omitempty"`
+
+	// Defines the procedure to remove a replica.
+	//
+	// +optional
+	MemberLeave *Action `json:"memberLeave,omitempty"`
+
+	// Defines the procedure for importing data into a replica.
+	//
+	// +optional
+	DataLoad *Action `json:"dataLoad,omitempty"`
+
 	// Defines the procedure that update a replica with new configuration.
 	//
 	// +optional
@@ -552,10 +568,25 @@ type InstanceStatus struct {
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
 
+	// Represents whether the instance is provisioned.
+	//
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// Represents whether the instance data is loaded.
+	//
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
+	// Represents whether the instance is joined the cluster.
+	//
+	// +optional
+	MemberJoined *bool `json:"memberJoined,omitempty"`
+
 	// Represents whether the instance is in volume expansion.
 	//
 	// +optional
-	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
+	InVolumeExpansion bool `json:"inVolumeExpansion,omitempty"`
 }
 
 type InstanceConfigStatus struct {
@@ -647,7 +678,7 @@ func (r *InstanceSet) IsInstancesReady() bool {
 		return false
 	}
 	// check whether the cluster has been initialized
-	if r.Status.ReadyInitReplicas != r.Status.InitReplicas {
+	if ptr.Deref(r.Status.InitReplicas, 0) == 0 || ptr.Deref(r.Status.InitReplicas, 0) != ptr.Deref(r.Status.ReadyInitReplicas, 0) {
 		return false
 	}
 	// check whether latest spec has been sent to the underlying workload
@@ -669,12 +700,20 @@ func (r *InstanceSet) IsInstancesReady() bool {
 		return false
 	}
 
+	// check whether all instances are joined the cluster
+	for _, inst := range r.Status.InstanceStatus {
+		if !ptr.Deref(inst.MemberJoined, true) {
+			return false
+		}
+	}
+
 	return true
 }
 
 // IsInstanceSetReady gives InstanceSet level 'ready' state:
-// 1. all instances are available
-// 2. and all instances have role set (if they are role-ful)
+// 1. all instances are ready and available
+// 2. all instances are joined the cluster
+// 3. all instances have role set (if they are role-ful)
 func (r *InstanceSet) IsInstanceSetReady() bool {
 	instancesReady := r.IsInstancesReady()
 	if !instancesReady {
@@ -695,4 +734,8 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 		}
 	}
 	return cnt == replicas
+}
+
+func (r *InstanceSet) IsInInitializing() bool {
+	return r.Status.InitReplicas == nil || *r.Status.InitReplicas != ptr.Deref(r.Status.ReadyInitReplicas, 0)
 }

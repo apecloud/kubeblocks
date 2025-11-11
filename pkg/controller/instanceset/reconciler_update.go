@@ -212,6 +212,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				updatingPods++
 			}
 		}
+		// TODO: compose the status from pods but not the its spec and status
+		r.updateInstanceConfigStatus(its, pod)
 	}
 
 	if !isBlocked {
@@ -243,7 +245,7 @@ func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(podList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, podList, r.isPodOrConfigUpdated)
+		plan := NewUpdatePlan(*its, podList, r.isInstanceUpdated)
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return -1, err
@@ -302,8 +304,6 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 				return false, err
 			}
 		}
-		// TODO: compose the status from pods but not the its spec and status
-		r.setInstanceConfigStatus(its, pod, config)
 	}
 	return allUpdated, nil
 }
@@ -342,35 +342,22 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 	return nil
 }
 
-func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
-	if its.Status.InstanceStatus == nil {
-		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
-	}
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
+func (r *updateReconciler) updateInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod) {
+	idx1 := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
 		return instance.PodName == pod.Name
 	})
-	if idx < 0 {
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
-		idx = len(its.Status.InstanceStatus) - 1
+	if idx1 < 0 {
+		return // instance status for pod not found?
 	}
 
-	if its.Status.InstanceStatus[idx].Configs == nil {
-		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
+	var configs []workloads.InstanceConfigStatus
+	for _, config := range its.Spec.Configs {
+		configs = append(configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
 	}
-	status := workloads.InstanceConfigStatus{
-		Name:       config.Name,
-		Generation: config.Generation,
-	}
-	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
-		if configStatus.Name == config.Name {
-			its.Status.InstanceStatus[idx].Configs[i] = status
-			return
-		}
-	}
-	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
+	its.Status.InstanceStatus[idx1].Configs = configs
 }
 
-func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+func (r *updateReconciler) isInstanceUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	policy, _, err := getPodUpdatePolicy(its, pod)
 	if err != nil {
 		return false, err
@@ -393,9 +380,9 @@ func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *core
 	if idx < 0 {
 		return true // new pod provisioned
 	}
-	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
-		if configStatus.Name == config.Name {
-			return config.Generation <= configStatus.Generation
+	for _, status := range its.Status.InstanceStatus[idx].Configs {
+		if status.Name == config.Name {
+			return config.Generation <= status.Generation
 		}
 	}
 	return config.Generation <= 0

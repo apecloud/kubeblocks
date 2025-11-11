@@ -33308,7 +33308,43 @@ string
 </tr>
 <tr>
 <td>
-<code>volumeExpansion</code><br/>
+<code>provisioned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is provisioned.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoaded</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance data is loaded.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is joined the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inVolumeExpansion</code><br/>
 <em>
 bool
 </em>
@@ -33438,7 +33474,43 @@ string
 </tr>
 <tr>
 <td>
-<code>volumeExpansion</code><br/>
+<code>provisioned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is provisioned.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoaded</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance data is loaded.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is joined the cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>inVolumeExpansion</code><br/>
 <em>
 bool
 </em>
@@ -33752,6 +33824,48 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Defines the procedure for a controlled transition of a role to a new replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoin</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to add a new replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeave</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to remove a replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoad</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for importing data into a replica.</p>
 </td>
 </tr>
 <tr>

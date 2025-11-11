@@ -133,6 +133,9 @@ func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv
 	}
 	if lifecycleActions != nil {
 		builder.get().Spec.LifecycleActions.Switchover = lifecycleActions.Switchover
+		builder.get().Spec.LifecycleActions.MemberJoin = lifecycleActions.MemberJoin
+		builder.get().Spec.LifecycleActions.MemberLeave = lifecycleActions.MemberLeave
+		builder.get().Spec.LifecycleActions.DataLoad = lifecycleActions.DataLoad
 		builder.get().Spec.LifecycleActions.Reconfigure = lifecycleActions.Reconfigure
 	}
 	if templateVars != nil {

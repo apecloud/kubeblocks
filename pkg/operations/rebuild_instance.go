@@ -125,7 +125,7 @@ func (r rebuildInstanceOpsHandler) validateRebuildInstanceWithHScale(reqCtx intc
 	synthesizedComp *component.SynthesizedComponent,
 	instanceNames []string) error {
 	// rebuild instance by horizontal scaling
-	pods, err := component.ListOwnedPods(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, synthesizedComp.Name)
+	pods, err := listCompPods(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, synthesizedComp.Name)
 	if err != nil {
 		return err
 	}

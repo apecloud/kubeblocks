@@ -20,26 +20,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -64,7 +70,10 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -106,16 +115,12 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		return fmt.Sprintf("%s-%d", itsKey.Name, ordinal)
 	}
 
-	mockPodsReady := func() {
+	podNames := func() []string {
+		podNames := make([]string, 0)
 		for i := int32(0); i < replicas; i++ {
-			mockPodReady(itsObj.Namespace, podName(i))
+			podNames = append(podNames, podName(i))
 		}
-	}
-
-	mockPodsReadyNAvailableWithRole := func() {
-		for i := int32(0); i < replicas; i++ {
-			mockPodReadyNAvailableWithRole(itsObj.Namespace, podName(i), "leader", 0)
-		}
+		return podNames
 	}
 
 	Context("provision", func() {
@@ -134,7 +139,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				g.Expect(its.IsInstanceSetReady()).Should(BeFalse())
 			})).Should(Succeed())
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -163,7 +168,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				g.Expect(its.IsInstanceSetReady()).Should(BeFalse())
 			})).Should(Succeed())
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its not ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -171,7 +176,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				g.Expect(its.IsInstanceSetReady()).Should(BeFalse())
 			})).Should(Succeed())
 
-			mockPodsReadyNAvailableWithRole()
+			mockPodsReadyNAvailableWithRole(itsObj.Namespace, "leader", 0, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -235,7 +240,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				})
 			})
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -289,7 +294,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		It("scale-in", func() {
 			createITSObj(itsName)
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -317,7 +322,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 					})
 			})
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -356,7 +361,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 					})
 			})
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -388,7 +393,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		It("scale-out", func() {
 			createITSObj(itsName)
 
-			mockPodsReady()
+			mockPodsReady(itsObj.Namespace, podNames()...)
 
 			By("check its ready")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -416,6 +421,376 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				g.Expect(its.Status.Replicas).Should(Equal(replicas + 1))
 				g.Expect(its.Status.ReadyReplicas).Should(Equal(replicas + 1))
 			})).Should(Succeed())
+		})
+	})
+
+	Context("membership", func() {
+		var (
+			memberJoinReplicas                = sets.New[string]()
+			memberLeaveReplicas               = sets.New[string]()
+			memberJoinError, memberLeaveError error
+		)
+
+		BeforeEach(func() {
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					rsp := kbagentproto.ActionResponse{}
+					switch req.Action {
+					case "memberJoin":
+						if memberJoinError != nil {
+							return rsp, memberJoinError
+						}
+						memberJoinReplicas.Insert(req.Parameters["KB_JOIN_MEMBER_POD_NAME"])
+					case "memberLeave":
+						if memberLeaveError != nil {
+							return rsp, memberLeaveError
+						}
+						memberLeaveReplicas.Insert(req.Parameters["KB_LEAVE_MEMBER_POD_NAME"])
+					}
+					return rsp, nil
+				}).AnyTimes()
+			})
+		})
+
+		AfterEach(func() {
+			kbacli.UnsetMockClient()
+			memberJoinReplicas.Clear()
+			memberLeaveReplicas.Clear()
+			memberJoinError = nil
+			memberLeaveError = nil
+		})
+
+		setup := func(initReplicas int32, withMemberAction bool, processors ...func(factory *testapps.MockInstanceSetFactory)) {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(initReplicas).
+					SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+						Type: kbappsv1.RollingUpdateStrategyType,
+					})
+				if withMemberAction {
+					f.SetLifecycleActions(&kbappsv1.ComponentLifecycleActions{
+						MemberJoin:  testapps.NewLifecycleAction("member-join"),
+						MemberLeave: testapps.NewLifecycleAction("member-leave"),
+					}, nil)
+				}
+			})
+
+			replicas := make([]string, 0)
+			for i := int32(0); i < initReplicas; i++ {
+				replicas = append(replicas, podName(i))
+			}
+			mockPodsReady(itsObj.Namespace, replicas...)
+
+			By("check ITS as ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+		}
+
+		It("provision w/o member join", func() {
+			var (
+				initReplicas = int32(1)
+			)
+
+			setup(initReplicas, false)
+
+			By("check instance spec")
+			for i := int32(0); i < initReplicas; i++ {
+				instKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+					g.Expect(inst.Spec.LifecycleActions).Should(BeNil())
+				})).Should(Succeed())
+			}
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoinReplicas).Should(BeEmpty())
+		})
+
+		It("provision w/ member join", func() {
+			var (
+				initReplicas = int32(1)
+			)
+
+			setup(initReplicas, true)
+
+			By("check instance spec")
+			for i := int32(0); i < initReplicas; i++ {
+				instKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+					g.Expect(inst.Spec.LifecycleActions).ShouldNot(BeNil())
+				})).Should(Succeed())
+			}
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoinReplicas).Should(BeEmpty())
+		})
+
+		It("scale-out w/o member join", func() {
+			var (
+				initReplicas   = int32(1)
+				targetReplicas = int32(2)
+			)
+
+			setup(initReplicas, false)
+
+			By("scale-out")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(targetReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas created")
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check init replicas keep running")
+			for i := int32(0); i < initReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoinReplicas).Should(BeEmpty())
+		})
+
+		It("scale-out w/ member join", func() {
+			var (
+				initReplicas   = int32(1)
+				targetReplicas = int32(2)
+			)
+
+			setup(initReplicas, true)
+
+			By("scale-out")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(targetReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas created")
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check init replicas keep running")
+			for i := int32(0); i < initReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check member join action be triggered")
+			for i := initReplicas; i < targetReplicas; i++ {
+				Eventually(memberJoinReplicas.Has(fmt.Sprintf("%s-%d", itsObj.Name, i))).Should(BeTrue())
+			}
+		})
+
+		PIt("scale-out w/ member join + data load", func() {
+			var (
+				initReplicas   = int32(1)
+				targetReplicas = int32(2)
+			)
+
+			By("mock assistant objects")
+			assistantObj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-env", itsObj.Name),
+				},
+				Data: map[string]string{
+					"version": "v1.0.0",
+				},
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, assistantObj)).Should(Succeed())
+			gvk, _ := model.GetGVKName(assistantObj)
+			assistantObjs := []corev1.ObjectReference{
+				{
+					APIVersion: gvk.Version,
+					Kind:       gvk.Kind,
+					Name:       gvk.Name,
+				},
+			}
+
+			setup(initReplicas, true, func(f *testapps.MockInstanceSetFactory) {
+				f.SetLifecycleActions(&kbappsv1.ComponentLifecycleActions{
+					MemberJoin:  testapps.NewLifecycleAction("member-join"),
+					MemberLeave: testapps.NewLifecycleAction("member-leave"),
+					DataDump:    testapps.NewLifecycleAction("data-dump"),
+					DataLoad:    testapps.NewLifecycleAction("data-load"),
+				}, nil).
+					SetInstanceAssistantObjects(assistantObjs)
+			})
+
+			By("scale-out")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(targetReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas created")
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check init replicas keep running")
+			for i := int32(0); i < initReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check member join action be triggered")
+			for i := initReplicas; i < targetReplicas; i++ {
+				Eventually(memberJoinReplicas.Has(fmt.Sprintf("%s-%d", itsObj.Name, i))).Should(BeTrue())
+			}
+		})
+
+		It("scale-in w/o member leave", func() {
+			var (
+				initReplicas   = int32(1)
+				targetReplicas = int32(2)
+			)
+
+			setup(initReplicas, false)
+
+			By("scale-out first")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(targetReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas created")
+			scaledReplicas := make([]string, 0)
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      podName(i),
+				}
+				scaledReplicas = append(scaledReplicas, podKey.Name)
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			mockPodsReady(itsObj.Namespace, scaledReplicas...)
+
+			By("check ITS as ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("check member join action NOT be triggered")
+			Consistently(memberJoinReplicas).Should(BeEmpty())
+
+			By("scale-in")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(initReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas deleted")
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      podName(i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+			}
+
+			By("check init replicas keep running")
+			for i := int32(0); i < initReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      podName(i),
+				}
+				Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check member leave action NOT be triggered")
+			Consistently(memberLeaveReplicas).Should(BeEmpty())
+		})
+
+		It("scale-in w/ member leave", func() {
+			var (
+				initReplicas   = int32(1)
+				targetReplicas = int32(2)
+			)
+
+			setup(initReplicas, true)
+
+			By("scale-out first")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(targetReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas created")
+			scaledReplicas := make([]string, 0)
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      podName(i),
+				}
+				scaledReplicas = append(scaledReplicas, podKey.Name)
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			mockPodsReady(itsObj.Namespace, scaledReplicas...)
+
+			By("check ITS as ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("check member join action be triggered")
+			for i := initReplicas; i < targetReplicas; i++ {
+				Eventually(memberJoinReplicas.Has(podName(i))).Should(BeTrue())
+			}
+
+			By("scale-in")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(initReplicas)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check replicas deleted")
+			for i := initReplicas; i < targetReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      podName(i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+			}
+
+			By("check init replicas keep running")
+			for i := int32(0); i < initReplicas; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      podName(i),
+				}
+				Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+			}
+
+			By("check member leave action be triggered")
+			for i := initReplicas; i < targetReplicas; i++ {
+				Eventually(memberLeaveReplicas.Has(podName(i))).Should(BeTrue())
+			}
 		})
 	})
 })

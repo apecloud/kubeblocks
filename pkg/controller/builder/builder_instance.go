@@ -206,8 +206,10 @@ func (builder *InstanceBuilder) SetRoles(roles []workloads.ReplicaRole) *Instanc
 	return builder
 }
 
-func (builder *InstanceBuilder) SetLifecycleActions(actions *workloads.LifecycleActions) *InstanceBuilder {
-	builder.get().Spec.LifecycleActions = actions
+func (builder *InstanceBuilder) SetLifecycleActions(actions *workloads.LifecycleActions, initializing bool) *InstanceBuilder {
+	if !initializing {
+		builder.get().Spec.LifecycleActions = actions
+	}
 	return builder
 }
 

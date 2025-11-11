@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package model
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 type GraphOptions struct {
 	replaceIfExisting     bool
@@ -27,6 +29,8 @@ type GraphOptions struct {
 	clientOpt             any
 	propagationPolicy     client.PropagationPolicy
 	subResource           string
+	prevHooks             []func(client.Object) error
+	postHooks             []func(client.Object) error
 }
 
 type GraphOption interface {
@@ -97,5 +101,33 @@ var _ GraphOption = &subResourceOption{}
 func WithSubResource(subResource string) GraphOption {
 	return &subResourceOption{
 		subResource: subResource,
+	}
+}
+
+type hookOption struct {
+	prevHook func(object client.Object) error
+	postHook func(object client.Object) error
+}
+
+var _ GraphOption = &hookOption{}
+
+func (o *hookOption) ApplyTo(opts *GraphOptions) {
+	if o.prevHook != nil {
+		opts.prevHooks = append(opts.prevHooks, o.prevHook)
+	}
+	if o.postHook != nil {
+		opts.postHooks = append(opts.postHooks, o.postHook)
+	}
+}
+
+func WithPrevHook(hook func(client.Object) error) GraphOption {
+	return &hookOption{
+		prevHook: hook,
+	}
+}
+
+func WithPostHook(hook func(client.Object) error) GraphOption {
+	return &hookOption{
+		postHook: hook,
 	}
 }

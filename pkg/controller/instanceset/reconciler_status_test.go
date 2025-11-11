@@ -72,7 +72,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 
 			By("replicas alignment")
-			reconciler = NewReplicasAlignmentReconciler()
+			reconciler = NewInstanceAlignmentReconciler()
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -399,7 +399,8 @@ var _ = Describe("status reconciler test", func() {
 			replicas := int32(3)
 			its.Spec.Replicas = &replicas
 			its.Status.InstanceStatus = oldInstanceStatus
-			setInstanceStatus(nil, its, pods)
+			r := &statusReconciler{}
+			r.buildInstanceStatus(nil, its, pods)
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))

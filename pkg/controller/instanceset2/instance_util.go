@@ -138,7 +138,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
 		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
-		SetLifecycleActions(its.Spec.LifecycleActions)
+		SetLifecycleActions(its.Spec.LifecycleActions, its.IsInInitializing())
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).

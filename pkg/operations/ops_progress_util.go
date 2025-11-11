@@ -177,7 +177,7 @@ func handleComponentStatusProgress(
 	if clusterComponent == nil {
 		return 0, 0, nil
 	}
-	if pods, err = intctrlcomp.ListOwnedPods(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName); err != nil {
+	if pods, err = listCompPods(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName); err != nil {
 		return 0, completedCount, err
 	}
 	expectReplicas := clusterComponent.Replicas

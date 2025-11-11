@@ -183,10 +183,25 @@ type InstanceStatus2 struct {
 	// +optional
 	Role string `json:"role,omitempty"`
 
+	// Represents whether the instance is provisioned.
+	//
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// Represents whether the instance data is loaded.
+	//
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
+	// Represents whether the instance is joined the cluster.
+	//
+	// +optional
+	MemberJoined *bool `json:"memberJoined,omitempty"`
+
 	// Represents whether the instance is in volume expansion.
 	//
 	// +optional
-	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
+	InVolumeExpansion bool `json:"inVolumeExpansion,omitempty"`
 }
 
 type InstanceAssistantObject struct {

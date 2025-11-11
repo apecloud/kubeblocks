@@ -165,18 +165,32 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 			workloadVertices = append(workloadVertices, vertex)
 		}
 	}
+	graphOptions := func(options ObjectOptions) []model.GraphOption {
+		opts := []model.GraphOption{
+			inDataContext4G(),
+		}
+		for i := range options.PrevHooks {
+			opts = append(opts, model.WithPrevHook(options.PrevHooks[i]))
+		}
+		for i := range options.PostHooks {
+			opts = append(opts, model.WithPostHook(options.PostHooks[i]))
+		}
+		return opts
+	}
 	createNewObjects := func() {
 		for name := range createSet {
-			if desiredTree.childrenOptions[name].SkipToReconcile {
+			options := desiredTree.childrenOptions[name]
+			if options.SkipToReconcile {
 				continue
 			}
-			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), inDataContext4G())
+			v := model.NewObjectVertex(nil, assign(ctx, newSnapshot[name]), model.ActionCreatePtr(), graphOptions(options)...)
 			findAndAppend(v)
 		}
 	}
 	updateObjects := func() {
 		for name := range updateSet {
-			if desiredTree.childrenOptions[name].SkipToReconcile {
+			options := desiredTree.childrenOptions[name]
+			if options.SkipToReconcile {
 				continue
 			}
 			oldObj := oldSnapshot[name]
@@ -190,21 +204,23 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 				var v *model.ObjectVertex
 				subResource := desiredTree.childrenOptions[*name].SubResource
 				if subResource != "" {
-					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource(subResource))
+					opts := append(graphOptions(options), model.WithSubResource(subResource))
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), opts...)
 				} else {
-					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), graphOptions(options)...)
 				}
 				findAndAppend(v)
 			}
 		}
 	}
-	deleteOrphanObjects := func() {
+	deleteObjects := func() {
 		for name := range deleteSet {
-			if desiredTree.childrenOptions[name].SkipToReconcile {
+			options := desiredTree.childrenOptions[name]
+			if options.SkipToReconcile {
 				continue
 			}
 			object := oldSnapshot[name]
-			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), inDataContext4G())
+			v := model.NewObjectVertex(nil, object, model.ActionDeletePtr(), graphOptions(options)...)
 			findAndAppend(v)
 		}
 	}
@@ -218,7 +234,7 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 	// objects to be updated
 	updateObjects()
 	// objects to be deleted
-	deleteOrphanObjects()
+	deleteObjects()
 	// handle object dependencies
 	handleDependencies()
 	return vertices
@@ -246,18 +262,49 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
+	if err := b.prevCallHooks(vertex); err != nil {
+		return fmt.Errorf("vertex call prev hooks failed: %v, obj: %s, action: %v", err, vertex.Obj.GetName(), *vertex.Action)
+	}
+	var err error
 	ctx := b.transCtx.ctx
 	switch *vertex.Action {
 	case model.CREATE:
-		return b.createObject(ctx, vertex)
+		err = b.createObject(ctx, vertex)
 	case model.UPDATE:
-		return b.updateObject(ctx, vertex)
+		err = b.updateObject(ctx, vertex)
 	case model.PATCH:
-		return b.patchObject(ctx, vertex)
+		err = b.patchObject(ctx, vertex)
 	case model.DELETE:
-		return b.deleteObject(ctx, vertex)
+		err = b.deleteObject(ctx, vertex)
 	case model.STATUS:
-		return b.statusObject(ctx, vertex)
+		err = b.statusObject(ctx, vertex)
+	}
+	if err == nil {
+		if err = b.postCallHooks(vertex); err != nil {
+			return fmt.Errorf("vertex call post hooks failed: %v, obj: %s, action: %v", err, vertex.Obj.GetName(), *vertex.Action)
+		}
+	}
+	return nil
+}
+
+func (b *PlanBuilder) prevCallHooks(vertex *model.ObjectVertex) error {
+	for i := range vertex.PrevHooks {
+		if vertex.PrevHooks[i] != nil {
+			if err := vertex.PrevHooks[i](vertex.Obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (b *PlanBuilder) postCallHooks(vertex *model.ObjectVertex) error {
+	for i := range vertex.PostHooks {
+		if vertex.PostHooks[i] != nil {
+			if err := vertex.PostHooks[i](vertex.Obj); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

@@ -195,7 +195,8 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 		return nil
 	}
 
-	lfa, err := newLifecycleAction(inst, nil, pod)
+	// FIXME: select all available pods
+	lfa, err := newLifecycleAction(inst, []*corev1.Pod{pod}, pod)
 	if err != nil {
 		return err
 	}

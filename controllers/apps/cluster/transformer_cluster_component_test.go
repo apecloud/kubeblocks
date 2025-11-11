@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"strings"
 
-	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
-	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,6 +40,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 

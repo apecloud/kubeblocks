@@ -495,6 +495,7 @@ var _ = Describe("cluster component transformer test", func() {
 		}
 		setters = append(setters, func(comp *appsv1.Component) {
 			comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+			comp.Labels[constant.ShardingDefLabelKey] = shardingDefName
 		})
 		return newCompObj(transCtx, specs[0], setters...)
 	}
@@ -1886,7 +1887,7 @@ var _ = Describe("cluster component transformer test", func() {
 				f.AddSharding(sharding1aName, shardingDefName, compDefName)
 			})
 			transCtx.shardingDefs = map[string]*appsv1.ShardingDefinition{
-				sharding1aName: testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject(),
+				shardingDefName: testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject(),
 			}
 			transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{
 				compDefName: testapps.NewComponentDefinitionFactory(compDefName).GetObject(),
@@ -1915,7 +1916,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 		Context("shard post provision", func() {
 			BeforeEach(func() {
-				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: testapps.NewLifecycleAction("shard-post-provision"),
 				}
 			})
@@ -1963,7 +1964,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 		Context("shard pre terminate", func() {
 			BeforeEach(func() {
-				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PreTerminate: testapps.NewLifecycleAction("shard-pre-terminate"),
 				}
 			})
@@ -2000,7 +2001,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 		Context("shard add", func() {
 			BeforeEach(func() {
-				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardAdd: testapps.NewLifecycleAction("shard-add"),
 				}
 			})
@@ -2062,7 +2063,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 		Context("shard remove", func() {
 			BeforeEach(func() {
-				transCtx.shardingDefs[sharding1aName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardRemove: testapps.NewLifecycleAction("shard-remove"),
 				}
 			})

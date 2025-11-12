@@ -834,7 +834,12 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
-	shardingDef := transCtx.shardingDefs[name]
+	var shardingDef *appsv1.ShardingDefinition
+	for _, shard := range transCtx.shardings {
+		if name == shard.Name {
+			shardingDef = transCtx.shardingDefs[shard.ShardingDef]
+		}
+	}
 	now := time.Now().Format(time.RFC3339Nano)
 	addPostProvisionAnnotation := func(comp *appsv1.Component) {
 		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.PostProvision == nil {
@@ -869,7 +874,11 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range runningComps {
-		err = doShardingLifecycleAction(transCtx, dag, transCtx.shardingDefs[name], &runningComps[i], name, kbShardingPreTerminateAction)
+		var shardingDef *appsv1.ShardingDefinition
+		if runningComps[i].Labels != nil {
+			shardingDef = transCtx.shardingDefs[runningComps[i].Labels[constant.ShardingDefLabelKey]]
+		}
+		err = doShardingLifecycleAction(transCtx, dag, shardingDef, &runningComps[i], name, kbShardingPreTerminateAction)
 		if err != nil {
 			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
 				"action", kbShardingPreTerminateAction, "component", runningComps[i].Name)
@@ -925,20 +934,25 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 
 	toCreate, toDelete, toUpdate := mapDiff(runningCompsMap, protoCompsMap)
 
+	var shardingDef *appsv1.ShardingDefinition
+	for _, shard := range transCtx.shardings {
+		if name == shard.Name {
+			shardingDef = transCtx.shardingDefs[shard.ShardingDef]
+		}
+	}
 	// TODO: update strategy
-	h.deleteComps(transCtx, dag, runningCompsMap, toDelete, name)
-	h.updateComps(transCtx, dag, runningCompsMap, protoCompsMap, toUpdate, name)
-	h.createComps(transCtx, dag, protoCompsMap, toCreate, name)
+	h.deleteComps(transCtx, dag, runningCompsMap, toDelete, name, shardingDef)
+	h.updateComps(transCtx, dag, runningCompsMap, protoCompsMap, toUpdate, name, shardingDef)
+	h.createComps(transCtx, dag, protoCompsMap, toCreate, shardingDef)
 
 	return nil
 }
 
 func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoComps map[string]*appsv1.Component, createSet sets.Set[string], shardingName string) {
+	protoComps map[string]*appsv1.Component, createSet sets.Set[string], shardingDef *appsv1.ShardingDefinition) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	now := time.Now().Format(time.RFC3339Nano)
 	addShardAddAnnotation := func(comp *appsv1.Component) {
-		shardingDef := transCtx.shardingDefs[shardingName]
 		if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
 			return
 		}
@@ -957,11 +971,12 @@ func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, 
 
 // deleteComps deletes the subcomponents of the sharding when the shards count is updated.
 func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, dag *graph.DAG,
-	runningComps map[string]*appsv1.Component, deleteSet sets.Set[string], shardingName string) {
+	runningComps map[string]*appsv1.Component, deleteSet sets.Set[string],
+	shardingName string, shardingDef *appsv1.ShardingDefinition) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	for name := range deleteSet {
-		err := doShardingLifecycleAction(transCtx, dag, transCtx.shardingDefs[shardingName], runningComps[name], shardingName, kbShardingRemoveAction)
+		err := doShardingLifecycleAction(transCtx, dag, shardingDef, runningComps[name], shardingName, kbShardingRemoveAction)
 		if err != nil {
 			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
 				"action", kbShardingRemoveAction, "component", name)
@@ -973,11 +988,12 @@ func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, 
 }
 
 func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, dag *graph.DAG,
-	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string], shardingName string) {
+	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string],
+	shardingName string, shardingDef *appsv1.ShardingDefinition) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range updateSet {
 		running, proto := runningComps[name], protoComps[name]
-		err := handleShardingAddNPostProvision(transCtx, dag, transCtx.shardingDefs[shardingName], running)
+		err := handleShardingAddNPostProvision(transCtx, dag, shardingDef, running, shardingName)
 		if err != nil {
 			continue
 		}
@@ -1357,19 +1373,19 @@ func synthesizedComponent(transCtx *clusterTransformContext, comp *appsv1.Compon
 	return synthesizedComp, nil
 }
 
-func handleShardingAddNPostProvision(transCtx *clusterTransformContext, dag *graph.DAG, shardingDef *appsv1.ShardingDefinition, comp *appsv1.Component) error {
+func handleShardingAddNPostProvision(transCtx *clusterTransformContext, dag *graph.DAG, shardingDef *appsv1.ShardingDefinition, comp *appsv1.Component, shardingName string) error {
 	var err error
 	switch {
 	case comp.Annotations[kbShardingAddKey] != "" && comp.Annotations[kbShardingPostProvisionKey] != "":
 		return fmt.Errorf("sharding component %s has both add and post-provision annotations", comp.Name)
 	case comp.Annotations[kbShardingAddKey] != "":
-		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingDef.Name, kbShardingAddAction)
+		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingAddAction)
 		if err != nil {
 			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
 				"action", kbShardingAddAction, "component", comp.Name)
 		}
 	case comp.Annotations[kbShardingPostProvisionKey] != "":
-		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingDef.Name, kbShardingPostProvisionAction)
+		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingPostProvisionAction)
 		if err != nil {
 			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
 				"action", kbShardingPostProvisionAction, "component", comp.Name)

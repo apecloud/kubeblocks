@@ -1405,7 +1405,8 @@ The scripts are mounted as volumes and can be referenced and executed by the Dow
 </tr><tr><td><p>&#34;http&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;sql&#34;</p></td>
-<td></td>
+<td><p>deprecated since 1.1.0</p>
+</td>
 </tr><tr><td><p>&#34;exec&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;tpl&#34;</p></td>
@@ -3086,8 +3087,7 @@ SignalType
 </em>
 </td>
 <td>
-<p>Specifies a valid Unix signal to be sent.
-For a comprehensive list of all Unix signals, see: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
+<p>Specifies a valid Unix signal to be sent.</p>
 </td>
 </tr>
 <tr>

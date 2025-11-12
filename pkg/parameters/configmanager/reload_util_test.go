@@ -23,12 +23,9 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,11 +34,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+var zapLog, _ = zap.NewDevelopment()
 
 func TestCreateUpdatedParamsPatch(t *testing.T) {
 	zapLog, _ = zap.NewDevelopment()
@@ -126,101 +124,6 @@ max_connections=666
 
 	require.Nil(t, os.WriteFile(filepath.Join(tmpDir, dir1, testFileName), []byte(v1), fs.ModePerm))
 	require.Nil(t, os.WriteFile(filepath.Join(tmpDir, dir2, testFileName), []byte(v2), fs.ModePerm))
-	return tmpDir
-}
-
-func TestOnlineUpdateParamsHandle(t *testing.T) {
-	server := mockRestAPIServer(t)
-	defer server.Close()
-
-	partroniPath := "reload.tpl"
-	tmpTestData := mockPatroniTestData(t, partroniPath)
-	defer os.RemoveAll(tmpTestData)
-
-	type args struct {
-		tplScriptPath string
-		formatConfig  *parametersv1alpha1.FileFormatConfig
-		dataType      string
-		dsn           string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    DynamicUpdater
-		wantErr bool
-	}{{
-		name: "online_update_params_handle_test",
-		args: args{
-			tplScriptPath: filepath.Join(tmpTestData, partroniPath),
-			formatConfig: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.Properties,
-			},
-			dsn:      server.URL,
-			dataType: "patroni",
-		},
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := OnlineUpdateParamsHandle(tt.args.tplScriptPath, tt.args.formatConfig, tt.args.dataType, tt.args.dsn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("OnlineUpdateParamsHandle() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			err = got(context.Background(), "", map[string]string{"key_buffer_size": "128M", "max_connections": "666"})
-			require.Nil(t, err)
-		})
-	}
-}
-
-func mockRestAPIServer(t *testing.T) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch strings.TrimSpace(r.URL.Path) {
-		default:
-			w.WriteHeader(http.StatusBadRequest)
-			_, err := w.Write([]byte(`failed`))
-			require.Nil(t, err)
-		case "/config", "/restart":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte(`success`))
-			require.Nil(t, err)
-		}
-	}))
-}
-
-func mockPatroniTestData(t *testing.T, reloadScript string) string {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "pg-patroni-test-")
-	require.Nil(t, err)
-
-	err = os.WriteFile(filepath.Join(tmpDir, reloadScript), []byte(`
-{{- $bootstrap := $.Files.Get "bootstrap.yaml" | fromYamlArray }}
-{{- $command := "reload" }}
-{{- range $pk, $_ := $.arg0 }}
-    {{- if has $pk $bootstrap  }}
-        {{- $command = "restart" }}
-        {{ break }}
-    {{- end }}
-{{- end }}
-{{ $params := dict "parameters" $.arg0 }}
-{{- $err := execSql ( dict "postgresql" $params | toJson ) "config" }}
-{{- if $err }}
-    {{- failed $err }}
-{{- end }}
-{{- $err := execSql "" $command }}
-{{- if $err }}
-    {{- failed $err }}
-{{- end }}
-`), fs.ModePerm)
-	require.Nil(t, err)
-
-	err = os.WriteFile(filepath.Join(tmpDir, "bootstrap.yaml"), []byte(`
-- archive_mode
-- autovacuum_freeze_max_age
-- autovacuum_max_workers
-- max_connections
-`), fs.ModePerm)
-	require.Nil(t, err)
-
 	return tmpDir
 }
 
@@ -318,74 +221,6 @@ var _ = Describe("ReloadUtil Test", func() {
 			Expect(err).Should(Succeed())
 			b, _ := os.ReadFile(targetFile)
 			Expect("[test]\na=1\nb=2\nkey1=128M\nkey2=512M\n").Should(BeEquivalentTo(string(b)))
-		})
-	})
-
-	Context("NeedSharedProcessNamespace", func() {
-		It("Should success with no error", func() {
-			tests := []struct {
-				name string
-				args []ConfigSpecMeta
-				want bool
-			}{{
-				name: "test1",
-				args: []ConfigSpecMeta{},
-				want: false,
-			}, {
-				name: "test2",
-				args: []ConfigSpecMeta{{
-					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentFileTemplate{
-							Name:     "test",
-							Template: "test_cm",
-						},
-					}},
-				},
-				want: false,
-			}, {
-				name: "test3",
-				args: []ConfigSpecMeta{{
-					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentFileTemplate{
-							Name:     "test",
-							Template: "test_cm",
-						},
-						ReloadType: parametersv1alpha1.ShellType,
-					},
-				}, {
-					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentFileTemplate{
-							Name:     "test2",
-							Template: "test_cm",
-						},
-						ReloadType: parametersv1alpha1.TPLScriptType,
-					}}},
-				want: false,
-			}, {
-				name: "test4",
-				args: []ConfigSpecMeta{{
-					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentFileTemplate{
-							Name:     "test",
-							Template: "test_cm",
-						},
-						ReloadType: parametersv1alpha1.UnixSignalType,
-					},
-				}, {
-					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentFileTemplate{
-							Name:     "test2",
-							Template: "test_cm",
-						},
-						ReloadType: parametersv1alpha1.TPLScriptType,
-					}}},
-				want: true,
-			}}
-			for _, tt := range tests {
-				got := NeedSharedProcessNamespace(tt.args)
-				Expect(got).Should(BeEquivalentTo(tt.want))
-			}
-
 		})
 	})
 })

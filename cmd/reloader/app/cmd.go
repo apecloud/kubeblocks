@@ -26,10 +26,8 @@ import (
 	"net/netip"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
@@ -42,32 +40,30 @@ import (
 )
 
 const (
-	InaddrAny   = "0.0.0.0"
-	Inaddr6Any  = "::"
-	InaddrLoop  = "localhost"
-	Inaddr6Loop = "::1"
+	InaddrAny  = "0.0.0.0"
+	Inaddr6Any = "::"
 )
 
 var logger *zap.SugaredLogger
 
 // NewConfigManagerCommand is used to reload configuration
 func NewConfigManagerCommand(ctx context.Context, name string) *cobra.Command {
-	opt := NewVolumeWatcherOpts()
+	opts := newServiceOptions()
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: name + " provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runConfigManagerCommand(ctx, opt)
+			return runConfigManagerCommand(ctx, opts)
 		},
 	}
 
 	cmd.SetContext(ctx)
-	InstallFlags(cmd.Flags(), opt)
+	installFlags(cmd.Flags(), opts)
 	return cmd
 }
 
-func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
-	zapLog := initLog(opt.LogLevel)
+func runConfigManagerCommand(ctx context.Context, opts *serviceOptions) error {
+	zapLog := initLog(opts.LogLevel)
 	defer func() {
 		_ = zapLog.Sync()
 	}()
@@ -75,40 +71,24 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 	logger = zapLog.Sugar()
 	cfgcm.SetLogger(zapLog)
 
-	if err := checkOptions(opt); err != nil {
+	if err := checkOptions(opts); err != nil {
 		return err
 	}
-	if opt.BackupPath == "" {
-		tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-backup-")
-		if err != nil {
-			return err
-		}
-		opt.BackupPath = tmpDir
-		defer os.RemoveAll(tmpDir)
-	}
-	return run(ctx, opt)
+	return run(ctx, opts)
 }
 
-func run(ctx context.Context, opt *VolumeWatcherOpts) error {
+func run(ctx context.Context, opts *serviceOptions) error {
 	var (
-		err           error
-		volumeWatcher *cfgcm.ConfigMapVolumeWatcher
-		configHandler cfgcm.ConfigHandler
+		handler cfgcm.ConfigHandler
+		err     error
 	)
 
-	if configHandler, err = cfgcm.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
+	if handler, err = cfgcm.CreateCombinedHandler(opts.CombConfig); err != nil {
 		return err
 	}
 
-	if len(opt.VolumeDirs) > 0 {
-		if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
-			return err
-		}
-		defer volumeWatcher.Close()
-	}
-
-	if err = checkAndCreateService(ctx, opt, configHandler); err != nil {
-		return err
+	if err = startGRPCService(opts, handler); err != nil {
+		return cfgutil.WrapError(err, "failed to start grpc service")
 	}
 
 	logger.Info("config manager started.")
@@ -117,53 +97,20 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 	return nil
 }
 
-func checkAndCreateService(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcm.ConfigHandler) error {
-	serviceOpt := opt.ServiceOpt
-	if !serviceOpt.RemoteOnlineUpdateEnable {
-		return nil
-	}
-	if err := startGRPCService(opt, ctx, handler); err != nil {
-		return cfgutil.WrapError(err, "failed to start grpc service")
-	}
-	return nil
-}
-
-func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler cfgcm.ConfigHandler) (*cfgcm.ConfigMapVolumeWatcher, error) {
-	eventHandler := func(ctx context.Context, event fsnotify.Event) error {
-		return handler.VolumeHandle(ctx, event)
-	}
-	logger.Infow("starting fsnotify VolumeWatcher.",
-		zap.Any("volumesDirs", strings.Join(opt.VolumeDirs, ",")),
-	)
-	volumeWatcher := cfgcm.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
-	err := volumeWatcher.AddHandler(eventHandler).Run()
-	if err != nil {
-		logger.Error(err, "failed to handle VolumeWatcher.")
-		return nil, err
-	}
-	logger.Info("fsnotify VolumeWatcher started.")
-	return volumeWatcher, nil
-}
-
-func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context, handler cfgcm.ConfigHandler) error {
+func startGRPCService(opts *serviceOptions, handler cfgcm.ConfigHandler) error {
 	var (
 		server *grpc.Server
-		proxy  = &reconfigureProxy{opt: opt.ServiceOpt, ctx: ctx, logger: logger.Named("grpcProxy")}
+		proxy  = &reconfigureProxy{handler: handler, logger: logger.Named("grpcProxy")}
 	)
-
-	if err := proxy.Init(handler); err != nil {
-		return err
-	}
 
 	// ipv4 unspecified address: 0.0.0.0
 	hostIP := InaddrAny
-	if ip, _ := netip.ParseAddr(proxy.opt.PodIP); ip.Is6() {
+	if ip, _ := netip.ParseAddr(opts.PodIP); ip.Is6() {
 		// ipv6 unspecified address: ::
 		hostIP = Inaddr6Any
 	}
 
-	tcpSpec := net.JoinHostPort(hostIP, strconv.Itoa(proxy.opt.GrpcPort))
-	// tcpSpec := fmt.Sprintf("[::]:%d", proxy.opt.GrpcPort)
+	tcpSpec := net.JoinHostPort(hostIP, strconv.Itoa(opts.GrpcPort))
 	logger.Infof("starting reconfigure service: %s", tcpSpec)
 	listener, err := net.Listen("tcp", tcpSpec)
 	if err != nil {
@@ -188,11 +135,11 @@ func logUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.
 	return handler(ctx, req)
 }
 
-func checkOptions(opt *VolumeWatcherOpts) error {
-	if len(opt.VolumeDirs) == 0 && !opt.ServiceOpt.RemoteOnlineUpdateEnable {
-		return cfgutil.MakeError("require volume directory is null.")
+func checkOptions(opts *serviceOptions) error {
+	if !opts.RemoteOnlineUpdateEnable {
+		return cfgutil.MakeError("remote online update is NOT enabled.")
 	}
-	if opt.CombConfig == "" {
+	if opts.CombConfig == "" {
 		return cfgutil.MakeError("required config is empty.")
 	}
 	return nil

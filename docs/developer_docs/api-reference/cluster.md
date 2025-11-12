@@ -31424,8 +31424,7 @@ SignalType
 </em>
 </td>
 <td>
-<p>Specifies a valid Unix signal to be sent.
-For a comprehensive list of all Unix signals, see: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
+<p>Specifies a valid Unix signal to be sent.</p>
 </td>
 </tr>
 <tr>

@@ -60,17 +60,6 @@ func TestIsSupportReload(t *testing.T) {
 		},
 		want: false,
 	}, {
-		name: "reload_test_with_unix_signal",
-		args: args{
-			reload: &parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-					ProcessName: "test",
-					Signal:      parametersv1alpha1.SIGHUP,
-				},
-			},
-		},
-		want: true,
-	}, {
 		name: "reload_test_with_shell",
 		args: args{
 			reload: &parametersv1alpha1.ReloadAction{
@@ -182,24 +171,6 @@ var _ = Describe("Handler Util Test", func() {
 				args    args
 				wantErr bool
 			}{{
-				name: "unixSignalTest",
-				args: args{
-					reloadAction: &parametersv1alpha1.ReloadAction{
-						UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-							Signal: parametersv1alpha1.SIGHUP,
-						}},
-				},
-				wantErr: false,
-			}, {
-				name: "unixSignalTest",
-				args: args{
-					reloadAction: &parametersv1alpha1.ReloadAction{
-						UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-							Signal: "SIGNOEXIST",
-						}},
-				},
-				wantErr: true,
-			}, {
 				name: "shellTest",
 				args: args{
 					reloadAction: &parametersv1alpha1.ReloadAction{
@@ -303,9 +274,8 @@ var _ = Describe("Handler Util Test", func() {
 		It("normal test", func() {
 			ccName := "config_constraint"
 			pd := mockParametersDef(ccName, &parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-					ProcessName: "test",
-					Signal:      parametersv1alpha1.SIGHUP,
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{
+					Command: []string{"/bin/true"},
 				},
 			})
 
@@ -319,20 +289,12 @@ var _ = Describe("Handler Util Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(len(configSpecs)).Should(BeEquivalentTo(1))
 			Expect(configSpecs[0].ConfigSpec).Should(BeEquivalentTo(mockConfigSpec(ccName)))
-			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(parametersv1alpha1.UnixSignalType))
+			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(parametersv1alpha1.ShellType))
 			Expect(&configSpecs[0].FormatterConfig).Should(BeEquivalentTo(cd[0].FileFormatConfig))
 		})
 	})
 
 	Context("TestFromReloadTypeConfig", func() {
-		It("TestSignalTrigger", func() {
-			Expect(parametersv1alpha1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-					ProcessName: "test",
-					Signal:      parametersv1alpha1.SIGHUP,
-				}})))
-		})
-
 		It("TestAutoTrigger", func() {
 			Expect(parametersv1alpha1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{
 				AutoTrigger: &parametersv1alpha1.AutoTrigger{
@@ -363,23 +325,6 @@ var _ = Describe("Handler Util Test", func() {
 	})
 
 	Context("TestValidateReloadOptions", func() {
-		It("TestSignalTrigger", func() {
-			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-					ProcessName: "test",
-					Signal:      parametersv1alpha1.SIGHUP,
-				}}, nil, nil),
-			).Should(Succeed())
-		})
-
-		It("TestSignalTrigger", func() {
-			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
-				AutoTrigger: &parametersv1alpha1.AutoTrigger{
-					ProcessName: "test",
-				}}, nil, nil),
-			).Should(Succeed())
-		})
-
 		It("TestShellTrigger", func() {
 			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{
@@ -450,9 +395,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test1",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", parametersv1alpha1.UnixSignalType, &parametersv1alpha1.ReloadAction{
-					UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{},
-				}),
 				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{
 						Sync: cfgutil.ToPointer(true),
@@ -465,7 +407,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 				}),
 			},
 			volumes: []corev1.VolumeMount{
-				{Name: "test1", SubPath: "test1"},
 				{Name: "test2", SubPath: "test2"},
 				{Name: "test3", SubPath: "test3"},
 			},
@@ -486,9 +427,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test2",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", parametersv1alpha1.UnixSignalType, &parametersv1alpha1.ReloadAction{
-					UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{},
-				}),
 				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{},
 				}),
@@ -497,15 +435,11 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 				}),
 			},
 			volumes: []corev1.VolumeMount{
-				{Name: "test1"},
 				{Name: "test2"},
 				{Name: "test3"},
 			},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", parametersv1alpha1.UnixSignalType, &parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{},
-			}),
 			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{},
 			}),
@@ -517,9 +451,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test3",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", parametersv1alpha1.UnixSignalType, &parametersv1alpha1.ReloadAction{
-					UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{},
-				}),
 				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{},
 				}),
@@ -530,9 +461,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 			volumes: []corev1.VolumeMount{},
 		},
 		want: []ConfigSpecMeta{
-			createConfigMeta("test1", parametersv1alpha1.UnixSignalType, &parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{},
-			}),
 			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{},
 			}),
@@ -544,9 +472,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		name: "test4",
 		args: args{
 			metas: []ConfigSpecMeta{
-				createConfigMeta("test1", parametersv1alpha1.UnixSignalType, &parametersv1alpha1.ReloadAction{
-					UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{},
-				}),
 				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{
 						Sync: cfgutil.ToPointer(false),
@@ -559,7 +484,6 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 				}),
 			},
 			volumes: []corev1.VolumeMount{
-				{Name: "test1", SubPath: "test1"},
 				{Name: "test2", SubPath: "test2"},
 				{Name: "test3", SubPath: "test3"},
 			},

@@ -22,16 +22,12 @@ package configmanager
 import (
 	"context"
 
-	"github.com/fsnotify/fsnotify"
-
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 type ConfigHandler interface {
 	OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error
-	VolumeHandle(ctx context.Context, event fsnotify.Event) error
-	MountPoint() []string
 }
 
 type ConfigSpecInfo struct {
@@ -41,8 +37,6 @@ type ConfigSpecInfo struct {
 	ConfigSpec      appsv1.ComponentFileTemplate         `json:"configSpec"`
 	FormatterConfig parametersv1alpha1.FileFormatConfig  `json:"formatterConfig"`
 	ConfigFile      string                               `json:"configFile"`
-
-	DownwardAPIOptions []parametersv1alpha1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions"`
 
 	// config volume mount path
 	MountPoint string `json:"mountPoint"`

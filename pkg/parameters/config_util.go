@@ -372,8 +372,6 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 		return nil
 	}
 
-	// This sidecar container will be able to view and signal processes from other containers
-	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
 	container, err := factory.BuildCfgManagerContainer(buildParams)
 	if err != nil {
 		return err
@@ -395,14 +393,6 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	}
 	component.InjectEnvVars4Containers(synthesizedComp, synthesizedComp.EnvVars, synthesizedComp.EnvFromSources, filter)
 	return nil
-}
-
-func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
-	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
-	if shared {
-		podSpec.ShareProcessNamespace = util.ToPointer(true)
-	}
-	buildParams.ShareProcessNamespace = shared
 }
 
 func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
@@ -497,7 +487,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		cfgManagerParams.ContainerPort = containerPort
 	}
 
-	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
+	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams); err != nil {
 		return nil, err
 	}
 	if err := buildReloadToolsContainer(cfgManagerParams, podSpec); err != nil {

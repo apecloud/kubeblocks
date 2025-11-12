@@ -106,6 +106,7 @@ type ParametersDefinitionSpec struct {
 	// - After a role switch (e.g., from secondary to primary), some changes in configuration are needed
 	//   to reflect the new role.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
 	// +optional
 	DownwardAPIChangeTriggeredActions []DownwardAPIChangeTriggeredAction `json:"downwardAPIChangeTriggeredActions,omitempty"`
 
@@ -207,6 +208,7 @@ type ParametersDefinitionStatus struct {
 type ReloadAction struct {
 	// Used to trigger a reload by sending a specific Unix signal to the process.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
 	// +optional
 	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
 
@@ -240,7 +242,6 @@ type ReloadAction struct {
 // UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.
 type UnixSignalTrigger struct {
 	// Specifies a valid Unix signal to be sent.
-	// For a comprehensive list of all Unix signals, see: ../../pkg/configuration/configmap/handler.go:allUnixSignals
 	//
 	// +kubebuilder:validation:Required
 	Signal SignalType `json:"signal"`

@@ -325,12 +325,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 		SetImage(sidecarRenderedParam.Image).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddVolumeMounts(sidecarRenderedParam.Volumes...)
-	if sidecarRenderedParam.ShareProcessNamespace {
-		user := int64(0)
-		containerBuilder.SetSecurityContext(corev1.SecurityContext{
-			RunAsUser: &user,
-		})
-	}
 	return containerBuilder.GetObject(), nil
 }
 

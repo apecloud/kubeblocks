@@ -24,16 +24,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sort"
-	"syscall"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/fsnotify/fsnotify"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -82,49 +77,6 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newUnixSignalConfig := func() ConfigSpecInfo {
-		return ConfigSpecInfo{
-			ReloadAction: &parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
-					ProcessName: findCurrProcName(),
-					Signal:      parametersv1alpha1.SIGHUP,
-				}},
-			ReloadType: parametersv1alpha1.UnixSignalType,
-			MountPoint: "/tmp/test",
-			ConfigSpec: newConfigSpec(),
-		}
-	}
-
-	newDownwardAPIOptions := func() []parametersv1alpha1.DownwardAPIChangeTriggeredAction {
-		return []parametersv1alpha1.DownwardAPIChangeTriggeredAction{
-			{
-				Name:       "labels",
-				MountPoint: filepath.Join(tmpWorkDir, "labels"),
-				Command:    []string{"sh", "-c", `echo "labels trigger"`},
-			},
-			{
-				Name:       "annotations",
-				MountPoint: filepath.Join(tmpWorkDir, "annotations"),
-				Command:    []string{"sh", "-c", `echo "annotation trigger"`},
-			},
-		}
-	}
-
-	newDownwardAPIConfig := func() ConfigSpecInfo {
-		return ConfigSpecInfo{
-			ReloadAction: &parametersv1alpha1.ReloadAction{
-				ShellTrigger: &parametersv1alpha1.ShellTrigger{
-					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
-				},
-			},
-			ReloadType:         parametersv1alpha1.ShellType,
-			MountPoint:         tmpWorkDir,
-			ConfigSpec:         newConfigSpec(),
-			FormatterConfig:    newFormatter(),
-			DownwardAPIOptions: newDownwardAPIOptions(),
-		}
-	}
-
 	newTPLScriptsConfig := func(configPath string) ConfigSpecInfo {
 		return ConfigSpecInfo{
 			ReloadAction: &parametersv1alpha1.ReloadAction{
@@ -158,28 +110,20 @@ var _ = Describe("Config Handler Test", func() {
 	}
 
 	Context("TestSimpleHandler", func() {
-		It("CreateSignalHandler", func() {
-			_, err := CreateSignalHandler(parametersv1alpha1.SIGALRM, "test", "")
-			Expect(err).Should(Succeed())
-			_, err = CreateSignalHandler("NOSIGNAL", "test", "")
-			Expect(err.Error()).To(ContainSubstring("not supported unix signal: NOSIGNAL"))
-		})
-
 		It("CreateShellHandler", func() {
-			_, err := CreateExecHandler(nil, "", nil, "")
+			_, err := createExecHandler(nil, nil, "")
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
-			_, err = CreateExecHandler([]string{}, "", nil, "")
+			_, err = createExecHandler([]string{}, nil, "")
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
-			c, err := CreateExecHandler([]string{"go", "version"}, "", &ConfigSpecInfo{
+			_, err = createExecHandler([]string{"go", "version"}, &ConfigSpecInfo{
 				ConfigSpec: appsv1.ComponentFileTemplate{
 					Name: "for_test",
 				}},
 				"")
 			Expect(err).Should(Succeed())
-			Expect(c.VolumeHandle(context.Background(), fsnotify.Event{})).Should(Succeed())
 		})
 
-		It("CreateTPLScriptHandler", func() {
+		It("createTPLScriptHandler", func() {
 			mockK8sTestConfigureDirectory(filepath.Join(tmpWorkDir, "config"), "my.cnf", "xxxx")
 			tplFile := filepath.Join(tmpWorkDir, "test.tpl")
 			configFile := filepath.Join(tmpWorkDir, "config.yaml")
@@ -191,7 +135,7 @@ var _ = Describe("Config Handler Test", func() {
 			b, _ := util.ToYamlConfig(tplConfig)
 			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
 
-			handler, err := CreateTPLScriptHandler("", configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
+			handler, err := createTPLScriptHandler("", configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
 			Expect(err).Should(Succeed())
 			tplHandler := handler.(*tplScriptHandler)
 			Expect(tplHandler.dsn).Should(BeEquivalentTo("admin:admin@(localhost:3306)/"))
@@ -200,59 +144,14 @@ var _ = Describe("Config Handler Test", func() {
 	})
 
 	Context("TestConfigHandler", func() {
-		It("SignalHandler", func() {
-			config := newUnixSignalConfig()
-			handler, err := CreateCombinedHandler(toJSONString(config), filepath.Join(tmpWorkDir, "backup"))
-			Expect(err).Should(Succeed())
-			Expect(handler.MountPoint()).Should(ContainElement(config.MountPoint))
-
-			// process unix signal
-			trigger := make(chan bool)
-			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGHUP)
-			defer stop()
-
-			go func() {
-				select {
-				case <-time.After(5 * time.Second):
-					// not walk here
-					Expect(true).Should(BeFalse())
-				case <-ctx.Done():
-					stop()
-					trigger <- true
-				}
-			}()
-			By("process unix signal")
-			Expect(handler.VolumeHandle(ctx, fsnotify.Event{Name: config.MountPoint})).Should(Succeed())
-
-			select {
-			case <-time.After(10 * time.Second):
-				logger.Info("failed to watch volume.")
-				Expect(true).Should(BeFalse())
-			case <-trigger:
-				logger.Info("success to watch volume.")
-				Expect(true).To(BeTrue())
-			}
-
-			By("not support handler")
-			Expect(handler.OnlineUpdate(ctx, "", nil).Error()).Should(ContainSubstring("not found handler for config name"))
-			Expect(handler.OnlineUpdate(ctx, config.ConfigSpec.Name, nil).Error()).Should(ContainSubstring("not support online update"))
-			By("not match mount point")
-			Expect(handler.VolumeHandle(ctx, fsnotify.Event{Name: "not_exist_mount_point"})).Should(Succeed())
-		})
-
 		Describe("Test ShellHandler", func() {
 			var configPath string
 			testShellHandlerCommon := func(configPath string, configSpec ConfigSpecInfo) {
-				handler, err := CreateCombinedHandler(toJSONString(configSpec), filepath.Join(tmpWorkDir, "backup"))
+				handler, err := CreateCombinedHandler(toJSONString(configSpec))
 				Expect(err).Should(Succeed())
-				Expect(handler.MountPoint()).Should(ContainElement(configPath))
 				By("change config", func() {
 					// mock modify config
 					prepareTestConfig(configPath, newVersion)
-					Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
-				})
-				By("not change config", func() {
-					Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
 				})
 				By("not support onlineUpdate", func() {
 					Expect(handler.OnlineUpdate(context.TODO(), configSpec.ConfigSpec.Name, nil)).Should(Succeed())
@@ -294,53 +193,12 @@ var _ = Describe("Config Handler Test", func() {
 			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
 
 			config := newTPLScriptsConfig(configFile)
-			handler, err := CreateCombinedHandler(toJSONString(config), "")
+			handler, err := CreateCombinedHandler(toJSONString(config))
 			Expect(err).Should(Succeed())
 			Expect(handler.OnlineUpdate(context.TODO(), config.ConfigSpec.Name, map[string]string{
 				"param_a": "a",
 				"param_b": "b",
 			})).Should(Succeed())
-		})
-
-		It("TplScriptsHandler Volume Event", func() {
-			By("mock command channel")
-			newCommandChannel = func(ctx context.Context, dataType, dsn string) (DynamicParamUpdater, error) {
-				return mockCChannel, nil
-			}
-
-			By("prepare config data")
-			configPath := filepath.Join(tmpWorkDir, "config")
-			prepareTestConfig(configPath, oldVersion)
-
-			tplFile := filepath.Join(tmpWorkDir, "test.tpl")
-			configFile := filepath.Join(tmpWorkDir, "config.yaml")
-			Expect(os.WriteFile(tplFile, []byte(``), fs.ModePerm)).Should(Succeed())
-
-			tplConfig := TPLScriptConfig{
-				Scripts:         "test.tpl",
-				FormatterConfig: newFormatter(),
-			}
-			b, _ := util.ToYamlConfig(tplConfig)
-			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
-
-			config := newTPLScriptsConfig(configFile)
-			config.MountPoint = configPath
-			handler, err := CreateCombinedHandler(toJSONString(config), filepath.Join(tmpWorkDir, "backup"))
-			Expect(err).Should(Succeed())
-
-			By("change config")
-			prepareTestConfig(configPath, newVersion)
-			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: configPath})).Should(Succeed())
-
-		})
-
-		It("DownwardAPIsHandler", func() {
-			config := newDownwardAPIConfig()
-			handler, err := CreateCombinedHandler(toJSONString(config), filepath.Join(tmpWorkDir, "backup"))
-			Expect(err).Should(Succeed())
-			Expect(handler.MountPoint()).Should(ContainElement(config.MountPoint))
-			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: config.DownwardAPIOptions[0].MountPoint})).Should(Succeed())
-			Expect(handler.VolumeHandle(context.TODO(), fsnotify.Event{Name: config.DownwardAPIOptions[1].MountPoint})).Should(Succeed())
 		})
 	})
 

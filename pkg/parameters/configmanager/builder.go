@@ -62,17 +62,15 @@ const (
 
 const (
 	KBScriptVolumePath = "/opt/kb-tools/reload"
-	KBConfigVolumePath = "/opt/kb-tools/config"
 
 	KBTOOLSScriptsPathEnv  = "TOOLS_SCRIPTS_PATH"
 	KBConfigManagerPathEnv = "TOOLS_PATH"
 )
 
-func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, managerParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
+func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, managerParams *CfgManagerBuildParams) error {
 	var volume *corev1.VolumeMount
 	var buildParam *ConfigSpecMeta
 
-	allVolumeMounts := getWatchedVolume(volumeDirs, managerParams.ConfigSpecsBuildParams)
 	for i := range managerParams.ConfigSpecsBuildParams {
 		buildParam = &managerParams.ConfigSpecsBuildParams[i]
 		volume = FindVolumeMount(managerParams.Volumes, buildParam.ConfigSpec.VolumeName)
@@ -85,52 +83,11 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 			return err
 		}
 	}
-	downwardAPIVolumes := buildDownwardAPIVolumes(managerParams)
-	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
-	managerParams.Volumes = append(managerParams.Volumes, downwardAPIVolumes...)
-	return buildConfigManagerArgs(managerParams, allVolumeMounts, cli, ctx)
+	return buildConfigManagerArgs(managerParams, cli, ctx)
 }
 
-func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecMeta) []corev1.VolumeMount {
-	enableWatchVolume := func(volume corev1.VolumeMount) bool {
-		for _, param := range buildParams {
-			if param.ConfigSpec.VolumeName != volume.Name {
-				continue
-			}
-			switch param.ReloadType {
-			case parametersv1alpha1.TPLScriptType:
-				return core.IsWatchModuleForTplTrigger(param.ReloadAction.TPLScriptTrigger)
-			case parametersv1alpha1.ShellType:
-				return core.IsWatchModuleForShellTrigger(param.ReloadAction.ShellTrigger)
-			default:
-				return true
-			}
-		}
-		return false
-	}
-
-	allVolumeMounts := make([]corev1.VolumeMount, 0, len(volumeDirs))
-	for _, volume := range volumeDirs {
-		if enableWatchVolume(volume) {
-			allVolumeMounts = append(allVolumeMounts, volume)
-		}
-	}
-	return allVolumeMounts
-}
-
-func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount {
-	for _, buildParam := range params.ConfigSpecsBuildParams {
-		for _, info := range buildParam.DownwardAPIOptions {
-			if FindVolumeMount(params.DownwardAPIVolumes, info.Name) == nil {
-				buildDownwardAPIVolume(params, info)
-			}
-		}
-	}
-	return params.DownwardAPIVolumes
-}
-
-func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context) error {
-	args := buildConfigManagerCommonArgs(volumeDirs)
+func buildConfigManagerArgs(params *CfgManagerBuildParams, cli client.Client, ctx context.Context) error {
+	args := buildConfigManagerCommonArgs()
 	args = append(args, "--operator-update-enable")
 	args = append(args, "--tcp", strconv.Itoa(int(params.ContainerPort)))
 
@@ -262,20 +219,6 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo parametersv1alpha1.DownwardAPIChangeTriggeredAction) {
-	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
-		Name:      fieldInfo.Name,
-		MountPath: fieldInfo.MountPoint,
-	})
-	manager.CMConfigVolumes = append(manager.CMConfigVolumes, corev1.Volume{
-		Name: fieldInfo.Name,
-		VolumeSource: corev1.VolumeSource{
-			DownwardAPI: &corev1.DownwardAPIVolumeSource{
-				Items: fieldInfo.Items,
-			}},
-	})
-}
-
 func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams, mountPoint, volumeName string) {
 	var execMode int32 = 0755
 	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
@@ -404,14 +347,11 @@ func GetScriptsVolumeName(configSpec appsv1.ComponentFileTemplate) string {
 	return fmt.Sprintf("%s%s", scriptVolumePrefix, configSpec.Name)
 }
 
-func buildConfigManagerCommonArgs(volumeDirs []corev1.VolumeMount) []string {
+func buildConfigManagerCommonArgs() []string {
 	args := make([]string, 0)
 	// set grpc port
 	// args = append(args, "--tcp", viper.GetString(cfgcore.ConfigManagerGPRCPortEnv))
 	args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
-	for _, volume := range volumeDirs {
-		args = append(args, "--volume-dir", volume.MountPath)
-	}
 	return args
 }
 

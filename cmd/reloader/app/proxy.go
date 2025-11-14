@@ -31,24 +31,12 @@ import (
 
 type reconfigureProxy struct {
 	cfgproto.ReconfigureServer
-	updater cfgcm.DynamicUpdater
-
-	ctx context.Context
-	opt ReconfigureServiceOptions
-
-	logger *zap.SugaredLogger
-}
-
-func (r *reconfigureProxy) Init(handler cfgcm.ConfigHandler) error {
-	if err := r.initOnlineUpdater(handler); err != nil {
-		r.logger.Errorf("init online updater failed: %+v", err)
-		return err
-	}
-	return nil
+	handler cfgcm.ConfigHandler
+	logger  *zap.SugaredLogger
 }
 
 func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
-	if r.updater == nil {
+	if r.handler == nil {
 		return nil, cfgcore.MakeError("online updating process is not initialized.")
 	}
 	params := request.GetParams()
@@ -59,19 +47,8 @@ func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfg
 	if request.ConfigFile != nil && *request.ConfigFile != "" {
 		key = key + "/" + *request.ConfigFile
 	}
-	if err := r.updater(ctx, key, params); err != nil {
+	if err := r.handler.OnlineUpdate(ctx, key, params); err != nil {
 		return nil, err
 	}
 	return &cfgproto.OnlineUpgradeParamsResponse{}, nil
-}
-
-func (r *reconfigureProxy) initOnlineUpdater(handler cfgcm.ConfigHandler) error {
-	if !r.opt.RemoteOnlineUpdateEnable {
-		return nil
-	}
-
-	r.updater = func(ctx context.Context, name string, updatedParams map[string]string) error {
-		return handler.OnlineUpdate(ctx, name, updatedParams)
-	}
-	return nil
 }

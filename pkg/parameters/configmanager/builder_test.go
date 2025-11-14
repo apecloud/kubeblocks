@@ -67,22 +67,7 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newVolumeMounts2 := func() []corev1.VolumeMount {
-		return []corev1.VolumeMount{
-			{
-				MountPath: "/postgresql/conf",
-				Name:      "pg_config",
-			},
-			{
-				MountPath: "/postgresql/conf2",
-				Name:      "pg_config",
-			}}
-	}
 	newReloadOptions := func(t parametersv1alpha1.DynamicReloadType, sync *bool) *parametersv1alpha1.ReloadAction {
-		signalHandle := &parametersv1alpha1.UnixSignalTrigger{
-			ProcessName: "postgres",
-			Signal:      parametersv1alpha1.SIGHUP,
-		}
 		shellHandle := &parametersv1alpha1.ShellTrigger{
 			Command: []string{"pwd"},
 		}
@@ -98,11 +83,6 @@ var _ = Describe("Config Builder Test", func() {
 		}
 
 		switch t {
-		default:
-			return nil
-		case parametersv1alpha1.UnixSignalType:
-			return &parametersv1alpha1.ReloadAction{
-				UnixSignalTrigger: signalHandle}
 		case parametersv1alpha1.ShellType:
 			return &parametersv1alpha1.ReloadAction{
 				ShellTrigger: shellHandle}
@@ -112,6 +92,8 @@ var _ = Describe("Config Builder Test", func() {
 		case parametersv1alpha1.AutoType:
 			return &parametersv1alpha1.ReloadAction{
 				AutoTrigger: autoHandle}
+		default:
+			return nil
 		}
 	}
 	newConfigSpecMeta := func() []ConfigSpecMeta {
@@ -138,7 +120,6 @@ var _ = Describe("Config Builder Test", func() {
 			ComponentName:          "test",
 			Volumes:                newVolumeMounts(),
 			ConfigSpecsBuildParams: newConfigSpecMeta(),
-			DownwardAPIVolumes:     make([]corev1.VolumeMount, 0),
 		}
 		if hasScripts {
 			param.ConfigSpecsBuildParams[0].ScriptConfig = []parametersv1alpha1.ScriptConfig{
@@ -178,40 +159,7 @@ formatterConfig:
 		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 	}
 
-	newDownwardAPIVolumes := func() []parametersv1alpha1.DownwardAPIChangeTriggeredAction {
-		return []parametersv1alpha1.DownwardAPIChangeTriggeredAction{
-			{
-				Name:       "downward-api",
-				MountPoint: "/etc/podinfo",
-				Command:    []string{"/bin/true"},
-				Items: []corev1.DownwardAPIVolumeFile{
-					{
-						Path: "labels/role",
-						FieldRef: &corev1.ObjectFieldSelector{
-							FieldPath: `metadata.labels['kubeblocks.io/role']`,
-						},
-					},
-				},
-			},
-		}
-	}
-
 	Context("TestBuildConfigManagerContainer", func() {
-		It("builds unixSignal reloader correctly", func() {
-			param := newCMBuildParams(false)
-			mockTplScriptCM()
-			reloadOptions := newReloadOptions(parametersv1alpha1.UnixSignalType, nil)
-			for i := range param.ConfigSpecsBuildParams {
-				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = parametersv1alpha1.UnixSignalType
-			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), ctx, param, newVolumeMounts2())).Should(Succeed())
-			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`, `--volume-dir`, `/postgresql/conf2`} {
-				Expect(param.Args).Should(ContainElement(arg))
-			}
-		})
-
 		It("builds shellTrigger reloader correctly", func() {
 			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				&corev1.ConfigMap{
@@ -230,10 +178,7 @@ formatterConfig:
 				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = parametersv1alpha1.ShellType
 			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
-			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
-				Expect(param.Args).Should(ContainElement(arg))
-			}
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param)).Should(Succeed())
 		})
 
 		It("builds tplScriptsTrigger reloader correctly", func() {
@@ -245,7 +190,7 @@ formatterConfig:
 				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
 			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param)).Should(Succeed())
 			for _, arg := range []string{`--operator-update-enable`} {
 				Expect(param.Args).Should(ContainElement(arg))
 			}
@@ -260,20 +205,7 @@ formatterConfig:
 				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
 			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
-			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
-				Expect(param.Args).Should(ContainElement(arg))
-			}
-		})
-
-		It("builds downwardAPI correctly", func() {
-			mockTplScriptCM()
-			param := newCMBuildParams(false)
-			buildParam := &param.ConfigSpecsBuildParams[0]
-			buildParam.DownwardAPIOptions = newDownwardAPIVolumes()
-			buildParam.ReloadAction = newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(true))
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
-			Expect(FindVolumeMount(param.DownwardAPIVolumes, buildParam.DownwardAPIOptions[0].Name)).ShouldNot(BeNil())
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param)).Should(Succeed())
 		})
 	})
 

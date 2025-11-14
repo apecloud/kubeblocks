@@ -21,6 +21,7 @@ package configmanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -33,12 +34,11 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
 type regexFilter = func(fileName string) bool
-type DynamicUpdater = func(ctx context.Context, configSpec string, updatedParams map[string]string) error
 
 const (
 	builtInExecFunctionName           = "exec"
@@ -50,19 +50,6 @@ const (
 
 // for testing
 var newCommandChannel = NewCommandChannel
-
-func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *parametersv1alpha1.FileFormatConfig, dataType, dsn string) (DynamicUpdater, error) {
-	tplContent, err := os.ReadFile(tplScriptPath)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkTPLScript(tplScriptPath, string(tplContent)); err != nil {
-		return nil, err
-	}
-	return func(ctx context.Context, configSpec string, updatedParams map[string]string) error {
-		return wrapGoTemplateRun(ctx, tplScriptPath, string(tplContent), updatedParams, formatConfig, dataType, dsn)
-	}, nil
-}
 
 func renderDSN(dsn string) (string, error) {
 	engine := gotemplate.NewTplEngine(nil, nil, "render-dsn", nil, nil, gotemplate.WithCustomizedWithType(gotemplate.KBDSL))
@@ -128,7 +115,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 			if err != nil {
 				return err
 			}
-			newConfig, err := core.ApplyConfigPatch(b, core.FromStringPointerMap(updatedParams), formatConfig, nil)
+			newConfig, err := cfgcore.ApplyConfigPatch(b, cfgcore.FromStringPointerMap(updatedParams), formatConfig, nil)
 			if err != nil {
 				return err
 			}
@@ -138,8 +125,8 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 }
 
 func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
-	patchOption := core.CfgOption{
-		Type:    core.CfgTplType,
+	patchOption := cfgcore.CfgOption{
+		Type:    cfgcore.CfgTplType,
 		CfgType: formatCfg.Format,
 		Log:     logger,
 	}
@@ -153,15 +140,15 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	if err != nil {
 		return nil, err
 	}
-	patch, err := core.CreateMergePatch(&core.ConfigResource{ConfigData: oldData}, &core.ConfigResource{ConfigData: newData}, patchOption)
+	patch, err := cfgcore.CreateMergePatch(&cfgcore.ConfigResource{ConfigData: oldData}, &cfgcore.ConfigResource{ConfigData: newData}, patchOption)
 	if err != nil {
 		return nil, err
 	}
 
-	params := core.GenerateVisualizedParamsList(patch, core.ToV1ConfigDescription(newVersion, formatCfg))
+	params := cfgcore.GenerateVisualizedParamsList(patch, cfgcore.ToV1ConfigDescription(newVersion, formatCfg))
 	r := make(map[string]string)
 	for _, key := range params {
-		if key.UpdateType != core.DeletedType {
+		if key.UpdateType != cfgcore.DeletedType {
 			for _, p := range key.Parameters {
 				if p.Value != nil {
 					r[p.Key] = *p.Value
@@ -222,7 +209,7 @@ func createFileRegex(fileRegex string) (regexFilter, error) {
 
 	regxPattern, err := regexp.Compile(fileRegex)
 	if err != nil {
-		return nil, core.WrapError(err, "failed to create regexp [%s]", fileRegex)
+		return nil, cfgcore.WrapError(err, "failed to create regexp [%s]", fileRegex)
 	}
 	return func(s string) bool {
 		return regxPattern.MatchString(s)
@@ -315,11 +302,21 @@ func copyFileContents(src, dst string) error {
 	return out.Sync()
 }
 
-func NeedSharedProcessNamespace(configSpecs []ConfigSpecMeta) bool {
-	for _, configSpec := range configSpecs {
-		if configSpec.ReloadType == parametersv1alpha1.UnixSignalType {
-			return true
-		}
+type files string
+
+func newFiles(basePath string) files {
+	return files(basePath)
+}
+
+func (f files) Get(filename string) (string, error) {
+	path := filepath.Join(string(f), filename)
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return "", cfgcore.MakeError("file %s not found", filename)
 	}
-	return false
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", cfgcore.WrapError(err, "failed to read file %s", filename)
+	}
+	return string(b), nil
 }

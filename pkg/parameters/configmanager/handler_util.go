@@ -21,11 +21,8 @@ package configmanager
 
 import (
 	"context"
-	"path/filepath"
-	"regexp"
 	"slices"
 
-	"github.com/fsnotify/fsnotify"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,8 +38,6 @@ type CfgManagerBuildParams struct {
 	Args        []string        `json:"args"`
 	Envs        []corev1.EnvVar `json:"envs"`
 
-	ShareProcessNamespace bool `json:"shareProcessNamespace"`
-
 	Volumes       []corev1.VolumeMount `json:"volumes"`
 	ComponentName string               `json:"componentName"`
 	SecreteName   string               `json:"secreteName"` // TODO(v1.0): conn-credential
@@ -53,9 +48,8 @@ type CfgManagerBuildParams struct {
 	ConfigSpecsBuildParams []ConfigSpecMeta
 
 	// init tools container
-	ToolsContainers    []corev1.Container
-	DownwardAPIVolumes []corev1.VolumeMount
-	CMConfigVolumes    []corev1.Volume
+	ToolsContainers []corev1.Container
+	CMConfigVolumes []corev1.Volume
 	// ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
 
 	// support custom config manager sidecar
@@ -82,10 +76,7 @@ func IsSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
 }
 
 func isValidReloadPolicy(reload parametersv1alpha1.ReloadAction) bool {
-	return reload.AutoTrigger != nil ||
-		reload.ShellTrigger != nil ||
-		reload.TPLScriptTrigger != nil ||
-		reload.UnixSignalTrigger != nil
+	return reload.AutoTrigger != nil || reload.ShellTrigger != nil || reload.TPLScriptTrigger != nil
 }
 
 func IsAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
@@ -94,8 +85,6 @@ func IsAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
 
 func FromReloadTypeConfig(reloadAction *parametersv1alpha1.ReloadAction) parametersv1alpha1.DynamicReloadType {
 	switch {
-	case reloadAction.UnixSignalTrigger != nil:
-		return parametersv1alpha1.UnixSignalType
 	case reloadAction.ShellTrigger != nil:
 		return parametersv1alpha1.ShellType
 	case reloadAction.TPLScriptTrigger != nil:
@@ -108,8 +97,6 @@ func FromReloadTypeConfig(reloadAction *parametersv1alpha1.ReloadAction) paramet
 
 func ValidateReloadOptions(reloadAction *parametersv1alpha1.ReloadAction, cli client.Client, ctx context.Context) error {
 	switch {
-	case reloadAction.UnixSignalTrigger != nil:
-		return checkSignalTrigger(reloadAction.UnixSignalTrigger)
 	case reloadAction.ShellTrigger != nil:
 		return checkShellTrigger(reloadAction.ShellTrigger)
 	case reloadAction.TPLScriptTrigger != nil:
@@ -135,39 +122,6 @@ func checkShellTrigger(options *parametersv1alpha1.ShellTrigger) error {
 	return nil
 }
 
-func checkSignalTrigger(options *parametersv1alpha1.UnixSignalTrigger) error {
-	signal := options.Signal
-	if !IsValidUnixSignal(signal) {
-		return core.MakeError("this special signal [%s] is not supported now.", signal)
-	}
-	return nil
-}
-
-func CreateCfgRegexFilter(regexString string) (NotifyEventFilter, error) {
-	regxPattern, err := regexp.Compile(regexString)
-	if err != nil {
-		return nil, core.WrapError(err, "failed to create regexp [%s]", regexString)
-	}
-
-	return func(event fsnotify.Event) (bool, error) {
-		return regxPattern.MatchString(event.Name), nil
-	}, nil
-}
-
-// CreateValidConfigMapFilter processes configmap volume
-// https://github.com/ossrs/srs/issues/1635
-func CreateValidConfigMapFilter() NotifyEventFilter {
-	return func(event fsnotify.Event) (bool, error) {
-		if !event.Has(fsnotify.Create) {
-			return false, nil
-		}
-		if filepath.Base(event.Name) != "..data" {
-			return false, nil
-		}
-		return true, nil
-	}
-}
-
 func actionToolsImage(reloadAction *parametersv1alpha1.ReloadAction) *parametersv1alpha1.ToolsSetup {
 	if reloadAction != nil && reloadAction.ShellTrigger != nil {
 		return reloadAction.ShellTrigger.ToolsSetup
@@ -187,16 +141,9 @@ func actionToolsScripts(paramDef parametersv1alpha1.ParametersDefinitionSpec) []
 	}
 
 	scriptConfigs := make([]parametersv1alpha1.ScriptConfig, 0)
-	for _, action := range paramDef.DownwardAPIChangeTriggeredActions {
-		if action.ScriptConfig != nil {
-			scriptConfigs = append(scriptConfigs, *action.ScriptConfig)
-		}
-	}
-	if paramDef.ReloadAction == nil {
-		return uniqueSlice(scriptConfigs)
-	}
-	if paramDef.ReloadAction.ShellTrigger != nil && paramDef.ReloadAction.ShellTrigger.ScriptConfig != nil {
-		scriptConfigs = append(scriptConfigs, *paramDef.ReloadAction.ShellTrigger.ScriptConfig)
+	reloadAction := paramDef.ReloadAction
+	if reloadAction != nil && reloadAction.ShellTrigger != nil && reloadAction.ShellTrigger.ScriptConfig != nil {
+		scriptConfigs = append(scriptConfigs, *reloadAction.ShellTrigger.ScriptConfig)
 	}
 	return uniqueSlice(scriptConfigs)
 }
@@ -239,12 +186,11 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentFileTemplate,
 			ToolsImageSpec: actionToolsImage(action),
 			ScriptConfig:   actionToolsScripts(paramsDef.Spec),
 			ConfigSpecInfo: ConfigSpecInfo{
-				ReloadAction:       action,
-				FormatterConfig:    *desc.FileFormatConfig,
-				ConfigSpec:         *configSpec,
-				ReloadType:         FromReloadTypeConfig(action),
-				ConfigFile:         desc.Name,
-				DownwardAPIOptions: paramsDef.Spec.DownwardAPIChangeTriggeredActions,
+				ReloadAction:    action,
+				FormatterConfig: *desc.FileFormatConfig,
+				ConfigSpec:      *configSpec,
+				ReloadType:      FromReloadTypeConfig(action),
+				ConfigFile:      desc.Name,
 			},
 		})
 	}

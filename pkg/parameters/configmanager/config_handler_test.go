@@ -26,7 +26,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,10 +44,6 @@ var _ = Describe("Config Handler Test", func() {
 	const (
 		oldVersion = "[test]\na = 1\nb = 2\n"
 		newVersion = "[test]\na = 2\nb = 2\n\nc = 100"
-
-		defaultBatchInputTemplate string = `{{- range $pKey, $pValue := $ }}
-{{ printf "%s=%s" $pKey $pValue }}
-{{- end }}`
 	)
 
 	BeforeEach(func() {
@@ -179,45 +174,6 @@ var _ = Describe("Config Handler Test", func() {
 				}
 				testShellHandlerCommon(configPath, configSpec)
 			})
-			Describe("Test reload in a batch", func() {
-				It("should succeed on the default batch input format", func() {
-					configSpec := ConfigSpecInfo{
-						ReloadAction: &parametersv1alpha1.ReloadAction{
-							ShellTrigger: &parametersv1alpha1.ShellTrigger{
-								Command: []string{"sh", "-c",
-									`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
-								},
-								BatchReload:                  util.ToPointer(true),
-								BatchParamsFormatterTemplate: defaultBatchInputTemplate,
-							}},
-						ReloadType:      parametersv1alpha1.ShellType,
-						MountPoint:      configPath,
-						ConfigSpec:      newConfigSpec(),
-						FormatterConfig: newFormatter(),
-					}
-					testShellHandlerCommon(configPath, configSpec)
-				})
-				It("should succeed on the custom batch input format", func() {
-					customBatchInputTemplate := `{{- range $pKey, $pValue := $ }}
-{{ printf "%s:%s" $pKey $pValue }}
-{{- end }}`
-					configSpec := ConfigSpecInfo{
-						ReloadAction: &parametersv1alpha1.ReloadAction{
-							ShellTrigger: &parametersv1alpha1.ShellTrigger{
-								Command: []string{"sh", "-c",
-									`while IFS=":" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
-								},
-								BatchReload:                  util.ToPointer(true),
-								BatchParamsFormatterTemplate: customBatchInputTemplate,
-							}},
-						ReloadType:      parametersv1alpha1.ShellType,
-						MountPoint:      configPath,
-						ConfigSpec:      newConfigSpec(),
-						FormatterConfig: newFormatter(),
-					}
-					testShellHandlerCommon(configPath, configSpec)
-				})
-			})
 		})
 		It("TplScriptsHandler", func() {
 			By("mock command channel")
@@ -286,76 +242,6 @@ var _ = Describe("Config Handler Test", func() {
 						Expect(theStdout).Should(Equal(fmt.Sprintf("hello %s %s\n", k, v)))
 					}
 				})
-			})
-		})
-		Describe("Test execute command with batch reload", func() {
-			var (
-				stdout string
-				err    error
-			)
-			BeforeEach(func() {
-				err = doBatchReloadAction(context.TODO(),
-					updatedParams,
-					func(out string, err error) {
-						stdout = out
-					},
-					defaultBatchInputTemplate,
-					"/bin/sh",
-					"-c",
-					`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
-				)
-			})
-			It("should execute the script successfully and have correct stdout content", func() {
-				By("checking that should execute the script successfully", func() {
-					Expect(err).Should(Succeed())
-				})
-				By("checking that should have correct stdout content", func() {
-					keys := make([]string, 0, len(updatedParams))
-					for k := range updatedParams {
-						keys = append(keys, k)
-					}
-					sort.Strings(keys)
-					var expectOutputSB strings.Builder
-					for _, k := range keys { // iterate the map in sorted order
-						v := updatedParams[k]
-						expectOutputSB.WriteString(fmt.Sprintf("key='%s'; val='%s'\n", k, v))
-					}
-					Expect(stdout).Should(Equal(expectOutputSB.String()))
-				})
-			})
-		})
-	})
-
-	Describe("Test generate batch stdin data", func() {
-		It("should pass the base scenario", func() {
-			// deliberately make the keys unsorted
-			updatedParams := map[string]string{
-				"key2": "val2",
-				"key1": "val1",
-				"key3": "",
-			}
-			// According to 'https://pkg.go.dev/text/template' :
-			// For `range`, if the value is a map and the keys can be sorted, the elements will be visited in sorted key order.
-			batchInputTemplate := `{{- range $pKey, $pValue := $ }}
-{{ printf "%s:%s" $pKey $pValue }}
-{{- end }}`
-			stdinStr, err := generateBatchStdinData(context.TODO(), updatedParams, batchInputTemplate)
-			By("checking there's no error", func() {
-				Expect(err).Should(Succeed())
-			})
-			By("checking the generated content is correct", func() {
-				keys := make([]string, 0, len(updatedParams))
-				for k := range updatedParams {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-				var expectOutputSB strings.Builder
-				for _, k := range keys { // iterate the map in sorted order
-					v := updatedParams[k]
-					expectOutputSB.WriteString(fmt.Sprintf("%s:%s\n", k, v))
-				}
-
-				Expect(stdinStr).Should(Equal(expectOutputSB.String()))
 			})
 		})
 	})

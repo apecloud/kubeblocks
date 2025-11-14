@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -880,8 +881,7 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 		}
 		err = doShardingLifecycleAction(transCtx, dag, shardingDef, &runningComps[i], name, kbShardingPreTerminateAction)
 		if err != nil {
-			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
-				"action", kbShardingPreTerminateAction, "component", runningComps[i].Name)
+			transCtx.Logger.Error(err, "failed to do shard lifecycle actions", "component", runningComps[i].Name)
 			continue
 		}
 
@@ -978,8 +978,7 @@ func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, 
 	for name := range deleteSet {
 		err := doShardingLifecycleAction(transCtx, dag, shardingDef, runningComps[name], shardingName, kbShardingRemoveAction)
 		if err != nil {
-			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
-				"action", kbShardingRemoveAction, "component", name)
+			transCtx.Logger.Error(err, "failed to do shard lifecycle actions", "component", name)
 			continue
 		}
 
@@ -1381,14 +1380,12 @@ func handleShardingAddNPostProvision(transCtx *clusterTransformContext, dag *gra
 	case comp.Annotations[kbShardingAddKey] != "":
 		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingAddAction)
 		if err != nil {
-			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
-				"action", kbShardingAddAction, "component", comp.Name)
+			transCtx.Logger.Error(err, "failed to do shard lifecycle actions", "component", comp.Name)
 		}
 	case comp.Annotations[kbShardingPostProvisionKey] != "":
 		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingPostProvisionAction)
 		if err != nil {
-			transCtx.Logger.Error(err, "failed to do shard lifecycle actions",
-				"action", kbShardingPostProvisionAction, "component", comp.Name)
+			transCtx.Logger.Error(err, "failed to do shard lifecycle actions", "component", comp.Name)
 		}
 	}
 
@@ -1472,7 +1469,13 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 
 	err = actionFunc(lfa)
 	if err != nil {
-		return lifecycle.IgnoreNotDefined(err)
+		err = lifecycle.IgnoreNotDefined(err)
+		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+			err = fmt.Errorf("%w: %w", ictrlutil.NewDelayedRequeueError(time.Second*10, fmt.Sprintf("wait for %s action precondition", actionName)), err)
+		} else {
+			err = fmt.Errorf("%w: %w", ictrlutil.NewRequeueError(time.Second*5, fmt.Sprintf("%s action failed", actionName)), err)
+		}
+		return err
 	}
 
 	markShardingActionDone(transCtx, dag, comp, checkAnnotationExist, annotation)

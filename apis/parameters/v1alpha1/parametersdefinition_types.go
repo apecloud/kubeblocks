@@ -432,6 +432,7 @@ type ShellTrigger struct {
 	//
 	// Defaults to 'False' if unspecified.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
 	// +optional
 	BatchReload *bool `json:"batchReload,omitempty"`
 
@@ -463,6 +464,7 @@ type ShellTrigger struct {
 	// key3=value3
 	// ```
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
 	// +optional
 	BatchParamsFormatterTemplate string `json:"batchParamsFormatterTemplate,omitempty"`
 

@@ -22,19 +22,16 @@ package configmanager
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/pkg/errors"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
@@ -177,19 +174,6 @@ type shellCommandHandler struct {
 	backupPath string
 	configMeta *ConfigSpecInfo
 	filter     regexFilter
-
-	isBatchReload      bool
-	batchInputTemplate string
-}
-
-func generateBatchStdinData(ctx context.Context, updatedParams map[string]string, batchInputTemplate string) (string, error) {
-	tplValues := gotemplate.TplValues{}
-	for k, v := range updatedParams {
-		tplValues[k] = v
-	}
-	engine := gotemplate.NewTplEngine(&tplValues, nil, "render-batch-input-parameters", nil, ctx)
-	stdinStr, err := engine.Render(batchInputTemplate)
-	return strings.TrimSpace(stdinStr) + "\n", err
 }
 
 func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
@@ -200,44 +184,9 @@ func (s *shellCommandHandler) OnlineUpdate(ctx context.Context, name string, upd
 	return s.execHandler(ctx, updatedParams, args...)
 }
 
-func doBatchReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, batchInputTemplate string, commandName string, args ...string) error {
-	// If there are any errors, try to check them before all steps.
-	batchStdinStr, err := generateBatchStdinData(ctx, updatedParams, batchInputTemplate)
-	if err != nil {
-		logger.Error(err, "cannot generate batch stdin data")
-		return err
-	}
+type actionCallback func(output string, err error)
 
-	command := exec.CommandContext(ctx, commandName, args...)
-	stdin, err := command.StdinPipe()
-	if err != nil {
-		return errors.Wrap(err, "cannot create a pipe connecting to the STDIN of the command")
-	}
-
-	go func() {
-		defer stdin.Close()
-		if _, err := io.WriteString(stdin, batchStdinStr); err != nil {
-			logger.Error(err, "cannot write batch stdin data into STDIN stream")
-		}
-	}()
-
-	stdout, err := cfgutil.ExecShellCommand(command)
-	if fn != nil {
-		fn(stdout, err)
-	}
-	logger.Info("do batch reload action",
-		"command", command.String(),
-		"stdin", batchStdinStr,
-		"stdout", stdout,
-		"error", err,
-	)
-	return err
-}
-
-// ActionCallback is a callback function for testcase.
-type ActionCallback func(output string, err error)
-
-func doReloadAction(ctx context.Context, updatedParams map[string]string, fn ActionCallback, commandName string, args ...string) error {
+func doReloadAction(ctx context.Context, updatedParams map[string]string, fn actionCallback, commandName string, args ...string) error {
 	commonHandle := func(args []string) error {
 		command := exec.CommandContext(ctx, commandName, args...)
 		stdout, err := cfgutil.ExecShellCommand(command)
@@ -266,9 +215,6 @@ func doReloadAction(ctx context.Context, updatedParams map[string]string, fn Act
 }
 
 func (s *shellCommandHandler) execHandler(ctx context.Context, updatedParams map[string]string, args ...string) error {
-	if s.isBatchReload && s.batchInputTemplate != "" {
-		return doBatchReloadAction(ctx, updatedParams, nil, s.batchInputTemplate, s.command, args...)
-	}
 	return doReloadAction(ctx, updatedParams, nil, s.command, args...)
 }
 
@@ -358,36 +304,6 @@ func createConfigVolumeMeta(configSpecName string, reloadType parametersv1alpha1
 	}
 }
 
-func isShellCommand(configMeta *ConfigSpecInfo) bool {
-	return configMeta != nil &&
-		configMeta.ReloadAction != nil &&
-		configMeta.ReloadAction.ShellTrigger != nil
-}
-
-func isBatchReloadMode(shellAction *parametersv1alpha1.ShellTrigger) bool {
-	return shellAction.BatchReload != nil && *shellAction.BatchReload
-}
-
-func isValidBatchReload(shellAction *parametersv1alpha1.ShellTrigger) bool {
-	return isBatchReloadMode(shellAction) && len(shellAction.BatchParamsFormatterTemplate) > 0
-}
-
-func isBatchReload(configMeta *ConfigSpecInfo) bool {
-	return isShellCommand(configMeta) && isBatchReloadMode(configMeta.ReloadAction.ShellTrigger)
-}
-
-func getBatchInputTemplate(configMeta *ConfigSpecInfo) string {
-	if !isShellCommand(configMeta) {
-		return ""
-	}
-
-	shellAction := configMeta.ReloadAction.ShellTrigger
-	if isValidBatchReload(shellAction) {
-		return shellAction.BatchParamsFormatterTemplate
-	}
-	return ""
-}
-
 func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 	if len(command) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
@@ -419,8 +335,6 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 		downwardAPIMountPoint:  cfgutil.ToSet(handler).AsSlice(),
 		downwardAPIHandler:     handler,
 		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, parametersv1alpha1.ShellType, []string{mountPoint}, formatterConfig),
-		isBatchReload:          isBatchReload(configMeta),
-		batchInputTemplate:     getBatchInputTemplate(configMeta),
 	}
 	return shellTrigger, nil
 }

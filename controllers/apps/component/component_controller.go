@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -121,7 +122,9 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(intctrlutil.RequeueError); ok {
+		if intctrlutil.IsRequeueError(err) {
+			var re intctrlutil.RequeueError
+			_ = errors.As(err, &re)
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
 		if apierrors.IsConflict(err) {

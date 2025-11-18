@@ -1122,5 +1122,4 @@
 	...
 }
 
-configuration: #PGPameter & {
-}
+configuration: #PGPameter & {}

@@ -56,7 +56,7 @@ func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSche
 	if schemaType != "" {
 		rootValue = rt.Underlying().LookupPath(cue.MakePath(cue.Def(schemaType)))
 		if rootValue.Err() != nil {
-			return nil, core.MakeError(errors.Details(rootValue.Err(), nil))
+			return nil, core.MakeError("%s", errors.Details(rootValue.Err(), nil))
 		}
 	} else {
 		defs, err := rt.Underlying().Fields(cue.Definitions(true))

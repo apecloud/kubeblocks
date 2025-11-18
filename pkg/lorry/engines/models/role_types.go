@@ -51,8 +51,9 @@ func (r RoleType) GetWeight() int32 {
 	}
 }
 
-func SortRoleByWeight(r1, r2 RoleType) bool {
-	return int(r1.GetWeight()) > int(r2.GetWeight())
+func SortRoleByWeight(r1, r2 RoleType) int {
+	// Sort in descending order (highest weight first)
+	return int(r2.GetWeight() - r1.GetWeight())
 }
 
 func String2RoleType(roleName string) RoleType {

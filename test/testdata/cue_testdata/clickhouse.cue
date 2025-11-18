@@ -38,5 +38,4 @@
 	// Clickhouse all parameter define: clickhouse settings define
 }
 
-configuration: #ProfilesParameter & {
-}
+configuration: #ProfilesParameter & {}

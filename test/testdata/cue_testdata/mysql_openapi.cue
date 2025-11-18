@@ -44,5 +44,4 @@
 }
 
 // configuration require
-configuration: #MysqlParameter & {
-}
+configuration: #MysqlParameter & {}

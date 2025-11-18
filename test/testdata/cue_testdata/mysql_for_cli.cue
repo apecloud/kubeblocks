@@ -30,8 +30,7 @@
 	// reference mysql parameters
 	...
 }
-mysqld: #MysqlParameter & {
-}
+mysqld: #MysqlParameter & {}
 // ignore client parameter validate
 // mysql client: a set of name/value pairs.
 client?: {

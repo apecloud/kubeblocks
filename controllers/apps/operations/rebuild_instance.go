@@ -328,8 +328,8 @@ func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(reqCtx intctrlutil.
 	rebuildInstance appsv1alpha1.RebuildInstance,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) error {
 	// 1. sort the instances
-	slices.SortFunc(rebuildInstance.Instances, func(a, b appsv1alpha1.Instance) bool {
-		return a.Name < b.Name
+	slices.SortFunc(rebuildInstance.Instances, func(a, b appsv1alpha1.Instance) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	// 2. assemble the corresponding replicas and instances based on the template

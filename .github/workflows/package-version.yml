@@ -16,7 +16,7 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.24"
 
 jobs:
   package-version:
@@ -94,7 +94,7 @@ jobs:
             git commit -a -m "chore: auto update apis docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
+
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
@@ -126,7 +126,7 @@ jobs:
             git commit -m "chore: auto update kbcli user docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
+
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
@@ -161,7 +161,7 @@ jobs:
               git commit -m "chore: auto upgrade kubeblocks addons version"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
+
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 

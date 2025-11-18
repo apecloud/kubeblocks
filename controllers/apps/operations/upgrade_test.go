@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -264,7 +262,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
 			By("expect upgrade successfully")
-			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, fmt.Sprintf(clusterName+"-"+statelessComp+"-0"), "", "")
+			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, clusterName+"-"+statelessComp+"-0", "", "")
 			_ = testapps.MockInstanceSetPods(&testCtx, nil, clusterObject, statefulComp)
 			pods := testapps.MockInstanceSetPods(&testCtx, nil, clusterObject, consensusComp)
 			for i := range pods {

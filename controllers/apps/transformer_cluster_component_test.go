@@ -802,7 +802,7 @@ var _ = Describe("cluster component transformer test", func() {
 				{
 					Name: "app-data",
 					Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse("1Gi"),
 							},
@@ -872,7 +872,7 @@ var _ = Describe("cluster component transformer test", func() {
 			vct := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 				Name: "app-data",
 				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -895,7 +895,7 @@ var _ = Describe("cluster component transformer test", func() {
 			vct := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 				Name: "app-data",
 				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},

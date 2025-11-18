@@ -202,7 +202,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.21
+	$(GO) mod tidy -compat=1.24
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
@@ -272,6 +272,10 @@ doc: api-doc ## generate all documents.
 manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
+.PHONY: manager-fast
+manager-fast:
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
+
 .PHONY: dataprotection
 dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
@@ -338,7 +342,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.21
+	$(GO) mod tidy -compat=1.24
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -435,7 +439,7 @@ install-docker-buildx: ## Create `docker buildx` builder.
 	fi
 
 .PHONY: golangci
-golangci: GOLANGCILINT_VERSION = v1.55.2
+golangci: GOLANGCILINT_VERSION = v1.64.8
 golangci: ## Download golangci-lint locally if necessary.
 ifneq ($(shell which golangci-lint),)
 	@echo golangci-lint is already installed

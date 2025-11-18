@@ -70,9 +70,9 @@ var _ = Describe("stateful_set builder", func() {
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					VolumeName: "foo-1",
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceCPU: resource.MustParse("500m"),
+							corev1.ResourceStorage: resource.MustParse("2Gi"),
 						},
 					},
 				},
@@ -85,9 +85,9 @@ var _ = Describe("stateful_set builder", func() {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				VolumeName: "foo-2",
-				Resources: corev1.ResourceRequirements{
+				Resources: corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
-						corev1.ResourceCPU: resource.MustParse("600m"),
+						corev1.ResourceStorage: resource.MustParse("2Gi"),
 					},
 				},
 			},

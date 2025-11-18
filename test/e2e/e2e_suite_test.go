@@ -27,8 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/vmware-tanzu/velero/test/e2e"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
 
 	"github.com/onsi/ginkgo/v2/reporters"
 	"go.uber.org/zap/zapcore"
@@ -84,18 +83,9 @@ func TestE2e(t *testing.T) {
 func GetKubeconfigContext() error {
 	var err error
 	var tcDefault TestClient
-	tcDefault, err = NewTestClient(VeleroCfg.DefaultCluster)
-	VeleroCfg.DefaultClient = &tcDefault
-	VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+	tcDefault, err = NewTestClient("")
 	if err != nil {
 		return err
-	}
-
-	if VeleroCfg.DefaultCluster != "" {
-		err = KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)
-		if err != nil {
-			return err
-		}
 	}
 	TC = &tcDefault
 	return nil

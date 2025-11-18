@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -133,8 +134,8 @@ var _ = Describe(" component service transformer test", func() {
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &corev1.Service{})
 			Expect(len(objs)).Should(Equal(int(transCtx.SynthesizeComponent.Replicas)))
-			slices.SortFunc(objs, func(a, b client.Object) bool {
-				return a.GetName() < b.GetName()
+			slices.SortFunc(objs, func(a, b client.Object) int {
+				return strings.Compare(a.GetName(), b.GetName())
 			})
 			for i := int32(0); i < transCtx.SynthesizeComponent.Replicas; i++ {
 				svc := objs[i].(*corev1.Service)
@@ -160,8 +161,8 @@ var _ = Describe(" component service transformer test", func() {
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &corev1.Service{})
 			Expect(len(objs)).Should(Equal(int(transCtx.SynthesizeComponent.Replicas)))
-			slices.SortFunc(objs, func(a, b client.Object) bool {
-				return a.GetName() < b.GetName()
+			slices.SortFunc(objs, func(a, b client.Object) int {
+				return strings.Compare(a.GetName(), b.GetName())
 			})
 			for i := int32(0); i < transCtx.SynthesizeComponent.Replicas; i++ {
 				svc := objs[i].(*corev1.Service)
@@ -188,8 +189,8 @@ var _ = Describe(" component service transformer test", func() {
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &corev1.Service{})
 			Expect(len(objs)).Should(Equal(int(replicas)))
-			slices.SortFunc(objs, func(a, b client.Object) bool {
-				return a.GetName() < b.GetName()
+			slices.SortFunc(objs, func(a, b client.Object) int {
+				return strings.Compare(a.GetName(), b.GetName())
 			})
 			for i := int32(0); i < replicas; i++ {
 				svc := objs[i].(*corev1.Service)

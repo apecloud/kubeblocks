@@ -272,10 +272,6 @@ doc: api-doc ## generate all documents.
 manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
-.PHONY: manager-fast
-manager-fast:
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
-
 .PHONY: dataprotection
 dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go

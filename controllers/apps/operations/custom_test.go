@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -280,7 +278,7 @@ var _ = Describe("CustomOps", func() {
 				GetObject()
 
 			// create a pod which belongs to the sharding component
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, shardingCompShortName, fmt.Sprintf(shardingCompName+"-0"), "", "")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, shardingCompShortName, shardingCompName+"-0", "", "")
 			Expect(testapps.ChangeObj(&testCtx, pod, func(obj *corev1.Pod) {
 				pod.Labels[constant.KBAppShardingNameLabelKey] = consensusComp
 			})).Should(Succeed())

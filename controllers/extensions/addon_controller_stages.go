@@ -1047,8 +1047,8 @@ func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *
 	}
 
 	// sort pod with latest creation place front
-	slices.SortFunc(podList.Items, func(a, b corev1.Pod) bool {
-		return b.CreationTimestamp.Before(&(a.CreationTimestamp))
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) int {
+		return b.CreationTimestamp.Compare(a.CreationTimestamp.Time)
 	})
 
 podsloop:

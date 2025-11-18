@@ -126,9 +126,9 @@ var _ = Describe("plan builder test", func() {
 		It("should update pvc object", func() {
 			pvcOrig := builder.NewPVCBuilder(namespace, name).GetObject()
 			pvc := pvcOrig.DeepCopy()
-			pvc.Spec.Resources = corev1.ResourceRequirements{
+			pvc.Spec.Resources = corev1.VolumeResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceStorage: resource.MustParse("500m"),
+					corev1.ResourceStorage: resource.MustParse("2Gi"),
 				},
 			}
 			v := &model.ObjectVertex{

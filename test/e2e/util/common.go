@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/test/e2e/util/common"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	"golang.org/x/net/context"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +77,7 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		return true, nil
 	})
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for pods in namespace %s to start running", namespace))
+		return errors.Wrapf(err, "Failed to wait for pods in namespace %s to start running", namespace)
 	}
 	return nil
 }

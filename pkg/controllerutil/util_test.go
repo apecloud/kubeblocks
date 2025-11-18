@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -81,8 +82,8 @@ var _ = Describe("utils test", func() {
 			})
 
 			Expect(dst).Should(HaveLen(3))
-			slices.SortStableFunc(dst, func(a, b corev1.Volume) bool {
-				return a.Name < b.Name
+			slices.SortStableFunc(dst, func(a, b corev1.Volume) int {
+				return strings.Compare(a.Name, b.Name)
 			})
 			Expect(dst[0].Name).Should(Equal("pvc0"))
 			Expect(dst[1].Name).Should(Equal("pvc1"))

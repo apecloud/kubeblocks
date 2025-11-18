@@ -33,9 +33,9 @@ var _ = Describe("pvc builder", func() {
 			name = "foo"
 			ns   = "default"
 		)
-		resources := corev1.ResourceRequirements{
+		resources := corev1.VolumeResourceRequirements{
 			Requests: map[corev1.ResourceName]resource.Quantity{
-				"CPU": resource.MustParse("500m"),
+				corev1.ResourceStorage: resource.MustParse("2Gi"),
 			},
 		}
 		accessModes := []corev1.PersistentVolumeAccessMode{

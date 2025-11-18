@@ -50,5 +50,4 @@
 }
 
 // configuration require
-configuration: #MongodParameter & {
-}
+configuration: #MongodParameter & {}

@@ -380,7 +380,7 @@ func (r *httpsVolumeStatsRequester) request(ctx context.Context) ([]byte, error)
 	}
 	if rsp.StatusCode != 200 {
 		r.logger.Error(nil, fmt.Sprintf("HTTP response from kubelet error: %s", rsp.Status))
-		return nil, fmt.Errorf(rsp.Status)
+		return nil, fmt.Errorf("%s", rsp.Status)
 	}
 
 	defer rsp.Body.Close()

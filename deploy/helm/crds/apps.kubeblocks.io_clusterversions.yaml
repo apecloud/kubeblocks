@@ -851,6 +851,19 @@ spec:
                                         required:
                                         - port
                                         type: object
+                                      sleep:
+                                        description: Sleep represents the duration
+                                          that the container should sleep before being
+                                          terminated.
+                                        properties:
+                                          seconds:
+                                            description: Seconds is the number of
+                                              seconds to sleep.
+                                            format: int64
+                                            type: integer
+                                        required:
+                                        - seconds
+                                        type: object
                                       tcpSocket:
                                         description: |-
                                           Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
@@ -950,6 +963,19 @@ spec:
                                             type: string
                                         required:
                                         - port
+                                        type: object
+                                      sleep:
+                                        description: Sleep represents the duration
+                                          that the container should sleep before being
+                                          terminated.
+                                        properties:
+                                          seconds:
+                                            description: Seconds is the number of
+                                              seconds to sleep.
+                                            format: int64
+                                            type: integer
+                                        required:
+                                        - seconds
                                         type: object
                                       tcpSocket:
                                         description: |-
@@ -2188,6 +2214,19 @@ spec:
                                         required:
                                         - port
                                         type: object
+                                      sleep:
+                                        description: Sleep represents the duration
+                                          that the container should sleep before being
+                                          terminated.
+                                        properties:
+                                          seconds:
+                                            description: Seconds is the number of
+                                              seconds to sleep.
+                                            format: int64
+                                            type: integer
+                                        required:
+                                        - seconds
+                                        type: object
                                       tcpSocket:
                                         description: |-
                                           Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
@@ -2287,6 +2326,19 @@ spec:
                                             type: string
                                         required:
                                         - port
+                                        type: object
+                                      sleep:
+                                        description: Sleep represents the duration
+                                          that the container should sleep before being
+                                          terminated.
+                                        properties:
+                                          seconds:
+                                            description: Seconds is the number of
+                                              seconds to sleep.
+                                            format: int64
+                                            type: integer
+                                        required:
+                                        - seconds
                                         type: object
                                       tcpSocket:
                                         description: |-

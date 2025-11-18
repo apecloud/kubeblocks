@@ -44,7 +44,7 @@ func InitTestClient(kubecontext string) (TestClient, error) {
 	if err != nil {
 		return TestClient{}, err
 	}
-	f := client.NewFactory("e2e", kubecontext, config)
+	f := client.NewFactory("e2e", config)
 	clientGo, err := f.KubeClient()
 	if err != nil {
 		return TestClient{}, err

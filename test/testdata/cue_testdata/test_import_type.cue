@@ -50,5 +50,4 @@ import "time"
 }
 
 // configuration require
-configuration: #Exemplar & {
-}
+configuration: #Exemplar & {}

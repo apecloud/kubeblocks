@@ -136,9 +136,10 @@ func (r *LogCollectionReconciler) collectErrorLogs(reqCtx intctrlutil.RequestCtx
 		return "", nil
 	}
 	// sort pod with oldest creation place front
-	slices.SortFunc(podList.Items, func(a, b corev1.Pod) bool {
-		return !b.CreationTimestamp.Before(&(a.CreationTimestamp))
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) int {
+		return a.CreationTimestamp.Compare(b.CreationTimestamp.Time)
 	})
+
 	oldestPod := podList.Items[0]
 	clientset, err := corev1client.NewForConfig(r.RestConfig)
 	if err != nil {

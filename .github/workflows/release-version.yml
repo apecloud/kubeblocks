@@ -12,7 +12,7 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.24"
 
 jobs:
   release-message:
@@ -47,7 +47,7 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
 
       - name: make ${{ matrix.ops }}
         run: |
@@ -96,7 +96,7 @@ jobs:
           update_release_notes_script=".github/scripts/update_release_notes.py"
           if [[ -f "${update_release_notes_script}" ]]; then
               check_file_log="check_addon_stable_versions.log"
-              touch ${check_file_log} 
+              touch ${check_file_log}
               python3 ${update_release_notes_script} \
                 --git-branch "${GIT_BRANCH}" \
                 --git-tag "${RELEASE_VERSION}" \
@@ -184,7 +184,7 @@ jobs:
             git commit -a -m "chore: auto update apis docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
+
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
@@ -216,7 +216,7 @@ jobs:
             git commit -m "chore: auto update kbcli user docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
+
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
@@ -251,7 +251,7 @@ jobs:
               git commit -a -m "chore: auto upgrade kubeblocks addons version"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
+
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 

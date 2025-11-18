@@ -92,7 +92,7 @@ func fillSimplifiedClusterAPI(cluster *appsv1alpha1.Cluster, clusterCompDef *app
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							"storage": cluster.Spec.Storage.Size,
 						},

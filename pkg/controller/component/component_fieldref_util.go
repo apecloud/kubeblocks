@@ -77,9 +77,9 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 				case appsv1alpha1.FromHeadlessServiceRef:
 					if referredComponentDef.WorkloadType == appsv1alpha1.Stateless {
 						errMsg := fmt.Sprintf("headless service ref is not supported for stateless component, cluster: %s, referred component: %s", cluster.Name, referredComponentDef.Name)
-						klog.V(1).Infof(errMsg)
+						klog.V(1).Infof("%s", errMsg)
 						if compRef.FailurePolicy == appsv1alpha1.FailurePolicyFail {
-							return fmt.Errorf(errMsg)
+							return fmt.Errorf("%s", errMsg)
 						}
 					}
 					env.Value = resolveHeadlessServiceFieldRef(refEnv.ValueFrom, cluster, referredComponents)

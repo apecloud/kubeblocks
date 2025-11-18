@@ -111,7 +111,7 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 
 	errMessage := response.GetErrMessage()
 	if errMessage != "" {
-		return core.MakeError(errMessage)
+		return core.MakeError("%s", errMessage)
 	}
 	return nil
 }
@@ -145,7 +145,7 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 
 	errMessage := response.GetErrMessage()
 	if errMessage != "" {
-		return core.MakeError(errMessage)
+		return core.MakeError("%s", errMessage)
 	}
 	return nil
 }

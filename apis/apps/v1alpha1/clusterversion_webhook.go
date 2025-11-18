@@ -105,5 +105,5 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 func newInvalidError(kind, resourceName, path, reason string) error {
 	return apierrors.NewInvalid(schema.GroupKind{Group: APIVersion, Kind: kind},
 		resourceName, field.ErrorList{field.InternalError(field.NewPath(path),
-			fmt.Errorf(reason))})
+			fmt.Errorf("%s", reason))})
 }

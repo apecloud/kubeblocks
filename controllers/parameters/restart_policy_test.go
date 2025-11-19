@@ -68,7 +68,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 			// mock client update caller
 			updateErr := core.MakeError("update failed!")
-			k8sMockClient.MockUpdateMethod(
+			k8sMockClient.MockPatchMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
 
@@ -139,7 +139,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 				}),
 				withClusterComponent(2))
 
-			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
 					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
@@ -187,7 +187,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 				withClusterComponent(2))
 
 			updateErr := core.MakeError("update failed!")
-			k8sMockClient.MockUpdateMethod(
+			k8sMockClient.MockPatchMethod(
 				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
 				testutil.WithSucceed(testutil.WithAnyTimes()))
 

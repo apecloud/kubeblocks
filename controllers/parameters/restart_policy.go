@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -54,7 +57,23 @@ func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFunc
 		progress  = core.NotStarted
 	)
 
-	if err := funcs.RestartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, rctx.Cluster, rctx.ClusterComponent.Name); err != nil {
+	recordEvent := func(obj client.Object) {
+		rctx.Recorder.Eventf(obj,
+			corev1.EventTypeNormal, "ReconfigureRestarted",
+			"restarting component[%s] in cluster[%s], version: %s", rctx.ClusterComponent.Name, rctx.Cluster.Name, newVersion)
+	}
+
+	objs := make([]client.Object, 0)
+	for _, unit := range rctx.InstanceSetUnits {
+		objs = append(objs, &unit)
+	}
+
+	if obj, err := funcs.RestartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, objs, recordEvent); err != nil {
+		if obj != nil {
+			rctx.Recorder.Eventf(obj,
+				corev1.EventTypeWarning, "ReconfigureFailed",
+				"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), rctx.Cluster.Name, newVersion)
+		}
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 

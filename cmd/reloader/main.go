@@ -21,31 +21,71 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
-	"path/filepath"
-	"syscall"
+	"time"
 
-	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 
-	"github.com/apecloud/kubeblocks/cmd/reloader/app"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sig
-		cancel()
-	}()
+type options struct {
+	config     string
+	configSpec string
+	parameters string
+	configFile string
+	timeout    int
+}
 
+var opts = &options{}
+
+func init() {
 	viper.AutomaticEnv()
-	cmd := app.NewConfigManagerCommand(ctx, filepath.Base(os.Args[0]))
-	if err := cmd.Execute(); err != nil && errors.Is(errors.Cause(err), context.Canceled) {
-		fmt.Println(err)
+
+	pflag.StringVar(&opts.config, "config", "", "the reload config")
+	pflag.StringVar(&opts.configSpec, "config-spec", "", "the config spec")
+	pflag.StringVar(&opts.parameters, "parameters", "", "the parameters to update")
+	pflag.StringVar(&opts.configFile, "config-file", "", "the config file to update")
+	pflag.IntVar(&opts.timeout, "timeout", 0, "the timeout to wait for the update to complete")
+}
+
+func main() {
+	var (
+		handler cfgcm.ConfigHandler
+		err     error
+	)
+	if handler, err = cfgcm.CreateCombinedHandler(opts.config); err != nil {
+		fmt.Printf("create combined handler error: %v\n", err)
+		os.Exit(-1)
+	}
+
+	if len(opts.parameters) == 0 {
+		// fmt.Printf("update parameters is empty\n")
+		os.Exit(0)
+	}
+	var parameters map[string]string
+	if err = json.Unmarshal([]byte(opts.parameters), &parameters); err != nil {
+		fmt.Printf("unmarshal parameters error: %v\n", err)
+		os.Exit(-1)
+	}
+
+	key := opts.configSpec
+	if opts.configFile != "" {
+		key = key + "/" + opts.configFile
+	}
+
+	ctx := context.Background()
+	if opts.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(opts.timeout)*time.Second)
+		defer cancel()
+	}
+
+	if err = handler.OnlineUpdate(ctx, key, parameters); err != nil {
+		fmt.Printf("update parameters error: %v\n", err)
 		os.Exit(-1)
 	}
 }

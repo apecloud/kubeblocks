@@ -496,18 +496,6 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	return cfgManagerParams, nil
 }
 
-func ResolveReloadServerGRPCPort(containers []corev1.Container) (int32, error) {
-	for _, container := range containers {
-		if container.Name != constant.ConfigSidecarName {
-			continue
-		}
-		if port, ok := findPortByPortName(container); ok {
-			return port, nil
-		}
-	}
-	return constant.InvalidContainerPort, core.MakeError("failed to find config manager grpc port, please add named config-manager port")
-}
-
 func allocConfigManagerHostPort(comp *component.SynthesizedComponent) (int32, error) {
 	pm := intctrlutil.GetPortManager()
 	portKey := intctrlutil.BuildHostPortName(comp.ClusterName, comp.Name, constant.ConfigSidecarName, constant.ConfigManagerPortName)
@@ -516,15 +504,6 @@ func allocConfigManagerHostPort(comp *component.SynthesizedComponent) (int32, er
 		return constant.InvalidContainerPort, err
 	}
 	return port, nil
-}
-
-func findPortByPortName(container corev1.Container) (int32, bool) {
-	for _, port := range container.Ports {
-		if port.Name == constant.ConfigManagerPortName {
-			return port.ContainerPort, true
-		}
-	}
-	return constant.InvalidContainerPort, false
 }
 
 // UpdateConfigPayload updates the configuration payload

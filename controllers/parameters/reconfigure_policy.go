@@ -22,8 +22,6 @@ package parameters
 import (
 	"strings"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
@@ -79,12 +76,6 @@ type reconfigureContext struct {
 	// Configmap object of the configuration template instance in the component.
 	ConfigMap *corev1.ConfigMap
 
-	// ConfigConstraint pointer
-	// ConfigConstraint *appsv1beta1.ConfigConstraintSpec
-
-	// For grpc factory
-	ReconfigureClientFactory createReconfigureClient
-
 	// List of containers using this config volume.
 	ContainerNames []string
 
@@ -99,23 +90,8 @@ type reconfigurePolicy interface {
 }
 
 var (
-	// lazy creation of grpc connection
-	// TODO support connection pool
-	newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			return nil, err
-		}
-		return cfgproto.NewReconfigureClient(conn), nil
-	}
-
 	upgradePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
 )
-
-// getClientFactory support ut mock
-func getClientFactory() createReconfigureClient {
-	return newGRPCClient
-}
 
 func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
 	upgradePolicyMap[policy] = action

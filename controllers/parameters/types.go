@@ -27,16 +27,12 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )
-
-type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, error)
 
 type GetPodsFunc func(params reconfigureContext) ([]corev1.Pod, error)
 type RestartComponent func(client client.Client, ctx intctrlutil.RequestCtx, key string, version string, cluster *appsv1.Cluster, compName string) error
 
-type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
-type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error
+type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, configSpec string, configFile string, updatedParams map[string]string) error
 
 // Node: Distinguish between implementation and interface.
 

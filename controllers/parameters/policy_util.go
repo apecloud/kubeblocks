@@ -22,12 +22,8 @@ package parameters
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/netip"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -38,8 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // GetComponentPods gets all pods of the component.
@@ -95,77 +89,9 @@ func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 	return pods, nil
 }
 
-// TODO commonOnlineUpdateWithPod migrate to sql command pipeline
-func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
-	address, err := resolveReloadServerGrpcURL(pod)
-	if err != nil {
-		return err
-	}
-	client, err := createClient(address)
-	if err != nil {
-		return err
-	}
-
-	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
-		ConfigSpec: configSpec,
-		Params:     updatedParams,
-		ConfigFile: ptr.To(configFile),
-	})
-	if err != nil {
-		return err
-	}
-
-	errMessage := response.GetErrMessage()
-	if errMessage != "" {
-		return core.MakeError("%s", errMessage)
-	}
-	return nil
-}
-
-func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
-	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
-	if pod.Spec.HostNetwork {
-		containerPort, err := parameters.ResolveReloadServerGRPCPort(pod.Spec.Containers)
-		if err != nil {
-			return "", err
-		}
-		podPort = int(containerPort)
-	}
-	return generateGrpcURL(pod, podPort)
-}
-
-func generateGrpcURL(pod *corev1.Pod, portPort int) (string, error) {
-	ip, err := ipAddressFromPod(pod.Status)
-	if err != nil {
-		return "", err
-	}
-	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
-}
-
-func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
-	// IPv4 address priority
-	for _, ip := range status.PodIPs {
-		address, err := netip.ParseAddr(ip.IP)
-		if err != nil || address.Is6() {
-			continue
-		}
-		return net.ParseIP(ip.IP), nil
-	}
-
-	// Using status.PodIP
-	address := net.ParseIP(status.PodIP)
-	if !validIPv4Address(address) && !validIPv6Address(address) {
-		return nil, fmt.Errorf("%s is not a valid IPv4/IPv6 address", status.PodIP)
-	}
-	return address, nil
-}
-
-func validIPv4Address(ip net.IP) bool {
-	return ip != nil && ip.To4() != nil
-}
-
-func validIPv6Address(ip net.IP) bool {
-	return ip != nil && ip.To16() != nil
+func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, configSpec string, configFile string, updatedParams map[string]string) error {
+	// TODO: update cluster spec to call the reconfigure action
+	return fmt.Errorf("not yet implemented")
 }
 
 func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
@@ -311,19 +237,18 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 
 func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
 	reCtx := reconfigureContext{
-		RequestCtx:               rctx.RequestCtx,
-		Client:                   rctx.Client,
-		ConfigTemplate:           *templateSpec,
-		ConfigMap:                rctx.ConfigMap,
-		ParametersDef:            &pd.Spec,
-		ConfigDescription:        configDescription,
-		Cluster:                  rctx.ClusterObj,
-		ContainerNames:           rctx.Containers,
-		InstanceSetUnits:         rctx.InstanceSetList,
-		ClusterComponent:         rctx.ClusterComObj,
-		SynthesizedComponent:     rctx.BuiltinComponent,
-		ReconfigureClientFactory: getClientFactory(),
-		Patch:                    patch,
+		RequestCtx:           rctx.RequestCtx,
+		Client:               rctx.Client,
+		ConfigTemplate:       *templateSpec,
+		ConfigMap:            rctx.ConfigMap,
+		ParametersDef:        &pd.Spec,
+		ConfigDescription:    configDescription,
+		Cluster:              rctx.ClusterObj,
+		ContainerNames:       rctx.Containers,
+		InstanceSetUnits:     rctx.InstanceSetList,
+		ClusterComponent:     rctx.ClusterComObj,
+		SynthesizedComponent: rctx.BuiltinComponent,
+		Patch:                patch,
 	}
 
 	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}

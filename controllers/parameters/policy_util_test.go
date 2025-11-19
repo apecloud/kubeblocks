@@ -113,12 +113,6 @@ func withClusterComponent(replicas int) ParamsOps {
 	}
 }
 
-func withGRPCClient(clientFactory createReconfigureClient) ParamsOps {
-	return func(params *reconfigureContext) {
-		params.ReconfigureClientFactory = clientFactory
-	}
-}
-
 func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 	return func(params *reconfigureContext) {
 		params.ConfigMap = &corev1.ConfigMap{

@@ -84,7 +84,7 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 		}
 		var targetPodName string
 		if targetPod != nil {
-			targetPodName = ""
+			targetPodName = targetPod.Name
 		}
 		return w.createWorkload(actionCtx, podSpec, targetPodName, index)
 	}

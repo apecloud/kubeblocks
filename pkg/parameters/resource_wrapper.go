@@ -80,7 +80,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 	}
 	return r.Wrap(func() error {
 		r.ComponentObj = &appsv1.Component{}
-		if err := r.Client.Get(r.Context, componentKey, r.ComponentObj, inDataContext()); err != nil {
+		if err := r.Client.Get(r.Context, componentKey, r.ComponentObj); err != nil {
 			return err
 		}
 		if len(r.ComponentObj.Spec.CompDef) == 0 {
@@ -91,7 +91,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 			Name: r.ComponentObj.Spec.CompDef,
 		}
 		r.ComponentDefObj = &appsv1.ComponentDefinition{}
-		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj, inDataContext()); err != nil {
+		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj); err != nil {
 			return err
 		}
 		if r.ComponentDefObj.Status.Phase != appsv1.AvailablePhase {
@@ -138,7 +138,7 @@ func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 
 	return r.Wrap(func() error {
 		r.ConfigMapObj = &corev1.ConfigMap{}
-		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj, inDataContextUnspecified())
+		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj)
 	})
 }
 

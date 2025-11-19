@@ -76,9 +76,6 @@ type reconfigureContext struct {
 	// Configmap object of the configuration template instance in the component.
 	ConfigMap *corev1.ConfigMap
 
-	// List of containers using this config volume.
-	ContainerNames []string
-
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
 	ParametersDef     *parametersv1alpha1.ParametersDefinitionSpec
 	Patch             *core.ConfigPatchInfo

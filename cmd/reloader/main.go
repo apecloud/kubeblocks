@@ -62,6 +62,11 @@ func main() {
 		os.Exit(-1)
 	}
 
+	key := opts.configSpec
+	if opts.configFile != "" {
+		key = key + "/" + opts.configFile
+	}
+
 	if len(opts.parameters) == 0 {
 		// fmt.Printf("update parameters is empty\n")
 		os.Exit(0)
@@ -72,20 +77,18 @@ func main() {
 		os.Exit(-1)
 	}
 
-	key := opts.configSpec
-	if opts.configFile != "" {
-		key = key + "/" + opts.configFile
-	}
-
-	ctx := context.Background()
-	if opts.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(opts.timeout)*time.Second)
-		defer cancel()
-	}
-
-	if err = handler.OnlineUpdate(ctx, key, parameters); err != nil {
+	if err = update(handler, key, parameters); err != nil {
 		fmt.Printf("update parameters error: %v\n", err)
 		os.Exit(-1)
 	}
+}
+
+func update(handler cfgcm.ConfigHandler, key string, parameters map[string]string) error {
+	ctx := context.Background()
+	var cancel context.CancelFunc
+	if opts.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(opts.timeout)*time.Second)
+		defer cancel()
+	}
+	return handler.OnlineUpdate(ctx, key, parameters)
 }

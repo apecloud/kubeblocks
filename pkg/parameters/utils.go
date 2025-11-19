@@ -19,18 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package parameters
 
-import (
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-)
-
-func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
-}
-
-func inDataContextUnspecified() *multicluster.ClientOption {
-	return multicluster.InDataContextUnspecified()
-}
-
 func copyMap(data map[string]string) map[string]string {
 	r := make(map[string]string, len(data))
 	for k, v := range data {

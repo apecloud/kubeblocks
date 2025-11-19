@@ -27,15 +27,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -123,37 +120,6 @@ var _ = Describe("Handler Util Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	mockParametersDef := func(ccName string, reloadOptions *parametersv1alpha1.ReloadAction) *parametersv1alpha1.ParametersDefinition {
-		return &parametersv1alpha1.ParametersDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: ccName,
-			},
-			Spec: parametersv1alpha1.ParametersDefinitionSpec{
-				FileName:     "test",
-				ReloadAction: reloadOptions,
-			}}
-	}
-	mockConfigDescription := func(tplName string, format parametersv1alpha1.CfgFileFormat) []parametersv1alpha1.ComponentConfigDescription {
-		return []parametersv1alpha1.ComponentConfigDescription{
-			{
-				Name:         "test",
-				TemplateName: tplName,
-				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
-					Format: format,
-				},
-			},
-		}
-	}
-
-	mockConfigSpec := func(tplName string) appsv1.ComponentFileTemplate {
-		return appsv1.ComponentFileTemplate{
-			Name:       tplName,
-			Template:   "config_template",
-			Namespace:  "default",
-			VolumeName: "for_test",
-		}
-	}
-
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
 			mockK8sCli.MockGetMethod(
@@ -239,91 +205,6 @@ var _ = Describe("Handler Util Test", func() {
 		})
 	})
 
-	Context("TestGetSupportReloadConfigSpecs", func() {
-		It("not support reload", func() {
-			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentFileTemplate{{
-				Name: "test",
-			}}, nil, nil)
-			Expect(err).Should(Succeed())
-			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
-		})
-
-		It("not ComponentConfigDescription", func() {
-			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentFileTemplate{{
-				Name:      "test",
-				Template:  "config_template",
-				Namespace: "default",
-			}}, nil, []*parametersv1alpha1.ParametersDefinition{mockParametersDef("test", nil)})
-			Expect(err).Should(Succeed())
-			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
-		})
-
-		It("not support reload for paramsDef", func() {
-			ccName := "config_constraint"
-			configtpl := mockConfigSpec(ccName)
-			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1.ComponentFileTemplate{configtpl},
-				mockConfigDescription(configtpl.Name, parametersv1alpha1.Ini),
-				nil,
-			)
-
-			Expect(err).Should(Succeed())
-			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
-		})
-
-		It("normal test", func() {
-			ccName := "config_constraint"
-			pd := mockParametersDef(ccName, &parametersv1alpha1.ReloadAction{
-				ShellTrigger: &parametersv1alpha1.ShellTrigger{
-					Command: []string{"/bin/true"},
-				},
-			})
-
-			cd := mockConfigDescription(ccName, parametersv1alpha1.Ini)
-			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1.ComponentFileTemplate{mockConfigSpec(ccName)},
-				cd,
-				[]*parametersv1alpha1.ParametersDefinition{pd},
-			)
-
-			Expect(err).Should(Succeed())
-			Expect(len(configSpecs)).Should(BeEquivalentTo(1))
-			Expect(configSpecs[0].ConfigSpec).Should(BeEquivalentTo(mockConfigSpec(ccName)))
-			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(parametersv1alpha1.ShellType))
-			Expect(&configSpecs[0].FormatterConfig).Should(BeEquivalentTo(cd[0].FileFormatConfig))
-		})
-	})
-
-	Context("TestFromReloadTypeConfig", func() {
-		It("TestAutoTrigger", func() {
-			Expect(parametersv1alpha1.AutoType).Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{
-				AutoTrigger: &parametersv1alpha1.AutoTrigger{
-					ProcessName: "test",
-				}})))
-		})
-
-		It("TestShellTrigger", func() {
-			Expect(parametersv1alpha1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{
-				ShellTrigger: &parametersv1alpha1.ShellTrigger{
-					Command: []string{"/bin/true"},
-				}})))
-		})
-
-		It("TestTplScriptsTrigger", func() {
-			Expect(parametersv1alpha1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: "test",
-						Namespace:          "default",
-					},
-				}})))
-		})
-
-		It("TestInvalidTrigger", func() {
-			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{})))
-		})
-	})
-
 	Context("TestValidateReloadOptions", func() {
 		It("TestShellTrigger", func() {
 			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
@@ -372,127 +253,3 @@ var _ = Describe("Handler Util Test", func() {
 		})
 	})
 })
-
-func TestFilterSubPathVolumeMount(t *testing.T) {
-	createConfigMeta := func(volumeName string, reloadType parametersv1alpha1.DynamicReloadType, reloadAction *parametersv1alpha1.ReloadAction) ConfigSpecMeta {
-		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
-			ReloadAction: reloadAction,
-			ReloadType:   reloadType,
-			ConfigSpec: appsv1.ComponentFileTemplate{
-				VolumeName: volumeName,
-			}}}
-	}
-
-	type args struct {
-		metas   []ConfigSpecMeta
-		volumes []corev1.VolumeMount
-	}
-	tests := []struct {
-		name string
-		args args
-		want []ConfigSpecMeta
-	}{{
-		name: "test1",
-		args: args{
-			metas: []ConfigSpecMeta{
-				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{
-						Sync: cfgutil.ToPointer(true),
-					},
-				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-						Sync: cfgutil.ToPointer(true),
-					},
-				}),
-			},
-			volumes: []corev1.VolumeMount{
-				{Name: "test2", SubPath: "test2"},
-				{Name: "test3", SubPath: "test3"},
-			},
-		},
-		want: []ConfigSpecMeta{
-			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-				ShellTrigger: &parametersv1alpha1.ShellTrigger{
-					Sync: cfgutil.ToPointer(true),
-				},
-			}),
-			createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					Sync: cfgutil.ToPointer(true),
-				},
-			}),
-		},
-	}, {
-		name: "test2",
-		args: args{
-			metas: []ConfigSpecMeta{
-				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{},
-				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-				}),
-			},
-			volumes: []corev1.VolumeMount{
-				{Name: "test2"},
-				{Name: "test3"},
-			},
-		},
-		want: []ConfigSpecMeta{
-			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-				ShellTrigger: &parametersv1alpha1.ShellTrigger{},
-			}),
-			createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-			}),
-		},
-	}, {
-		name: "test3",
-		args: args{
-			metas: []ConfigSpecMeta{
-				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{},
-				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-				}),
-			},
-			volumes: []corev1.VolumeMount{},
-		},
-		want: []ConfigSpecMeta{
-			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-				ShellTrigger: &parametersv1alpha1.ShellTrigger{},
-			}),
-			createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-			}),
-		},
-	}, {
-		name: "test4",
-		args: args{
-			metas: []ConfigSpecMeta{
-				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{
-						Sync: cfgutil.ToPointer(false),
-					},
-				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-						Sync: cfgutil.ToPointer(false),
-					},
-				}),
-			},
-			volumes: []corev1.VolumeMount{
-				{Name: "test2", SubPath: "test2"},
-				{Name: "test3", SubPath: "test3"},
-			},
-		},
-		want: nil,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, FilterSupportReloadActionConfigSpecs(tt.args.metas, tt.args.volumes), "FilterSupportReloadActionConfigSpecs(%v, %v)", tt.args.metas, tt.args.volumes)
-		})
-	}
-}

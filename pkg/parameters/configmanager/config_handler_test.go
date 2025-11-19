@@ -104,7 +104,7 @@ var _ = Describe("Config Handler Test", func() {
 	toJSONString := func(v ConfigSpecInfo) string {
 		b, err := util.ToYamlConfig([]ConfigSpecInfo{v})
 		Expect(err).Should(Succeed())
-		configFile := filepath.Join(tmpWorkDir, configManagerConfig)
+		configFile := filepath.Join(tmpWorkDir, "config-manager.yaml")
 		Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
 		return configFile
 	}

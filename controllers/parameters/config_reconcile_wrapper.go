@@ -42,7 +42,6 @@ type ReconcileContext struct {
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	Containers      []string
 	InstanceSetList []workloads.InstanceSet
 
 	ConfigRender   *parametersv1alpha1.ParamConfigRenderer
@@ -79,7 +78,7 @@ func (c *ReconcileContext) GetRelatedObjects() error {
 
 func (c *ReconcileContext) Workload() *ReconcileContext {
 	instanceSetFn := func() (err error) {
-		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
+		c.InstanceSetList, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
 			c.Name,

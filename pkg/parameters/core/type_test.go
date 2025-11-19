@@ -26,7 +26,6 @@ import (
 )
 
 func TestGetInstanceName(t *testing.T) {
-	require.Equal(t, "config.kubeblocks.io/tpl-template-test", GenerateTPLUniqLabelKeyWithConfig("template-test"))
 	require.Equal(t, "config.kubeblocks.io/constraints-test", GenerateConstraintsUniqLabelKeyWithConfig("test"))
 	require.Equal(t, "mytest-mysql-config-template", GetComponentCfgName("mytest", "mysql", "config-template"))
 	require.Equal(t, "mytest-envfrom", GenerateEnvFromName("mytest"))

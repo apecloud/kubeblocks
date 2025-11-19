@@ -376,7 +376,7 @@ dataProtection:
     imagePullSecrets: []
     datasafed:
       repository: apecloud/datasafed
-      tag: "0.2.2"
+      tag: "0.2.3"
   ## @param toleration
   tolerations:
   - key: kb-controller

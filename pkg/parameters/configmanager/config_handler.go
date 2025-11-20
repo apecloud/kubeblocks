@@ -43,12 +43,7 @@ func CreateCombinedHandler(config string) (ConfigHandler, error) {
 		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}
-		return createTPLScriptHandler(
-			configMeta.ConfigSpec.Name,
-			configMeta.TPLConfig,
-			[]string{configMeta.MountPoint},
-			backupPath,
-		)
+		return createTPLScriptHandler(configMeta.TPLConfig, []string{configMeta.MountPoint}, backupPath)
 	}
 
 	var h ConfigHandler
@@ -204,7 +199,7 @@ func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, update
 		u.engineType, u.dsn)
 }
 
-func createTPLScriptHandler(name, configPath string, dirs []string, backupPath string) (ConfigHandler, error) {
+func createTPLScriptHandler(configPath string, dirs []string, backupPath string) (ConfigHandler, error) {
 	tplConfig := TPLScriptConfig{}
 	if err := cfgutil.FromYamlConfig(configPath, &tplConfig); err != nil {
 		return nil, err

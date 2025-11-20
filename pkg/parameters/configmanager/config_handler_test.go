@@ -135,7 +135,7 @@ var _ = Describe("Config Handler Test", func() {
 			b, _ := util.ToYamlConfig(tplConfig)
 			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
 
-			handler, err := createTPLScriptHandler("", configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
+			handler, err := createTPLScriptHandler(configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
 			Expect(err).Should(Succeed())
 			tplHandler := handler.(*tplScriptHandler)
 			Expect(tplHandler.dsn).Should(BeEquivalentTo("admin:admin@(localhost:3306)/"))

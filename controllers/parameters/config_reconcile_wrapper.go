@@ -37,7 +37,6 @@ type ReconcileContext struct {
 	intctrlutil.RequestCtx
 	parameters.ResourceFetcher[ReconcileContext]
 
-	Name             string
 	MatchingLabels   client.MatchingLabels
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
@@ -52,7 +51,6 @@ func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
 	resourceCtx *render.ResourceCtx,
 	cm *corev1.ConfigMap,
 	cluster *appsv1.Cluster,
-	configSpecName string,
 	matchingLabels client.MatchingLabels) *ReconcileContext {
 	configContext := ReconcileContext{
 		ResourceFetcher: parameters.ResourceFetcher[ReconcileContext]{
@@ -60,7 +58,6 @@ func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
 		},
 		RequestCtx:     reqCtx,
 		ConfigMap:      cm,
-		Name:           configSpecName,
 		MatchingLabels: matchingLabels,
 	}
 	return configContext.Init(resourceCtx, &configContext)
@@ -81,7 +78,6 @@ func (c *ReconcileContext) Workload() *ReconcileContext {
 		c.InstanceSetList, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
-			c.Name,
 			generics.InstanceSetSignature,
 			client.ObjectKeyFromObject(c.ConfigMap),
 			client.InNamespace(c.Namespace),

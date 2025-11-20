@@ -33,7 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, configSpecName string, _ func(T, PT, L, PL), cfg client.ObjectKey, opts ...client.ListOption) ([]T, error) {
+func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, _ func(T, PT, L, PL), cfg client.ObjectKey, opts ...client.ListOption) ([]T, error) {
 	var objList L
 	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
 		return nil, err

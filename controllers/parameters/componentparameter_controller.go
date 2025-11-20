@@ -39,7 +39,6 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -84,17 +83,14 @@ func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	builder := intctrlutil.NewControllerManagedBy(mgr).
+func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&parametersv1alpha1.ComponentParameter{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
 		}).
-		Owns(&corev1.ConfigMap{})
-	if multiClusterMgr != nil {
-		multiClusterMgr.Own(builder, &corev1.ConfigMap{}, &parametersv1alpha1.ComponentParameter{})
-	}
-	return builder.Complete(r)
+		Owns(&corev1.ConfigMap{}).
+		Complete(r)
 }
 
 func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {

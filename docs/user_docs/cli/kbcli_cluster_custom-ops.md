@@ -57,15 +57,6 @@ kbcli cluster custom-ops OpsDef --cluster <clusterName> <your custom params> [fl
 ### SEE ALSO
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli cluster custom-ops kafka-quota](kbcli_cluster_custom-ops_kafka-quota.md)	 - Create a custom ops with opsDef kafka-quota
-* [kbcli cluster custom-ops kafka-topic](kbcli_cluster_custom-ops_kafka-topic.md)	 - Create a custom ops with opsDef kafka-topic
-* [kbcli cluster custom-ops kafka-user-acl](kbcli_cluster_custom-ops_kafka-user-acl.md)	 - Create a custom ops with opsDef kafka-user-acl
-* [kbcli cluster custom-ops pg-update-standby-config](kbcli_cluster_custom-ops_pg-update-standby-config.md)	 - Create a custom ops with opsDef pg-update-standby-config
-* [kbcli cluster custom-ops redis-cluster-rebalance](kbcli_cluster_custom-ops_redis-cluster-rebalance.md)	 - Create a custom ops with opsDef redis-cluster-rebalance
-* [kbcli cluster custom-ops redis-master-account-ops](kbcli_cluster_custom-ops_redis-master-account-ops.md)	 - Create a custom ops with opsDef redis-master-account-ops
-* [kbcli cluster custom-ops redis-reset-master](kbcli_cluster_custom-ops_redis-reset-master.md)	 - Create a custom ops with opsDef redis-reset-master
-* [kbcli cluster custom-ops redis-sentinel-account-ops](kbcli_cluster_custom-ops_redis-sentinel-account-ops.md)	 - Create a custom ops with opsDef redis-sentinel-account-ops
-* [kbcli cluster custom-ops redis-shard-account-ops](kbcli_cluster_custom-ops_redis-shard-account-ops.md)	 - Create a custom ops with opsDef redis-shard-account-ops
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

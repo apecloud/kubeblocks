@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   code-assistant:
-    uses: All-Hands-AI/OpenHands/.github/workflows/openhands-resolver.yml@main
+    uses: OpenHands/OpenHands/.github/workflows/openhands-resolver.yml@main
     with:
       macro: ${{ vars.MACRO || '@openhands-agent' }}
       target_branch: ${{ vars.TARGET_BRANCH || 'main' }}

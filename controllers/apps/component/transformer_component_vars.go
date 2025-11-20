@@ -77,7 +77,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	envVars2, envData := buildEnvVarsNData(envVars)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
 
-	if err := createOrUpdateEnvConfigMap(transCtx, dag, envData); err != nil {
+	if err := createOrUpdateEnvConfigMap(transCtx, dag, envData, nil); err != nil {
 		return err
 	}
 	component.AddInstanceAssistantObject(synthesizedComp, &corev1.ConfigMap{
@@ -126,7 +126,7 @@ func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {
 	}
 }
 
-func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.DAG, data map[string]string) error {
+func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.DAG, full, incremental map[string]string) error {
 	var (
 		synthesizedComp = transCtx.SynthesizeComponent
 		envKey          = types.NamespacedName{
@@ -159,12 +159,29 @@ func createOrUpdateEnvConfigMap(transCtx *componentTransformContext, dag *graph.
 	}
 
 	newData := func() map[string]string {
-		if envObjVertex == nil {
+		merged := func() map[string]string {
+			if full == nil {
+				return incremental
+			}
+			if incremental == nil {
+				return full
+			}
+			data := maps.Clone(full)
+			maps.Copy(data, incremental)
 			return data
 		}
-		merged := maps.Clone(envObj.Data)
-		maps.Copy(merged, data)
-		return merged
+		if envObj == nil || envObj.Data == nil {
+			return merged()
+		}
+
+		data := maps.Clone(envObj.Data)
+		if full != nil {
+			data = maps.Clone(full) // override
+		}
+		if incremental != nil {
+			maps.Copy(data, incremental) // merge
+		}
+		return data
 	}()
 
 	if envObj == nil {

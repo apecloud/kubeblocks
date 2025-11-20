@@ -24,71 +24,19 @@ import (
 
 	"go.uber.org/zap"
 
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/container"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )
 
 type reconfigureProxy struct {
 	cfgproto.ReconfigureServer
-	updater cfgcm.DynamicUpdater
-
-	ctx    context.Context
-	opt    ReconfigureServiceOptions
-	killer cfgutil.ContainerKiller
-
-	logger *zap.SugaredLogger
-}
-
-var stopContainerSignal = viper.GetString(cfgutil.KillContainerSignalEnvName)
-
-func (r *reconfigureProxy) Init(handler cfgcm.ConfigHandler) error {
-	if err := r.initOnlineUpdater(handler); err != nil {
-		r.logger.Errorf("init online updater failed: %+v", err)
-		return err
-	}
-	if err := r.initContainerKiller(); err != nil {
-		r.logger.Errorf("init container killer failed: %+v", err)
-		return err
-	}
-	return nil
-}
-
-func (r *reconfigureProxy) initContainerKiller() error {
-	if !r.opt.ContainerRuntimeEnable {
-		r.logger.Info("container killer is disabled.")
-		return nil
-	}
-
-	killer, err := cfgutil.NewContainerKiller(r.opt.ContainerRuntime, r.opt.RuntimeEndpoint, r.logger)
-	if err != nil {
-		return cfgcore.WrapError(err, "failed to create container killer")
-	}
-	if err := killer.Init(r.ctx); err != nil {
-		return cfgcore.WrapError(err, "failed to init killer")
-	}
-	r.killer = killer
-	return nil
-}
-
-func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.StopContainerRequest) (*cfgproto.StopContainerResponse, error) {
-	if r.killer == nil {
-		return nil, cfgcore.MakeError("container killing process is not initialized.")
-	}
-	ds := request.GetContainerIDs()
-	if len(ds) == 0 {
-		return &cfgproto.StopContainerResponse{ErrMessage: "no match for any container with containerId."}, nil
-	}
-	if err := r.killer.Kill(ctx, ds, stopContainerSignal, nil); err != nil {
-		return nil, err
-	}
-	return &cfgproto.StopContainerResponse{}, nil
+	handler cfgcm.ConfigHandler
+	logger  *zap.SugaredLogger
 }
 
 func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
-	if r.updater == nil {
+	if r.handler == nil {
 		return nil, cfgcore.MakeError("online updating process is not initialized.")
 	}
 	params := request.GetParams()
@@ -99,19 +47,8 @@ func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfg
 	if request.ConfigFile != nil && *request.ConfigFile != "" {
 		key = key + "/" + *request.ConfigFile
 	}
-	if err := r.updater(ctx, key, params); err != nil {
+	if err := r.handler.OnlineUpdate(ctx, key, params); err != nil {
 		return nil, err
 	}
 	return &cfgproto.OnlineUpgradeParamsResponse{}, nil
-}
-
-func (r *reconfigureProxy) initOnlineUpdater(handler cfgcm.ConfigHandler) error {
-	if !r.opt.RemoteOnlineUpdateEnable {
-		return nil
-	}
-
-	r.updater = func(ctx context.Context, name string, updatedParams map[string]string) error {
-		return handler.OnlineUpdate(ctx, name, updatedParams)
-	}
-	return nil
 }

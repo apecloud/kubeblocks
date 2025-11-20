@@ -351,7 +351,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+func newLifecycleAction(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = inst.Labels[constant.AppInstanceLabelKey]
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]
@@ -359,11 +359,7 @@ func newLifecycleAction(inst *workloads.Instance, objects []client.Object, pod *
 			Switchover:  inst.Spec.LifecycleActions.Switchover,
 			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
 		}
-		pods []*corev1.Pod
 	)
-	for i := range objects {
-		pods = append(pods, objects[i].(*corev1.Pod))
-	}
 	return lifecycle.New(inst.Namespace, clusterName, compName,
-		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods...)
+		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods)
 }

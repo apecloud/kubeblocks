@@ -40,12 +40,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -221,7 +222,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	return r.performUpgrade(rctx, tasks)
 }
 
-func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string, result *intctrlutil.Result) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string, result *parameters.Result) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
@@ -236,7 +237,7 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 
 func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
 	var err error
-	var returnedStatus ReturnedStatus
+	var returnedStatus returnedStatus
 	var reloadType string
 
 	for _, task := range reloadTasks {
@@ -249,7 +250,7 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTas
 	return r.succeed(rctx, reloadType, returnedStatus)
 }
 
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus ReturnedStatus, policy string, err error) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus returnedStatus, policy string, err error) (ctrl.Result, error) {
 	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
 		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(returnedStatus, policy, phase, options...))
 	}
@@ -268,7 +269,7 @@ func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus Re
 	}
 }
 
-func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus ReturnedStatus) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus returnedStatus) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,

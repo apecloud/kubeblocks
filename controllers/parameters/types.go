@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )
 
 type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, error)
@@ -41,17 +41,15 @@ type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient
 // Node: Distinguish between implementation and interface.
 
 type RollingUpgradeFuncs struct {
-	GetPodsFunc          GetPodsFunc
-	RestartContainerFunc RestartContainerFunc
-	OnlineUpdatePodFunc  OnlineUpdatePodFunc
-	RestartComponent     RestartComponent
+	GetPodsFunc         GetPodsFunc
+	OnlineUpdatePodFunc OnlineUpdatePodFunc
+	RestartComponent    RestartComponent
 }
 
 func GetInstanceSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	return RollingUpgradeFuncs{
-		GetPodsFunc:          getPodsForOnlineUpdate,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-		RestartComponent:     restartComponent,
+		GetPodsFunc:         getPodsForOnlineUpdate,
+		OnlineUpdatePodFunc: commonOnlineUpdateWithPod,
+		RestartComponent:    restartComponent,
 	}
 }

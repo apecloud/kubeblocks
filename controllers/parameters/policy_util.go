@@ -32,13 +32,13 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -122,44 +122,10 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 	return nil
 }
 
-func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerNames []string, createClient createReconfigureClient) error {
-	containerIDs := make([]string, 0, len(containerNames))
-	for _, name := range containerNames {
-		containerID := intctrlutil.GetContainerID(pod, name)
-		if containerID == "" {
-			return core.MakeError("failed to find container in pod[%s], name=%s", name, pod.Name)
-		}
-		containerIDs = append(containerIDs, containerID)
-	}
-
-	address, err := resolveReloadServerGrpcURL(pod)
-	if err != nil {
-		return err
-	}
-	// stop container
-	client, err := createClient(address)
-	if err != nil {
-		return err
-	}
-
-	response, err := client.StopContainer(ctx, &cfgproto.StopContainerRequest{
-		ContainerIDs: containerIDs,
-	})
-	if err != nil {
-		return err
-	}
-
-	errMessage := response.GetErrMessage()
-	if errMessage != "" {
-		return core.MakeError("%s", errMessage)
-	}
-	return nil
-}
-
 func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
 	if pod.Spec.HostNetwork {
-		containerPort, err := configuration.ResolveReloadServerGRPCPort(pod.Spec.Containers)
+		containerPort, err := parameters.ResolveReloadServerGRPCPort(pod.Spec.Containers)
 		if err != nil {
 			return "", err
 		}
@@ -202,11 +168,30 @@ func validIPv6Address(ip net.IP) bool {
 	return ip != nil && ip.To16() != nil
 }
 
-func getComponentSpecPtrByName(cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
+func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
 	for i := range cluster.Spec.ComponentSpecs {
 		componentSpec := &cluster.Spec.ComponentSpecs[i]
 		if componentSpec.Name == compName {
 			return componentSpec, nil
+		}
+	}
+	// check if the component is a sharding component
+	compObjList := &appsv1.ComponentList{}
+	if err := cli.List(ctx.Ctx, compObjList, client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compName,
+	}); err != nil {
+		return nil, err
+	}
+	if len(compObjList.Items) > 0 {
+		shardingName := compObjList.Items[0].Labels[constant.KBAppShardingNameLabelKey]
+		if shardingName != "" {
+			for i := range cluster.Spec.Shardings {
+				shardSpec := &cluster.Spec.Shardings[i]
+				if shardSpec.Name == shardingName {
+					return &shardSpec.Template, nil
+				}
+			}
 		}
 	}
 	return nil, fmt.Errorf("component %s not found", compName)
@@ -215,7 +200,7 @@ func getComponentSpecPtrByName(cluster *appsv1.Cluster, compName string) (*appsv
 func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, cluster *appsv1.Cluster, compName string) error {
 	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 
-	compSpec, err := getComponentSpecPtrByName(cluster, compName)
+	compSpec, err := getComponentSpecPtrByName(cli, ctx, cluster, compName)
 	if err != nil {
 		return err
 	}
@@ -234,7 +219,7 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 }
 
 type ReloadAction interface {
-	ExecReload() (ReturnedStatus, error)
+	ExecReload() (returnedStatus, error)
 	ReloadType() string
 }
 
@@ -247,12 +232,12 @@ func (r reconfigureTask) ReloadType() string {
 	return string(r.ReloadPolicy)
 }
 
-func (r reconfigureTask) ExecReload() (ReturnedStatus, error) {
+func (r reconfigureTask) ExecReload() (returnedStatus, error) {
 	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
 
-	return ReturnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
+	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
 }
 
 func resolveReloadActionPolicy(jsonPatch string,
@@ -266,7 +251,7 @@ func resolveReloadActionPolicy(jsonPatch string,
 
 	// make decision
 	switch {
-	case !dynamicUpdate && intctrlutil.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
+	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
 		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = parametersv1alpha1.RestartPolicy
@@ -292,7 +277,7 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 
 	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
 	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
-		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && intctrlutil.NeedDynamicReloadAction(&pd.Spec))
+		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
 	}
 
 	for key, jsonPatch := range patch.UpdateConfig {
@@ -301,7 +286,7 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 		if !ok || pd.Spec.ReloadAction == nil {
 			continue
 		}
-		configFormat := intctrlutil.GetComponentConfigDescription(&rctx.ConfigRender.Spec, key)
+		configFormat := parameters.GetComponentConfigDescription(&rctx.ConfigRender.Spec, key)
 		if configFormat == nil || configFormat.FileFormatConfig == nil {
 			continue
 		}
@@ -337,7 +322,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 		InstanceSetUnits:         rctx.InstanceSetList,
 		ClusterComponent:         rctx.ClusterComObj,
 		SynthesizedComponent:     rctx.BuiltinComponent,
-		ReconfigureClientFactory: GetClientFactory(),
+		ReconfigureClientFactory: getClientFactory(),
 		Patch:                    patch,
 	}
 
@@ -362,8 +347,8 @@ func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *Reconc
 
 func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
 	params := make(map[string]string)
-	dynamicAction := intctrlutil.NeedDynamicReloadAction(paramDef)
-	needReloadStaticParams := intctrlutil.ReloadStaticParameters(paramDef)
+	dynamicAction := parameters.NeedDynamicReloadAction(paramDef)
+	needReloadStaticParams := parameters.ReloadStaticParameters(paramDef)
 	visualizedParams := core.GenerateVisualizedParamsList(configPatch, []parametersv1alpha1.ComponentConfigDescription{description})
 
 	for _, key := range visualizedParams {

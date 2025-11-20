@@ -279,7 +279,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		return nil
 	}
 
-	lfa, err := newLifecycleAction(its, nil, pod)
+	lfa, err := newLifecycleAction(its, tree, pod)
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 		itsCopy.Spec.LifecycleActions = &workloads.LifecycleActions{}
 	}
 	itsCopy.Spec.LifecycleActions.Reconfigure = config.Reconfigure
-	lfa, err := newLifecycleAction(itsCopy, nil, pod)
+	lfa, err := newLifecycleAction(itsCopy, tree, pod)
 	if err != nil {
 		return err
 	}

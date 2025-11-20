@@ -98,7 +98,7 @@ var _ = Describe("Component Controller", func() {
 		By("clean resources")
 
 		// delete components (and all dependent sub-resources), and component definitions & versions
-		testapps.ClearComponentResourcesWithRemoveFinalizerOption(&testCtx)
+		testapps.ClearComponentResources(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)

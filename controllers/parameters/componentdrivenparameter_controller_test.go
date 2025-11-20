@@ -33,9 +33,9 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
@@ -133,7 +133,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.Payload).Should(HaveKey(constant.ReplicasPayload))
 				g.Expect(item.Payload).Should(HaveKey(constant.ComponentResourcePayload))

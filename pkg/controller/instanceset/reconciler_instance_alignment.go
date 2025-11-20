@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -168,6 +169,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			default:
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
+					// pvc can be created by restore controller, restore controller reference for it
+					if err := controllerutil.SetControllerReference(its, pvcObj, model.GetScheme()); err != nil {
+						return kubebuilderx.Continue, err
+					}
 					if err = tree.Update(pvcObj); err != nil {
 						return kubebuilderx.Continue, err
 					}

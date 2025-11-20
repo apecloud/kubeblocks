@@ -32,6 +32,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
@@ -39,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -202,54 +204,42 @@ func validIPv6Address(ip net.IP) bool {
 	return ip != nil && ip.To16() != nil
 }
 
-func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
-	for i := range cluster.Spec.ComponentSpecs {
-		componentSpec := &cluster.Spec.ComponentSpecs[i]
-		if componentSpec.Name == compName {
-			return componentSpec, nil
-		}
-	}
-	// check if the component is a sharding component
-	compObjList := &appsv1.ComponentList{}
-	if err := cli.List(ctx.Ctx, compObjList, client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: compName,
-	}); err != nil {
-		return nil, err
-	}
-	if len(compObjList.Items) > 0 {
-		shardingName := compObjList.Items[0].Labels[constant.KBAppShardingNameLabelKey]
-		if shardingName != "" {
-			for i := range cluster.Spec.Shardings {
-				shardSpec := &cluster.Spec.Shardings[i]
-				if shardSpec.Name == shardingName {
-					return &shardSpec.Template, nil
-				}
-			}
-		}
-	}
-	return nil, fmt.Errorf("component %s not found", compName)
-}
+func restartWorkload[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, annotationKey, annotationValue string, obj PT, _ func(T, PT, L, PL)) error {
 
-func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, cluster *appsv1.Cluster, compName string) error {
-	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-
-	compSpec, err := getComponentSpecPtrByName(cli, ctx, cluster, compName)
-	if err != nil {
-		return err
-	}
-
-	if compSpec.Annotations == nil {
-		compSpec.Annotations = map[string]string{}
-	}
-
-	if compSpec.Annotations[cfgAnnotationKey] == newVersion {
+	template := transformPodTemplate(obj)
+	if template.Annotations != nil && template.Annotations[annotationKey] == annotationValue {
 		return nil
 	}
 
-	compSpec.Annotations[cfgAnnotationKey] = newVersion
+	patch := client.MergeFrom(PT(obj.DeepCopy()))
+	if template.Annotations == nil {
+		template.Annotations = map[string]string{}
+	}
+	template.Annotations[annotationKey] = annotationValue
+	if err := cli.Patch(ctx, obj, patch); err != nil {
+		return err
+	}
+	return nil
+}
 
-	return cli.Update(ctx.Ctx, cluster)
+func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+	var err error
+	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+	for _, obj := range objs {
+		switch w := obj.(type) {
+		case *workloads.InstanceSet:
+			err = restartWorkload(cli, ctx.Ctx, cfgAnnotationKey, newVersion, w, generics.InstanceSetSignature)
+		default:
+			// ignore other types workload
+		}
+		if err != nil {
+			return obj, err
+		}
+		if recordEvent != nil {
+			recordEvent(obj)
+		}
+	}
+	return nil, nil
 }
 
 type ReloadAction interface {

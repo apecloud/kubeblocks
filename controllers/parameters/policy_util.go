@@ -318,7 +318,6 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 		ParametersDef:            &pd.Spec,
 		ConfigDescription:        configDescription,
 		Cluster:                  rctx.ClusterObj,
-		ContainerNames:           rctx.Containers,
 		InstanceSetUnits:         rctx.InstanceSetList,
 		ClusterComponent:         rctx.ClusterComObj,
 		SynthesizedComponent:     rctx.BuiltinComponent,

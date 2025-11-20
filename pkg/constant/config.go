@@ -19,8 +19,6 @@ package constant
 const (
 	ConfigManagerToolPath = "/bin/reloader"
 
-	// ConfigurationTplLabelPrefixKey clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
 	// CMInsLastReconfigurePhaseKey defines the current phase

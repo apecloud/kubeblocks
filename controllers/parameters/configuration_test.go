@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -148,7 +147,6 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		AddAppNameLabel(clusterName).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(defaultCompName).
-		AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 		Create(&testCtx).GetObject()
 
 	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)

@@ -49,7 +49,6 @@ import (
 const (
 	configTemplateName = "reload.yaml"
 	scriptVolumePrefix = "cm-script-"
-	configVolumePrefix = "cm-config-"
 
 	scriptConfigField    = "scripts"
 	formatterConfigField = "formatterConfig"

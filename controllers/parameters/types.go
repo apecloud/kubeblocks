@@ -35,7 +35,6 @@ type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, erro
 type GetPodsFunc func(params reconfigureContext) ([]corev1.Pod, error)
 type RestartComponent func(client client.Client, ctx intctrlutil.RequestCtx, key string, version string, cluster *appsv1.Cluster, compName string) error
 
-type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
 type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error
 
 // Node: Distinguish between implementation and interface.

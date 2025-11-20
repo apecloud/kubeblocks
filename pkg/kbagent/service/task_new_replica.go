@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -114,5 +115,5 @@ func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) 
 	dialer := &net.Dialer{
 		Timeout: newReplicaConnectTimeoutSeconds * time.Second,
 	}
-	return dialer.Dial("tcp", fmt.Sprintf("%s:%d", s.task.Remote, s.task.Port))
+	return dialer.Dial("tcp", net.JoinHostPort(s.task.Remote, strconv.Itoa(int(s.task.Port))))
 }

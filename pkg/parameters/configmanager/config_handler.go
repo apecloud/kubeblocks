@@ -26,7 +26,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
@@ -44,12 +43,7 @@ func CreateCombinedHandler(config string) (ConfigHandler, error) {
 		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}
-		return createTPLScriptHandler(
-			configMeta.ConfigSpec.Name,
-			configMeta.TPLConfig,
-			[]string{configMeta.MountPoint},
-			backupPath,
-		)
+		return createTPLScriptHandler(configMeta.TPLConfig, []string{configMeta.MountPoint}, backupPath)
 	}
 
 	var h ConfigHandler
@@ -96,34 +90,9 @@ func (m *multiHandler) OnlineUpdate(ctx context.Context, name string, updatedPar
 	return cfgcore.MakeError("not found handler for config name: %s", name)
 }
 
-type configVolumeHandleMeta struct {
-	ConfigHandler
-
-	reloadType parametersv1alpha1.DynamicReloadType
-	configSpec appsv1alpha1.ComponentTemplateSpec
-
-	formatterConfig *parametersv1alpha1.FileFormatConfig
-}
-
-func (s *configVolumeHandleMeta) OnlineUpdate(_ context.Context, _ string, _ map[string]string) error {
-	return cfgcore.MakeError("not support online update")
-}
-
-func createConfigVolumeMeta(configSpecName string, reloadType parametersv1alpha1.DynamicReloadType, formatterConfig *parametersv1alpha1.FileFormatConfig) configVolumeHandleMeta {
-	return configVolumeHandleMeta{
-		reloadType: reloadType,
-		configSpec: appsv1alpha1.ComponentTemplateSpec{
-			Name: configSpecName,
-		},
-		formatterConfig: formatterConfig,
-	}
-}
-
 type shellCommandHandler struct {
-	configVolumeHandleMeta
-	command string
-	arg     []string
-
+	command    string
+	arg        []string
 	backupPath string
 	configMeta *ConfigSpecInfo
 }
@@ -179,20 +148,17 @@ func createExecHandler(command []string, configMeta *ConfigSpecInfo, backupPath 
 		return nil, err
 	}
 
-	var formatterConfig *parametersv1alpha1.FileFormatConfig
 	if backupPath != "" && configMeta != nil && configMeta.ReloadAction != nil {
 		if err := checkAndBackup(*configMeta, []string{configMeta.MountPoint}, filter, backupPath); err != nil {
 			return nil, err
 		}
-		formatterConfig = &configMeta.FormatterConfig
 	}
 
 	shellTrigger := &shellCommandHandler{
-		command:                command[0],
-		arg:                    command[1:],
-		backupPath:             backupPath,
-		configMeta:             configMeta,
-		configVolumeHandleMeta: createConfigVolumeMeta(configMeta.ConfigSpec.Name, parametersv1alpha1.ShellType, formatterConfig),
+		command:    command[0],
+		arg:        command[1:],
+		backupPath: backupPath,
+		configMeta: configMeta,
 	}
 	return shellTrigger, nil
 }
@@ -215,13 +181,12 @@ func fromConfigSpecInfo(meta *ConfigSpecInfo) string {
 }
 
 type tplScriptHandler struct {
-	configVolumeHandleMeta
-
-	tplScripts string
-	tplContent string
-	engineType string
-	dsn        string
-	backupPath string
+	tplScripts      string
+	tplContent      string
+	engineType      string
+	dsn             string
+	backupPath      string
+	formatterConfig *parametersv1alpha1.FileFormatConfig
 }
 
 func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
@@ -234,7 +199,7 @@ func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, update
 		u.engineType, u.dsn)
 }
 
-func createTPLScriptHandler(name, configPath string, dirs []string, backupPath string) (ConfigHandler, error) {
+func createTPLScriptHandler(configPath string, dirs []string, backupPath string) (ConfigHandler, error) {
 	tplConfig := TPLScriptConfig{}
 	if err := cfgutil.FromYamlConfig(configPath, &tplConfig); err != nil {
 		return nil, err
@@ -263,12 +228,12 @@ func createTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 		return nil, err
 	}
 	tplHandler := &tplScriptHandler{
-		configVolumeHandleMeta: createConfigVolumeMeta(name, parametersv1alpha1.TPLScriptType, &tplConfig.FormatterConfig),
-		tplContent:             string(tplContent),
-		tplScripts:             tplScripts,
-		engineType:             tplConfig.DataType,
-		dsn:                    dsn,
-		backupPath:             backupPath,
+		tplContent:      string(tplContent),
+		tplScripts:      tplScripts,
+		engineType:      tplConfig.DataType,
+		dsn:             dsn,
+		backupPath:      backupPath,
+		formatterConfig: &tplConfig.FormatterConfig,
 	}
 	return tplHandler, nil
 }

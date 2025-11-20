@@ -160,12 +160,6 @@ func GenerateComponentConfigurationName(clusterName, componentName string) strin
 	return fmt.Sprintf("%s-%s", clusterName, componentName)
 }
 
-// GenerateTPLUniqLabelKeyWithConfig generates uniq key for configuration template
-// reference: docs/img/reconfigure-cr-relationship.drawio.png
-func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
-	return GenerateUniqKeyWithConfig(constant.ConfigurationTplLabelPrefixKey, configKey)
-}
-
 // GenerateUniqKeyWithConfig is similar to getInstanceCfgCMName, generates uniq label/annotations for configuration template
 func GenerateUniqKeyWithConfig(label string, configKey string) string {
 	return fmt.Sprintf("%s-%s", label, configKey)

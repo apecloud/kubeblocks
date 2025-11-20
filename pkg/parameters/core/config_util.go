@@ -22,10 +22,7 @@ package core
 import (
 	"context"
 	"path/filepath"
-	"regexp"
-	"strings"
 
-	"github.com/spf13/cast"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -35,25 +32,6 @@ import (
 type ParamPairs struct {
 	Key           string
 	UpdatedParams map[string]interface{}
-}
-
-const pattern = `^[a-z0-9A-Z]([a-zA-Z0-9\.\-\_]*[a-zA-Z0-9])?$`
-const validLabelLength = 63
-
-var regxPattern = regexp.MustCompile(pattern)
-
-func FromValueToString(val interface{}) string {
-	str := strings.Trim(cast.ToString(val), ` '"`)
-	if IsValidLabelKeyOrValue(str) {
-		return str
-	}
-	return ""
-}
-
-// IsValidLabelKeyOrValue checks if the input string is a valid label key or value
-// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
-func IsValidLabelKeyOrValue(label string) bool {
-	return len(label) <= validLabelLength && regxPattern.MatchString(label)
 }
 
 // MergeUpdatedConfig replaces the file content of the changed key.

@@ -2553,6 +2553,26 @@ spec:
                     description: Host networking requested for this pod. Use the host's
                       network namespace.
                     type: boolean
+                  hostPorts:
+                    description: |-
+                      The list of container ports that are required by the component.
+                      This will override the container ports defined in component definition.
+                    items:
+                      properties:
+                        name:
+                          description: Name of the host port.
+                          type: string
+                        port:
+                          description: Port number of the host port.
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                      required:
+                      - name
+                      - port
+                      type: object
+                    type: array
                 type: object
               offlineInstances:
                 description: |-

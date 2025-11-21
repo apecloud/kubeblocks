@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -74,7 +73,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.P
 		return nil, false, err
 	}
 	if !restart {
-		restart = cfgcm.NeedRestart(paramsDefs, patch)
+		restart = parameters.NeedRestart(paramsDefs, patch)
 	}
 	return patch, restart, nil
 }

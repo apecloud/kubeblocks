@@ -32,7 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -181,7 +180,7 @@ func resolveReloadActionPolicy(jsonPatch string,
 		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = parametersv1alpha1.RestartPolicy
-	case cfgcm.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
+	case parameters.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
 		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
 	case enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
 		policy = parametersv1alpha1.SyncDynamicReloadPolicy

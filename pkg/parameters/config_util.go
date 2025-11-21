@@ -438,3 +438,27 @@ func ResolveShardingReference(ctx context.Context, reader client.Reader, comp *a
 	}
 	return nil, nil
 }
+
+func NeedRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo) bool {
+	if patch == nil {
+		return false
+	}
+	for key := range patch.UpdateConfig {
+		if paramsDef, ok := paramsDefs[key]; !ok || !isSupportReload(paramsDef.Spec.ReloadAction) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
+	return reload != nil && isValidReloadPolicy(*reload)
+}
+
+func isValidReloadPolicy(reload parametersv1alpha1.ReloadAction) bool {
+	return reload.AutoTrigger != nil || reload.ShellTrigger != nil
+}
+
+func IsAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
+	return reload != nil && reload.AutoTrigger != nil
+}

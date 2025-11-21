@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-manager-config
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 data:
@@ -27,6 +28,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-host-ports
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 data: {}

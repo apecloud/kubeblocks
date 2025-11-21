@@ -4,6 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-dataprotection
+  namespace: {{ .Release.Namespace }}
   {{- with .Values.dataProtection.deployAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}

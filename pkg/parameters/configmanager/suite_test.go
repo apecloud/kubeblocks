@@ -25,8 +25,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"go.uber.org/zap"
 )
 
 var ctx context.Context
@@ -34,15 +32,11 @@ var cancel context.CancelFunc
 
 func TestConfigManger(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "ConfigManager sidecar Module Suite")
+	RunSpecs(t, "ConfigManager Suite")
 }
 
 var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
-	zapLog, _ = zap.NewDevelopment()
-	SetLogger(zapLog)
-	logger.Info("logger start")
-
 })
 
 var _ = AfterSuite(func() {

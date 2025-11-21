@@ -219,6 +219,7 @@ type ReloadAction struct {
 
 	// Enables reloading process using a Go template script.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
 	// +optional
 	TPLScriptTrigger *TPLScriptTrigger `json:"tplScriptTrigger"`
 

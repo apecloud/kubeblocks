@@ -70,19 +70,6 @@ func TestIsSupportReload(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "reload_test_with_tpl_script",
-		args: args{
-			reload: &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: "cm",
-						Namespace:          "default",
-					},
-				},
-			},
-		},
-		want: true,
-	}, {
 		name: "auto_trigger_reload_test_with_process_name",
 		args: args{
 			reload: &parametersv1alpha1.ReloadAction{
@@ -189,32 +176,6 @@ var _ = Describe("Handler Util Test", func() {
 				},
 				wantErr: false,
 			}, {
-				name: "TPLScriptTest",
-				args: args{
-					reloadAction: &parametersv1alpha1.ReloadAction{
-						TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-							ScriptConfig: parametersv1alpha1.ScriptConfig{
-								ScriptConfigMapRef: "test",
-							},
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
-				},
-				wantErr: true,
-			}, {
-				name: "TPLScriptTest",
-				args: args{
-					reloadAction: &parametersv1alpha1.ReloadAction{
-						TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-							ScriptConfig: parametersv1alpha1.ScriptConfig{
-								ScriptConfigMapRef: "test",
-							},
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
-				},
-				wantErr: false,
-			}, {
 				name: "autoTriggerTest",
 				args: args{
 					reloadAction: &parametersv1alpha1.ReloadAction{
@@ -309,16 +270,6 @@ var _ = Describe("Handler Util Test", func() {
 				}})))
 		})
 
-		It("TestTplScriptsTrigger", func() {
-			Expect(parametersv1alpha1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: "test",
-						Namespace:          "default",
-					},
-				}})))
-		})
-
 		It("TestInvalidTrigger", func() {
 			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&parametersv1alpha1.ReloadAction{})))
 		})
@@ -331,40 +282,6 @@ var _ = Describe("Handler Util Test", func() {
 					Command: []string{"/bin/true"},
 				}}, nil, nil),
 			).Should(Succeed())
-		})
-
-		It("TestTplScriptsTrigger", func() {
-			ns := "default"
-			testName1 := "test1"
-			testName2 := "not_test1"
-			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      testName1,
-						Namespace: ns,
-					},
-				},
-			}), testutil.WithTimes(2)))
-
-			By("Test valid")
-			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: testName1,
-						Namespace:          ns,
-					},
-				}}, mockK8sCli.Client(), ctx),
-			).Should(Succeed())
-
-			By("Test invalid")
-			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: testName2,
-						Namespace:          ns,
-					},
-				}}, mockK8sCli.Client(), ctx),
-			).ShouldNot(Succeed())
 		})
 
 		It("TestInvalidTrigger", func() {
@@ -400,25 +317,14 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 						Sync: cfgutil.ToPointer(true),
 					},
 				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-						Sync: cfgutil.ToPointer(true),
-					},
-				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test2", SubPath: "test2"},
-				{Name: "test3", SubPath: "test3"},
 			},
 		},
 		want: []ConfigSpecMeta{
 			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{
-					Sync: cfgutil.ToPointer(true),
-				},
-			}),
-			createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
 					Sync: cfgutil.ToPointer(true),
 				},
 			}),
@@ -430,21 +336,14 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{},
 				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test2"},
-				{Name: "test3"},
 			},
 		},
 		want: []ConfigSpecMeta{
 			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{},
-			}),
-			createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
 			}),
 		},
 	}, {
@@ -454,18 +353,12 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 				createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{},
 				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-				}),
 			},
 			volumes: []corev1.VolumeMount{},
 		},
 		want: []ConfigSpecMeta{
 			createConfigMeta("test2", parametersv1alpha1.ShellType, &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{},
-			}),
-			createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
 			}),
 		},
 	}, {
@@ -477,15 +370,9 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 						Sync: cfgutil.ToPointer(false),
 					},
 				}),
-				createConfigMeta("test3", parametersv1alpha1.TPLScriptType, &parametersv1alpha1.ReloadAction{
-					TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-						Sync: cfgutil.ToPointer(false),
-					},
-				}),
 			},
 			volumes: []corev1.VolumeMount{
 				{Name: "test2", SubPath: "test2"},
-				{Name: "test3", SubPath: "test3"},
 			},
 		},
 		want: nil,

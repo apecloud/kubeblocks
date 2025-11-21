@@ -21,16 +21,12 @@ package configmanager
 
 import (
 	"context"
-	"reflect"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -43,8 +39,6 @@ var _ = Describe("Config Builder Test", func() {
 	const (
 		scriptsName = "script_cm"
 		scriptsNS   = "default"
-
-		lazyRenderedTemplateName = "lazy-rendered-template"
 	)
 
 	var mockK8sCli *testutil.K8sClientMockHelper
@@ -58,8 +52,6 @@ var _ = Describe("Config Builder Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	syncFn := func(sync bool) *bool { r := sync; return &r }
-
 	newVolumeMounts := func() []corev1.VolumeMount {
 		return []corev1.VolumeMount{
 			{
@@ -71,13 +63,6 @@ var _ = Describe("Config Builder Test", func() {
 		shellHandle := &parametersv1alpha1.ShellTrigger{
 			Command: []string{"pwd"},
 		}
-		scriptHandle := &parametersv1alpha1.TPLScriptTrigger{
-			Sync: sync,
-			ScriptConfig: parametersv1alpha1.ScriptConfig{
-				ScriptConfigMapRef: "reload-script",
-				Namespace:          scriptsNS,
-			},
-		}
 		autoHandle := &parametersv1alpha1.AutoTrigger{
 			ProcessName: "postgres",
 		}
@@ -86,9 +71,6 @@ var _ = Describe("Config Builder Test", func() {
 		case parametersv1alpha1.ShellType:
 			return &parametersv1alpha1.ReloadAction{
 				ShellTrigger: shellHandle}
-		case parametersv1alpha1.TPLScriptType:
-			return &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: scriptHandle}
 		case parametersv1alpha1.AutoType:
 			return &parametersv1alpha1.ReloadAction{
 				AutoTrigger: autoHandle}
@@ -132,35 +114,8 @@ var _ = Describe("Config Builder Test", func() {
 		return param
 	}
 
-	mockTplScriptCM := func() {
-		mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
-			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "reload-script",
-					Namespace: scriptsNS,
-				},
-				Data: map[string]string{
-					"reload.yaml": `
-scripts: reload.tpl
-fileRegex: my.cnf
-formatterConfig:
-  format: ini
-`,
-				}},
-			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      lazyRenderedTemplateName,
-					Namespace: scriptsNS,
-				},
-				Data: map[string]string{
-					"my.cnf": "",
-				}},
-		}), testutil.WithAnyTimes()))
-		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
-	}
-
 	Context("TestBuildConfigManagerContainer", func() {
-		It("builds shellTrigger reloader correctly", func() {
+		It("build shell reloader correctly", func() {
 			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -180,107 +135,5 @@ formatterConfig:
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param)).Should(Succeed())
 		})
-
-		It("builds tplScriptsTrigger reloader correctly", func() {
-			mockTplScriptCM()
-			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(true))
-			for i := range param.ConfigSpecsBuildParams {
-				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
-			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param)).Should(Succeed())
-			for _, arg := range []string{`--operator-update-enable`} {
-				Expect(param.Args).Should(ContainElement(arg))
-			}
-		})
-
-		It("builds tplScriptsTrigger reloader correctly with sync", func() {
-			mockTplScriptCM()
-			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(false))
-			for i := range param.ConfigSpecsBuildParams {
-				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
-			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param)).Should(Succeed())
-		})
 	})
-
 })
-
-func TestCheckAndUpdateReloadYaml(t *testing.T) {
-	customEqual := func(l, r map[string]string) bool {
-		if len(l) != len(r) {
-			return false
-		}
-		var err error
-		for k, v := range l {
-			var lv any
-			var rv any
-			err = yaml.Unmarshal([]byte(v), &lv)
-			assert.Nil(t, err)
-			err = yaml.Unmarshal([]byte(r[k]), &rv)
-			assert.Nil(t, err)
-			if !reflect.DeepEqual(lv, rv) {
-				return false
-			}
-		}
-		return true
-	}
-
-	type args struct {
-		data            map[string]string
-		reloadConfig    string
-		formatterConfig *parametersv1alpha1.FileFormatConfig
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    map[string]string
-		wantErr bool
-	}{{
-		name: "testCheckAndUpdateReloadYaml",
-		args: args{
-			data: map[string]string{"reload.yaml": `
-fileRegex: my.cnf
-scripts: reload.tpl
-`},
-			reloadConfig: "reload.yaml",
-			formatterConfig: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.Ini,
-			},
-		},
-		wantErr: false,
-		want: map[string]string{"reload.yaml": `
-scripts: reload.tpl
-fileRegex: my.cnf
-formatterConfig:
-  format: ini
-`,
-		},
-	}, {
-		name: "testCheckAndUpdateReloadYaml",
-		args: args{
-			data:            map[string]string{},
-			reloadConfig:    "reload.yaml",
-			formatterConfig: &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Ini},
-		},
-		wantErr: true,
-		want:    map[string]string{},
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := checkAndUpdateReloadYaml(tt.args.data, tt.args.reloadConfig, *tt.args.formatterConfig)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("checkAndUpdateReloadYaml() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !customEqual(got, tt.want) {
-				t.Errorf("checkAndUpdateReloadYaml() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

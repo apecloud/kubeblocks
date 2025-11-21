@@ -77,19 +77,6 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newTPLScriptsConfig := func(configPath string) ConfigSpecInfo {
-		return ConfigSpecInfo{
-			ReloadAction: &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
-			},
-			ReloadType:      parametersv1alpha1.TPLScriptType,
-			MountPoint:      "/tmp/test",
-			ConfigSpec:      newConfigSpec(),
-			FormatterConfig: newFormatter(),
-			TPLConfig:       configPath,
-		}
-	}
-
 	prepareTestConfig := func(configPath string, config string) {
 		fileInfo, err := os.Stat(configPath)
 		if err != nil {
@@ -111,36 +98,16 @@ var _ = Describe("Config Handler Test", func() {
 
 	Context("TestSimpleHandler", func() {
 		It("CreateShellHandler", func() {
-			_, err := createExecHandler(nil, nil, "")
+			_, err := createShellHandler(nil, nil)
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
-			_, err = createExecHandler([]string{}, nil, "")
+			_, err = createShellHandler([]string{}, nil)
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
-			_, err = createExecHandler([]string{"go", "version"}, &ConfigSpecInfo{
+			_, err = createShellHandler([]string{"go", "version"}, &ConfigSpecInfo{
 				ConfigSpec: appsv1.ComponentFileTemplate{
 					Name: "for_test",
-				}},
-				"")
+				}})
 			Expect(err).Should(Succeed())
 		})
-
-		It("createTPLScriptHandler", func() {
-			mockK8sTestConfigureDirectory(filepath.Join(tmpWorkDir, "config"), "my.cnf", "xxxx")
-			tplFile := filepath.Join(tmpWorkDir, "test.tpl")
-			configFile := filepath.Join(tmpWorkDir, "config.yaml")
-			Expect(os.WriteFile(tplFile, []byte(``), fs.ModePerm)).Should(Succeed())
-
-			os.Setenv("MYSQL_USER", "admin")
-			os.Setenv("MYSQL_PASSWORD", "admin")
-			tplConfig := TPLScriptConfig{Scripts: "test.tpl", DSN: `{%- expandenv "${MYSQL_USER}:${MYSQL_PASSWORD}@(localhost:3306)/" | trim %}`}
-			b, _ := util.ToYamlConfig(tplConfig)
-			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
-
-			handler, err := createTPLScriptHandler(configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
-			Expect(err).Should(Succeed())
-			tplHandler := handler.(*tplScriptHandler)
-			Expect(tplHandler.dsn).Should(BeEquivalentTo("admin:admin@(localhost:3306)/"))
-		})
-
 	})
 
 	Context("TestConfigHandler", func() {
@@ -168,37 +135,11 @@ var _ = Describe("Config Handler Test", func() {
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
 					ReloadType:      parametersv1alpha1.ShellType,
-					MountPoint:      configPath,
 					ConfigSpec:      newConfigSpec(),
 					FormatterConfig: newFormatter(),
 				}
 				testShellHandlerCommon(configPath, configSpec)
 			})
-		})
-		It("TplScriptsHandler", func() {
-			By("mock command channel")
-			newCommandChannel = func(ctx context.Context, dataType, dsn string) (DynamicParamUpdater, error) {
-				return mockCChannel, nil
-			}
-
-			tplFile := filepath.Join(tmpWorkDir, "test.tpl")
-			configFile := filepath.Join(tmpWorkDir, "config.yaml")
-			Expect(os.WriteFile(tplFile, []byte(``), fs.ModePerm)).Should(Succeed())
-
-			tplConfig := TPLScriptConfig{
-				Scripts:         "test.tpl",
-				FormatterConfig: newFormatter(),
-			}
-			b, _ := util.ToYamlConfig(tplConfig)
-			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
-
-			config := newTPLScriptsConfig(configFile)
-			handler, err := CreateCombinedHandler(toJSONString(config))
-			Expect(err).Should(Succeed())
-			Expect(handler.OnlineUpdate(context.TODO(), config.ConfigSpec.Name, map[string]string{
-				"param_a": "a",
-				"param_b": "b",
-			})).Should(Succeed())
 		})
 	})
 
@@ -246,40 +187,3 @@ var _ = Describe("Config Handler Test", func() {
 		})
 	})
 })
-
-func mockK8sTestConfigureDirectory(mockDirectory string, cfgFile, content string) {
-	var (
-		tmpVolumeDir   = filepath.Join(mockDirectory, "..2023_06_16_06_06_06.1234567")
-		configFilePath = filepath.Join(tmpVolumeDir, cfgFile)
-		tmpDataDir     = filepath.Join(mockDirectory, "..data_tmp")
-		watchedDataDir = filepath.Join(mockDirectory, "..data")
-	)
-
-	// wait inotify ready
-	Expect(os.MkdirAll(tmpVolumeDir, fs.ModePerm)).Should(Succeed())
-	Expect(os.WriteFile(configFilePath, []byte(content), fs.ModePerm)).Should(Succeed())
-	Expect(os.Chmod(configFilePath, fs.ModePerm)).Should(Succeed())
-
-	pwd, err := os.Getwd()
-	Expect(err).Should(Succeed())
-	defer func() {
-		_ = os.Chdir(pwd)
-	}()
-
-	Expect(os.Chdir(mockDirectory))
-	Expect(os.Symlink(filepath.Base(tmpVolumeDir), filepath.Base(tmpDataDir))).Should(Succeed())
-	Expect(os.Rename(tmpDataDir, watchedDataDir)).Should(Succeed())
-	Expect(os.Symlink(filepath.Join(filepath.Base(watchedDataDir), cfgFile), cfgFile)).Should(Succeed())
-}
-
-type mockCommandChannel struct {
-}
-
-func (m *mockCommandChannel) ExecCommand(ctx context.Context, command string, args ...string) (string, error) {
-	return "", nil
-}
-
-func (m *mockCommandChannel) Close() {
-}
-
-var mockCChannel = &mockCommandChannel{}

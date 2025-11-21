@@ -40,7 +40,6 @@ type ConfigSpecInfo struct {
 
 	// config volume mount path
 	MountPoint string `json:"mountPoint"`
-	TPLConfig  string `json:"tplConfig"`
 }
 
 type ConfigSpecMeta struct {
@@ -48,13 +47,4 @@ type ConfigSpecMeta struct {
 
 	ScriptConfig   []parametersv1alpha1.ScriptConfig
 	ToolsImageSpec *parametersv1alpha1.ToolsSetup
-}
-
-type TPLScriptConfig struct {
-	Scripts   string `json:"scripts"`
-	FileRegex string `json:"fileRegex"`
-	DataType  string `json:"dataType"`
-	DSN       string `json:"dsn"`
-
-	FormatterConfig parametersv1alpha1.FileFormatConfig `json:"formatterConfig"`
 }

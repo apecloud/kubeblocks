@@ -67,7 +67,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigSpecsBuildParams: []cfgcm.ConfigSpecMeta{{
 					ConfigSpecInfo: cfgcm.ConfigSpecInfo{
 						ConfigSpec:      component.ConfigTemplates(clusterComponent)[0],
-						ReloadType:      parametersv1alpha1.TPLScriptType,
+						ReloadType:      parametersv1alpha1.ShellType,
 						FormatterConfig: parametersv1alpha1.FileFormatConfig{},
 					},
 					ToolsImageSpec: &parametersv1alpha1.ToolsSetup{

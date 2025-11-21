@@ -43,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -210,7 +209,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
 		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning, "nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
+		return r.updateConfigCMStatus(reqCtx, configMap, cfgcore.ReconfigureNoChangeType, nil)
 	}
 
 	if configPatch != nil {
@@ -271,7 +270,7 @@ func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus re
 	case ESNone:
 		return r.succeed(rctx, policy, returnedStatus)
 	default:
-		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status"), false))
+		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(cfgcore.MakeError("unknown status"), false))
 	}
 }
 

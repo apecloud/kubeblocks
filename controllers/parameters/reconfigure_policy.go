@@ -121,11 +121,6 @@ func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
 	if reloadAction == nil {
 		return false
 	}
-
-	if reloadAction.TPLScriptTrigger != nil {
-		return !core.IsWatchModuleForTplTrigger(reloadAction.TPLScriptTrigger)
-	}
-
 	if reloadAction.ShellTrigger != nil {
 		return !core.IsWatchModuleForShellTrigger(reloadAction.ShellTrigger)
 	}

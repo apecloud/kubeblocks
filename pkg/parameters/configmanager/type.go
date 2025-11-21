@@ -33,20 +33,7 @@ type ConfigHandler interface {
 type ConfigSpecInfo struct {
 	*parametersv1alpha1.ReloadAction `json:",inline"`
 
-	ReloadType      parametersv1alpha1.DynamicReloadType `json:"reloadType"`
-	ConfigSpec      appsv1.ComponentFileTemplate         `json:"configSpec"`
-	FormatterConfig parametersv1alpha1.FileFormatConfig  `json:"formatterConfig"`
-	ConfigFile      string                               `json:"configFile"`
-
-	// config volume mount path
-	MountPoint string `json:"mountPoint"`
-	TPLConfig  string `json:"tplConfig"`
-}
-
-type TPLScriptConfig struct {
-	Scripts         string                              `json:"scripts"`
-	FileRegex       string                              `json:"fileRegex"`
-	DataType        string                              `json:"dataType"`
-	DSN             string                              `json:"dsn"`
-	FormatterConfig parametersv1alpha1.FileFormatConfig `json:"formatterConfig"`
+	ReloadType parametersv1alpha1.DynamicReloadType `json:"reloadType"`
+	ConfigSpec appsv1.ComponentFileTemplate         `json:"configSpec"`
+	ConfigFile string                               `json:"configFile"`
 }

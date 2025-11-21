@@ -4,7 +4,6 @@ go 1.24.0
 
 require (
 	cuelang.org/go v0.8.0
-	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/StudioSol/set v1.0.0

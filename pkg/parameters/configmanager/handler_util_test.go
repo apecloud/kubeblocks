@@ -27,12 +27,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -62,19 +59,6 @@ func TestIsSupportReload(t *testing.T) {
 			reload: &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{
 					Command: strings.Fields("pg_ctl reload"),
-				},
-			},
-		},
-		want: true,
-	}, {
-		name: "reload_test_with_tpl_script",
-		args: args{
-			reload: &parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: "cm",
-						Namespace:          "default",
-					},
 				},
 			},
 		},
@@ -122,11 +106,6 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
-			mockK8sCli.MockGetMethod(
-				testutil.WithFailed(cfgcore.MakeError("failed to get resource."), testutil.WithTimes(1)),
-				testutil.WithSucceed(testutil.WithTimes(1)),
-			)
-
 			type args struct {
 				reloadAction *parametersv1alpha1.ReloadAction
 				cli          client.Client
@@ -152,32 +131,6 @@ var _ = Describe("Handler Util Test", func() {
 						ShellTrigger: &parametersv1alpha1.ShellTrigger{
 							Command: strings.Fields("go"),
 						}},
-				},
-				wantErr: false,
-			}, {
-				name: "TPLScriptTest",
-				args: args{
-					reloadAction: &parametersv1alpha1.ReloadAction{
-						TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-							ScriptConfig: parametersv1alpha1.ScriptConfig{
-								ScriptConfigMapRef: "test",
-							},
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
-				},
-				wantErr: true,
-			}, {
-				name: "TPLScriptTest",
-				args: args{
-					reloadAction: &parametersv1alpha1.ReloadAction{
-						TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-							ScriptConfig: parametersv1alpha1.ScriptConfig{
-								ScriptConfigMapRef: "test",
-							},
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
 				},
 				wantErr: false,
 			}, {
@@ -212,40 +165,6 @@ var _ = Describe("Handler Util Test", func() {
 					Command: []string{"/bin/true"},
 				}}, nil, nil),
 			).Should(Succeed())
-		})
-
-		It("TestTplScriptsTrigger", func() {
-			ns := "default"
-			testName1 := "test1"
-			testName2 := "not_test1"
-			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      testName1,
-						Namespace: ns,
-					},
-				},
-			}), testutil.WithTimes(2)))
-
-			By("Test valid")
-			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: testName1,
-						Namespace:          ns,
-					},
-				}}, mockK8sCli.Client(), ctx),
-			).Should(Succeed())
-
-			By("Test invalid")
-			Expect(ValidateReloadOptions(&parametersv1alpha1.ReloadAction{
-				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{
-					ScriptConfig: parametersv1alpha1.ScriptConfig{
-						ScriptConfigMapRef: testName2,
-						Namespace:          ns,
-					},
-				}}, mockK8sCli.Client(), ctx),
-			).ShouldNot(Succeed())
 		})
 
 		It("TestInvalidTrigger", func() {

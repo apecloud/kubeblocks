@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,8 +30,6 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
-	mockproto "github.com/apecloud/kubeblocks/pkg/parameters/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -41,13 +38,11 @@ var operatorSyncPolicy = &syncPolicy{}
 var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	var (
-		k8sMockClient     *testutil.K8sClientMockHelper
-		reconfigureClient *mockproto.MockReconfigureClient
+		k8sMockClient *testutil.K8sClientMockHelper
 	)
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
-		reconfigureClient = mockproto.NewMockReconfigureClient(k8sMockClient.Controller())
 	})
 
 	AfterEach(func() {
@@ -58,9 +53,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 		It("Should success without error", func() {
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
-					return reconfigureClient, nil
-				}),
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
@@ -90,11 +82,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			// mock client update caller
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithMinTimes(3)))
 
-			By("mock remote online update caller")
-			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
-				MinTimes(3)
-
 			status, err := operatorSyncPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
@@ -113,9 +100,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 		It("Should success without error", func() {
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
-					return reconfigureClient, nil
-				}),
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
@@ -155,11 +139,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client patch caller")
 			// mock client update caller
 			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithTimes(1)))
-
-			By("mock remote online update caller")
-			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
-				Times(1)
 
 			status, err := operatorSyncPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())

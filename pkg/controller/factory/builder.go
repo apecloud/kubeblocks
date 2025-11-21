@@ -21,7 +21,6 @@ package factory
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -40,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -298,69 +295,6 @@ func BuildConfigMapWithTemplate(cluster *kbappsv1.Cluster,
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
 		SetData(configs).
 		GetObject()
-}
-
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
-	var env []corev1.EnvVar
-	env = append(env, corev1.EnvVar{
-		Name: "CONFIG_MANAGER_POD_IP",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "status.podIP",
-			},
-		},
-	})
-	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
-		AddCommands("env").
-		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").
-		AddArgs(getSidecarBinaryPath(sidecarRenderedParam)).
-		AddArgs(sidecarRenderedParam.Args...).
-		AddEnv(env...).
-		AddPorts(corev1.ContainerPort{
-			Name:          constant.ConfigManagerPortName,
-			ContainerPort: sidecarRenderedParam.ContainerPort,
-			Protocol:      "TCP",
-		}).
-		SetImage(sidecarRenderedParam.Image).
-		SetImagePullPolicy(corev1.PullIfNotPresent).
-		AddVolumeMounts(sidecarRenderedParam.Volumes...)
-	return containerBuilder.GetObject(), nil
-}
-
-func getSidecarBinaryPath(buildParams *cfgcm.CfgManagerBuildParams) string {
-	if buildParams.ConfigManagerReloadPath != "" {
-		return buildParams.ConfigManagerReloadPath
-	}
-	return constant.ConfigManagerToolPath
-}
-
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, toolsMetas []parametersv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
-	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
-	for _, toolConfig := range toolsMetas {
-		toolContainerBuilder := builder.NewContainerBuilder(toolConfig.Name).
-			AddCommands(toolConfig.Command...).
-			SetImagePullPolicy(corev1.PullIfNotPresent).
-			AddVolumeMounts(sidecarRenderedParam.Volumes...)
-		if len(toolConfig.Image) > 0 {
-			toolContainerBuilder.SetImage(toolConfig.Image)
-		}
-		toolContainers = append(toolContainers, *toolContainerBuilder.GetObject())
-	}
-	for i := range toolContainers {
-		container := &toolContainers[i]
-		if meta, ok := toolsMap[container.Name]; ok {
-			setToolsScriptsPath(container, meta)
-		}
-	}
-	return toolContainers, nil
-}
-
-func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta) {
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:  cfgcm.KBTOOLSScriptsPathEnv,
-		Value: filepath.Join(cfgcm.KBScriptVolumePath, meta.ConfigSpec.Name),
-	})
 }
 
 func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {

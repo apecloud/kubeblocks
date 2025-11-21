@@ -68,15 +68,6 @@ func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.Co
 	return nil
 }
 
-// GetPodContainerWithVolumeMount searches for containers mounting the volume
-func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) []*corev1.Container {
-	containers := podSpec.Containers
-	if len(containers) == 0 || volumeName == "" {
-		return nil
-	}
-	return getContainerWithVolumeMount(containers, volumeName)
-}
-
 // GetVolumeMountName finds the volume with mount name
 func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
 	for i := range volumes {
@@ -157,30 +148,6 @@ func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []
 		}
 	}
 	return len(configs) == len(volumes)
-}
-
-func getContainerWithVolumeMount(containers []corev1.Container, volumeName string) []*corev1.Container {
-	mountContainers := make([]*corev1.Container, 0, len(containers))
-	for i, c := range containers {
-		volumeMounts := c.VolumeMounts
-		for _, vm := range volumeMounts {
-			if vm.Name == volumeName {
-				mountContainers = append(mountContainers, &containers[i])
-				break
-			}
-		}
-	}
-	return mountContainers
-}
-
-func GetVolumeMountByVolume(container *corev1.Container, volumeName string) *corev1.VolumeMount {
-	for _, volume := range container.VolumeMounts {
-		if volume.Name == volumeName {
-			return &volume
-		}
-	}
-
-	return nil
 }
 
 // GetCoreNum gets content of Resources.Limits.cpu

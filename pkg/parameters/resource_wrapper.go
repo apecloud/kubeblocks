@@ -169,11 +169,3 @@ func NewResourceFetcher(resourceCtx *render.ResourceCtx) *Fetcher {
 	f := &Fetcher{}
 	return f.Init(resourceCtx, f)
 }
-
-func copyMap(data map[string]string) map[string]string {
-	r := make(map[string]string, len(data))
-	for k, v := range data {
-		r[k] = v
-	}
-	return r
-}

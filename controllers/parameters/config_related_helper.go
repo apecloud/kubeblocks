@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -59,7 +58,7 @@ func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject
 		contains := intctrlutil.GetContainersByConfigmap(podTemplate.Spec.Containers,
 			volumeMounted.Name, core.GenerateEnvFromName(cfg.Name),
 			func(containerName string) bool {
-				return constant.ConfigSidecarName == containerName
+				return false // TODO: the new way to filter the containers which mounted the configmap
 			})
 		if len(contains) > 0 {
 			objs = append(objs, items[i])

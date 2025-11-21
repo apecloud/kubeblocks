@@ -110,7 +110,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 		if !intctrlutil.IsPodReady(&pod) {
 			continue
 		}
-		if err = funcs.OnlineUpdatePodFunc(&pod, ctx, rctx.ReconfigureClientFactory, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {
+		if err = funcs.OnlineUpdatePodFunc(&pod, ctx, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		if err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, rctx.Client, ctx); err != nil {

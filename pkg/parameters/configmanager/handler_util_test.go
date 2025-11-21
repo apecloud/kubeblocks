@@ -34,7 +34,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -143,11 +142,6 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
-			mockK8sCli.MockGetMethod(
-				testutil.WithFailed(cfgcore.MakeError("failed to get resource."), testutil.WithTimes(1)),
-				testutil.WithSucceed(testutil.WithTimes(1)),
-			)
-
 			type args struct {
 				reloadAction *parametersv1alpha1.ReloadAction
 				cli          client.Client

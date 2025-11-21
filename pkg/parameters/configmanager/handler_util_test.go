@@ -251,7 +251,6 @@ var _ = Describe("Handler Util Test", func() {
 			Expect(len(configSpecs)).Should(BeEquivalentTo(1))
 			Expect(configSpecs[0].ConfigSpec).Should(BeEquivalentTo(mockConfigSpec(ccName)))
 			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(parametersv1alpha1.ShellType))
-			Expect(&configSpecs[0].FormatterConfig).Should(BeEquivalentTo(cd[0].FileFormatConfig))
 		})
 	})
 

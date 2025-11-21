@@ -174,11 +174,10 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentFileTemplate,
 			ToolsImageSpec: actionToolsImage(action),
 			ScriptConfig:   actionToolsScripts(paramsDef.Spec),
 			ConfigSpecInfo: ConfigSpecInfo{
-				ReloadAction:    action,
-				FormatterConfig: *desc.FileFormatConfig,
-				ConfigSpec:      *configSpec,
-				ReloadType:      FromReloadTypeConfig(action),
-				ConfigFile:      desc.Name,
+				ReloadAction: action,
+				ConfigSpec:   *configSpec,
+				ReloadType:   FromReloadTypeConfig(action),
+				ConfigFile:   desc.Name,
 			},
 		})
 	}

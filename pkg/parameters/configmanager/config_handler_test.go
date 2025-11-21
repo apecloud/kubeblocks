@@ -66,17 +66,6 @@ var _ = Describe("Config Handler Test", func() {
 		}
 	}
 
-	newFormatter := func() parametersv1alpha1.FileFormatConfig {
-		return parametersv1alpha1.FileFormatConfig{
-			FormatterAction: parametersv1alpha1.FormatterAction{
-				IniConfig: &parametersv1alpha1.IniConfig{
-					SectionName: "test",
-				},
-			},
-			Format: parametersv1alpha1.Ini,
-		}
-	}
-
 	prepareTestConfig := func(configPath string, config string) {
 		fileInfo, err := os.Stat(configPath)
 		if err != nil {
@@ -134,9 +123,8 @@ var _ = Describe("Config Handler Test", func() {
 						ShellTrigger: &parametersv1alpha1.ShellTrigger{
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
-					ReloadType:      parametersv1alpha1.ShellType,
-					ConfigSpec:      newConfigSpec(),
-					FormatterConfig: newFormatter(),
+					ReloadType: parametersv1alpha1.ShellType,
+					ConfigSpec: newConfigSpec(),
 				}
 				testShellHandlerCommon(configPath, configSpec)
 			})

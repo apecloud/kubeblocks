@@ -66,9 +66,8 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				Cluster:       clusterObj,
 				ConfigSpecsBuildParams: []cfgcm.ConfigSpecMeta{{
 					ConfigSpecInfo: cfgcm.ConfigSpecInfo{
-						ConfigSpec:      component.ConfigTemplates(clusterComponent)[0],
-						ReloadType:      parametersv1alpha1.ShellType,
-						FormatterConfig: parametersv1alpha1.FileFormatConfig{},
+						ConfigSpec: component.ConfigTemplates(clusterComponent)[0],
+						ReloadType: parametersv1alpha1.ShellType,
 					},
 					ToolsImageSpec: &parametersv1alpha1.ToolsSetup{
 						MountPoint: "/opt/tools",

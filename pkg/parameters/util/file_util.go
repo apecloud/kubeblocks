@@ -22,31 +22,10 @@ package util
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 
 	oyaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
-
-func FromConfigFiles(files []string) (map[string]string, error) {
-	m := make(map[string]string)
-	for _, file := range files {
-		b, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		m[filepath.Base(file)] = string(b)
-	}
-	return m, nil
-}
-
-func ToArgs(m map[string]string) []string {
-	args := make([]string, 0, len(m)*2)
-	for k, v := range m {
-		args = append(args, k, v)
-	}
-	return args
-}
 
 func FromYamlConfig[T any](yamlConfig string, obj T) error {
 	if _, err := os.Stat(yamlConfig); err != nil {
@@ -70,15 +49,4 @@ func ToYamlConfig(obj interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return oyaml.Marshal(jsonObj)
-}
-
-func CheckPathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }

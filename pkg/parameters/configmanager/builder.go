@@ -26,12 +26,9 @@ import (
 	"strconv"
 
 	"github.com/imdario/mergo"
-	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,17 +38,12 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
-	configTemplateName = "reload.yaml"
 	scriptVolumePrefix = "cm-script-"
-
-	scriptConfigField    = "scripts"
-	formatterConfigField = "formatterConfig"
 
 	configManagerConfigVolumeName = "config-manager-config"
 	configManagerConfig           = "config-manager.yaml"
@@ -77,7 +69,6 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 			ctrl.Log.Info(fmt.Sprintf("volume mount not be use : %s", buildParam.ConfigSpec.VolumeName))
 			continue
 		}
-		buildParam.MountPoint = volume.MountPath
 		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, managerParams); err != nil {
 			return err
 		}
@@ -180,41 +171,6 @@ func buildConfigSpecHandleMeta(cli client.Client, ctx context.Context, buildPara
 			return err
 		}
 	}
-	if buildParam.ReloadType == parametersv1alpha1.TPLScriptType {
-		return buildTPLScriptCM(buildParam, cmBuildParam, cli, ctx)
-	}
-	return nil
-}
-
-func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context) error {
-	var (
-		options      = configSpecBuildMeta.TPLScriptTrigger
-		formatConfig = configSpecBuildMeta.FormatterConfig
-		mountPoint   = GetScriptsMountPoint(configSpecBuildMeta.ConfigSpec)
-	)
-
-	reloadYamlFn := func(cm *corev1.ConfigMap) error {
-		newData, err := checkAndUpdateReloadYaml(cm.Data, configTemplateName, formatConfig)
-		if err != nil {
-			return err
-		}
-		cm.Data = newData
-		return nil
-	}
-
-	referenceCMKey := client.ObjectKey{
-		Namespace: options.Namespace,
-		Name:      options.ScriptConfigMapRef,
-	}
-	scriptCMKey := client.ObjectKey{
-		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s%s-%s", configManagerCMPrefix, options.ScriptConfigMapRef, manager.Cluster.GetName()),
-	}
-	if err := checkOrCreateConfigMap(referenceCMKey, scriptCMKey, cli, ctx, manager.Cluster, reloadYamlFn); err != nil {
-		return err
-	}
-	buildReloadScriptVolume(scriptCMKey.Name, manager, mountPoint, GetScriptsVolumeName(configSpecBuildMeta.ConfigSpec))
-	configSpecBuildMeta.TPLConfig = filepath.Join(mountPoint, configTemplateName)
 	return nil
 }
 
@@ -295,32 +251,6 @@ func mergeWithOverride(dst, src interface{}) {
 	_ = mergo.Merge(dst, src, mergo.WithOverride)
 }
 
-func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
-	configObject := make(map[string]interface{})
-	if content, ok := data[reloadConfig]; ok {
-		if err := yaml.Unmarshal([]byte(content), &configObject); err != nil {
-			return nil, err
-		}
-	}
-	if res, _, _ := unstructured.NestedFieldNoCopy(configObject, scriptConfigField); res == nil {
-		return nil, core.MakeError("reload.yaml required field: %s", scriptConfigField)
-	}
-
-	formatObject, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(&formatterConfig)
-	if err != nil {
-		return nil, err
-	}
-	if err := unstructured.SetNestedField(configObject, formatObject, formatterConfigField); err != nil {
-		return nil, err
-	}
-	b, err := yaml.Marshal(configObject)
-	if err != nil {
-		return nil, err
-	}
-	data[reloadConfig] = string(b)
-	return data, nil
-}
-
 func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentFileTemplate) error {
 	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
@@ -336,10 +266,6 @@ func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *Cf
 	}
 	buildReloadScriptVolume(scriptsCMKey.Name, manager, mountPoint, GetScriptsVolumeName(configSpec))
 	return nil
-}
-
-func GetScriptsMountPoint(configSpec appsv1.ComponentFileTemplate) string {
-	return filepath.Join(KBScriptVolumePath, configSpec.Name)
 }
 
 func GetScriptsVolumeName(configSpec appsv1.ComponentFileTemplate) string {

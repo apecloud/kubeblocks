@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
 type ParamPairs struct {
@@ -81,15 +80,6 @@ func wrapValue(result map[string]interface{}, paramValue string, paramName strin
 	return nil
 }
 
-// FromStringPointerMap converts a map[string]string to a map[string]interface{}
-func FromStringPointerMap(m map[string]string) map[string]*string {
-	r := make(map[string]*string, len(m))
-	for key, v := range m {
-		r[key] = cfgutil.ToPointer(v)
-	}
-	return r
-}
-
 func ApplyConfigPatch(baseCfg []byte,
 	updatedParameters map[string]*string,
 	formatConfig *parametersv1alpha1.FileFormatConfig,
@@ -119,13 +109,6 @@ func ApplyConfigPatch(baseCfg []byte,
 }
 
 func IsWatchModuleForShellTrigger(trigger *parametersv1alpha1.ShellTrigger) bool {
-	if trigger == nil || trigger.Sync == nil {
-		return true
-	}
-	return !*trigger.Sync
-}
-
-func IsWatchModuleForTplTrigger(trigger *parametersv1alpha1.TPLScriptTrigger) bool {
 	if trigger == nil || trigger.Sync == nil {
 		return true
 	}

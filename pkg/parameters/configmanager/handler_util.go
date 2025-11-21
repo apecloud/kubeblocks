@@ -76,7 +76,7 @@ func IsSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
 }
 
 func isValidReloadPolicy(reload parametersv1alpha1.ReloadAction) bool {
-	return reload.AutoTrigger != nil || reload.ShellTrigger != nil || reload.TPLScriptTrigger != nil
+	return reload.AutoTrigger != nil || reload.ShellTrigger != nil
 }
 
 func IsAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
@@ -87,8 +87,6 @@ func FromReloadTypeConfig(reloadAction *parametersv1alpha1.ReloadAction) paramet
 	switch {
 	case reloadAction.ShellTrigger != nil:
 		return parametersv1alpha1.ShellType
-	case reloadAction.TPLScriptTrigger != nil:
-		return parametersv1alpha1.TPLScriptType
 	case reloadAction.AutoTrigger != nil:
 		return parametersv1alpha1.AutoType
 	}
@@ -99,20 +97,10 @@ func ValidateReloadOptions(reloadAction *parametersv1alpha1.ReloadAction, cli cl
 	switch {
 	case reloadAction.ShellTrigger != nil:
 		return checkShellTrigger(reloadAction.ShellTrigger)
-	case reloadAction.TPLScriptTrigger != nil:
-		return checkTPLScriptTrigger(reloadAction.TPLScriptTrigger, cli, ctx)
 	case reloadAction.AutoTrigger != nil:
 		return nil
 	}
 	return core.MakeError("require special reload type!")
-}
-
-func checkTPLScriptTrigger(options *parametersv1alpha1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
-	cm := corev1.ConfigMap{}
-	return cli.Get(ctx, client.ObjectKey{
-		Namespace: options.Namespace,
-		Name:      options.ScriptConfigMapRef,
-	}, &cm)
 }
 
 func checkShellTrigger(options *parametersv1alpha1.ShellTrigger) error {
@@ -186,11 +174,10 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentFileTemplate,
 			ToolsImageSpec: actionToolsImage(action),
 			ScriptConfig:   actionToolsScripts(paramsDef.Spec),
 			ConfigSpecInfo: ConfigSpecInfo{
-				ReloadAction:    action,
-				FormatterConfig: *desc.FileFormatConfig,
-				ConfigSpec:      *configSpec,
-				ReloadType:      FromReloadTypeConfig(action),
-				ConfigFile:      desc.Name,
+				ReloadAction: action,
+				ConfigSpec:   *configSpec,
+				ReloadType:   FromReloadTypeConfig(action),
+				ConfigFile:   desc.Name,
 			},
 		})
 	}
@@ -206,7 +193,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentFileTemplate,
 // As a result, the config-manager cannot detect configuration changes and does not support dynamic parameter updates for such configurations.
 // Therefore, async-type ConfigSpecs with subpath volume mounts need to be removed.
 //
-// 2. Sync mode: For sync mode (regardless of the reload action type - TPLScriptType trigger or ShellType trigger), the controller directly watches
+// 2. Sync mode: For sync mode (regardless of the reload action type - ShellType trigger), the controller directly watches
 // the ConfigMap changes and actively invokes the reload action.
 //
 // Both async and sync types need to pass the ConfigSpecs to the config-manager.
@@ -231,6 +218,5 @@ func isSubPathMount(v *corev1.VolumeMount) bool {
 
 func isSyncReloadAction(meta ConfigSpecInfo) bool {
 	// If synchronous reloadAction is supported, kubelet limitations can be ignored.
-	return meta.ReloadType == parametersv1alpha1.TPLScriptType && !core.IsWatchModuleForTplTrigger(meta.TPLScriptTrigger) ||
-		meta.ReloadType == parametersv1alpha1.ShellType && !core.IsWatchModuleForShellTrigger(meta.ShellTrigger)
+	return meta.ReloadType == parametersv1alpha1.ShellType && !core.IsWatchModuleForShellTrigger(meta.ShellTrigger)
 }

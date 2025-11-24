@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   name: kb-addon-{{ include "addon.prometheus.name" . }}-{{ .Values.prometheus.alertmanager.configMapOverrideName }}
+  namespace: {{ template "kubeblocks.prometheus.namespace" . }}
 data:
   alertmanager.yml: |
     global: { }

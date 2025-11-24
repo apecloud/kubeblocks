@@ -4,6 +4,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: victoria-metrics-agent-chart-kubeblocks-values
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   {{- if .Values.keepAddons }}

@@ -4,6 +4,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "addon.alertmanager-webhook-adaptor.name" . }}-chart-kubeblocks-values
+  namespace: {{ template "kubeblocks.prometheus.namespace" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   {{- if .Values.keepAddons }}

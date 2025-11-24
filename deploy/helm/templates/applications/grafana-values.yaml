@@ -4,6 +4,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-chart-kubeblocks-values
+  namespace: {{ template "kubeblocks.grafana.namespace" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   {{- if .Values.keepAddons }}

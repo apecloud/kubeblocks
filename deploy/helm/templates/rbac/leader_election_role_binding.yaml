@@ -11,5 +11,5 @@ roleRef:
   name: {{ include "kubeblocks.fullname" . }}-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: {{ include "kubeblocks.fullname" . }}-controller-manager
+  name: {{ include "kubeblocks.fullname" . }}
   namespace: {{ .Release.Namespace }}

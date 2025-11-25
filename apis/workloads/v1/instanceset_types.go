@@ -504,7 +504,7 @@ type LifecycleActions struct {
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
-	// Defines the procedure that update a replica with new configuration.
+	// Defines the procedure that update replicas with new configuration.
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`

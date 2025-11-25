@@ -166,7 +166,7 @@ spec:
                       type: string
                     reconfigure:
                       description: |-
-                        The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+                        The custom reconfigure action to reload the configuration whenever changes to this config are detected.
 
 
                         The container executing this action has access to following variables:
@@ -175,9 +175,6 @@ spec:
                         - KB_CONFIG_FILES_CREATED: file1,file2...
                         - KB_CONFIG_FILES_REMOVED: file1,file2...
                         - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
-
-                        Note: This field is immutable once it has been set.
                       properties:
                         exec:
                           description: |-

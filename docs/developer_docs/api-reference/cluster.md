@@ -2339,7 +2339,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -2809,27 +2809,6 @@ ClusterComponentConfigSource
 </tr>
 <tr>
 <td>
-<code>reconfigure</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The custom reconfigure action to reload the service configuration whenever changes to this config are detected.</p>
-<p>The container executing this action has access to following variables:</p>
-<ul>
-<li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
-<li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
-<li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
-</ul>
-<p>Note: This field is immutable once it has been set.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>externalManaged</code><br/>
 <em>
 bool
@@ -2840,6 +2819,26 @@ bool
 <p>ExternalManaged indicates whether the configuration is managed by an external system.
 When set to true, the controller will use the user-provided template and reconfigure action,
 ignoring the default template and update behavior.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The custom reconfigure action to reload the configuration whenever changes to this config are detected.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -5750,7 +5749,23 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to restart the pod when the file changes.</p>
+<p>Specifies whether to restart the pods when the configuration changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure that reloads the configuration when the file changes.</p>
+<p>When @restartOnFileChange is set to true, this action will be ignored.</p>
+<p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
 </tbody>
@@ -6056,7 +6071,6 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure that update a replica with new configuration.</p>
 <p>Note: This field is immutable once it has been set.</p>
-<p>This Action is reserved for future versions.</p>
 </td>
 </tr>
 <tr>
@@ -33766,7 +33780,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the procedure that update a replica with new configuration.</p>
+<p>Defines the procedure that update replicas with new configuration.</p>
 </td>
 </tr>
 </tbody>

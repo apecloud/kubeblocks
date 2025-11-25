@@ -205,15 +205,15 @@ func (in *ClusterComponentConfig) DeepCopyInto(out *ClusterComponentConfig) {
 		}
 	}
 	in.ClusterComponentConfigSource.DeepCopyInto(&out.ClusterComponentConfigSource)
-	if in.Reconfigure != nil {
-		in, out := &in.Reconfigure, &out.Reconfigure
-		*out = new(Action)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.ExternalManaged != nil {
 		in, out := &in.ExternalManaged, &out.ExternalManaged
 		*out = new(bool)
 		**out = **in
+	}
+	if in.Reconfigure != nil {
+		in, out := &in.Reconfigure, &out.Reconfigure
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
 	}
 }
 
@@ -1296,6 +1296,11 @@ func (in *ComponentFileTemplate) DeepCopyInto(out *ComponentFileTemplate) {
 		in, out := &in.RestartOnFileChange, &out.RestartOnFileChange
 		*out = new(bool)
 		**out = **in
+	}
+	if in.Reconfigure != nil {
+		in, out := &in.Reconfigure, &out.Reconfigure
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
 	}
 }
 

@@ -495,7 +495,14 @@ type ClusterComponentConfig struct {
 	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
 
-	// The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+	// ExternalManaged indicates whether the configuration is managed by an external system.
+	// When set to true, the controller will use the user-provided template and reconfigure action,
+	// ignoring the default template and update behavior.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
+
+	// The custom reconfigure action to reload the configuration whenever changes to this config are detected.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -503,17 +510,24 @@ type ClusterComponentConfig struct {
 	// - KB_CONFIG_FILES_REMOVED: file1,file2...
 	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
 	//
-	// Note: This field is immutable once it has been set.
-	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
 
-	// ExternalManaged indicates whether the configuration is managed by an external system.
-	// When set to true, the controller will use the user-provided template and reconfigure action,
-	// ignoring the default template and update behavior.
+	// The custom reconfigure actions to reload the configuration whenever changes to this config are detected.
+	// It is applicable to the scenario where there are more than one files in the configuration,
+	// and they have different reload actions.
+	//
+	// Each key in the map represents a file name, and the corresponding value is the action to reload the
+	// configuration for that file. It takes precedence over the default @reconfigure action if set.
+	//
+	// The container executing each action has access to following variables:
+	//
+	// - KB_CONFIG_FILES_CREATED: file
+	// - KB_CONFIG_FILES_REMOVED: file
+	// - KB_CONFIG_FILES_UPDATED: checksum
 	//
 	// +optional
-	ExternalManaged *bool `json:"externalManaged,omitempty"`
+	// Reconfigures *map[string]Action `json:"reconfigures,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

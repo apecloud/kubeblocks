@@ -6153,7 +6153,26 @@ Kubernetes core/v1.PodDNSConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the DNS parameters of a pod.</p>
+<p>Specifies the DNS parameters of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostPort">
+[]HostPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the host ports of the pod.
+It&rsquo;s valid if and only if the <code>hostNetwork</code> is enabled.</p>
+<p>If any host ports are specified, the default host-port manager provided by KB will be ignored.
+Therefore, it is the user&rsquo;s responsibility to specify all container ports that need to be bound to host ports.
+Check @cmpd.spec.hostNetwork to obtain all container ports that need to be bound.</p>
+<p>!!!!! When you specify the host ports, you must specify two additional ports for the kbagent sidecar of KB: &lsquo;http&rsquo;, &lsquo;streaming&rsquo;.</p>
 </td>
 </tr>
 </tbody>
@@ -8426,6 +8445,45 @@ ContainerVars
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.HostPort">HostPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentNetwork">ComponentNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the host port.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The port number of the host port.</p>
 </td>
 </tr>
 </tbody>

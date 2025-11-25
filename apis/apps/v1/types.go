@@ -257,20 +257,26 @@ type ComponentNetwork struct {
 	// +optional
 	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
 
-	// Specifies the host ports of the pod[ explicitly.
+	// Specifies the host ports of the pod.
 	// It's valid if and only if the `hostNetwork` is enabled.
+	//
+	// If any host ports are specified, the default host-port manager provided by KB will be ignored.
+	// Therefore, it is the user's responsibility to specify all container ports that need to be bound to host ports.
+	// Check @cmpd.spec.hostNetwork to obtain all container ports that need to be bound.
+	//
+	// !!!!! When you specify the host ports, you must specify two additional ports for the kbagent sidecar of KB: 'http', 'streaming'.
 	//
 	// +optional
 	HostPorts []HostPort `json:"hostPorts,omitempty"`
 }
 
 type HostPort struct {
-	// Name is the name of the host port.
+	// The name of the host port.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Port is the port number of the host port.
+	// The port number of the host port.
 	//
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535

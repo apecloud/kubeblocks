@@ -2709,7 +2709,7 @@ spec:
                       description: Defines the network configuration for the Component.
                       properties:
                         dnsConfig:
-                          description: Specifies the DNS parameters of a pod.
+                          description: Specifies the DNS parameters of the pod.
                           properties:
                             nameservers:
                               description: |-
@@ -2774,6 +2774,34 @@ spec:
                           description: Host networking requested for this pod. Use
                             the host's network namespace.
                           type: boolean
+                        hostPorts:
+                          description: |-
+                            Specifies the host ports of the pod.
+                            It's valid if and only if the `hostNetwork` is enabled.
+
+
+                            If any host ports are specified, the default host-port manager provided by KB will be ignored.
+                            Therefore, it is the user's responsibility to specify all container ports that need to be bound to host ports.
+                            Check @cmpd.spec.hostNetwork to obtain all container ports that need to be bound.
+
+
+                            !!!!! When you specify the host ports, you must specify two additional ports for the kbagent sidecar of KB: 'http', 'streaming'.
+                          items:
+                            properties:
+                              name:
+                                description: The name of the host port.
+                                type: string
+                              port:
+                                description: The port number of the host port.
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            required:
+                            - name
+                            - port
+                            type: object
+                          type: array
                       type: object
                     offlineInstances:
                       description: |-
@@ -13959,7 +13987,7 @@ spec:
                           description: Defines the network configuration for the Component.
                           properties:
                             dnsConfig:
-                              description: Specifies the DNS parameters of a pod.
+                              description: Specifies the DNS parameters of the pod.
                               properties:
                                 nameservers:
                                   description: |-
@@ -14024,6 +14052,34 @@ spec:
                               description: Host networking requested for this pod.
                                 Use the host's network namespace.
                               type: boolean
+                            hostPorts:
+                              description: |-
+                                Specifies the host ports of the pod.
+                                It's valid if and only if the `hostNetwork` is enabled.
+
+
+                                If any host ports are specified, the default host-port manager provided by KB will be ignored.
+                                Therefore, it is the user's responsibility to specify all container ports that need to be bound to host ports.
+                                Check @cmpd.spec.hostNetwork to obtain all container ports that need to be bound.
+
+
+                                !!!!! When you specify the host ports, you must specify two additional ports for the kbagent sidecar of KB: 'http', 'streaming'.
+                              items:
+                                properties:
+                                  name:
+                                    description: The name of the host port.
+                                    type: string
+                                  port:
+                                    description: The port number of the host port.
+                                    format: int32
+                                    maximum: 65535
+                                    minimum: 1
+                                    type: integer
+                                required:
+                                - name
+                                - port
+                                type: object
+                              type: array
                           type: object
                         offlineInstances:
                           description: |-

@@ -28,9 +28,9 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	configctrl "github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 type reconfigureRelatedResource struct {
@@ -78,7 +78,7 @@ func resolveComponentTemplateSpec(resources *reconfigureRelatedResource, fetcher
 		return nil
 	}
 
-	configSpec := intctrlutil.GetConfigTemplateItem(&fetcher.ComponentParameterObj.Spec, configSpecName)
+	configSpec := configctrl.GetConfigTemplateItem(&fetcher.ComponentParameterObj.Spec, configSpecName)
 	if configSpec == nil {
 		return fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, fetcher.ComponentParameterObj.Name)
 	}

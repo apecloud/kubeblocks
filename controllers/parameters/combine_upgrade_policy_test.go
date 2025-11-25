@@ -59,7 +59,6 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				}),
 				withClusterComponent(2))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(parametersv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
@@ -78,7 +77,6 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				}),
 				withClusterComponent(2))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(parametersv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
@@ -86,24 +84,14 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 	})
 })
 
-type testPolicy struct {
-}
+type testPolicy struct{}
 
-type testErrorPolicy struct {
-}
-
-func (t testErrorPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
-	return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("testErrorPolicy failed")
-}
-
-func (t testErrorPolicy) GetPolicyName() string {
-	return "testErrorPolicy"
-}
-
-func (t testPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
+func (t testPolicy) Upgrade(params reconfigureContext) (returnedStatus, error) {
 	return makeReturnedStatus(ESNone), nil
 }
 
-func (t testPolicy) GetPolicyName() string {
-	return "testPolicy"
+type testErrorPolicy struct{}
+
+func (t testErrorPolicy) Upgrade(params reconfigureContext) (returnedStatus, error) {
+	return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("testErrorPolicy failed")
 }

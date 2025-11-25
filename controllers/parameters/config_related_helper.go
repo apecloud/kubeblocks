@@ -28,26 +28,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, configSpecName string, _ func(T, PT, L, PL), cfg client.ObjectKey, opts ...client.ListOption) ([]T, []string, error) {
+func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, _ func(T, PT, L, PL), cfg client.ObjectKey, opts ...client.ListOption) ([]T, error) {
 	var objList L
 	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	objs := make([]T, 0)
-	containers := cfgutil.NewSet()
 	items := toObjects[T, L, PL](&objList)
 	for i := range items {
 		obj := toResourceObject(&items[i])
 		if objs == nil {
-			return nil, nil, core.MakeError("failed to convert to resource object")
+			return nil, core.MakeError("failed to convert to resource object")
 		}
 		podTemplate := transformPodTemplate(obj)
 		if podTemplate == nil {
@@ -65,10 +63,9 @@ func retrieveRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject
 			})
 		if len(contains) > 0 {
 			objs = append(objs, items[i])
-			containers.Add(contains...)
 		}
 	}
-	return objs, containers.AsSlice(), nil
+	return objs, nil
 }
 
 func transformPodTemplate(obj client.Object) *corev1.PodTemplateSpec {

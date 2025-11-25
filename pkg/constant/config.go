@@ -19,8 +19,6 @@ package constant
 const (
 	ConfigManagerToolPath = "/bin/reloader"
 
-	// ConfigurationTplLabelPrefixKey clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
 	// CMInsLastReconfigurePhaseKey defines the current phase
@@ -62,8 +60,7 @@ const (
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
 
-	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
-	ConfigInstanceType    = "instance"
+	ConfigInstanceType = "instance"
 
 	ReconfigureManagerSource = "manager"
 	ReconfigureUserSource    = "ops"

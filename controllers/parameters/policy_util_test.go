@@ -22,7 +22,6 @@ package parameters
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/sethvargo/go-password/password"
 	"github.com/stretchr/testify/assert"
@@ -39,9 +38,9 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var (
@@ -222,26 +221,6 @@ func withReadyPod(rMin, rMax int) PodOptions {
 			Status: corev1.ConditionTrue,
 		})
 
-		pod.Status.Phase = corev1.PodRunning
-	}
-}
-
-func withAvailablePod(rMin, rMax int) PodOptions {
-	return func(pod *corev1.Pod, index int) {
-		if index < rMin || index >= rMax {
-			return
-		}
-
-		if pod.Status.Conditions == nil {
-			pod.Status.Conditions = make([]corev1.PodCondition, 0)
-		}
-
-		h, _ := time.ParseDuration("-1h")
-		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
-			Type:               corev1.PodReady,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.NewTime(time.Now().Add(h)),
-		})
 		pod.Status.Phase = corev1.PodRunning
 	}
 }

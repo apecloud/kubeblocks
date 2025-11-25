@@ -24,21 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/container"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-)
-
-type NotifyEventType int
-
-const (
-	UnixSignal NotifyEventType = iota // "signal"
-	WebHook                           // "http"
-	ShellTool                         // "exec"
-	SQL                               // "sql"
-	TPLScript                         // "tpl"
-	Comb                              // "comb"
 )
 
 const (
@@ -46,12 +32,6 @@ const (
 	configPodIPEnvName       = "CONFIG_MANAGER_POD_IP"
 	localhostAddress         = "127.0.0.1"
 )
-
-var allNotifyType = map[NotifyEventType]appsv1beta1.DynamicReloadType{
-	UnixSignal: appsv1beta1.UnixSignalType,
-	ShellTool:  appsv1beta1.ShellType,
-	TPLScript:  appsv1beta1.TPLScriptType,
-}
 
 func init() {
 	if err := viper.BindEnv(configPodIPEnvName); err != nil {
@@ -61,147 +41,54 @@ func init() {
 	viper.SetDefault(configPodIPEnvName, localhostAddress)
 }
 
-func (f *NotifyEventType) Type() string {
-	return "notifyType"
-}
-
-func (f *NotifyEventType) Set(val string) error {
-	for key, value := range allNotifyType {
-		if val == string(value) {
-			*f = key
-			return nil
-		}
-	}
-	return cfgcore.MakeError("not supported type[%s], required list: [%v]", val, allNotifyType)
-}
-
-func (f *NotifyEventType) String() string {
-	reloadType, ok := allNotifyType[*f]
-	if !ok {
-		return ""
-	}
-	return string(reloadType)
-}
-
-type ReconfigureServiceOptions struct {
+type serviceOptions struct {
 	GrpcPort int
 	PodIP    string
 
 	// EnableRemoteOnlineUpdate enables remote online update
 	RemoteOnlineUpdateEnable bool
-	// EnableContainerRuntime enables container runtime
-	ContainerRuntimeEnable bool
 
-	DebugMode        bool
-	ContainerRuntime cfgutil.CRIType
-	RuntimeEndpoint  string
-}
-
-type VolumeWatcherOpts struct {
-	VolumeDirs []string
-
-	// Exec command for reload
-	BackupPath string
+	DebugMode bool
 
 	LogLevel   string
 	CombConfig string
-
-	ServiceOpt ReconfigureServiceOptions
 }
 
-func NewVolumeWatcherOpts() *VolumeWatcherOpts {
-	return &VolumeWatcherOpts{
-		// for reconfigure options
-		ServiceOpt: ReconfigureServiceOptions{
-			GrpcPort:                 configManagerDefaultPort,
-			PodIP:                    viper.GetString(configPodIPEnvName),
-			ContainerRuntime:         cfgutil.AutoType,
-			DebugMode:                false,
-			ContainerRuntimeEnable:   false,
-			RemoteOnlineUpdateEnable: false,
-		},
-		LogLevel: "info",
+func newServiceOptions() *serviceOptions {
+	return &serviceOptions{
+		GrpcPort:                 configManagerDefaultPort,
+		PodIP:                    viper.GetString(configPodIPEnvName),
+		DebugMode:                false,
+		RemoteOnlineUpdateEnable: true,
+		LogLevel:                 "info",
 	}
 }
 
-func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
-	flags.StringArrayVar(&opt.VolumeDirs,
-		"volume-dir",
-		opt.VolumeDirs,
-		"the config map volume directory to be watched for updates; may be used multiple times.")
-
-	// flags.Var(&opt.NotifyHandType,
-	//	"notify-type",
-	//	"the config describes how to process notification messages.",
-	// )
-	//
-	// for signal handle
-	// flags.StringVar(&opt.ProcessName,
-	//	"process",
-	//	opt.ProcessName,
-	//	"the config describes what db program is.")
-	// flags.StringVar((*string)(&opt.Signal),
-	//	"signal",
-	//	string(opt.Signal),
-	//	"the config describes the reload unix signal.")
-	//
-	// for exec handle
-	// flags.StringVar(&opt.Command,
-	//	"command",
-	//	opt.Command,
-	//	"the config describes reload command. ")
-	//
-	// for exec tpl scripts
-	// flags.StringVar(&opt.TPLConfig,
-	//	"tpl-config",
-	//	opt.TPLConfig,
-	//	"the config describes reload behaviors by tpl script.")
-	// flags.StringVar(&opt.BackupPath,
-	//	"backup-path",
-	//	opt.BackupPath,
-	//	"the config describes backup path.")
-	// flags.StringVar(&opt.FileRegex,
-	//	"regex",
-	//	opt.FileRegex,
-	//	"the config sets filter config file.")
-
-	flags.StringVar(&opt.LogLevel,
+func installFlags(flags *pflag.FlagSet, opts *serviceOptions) {
+	flags.StringVar(&opts.LogLevel,
 		"log-level",
-		opt.LogLevel,
+		opts.LogLevel,
 		"the config sets log level. enum: [error, info, debug]")
-	flags.StringVar(&opt.ServiceOpt.PodIP,
+	flags.StringVar(&opts.PodIP,
 		"pod-ip",
-		opt.ServiceOpt.PodIP,
+		opts.PodIP,
 		"the config sets pod ip address.")
-	flags.IntVar(&opt.ServiceOpt.GrpcPort,
+	flags.IntVar(&opts.GrpcPort,
 		"tcp",
-		opt.ServiceOpt.GrpcPort,
+		opts.GrpcPort,
 		"the config sets service port.")
-	flags.BoolVar(&opt.ServiceOpt.DebugMode,
+	flags.BoolVar(&opts.DebugMode,
 		"debug",
-		opt.ServiceOpt.DebugMode,
+		opts.DebugMode,
 		"the config sets debug mode.")
-	flags.StringVar((*string)(&opt.ServiceOpt.ContainerRuntime),
-		"container-runtime",
-		string(opt.ServiceOpt.ContainerRuntime),
-		"the config sets cri runtime type.")
-	flags.StringVar(&opt.ServiceOpt.RuntimeEndpoint,
-		"runtime-endpoint",
-		opt.ServiceOpt.RuntimeEndpoint,
-		"the config sets cri runtime endpoint.")
 
-	flags.BoolVar(&opt.ServiceOpt.ContainerRuntimeEnable,
-		"cri-enable",
-		opt.ServiceOpt.ContainerRuntimeEnable,
-		"the config sets enable cri.")
-
-	flags.BoolVar(&opt.ServiceOpt.RemoteOnlineUpdateEnable,
+	flags.BoolVar(&opts.RemoteOnlineUpdateEnable,
 		"operator-update-enable",
-		opt.ServiceOpt.ContainerRuntimeEnable,
+		opts.RemoteOnlineUpdateEnable,
 		"the config sets enable operator update parameter.")
 
 	// for multi handler
-	flags.StringVar(&opt.CombConfig,
+	flags.StringVar(&opts.CombConfig,
 		"config",
 		"",
 		"the reload config.")

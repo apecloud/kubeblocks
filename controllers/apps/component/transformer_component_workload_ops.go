@@ -222,7 +222,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 	}
 
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		lifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+		lifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}
@@ -253,18 +253,18 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 		return nil
 	}
 
-	// replicas to be created
+	// replicas to be provisioned
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
-	if len(newReplicas) == 0 {
-		return nil
-	}
-
 	// replicas in provisioning that the data has not been loaded
 	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
 		return s.DataLoaded != nil && !*s.DataLoaded
 	})
 	if err != nil {
 		return err
+	}
+
+	if len(newReplicas) == 0 && len(provisioningReplicas) == 0 {
+		return nil
 	}
 
 	// the source replica
@@ -285,7 +285,7 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 		SynthesizeComponent: r.synthesizeComp,
 		Component:           r.component,
 	}
-	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
+	return createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {
@@ -387,7 +387,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
 	synthesizedComp := r.synthesizeComp
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}

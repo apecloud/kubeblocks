@@ -22,14 +22,14 @@ package parameters
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -57,8 +57,6 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 	Context("simple reconfigure policy test", func() {
 		It("Should success without error", func() {
-			Expect(simplePolicy.GetPolicyName()).Should(BeEquivalentTo("restart"))
-
 			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{

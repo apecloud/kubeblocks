@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 // ParameterReconciler reconciles a Parameter object
@@ -131,7 +132,7 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if intctrlutil.ParametersTerminalPhases(parameter.Status, parameter.Generation) {
+	if parameters.ParametersTerminalPhases(parameter.Status, parameter.Generation) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -173,7 +174,7 @@ func (r *ParameterReconciler) generateParameterTaskContext(
 					Namespace:     parameter.Namespace,
 					ClusterName:   parameter.Spec.ClusterName,
 					ComponentName: compName,
-				}, nil, cluster, "", nil))
+				}, nil, cluster, nil))
 		}
 	}
 	return rctxs, params, nil
@@ -265,7 +266,7 @@ func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bo
 	var finished = true
 
 	defer func() {
-		if finished && !intctrlutil.IsFailedPhase(parameterStatus.Phase) {
+		if finished && !parameters.IsFailedPhase(parameterStatus.Phase) {
 			parameterStatus.Phase = parametersv1alpha1.CFinishedPhase
 		}
 	}()

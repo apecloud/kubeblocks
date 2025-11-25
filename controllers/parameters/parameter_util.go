@@ -32,9 +32,9 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 type reconfigureReconcileHandle func(*ReconcileContext, *parametersv1alpha1.Parameter) error
@@ -42,7 +42,7 @@ type reconfigureReconcileHandle func(*ReconcileContext, *parametersv1alpha1.Para
 func updateComponentParameterStatus(configmaps map[string]*corev1.ConfigMap) func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 	return func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 		status := safeResolveComponentStatus(&parameter.Status, rctx.ComponentName)
-		if !intctrlutil.IsParameterFinished(status.Phase) {
+		if !parameters.IsParameterFinished(status.Phase) {
 			syncReconfiguringPhase(rctx, status, configmaps)
 		}
 		return nil
@@ -66,15 +66,15 @@ func syncReconfiguringPhase(rctx *ReconcileContext, status *parametersv1alpha1.C
 			return
 		}
 		cm := configmaps[parameterStatus.Name]
-		compSpec := intctrlutil.GetConfigTemplateItem(&rctx.ComponentParameterObj.Spec, parameterStatus.Name)
-		compStatus := intctrlutil.GetItemStatus(&rctx.ComponentParameterObj.Status, parameterStatus.Name)
+		compSpec := parameters.GetConfigTemplateItem(&rctx.ComponentParameterObj.Spec, parameterStatus.Name)
+		compStatus := parameters.GetItemStatus(&rctx.ComponentParameterObj.Status, parameterStatus.Name)
 		if compStatus == nil || compSpec == nil || cm == nil {
 			rctx.Log.Info("component status or spec not found", "component", parameterStatus.Name, "template", parameterStatus.Name)
 			continue
 		}
-		parameterStatus.Phase = intctrlutil.GetUpdatedParametersReconciledPhase(cm, *compSpec, compStatus)
+		parameterStatus.Phase = parameters.GetUpdatedParametersReconciledPhase(cm, *compSpec, compStatus)
 		if finished {
-			finished = intctrlutil.IsParameterFinished(parameterStatus.Phase)
+			finished = parameters.IsParameterFinished(parameterStatus.Phase)
 		}
 		if parameterStatus.Phase == parametersv1alpha1.CFailedAndPausePhase {
 			status.Phase = parametersv1alpha1.CFailedAndPausePhase
@@ -110,15 +110,15 @@ func mergeWithOverride(item *parametersv1alpha1.ConfigTemplateItemDetail, update
 func updateParameters(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 	var updated bool
 
-	compStatus := intctrlutil.GetParameterStatus(&parameter.Status, rctx.ComponentName)
-	if compStatus == nil || intctrlutil.IsParameterFinished(compStatus.Phase) {
+	compStatus := parameters.GetParameterStatus(&parameter.Status, rctx.ComponentName)
+	if compStatus == nil || parameters.IsParameterFinished(compStatus.Phase) {
 		return nil
 	}
 
 	patch := rctx.ComponentParameterObj.DeepCopy()
 	var item *parametersv1alpha1.ConfigTemplateItemDetail
 	for _, status := range compStatus.ParameterStatus {
-		if item = intctrlutil.GetConfigTemplateItem(&rctx.ComponentParameterObj.Spec, status.Name); item == nil {
+		if item = parameters.GetConfigTemplateItem(&rctx.ComponentParameterObj.Spec, status.Name); item == nil {
 			status.Phase = parametersv1alpha1.CMergeFailedPhase
 			continue
 		}
@@ -140,7 +140,7 @@ func updateParameters(rctx *ReconcileContext, parameter *parametersv1alpha1.Para
 }
 
 func updateCustomTemplates(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
-	component := intctrlutil.GetParameter(&parameter.Spec, rctx.ComponentName)
+	component := parameters.GetParameter(&parameter.Spec, rctx.ComponentName)
 	if component == nil || len(component.CustomTemplates) == 0 {
 		return nil
 	}
@@ -154,10 +154,10 @@ func updateCustomTemplates(rctx *ReconcileContext, parameter *parametersv1alpha1
 
 func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters, configmaps map[string]*corev1.ConfigMap) func(*ReconcileContext, *parametersv1alpha1.Parameter) error {
 	return func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
-		if !configctrl.HasValidParameterTemplate(rctx.ConfigRender) {
+		if !parameters.HasValidParameterTemplate(rctx.ConfigRender) {
 			return intctrlutil.NewFatalError(fmt.Sprintf("component[%s] does not support reconfigure", rctx.ComponentName))
 		}
-		classParameters, err := configctrl.ClassifyComponentParameters(updatedParameters,
+		classParameters, err := parameters.ClassifyComponentParameters(updatedParameters,
 			flatten(rctx.ParametersDefs),
 			rctx.ComponentDefObj.Spec.Configs,
 			configmaps,
@@ -167,7 +167,7 @@ func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters
 			return intctrlutil.NewFatalError(err.Error())
 		}
 		for tpl, m := range classParameters {
-			configDescs := intctrlutil.GetComponentConfigDescriptions(&rctx.ConfigRender.Spec, tpl)
+			configDescs := parameters.GetComponentConfigDescriptions(&rctx.ConfigRender.Spec, tpl)
 			if len(configDescs) == 0 {
 				return intctrlutil.NewFatalError(fmt.Sprintf("not found config description from pdcr: %s", tpl))
 			}
@@ -180,11 +180,11 @@ func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters
 	}
 }
 
-func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, parameters map[string]*parametersv1alpha1.ParametersInFile) error {
+func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, params map[string]*parametersv1alpha1.ParametersInFile) error {
 	if len(parametersDefs) == 0 || len(descs) == 0 {
 		return nil
 	}
-	_, err := configctrl.DoMerge(resolveBaseData(parameters), configctrl.DerefMapValues(parameters), parametersDefs, descs)
+	_, err := parameters.DoMerge(resolveBaseData(params), parameters.DerefMapValues(params), parametersDefs, descs)
 	return err
 }
 
@@ -205,7 +205,7 @@ func toArray(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) []*
 }
 
 func safeResolveComponentStatus(status *parametersv1alpha1.ParameterStatus, componentName string) *parametersv1alpha1.ComponentReconfiguringStatus {
-	compStatus := intctrlutil.GetParameterStatus(status, componentName)
+	compStatus := parameters.GetParameterStatus(status, componentName)
 	if compStatus != nil {
 		return compStatus
 	}
@@ -215,12 +215,12 @@ func safeResolveComponentStatus(status *parametersv1alpha1.ParameterStatus, comp
 			ComponentName: componentName,
 			Phase:         parametersv1alpha1.CInitPhase,
 		})
-	return intctrlutil.GetParameterStatus(status, componentName)
+	return parameters.GetParameterStatus(status, componentName)
 }
 
 func safeResolveComponentParameterStatus(status *parametersv1alpha1.ParameterStatus, componentName string, tpl string) *parametersv1alpha1.ReconfiguringStatus {
 	compStatus := safeResolveComponentStatus(status, componentName)
-	parameterStatus := intctrlutil.GetParameterReconfiguringStatus(compStatus, tpl)
+	parameterStatus := parameters.GetParameterReconfiguringStatus(compStatus, tpl)
 	if parameterStatus != nil {
 		return parameterStatus
 	}
@@ -231,12 +231,12 @@ func safeResolveComponentParameterStatus(status *parametersv1alpha1.ParameterSta
 				Name: tpl,
 			},
 		})
-	return intctrlutil.GetParameterReconfiguringStatus(compStatus, tpl)
+	return parameters.GetParameterReconfiguringStatus(compStatus, tpl)
 }
 
 func safeUpdateComponentParameterStatus(status *parametersv1alpha1.ParameterStatus, componentName string, tpl string, updatedParams map[string]*parametersv1alpha1.ParametersInFile) {
 	parameterStatus := safeResolveComponentParameterStatus(status, componentName, tpl)
-	parameterStatus.UpdatedParameters = configctrl.DerefMapValues(updatedParams)
+	parameterStatus.UpdatedParameters = parameters.DerefMapValues(updatedParams)
 }
 
 func flatten(parametersDefs map[string]*parametersv1alpha1.ParametersDefinition) []*parametersv1alpha1.ParametersDefinition {
@@ -273,7 +273,7 @@ func prepareResources(rctx *ReconcileContext, _ *parametersv1alpha1.Parameter) e
 func syncComponentParameterStatus(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 	syncConfigTemplateStatus := func(status *parametersv1alpha1.ComponentReconfiguringStatus, compParamStatus *parametersv1alpha1.ComponentParameterStatus) {
 		for i, parameterStatus := range status.ParameterStatus {
-			itemStatus := intctrlutil.GetItemStatus(compParamStatus, parameterStatus.Name)
+			itemStatus := parameters.GetItemStatus(compParamStatus, parameterStatus.Name)
 			if itemStatus != nil {
 				status.ParameterStatus[i].ConfigTemplateItemDetailStatus = *itemStatus
 			}

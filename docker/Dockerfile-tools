@@ -64,6 +64,7 @@ ARG APK_MIRROR
 # install tools via apk
 ENV APK_MIRROR=${APK_MIRROR}
 RUN if [ -n "${APK_MIRROR}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRROR}/g" /etc/apk/repositories; fi
+# curl is used to send certain requests, such as reload in config-manager.
 RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
     && rm -rf /var/cache/apk/*
 

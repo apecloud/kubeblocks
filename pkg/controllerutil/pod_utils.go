@@ -68,62 +68,6 @@ func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.Co
 	return nil
 }
 
-// GetVolumeMountName finds the volume with mount name
-func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
-	for i := range volumes {
-		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
-			return &volumes[i]
-		}
-		if volumes[i].Projected == nil {
-			continue
-		}
-		for j := range volumes[i].Projected.Sources {
-			if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
-				return &volumes[i]
-			}
-		}
-	}
-	return nil
-}
-
-type containerNameFilter func(containerName string) bool
-
-func GetContainersByConfigmap(containers []corev1.Container, volumeName string, cmName string, filters ...containerNameFilter) []string {
-	containerFilter := func(c corev1.Container) bool {
-		for _, f := range filters {
-			if (len(c.VolumeMounts) == 0 && len(c.EnvFrom) == 0) ||
-				f(c.Name) {
-				return true
-			}
-		}
-		return false
-	}
-
-	tmpList := make([]string, 0, len(containers))
-	for _, c := range containers {
-		if containerFilter(c) {
-			continue
-		}
-		for _, vm := range c.VolumeMounts {
-			if vm.Name == volumeName {
-				tmpList = append(tmpList, c.Name)
-				goto breakHere
-			}
-		}
-		if cmName == "" {
-			continue
-		}
-		for _, source := range c.EnvFrom {
-			if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
-				tmpList = append(tmpList, c.Name)
-				break
-			}
-		}
-	breakHere:
-	}
-	return tmpList
-}
-
 func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	if len(containers) == 0 {
 		return nil

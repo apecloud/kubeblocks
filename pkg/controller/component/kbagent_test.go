@@ -366,16 +366,16 @@ var _ = Describe("kb-agent", func() {
 					ComponentFileTemplate: appsv1.ComponentFileTemplate{
 						Name:     "log.conf",
 						Template: "default",
-					},
-					Reconfigure: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Env: []corev1.EnvVar{
-								{
-									Name:  "LOG_CONF_PATH",
-									Value: "/var/run/log.conf",
+						Reconfigure: &appsv1.Action{
+							Exec: &appsv1.ExecAction{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "LOG_CONF_PATH",
+										Value: "/var/run/log.conf",
+									},
 								},
+								Command: []string{"echo", "reconfigure"},
 							},
-							Command: []string{"echo", "reconfigure"},
 						},
 					},
 				},
@@ -384,16 +384,16 @@ var _ = Describe("kb-agent", func() {
 						Name:            "server.conf",
 						Template:        "default",
 						ExternalManaged: ptr.To(true),
-					},
-					Reconfigure: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Env: []corev1.EnvVar{
-								{
-									Name:  "SERVER_CONF_PATH",
-									Value: "/var/run/server.conf",
+						Reconfigure: &appsv1.Action{
+							Exec: &appsv1.ExecAction{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "SERVER_CONF_PATH",
+										Value: "/var/run/server.conf",
+									},
 								},
+								Command: []string{"echo", "reconfigure"},
 							},
-							Command: []string{"echo", "reconfigure"},
 						},
 					},
 				},

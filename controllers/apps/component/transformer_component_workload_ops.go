@@ -453,7 +453,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			action     *appsv1.Action
 			actionName string
 		)
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+		if ptr.Deref(tpl.ExternalManaged, false) {
 			if tpl.Reconfigure == nil {
 				return // disabled by the external system
 			}

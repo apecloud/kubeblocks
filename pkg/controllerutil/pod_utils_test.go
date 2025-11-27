@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -286,20 +285,6 @@ var _ = Describe("pod utils", func() {
 		})
 	})
 
-	// for test GetContainerWithVolumeMount
-	Context("GetVolumeMountName test", func() {
-		It("Should succeed with no error", func() {
-			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")
-			Expect(volume).NotTo(BeNil())
-			Expect(volume.Name).To(Equal("config1"))
-
-			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")).To(Equal(&pod.Spec.Volumes[0]))
-		})
-		It("Should fail", func() {
-			Expect(GetVolumeMountName(pod.Spec.Volumes, "not_exist_resource")).To(BeNil())
-		})
-	})
-
 	// for test MemorySize or CoreNum
 	Context("Get Resource test", func() {
 		It("Resource exists limit", func() {
@@ -408,70 +393,6 @@ var _ = Describe("pod utils", func() {
 		It("Resource not request", func() {
 			pvcTpl := corev1.PersistentVolumeClaimTemplate{}
 			Expect(GetStorageSizeFromPersistentVolume(pvcTpl)).To(BeEquivalentTo(-1))
-		})
-	})
-
-	Context("common funcs test", func() {
-		It("GetContainersByConfigmap Should succeed with no error", func() {
-			type args struct {
-				containers []corev1.Container
-				volumeName string
-				envFrom    string
-				filters    []containerNameFilter
-			}
-			tests := []struct {
-				name string
-				args args
-				want []string
-			}{{
-				name: "test1",
-				args: args{
-					containers: pod.Spec.Containers,
-					volumeName: "config1",
-				},
-				want: []string{"mysql", "mysql2"},
-			}, {
-				name: "test1",
-				args: args{
-					containers: pod.Spec.Containers,
-					volumeName: "config1",
-					filters: []containerNameFilter{
-						func(name string) bool {
-							return name != "mysql"
-						},
-					},
-				},
-				want: []string{"mysql"},
-			}, {
-				name: "test1",
-				args: args{
-					containers: pod.Spec.Containers,
-					volumeName: "config2",
-					filters: []containerNameFilter{
-						func(name string) bool {
-							return strings.HasPrefix(name, "mysql")
-						},
-					},
-				},
-				want: []string{},
-			}, {
-				name: "test_env",
-				args: args{
-					containers: pod.Spec.Containers,
-					volumeName: "not-config2",
-					envFrom:    "test-config-env",
-					filters: []containerNameFilter{
-						func(name string) bool {
-							return false
-						},
-					},
-				},
-				want: []string{"mysql3", "mysql4"},
-			}}
-			for _, tt := range tests {
-				Expect(GetContainersByConfigmap(tt.args.containers, tt.args.volumeName, tt.args.envFrom, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
-			}
-
 		})
 	})
 

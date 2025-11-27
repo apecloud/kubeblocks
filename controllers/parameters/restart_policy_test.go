@@ -58,7 +58,6 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 	Context("simple reconfigure policy test", func() {
 		It("Should success without error", func() {
 			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
-				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
@@ -86,14 +85,14 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2)),
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock pod-1 restart
 						if index == 1 {
 							updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 						}
 					})),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock all pod restart
 						updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 					})),
@@ -131,7 +130,6 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 	Context("simple reconfigure policy test with Replication", func() {
 		It("Should success", func() {
 			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
-				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
@@ -140,8 +138,8 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2,
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2)),
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2,
 						withReadyPod(0, 2), func(pod *corev1.Pod, _ int) {
 							updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 						})),
@@ -173,12 +171,10 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 		})
 	})
 
-	// TODO(component)
 	Context("simple reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
-				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
@@ -191,14 +187,14 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2)),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2)),
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock pod-1 restart
 						if index == 1 {
 							updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 						}
 					})),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
 						// mock all pod restart
 						updatePodCfgVersion(pod, mockParam.generateConfigIdentifier(), mockParam.getTargetVersionHash())
 					})),
@@ -247,24 +243,4 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 
 		})
 	})
-
-	// Context("simple reconfigure policy test without not configmap volume", func() {
-	//	It("Should failed", func() {
-	//		// mock not cc
-	//		mockParam := newMockReconfigureParams("restartPolicy", nil,
-	//			withMockInstanceSet(2, nil),
-	//			withConfigSpec("not_tpl_name", map[string]string{
-	//				"key": "value",
-	//			}),
-	//			withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
-	//				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-	//					Name:       "for_test",
-	//					VolumeName: "test_volume",
-	//				}}}))
-	//		status, err := restartPolicy.Upgrade(mockParam)
-	//		Expect(err).ShouldNot(Succeed())
-	//		Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))
-	//		Expect(status.Status).Should(BeEquivalentTo(ESFailed))
-	//	})
-	// })
 })

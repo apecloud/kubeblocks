@@ -50,7 +50,6 @@ import (
 const (
 	configReconcileInterval                 = time.Second * 1
 	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
-	configurationNotUsingMessage            = "the configmap is not used by any container, skip reconfigure"
 	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
 )
 
@@ -193,12 +192,6 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	if rctx.ClusterComObj == nil {
 		reqCtx.Log.Info("not found component.")
 		return intctrlutil.Reconciled()
-	}
-
-	if len(rctx.InstanceSetList) == 0 {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
-			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, parametersv1alpha1.CFinishedPhase, configurationNotUsingMessage)
 	}
 
 	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.ConfigRender, rctx.ParametersDefs)

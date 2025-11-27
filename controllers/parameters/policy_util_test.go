@@ -23,13 +23,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/sethvargo/go-password/password"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +34,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -45,44 +41,8 @@ import (
 
 var (
 	defaultNamespace = "default"
-	itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.InstanceSetKind)
+	// itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.InstanceSetKind)
 )
-
-func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {
-	uid, _ := password.Generate(12, 12, 0, true, false)
-	return workloads.InstanceSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       workloads.InstanceSetKind,
-			APIVersion: workloads.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: defaultNamespace,
-			UID:       types.UID(uid),
-		},
-		Spec: workloads.InstanceSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{},
-					Volumes: []corev1.Volume{{
-						Name: "for_test",
-						VolumeSource: corev1.VolumeSource{
-							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/tmp",
-							},
-						}}},
-				},
-			},
-		},
-	}
-}
 
 func newMockRunningComponent() *appsv1.Component {
 	return &appsv1.Component{
@@ -92,19 +52,9 @@ func newMockRunningComponent() *appsv1.Component {
 	}
 }
 
-type ParamsOps func(params *reconfigureContext)
+type paramsOps func(params *reconfigureContext)
 
-func withMockInstanceSet(replicas int, labels map[string]string) ParamsOps {
-	return func(params *reconfigureContext) {
-		rand, _ := password.Generate(12, 8, 0, true, false)
-		itsName := "test_" + rand
-		params.InstanceSetUnits = []workloads.InstanceSet{
-			newMockInstanceSet(replicas, itsName, labels),
-		}
-	}
-}
-
-func withClusterComponent(replicas int) ParamsOps {
+func withClusterComponent(replicas int) paramsOps {
 	return func(params *reconfigureContext) {
 		params.ClusterComponent = &appsv1.ClusterComponentSpec{
 			Name:     "test",
@@ -113,7 +63,7 @@ func withClusterComponent(replicas int) ParamsOps {
 	}
 }
 
-func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
+func withConfigSpec(configSpecName string, data map[string]string) paramsOps {
 	return func(params *reconfigureContext) {
 		params.ConfigMap = &corev1.ConfigMap{
 			Data: data,
@@ -122,7 +72,7 @@ func withConfigSpec(configSpecName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withConfigDescription(formatter *parametersv1alpha1.FileFormatConfig) ParamsOps {
+func withConfigDescription(formatter *parametersv1alpha1.FileFormatConfig) paramsOps {
 	return func(params *reconfigureContext) {
 		params.ConfigDescription = &parametersv1alpha1.ComponentConfigDescription{
 			Name:             "for-test",
@@ -131,19 +81,19 @@ func withConfigDescription(formatter *parametersv1alpha1.FileFormatConfig) Param
 	}
 }
 
-func withUpdatedParameters(patch *core.ConfigPatchInfo) ParamsOps {
+func withUpdatedParameters(patch *core.ConfigPatchInfo) paramsOps {
 	return func(params *reconfigureContext) {
 		params.Patch = patch
 	}
 }
 
-func withParamDef(pd *parametersv1alpha1.ParametersDefinitionSpec) ParamsOps {
+func withParamDef(pd *parametersv1alpha1.ParametersDefinitionSpec) paramsOps {
 	return func(params *reconfigureContext) {
 		params.ParametersDef = pd
 	}
 }
 
-func newMockReconfigureParams(testName string, cli client.Client, paramOps ...ParamsOps) reconfigureContext {
+func newMockReconfigureParams(testName string, cli client.Client, paramOps ...paramsOps) reconfigureContext {
 	params := reconfigureContext{
 		Client: cli,
 		RequestCtx: intctrlutil.RequestCtx{
@@ -152,6 +102,19 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 			Recorder: record.NewFakeRecorder(100),
 		},
 		SynthesizedComponent: &component.SynthesizedComponent{
+			Namespace:   defaultNamespace,
+			ClusterName: "test",
+			Name:        "test",
+			PodSpec: &corev1.PodSpec{
+				Containers: []corev1.Container{},
+				Volumes: []corev1.Volume{{
+					Name: "for_test",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: "/tmp",
+						},
+					}}},
+			},
 			MinReadySeconds: 5,
 			Roles: []appsv1.ReplicaRole{
 				{
@@ -184,11 +147,11 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 	return params
 }
 
-func newMockPodsWithInstanceSet(its *workloads.InstanceSet, replicas int, options ...PodOptions) []corev1.Pod {
+func newMockPodsWitheContext(ctx reconfigureContext, replicas int, options ...PodOptions) []corev1.Pod {
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
-		pods[i] = newMockPod(its.Name+"-"+fmt.Sprint(i), &its.Spec.Template.Spec)
-		pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, itsSchemaKind)}
+		pods[i] = newMockPod(ctx.SynthesizedComponent.Name+"-"+fmt.Sprint(i), ctx.SynthesizedComponent.PodSpec)
+		// pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, itsSchemaKind)}
 		pods[i].Status.PodIP = "1.1.1.1"
 	}
 	for _, customFn := range options {
@@ -227,17 +190,17 @@ func fromPodObjectList(pods []corev1.Pod) []runtime.Object {
 	return objs
 }
 
-func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.OwnerReference {
-	bRefFn := func(b bool) *bool { return &b }
-	return metav1.OwnerReference{
-		APIVersion:         gvk.GroupVersion().String(),
-		Kind:               gvk.Kind,
-		Name:               owner.GetName(),
-		UID:                owner.GetUID(),
-		Controller:         bRefFn(true),
-		BlockOwnerDeletion: bRefFn(false),
-	}
-}
+// func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.OwnerReference {
+//	bRefFn := func(b bool) *bool { return &b }
+//	return metav1.OwnerReference{
+//		APIVersion:         gvk.GroupVersion().String(),
+//		Kind:               gvk.Kind,
+//		Name:               owner.GetName(),
+//		UID:                owner.GetUID(),
+//		Controller:         bRefFn(true),
+//		BlockOwnerDeletion: bRefFn(false),
+//	}
+// }
 
 type PodOptions func(pod *corev1.Pod, index int)
 

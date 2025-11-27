@@ -38,10 +38,6 @@ func init() {
 func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	rctx.Log.V(1).Info("simple policy begin....")
 
-	return s.restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs())
-}
-
-func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	var (
 		newVersion = rctx.getTargetVersionHash()
 		configKey  = rctx.generateConfigIdentifier()
@@ -50,17 +46,17 @@ func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs
 		progress  = core.NotStarted
 	)
 
-	if err := funcs.RestartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, rctx.Cluster, rctx.ClusterComponent.Name); err != nil {
+	if err := restartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, rctx.Cluster, rctx.ClusterComponent.Name); err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
-	pods, err := funcs.GetPodsFunc(rctx)
+	pods, err := getPodsForOnlineUpdate(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	if len(pods) != 0 {
-		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
+		progress = checkReconfigureUpdateProgress(pods, configKey, newVersion)
 	}
 
 	if len(pods) == int(progress) {

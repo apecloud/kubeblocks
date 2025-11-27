@@ -35,21 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-// GetComponentPods gets all pods of the component.
-func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {
-	componentPods := make([]corev1.Pod, 0)
-	for i := range params.InstanceSetUnits {
-		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx, params.Client, &params.InstanceSetUnits[i])
-		if err != nil {
-			return nil, err
-		}
-		componentPods = append(componentPods, pods...)
-	}
-	return componentPods, nil
-}
-
-// CheckReconfigureUpdateProgress checks pods of the component is ready.
-func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
+func checkReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
 	var (
 		readyPods        int32 = 0
 		cfgAnnotationKey       = core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
@@ -65,27 +51,27 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 }
 
 func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
-	if len(params.InstanceSetUnits) > 1 {
-		return nil, core.MakeError("component require only one InstanceSet, actual %d components", len(params.InstanceSetUnits))
-	}
-
-	if len(params.InstanceSetUnits) == 0 {
-		return nil, nil
-	}
-
-	pods, err := GetComponentPods(params)
-	if err != nil {
+	var (
+		ctx     = params.Ctx
+		cli     = params.Client
+		podList = &corev1.PodList{}
+		opts    = []client.ListOption{
+			client.InNamespace(params.SynthesizedComponent.Namespace),
+			client.MatchingLabels(constant.GetCompLabels(params.SynthesizedComponent.ClusterName, params.SynthesizedComponent.Name)),
+		}
+	)
+	if err := cli.List(ctx, podList, opts...); err != nil {
 		return nil, err
 	}
 
 	if params.SynthesizedComponent != nil {
 		instanceset.SortPods(
-			pods,
+			podList.Items,
 			instanceset.ComposeRolePriorityMap(params.SynthesizedComponent.Roles),
 			true,
 		)
 	}
-	return pods, nil
+	return podList.Items, nil
 }
 
 func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, configSpec string, configFile string, updatedParams map[string]string) error {
@@ -235,21 +221,21 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 }
 
 func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
-	reCtx := reconfigureContext{
-		RequestCtx:           rctx.RequestCtx,
-		Client:               rctx.Client,
-		ConfigTemplate:       *templateSpec,
-		ConfigMap:            rctx.ConfigMap,
-		ParametersDef:        &pd.Spec,
-		ConfigDescription:    configDescription,
-		Cluster:              rctx.ClusterObj,
-		InstanceSetUnits:     rctx.InstanceSetList,
-		ClusterComponent:     rctx.ClusterComObj,
-		SynthesizedComponent: rctx.BuiltinComponent,
-		Patch:                patch,
+	return reconfigureTask{
+		ReloadPolicy: reloadPolicy,
+		taskCtx: reconfigureContext{
+			RequestCtx:           rctx.RequestCtx,
+			Client:               rctx.Client,
+			ConfigTemplate:       *templateSpec,
+			ConfigMap:            rctx.ConfigMap,
+			ParametersDef:        &pd.Spec,
+			ConfigDescription:    configDescription,
+			Cluster:              rctx.ClusterObj,
+			ClusterComponent:     rctx.ClusterComObj,
+			SynthesizedComponent: rctx.BuiltinComponent,
+			Patch:                patch,
+		},
 	}
-
-	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}
 }
 
 func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) reconfigureTask {
@@ -262,7 +248,6 @@ func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *Reconc
 			ClusterComponent:     rctx.ClusterComObj,
 			Cluster:              rctx.ClusterObj,
 			SynthesizedComponent: rctx.BuiltinComponent,
-			InstanceSetUnits:     rctx.InstanceSetList,
 			ConfigMap:            rctx.ConfigMap,
 		},
 	}

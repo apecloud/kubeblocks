@@ -53,7 +53,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 		It("Should success without error", func() {
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
 				withUpdatedParameters(&core.ConfigPatchInfo{
@@ -71,9 +70,9 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 3,
 						withReadyPod(0, 1))),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 3,
 						withReadyPod(0, 3))),
 				}),
 				testutil.WithAnyTimes()))
@@ -100,7 +99,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 		It("Should success without error", func() {
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
 				withUpdatedParameters(&core.ConfigPatchInfo{
@@ -125,7 +123,7 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
+					fromPodObjectList(newMockPodsWitheContext(mockParam, 3,
 						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
 							if index == 0 {
 								if pod.Labels == nil {

@@ -48,30 +48,14 @@ func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 		return makeReturnedStatus(ESNone), nil
 	}
 
-	funcs := GetInstanceSetRollingUpgradeFuncs()
-	pods, err := funcs.GetPodsFunc(rctx)
+	pods, err := getPodsForOnlineUpdate(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
-	return sync(rctx, updatedParameters, pods, funcs)
+	return o.sync(rctx, updatedParameters, pods)
 }
 
-func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
-	var result []corev1.Pod
-
-	match, err := metav1.LabelSelectorAsSelector(selector)
-	if err != nil {
-		return nil, core.WrapError(err, "failed to convert selector: %v", selector)
-	}
-	for _, pod := range pods {
-		if match.Matches(labels.Set(pod.Labels)) {
-			result = append(result, pod)
-		}
-	}
-	return result, nil
-}
-
-func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (returnedStatus, error) {
+func (o *syncPolicy) sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod) (returnedStatus, error) {
 	var (
 		r        = ESNone
 		total    = int32(len(pods))
@@ -87,7 +71,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 	)
 
 	if selector != nil {
-		pods, err = matchLabel(pods, selector)
+		pods, err = o.matchLabel(pods, selector)
 	}
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
@@ -110,10 +94,10 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 		if !intctrlutil.IsPodReady(&pod) {
 			continue
 		}
-		if err = funcs.OnlineUpdatePodFunc(&pod, ctx, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {
+		if err = commonOnlineUpdateWithPod(&pod, ctx, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		if err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, rctx.Client, ctx); err != nil {
+		if err = o.updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, rctx.Client, ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		progress++
@@ -125,7 +109,21 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func updatePodLabelsWithConfigVersion(pod *corev1.Pod, labelKey, configVersion string, cli client.Client, ctx context.Context) error {
+func (o *syncPolicy) matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
+	var result []corev1.Pod
+	match, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return nil, core.WrapError(err, "failed to convert selector: %v", selector)
+	}
+	for _, pod := range pods {
+		if match.Matches(labels.Set(pod.Labels)) {
+			result = append(result, pod)
+		}
+	}
+	return result, nil
+}
+
+func (o *syncPolicy) updatePodLabelsWithConfigVersion(pod *corev1.Pod, labelKey, configVersion string, cli client.Client, ctx context.Context) error {
 	patch := client.MergeFrom(pod.DeepCopy())
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string, 1)

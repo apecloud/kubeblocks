@@ -50,9 +50,9 @@ func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec
 }
 
 func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.ComponentSpecs {
+	for i, v := range r.ComponentSpecs {
 		if v.Name == componentName {
-			return &v
+			return &r.ComponentSpecs[i]
 		}
 	}
 	return nil

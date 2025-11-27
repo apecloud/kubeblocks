@@ -610,6 +610,9 @@ spec:
                       description: Variables are key-value pairs for dynamic configuration
                         values that can be provided by the user.
                       type: object
+                    versionHash:
+                      description: The versioned hash of the config content.
+                      type: string
                   type: object
                 type: array
               disableExporter:

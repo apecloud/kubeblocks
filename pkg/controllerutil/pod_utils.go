@@ -25,15 +25,13 @@ import (
 	"strings"
 	"time"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -162,17 +160,6 @@ func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodCondition
 		}
 	}
 	return nil
-}
-
-func IsMatchConfigVersion(obj client.Object, labelKey string, version string) bool {
-	labels := obj.GetLabels()
-	if len(labels) == 0 {
-		return false
-	}
-	if lastVersion, ok := labels[labelKey]; ok && lastVersion == version {
-		return true
-	}
-	return false
 }
 
 func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {

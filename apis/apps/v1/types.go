@@ -502,6 +502,11 @@ type ClusterComponentConfig struct {
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`
 
+	// The versioned hash of the config content.
+	//
+	// +optional
+	VersionHash string `json:"versionHash,omitempty"`
+
 	// The custom reconfigure action to reload the configuration whenever changes to this config are detected.
 	//
 	// The container executing this action has access to following variables:

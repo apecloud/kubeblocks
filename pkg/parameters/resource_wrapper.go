@@ -39,6 +39,7 @@ type ResourceFetcher[T any] struct {
 	*render.ResourceCtx
 
 	ClusterObj      *appsv1.Cluster
+	ClusterObjCopy  *appsv1.Cluster
 	ComponentObj    *appsv1.Component
 	ComponentDefObj *appsv1.ComponentDefinition
 	ClusterComObj   *appsv1.ClusterComponentSpec
@@ -63,13 +64,18 @@ func (r *ResourceFetcher[T]) Wrap(fn func() error) (ret *T) {
 }
 
 func (r *ResourceFetcher[T]) Cluster() *T {
-	clusterKey := client.ObjectKey{
-		Namespace: r.Namespace,
-		Name:      r.ClusterName,
-	}
 	return r.Wrap(func() error {
-		r.ClusterObj = &appsv1.Cluster{}
-		return r.Client.Get(r.Context, clusterKey, r.ClusterObj)
+		clusterKey := client.ObjectKey{
+			Namespace: r.Namespace,
+			Name:      r.ClusterName,
+		}
+		cluster := &appsv1.Cluster{}
+		err := r.Client.Get(r.Context, clusterKey, cluster)
+		if err == nil {
+			r.ClusterObj = cluster
+			r.ClusterObjCopy = r.ClusterObj.DeepCopy()
+		}
+		return err
 	})
 }
 

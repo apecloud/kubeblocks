@@ -2823,6 +2823,18 @@ ignoring the default template and update behavior.</p>
 </tr>
 <tr>
 <td>
+<code>versionHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The versioned hash of the config content.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reconfigure</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -32259,7 +32271,20 @@ int64
 </em>
 </td>
 <td>
-<p>The generation of the config.</p>
+<em>(Optional)</em>
+<p>The generation of the config content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>versionHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The versioned hash of the config content.</p>
 </td>
 </tr>
 <tr>
@@ -32426,7 +32451,20 @@ int64
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The generation of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>versionHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The hash of the config content.</p>
 </td>
 </tr>
 </tbody>

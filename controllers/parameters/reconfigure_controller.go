@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -234,26 +235,44 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 }
 
 func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
-	var err error
-	var returnedStatus returnedStatus
-	var reloadType string
-
+	var (
+		err        error
+		status     returnedStatus
+		reloadType string
+	)
 	for _, task := range reloadTasks {
 		reloadType = task.ReloadType()
-		returnedStatus, err = task.ExecReload()
-		if err != nil || returnedStatus.Status != ESNone {
-			return r.status(rctx, returnedStatus, reloadType, err)
+		status, err = task.ExecReload()
+		if err != nil || status.Status != ESNone {
+			break
 		}
 	}
-	return r.succeed(rctx, reloadType, returnedStatus)
+	// submit changes to the cluster
+	if err1 := r.submit(rctx); err1 != nil {
+		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit changes to the cluster", "error", err1)
+	}
+	if err != nil || status.Status != ESNone {
+		return r.status(rctx, reloadType, status, err)
+	}
+	return r.succeed(rctx, reloadType, status)
 }
 
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus returnedStatus, policy string, err error) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) submit(rctx *ReconcileContext) error {
+	if rctx.ClusterObj == nil || rctx.ClusterObjCopy == nil {
+		return fmt.Errorf("the cluster object is nil")
+	}
+	if reflect.DeepEqual(rctx.ClusterObj.Spec, rctx.ClusterObjCopy.Spec) {
+		return nil
+	}
+	return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
+}
+
+func (r *ReconfigureReconciler) status(rctx *ReconcileContext, reloadType string, status returnedStatus, err error) (ctrl.Result, error) {
 	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
-		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(returnedStatus, policy, phase, options...))
+		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(status, reloadType, phase, options...))
 	}
 
-	switch returnedStatus.Status {
+	switch status.Status {
 	case ESFailedAndRetry:
 		return updatePhase(parametersv1alpha1.CFailedPhase, withFailed(err, true))
 	case ESRetry:
@@ -261,19 +280,19 @@ func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus re
 	case ESFailed:
 		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
 	case ESNone:
-		return r.succeed(rctx, policy, returnedStatus)
+		return r.succeed(rctx, reloadType, status)
 	default:
 		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(cfgcore.MakeError("unknown status"), false))
 	}
 }
 
-func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus returnedStatus) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, status returnedStatus) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,
 		"the reconfigure[%s] has been processed successfully",
 		reloadType)
 
-	result := reconciled(returnedStatus, reloadType, parametersv1alpha1.CFinishedPhase)
+	result := reconciled(status, reloadType, parametersv1alpha1.CFinishedPhase)
 	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, reloadType, &result)
 }

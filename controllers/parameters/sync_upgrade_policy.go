@@ -20,16 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"context"
 	"fmt"
+	"slices"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/utils/ptr"
 
+	apisappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
@@ -43,91 +41,87 @@ func init() {
 }
 
 func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
-	updatedParameters := generateOnlineUpdateParams(rctx.Patch, rctx.ParametersDef, *rctx.ConfigDescription)
-	if len(updatedParameters) == 0 {
+	updateParams := o.updateParameters(rctx)
+	if len(updateParams) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
-
-	pods, err := getPodsForOnlineUpdate(rctx)
-	if err != nil {
-		return makeReturnedStatus(ESFailedAndRetry), err
-	}
-	return o.sync(rctx, updatedParameters, pods)
+	return o.sync(rctx, updateParams)
 }
 
-func (o *syncPolicy) sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod) (returnedStatus, error) {
+func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string {
 	var (
-		r        = ESNone
-		total    = int32(len(pods))
-		replicas = int32(rctx.getTargetReplicas())
-		progress = core.NotStarted
-
-		err         error
-		ctx         = rctx.Ctx
-		configKey   = rctx.generateConfigIdentifier()
-		versionHash = rctx.getTargetVersionHash()
-		selector    = parameters.GetPodSelector(rctx.ParametersDef)
-		fileName    string
+		paramDef               = rctx.ParametersDef
+		dynamicAction          = parameters.NeedDynamicReloadAction(paramDef)
+		needReloadStaticParams = parameters.ReloadStaticParameters(paramDef)
+		visualizedParams       = core.GenerateVisualizedParamsList(rctx.Patch,
+			[]parametersv1alpha1.ComponentConfigDescription{*rctx.ConfigDescription})
 	)
-
-	if selector != nil {
-		pods, err = o.matchLabel(pods, selector)
-	}
-	if err != nil {
-		return makeReturnedStatus(ESFailedAndRetry), err
-	}
-	if len(pods) == 0 {
-		rctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
-		return makeReturnedStatus(ESRetry), nil
-	}
-	if rctx.ConfigDescription != nil {
-		fileName = rctx.ConfigDescription.Name
-	}
-
-	requireUpdatedCount := int32(len(pods))
-	for _, pod := range pods {
-		rctx.Log.V(1).Info(fmt.Sprintf("sync pod: %s", pod.Name))
-		if intctrlutil.IsMatchConfigVersion(&pod, configKey, versionHash) {
-			progress++
+	params := make(map[string]string)
+	for _, key := range visualizedParams {
+		if key.UpdateType != core.UpdatedType {
 			continue
 		}
-		if !intctrlutil.IsPodReady(&pod) {
-			continue
+		for _, p := range key.Parameters {
+			if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
+				continue
+			}
+			if p.Value != nil {
+				params[p.Key] = *p.Value
+			}
 		}
-		if err = commonOnlineUpdateWithPod(&pod, ctx, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {
-			return makeReturnedStatus(ESFailedAndRetry), err
-		}
-		if err = o.updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, rctx.Client, ctx); err != nil {
-			return makeReturnedStatus(ESFailedAndRetry), err
-		}
-		progress++
 	}
-
-	if requireUpdatedCount != progress || replicas != total {
-		r = ESRetry
-	}
-	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
+	return params
 }
 
-func (o *syncPolicy) matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
-	var result []corev1.Pod
-	match, err := metav1.LabelSelectorAsSelector(selector)
-	if err != nil {
-		return nil, core.WrapError(err, "failed to convert selector: %v", selector)
-	}
-	for _, pod := range pods {
-		if match.Matches(labels.Set(pod.Labels)) {
-			result = append(result, pod)
+func (o *syncPolicy) sync(rctx reconfigureContext, parameters map[string]string) (returnedStatus, error) {
+	var config *apisappsv1.ClusterComponentConfig
+	for i, cfg := range rctx.ClusterComponent.Configs {
+		if ptr.Deref(cfg.Name, "") == rctx.ConfigTemplate.Name {
+			config = &rctx.ClusterComponent.Configs[i]
+			break
 		}
 	}
-	return result, nil
+	if config == nil {
+		return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
+	}
+	if config.VersionHash != rctx.getTargetVersionHash() {
+		return o.update(rctx, config, parameters), nil
+	}
+	return o.status(rctx), nil
 }
 
-func (o *syncPolicy) updatePodLabelsWithConfigVersion(pod *corev1.Pod, labelKey, configVersion string, cli client.Client, ctx context.Context) error {
-	patch := client.MergeFrom(pod.DeepCopy())
-	if pod.Labels == nil {
-		pod.Labels = make(map[string]string, 1)
+func (o *syncPolicy) update(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string) returnedStatus {
+	var (
+		replicas = rctx.getTargetReplicas()
+		// fileName string
+	)
+	// if rctx.ConfigDescription != nil {
+	//	fileName = rctx.ConfigDescription.Name
+	// }
+
+	// TODO: config file?
+	config.Variables = parameters // TODO: variables vs parameters?
+	config.VersionHash = rctx.getTargetVersionHash()
+
+	return makeReturnedStatus(ESRetry, withExpected(replicas), withSucceed(0))
+}
+
+func (o *syncPolicy) status(rctx reconfigureContext) returnedStatus {
+	var (
+		replicas    = rctx.getTargetReplicas()
+		versionHash = rctx.getTargetVersionHash()
+	)
+	updated := int32(0)
+	for _, inst := range rctx.ITS.Status.InstanceStatus {
+		idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
+			return cfg.Name == rctx.ConfigTemplate.Name
+		})
+		if idx >= 0 && inst.Configs[idx].VersionHash == versionHash {
+			updated++
+		}
 	}
-	pod.Labels[labelKey] = configVersion
-	return cli.Patch(ctx, pod, patch)
+	if updated == replicas {
+		return makeReturnedStatus(ESNone, withExpected(replicas), withSucceed(updated))
+	}
+	return makeReturnedStatus(ESRetry, withExpected(replicas), withSucceed(updated))
 }

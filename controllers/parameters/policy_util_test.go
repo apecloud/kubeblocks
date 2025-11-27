@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -63,12 +64,26 @@ func withClusterComponent(replicas int) paramsOps {
 	}
 }
 
+func withClusterComponentNConfigs(replicas int, configs []appsv1.ClusterComponentConfig) paramsOps {
+	return func(params *reconfigureContext) {
+		params.ClusterComponent = &appsv1.ClusterComponentSpec{
+			Name:     "test",
+			Replicas: func() int32 { rep := int32(replicas); return rep }(),
+			Configs:  configs,
+		}
+	}
+}
+
+func withWorkload() paramsOps {
+	return func(params *reconfigureContext) {
+		params.ITS = &workloads.InstanceSet{}
+	}
+}
+
 func withConfigSpec(configSpecName string, data map[string]string) paramsOps {
 	return func(params *reconfigureContext) {
-		params.ConfigMap = &corev1.ConfigMap{
-			Data: data,
-		}
 		params.ConfigTemplate.Name = configSpecName
+		params.VersionHash = computeTargetVersionHash(params.RequestCtx, data)
 	}
 }
 

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -72,11 +71,6 @@ func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 		)
 	}
 	return podList.Items, nil
-}
-
-func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, configSpec string, configFile string, updatedParams map[string]string) error {
-	// TODO: update cluster spec to call the reconfigure action
-	return fmt.Errorf("not yet implemented")
 }
 
 func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
@@ -147,7 +141,6 @@ func (r reconfigureTask) ExecReload() (returnedStatus, error) {
 	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
-
 	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
 }
 
@@ -227,12 +220,13 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,
 			ConfigTemplate:       *templateSpec,
-			ConfigMap:            rctx.ConfigMap,
+			VersionHash:          computeTargetVersionHash(rctx.RequestCtx, rctx.ConfigMap.Data),
 			ParametersDef:        &pd.Spec,
 			ConfigDescription:    configDescription,
 			Cluster:              rctx.ClusterObj,
 			ClusterComponent:     rctx.ClusterComObj,
 			SynthesizedComponent: rctx.BuiltinComponent,
+			ITS:                  rctx.ITS,
 			Patch:                patch,
 		},
 	}
@@ -245,32 +239,11 @@ func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *Reconc
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,
 			ConfigTemplate:       *configTemplate,
+			VersionHash:          computeTargetVersionHash(rctx.RequestCtx, rctx.ConfigMap.Data),
 			ClusterComponent:     rctx.ClusterComObj,
 			Cluster:              rctx.ClusterObj,
 			SynthesizedComponent: rctx.BuiltinComponent,
-			ConfigMap:            rctx.ConfigMap,
+			ITS:                  rctx.ITS,
 		},
 	}
-}
-
-func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
-	params := make(map[string]string)
-	dynamicAction := parameters.NeedDynamicReloadAction(paramDef)
-	needReloadStaticParams := parameters.ReloadStaticParameters(paramDef)
-	visualizedParams := core.GenerateVisualizedParamsList(configPatch, []parametersv1alpha1.ComponentConfigDescription{description})
-
-	for _, key := range visualizedParams {
-		if key.UpdateType != core.UpdatedType {
-			continue
-		}
-		for _, p := range key.Parameters {
-			if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
-				continue
-			}
-			if p.Value != nil {
-				params[p.Key] = *p.Value
-			}
-		}
-	}
-	return params
 }

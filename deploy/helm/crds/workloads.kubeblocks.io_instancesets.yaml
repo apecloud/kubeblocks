@@ -70,7 +70,7 @@ spec:
                 items:
                   properties:
                     generation:
-                      description: The generation of the config.
+                      description: The generation of the config content.
                       format: int64
                       type: integer
                     name:
@@ -519,8 +519,10 @@ spec:
 
                         An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
                       type: string
+                    versionHash:
+                      description: The versioned hash of the config content.
+                      type: string
                   required:
-                  - generation
                   - name
                   type: object
                 type: array
@@ -11716,8 +11718,10 @@ spec:
                           name:
                             description: The name of the config.
                             type: string
+                          versionHash:
+                            description: The hash of the config content.
+                            type: string
                         required:
-                        - generation
                         - name
                         type: object
                       type: array

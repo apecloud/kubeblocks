@@ -63,9 +63,9 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
-		if len(backup.Status.Targets) < int(spec.Shards) {
+		if len(backup.Status.Targets) > int(spec.Shards) {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
-				`the source targets count of the backup "%s" must be equal to or greater than the count of the shard components "%s"`,
+				`the source targets count of the backup "%s" must be equal to or less than the count of the shard components "%s"`,
 				backup.Name, spec.Name)
 		}
 		shardComponents, err := sharding.ListShardingComponents(c.Context, c.Client, c.Cluster, spec.Name)

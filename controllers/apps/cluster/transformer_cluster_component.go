@@ -1356,7 +1356,7 @@ func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Co
 		return nil, fmt.Errorf("has no pods to running the sharding lifecycle action")
 	}
 
-	return lifecycle.NewShardingLifecycle(transCtx.Cluster.Namespace, transCtx.Cluster.Name, synthesizedComp.Name, shardingName, lifecycleAction, synthesizedComp.TemplateVars, nil, pods...)
+	return lifecycle.NewShardingLifecycle(transCtx.Cluster.Namespace, transCtx.Cluster.Name, synthesizedComp.Name, shardingName, lifecycleAction, synthesizedComp.TemplateVars, nil, pods)
 }
 
 func synthesizedComponent(transCtx *clusterTransformContext, comp *appsv1.Component) (*component.SynthesizedComponent, error) {

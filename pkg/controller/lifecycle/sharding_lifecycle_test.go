@@ -116,14 +116,14 @@ var _ = Describe("sharding lifecycle", func() {
 
 	Context("new sharding lifecycle", func() {
 		It("nil pod", func() {
-			_, err := NewShardingLifecycle("", "", "", "", nil, nil, nil)
+			_, err := NewShardingLifecycle("", "", "", "", nil, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("either pod or pods must be provided to call lifecycle actions"))
+			Expect(err.Error()).Should(ContainSubstring("pods must be provided to call lifecycle action"))
 		})
 
 		It("pod", func() {
 			pod := pods[0]
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, pod)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, pod, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -140,7 +140,7 @@ var _ = Describe("sharding lifecycle", func() {
 
 		It("pods", func() {
 			pod := pods[0]
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -160,7 +160,7 @@ var _ = Describe("sharding lifecycle", func() {
 				"SHARD_NAME":   shardingName,
 				"CLUSTER_NAME": clusterName,
 			}
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, templateVars, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, templateVars, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -172,7 +172,7 @@ var _ = Describe("sharding lifecycle", func() {
 	Context("call sharding actions", func() {
 		It("ShardRemove - not defined", func() {
 			shardingActions.ShardRemove = nil
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -183,7 +183,7 @@ var _ = Describe("sharding lifecycle", func() {
 		})
 
 		It("PostProvision - action request", func() {
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -213,7 +213,7 @@ var _ = Describe("sharding lifecycle", func() {
 		})
 
 		It("PreTerminate - succeed", func() {
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -230,7 +230,7 @@ var _ = Describe("sharding lifecycle", func() {
 		})
 
 		It("fail - error code", func() {
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -258,7 +258,7 @@ var _ = Describe("sharding lifecycle", func() {
 		})
 
 		It("fail - error msg", func() {
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -281,7 +281,7 @@ var _ = Describe("sharding lifecycle", func() {
 			key := "SHARD_TEMPLATE_VAR"
 			val := "shard-template-value"
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, map[string]string{key: val}, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, map[string]string{key: val}, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -304,7 +304,7 @@ var _ = Describe("sharding lifecycle", func() {
 			componentReady := appsv1.ComponentReadyPreConditionType
 			shardingActions.PostProvision.PreCondition = &componentReady
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -342,7 +342,7 @@ var _ = Describe("sharding lifecycle", func() {
 			componentReady := appsv1.ComponentReadyPreConditionType
 			shardingActions.PostProvision.PreCondition = &componentReady
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -381,7 +381,7 @@ var _ = Describe("sharding lifecycle", func() {
 			immediately := appsv1.ImmediatelyPreConditionType
 			shardingActions.ShardAdd.PreCondition = &immediately
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -401,7 +401,7 @@ var _ = Describe("sharding lifecycle", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
 			shardingActions.ShardRemove.PreCondition = &clusterReady
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -434,7 +434,7 @@ var _ = Describe("sharding lifecycle", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
 			shardingActions.ShardRemove.PreCondition = &clusterReady
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -462,7 +462,7 @@ var _ = Describe("sharding lifecycle", func() {
 			unknownType := appsv1.PreConditionType("UnknownType")
 			shardingActions.PostProvision.PreCondition = &unknownType
 
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 
@@ -472,7 +472,7 @@ var _ = Describe("sharding lifecycle", func() {
 		})
 
 		It("multiple actions success", func() {
-			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods...)
+			shardingLifecycle, err := NewShardingLifecycle(namespace, clusterName, compName, shardingName, shardingActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(shardingLifecycle).ShouldNot(BeNil())
 

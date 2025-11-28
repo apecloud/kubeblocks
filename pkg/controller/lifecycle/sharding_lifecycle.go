@@ -39,8 +39,8 @@ type ShardingLifecycle interface {
 }
 
 func NewShardingLifecycle(namespace, clusterName, compName, shardingName string, lifecycleActions *appsv1.ShardingLifecycleActions,
-	templateVars map[string]string, pod *corev1.Pod, pods ...*corev1.Pod) (ShardingLifecycle, error) {
-	agent, err := New(namespace, clusterName, compName, nil, templateVars, pod, pods...)
+	templateVars map[string]string, pod *corev1.Pod, pods []*corev1.Pod) (ShardingLifecycle, error) {
+	agent, err := New(namespace, clusterName, compName, nil, templateVars, pod, pods)
 	if err != nil {
 		return nil, err
 	}

@@ -430,12 +430,17 @@ func (s *Scheduler) getLastAppliedConfigsMap() (map[string]string, error) {
 	return resMap, nil
 }
 
-func (s *Scheduler) getReconfigureGenerationKey() string {
-	reconfigureGen := s.BackupSchedule.Annotations[dptypes.ReConfigureGenerationKey]
-	if reconfigureGen == "" {
-		return "0"
+func (s *Scheduler) getReconfigureGenerationKey() (int, error) {
+	reconfigureGenStr := s.BackupSchedule.Annotations[dptypes.ReConfigureGenerationKey]
+	if reconfigureGenStr == "" {
+		return 0, nil
 	}
-	return reconfigureGen
+	reconfigureGen, err := strconv.Atoi(reconfigureGenStr)
+	if err != nil {
+		return -1, err
+	}
+
+	return reconfigureGen, nil
 }
 
 func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
@@ -489,15 +494,18 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	if !slices.Contains(appsv1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
 	}
-	reconfigureGen := s.getReconfigureGenerationKey()
+	reconfigureGen, err := s.getReconfigureGenerationKey()
+	if err != nil {
+		return err
+	}
 	ops := opsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s-%s", s.BackupSchedule.Name, func() string {
+			Name: fmt.Sprintf("%s-%s-%d", s.BackupSchedule.Name, func() string {
 				if enable {
 					return "enable"
 				}
 				return "disable"
-			}(), reconfigureGen),
+			}(), reconfigureGen+1),
 			Namespace: s.BackupSchedule.Namespace,
 			Labels: map[string]string{
 				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
@@ -533,11 +541,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	lastAppliedConfigsMap[schedulePolicy.BackupMethod] = updateParameterPairs
 	updateParameterPairsBytes, _ = json.Marshal(lastAppliedConfigsMap)
 	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(updateParameterPairsBytes)
-	newReconfigureGen, err := strconv.Atoi(reconfigureGen)
-	if err != nil {
-		return err
-	}
-	s.BackupSchedule.Annotations[dptypes.ReConfigureGenerationKey] = fmt.Sprintf("%d", newReconfigureGen+1)
+	s.BackupSchedule.Annotations[dptypes.ReConfigureGenerationKey] = fmt.Sprintf("%d", reconfigureGen+1)
 	delete(s.BackupSchedule.Annotations, constant.LastAppliedConfigAnnotationKey)
 	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
 		return err

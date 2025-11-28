@@ -17649,6 +17649,7 @@ spec:
                       type: object
                   required:
                   - name
+                  - shards
                   type: object
                 maxItems: 128
                 minItems: 1

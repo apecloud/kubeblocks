@@ -51,7 +51,7 @@ const (
 type DynamicReloadType string
 
 const (
-	UnixSignalType DynamicReloadType = "signal"
+	UnixSignalType DynamicReloadType = "signal" // deprecated since 1.1.0
 	SQLType        DynamicReloadType = "sql"
 	ShellType      DynamicReloadType = "exec"
 	HTTPType       DynamicReloadType = "http"
@@ -173,8 +173,6 @@ type ReloadPolicy string
 const (
 	NonePolicy                    ReloadPolicy = "none"
 	RestartPolicy                 ReloadPolicy = "restart"
-	RestartContainerPolicy        ReloadPolicy = "restartContainer"
-	RollingPolicy                 ReloadPolicy = "rolling"
 	AsyncDynamicReloadPolicy      ReloadPolicy = "asyncReload"
 	SyncDynamicReloadPolicy       ReloadPolicy = "syncReload"
 	DynamicReloadAndRestartPolicy ReloadPolicy = "dynamicReloadBeginRestart"

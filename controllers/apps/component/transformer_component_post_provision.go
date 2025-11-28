@@ -58,6 +58,8 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		err = lifecycle.IgnoreNotDefined(err)
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
 			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
+		} else {
+			err = fmt.Errorf("%w: %w", intctrlutil.NewRequeueError(time.Second*5, "post-provision action failed"), err)
 		}
 		return err
 	}
@@ -102,7 +104,7 @@ func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *
 		return nil, fmt.Errorf("has no pods to running the post-provision action")
 	}
 	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods)
 }
 
 func checkPostProvisionDone(transCtx *componentTransformContext) bool {

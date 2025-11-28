@@ -29,11 +29,12 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 // type ValidateConfigMap func(configTpl, ns string) (*corev1.ConfigMap, error)
@@ -93,7 +94,7 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *parametersv1alpha1.Compo
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
 		return nil
 	}
-	itemStatus := intctrlutil.GetItemStatus(status, item.Name)
+	itemStatus := parameters.GetItemStatus(status, item.Name)
 	if itemStatus == nil || itemStatus.Phase == "" {
 		ctx.Log.WithName(item.Name).Info(fmt.Sprintf("ComponentParameters cr is creating: %v", item))
 		status.ConfigurationItemStatus = append(status.ConfigurationItemStatus, parametersv1alpha1.ConfigTemplateItemDetailStatus{
@@ -101,7 +102,7 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *parametersv1alpha1.Compo
 			Phase:          parametersv1alpha1.CInitPhase,
 			UpdateRevision: strconv.FormatInt(generation, 10),
 		})
-		itemStatus = intctrlutil.GetItemStatus(status, item.Name)
+		itemStatus = parameters.GetItemStatus(status, item.Name)
 	}
 	if !isReconcileStatus(itemStatus.Phase) {
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating or deleting and pass: %v", itemStatus))

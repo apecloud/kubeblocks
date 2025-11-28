@@ -48,6 +48,7 @@ func getVolumesByNames(pod *corev1.Pod, volumeNames []string) []corev1.Volume {
 		for _, name := range volumeNames {
 			if v.Name == name {
 				volumes = append(volumes, v)
+				break
 			}
 		}
 	}
@@ -60,6 +61,7 @@ func getVolumesByMounts(pod *corev1.Pod, mounts []corev1.VolumeMount) []corev1.V
 		for _, m := range mounts {
 			if v.Name == m.Name {
 				volumes = append(volumes, v)
+				break
 			}
 		}
 	}

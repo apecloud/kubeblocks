@@ -29,16 +29,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
-type options = func(*intctrlutil.Result)
+type options = func(*parameters.Result)
 
-func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) intctrlutil.Result {
-	result := intctrlutil.Result{
+func reconciled(status returnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) parameters.Result {
+	result := parameters.Result{
 		Policy:        policy,
 		Phase:         phase,
 		ExecResult:    string(status.Status),
@@ -52,8 +53,8 @@ func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.P
 	return result
 }
 
-func unReconciled(phase parametersv1alpha1.ParameterPhase, revision string, message string) intctrlutil.Result {
-	return intctrlutil.Result{
+func unReconciled(phase parametersv1alpha1.ParameterPhase, revision string, message string) parameters.Result {
+	return parameters.Result{
 		Phase:         phase,
 		Revision:      revision,
 		Message:       message,
@@ -64,12 +65,12 @@ func unReconciled(phase parametersv1alpha1.ParameterPhase, revision string, mess
 	}
 }
 
-func isReconciledResult(result intctrlutil.Result) bool {
+func isReconciledResult(result parameters.Result) bool {
 	return result.ExecResult != "" && result.Policy != ""
 }
 
 func withFailed(err error, retry bool) options {
-	return func(result *intctrlutil.Result) {
+	return func(result *parameters.Result) {
 		result.Retry = retry
 		if err != nil {
 			result.Failed = true
@@ -99,7 +100,7 @@ func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 	return updateConfigPhaseWithResult(cli, ctx, config, unReconciled(phase, "", message))
 }
 
-func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, result intctrlutil.Result) (ctrl.Result, error) {
+func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, result parameters.Result) (ctrl.Result, error) {
 	revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]
 	if !ok || revision == "" {
 		return intctrlutil.Reconciled()
@@ -149,7 +150,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 }
 
 // updateAppliedConfigs updates hash label and last applied config
-func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string, result *intctrlutil.Result) (bool, error) {
+func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string, result *parameters.Result) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
 	if config.ObjectMeta.Annotations == nil {

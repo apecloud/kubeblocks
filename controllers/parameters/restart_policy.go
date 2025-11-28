@@ -22,9 +22,9 @@ package parameters
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var restartPolicyInstance = &restartPolicy{}
@@ -35,17 +35,13 @@ func init() {
 	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInstance)
 }
 
-func (s *restartPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	rctx.Log.V(1).Info("simple policy begin....")
 
-	return restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs())
+	return s.restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs())
 }
 
-func (s *restartPolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.RestartPolicy)
-}
-
-func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	var (
 		newVersion = rctx.getTargetVersionHash()
 		configKey  = rctx.generateConfigIdentifier()

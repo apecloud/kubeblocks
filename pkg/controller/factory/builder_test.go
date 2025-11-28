@@ -33,9 +33,9 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -157,25 +157,6 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 			Expect(configmap.SecurityContext).Should(BeNil())
-		})
-
-		It("builds config manager sidecar container correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
-			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
-				ManagerName:           "cfgmgr",
-				Image:                 constant.KBToolsImage,
-				ShareProcessNamespace: true,
-				Args:                  []string{},
-				Envs:                  []corev1.EnvVar{},
-				Volumes:               []corev1.VolumeMount{},
-				Cluster:               cluster,
-			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
-			Expect(err).Should(BeNil())
-			Expect(configmap).ShouldNot(BeNil())
-			Expect(configmap.SecurityContext).ShouldNot(BeNil())
-			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
-			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
 		})
 
 		It("builds cfg manager tools  correctly", func() {

@@ -2703,7 +2703,7 @@ spec:
                         The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
                         but required otherwise.
                       maxLength: 22
-                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      pattern: ^$|^[a-z]([a-z0-9-]*[a-z0-9])?$
                       type: string
                     network:
                       description: Defines the network configuration for the Component.
@@ -13953,7 +13953,7 @@ spec:
                             The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
                             but required otherwise.
                           maxLength: 22
-                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                          pattern: ^$|^[a-z]([a-z0-9-]*[a-z0-9])?$
                           type: string
                         network:
                           description: Defines the network configuration for the Component.

@@ -5867,6 +5867,8 @@ Action
 This approach aims to minimize downtime and maintain availability
 during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 In a typical consensus system, this action is used to transfer leader role to another replica.</p>
+<p>When a pod is about to be updated, a switchover action will be triggered for it. So addon implementation must determine
+if the pod&rsquo;s current role needs to be transferred.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>
@@ -31422,8 +31424,7 @@ SignalType
 </em>
 </td>
 <td>
-<p>Specifies a valid Unix signal to be sent.
-For a comprehensive list of all Unix signals, see: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
+<p>Specifies a valid Unix signal to be sent.</p>
 </td>
 </tr>
 <tr>

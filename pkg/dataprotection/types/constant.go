@@ -64,6 +64,7 @@ const (
 	GeminiAcknowledgedAnnotationKey = "dataprotection.kubeblocks.io/gemini-acknowledged"
 	// LastAppliedConfigsAnnotationKey specifies last applied reconfigurations.
 	LastAppliedConfigsAnnotationKey = "dataprotection.kubeblocks.io/last-applied-configurations"
+	ReConfigureGenerationKey        = "dataprotection.kubeblocks.io/reconfigure-generation"
 	// SkipReconciliationAnnotationKey specifies whether to skip reconciliation.
 	SkipReconciliationAnnotationKey = "dataprotection.kubeblocks.io/skip-reconciliation"
 	// SkipRestorationCheckAnnotationKey specifies whether to skip restoration check.

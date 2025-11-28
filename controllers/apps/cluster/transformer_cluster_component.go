@@ -1362,8 +1362,10 @@ func buildComponentCustomActions(transCtx *clusterTransformContext, proto, runni
 		}
 	}
 
-	for _, action := range running.Spec.CustomActions {
-		checkNAppend(action.Name, action.Action)
+	if running != nil {
+		for _, action := range running.Spec.CustomActions {
+			checkNAppend(action.Name, action.Action)
+		}
 	}
 
 	if shardingDef.Spec.LifecycleActions.ShardAdd != nil {

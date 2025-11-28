@@ -1194,6 +1194,9 @@ func buildComponentWrapper(transCtx *clusterTransformContext,
 	if err = buildComponentSidecars(transCtx, comp, running); err != nil {
 		return nil, err
 	}
+	if err = buildComponentCustomActions(transCtx, comp, running); err != nil {
+		return nil, err
+	}
 	return comp, nil
 }
 
@@ -1339,6 +1342,50 @@ func buildComponentSidecar(proto, running *appsv1.Component, sidecarName string,
 		SidecarDef: sidecarDef.Name,
 	}
 	return checkedAppend(sidecar, sidecarDef)
+}
+
+func buildComponentCustomActions(transCtx *clusterTransformContext, proto, running *appsv1.Component) error {
+	shardingDef, ok := transCtx.shardingDefs[proto.Labels[constant.ShardingDefLabelKey]]
+	if !ok || shardingDef.Spec.LifecycleActions == nil {
+		return nil
+	}
+
+	customActions := make([]appsv1.CustomAction, 0)
+	actionNames := sets.New[string]()
+
+	checkNAppend := func(actionName string, action *appsv1.Action) {
+		if !actionNames.Has(actionName) {
+			customActions = append(customActions, appsv1.CustomAction{
+				Name:   actionName,
+				Action: action,
+			})
+		}
+	}
+
+	for _, action := range running.Spec.CustomActions {
+		checkNAppend(action.Name, action.Action)
+	}
+
+	if shardingDef.Spec.LifecycleActions.ShardAdd != nil {
+		checkNAppend(kbShardingAddAction, shardingDef.Spec.LifecycleActions.ShardAdd)
+	}
+	if shardingDef.Spec.LifecycleActions.PostProvision != nil {
+		checkNAppend(kbShardingPostProvisionAction, shardingDef.Spec.LifecycleActions.PostProvision)
+	}
+	if shardingDef.Spec.LifecycleActions.PreTerminate != nil {
+		checkNAppend(kbShardingPreTerminateAction, shardingDef.Spec.LifecycleActions.PreTerminate)
+	}
+	if shardingDef.Spec.LifecycleActions.ShardRemove != nil {
+		checkNAppend(kbShardingRemoveAction, shardingDef.Spec.LifecycleActions.ShardRemove)
+	}
+
+	if len(customActions) > 0 {
+		slices.SortFunc(customActions, func(a, b appsv1.CustomAction) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		proto.Spec.CustomActions = customActions
+	}
+	return nil
 }
 
 func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Component, lifecycleAction *appsv1.ShardingLifecycleActions, shardingName string) (lifecycle.ShardingLifecycle, error) {

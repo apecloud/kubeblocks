@@ -157,7 +157,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		return nil, err
 	}
 
-	if err = buildKBAgentContainer(ctx, cli, synthesizeComp, comp); err != nil {
+	if err = buildKBAgentContainer(synthesizeComp, comp); err != nil {
 		return nil, errors.Wrap(err, "build kb-agent container failed")
 	}
 

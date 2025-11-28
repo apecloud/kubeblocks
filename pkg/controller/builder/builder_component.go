@@ -211,3 +211,8 @@ func (builder *ComponentBuilder) SetEnableInstanceAPI(enable *bool) *ComponentBu
 	builder.get().Spec.EnableInstanceAPI = enable
 	return builder
 }
+
+func (builder *ComponentBuilder) SetCustomActions(actions []appsv1.CustomAction) *ComponentBuilder {
+	builder.get().Spec.CustomActions = actions
+	return builder
+}

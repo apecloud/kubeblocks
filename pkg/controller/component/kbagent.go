@@ -20,15 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strconv"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -38,6 +32,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -121,18 +118,12 @@ func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.T
 	}, nil
 }
 
-func buildKBAgentContainer(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
+func buildKBAgentContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if !hasActionDefined(synthesizedComp) {
 		return nil
 	}
 
-	// build sharding lifecycle action
-	shardingLifecycleAction, err := getShardingLifecycleActions(ctx, cli, synthesizedComp, comp)
-	if err != nil {
-		return err
-	}
-
-	envVars, err := buildKBAgentStartupEnvs(synthesizedComp, shardingLifecycleAction)
+	envVars, err := buildKBAgentStartupEnvs(synthesizedComp, comp)
 	if err != nil {
 		return err
 	}
@@ -142,7 +133,7 @@ func buildKBAgentContainer(ctx context.Context, cli client.Reader, synthesizedCo
 			SetImage(viper.GetString(constant.KBToolsImage)).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
 			AddCommands(kbAgentCommand).
-			AddEnv(mergedActionEnv4KBAgent(synthesizedComp, shardingLifecycleAction)...).
+			AddEnv(mergedActionEnv4KBAgent(synthesizedComp, comp)...).
 			AddEnv(envVars...).
 			SetSecurityContext(corev1.SecurityContext{
 				RunAsGroup: &[]int64{1000}[0],
@@ -193,7 +184,7 @@ func buildKBAgentContainer(ctx context.Context, cli client.Reader, synthesizedCo
 		return err
 	}
 
-	if err = handleCustomImageNContainerDefined(synthesizedComp, shardingLifecycleAction, container, workerContainer); err != nil {
+	if err = handleCustomImageNContainerDefined(synthesizedComp, comp, container, workerContainer); err != nil {
 		return err
 	}
 
@@ -222,7 +213,7 @@ func buildKBAgentContainer(ctx context.Context, cli client.Reader, synthesizedCo
 	return nil
 }
 
-func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, shardingLifecycleAction *appsv1.ShardingLifecycleActions) []corev1.EnvVar {
+func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) []corev1.EnvVar {
 	env := make([]corev1.EnvVar, 0)
 	envSet := sets.New[string]()
 
@@ -258,15 +249,8 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, shardingLife
 		}
 	}
 
-	if shardingLifecycleAction != nil {
-		for _, action := range []*appsv1.Action{
-			shardingLifecycleAction.PostProvision,
-			shardingLifecycleAction.PreTerminate,
-			shardingLifecycleAction.ShardAdd,
-			shardingLifecycleAction.ShardRemove,
-		} {
-			checkedAppend(action)
-		}
+	for _, action := range comp.Spec.CustomActions {
+		checkedAppend(action.Action)
 	}
 
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
@@ -276,7 +260,7 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, shardingLife
 	return env
 }
 
-func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent, shardingLifecycleAction *appsv1.ShardingLifecycleActions) ([]corev1.EnvVar, error) {
+func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) ([]corev1.EnvVar, error) {
 	var (
 		actions   []proto.Action
 		probes    []proto.Probe
@@ -338,17 +322,8 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent, shardingLife
 		}
 	})
 
-	if shardingLifecycleAction != nil {
-		if a := buildAction4KBAgent(shardingLifecycleAction.PostProvision, "shardPostProvision"); a != nil {
-			actions = append(actions, *a)
-		}
-		if a := buildAction4KBAgent(shardingLifecycleAction.PreTerminate, "shardPreTerminate"); a != nil {
-			actions = append(actions, *a)
-		}
-		if a := buildAction4KBAgent(shardingLifecycleAction.ShardAdd, "shardAdd"); a != nil {
-			actions = append(actions, *a)
-		}
-		if a := buildAction4KBAgent(shardingLifecycleAction.ShardRemove, "shardRemove"); a != nil {
+	for _, action := range comp.Spec.CustomActions {
+		if a := buildAction4KBAgent(action.Action, action.Name); a != nil {
 			actions = append(actions, *a)
 		}
 	}
@@ -432,8 +407,8 @@ func buildProbe4KBAgent(probe *appsv1.Probe, name, instance string) (*proto.Acti
 	return a, p
 }
 
-func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, shardingLifecycleAction *appsv1.ShardingLifecycleActions, containers ...*corev1.Container) error {
-	image, c, err := customExecActionImageNContainer(synthesizedComp, shardingLifecycleAction)
+func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, comp *appsv1.Component, containers ...*corev1.Container) error {
+	image, c, err := customExecActionImageNContainer(synthesizedComp, comp)
 	if err != nil {
 		return err
 	}
@@ -465,7 +440,7 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, s
 	return nil
 }
 
-func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent, shardingLifecycleAction *appsv1.ShardingLifecycleActions) (string, *corev1.Container, error) {
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) (string, *corev1.Container, error) {
 	if !hasActionDefined(synthesizedComp) {
 		return "", nil, nil
 	}
@@ -493,13 +468,8 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent, shar
 		actions = append(actions, action)
 	})
 
-	if shardingLifecycleAction != nil {
-		actions = append(actions, []*appsv1.Action{
-			shardingLifecycleAction.PostProvision,
-			shardingLifecycleAction.PreTerminate,
-			shardingLifecycleAction.ShardAdd,
-			shardingLifecycleAction.ShardRemove,
-		}...)
+	for _, action := range comp.Spec.CustomActions {
+		actions = append(actions, action.Action)
 	}
 
 	var image, container string

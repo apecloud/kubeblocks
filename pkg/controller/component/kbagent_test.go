@@ -130,6 +130,16 @@ var _ = Describe("kb-agent", func() {
 				},
 				Spec: appsv1.ComponentSpec{
 					Configs: []appsv1.ClusterComponentConfig{},
+					CustomActions: []appsv1.CustomAction{
+						{
+							Name: "shardAdd",
+							Action: &appsv1.Action{
+								Exec: &appsv1.ExecAction{
+									Command: []string{"echo", "shardAdd"},
+								},
+							},
+						},
+					},
 				},
 			}
 		})
@@ -448,6 +458,12 @@ var _ = Describe("kb-agent", func() {
 				Name: "udf-reconfigure-server.conf",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "reconfigure"},
+				},
+			}))
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "shardAdd",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "shardAdd"},
 				},
 			}))
 

@@ -823,10 +823,10 @@ const (
 	// kbShardingRemoveDoneKey is an annotation key to mark the sharding components which have been removed during sharding scaling in
 	kbShardingRemoveDoneKey = "kubeblocks.io/sharding-remove-done"
 
-	kbShardingPostProvisionAction = "shardingPostProvision"
-	kbShardingPreTerminateAction  = "shardingPreTerminate"
-	kbShardingAddAction           = "shardingAdd"
-	kbShardingRemoveAction        = "shardingRemove"
+	kbShardingPostProvisionAction = "shardPostProvision"
+	kbShardingPreTerminateAction  = "shardPreTerminate"
+	kbShardingAddAction           = "shardAdd"
+	kbShardingRemoveAction        = "shardRemove"
 )
 
 func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {

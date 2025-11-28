@@ -1914,6 +1914,30 @@ var _ = Describe("cluster component transformer test", func() {
 			return shardComp, pod
 		}
 
+		Context("build component custom actions", func() {
+			It("add all lifecycle actions", func() {
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PostProvision: testapps.NewLifecycleAction("shard-post-provision"),
+					PreTerminate:  testapps.NewLifecycleAction("shard-pre-terminate"),
+					ShardAdd:      testapps.NewLifecycleAction("shard-add"),
+					ShardRemove:   testapps.NewLifecycleAction("shard-remove"),
+				}
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(len(comp.Spec.CustomActions)).Should(Equal(4))
+				Expect(comp.Spec.CustomActions[0].Name).Should(Equal(kbShardingAddAction))
+				Expect(comp.Spec.CustomActions[1].Name).Should(Equal(kbShardingPostProvisionAction))
+				Expect(comp.Spec.CustomActions[2].Name).Should(Equal(kbShardingPreTerminateAction))
+				Expect(comp.Spec.CustomActions[3].Name).Should(Equal(kbShardingRemoveAction))
+			})
+		})
+
 		Context("shard post provision", func() {
 			BeforeEach(func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{

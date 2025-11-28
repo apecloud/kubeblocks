@@ -960,6 +960,22 @@ bool
 <p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
+<p>Each custom action defines a specific operation that can be executed,
+will be merged with ComponentLifecycleActions defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -2339,7 +2355,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -6801,6 +6817,22 @@ bool
 <p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
+<p>Each custom action defines a specific operation that can be executed,
+will be merged with ComponentLifecycleActions defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
@@ -7668,6 +7700,48 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.CustomAction">CustomAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the custom action.</p>
+<p>The name will be used as the action name when invoking the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the action to be performed.</p>
 </td>
 </tr>
 </tbody>

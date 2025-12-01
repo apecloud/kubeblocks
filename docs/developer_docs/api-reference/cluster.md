@@ -6167,12 +6167,24 @@ Kubernetes core/v1.PodDNSConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the host ports of the pod.
-It&rsquo;s valid if and only if the <code>hostNetwork</code> is enabled.</p>
-<p>If any host ports are specified, the default host-port manager provided by KB will be ignored.
-Therefore, it is the user&rsquo;s responsibility to specify all container ports that need to be bound to host ports.
-Check @cmpd.spec.hostNetwork to obtain all container ports that need to be bound.</p>
-<p>!!!!! When you specify the host ports, you must specify two additional ports for the kbagent sidecar of KB: &lsquo;http&rsquo;, &lsquo;streaming&rsquo;.</p>
+<p>HostPorts specifies the mapping of container ports to host ports.
+The behavior varies based on the HostNetwork setting:</p>
+<ol>
+<li><p>When HostNetwork is enabled:</p>
+<ul>
+<li>If this field is empty: All ports are automatically allocated by the host-port manager.</li>
+<li>If this field is specified:
+a) Mappings for all ports defined in <code>cmpd.spec.hostNetwork</code> are MANDATORY.
+b) Mappings for kbagent ports (&ldquo;http&rdquo;, &ldquo;streaming&rdquo;) are OPTIONAL.
+You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.</li>
+</ul></li>
+<li><p>When HostNetwork is disabled:
+It allows optional mapping for container ports to host ports.</p>
+<ul>
+<li>Mappings are restricted to ports defined in <code>cmpd.spec.runtime.containers.ports</code>.</li>
+<li>Any specified container ports not present in the runtime definition will be ignored.</li>
+</ul></li>
+</ol>
 </td>
 </tr>
 </tbody>
@@ -8472,7 +8484,7 @@ string
 </em>
 </td>
 <td>
-<p>The name of the host port.</p>
+<p>The name of the container port.</p>
 </td>
 </tr>
 <tr>

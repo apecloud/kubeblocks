@@ -38,7 +38,7 @@ type ShardingLifecycle interface {
 	ShardRemove(ctx context.Context, cli client.Reader, opts *Options) error
 }
 
-func NewShardingLifecycle(namespace, clusterName, compName, shardingName string, lifecycleActions *appsv1.ShardingLifecycleActions,
+func NewShardingLifecycle(namespace, clusterName, compName, shardName string, lifecycleActions *appsv1.ShardingLifecycleActions,
 	templateVars map[string]string, pod *corev1.Pod, pods []*corev1.Pod) (ShardingLifecycle, error) {
 	agent, err := New(namespace, clusterName, compName, nil, templateVars, pod, pods)
 	if err != nil {
@@ -47,7 +47,7 @@ func NewShardingLifecycle(namespace, clusterName, compName, shardingName string,
 
 	return &shardingAgent{
 		kbagent:                  agent.(*kbagent),
-		shardingName:             shardingName,
+		shardName:                shardName,
 		shardingLifecycleActions: lifecycleActions,
 	}, nil
 }

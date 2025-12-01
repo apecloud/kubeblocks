@@ -135,7 +135,7 @@ var _ = Describe("sharding lifecycle", func() {
 			Expect(agent.pods[0]).Should(Equal(pod))
 			Expect(agent.clusterName).Should(Equal(clusterName))
 			Expect(agent.compName).Should(Equal(compName))
-			Expect(agent.shardingName).Should(Equal(shardingName))
+			Expect(agent.shardName).Should(Equal(shardingName))
 		})
 
 		It("pods", func() {
@@ -148,7 +148,7 @@ var _ = Describe("sharding lifecycle", func() {
 			Expect(agent.namespace).Should(Equal(namespace))
 			Expect(agent.clusterName).Should(Equal(clusterName))
 			Expect(agent.compName).Should(Equal(compName))
-			Expect(agent.shardingName).Should(Equal(shardingName))
+			Expect(agent.shardName).Should(Equal(shardingName))
 			Expect(agent.shardingLifecycleActions).Should(Equal(shardingActions))
 			Expect(agent.pod).Should(Equal(pod))
 			Expect(agent.pods).Should(HaveLen(1))

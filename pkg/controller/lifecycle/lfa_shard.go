@@ -27,12 +27,14 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
+const (
+	shardAddShardNameVar    = "KB_SHARD_ADD_SHARD_NAME"
+	shardRemoveShardNameVar = "KB_SHARD_REMOVE_SHARD_NAME"
+)
+
 type shardAdd struct {
-	namespace    string
-	clusterName  string
-	compName     string
-	shardingName string
-	action       *appsv1.Action
+	shardName string
+	action    *appsv1.Action
 }
 
 var _ lifecycleAction = &shardAdd{}
@@ -42,15 +44,14 @@ func (a *shardAdd) name() string {
 }
 
 func (a *shardAdd) parameters(context.Context, client.Reader) (map[string]string, error) {
-	return nil, nil
+	m := make(map[string]string)
+	m[shardAddShardNameVar] = a.shardName
+	return m, nil
 }
 
 type shardRemove struct {
-	namespace    string
-	clusterName  string
-	compName     string
-	shardingName string
-	action       *appsv1.Action
+	shardName string
+	action    *appsv1.Action
 }
 
 var _ lifecycleAction = &shardRemove{}
@@ -60,14 +61,13 @@ func (a *shardRemove) name() string {
 }
 
 func (a *shardRemove) parameters(context.Context, client.Reader) (map[string]string, error) {
-	return nil, nil
+	m := make(map[string]string)
+	m[shardRemoveShardNameVar] = a.shardName
+	return m, nil
 }
 
 type shardPostProvision struct {
-	namespace   string
-	clusterName string
-	compName    string
-	action      *appsv1.Action
+	action *appsv1.Action
 }
 
 var _ lifecycleAction = &shardPostProvision{}
@@ -81,10 +81,7 @@ func (a *shardPostProvision) parameters(context.Context, client.Reader) (map[str
 }
 
 type shardPreTerminate struct {
-	namespace   string
-	clusterName string
-	compName    string
-	action      *appsv1.Action
+	action *appsv1.Action
 }
 
 var _ lifecycleAction = &shardPreTerminate{}

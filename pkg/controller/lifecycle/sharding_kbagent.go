@@ -32,16 +32,13 @@ import (
 
 type shardingAgent struct {
 	*kbagent
-	shardingName             string
+	shardName                string
 	shardingLifecycleActions *appsv1.ShardingLifecycleActions
 }
 
 func (a *shardingAgent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
 	lfa := &shardPostProvision{
-		namespace:   a.namespace,
-		clusterName: a.clusterName,
-		compName:    a.compName,
-		action:      a.shardingLifecycleActions.PostProvision,
+		action: a.shardingLifecycleActions.PostProvision,
 	}
 
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
@@ -49,10 +46,7 @@ func (a *shardingAgent) PostProvision(ctx context.Context, cli client.Reader, op
 
 func (a *shardingAgent) PreTerminate(ctx context.Context, cli client.Reader, opts *Options) error {
 	lfa := &shardPreTerminate{
-		namespace:   a.namespace,
-		clusterName: a.clusterName,
-		compName:    a.compName,
-		action:      a.shardingLifecycleActions.PreTerminate,
+		action: a.shardingLifecycleActions.PreTerminate,
 	}
 
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
@@ -60,11 +54,8 @@ func (a *shardingAgent) PreTerminate(ctx context.Context, cli client.Reader, opt
 
 func (a *shardingAgent) ShardAdd(ctx context.Context, cli client.Reader, opts *Options) error {
 	lfa := &shardAdd{
-		namespace:    a.namespace,
-		clusterName:  a.clusterName,
-		compName:     a.compName,
-		shardingName: a.shardingName,
-		action:       a.shardingLifecycleActions.ShardAdd,
+		shardName: a.shardName,
+		action:    a.shardingLifecycleActions.ShardAdd,
 	}
 
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
@@ -72,11 +63,8 @@ func (a *shardingAgent) ShardAdd(ctx context.Context, cli client.Reader, opts *O
 
 func (a *shardingAgent) ShardRemove(ctx context.Context, cli client.Reader, opts *Options) error {
 	lfa := &shardRemove{
-		namespace:    a.namespace,
-		clusterName:  a.clusterName,
-		compName:     a.compName,
-		shardingName: a.shardingName,
-		action:       a.shardingLifecycleActions.ShardRemove,
+		shardName: a.shardName,
+		action:    a.shardingLifecycleActions.ShardRemove,
 	}
 
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, lfa.action, lfa, opts))
@@ -102,7 +90,7 @@ func (a *shardingAgent) precondition(ctx context.Context, cli client.Reader, spe
 
 func (a *shardingAgent) compReadyCheck(ctx context.Context, cli client.Reader) error {
 	compList := &appsv1.ComponentList{}
-	labels := constant.GetClusterLabels(a.clusterName, map[string]string{constant.KBAppShardingNameLabelKey: a.shardingName})
+	labels := constant.GetClusterLabels(a.clusterName, map[string]string{constant.KBAppShardingNameLabelKey: a.shardName})
 	if err := cli.List(ctx, compList, client.InNamespace(a.namespace), client.MatchingLabels(labels)); err != nil {
 		return err
 	}

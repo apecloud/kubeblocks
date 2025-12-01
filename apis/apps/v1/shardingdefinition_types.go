@@ -188,12 +188,20 @@ type ShardingLifecycleActions struct {
 
 	// Specifies the hook to be executed after a shard added.
 	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_SHARD_ADD_SHARD_NAME: The name of the shard being added.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
 	ShardAdd *Action `json:"shardAdd,omitempty"`
 
 	// Specifies the hook to be executed prior to remove a shard.
+	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_SHARD_REMOVE_SHARD_NAME: The name of the shard being removed.
 	//
 	// Note: This field is immutable once it has been set.
 	//

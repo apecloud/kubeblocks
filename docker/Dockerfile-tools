@@ -113,5 +113,3 @@ RUN ln -s /config/lorry /config/probe
 # mkdir kbcli config dir and helm cache dir.
 RUN mkdir /.cache && chown -R 65532:65532 /.cache
 USER 65532:65532
-
-19.1

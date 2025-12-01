@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -53,7 +54,10 @@ func GetPortManager(network *appsv1.ComponentNetwork) PortManager {
 	if network == nil || !network.HostNetwork || len(network.HostPorts) == 0 {
 		return defaultPortManager
 	}
-	return newDefinedPortManager(network.HostPorts)
+	if defaultPortManager == nil {
+		return newDefinedPortManager(nil, network.HostPorts)
+	}
+	return newDefinedPortManager(defaultPortManager.(*portManager), network.HostPorts)
 }
 
 func InitDefaultHostPortManager(cli client.Client) error {
@@ -355,25 +359,35 @@ func (m *portManager) ReleaseByPrefix(prefix string) error {
 			keys = append(keys, key)
 		}
 	}
-	if err := m.delete(keys); err != nil {
-		return err
+	if len(keys) > 0 {
+		return m.delete(keys)
 	}
 	return nil
 }
 
 type definedPortManager struct {
-	hostPorts map[string]int32
+	defaultPortManager *portManager
+	hostPorts          map[string]int32
 }
 
-func (m *definedPortManager) PortKey(_, _, _, portName string) string {
+func (m *definedPortManager) PortKey(clusterName, compName, containerName, portName string) string {
+	if m.isKBAgentPortNNotDefined(containerName, portName) {
+		return m.defaultPortManager.PortKey(clusterName, compName, containerName, portName)
+	}
 	return portName
 }
 
 func (m *definedPortManager) GetPort(key string) (int32, error) {
+	if m.isKBAgentPortNNotDefinedInKey(key) {
+		return m.defaultPortManager.GetPort(key)
+	}
 	return m.hostPorts[key], nil
 }
 
-func (m *definedPortManager) UsePort(_ string, _ int32) error {
+func (m *definedPortManager) UsePort(key string, port int32) error {
+	if m.isKBAgentPortNNotDefinedInKey(key) {
+		return m.defaultPortManager.UsePort(key, port)
+	}
 	return nil
 }
 
@@ -382,18 +396,50 @@ func (m *definedPortManager) AllocatePort(key string) (int32, error) {
 	if ok {
 		return port, nil
 	}
+	if m.isKBAgentPortNNotDefinedInKey(key) {
+		return m.defaultPortManager.AllocatePort(key)
+	}
 	return 0, fmt.Errorf("no available port")
 
 }
 
-func (m *definedPortManager) ReleaseByPrefix(_ string) error {
-	return nil
+func (m *definedPortManager) ReleaseByPrefix(prefix string) error {
+	if m.hasKBAgentPortDefined() {
+		return nil
+	}
+	return m.defaultPortManager.ReleaseByPrefix(prefix)
 }
 
-func newDefinedPortManager(hostPorts []appsv1.HostPort) *definedPortManager {
+func (m *definedPortManager) isKBAgentPort(containerName, portName string) bool {
+	return containerName == kbagent.ContainerName && (portName == kbagent.DefaultHTTPPortName || portName == kbagent.DefaultStreamingPortName)
+}
+
+func (m *definedPortManager) hasKBAgentPortDefined() bool {
+	_, http := m.hostPorts[kbagent.DefaultHTTPPortName]
+	_, stream := m.hostPorts[kbagent.DefaultStreamingPortName]
+	return http && stream
+}
+
+func (m *definedPortManager) isKBAgentPortNNotDefined(containerName, portName string) bool {
+	_, defined := m.hostPorts[portName]
+	return m.isKBAgentPort(containerName, portName) && !defined
+}
+
+func (m *definedPortManager) isKBAgentPortNNotDefinedInKey(key string) bool {
+	subs := strings.Split(key, "-")
+	if len(subs) != 4 {
+		return false
+	}
+	return m.isKBAgentPortNNotDefined(subs[2], subs[3])
+}
+
+func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.HostPort) *definedPortManager {
 	hostPortsMap := make(map[string]int32)
 	for _, hp := range hostPorts {
 		hostPortsMap[hp.Name] = hp.Port
 	}
-	return &definedPortManager{hostPorts: hostPortsMap}
+	return &definedPortManager{
+		defaultPortManager: defaultPortManager,
+		hostPorts:          hostPortsMap,
+	}
 }

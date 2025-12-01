@@ -82,10 +82,6 @@ RUN --mount=type=bind,target=. \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/lorryctl cmd/lorry/ctl/main.go
 
 
-RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13  GOOS=${TARGETOS} GOARCH=${TARGETARCH} &&  \
-    wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-${GOOS}-${GOARCH}
-
-
 # Use the static binary of curl instead of the Alpine package, as curl may be injected into the kb-agent container, which uses the Actions image.
 FROM --platform=${TARGETPLATFORM} tarampampam/curl:8.6.0 as binary-downloader
 
@@ -107,7 +103,6 @@ COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/config_render /bin
 COPY --from=builder /out/lorry /bin
 COPY --from=builder /out/lorryctl /bin
-COPY --from=builder /bin/grpc_health_probe /bin
 COPY --from=builder /out/helm_hook /bin
 COPY --from=binary-downloader /bin/curl /bin/
 
@@ -115,10 +110,6 @@ COPY --from=binary-downloader /bin/curl /bin/
 RUN ln -s /bin/lorry /bin/probe
 RUN ln -s /config/lorry /config/probe
 
-# enable grpc_health_probe binary
-RUN chmod +x /bin/grpc_health_probe
-
 # mkdir kbcli config dir and helm cache dir.
 RUN mkdir /.cache && chown -R 65532:65532 /.cache
 USER 65532:65532
-

@@ -23,45 +23,25 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
+	apisappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
-	mockproto "github.com/apecloud/kubeblocks/pkg/parameters/proto/mocks"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
-var operatorSyncPolicy = &syncPolicy{}
-
-var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
-
-	var (
-		k8sMockClient     *testutil.K8sClientMockHelper
-		reconfigureClient *mockproto.MockReconfigureClient
-	)
-
-	BeforeEach(func() {
-		k8sMockClient = testutil.NewK8sMockClient()
-		reconfigureClient = mockproto.NewMockReconfigureClient(k8sMockClient.Controller())
-	})
-
-	AfterEach(func() {
-		k8sMockClient.Finish()
-	})
-
+var _ = Describe("Reconfigure SyncPolicy", func() {
 	Context("sync reconfigure policy test", func() {
-		It("Should success without error", func() {
+		var (
+			rctx   reconfigureContext
+			policy = &syncPolicy{}
+		)
+
+		BeforeEach(func() {
 			By("prepare reconfigure policy params")
-			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
-					return reconfigureClient, nil
-				}),
-				withMockInstanceSet(3, nil),
+			rctx = newMockReconfigureParams("operatorSyncPolicy", k8sClient,
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
 				withUpdatedParameters(&core.ConfigPatchInfo{
@@ -74,99 +54,100 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 					MergeReloadAndRestart:           pointer.Bool(false),
 					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
 				}),
-				withClusterComponent(3))
-
-			By("mock client get pod caller")
-			k8sMockClient.MockListMethod(testutil.WithListReturned(
-				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
-						withReadyPod(0, 1))),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
-						withReadyPod(0, 3))),
+				withClusterComponentNConfigs(3, []apisappsv1.ClusterComponentConfig{
+					{
+						Name: ptr.To("for_test"),
+					},
 				}),
-				testutil.WithAnyTimes()))
+				withWorkload())
+		})
 
-			By("mock client patch caller")
-			// mock client update caller
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithMinTimes(3)))
-
-			By("mock remote online update caller")
-			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
-				MinTimes(3)
-
-			status, err := operatorSyncPolicy.Upgrade(mockParam)
+		It("update cluster spec", func() {
+			By("update cluster spec")
+			status, err := policy.Upgrade(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			status, err = operatorSyncPolicy.Upgrade(mockParam)
-			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(BeEquivalentTo(ESNone))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(rctx.ClusterComponent.Configs[0].VersionHash).Should(Equal(rctx.getTargetVersionHash()))
+			Expect(rctx.ClusterComponent.Configs[0].Variables).Should(HaveKeyWithValue("a", "c b e f"))
 		})
-	})
 
-	Context("sync reconfigure policy with selector test", func() {
-		It("Should success without error", func() {
-			By("prepare reconfigure policy params")
-			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
-					return reconfigureClient, nil
-				}),
-				withMockInstanceSet(3, nil),
-				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(&core.ConfigPatchInfo{
-					IsModify: true,
-					UpdateConfig: map[string][]byte{
-						"for-test": []byte(`{"a":"c b e f"}`),
-					},
-				}),
-				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
-					MergeReloadAndRestart:           pointer.Bool(false),
-					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
-					ReloadAction: &parametersv1alpha1.ReloadAction{
-						TargetPodSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"primary": "true",
-							},
+		It("status replicas - partially updated", func() {
+			By("update cluster spec")
+			status, err := policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
+
+			By("mock the instance status")
+			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
+				{
+					PodName: "0",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:        rctx.ConfigTemplate.Name,
+							VersionHash: rctx.getTargetVersionHash(),
 						},
 					},
-				}),
-				withClusterComponent(3))
+				},
+			}
 
-			By("mock client get pod caller")
-			k8sMockClient.MockListMethod(testutil.WithListReturned(
-				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
-						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
-							if index == 0 {
-								if pod.Labels == nil {
-									pod.Labels = make(map[string]string)
-								}
-								pod.Labels["primary"] = "true"
-							}
-						}))),
-				testutil.WithAnyTimes()))
+			By("status check")
+			status, err = policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
+		})
 
-			By("mock client patch caller")
-			// mock client update caller
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithTimes(1)))
+		It("status replicas - all", func() {
+			By("update cluster spec")
+			status, err := policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			By("mock remote online update caller")
-			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
-				Times(1)
+			By("mock the instance status")
+			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
+				{
+					PodName: "0",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:        rctx.ConfigTemplate.Name,
+							VersionHash: rctx.getTargetVersionHash(),
+						},
+					},
+				},
+				{
+					PodName: "1",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:        rctx.ConfigTemplate.Name,
+							VersionHash: rctx.getTargetVersionHash(),
+						},
+					},
+				},
+				{
+					PodName: "2",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:        rctx.ConfigTemplate.Name,
+							VersionHash: rctx.getTargetVersionHash(),
+						},
+					},
+				},
+			}
 
-			status, err := operatorSyncPolicy.Upgrade(mockParam)
+			By("status check")
+			status, err = policy.Upgrade(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(1))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
 		})
 	})
-
 })

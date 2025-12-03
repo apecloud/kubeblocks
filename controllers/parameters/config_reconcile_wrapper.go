@@ -26,10 +26,10 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
@@ -41,7 +41,7 @@ type ReconcileContext struct {
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	InstanceSetList []workloads.InstanceSet
+	ITS *workloads.InstanceSet
 
 	ConfigRender   *parametersv1alpha1.ParamConfigRenderer
 	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
@@ -74,17 +74,14 @@ func (c *ReconcileContext) GetRelatedObjects() error {
 }
 
 func (c *ReconcileContext) Workload() *ReconcileContext {
-	instanceSetFn := func() (err error) {
-		c.InstanceSetList, err = retrieveRelatedComponentsByConfigmap(
-			c.Client,
-			c.Context,
-			generics.InstanceSetSignature,
-			client.ObjectKeyFromObject(c.ConfigMap),
-			client.InNamespace(c.Namespace),
-			c.MatchingLabels)
-		return
-	}
-	return c.Wrap(instanceSetFn)
+	return c.Wrap(func() error {
+		itsKey := client.ObjectKey{
+			Namespace: c.Namespace,
+			Name:      constant.GenerateWorkloadNamePattern(c.ClusterName, c.ComponentName),
+		}
+		c.ITS = &workloads.InstanceSet{}
+		return c.Client.Get(c.Context, itsKey, c.ITS)
+	})
 }
 
 func (c *ReconcileContext) SynthesizedComponent() *ReconcileContext {

@@ -22,9 +22,6 @@ package parameters
 import (
 	"strings"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -33,7 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
@@ -64,23 +60,13 @@ type reconfigureContext struct {
 	intctrlutil.RequestCtx
 	Client client.Client
 
-	Cluster        *appsv1.Cluster
 	ConfigTemplate appsv1.ComponentFileTemplate
+	VersionHash    string // the version hash of the new configuration
 
-	// Associated component for cluster.
-	ClusterComponent *appsv1.ClusterComponentSpec
-
-	// Associated component for component and component definition.
+	Cluster              *appsv1.Cluster
+	ClusterComponent     *appsv1.ClusterComponentSpec
 	SynthesizedComponent *component.SynthesizedComponent
-
-	// List of InstanceSet using this config template.
-	InstanceSetUnits []workloads.InstanceSet
-
-	// Configmap object of the configuration template instance in the component.
-	ConfigMap *corev1.ConfigMap
-
-	// For grpc factory
-	ReconfigureClientFactory createReconfigureClient
+	ITS                  *workloads.InstanceSet // TODO: use cluster or component API?
 
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
 	ParametersDef     *parametersv1alpha1.ParametersDefinitionSpec
@@ -93,23 +79,8 @@ type reconfigurePolicy interface {
 }
 
 var (
-	// lazy creation of grpc connection
-	// TODO support connection pool
-	newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			return nil, err
-		}
-		return cfgproto.NewReconfigureClient(conn), nil
-	}
-
 	upgradePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
 )
-
-// getClientFactory support ut mock
-func getClientFactory() createReconfigureClient {
-	return newGRPCClient
-}
 
 func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
 	upgradePolicyMap[policy] = action
@@ -125,17 +96,11 @@ func (param *reconfigureContext) generateConfigIdentifier() string {
 }
 
 func (param *reconfigureContext) getTargetVersionHash() string {
-	hash, err := util.ComputeHash(param.ConfigMap.Data)
-	if err != nil {
-		param.Log.Error(err, "failed to get configuration version!")
-		return ""
-	}
-
-	return hash
+	return param.VersionHash
 }
 
-func (param *reconfigureContext) getTargetReplicas() int {
-	return int(param.ClusterComponent.Replicas)
+func (param *reconfigureContext) getTargetReplicas() int32 {
+	return param.ClusterComponent.Replicas
 }
 
 func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
@@ -146,6 +111,15 @@ func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
 		return !core.IsWatchModuleForShellTrigger(reloadAction.ShellTrigger)
 	}
 	return false
+}
+
+func computeTargetVersionHash(rctx intctrlutil.RequestCtx, data map[string]string) string {
+	hash, err := util.ComputeHash(data)
+	if err != nil {
+		rctx.Log.Error(err, "failed to get configuration version!")
+		return ""
+	}
+	return hash
 }
 
 func withSucceed(succeedCount int32) func(status *returnedStatus) {

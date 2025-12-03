@@ -60,10 +60,10 @@ func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesized
 }
 
 func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
-	InjectEnvVars4Containers(synthesizedComp, envVars, envFromSources, nil)
+	injectEnvVars4Containers(synthesizedComp, envVars, envFromSources, nil)
 }
 
-func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar,
+func injectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar,
 	envFromSources []corev1.EnvFromSource, filter func(container *corev1.Container) bool) {
 	for _, cc := range []*[]corev1.Container{&synthesizedComp.PodSpec.InitContainers, &synthesizedComp.PodSpec.Containers} {
 		for i := range *cc {

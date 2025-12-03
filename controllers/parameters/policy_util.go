@@ -20,14 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"context"
 	"fmt"
-	"net"
-	"net/netip"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -36,27 +31,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// GetComponentPods gets all pods of the component.
-func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {
-	componentPods := make([]corev1.Pod, 0)
-	for i := range params.InstanceSetUnits {
-		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx, params.Client, &params.InstanceSetUnits[i])
-		if err != nil {
-			return nil, err
-		}
-		componentPods = append(componentPods, pods...)
-	}
-	return componentPods, nil
-}
-
-// CheckReconfigureUpdateProgress checks pods of the component is ready.
-func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
+func checkReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
 	var (
 		readyPods        int32 = 0
 		cfgAnnotationKey       = core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
@@ -72,100 +50,27 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 }
 
 func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
-	if len(params.InstanceSetUnits) > 1 {
-		return nil, core.MakeError("component require only one InstanceSet, actual %d components", len(params.InstanceSetUnits))
-	}
-
-	if len(params.InstanceSetUnits) == 0 {
-		return nil, nil
-	}
-
-	pods, err := GetComponentPods(params)
-	if err != nil {
+	var (
+		ctx     = params.Ctx
+		cli     = params.Client
+		podList = &corev1.PodList{}
+		opts    = []client.ListOption{
+			client.InNamespace(params.SynthesizedComponent.Namespace),
+			client.MatchingLabels(constant.GetCompLabels(params.SynthesizedComponent.ClusterName, params.SynthesizedComponent.Name)),
+		}
+	)
+	if err := cli.List(ctx, podList, opts...); err != nil {
 		return nil, err
 	}
 
 	if params.SynthesizedComponent != nil {
 		instanceset.SortPods(
-			pods,
+			podList.Items,
 			instanceset.ComposeRolePriorityMap(params.SynthesizedComponent.Roles),
 			true,
 		)
 	}
-	return pods, nil
-}
-
-// TODO commonOnlineUpdateWithPod migrate to sql command pipeline
-func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
-	address, err := resolveReloadServerGrpcURL(pod)
-	if err != nil {
-		return err
-	}
-	client, err := createClient(address)
-	if err != nil {
-		return err
-	}
-
-	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
-		ConfigSpec: configSpec,
-		Params:     updatedParams,
-		ConfigFile: ptr.To(configFile),
-	})
-	if err != nil {
-		return err
-	}
-
-	errMessage := response.GetErrMessage()
-	if errMessage != "" {
-		return core.MakeError("%s", errMessage)
-	}
-	return nil
-}
-
-func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
-	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
-	if pod.Spec.HostNetwork {
-		containerPort, err := parameters.ResolveReloadServerGRPCPort(pod.Spec.Containers)
-		if err != nil {
-			return "", err
-		}
-		podPort = int(containerPort)
-	}
-	return generateGrpcURL(pod, podPort)
-}
-
-func generateGrpcURL(pod *corev1.Pod, portPort int) (string, error) {
-	ip, err := ipAddressFromPod(pod.Status)
-	if err != nil {
-		return "", err
-	}
-	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
-}
-
-func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
-	// IPv4 address priority
-	for _, ip := range status.PodIPs {
-		address, err := netip.ParseAddr(ip.IP)
-		if err != nil || address.Is6() {
-			continue
-		}
-		return net.ParseIP(ip.IP), nil
-	}
-
-	// Using status.PodIP
-	address := net.ParseIP(status.PodIP)
-	if !validIPv4Address(address) && !validIPv6Address(address) {
-		return nil, fmt.Errorf("%s is not a valid IPv4/IPv6 address", status.PodIP)
-	}
-	return address, nil
-}
-
-func validIPv4Address(ip net.IP) bool {
-	return ip != nil && ip.To4() != nil
-}
-
-func validIPv6Address(ip net.IP) bool {
-	return ip != nil && ip.To16() != nil
+	return podList.Items, nil
 }
 
 func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
@@ -236,7 +141,6 @@ func (r reconfigureTask) ExecReload() (returnedStatus, error) {
 	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
-
 	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
 }
 
@@ -255,7 +159,7 @@ func resolveReloadActionPolicy(jsonPatch string,
 		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = parametersv1alpha1.RestartPolicy
-	case cfgcm.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
+	case parameters.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
 		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
 	case enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
 		policy = parametersv1alpha1.SyncDynamicReloadPolicy
@@ -310,22 +214,22 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 }
 
 func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
-	reCtx := reconfigureContext{
-		RequestCtx:               rctx.RequestCtx,
-		Client:                   rctx.Client,
-		ConfigTemplate:           *templateSpec,
-		ConfigMap:                rctx.ConfigMap,
-		ParametersDef:            &pd.Spec,
-		ConfigDescription:        configDescription,
-		Cluster:                  rctx.ClusterObj,
-		InstanceSetUnits:         rctx.InstanceSetList,
-		ClusterComponent:         rctx.ClusterComObj,
-		SynthesizedComponent:     rctx.BuiltinComponent,
-		ReconfigureClientFactory: getClientFactory(),
-		Patch:                    patch,
+	return reconfigureTask{
+		ReloadPolicy: reloadPolicy,
+		taskCtx: reconfigureContext{
+			RequestCtx:           rctx.RequestCtx,
+			Client:               rctx.Client,
+			ConfigTemplate:       *templateSpec,
+			VersionHash:          computeTargetVersionHash(rctx.RequestCtx, rctx.ConfigMap.Data),
+			ParametersDef:        &pd.Spec,
+			ConfigDescription:    configDescription,
+			Cluster:              rctx.ClusterObj,
+			ClusterComponent:     rctx.ClusterComObj,
+			SynthesizedComponent: rctx.BuiltinComponent,
+			ITS:                  rctx.ITS,
+			Patch:                patch,
+		},
 	}
-
-	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}
 }
 
 func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) reconfigureTask {
@@ -335,33 +239,11 @@ func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *Reconc
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,
 			ConfigTemplate:       *configTemplate,
+			VersionHash:          computeTargetVersionHash(rctx.RequestCtx, rctx.ConfigMap.Data),
 			ClusterComponent:     rctx.ClusterComObj,
 			Cluster:              rctx.ClusterObj,
 			SynthesizedComponent: rctx.BuiltinComponent,
-			InstanceSetUnits:     rctx.InstanceSetList,
-			ConfigMap:            rctx.ConfigMap,
+			ITS:                  rctx.ITS,
 		},
 	}
-}
-
-func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
-	params := make(map[string]string)
-	dynamicAction := parameters.NeedDynamicReloadAction(paramDef)
-	needReloadStaticParams := parameters.ReloadStaticParameters(paramDef)
-	visualizedParams := core.GenerateVisualizedParamsList(configPatch, []parametersv1alpha1.ComponentConfigDescription{description})
-
-	for _, key := range visualizedParams {
-		if key.UpdateType != core.UpdatedType {
-			continue
-		}
-		for _, p := range key.Parameters {
-			if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
-				continue
-			}
-			if p.Value != nil {
-				params[p.Key] = *p.Value
-			}
-		}
-	}
-	return params
 }

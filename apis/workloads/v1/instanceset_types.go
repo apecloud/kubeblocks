@@ -504,7 +504,7 @@ type LifecycleActions struct {
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
-	// Defines the procedure that update a replica with new configuration.
+	// Defines the procedure that update replicas with new configuration.
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
@@ -514,8 +514,15 @@ type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
-	// The generation of the config.
-	Generation int64 `json:"generation"`
+	// The generation of the config content.
+	//
+	// +optional
+	Generation int64 `json:"generation,omitempty"`
+
+	// The versioned hash of the config content.
+	//
+	// +optional
+	VersionHash string `json:"versionHash,omitempty"`
 
 	// The custom reconfigure action.
 	//
@@ -566,8 +573,13 @@ type InstanceConfigStatus struct {
 
 	// The generation of the config.
 	//
-	// +kubebuilder:validation:Required
-	Generation int64 `json:"generation"`
+	// +optional
+	Generation int64 `json:"generation,omitempty"`
+
+	// The hash of the config content.
+	//
+	// +optional
+	VersionHash string `json:"versionHash,omitempty"`
 }
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate

@@ -259,7 +259,7 @@ func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, par
 	if finished {
 		return intctrlutil.Reconciled()
 	}
-	return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "")
+	return intctrlutil.RequeueAfter(configReconcileInterval, reqCtx.Log, "")
 }
 
 func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bool {

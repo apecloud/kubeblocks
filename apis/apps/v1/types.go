@@ -252,10 +252,42 @@ type ComponentNetwork struct {
 	// +optional
 	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 
-	// Specifies the DNS parameters of a pod.
+	// Specifies the DNS parameters of the pod.
 	//
 	// +optional
 	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
+
+	// HostPorts specifies the mapping of container ports to host ports.
+	// The behavior varies based on the HostNetwork setting:
+	//
+	// 1. When HostNetwork is enabled:
+	//    - If this field is empty: All ports are automatically allocated by the host-port manager.
+	//    - If this field is specified:
+	//      a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
+	//      b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+	//         You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+	//
+	// 2. When HostNetwork is disabled:
+	//    It allows optional mapping for container ports to host ports.
+	//    - Mappings are restricted to ports defined in `cmpd.spec.runtime.containers.ports`.
+	//    - Any specified container ports not present in the runtime definition will be ignored.
+	//
+	// +optional
+	HostPorts []HostPort `json:"hostPorts,omitempty"`
+}
+
+type HostPort struct {
+	// The name of the container port.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The port number of the host port.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Required
+	Port int32 `json:"port"`
 }
 
 type Service struct {

@@ -147,7 +147,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	}
 
 	// release the allocated host-network ports for the component
-	pm := intctrlutil.GetPortManager()
+	pm := intctrlutil.GetPortManager(comp.Spec.Network)
 	if err = pm.ReleaseByPrefix(comp.Name); err != nil {
 		return intctrlutil.NewRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
 	}

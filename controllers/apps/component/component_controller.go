@@ -151,6 +151,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentMonitorContainerTransformer{},
 			// allocate ports for host-network component
 			&componentHostNetworkTransformer{},
+			// map for container ports to host ports
+			&componentHostPortTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
 			// handle component system accounts

@@ -415,7 +415,7 @@ func main() {
 		client = multiClusterMgr.GetClient()
 	}
 
-	if err := intctrlutil.InitHostPortManager(mgr.GetClient()); err != nil {
+	if err := intctrlutil.InitDefaultHostPortManager(mgr.GetClient()); err != nil {
 		setupLog.Error(err, "unable to init port manager")
 		os.Exit(1)
 	}

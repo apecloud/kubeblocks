@@ -626,7 +626,7 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
 	// +kubebuilder:validation:Required
-	Shards int32 `json:"shards,omitempty"`
+	Shards int32 `json:"shards"`
 }
 
 // ClusterService defines a service that is exposed externally, allowing entities outside the cluster to access it.

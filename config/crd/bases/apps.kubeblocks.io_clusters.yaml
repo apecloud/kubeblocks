@@ -13552,6 +13552,7 @@ spec:
                       type: object
                   required:
                   - name
+                  - shards
                   - template
                   type: object
                 maxItems: 128

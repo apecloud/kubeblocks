@@ -328,7 +328,7 @@ func (m *portManager) AllocatePort(key string) (int32, error) {
 	}
 
 	if len(m.used) >= int(m.to-m.from)+1 {
-		return 0, fmt.Errorf("no available port")
+		return 0, fmt.Errorf("no available port: %s", key)
 	}
 
 	for {
@@ -399,7 +399,7 @@ func (m *definedPortManager) AllocatePort(key string) (int32, error) {
 	if m.isKBAgentPortNNotDefinedInKey(key) {
 		return m.defaultPortManager.AllocatePort(key)
 	}
-	return 0, fmt.Errorf("no available port")
+	return 0, fmt.Errorf("no available port: %s", key)
 
 }
 
@@ -427,10 +427,10 @@ func (m *definedPortManager) isKBAgentPortNNotDefined(containerName, portName st
 
 func (m *definedPortManager) isKBAgentPortNNotDefinedInKey(key string) bool {
 	subs := strings.Split(key, "-")
-	if len(subs) != 4 {
+	if len(subs) < 4 {
 		return false
 	}
-	return m.isKBAgentPortNNotDefined(subs[2], subs[3])
+	return m.isKBAgentPortNNotDefined(subs[len(subs)-2], subs[len(subs)-1])
 }
 
 func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.HostPort) *definedPortManager {

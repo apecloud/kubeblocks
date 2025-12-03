@@ -75,10 +75,11 @@ type SynthesizedComponent struct {
 	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
 	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
 	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
-	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
-	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
-	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
-	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
+	Network                          *kbappsv1.ComponentNetwork
+	HostNetwork                      *kbappsv1.HostNetwork       `json:"hostNetwork,omitempty"`
+	ComponentServices                []kbappsv1.ComponentService `json:"componentServices,omitempty"`
+	MinReadySeconds                  int32                       `json:"minReadySeconds,omitempty"`
+	DisableExporter                  *bool                       `json:"disableExporter,omitempty"`
 	Stop                             *bool
 	EnableInstanceAPI                *bool
 	InstanceAssistantObjects         []corev1.ObjectReference

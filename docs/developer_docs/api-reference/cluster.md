@@ -6153,7 +6153,38 @@ Kubernetes core/v1.PodDNSConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the DNS parameters of a pod.</p>
+<p>Specifies the DNS parameters of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostPort">
+[]HostPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>HostPorts specifies the mapping of container ports to host ports.
+The behavior varies based on the HostNetwork setting:</p>
+<ol>
+<li><p>When HostNetwork is enabled:</p>
+<ul>
+<li>If this field is empty: All ports are automatically allocated by the host-port manager.</li>
+<li>If this field is specified:
+a) Mappings for all ports defined in <code>cmpd.spec.hostNetwork</code> are MANDATORY.
+b) Mappings for kbagent ports (&ldquo;http&rdquo;, &ldquo;streaming&rdquo;) are OPTIONAL.
+You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.</li>
+</ul></li>
+<li><p>When HostNetwork is disabled:
+It allows optional mapping for container ports to host ports.</p>
+<ul>
+<li>Mappings are restricted to ports defined in <code>cmpd.spec.runtime.containers.ports</code>.</li>
+<li>Any specified container ports not present in the runtime definition will be ignored.</li>
+</ul></li>
+</ol>
 </td>
 </tr>
 </tbody>
@@ -8426,6 +8457,45 @@ ContainerVars
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.HostPort">HostPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentNetwork">ComponentNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the container port.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The port number of the host port.</p>
 </td>
 </tr>
 </tbody>

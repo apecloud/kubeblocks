@@ -49,9 +49,6 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
 		return nil
 	}
-	if synthesizedComp.Stop != nil && *synthesizedComp.Stop {
-		return nil
-	}
 
 	if checkPostProvisionDone(transCtx) {
 		return nil

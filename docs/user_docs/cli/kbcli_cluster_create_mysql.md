@@ -43,7 +43,7 @@ kbcli cluster create mysql NAME [flags]
       --tolerations strings                                         Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology string                                             Topology type of the serve. Note that under the orc/orc-proxysql topology, it is necessary to specify the Orchestrator cluster information. You should choose either orchestrator.cluster-service-selector or orchestrator.service-reference. This means that depending on your setup, you will configure one of these options to properly integrate with the Orchestrator service for managing your MySQL cluster. Legal values [semisync, semisync-proxysql, mgr, mgr-proxysql, orc, orc-proxysql]. (default "semisync")
       --topology-keys stringArray                                   Topology keys for affinity
-      --version string                                              MySQL version Legal values [8.0.39, 8.0.38, 8.0.37, 8.0.36, 8.4.2, 8.4.1, 8.4.0, 5.7.44]. (default "8.0.39")
+      --version string                                              MySQL version Legal values [8.0.39, 8.0.38, 8.0.37, 8.0.36, 8.4.7, 8.4.3, 8.4.2, 8.4.1, 8.4.0, 5.7.44]. (default "8.0.39")
 ```
 
 ### Options inherited from parent commands

@@ -203,14 +203,13 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *componentTransformContext, synthesizedComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
 	var (
-		stop              = isCompStopped(synthesizedComp)
-		start             = !stop && isWorkloadStopped(runningITS)
-		postProvisionDone = checkPostProvisionDone(transCtx)
+		stop  = isCompStopped(synthesizedComp)
+		start = !stop && isWorkloadStopped(runningITS)
 	)
 	if start || stop {
 		*protoITS = runningITS.DeepCopy() // don't modify the runningITS except for the replicas
 	}
-	if stop && postProvisionDone {
+	if stop && checkPostProvisionDone(transCtx) {
 		return start, stop, t.stopWorkload(synthesizedComp, runningITS, *protoITS)
 	}
 	if start {

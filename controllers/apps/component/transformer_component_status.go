@@ -119,7 +119,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}()
 
 	stopped := isCompStopped(t.synthesizeComp)
-	postProvisionDone := checkPostProvisionDone(transCtx)
 
 	hasRunningPods := func() bool {
 		return t.runningITS.Status.Replicas > 0
@@ -167,7 +166,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	switch {
 	case isDeleting:
 		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
-	case stopped && (hasRunningPods || !postProvisionDone):
+	case stopped && (hasRunningPods || !checkPostProvisionDone(transCtx)):
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")

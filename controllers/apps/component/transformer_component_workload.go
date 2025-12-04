@@ -183,7 +183,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 
 func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransformContext, cli model.GraphClient, dag *graph.DAG,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	start, stop, err := t.handleWorkloadStartNStop(synthesizedComp, runningITS, &protoITS)
+	start, stop, err := t.handleWorkloadStartNStop(transCtx, synthesizedComp, runningITS, &protoITS)
 	if err != nil {
 		return err
 	}
@@ -213,8 +213,8 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 	return nil
 }
 
-func (t *componentWorkloadTransformer) handleWorkloadStartNStop(
-	synthesizedComp *component.SynthesizedComponent, runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
+func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *componentTransformContext, synthesizedComp *component.SynthesizedComponent,
+	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
 	var (
 		stop  = isCompStopped(synthesizedComp)
 		start = !stop && isWorkloadStopped(runningITS)
@@ -222,7 +222,7 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(
 	if start || stop {
 		*protoITS = runningITS.DeepCopy() // don't modify the runningITS except for the replicas
 	}
-	if stop {
+	if stop && checkPostProvisionDone(transCtx) {
 		return start, stop, t.stopWorkload(synthesizedComp, runningITS, *protoITS)
 	}
 	if start {

@@ -632,7 +632,7 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
 	// +kubebuilder:validation:Required
-	Shards int32 `json:"shards,omitempty"`
+	Shards int32 `json:"shards"`
 
 	// The default template for generating Components for shards, where each shard consists of one Component.
 	//

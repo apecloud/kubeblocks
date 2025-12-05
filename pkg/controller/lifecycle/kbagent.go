@@ -277,7 +277,7 @@ func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader, labe
 		its := object.(*workloads.InstanceSet)
 		return its.IsInstancesReady()
 	}
-	return a.readyCheck(ctx, cli, "runtime", a.newFetcher(constant.GenerateClusterComponentName(a.clusterName, a.compName), &workloads.InstanceSet{}, labels, &workloads.InstanceSetList{}), ready)
+	return a.readyCheck(ctx, cli, "runtime", a.newFetcher(constant.GenerateWorkloadNamePattern(a.clusterName, a.compName), &workloads.InstanceSet{}, labels, &workloads.InstanceSetList{}), ready)
 }
 
 func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, kind string, fetch fetcher, ready func(object client.Object) bool) error {

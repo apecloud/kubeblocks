@@ -91,9 +91,6 @@ func withShardingLabels(labels map[string]string, extraLabels ...map[string]stri
 			if v, ok := m[KBAppShardTemplateLabelKey]; ok {
 				labels[KBAppShardTemplateLabelKey] = v
 			}
-			if v, ok := m[ShardingDefLabelKey]; ok {
-				labels[ShardingDefLabelKey] = v
-			}
 		}
 	}
 	return labels

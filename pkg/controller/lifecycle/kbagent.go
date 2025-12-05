@@ -242,7 +242,7 @@ func (f *listFetcher) String() string {
 }
 
 func (a *kbagent) newFetcher(name string, obj client.Object, labels client.MatchingLabels, list client.ObjectList) fetcher {
-	if labels == nil || len(labels) == 0 {
+	if len(labels) == 0 {
 		return &objectFetcher{
 			name:      name,
 			namespace: a.namespace,

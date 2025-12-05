@@ -246,6 +246,7 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 	if vertex.Action == nil {
 		return errors.New("vertex action can't be nil")
 	}
+	b.transCtx.logger.V(5).Info("action for vertex", "vertex", vertex.String())
 	ctx := b.transCtx.ctx
 	switch *vertex.Action {
 	case model.CREATE:

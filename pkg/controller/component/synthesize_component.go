@@ -102,7 +102,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
-		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
 		SystemAccounts:                   compDefObj.Spec.SystemAccounts,
 		Replicas:                         comp.Spec.Replicas,
 		Resources:                        comp.Spec.Resources,
@@ -131,6 +130,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		return nil, err
 	}
 
+	buildLifecycleActions(synthesizeComp, compDef, comp)
+
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
 
@@ -157,7 +158,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		return nil, err
 	}
 
-	if err = buildKBAgentContainer(synthesizeComp, comp); err != nil {
+	if err = buildKBAgentContainer(synthesizeComp); err != nil {
 		return nil, errors.Wrap(err, "build kb-agent container failed")
 	}
 
@@ -558,4 +559,17 @@ func getPodUpgradePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefini
 		return *policy
 	}
 	return appsv1.PreferInPlacePodUpdatePolicyType // default
+}
+
+func buildLifecycleActions(synthesizeComp *SynthesizedComponent, compDefObj *appsv1.ComponentDefinition, comp *appsv1.Component) {
+	synthesizedLifecycleActions := &SynthesizedLifecycleActions{}
+	if compDefObj != nil {
+		synthesizedLifecycleActions.ComponentLifecycleActions = compDefObj.Spec.LifecycleActions
+	}
+
+	if comp != nil {
+		synthesizedLifecycleActions.CustomActions = comp.Spec.CustomActions
+	}
+
+	synthesizeComp.LifecycleActions = synthesizedLifecycleActions
 }

@@ -119,12 +119,12 @@ func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.T
 	}, nil
 }
 
-func buildKBAgentContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
+func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if !hasActionDefined(synthesizedComp) {
 		return nil
 	}
 
-	envVars, err := buildKBAgentStartupEnvs(synthesizedComp, comp)
+	envVars, err := buildKBAgentStartupEnvs(synthesizedComp)
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 			SetImage(viper.GetString(constant.KBToolsImage)).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
 			AddCommands(kbAgentCommand).
-			AddEnv(mergedActionEnv4KBAgent(synthesizedComp, comp)...).
+			AddEnv(mergedActionEnv4KBAgent(synthesizedComp)...).
 			AddEnv(envVars...).
 			SetSecurityContext(corev1.SecurityContext{
 				RunAsGroup: &[]int64{1000}[0],
@@ -185,7 +185,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 		return err
 	}
 
-	if err = handleCustomImageNContainerDefined(synthesizedComp, comp, container, workerContainer); err != nil {
+	if err = handleCustomImageNContainerDefined(synthesizedComp, container, workerContainer); err != nil {
 		return err
 	}
 
@@ -214,7 +214,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 	return nil
 }
 
-func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) []corev1.EnvVar {
+func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
 	env := make([]corev1.EnvVar, 0)
 	envSet := sets.New[string]()
 
@@ -229,7 +229,7 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, comp *appsv1
 		}
 	}
 
-	if synthesizedComp.LifecycleActions != nil {
+	if synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 		for _, action := range []*appsv1.Action{
 			synthesizedComp.LifecycleActions.PostProvision,
 			synthesizedComp.LifecycleActions.PreTerminate,
@@ -250,8 +250,10 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, comp *appsv1
 		}
 	}
 
-	for _, action := range comp.Spec.CustomActions {
-		checkedAppend(action.Action)
+	if synthesizedComp.LifecycleActions != nil {
+		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
+			checkedAppend(action.Action)
+		}
 	}
 
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
@@ -261,14 +263,14 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent, comp *appsv1
 	return env
 }
 
-func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) ([]corev1.EnvVar, error) {
+func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.EnvVar, error) {
 	var (
 		actions   []proto.Action
 		probes    []proto.Probe
 		streaming []string
 	)
 
-	if synthesizedComp.LifecycleActions != nil {
+	if synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PostProvision, "postProvision"); a != nil {
 			actions = append(actions, *a)
 		}
@@ -323,9 +325,11 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent, comp *appsv1
 		}
 	})
 
-	for _, action := range comp.Spec.CustomActions {
-		if a := buildAction4KBAgent(action.Action, action.Name); a != nil {
-			actions = append(actions, *a)
+	if synthesizedComp.LifecycleActions != nil {
+		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
+			if a := buildAction4KBAgent(action.Action, action.Name); a != nil {
+				actions = append(actions, *a)
+			}
 		}
 	}
 
@@ -408,8 +412,8 @@ func buildProbe4KBAgent(probe *appsv1.Probe, name, instance string) (*proto.Acti
 	return a, p
 }
 
-func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, comp *appsv1.Component, containers ...*corev1.Container) error {
-	image, c, err := customExecActionImageNContainer(synthesizedComp, comp)
+func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, containers ...*corev1.Container) error {
+	image, c, err := customExecActionImageNContainer(synthesizedComp)
 	if err != nil {
 		return err
 	}
@@ -441,13 +445,13 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 	return nil
 }
 
-func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) (string, *corev1.Container, error) {
+func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, *corev1.Container, error) {
 	if !hasActionDefined(synthesizedComp) {
 		return "", nil, nil
 	}
 
 	actions := make([]*appsv1.Action, 0)
-	if synthesizedComp.LifecycleActions != nil {
+	if synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 		actions = append(actions, []*appsv1.Action{
 			synthesizedComp.LifecycleActions.PostProvision,
 			synthesizedComp.LifecycleActions.PreTerminate,
@@ -469,8 +473,10 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent, comp
 		actions = append(actions, action)
 	})
 
-	for _, action := range comp.Spec.CustomActions {
-		actions = append(actions, action.Action)
+	if synthesizedComp.LifecycleActions != nil {
+		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
+			actions = append(actions, action.Action)
+		}
 	}
 
 	var image, container string
@@ -556,7 +562,8 @@ func iterAvailablePort(port int32, set map[int32]bool) (int32, error) {
 }
 
 func hasActionDefined(synthesizedComp *SynthesizedComponent) bool {
-	if synthesizedComp.LifecycleActions != nil {
+	if synthesizedComp.LifecycleActions != nil &&
+		(synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil || len(synthesizedComp.LifecycleActions.CustomActions) > 0) {
 		return true
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {

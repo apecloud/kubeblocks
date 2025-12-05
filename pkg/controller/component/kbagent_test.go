@@ -27,7 +27,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -42,7 +41,6 @@ import (
 var _ = Describe("kb-agent", func() {
 	var (
 		synthesizedComp *SynthesizedComponent
-		comp            *appsv1.Component
 	)
 
 	cleanEnv := func() {
@@ -90,46 +88,32 @@ var _ = Describe("kb-agent", func() {
 						},
 					},
 				},
-				LifecycleActions: &appsv1.ComponentLifecycleActions{
-					PostProvision: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Command: []string{"echo", "hello"},
-						},
-						TimeoutSeconds: 5,
-						RetryPolicy: &appsv1.RetryPolicy{
-							MaxRetries:    5,
-							RetryInterval: 10,
-						},
-						PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
-					},
-					RoleProbe: &appsv1.Probe{
-						Action: appsv1.Action{
+				LifecycleActions: &SynthesizedLifecycleActions{
+					ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
+						PostProvision: &appsv1.Action{
 							Exec: &appsv1.ExecAction{
 								Command: []string{"echo", "hello"},
 							},
 							TimeoutSeconds: 5,
+							RetryPolicy: &appsv1.RetryPolicy{
+								MaxRetries:    5,
+								RetryInterval: 10,
+							},
+							PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
 						},
-						InitialDelaySeconds: 5,
-						PeriodSeconds:       1,
-						SuccessThreshold:    3,
-						FailureThreshold:    3,
+						RoleProbe: &appsv1.Probe{
+							Action: appsv1.Action{
+								Exec: &appsv1.ExecAction{
+									Command: []string{"echo", "hello"},
+								},
+								TimeoutSeconds: 5,
+							},
+							InitialDelaySeconds: 5,
+							PeriodSeconds:       1,
+							SuccessThreshold:    3,
+							FailureThreshold:    3,
+						},
 					},
-				},
-			}
-			comp = &appsv1.Component{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      "test-cluster-comp",
-					Labels: map[string]string{
-						constant.AppInstanceLabelKey: "test-cluster",
-					},
-					Annotations: map[string]string{
-						constant.KBAppClusterUIDKey:      "uuid",
-						constant.KubeBlocksGenerationKey: "1",
-					},
-				},
-				Spec: appsv1.ComponentSpec{
-					Configs: []appsv1.ClusterComponentConfig{},
 					CustomActions: []appsv1.CustomAction{
 						{
 							Name: "shardAdd",
@@ -147,13 +131,13 @@ var _ = Describe("kb-agent", func() {
 		It("nil", func() {
 			synthesizedComp.LifecycleActions = nil
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 			Expect(kbAgentContainer()).Should(BeNil())
 		})
 
 		It("port", func() {
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()
@@ -169,7 +153,7 @@ var _ = Describe("kb-agent", func() {
 					ContainerPort: kbagent.DefaultHTTPPort,
 				},
 			}
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()
@@ -180,7 +164,7 @@ var _ = Describe("kb-agent", func() {
 		})
 
 		It("startup env", func() {
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()
@@ -205,7 +189,7 @@ var _ = Describe("kb-agent", func() {
 			}
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Env = env
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()
@@ -219,7 +203,7 @@ var _ = Describe("kb-agent", func() {
 			image := "custom-image"
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = image
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			ic := kbAgentInitContainer()
@@ -238,7 +222,7 @@ var _ = Describe("kb-agent", func() {
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = image
 			synthesizedComp.LifecycleActions.RoleProbe.Exec.Image = image
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 		})
 
@@ -248,7 +232,7 @@ var _ = Describe("kb-agent", func() {
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = image1
 			synthesizedComp.LifecycleActions.RoleProbe.Exec.Image = image2
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("only one exec image is allowed in lifecycle actions"))
 		})
@@ -257,7 +241,7 @@ var _ = Describe("kb-agent", func() {
 			container := synthesizedComp.PodSpec.Containers[0]
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			ic := kbAgentInitContainer()
@@ -280,7 +264,7 @@ var _ = Describe("kb-agent", func() {
 			container := synthesizedComp.PodSpec.Containers[0]
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()
@@ -294,7 +278,7 @@ var _ = Describe("kb-agent", func() {
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 			synthesizedComp.LifecycleActions.RoleProbe.Exec.Container = container.Name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 		})
 
@@ -307,7 +291,7 @@ var _ = Describe("kb-agent", func() {
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 			synthesizedComp.LifecycleActions.RoleProbe.Exec.Container = container1.Name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("only one exec container is allowed in lifecycle actions"))
 		})
@@ -316,7 +300,7 @@ var _ = Describe("kb-agent", func() {
 			name := "not-defined"
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf("exec container %s not found", name)))
 		})
@@ -332,7 +316,7 @@ var _ = Describe("kb-agent", func() {
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = container.Image
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			ic := kbAgentInitContainer()
@@ -361,7 +345,7 @@ var _ = Describe("kb-agent", func() {
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = image
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			ic := kbAgentInitContainer()
@@ -427,7 +411,7 @@ var _ = Describe("kb-agent", func() {
 				},
 			}
 
-			err := buildKBAgentContainer(synthesizedComp, comp)
+			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()

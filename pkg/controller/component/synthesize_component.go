@@ -121,6 +121,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 		EnableInstanceAPI:                comp.Spec.EnableInstanceAPI,
+		LifecycleActions: &SynthesizedLifecycleActions{
+			ComponentLifecycleActions: compDefObj.Spec.LifecycleActions,
+			CustomActions:             comp.Spec.CustomActions,
+		},
 	}
 
 	// build scheduling policy for workload
@@ -130,8 +134,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
-
-	buildLifecycleActions(synthesizeComp, compDef, comp)
 
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
@@ -560,17 +562,4 @@ func getPodUpgradePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefini
 		return *policy
 	}
 	return appsv1.PreferInPlacePodUpdatePolicyType // default
-}
-
-func buildLifecycleActions(synthesizeComp *SynthesizedComponent, compDefObj *appsv1.ComponentDefinition, comp *appsv1.Component) {
-	synthesizedLifecycleActions := &SynthesizedLifecycleActions{}
-	if compDefObj != nil {
-		synthesizedLifecycleActions.ComponentLifecycleActions = compDefObj.Spec.LifecycleActions
-	}
-
-	if comp != nil {
-		synthesizedLifecycleActions.CustomActions = comp.Spec.CustomActions
-	}
-
-	synthesizeComp.LifecycleActions = synthesizedLifecycleActions
 }

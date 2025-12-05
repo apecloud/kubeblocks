@@ -96,7 +96,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetSystemAccounts(compSpec.SystemAccounts).
 		SetStop(compSpec.Stop).
 		SetSidecars(nil).
-		SetCustomActions(nil).
 		SetEnableInstanceAPI(compSpec.EnableInstanceAPI)
 	return compBuilder.GetObject(), nil
 }

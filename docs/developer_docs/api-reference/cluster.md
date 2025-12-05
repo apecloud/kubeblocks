@@ -12266,7 +12266,7 @@ Action
 <p>Specifies the hook to be executed after a shard added.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_SHARD_ADD_SHARD_NAME: The name of the shard being added.</li>
+<li>KB_ADD_SHARD_NAME: The name of the shard being added.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -12285,7 +12285,7 @@ Action
 <p>Specifies the hook to be executed prior to remove a shard.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_SHARD_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
+<li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>

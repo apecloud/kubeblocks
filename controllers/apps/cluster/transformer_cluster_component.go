@@ -828,8 +828,8 @@ const (
 	kbShardingAddAction           = "shardAdd"
 	kbShardingRemoveAction        = "shardRemove"
 
-	shardAddShardNameVar    = "KB_SHARD_ADD_SHARD_NAME"
-	shardRemoveShardNameVar = "KB_SHARD_REMOVE_SHARD_NAME"
+	shardAddShardNameVar    = "KB_ADD_SHARD_NAME"
+	shardRemoveShardNameVar = "KB_REMOVE_SHARD_NAME"
 )
 
 func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {

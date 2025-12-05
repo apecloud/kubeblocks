@@ -957,7 +957,7 @@ spec:
                       The container executing this action has access to following variables:
 
 
-                      - KB_SHARD_ADD_SHARD_NAME: The name of the shard being added.
+                      - KB_ADD_SHARD_NAME: The name of the shard being added.
 
 
                       Note: This field is immutable once it has been set.
@@ -1396,7 +1396,7 @@ spec:
                       The container executing this action has access to following variables:
 
 
-                      - KB_SHARD_REMOVE_SHARD_NAME: The name of the shard being removed.
+                      - KB_REMOVE_SHARD_NAME: The name of the shard being removed.
 
 
                       Note: This field is immutable once it has been set.

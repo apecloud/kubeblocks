@@ -250,12 +250,6 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 		}
 	}
 
-	if synthesizedComp.LifecycleActions != nil {
-		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
-			checkedAppend(action.Action)
-		}
-	}
-
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
 		checkedAppend(action)
 	})
@@ -324,14 +318,6 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 			actions = append(actions, *a)
 		}
 	})
-
-	if synthesizedComp.LifecycleActions != nil {
-		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
-			if a := buildAction4KBAgent(action.Action, action.Name); a != nil {
-				actions = append(actions, *a)
-			}
-		}
-	}
 
 	return kbagent.BuildEnv4Server(actions, probes, streaming)
 }
@@ -473,12 +459,6 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		actions = append(actions, action)
 	})
 
-	if synthesizedComp.LifecycleActions != nil {
-		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
-			actions = append(actions, action.Action)
-		}
-	}
-
 	var image, container string
 	for _, action := range actions {
 		if action == nil || action.Exec == nil {
@@ -578,8 +558,13 @@ func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(na
 	// user-defined actions
 	for i, tpl := range synthesizedComp.FileTemplates {
 		if tpl.Reconfigure != nil {
-			name := lifecycle.UDFActionName(UDFReconfigureActionName(tpl))
-			f(name, synthesizedComp.FileTemplates[i].Reconfigure)
+			f(lifecycle.UDFActionName(UDFReconfigureActionName(tpl)), synthesizedComp.FileTemplates[i].Reconfigure)
+		}
+	}
+
+	if synthesizedComp.LifecycleActions != nil {
+		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
+			f(lifecycle.UDFActionName(action.Name), action.Action)
 		}
 	}
 }

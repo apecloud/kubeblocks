@@ -827,6 +827,9 @@ const (
 	kbShardingPreTerminateAction  = "shardPreTerminate"
 	kbShardingAddAction           = "shardAdd"
 	kbShardingRemoveAction        = "shardRemove"
+
+	shardAddShardNameVar    = "KB_SHARD_ADD_SHARD_NAME"
+	shardRemoveShardNameVar = "KB_SHARD_REMOVE_SHARD_NAME"
 )
 
 func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
@@ -1371,14 +1374,14 @@ func buildComponentCustomActions(transCtx *clusterTransformContext, proto, runni
 	if shardingDef.Spec.LifecycleActions.ShardAdd != nil {
 		checkNAppend(kbShardingAddAction, shardingDef.Spec.LifecycleActions.ShardAdd)
 	}
+	if shardingDef.Spec.LifecycleActions.ShardRemove != nil {
+		checkNAppend(kbShardingRemoveAction, shardingDef.Spec.LifecycleActions.ShardRemove)
+	}
 	if shardingDef.Spec.LifecycleActions.PostProvision != nil {
 		checkNAppend(kbShardingPostProvisionAction, shardingDef.Spec.LifecycleActions.PostProvision)
 	}
 	if shardingDef.Spec.LifecycleActions.PreTerminate != nil {
 		checkNAppend(kbShardingPreTerminateAction, shardingDef.Spec.LifecycleActions.PreTerminate)
-	}
-	if shardingDef.Spec.LifecycleActions.ShardRemove != nil {
-		checkNAppend(kbShardingRemoveAction, shardingDef.Spec.LifecycleActions.ShardRemove)
 	}
 
 	if len(customActions) > 0 {
@@ -1390,7 +1393,7 @@ func buildComponentCustomActions(transCtx *clusterTransformContext, proto, runni
 	return nil
 }
 
-func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Component, lifecycleAction *appsv1.ShardingLifecycleActions, shardingName string) (lifecycle.ShardingLifecycle, error) {
+func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
 	synthesizedComp, err := synthesizedComponent(transCtx, comp)
 	if err != nil {
 		return nil, err
@@ -1405,7 +1408,7 @@ func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Co
 		return nil, fmt.Errorf("has no pods to running the sharding lifecycle action")
 	}
 
-	return lifecycle.NewShardingLifecycle(transCtx.Cluster.Namespace, transCtx.Cluster.Name, synthesizedComp.Name, shardingName, lifecycleAction, synthesizedComp.TemplateVars, nil, pods)
+	return lifecycle.New(transCtx.Cluster.Namespace, transCtx.Cluster.Name, synthesizedComp.Name, nil, synthesizedComp.TemplateVars, nil, pods)
 }
 
 func synthesizedComponent(transCtx *clusterTransformContext, comp *appsv1.Component) (*component.SynthesizedComponent, error) {
@@ -1454,31 +1457,29 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 	var checkAnnotationExist bool
 	var annotation string
 	var needsAction func() bool
-	var actionFunc func(lfa lifecycle.ShardingLifecycle) error
+	var action *appsv1.Action
+	var args map[string]string
 	switch actionName {
 	case kbShardingPostProvisionAction:
 		checkAnnotationExist = false
 		annotation = kbShardingPostProvisionKey
+		action = shardingDef.Spec.LifecycleActions.PostProvision
 		needsAction = func() bool {
-			return shardingDef.Spec.LifecycleActions.PostProvision != nil
-		}
-		actionFunc = func(lfa lifecycle.ShardingLifecycle) error {
-			return lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
+			return action != nil
 		}
 	case kbShardingPreTerminateAction:
 		checkAnnotationExist = true
 		annotation = kbShardingPreTerminateDoneKey
+		action = shardingDef.Spec.LifecycleActions.PreTerminate
 		needsAction = func() bool {
-			return shardingDef.Spec.LifecycleActions.PreTerminate != nil
-		}
-		actionFunc = func(lfa lifecycle.ShardingLifecycle) error {
-			return lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
+			return action != nil
 		}
 	case kbShardingRemoveAction:
 		checkAnnotationExist = true
 		annotation = kbShardingRemoveDoneKey
+		action = shardingDef.Spec.LifecycleActions.ShardRemove
 		needsAction = func() bool {
-			if shardingDef.Spec.LifecycleActions.ShardRemove == nil {
+			if action == nil {
 				return false
 			}
 			if comp.Annotations != nil && comp.Annotations[kbShardingAddKey] != "" {
@@ -1487,17 +1488,18 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 			}
 			return true
 		}
-		actionFunc = func(lfa lifecycle.ShardingLifecycle) error {
-			return lfa.ShardRemove(transCtx.Context, transCtx.Client, nil)
+		args = map[string]string{
+			shardRemoveShardNameVar: shardingName,
 		}
 	case kbShardingAddAction:
 		checkAnnotationExist = false
 		annotation = kbShardingAddKey
+		action = shardingDef.Spec.LifecycleActions.ShardAdd
 		needsAction = func() bool {
-			return shardingDef.Spec.LifecycleActions.ShardAdd != nil
+			return action != nil
 		}
-		actionFunc = func(lfa lifecycle.ShardingLifecycle) error {
-			return lfa.ShardAdd(transCtx.Context, transCtx.Client, nil)
+		args = map[string]string{
+			shardAddShardNameVar: shardingName,
 		}
 	default:
 		return fmt.Errorf("unknown sharding lifecycle action: %s", actionName)
@@ -1511,12 +1513,16 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 		return nil
 	}
 
-	lfa, err := lifecycleAction4Sharding(transCtx, comp, shardingDef.Spec.LifecycleActions, shardingName)
+	lfa, err := lifecycleAction4Sharding(transCtx, comp)
 	if err != nil {
 		return err
 	}
 
-	err = actionFunc(lfa)
+	err = lfa.UserDefined(transCtx.Context, transCtx.Client, &lifecycle.Options{
+		PreConditionCheckScope: map[appsv1.PreConditionType]client.MatchingLabels{
+			appsv1.ComponentReadyPreConditionType: constant.GetClusterLabels(transCtx.Cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
+		},
+	}, actionName, action, args)
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {

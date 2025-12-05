@@ -445,7 +445,7 @@ var _ = Describe("kb-agent", func() {
 				},
 			}))
 			Expect(actions).Should(ContainElement(proto.Action{
-				Name: "shardAdd",
+				Name: "udf-shardAdd",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "shardAdd"},
 				},

@@ -1914,6 +1914,17 @@ var _ = Describe("cluster component transformer test", func() {
 			return shardComp, pod
 		}
 
+		mockKBAgent := func(actionName string) {
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "udf-"+actionName {
+						actionDone = true
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+		}
+
 		Context("build component custom actions", func() {
 			It("add all lifecycle actions", func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
@@ -1966,14 +1977,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-						if req.Action == "shardPostProvision" {
-							actionDone = true
-						}
-						return kbagentproto.ActionResponse{}, nil
-					}).AnyTimes()
-				})
+				mockKBAgent(kbShardingPostProvisionAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
@@ -2003,14 +2007,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-						if req.Action == "shardPreTerminate" {
-							actionDone = true
-						}
-						return kbagentproto.ActionResponse{}, nil
-					}).AnyTimes()
-				})
+				mockKBAgent(kbShardingPreTerminateAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
@@ -2065,14 +2062,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-						if req.Action == "shardAdd" {
-							actionDone = true
-						}
-						return kbagentproto.ActionResponse{}, nil
-					}).AnyTimes()
-				})
+				mockKBAgent(kbShardingAddAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
@@ -2102,14 +2092,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-						if req.Action == "shardRemove" {
-							actionDone = true
-						}
-						return kbagentproto.ActionResponse{}, nil
-					}).AnyTimes()
-				})
+				mockKBAgent(kbShardingRemoveAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())

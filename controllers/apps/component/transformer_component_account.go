@@ -199,7 +199,7 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	if len(account.SecretRef.Password) > 0 {
 		passwordKey = account.SecretRef.Password
 	}
-	if len(secret.Data) == 0 || len(secret.Data[passwordKey]) == 0 {
+	if _, ok := secret.Data[passwordKey]; !ok {
 		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
 	}
 	return secret.Data[passwordKey], nil

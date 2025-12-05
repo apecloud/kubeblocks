@@ -7,6 +7,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:
@@ -20,6 +21,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
+  namespace: {{ .Release.Namespace }}
   labels: {{ include "kubeblocks.labels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
@@ -34,6 +36,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.crd.conversion.webhook
+  namespace: {{ .Release.Namespace }}
 data:
   conversion_webhook_patch.json: |
     {
@@ -64,6 +67,7 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-mutating-webhook-configuration
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 webhooks:
@@ -120,6 +124,7 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-validating-webhook-configuration
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 webhooks:

@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   name: kb-addon-{{ include "addon.alertmanager-webhook-adaptor.name" . }}-{{index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"}}
+  namespace: {{ template "kubeblocks.prometheus.namespace" . }}
 data:
   config.yml: |
     receivers: [ ]

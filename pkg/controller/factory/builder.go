@@ -83,7 +83,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetPodUpgradePolicy(synthesizedComp.PodUpgradePolicy).
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
-		SetLifecycleActions(synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars).
+		SetLifecycleActions(getComponentLifecycleActions(synthesizedComp), synthesizedComp.TemplateVars).
 		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
 		SetInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects)
 	if compDef != nil {
@@ -183,6 +183,13 @@ func getPodManagementPolicy(synthesizedComp *component.SynthesizedComponent) app
 		return *synthesizedComp.PodManagementPolicy
 	}
 	return appsv1.OrderedReadyPodManagement // default value
+}
+
+func getComponentLifecycleActions(synthesizedComp *component.SynthesizedComponent) *kbappsv1.ComponentLifecycleActions {
+	if synthesizedComp.LifecycleActions != nil {
+		return synthesizedComp.LifecycleActions.ComponentLifecycleActions
+	}
+	return nil
 }
 
 func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedComponent) *intstr.IntOrString {

@@ -960,6 +960,22 @@ bool
 <p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
+<p>Each custom action defines a specific operation that can be executed,
+will be merged with ComponentLifecycleActions defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -2339,7 +2355,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -3873,9 +3889,9 @@ KubeBlocks dynamically creates and deletes Components based on the difference
 between the desired and actual number of shards.
 KubeBlocks provides lifecycle management for sharding, including:</p>
 <ul>
-<li>Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+<li>Executing the shardAdd Action defined in the ShardingDefinition when the number of shards increases.
 This allows for custom actions to be performed after a new shard is provisioned.</li>
-<li>Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+<li>Executing the shardRemove Action defined in the ShardingDefinition when the number of shards decreases.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
@@ -6832,6 +6848,22 @@ bool
 <p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
+<p>Each custom action defines a specific operation that can be executed,
+will be merged with ComponentLifecycleActions defined in referenced ComponentDefinition.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
@@ -7699,6 +7731,48 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.CustomAction">CustomAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the custom action.</p>
+<p>The name will be used as the action name when invoking the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the action to be performed.</p>
 </td>
 </tr>
 </tbody>
@@ -12190,6 +12264,10 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed after a shard added.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ADD_SHARD_NAME: The name of the shard being added.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12205,6 +12283,10 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed prior to remove a shard.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

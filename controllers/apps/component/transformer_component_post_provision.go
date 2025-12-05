@@ -104,7 +104,7 @@ func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *
 		return nil, fmt.Errorf("has no pods to running the post-provision action")
 	}
 	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods)
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, nil, pods)
 }
 
 func checkPostProvisionDone(transCtx *componentTransformContext) bool {

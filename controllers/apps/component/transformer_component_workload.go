@@ -168,7 +168,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 		return err
 	}
 
-	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions)
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions)
 	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 

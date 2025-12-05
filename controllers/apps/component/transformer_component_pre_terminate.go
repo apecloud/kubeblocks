@@ -167,7 +167,7 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
 	}
 	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods)
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, nil, pods)
 }
 
 func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (*component.SynthesizedComponent, error) {

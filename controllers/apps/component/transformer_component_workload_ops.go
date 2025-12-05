@@ -222,7 +222,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 	}
 
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		lifecycleActions, synthesizedComp.TemplateVars, pod, pods)
+		lifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}
@@ -243,12 +243,12 @@ func (r *componentWorkloadOps) scaleOut() error {
 
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
-	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
 	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
 func (r *componentWorkloadOps) buildDataReplicationTask() error {
-	_, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
+	_, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
 	if !hasDataActionDefined {
 		return nil
 	}
@@ -387,7 +387,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
 	synthesizedComp := r.synthesizeComp
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods)
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}
@@ -460,7 +460,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 		}
 		action = tpl.Reconfigure
 		actionName = component.UDFReconfigureActionName(tpl)
-		if action == nil && synthesizedComp.LifecycleActions != nil {
+		if action == nil && synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 			action = synthesizedComp.LifecycleActions.Reconfigure
 			actionName = "" // default reconfigure action
 		}

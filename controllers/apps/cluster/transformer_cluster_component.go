@@ -803,7 +803,7 @@ func (h *clusterComponentHandler) runningComp(transCtx *clusterTransformContext,
 func (h *clusterComponentHandler) protoComp(transCtx *clusterTransformContext, name string, running *appsv1.Component) (*appsv1.Component, error) {
 	for _, comp := range transCtx.components {
 		if comp.Name == name {
-			return buildComponentWrapper(transCtx, comp, nil, nil, running, nil)
+			return buildComponentWrapper(transCtx, comp, nil, nil, running)
 		}
 	}
 	return nil, fmt.Errorf("cluster component %s not found", name)
@@ -876,15 +876,12 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
-	var shardingDef *appsv1.ShardingDefinition
-	for _, shard := range transCtx.shardings {
-		if name == shard.Name {
-			shardingDef = transCtx.shardingDefs[shard.ShardingDef]
-		}
-	}
-
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range runningComps {
+		var shardingDef *appsv1.ShardingDefinition
+		if runningComps[i].Annotations != nil {
+			shardingDef = transCtx.shardingDefs[runningComps[i].Annotations[constant.ShardingDefAnnotationKey]]
+		}
 		err = doShardingLifecycleAction(transCtx, dag, shardingDef, &runningComps[i], name, kbShardingPreTerminateAction)
 		if err != nil {
 			transCtx.Logger.Error(err, "failed to do shard lifecycle actions", "component", runningComps[i].Name)
@@ -1026,8 +1023,8 @@ func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
 		for i := range tplComps {
 			spec := shardingComps[tplName][i]
 			labels := h.buildLabels(sharding, tplName)
-			annotations := h.buildAnnotations(transCtx, sharding.Name, spec.Name)
-			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running, transCtx.shardingDefs[sharding.ShardingDef])
+			annotations := h.buildAnnotations(transCtx, sharding.Name, spec.Name, transCtx.shardingDefs[sharding.ShardingDef])
+			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
 			if err != nil {
 				return nil, err
 			}
@@ -1051,10 +1048,17 @@ func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding, s
 	return labels
 }
 
-func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformContext, shardingName, compName string) map[string]string {
+func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformContext, shardingName, compName string, shardingDef *appsv1.ShardingDefinition) map[string]string {
 	var annotations map[string]string
 	if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
 		annotations = maps.Clone(compAnnotations)
+	}
+
+	if shardingDef != nil {
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[constant.ShardingDefAnnotationKey] = shardingDef.Name
 	}
 
 	// convert the sharding hostNetwork annotation to the component annotation
@@ -1190,9 +1194,7 @@ func shardingCompNName(comp *appsv1.Component) string {
 	return ""
 }
 
-func buildComponentWrapper(transCtx *clusterTransformContext,
-	spec *appsv1.ClusterComponentSpec, labels, annotations map[string]string,
-	running *appsv1.Component, shardingDef *appsv1.ShardingDefinition) (*appsv1.Component, error) {
+func buildComponentWrapper(transCtx *clusterTransformContext, spec *appsv1.ClusterComponentSpec, labels, annotations map[string]string, running *appsv1.Component) (*appsv1.Component, error) {
 	// cluster.spec.components[*] has no sidecars defined, so we need to build sidecars for it here
 	comp, err := component.BuildComponent(transCtx.Cluster, spec, labels, annotations)
 	if err != nil {
@@ -1201,7 +1203,7 @@ func buildComponentWrapper(transCtx *clusterTransformContext,
 	if err = buildComponentSidecars(transCtx, comp, running); err != nil {
 		return nil, err
 	}
-	if err = buildComponentCustomActions(comp, running, shardingDef); err != nil {
+	if err = buildComponentCustomActions(transCtx, comp, running); err != nil {
 		return nil, err
 	}
 	return comp, nil
@@ -1351,7 +1353,11 @@ func buildComponentSidecar(proto, running *appsv1.Component, sidecarName string,
 	return checkedAppend(sidecar, sidecarDef)
 }
 
-func buildComponentCustomActions(proto, running *appsv1.Component, shardingDef *appsv1.ShardingDefinition) error {
+func buildComponentCustomActions(transCtx *clusterTransformContext, proto, running *appsv1.Component) error {
+	var shardingDef *appsv1.ShardingDefinition
+	if transCtx.shardingDefs != nil {
+		shardingDef = transCtx.shardingDefs[proto.Annotations[constant.ShardingDefAnnotationKey]]
+	}
 	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil {
 		return nil
 	}

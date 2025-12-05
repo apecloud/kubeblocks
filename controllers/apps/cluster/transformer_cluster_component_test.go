@@ -2000,7 +2000,8 @@ var _ = Describe("cluster component transformer test", func() {
 			It("do pre-terminate action successfully", func() {
 				transCtx.shardings = nil
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
-					constant.KBAppClusterUIDKey: "test-uid",
+					constant.KBAppClusterUIDKey:       "test-uid",
+					constant.ShardingDefAnnotationKey: shardingDefName,
 				})
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
 					return []client.Object{shardComp, pod}

@@ -183,85 +183,12 @@ func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *app
 	}
 }
 
-type fetcher interface {
-	Fetch(ctx context.Context, cli client.Reader) ([]client.Object, error)
-	String() string
-}
-
-type objectFetcher struct {
-	name      string
-	namespace string
-	obj       client.Object
-}
-
-func (f *objectFetcher) Fetch(ctx context.Context, cli client.Reader) ([]client.Object, error) {
-	key := types.NamespacedName{
-		Name:      f.name,
-		Namespace: f.namespace,
-	}
-	if err := cli.Get(ctx, key, f.obj); err != nil {
-		return nil, err
-	}
-	return []client.Object{f.obj}, nil
-}
-
-func (f *objectFetcher) String() string {
-	return fmt.Sprintf("namespace: %s, name: %s", f.namespace, f.name)
-}
-
-type listFetcher struct {
-	namespace   string
-	matchLabels client.MatchingLabels
-	list        client.ObjectList
-}
-
-func (f *listFetcher) Fetch(ctx context.Context, cli client.Reader) ([]client.Object, error) {
-	opts := []client.ListOption{
-		client.InNamespace(f.namespace),
-	}
-	if len(f.matchLabels) > 0 {
-		opts = append(opts, f.matchLabels)
-	}
-	if err := cli.List(ctx, f.list, opts...); err != nil {
-		return nil, err
-	}
-
-	var objs []client.Object
-	items, err := meta.ExtractList(f.list)
-	if err != nil {
-		return nil, err
-	}
-	for _, item := range items {
-		objs = append(objs, item.(client.Object))
-	}
-	return objs, nil
-}
-
-func (f *listFetcher) String() string {
-	return fmt.Sprintf("namespace: %s, matchLabels: %v", f.namespace, f.matchLabels)
-}
-
-func (a *kbagent) newFetcher(name string, obj client.Object, labels client.MatchingLabels, list client.ObjectList) fetcher {
-	if len(labels) == 0 {
-		return &objectFetcher{
-			name:      name,
-			namespace: a.namespace,
-			obj:       obj,
-		}
-	}
-	return &listFetcher{
-		namespace:   a.namespace,
-		matchLabels: labels,
-		list:        list,
-	}
-}
-
 func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
 	ready := func(object client.Object) bool {
 		cluster := object.(*appsv1.Cluster)
 		return cluster.Status.Phase == appsv1.RunningClusterPhase
 	}
-	return a.readyCheck(ctx, cli, "cluster", a.newFetcher(a.clusterName, &appsv1.Cluster{}, labels, &appsv1.ClusterList{}), ready)
+	return a.readyCheck(ctx, cli, a.clusterName, "cluster", &appsv1.Cluster{}, &appsv1.ClusterList{}, ready, labels)
 }
 
 func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
@@ -269,7 +196,7 @@ func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader, labels 
 		comp := object.(*appsv1.Component)
 		return comp.Status.Phase == appsv1.RunningComponentPhase
 	}
-	return a.readyCheck(ctx, cli, "component", a.newFetcher(constant.GenerateClusterComponentName(a.clusterName, a.compName), &appsv1.Component{}, labels, &appsv1.ComponentList{}), ready)
+	return a.readyCheck(ctx, cli, constant.GenerateClusterComponentName(a.clusterName, a.compName), "component", &appsv1.Component{}, &appsv1.ComponentList{}, ready, labels)
 }
 
 func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
@@ -277,20 +204,46 @@ func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader, labe
 		its := object.(*workloads.InstanceSet)
 		return its.IsInstancesReady()
 	}
-	return a.readyCheck(ctx, cli, "runtime", a.newFetcher(constant.GenerateWorkloadNamePattern(a.clusterName, a.compName), &workloads.InstanceSet{}, labels, &workloads.InstanceSetList{}), ready)
+	return a.readyCheck(ctx, cli, constant.GenerateWorkloadNamePattern(a.clusterName, a.compName), "runtime", &workloads.InstanceSet{}, &workloads.InstanceSetList{}, ready, labels)
 }
 
-func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, kind string, fetch fetcher, ready func(object client.Object) bool) error {
-	objs, err := fetch.Fetch(ctx, cli)
-	if err != nil {
-		return err
+func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string,
+	obj client.Object, objList client.ObjectList, ready func(object client.Object) bool, labels client.MatchingLabels) error {
+	objs := make([]client.Object, 0)
+	if len(labels) == 0 {
+		key := types.NamespacedName{
+			Namespace: a.namespace,
+			Name:      name,
+		}
+		if err := cli.Get(ctx, key, obj); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+		}
+		objs = append(objs, obj)
+	} else {
+		listObjs := func() error {
+			if err := cli.List(ctx, objList, client.InNamespace(a.namespace), labels); err != nil {
+				return err
+			}
+			items, err := meta.ExtractList(objList)
+			if err != nil {
+				return err
+			}
+			for _, item := range items {
+				objs = append(objs, item.(client.Object))
+			}
+			return nil
+		}
+
+		if err := listObjs(); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+		}
 	}
 	if len(objs) == 0 {
-		return fmt.Errorf("%w: no %s found for %s", ErrPreconditionFailed, kind, fetch.String())
+		return fmt.Errorf("%w: no %s found", ErrPreconditionFailed, kind)
 	}
 
-	for _, obj := range objs {
-		if !ready(obj) {
+	for _, o := range objs {
+		if !ready(o) {
 			return fmt.Errorf("%w: %s is not ready", ErrPreconditionFailed, kind)
 		}
 	}

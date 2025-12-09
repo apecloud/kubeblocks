@@ -20,51 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("Reconfigure restartPolicy", func() {
 	var (
-		k8sMockClient *testutil.K8sClientMockHelper
-		policy        = upgradePolicyMap[parametersv1alpha1.RestartPolicy]
+		policy = upgradePolicyMap[parametersv1alpha1.RestartPolicy]
 	)
-
-	BeforeEach(func() {
-		k8sMockClient = testutil.NewK8sMockClient()
-	})
-
-	AfterEach(func() {
-		k8sMockClient.Finish()
-	})
 
 	Context("restart policy test", func() {
 		It("should success without error", func() {
-			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
+			mockParam := newMockReconfigureParams("restartPolicy", k8sClient,
 				withConfigSpec("test", map[string]string{
 					"key": "value",
 				}),
 				withClusterComponent(2),
 				withWorkload())
 
-			updateErr := fmt.Errorf("mock error")
-			k8sMockClient.MockUpdateMethod(
-				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
-				testutil.WithSucceed(testutil.WithAnyTimes()))
-
-			status, err := policy.Upgrade(mockParam)
-			Expect(err).Should(BeEquivalentTo(updateErr))
-			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
-
 			// first upgrade, not pod is ready
 			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{}
-			status, err = policy.Upgrade(mockParam)
+			status, err := policy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
 			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(0)))

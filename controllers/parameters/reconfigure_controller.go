@@ -214,7 +214,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			configPatch.UpdateConfig))
 	}
 
-	tasks, err := genReconfigureActionTasks(configSpec, rctx, configPatch, forceRestart)
+	tasks, err := buildReconfigureTasks(configSpec, rctx, configPatch, forceRestart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -234,15 +234,15 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, tasks []reconfigureTask) (ctrl.Result, error) {
 	var (
 		err        error
 		status     returnedStatus
 		reloadType string
 	)
-	for _, task := range reloadTasks {
-		reloadType = task.ReloadType()
-		status, err = task.ExecReload()
+	for _, task := range tasks {
+		reloadType = string(task.policy)
+		status, err = task.reconfigure()
 		if err != nil || status.Status != ESNone {
 			break
 		}

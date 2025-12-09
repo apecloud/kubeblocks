@@ -28,29 +28,19 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-type ReloadAction interface {
-	ExecReload() (returnedStatus, error)
-	ReloadType() string
-}
-
 type reconfigureTask struct {
-	parametersv1alpha1.ReloadPolicy
+	policy  parametersv1alpha1.ReloadPolicy
 	taskCtx reconfigureContext
 }
 
-func (r reconfigureTask) ReloadType() string {
-	return string(r.ReloadPolicy)
-}
-
-func (r reconfigureTask) ExecReload() (returnedStatus, error) {
-	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
+func (r reconfigureTask) reconfigure() (returnedStatus, error) {
+	if executor, ok := upgradePolicyMap[r.policy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
-	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
+	return returnedStatus{}, fmt.Errorf("unknown reconfigure policy: %s", r.policy)
 }
 
-func resolveReloadActionPolicy(jsonPatch string,
-	format *parametersv1alpha1.FileFormatConfig,
+func resolveReconfigurePolicy(jsonPatch string, format *parametersv1alpha1.FileFormatConfig,
 	pd *parametersv1alpha1.ParametersDefinitionSpec) (parametersv1alpha1.ReloadPolicy, error) {
 	var policy = parametersv1alpha1.NonePolicy
 	dynamicUpdate, err := core.CheckUpdateDynamicParameters(format, pd, jsonPatch)
@@ -74,14 +64,12 @@ func resolveReloadActionPolicy(jsonPatch string,
 	return policy, nil
 }
 
-// genReconfigureActionTasks generates a list of reconfiguration tasks based on the provided templateSpec,
-// reconfiguration context, configuration patch, and a restart flag.
-func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]ReloadAction, error) {
-	var tasks []ReloadAction
+func buildReconfigureTasks(templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]reconfigureTask, error) {
+	var tasks []reconfigureTask
 
 	// If the patch or ConfigRender is nil, return a single restart task.
 	if patch == nil || rctx.ConfigRender == nil {
-		return []ReloadAction{buildRestartTask(templateSpec, rctx)}, nil
+		return []reconfigureTask{buildRestartTask(templateSpec, rctx)}, nil
 	}
 
 	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
@@ -100,27 +88,32 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx 
 			continue
 		}
 		// Determine the appropriate ReloadPolicy.
-		policy, err := resolveReloadActionPolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
+		policy, err := resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
 		if err != nil {
 			return nil, err
 		}
 		// If a reload action is needed, append a new reload action task to the tasks slice.
 		if needReloadAction(pd, policy) {
-			tasks = append(tasks, buildReloadActionTask(policy, templateSpec, rctx, pd, configFormat, patch))
+			tasks = append(tasks, buildReloadTask(policy, templateSpec, rctx, pd, configFormat, patch))
 		}
 	}
 
 	// If no tasks were added, return a single restart task.
 	if len(tasks) == 0 {
-		return []ReloadAction{buildRestartTask(templateSpec, rctx)}, nil
+		return []reconfigureTask{buildRestartTask(templateSpec, rctx)}, nil
 	}
 
 	return tasks, nil
 }
 
-func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
+func buildReloadTask(policy parametersv1alpha1.ReloadPolicy,
+	templateSpec *appsv1.ComponentFileTemplate,
+	rctx *ReconcileContext,
+	pd *parametersv1alpha1.ParametersDefinition,
+	configDescription *parametersv1alpha1.ComponentConfigDescription,
+	patch *core.ConfigPatchInfo) reconfigureTask {
 	return reconfigureTask{
-		ReloadPolicy: reloadPolicy,
+		policy: policy,
 		taskCtx: reconfigureContext{
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,
@@ -139,7 +132,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 
 func buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) reconfigureTask {
 	return reconfigureTask{
-		ReloadPolicy: parametersv1alpha1.RestartPolicy,
+		policy: parametersv1alpha1.RestartPolicy,
 		taskCtx: reconfigureContext{
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,

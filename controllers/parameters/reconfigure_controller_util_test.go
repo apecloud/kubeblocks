@@ -20,13 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,14 +42,6 @@ var (
 	defaultNamespace = "default"
 	// itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.InstanceSetKind)
 )
-
-func newMockRunningComponent() *appsv1.Component {
-	return &appsv1.Component{
-		Status: appsv1.ComponentStatus{
-			Phase: appsv1.RunningComponentPhase,
-		},
-	}
-}
 
 type paramsOps func(params *reconfigureContext)
 
@@ -161,62 +151,6 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...pa
 		}
 	}
 	return params
-}
-
-func newMockPodsWitheContext(ctx reconfigureContext, replicas int, options ...podOptions) []corev1.Pod {
-	pods := make([]corev1.Pod, replicas)
-	for i := 0; i < replicas; i++ {
-		pods[i] = newMockPod(ctx.SynthesizedComponent.Name+"-"+fmt.Sprint(i), ctx.SynthesizedComponent.PodSpec)
-		// pods[i].OwnerReferences = []metav1.OwnerReference{newControllerRef(its, itsSchemaKind)}
-		pods[i].Status.PodIP = "1.1.1.1"
-	}
-	for _, customFn := range options {
-		for i := range pods {
-			pod := &pods[i]
-			customFn(pod, i)
-		}
-	}
-	return pods
-}
-
-func withReadyPod(rMin, rMax int) podOptions {
-	return func(pod *corev1.Pod, index int) {
-		if index < rMin || index >= rMax {
-			return
-		}
-
-		if pod.Status.Conditions == nil {
-			pod.Status.Conditions = make([]corev1.PodCondition, 0)
-		}
-
-		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
-			Type:   corev1.PodReady,
-			Status: corev1.ConditionTrue,
-		})
-
-		pod.Status.Phase = corev1.PodRunning
-	}
-}
-
-func fromPodObjectList(pods []corev1.Pod) []runtime.Object {
-	objs := make([]runtime.Object, len(pods))
-	for i := 0; i < len(pods); i++ {
-		objs[i] = &pods[i]
-	}
-	return objs
-}
-
-type podOptions func(pod *corev1.Pod, index int)
-
-func newMockPod(podName string, podSpec *corev1.PodSpec) corev1.Pod {
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: defaultNamespace,
-		},
-	}
-	pod.Spec = *podSpec.DeepCopy()
-	return pod
 }
 
 func Test_resolveReloadActionPolicy(t *testing.T) {
@@ -334,7 +268,7 @@ func Test_resolveReloadActionPolicy(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveReloadActionPolicy(tt.args.jsonPatch, tt.args.format, tt.args.pd)
+			got, err := resolveReconfigurePolicy(tt.args.jsonPatch, tt.args.format, tt.args.pd)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveReloadActionPolicy(%v, %v, %v)", tt.args.jsonPatch, tt.args.format, tt.args.pd)
 			}

@@ -106,7 +106,6 @@ const (
 type BackupActionSpec struct {
 	// Represents the action to be performed for backing up data.
 	//
-	// +kubebuilder:validation:Required
 	BackupData *BackupDataActionSpec `json:"backupData,omitempty"`
 
 	// Represents a set of actions that should be executed before the backup process begins.

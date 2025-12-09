@@ -2844,13 +2844,25 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>The custom reconfigure action to reload the configuration whenever changes to this config are detected.</p>
+<p>The custom reconfigure action to reload the updated configuration.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>restartOnChange</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart the component to reload the updated configuration.</p>
 </td>
 </tr>
 </tbody>

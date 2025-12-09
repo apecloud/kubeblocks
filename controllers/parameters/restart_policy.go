@@ -34,11 +34,7 @@ var restartPolicyInstance = &restartPolicy{}
 type restartPolicy struct{}
 
 func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
-	rctx.Log.V(1).Info("simple policy begin....")
-
-	s.restart(rctx)
-
-	return syncLatestConfigStatus(rctx), nil
+	return syncUpdatedConfig(rctx, nil, true)
 }
 
 func (s *restartPolicy) restart(rctx reconfigureContext) {

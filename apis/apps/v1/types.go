@@ -539,7 +539,7 @@ type ClusterComponentConfig struct {
 	// +optional
 	VersionHash string `json:"versionHash,omitempty"`
 
-	// The custom reconfigure action to reload the configuration whenever changes to this config are detected.
+	// The custom reconfigure action to reload the updated configuration.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -550,21 +550,10 @@ type ClusterComponentConfig struct {
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
 
-	// The custom reconfigure actions to reload the configuration whenever changes to this config are detected.
-	// It is applicable to the scenario where there are more than one files in the configuration,
-	// and they have different reload actions.
-	//
-	// Each key in the map represents a file name, and the corresponding value is the action to reload the
-	// configuration for that file. It takes precedence over the default @reconfigure action if set.
-	//
-	// The container executing each action has access to following variables:
-	//
-	// - KB_CONFIG_FILES_CREATED: file
-	// - KB_CONFIG_FILES_REMOVED: file
-	// - KB_CONFIG_FILES_UPDATED: checksum
+	// Specifies whether to restart the component to reload the updated configuration.
 	//
 	// +optional
-	// Reconfigures *map[string]Action `json:"reconfigures,omitempty"`
+	RestartOnChange *bool `json:"restartOnChange,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

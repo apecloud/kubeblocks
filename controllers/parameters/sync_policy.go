@@ -45,7 +45,7 @@ func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	if len(updateParams) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
-	return o.sync(rctx, updateParams)
+	return syncUpdatedConfig(rctx, updateParams, false)
 }
 
 func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string {
@@ -73,7 +73,7 @@ func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string
 	return params
 }
 
-func (o *syncPolicy) sync(rctx reconfigureContext, parameters map[string]string) (returnedStatus, error) {
+func syncUpdatedConfig(rctx reconfigureContext, parameters map[string]string, restart bool) (returnedStatus, error) {
 	var config *apisappsv1.ClusterComponentConfig
 	for i, cfg := range rctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == rctx.ConfigTemplate.Name {
@@ -85,12 +85,12 @@ func (o *syncPolicy) sync(rctx reconfigureContext, parameters map[string]string)
 		return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
 	}
 	if config.VersionHash != rctx.getTargetVersionHash() {
-		return o.update(rctx, config, parameters), nil
+		return submitUpdatedConfig(rctx, config, parameters, restart), nil
 	}
 	return syncLatestConfigStatus(rctx), nil
 }
 
-func (o *syncPolicy) update(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string) returnedStatus {
+func submitUpdatedConfig(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) returnedStatus {
 	var (
 		replicas = rctx.getTargetReplicas()
 		// fileName string
@@ -102,6 +102,9 @@ func (o *syncPolicy) update(rctx reconfigureContext, config *apisappsv1.ClusterC
 	// TODO: config file?
 	config.Variables = parameters // TODO: variables vs parameters?
 	config.VersionHash = rctx.getTargetVersionHash()
+	if restart {
+		config.RestartOnChange = ptr.To(true)
+	}
 
 	return makeReturnedStatus(ESRetry, withExpected(replicas), withSucceed(0))
 }

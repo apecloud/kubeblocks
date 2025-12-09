@@ -66,7 +66,7 @@ type reconfigureContext struct {
 	Cluster              *appsv1.Cluster
 	ClusterComponent     *appsv1.ClusterComponentSpec
 	SynthesizedComponent *component.SynthesizedComponent
-	ITS                  *workloads.InstanceSet // TODO: use cluster or component API?
+	its                  *workloads.InstanceSet // TODO: use cluster or component API?
 
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
 	ParametersDef     *parametersv1alpha1.ParametersDefinitionSpec

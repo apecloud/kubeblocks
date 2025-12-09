@@ -76,7 +76,7 @@ func withClusterComponentNConfigs(replicas int, configs []appsv1.ClusterComponen
 
 func withWorkload() paramsOps {
 	return func(params *reconfigureContext) {
-		params.ITS = &workloads.InstanceSet{}
+		params.its = &workloads.InstanceSet{}
 	}
 }
 
@@ -146,7 +146,8 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...pa
 		},
 		Cluster: &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
+				Namespace: defaultNamespace,
+				Name:      "test",
 			}},
 		ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{},
 	}
@@ -162,7 +163,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...pa
 	return params
 }
 
-func newMockPodsWitheContext(ctx reconfigureContext, replicas int, options ...PodOptions) []corev1.Pod {
+func newMockPodsWitheContext(ctx reconfigureContext, replicas int, options ...podOptions) []corev1.Pod {
 	pods := make([]corev1.Pod, replicas)
 	for i := 0; i < replicas; i++ {
 		pods[i] = newMockPod(ctx.SynthesizedComponent.Name+"-"+fmt.Sprint(i), ctx.SynthesizedComponent.PodSpec)
@@ -178,7 +179,7 @@ func newMockPodsWitheContext(ctx reconfigureContext, replicas int, options ...Po
 	return pods
 }
 
-func withReadyPod(rMin, rMax int) PodOptions {
+func withReadyPod(rMin, rMax int) podOptions {
 	return func(pod *corev1.Pod, index int) {
 		if index < rMin || index >= rMax {
 			return
@@ -205,19 +206,7 @@ func fromPodObjectList(pods []corev1.Pod) []runtime.Object {
 	return objs
 }
 
-// func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.OwnerReference {
-//	bRefFn := func(b bool) *bool { return &b }
-//	return metav1.OwnerReference{
-//		APIVersion:         gvk.GroupVersion().String(),
-//		Kind:               gvk.Kind,
-//		Name:               owner.GetName(),
-//		UID:                owner.GetUID(),
-//		Controller:         bRefFn(true),
-//		BlockOwnerDeletion: bRefFn(false),
-//	}
-// }
-
-type PodOptions func(pod *corev1.Pod, index int)
+type podOptions func(pod *corev1.Pod, index int)
 
 func newMockPod(podName string, podSpec *corev1.PodSpec) corev1.Pod {
 	pod := corev1.Pod{

@@ -41,7 +41,7 @@ type ReconcileContext struct {
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	ITS *workloads.InstanceSet
+	its *workloads.InstanceSet
 
 	ConfigRender   *parametersv1alpha1.ParamConfigRenderer
 	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
@@ -67,20 +67,23 @@ func (c *ReconcileContext) GetRelatedObjects() error {
 	return c.Cluster().
 		ComponentAndComponentDef().
 		ComponentSpec().
-		Workload().
+		workload().
 		SynthesizedComponent().
 		ParametersDefinitions().
 		Complete()
 }
 
-func (c *ReconcileContext) Workload() *ReconcileContext {
+func (c *ReconcileContext) workload() *ReconcileContext {
 	return c.Wrap(func() error {
 		itsKey := client.ObjectKey{
 			Namespace: c.Namespace,
 			Name:      constant.GenerateWorkloadNamePattern(c.ClusterName, c.ComponentName),
 		}
-		c.ITS = &workloads.InstanceSet{}
-		return c.Client.Get(c.Context, itsKey, c.ITS)
+		its := &workloads.InstanceSet{}
+		if err := c.Client.Get(c.Context, itsKey, its); err == nil {
+			c.its = its
+		}
+		return nil
 	})
 }
 

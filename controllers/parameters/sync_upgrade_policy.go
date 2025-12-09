@@ -87,7 +87,7 @@ func (o *syncPolicy) sync(rctx reconfigureContext, parameters map[string]string)
 	if config.VersionHash != rctx.getTargetVersionHash() {
 		return o.update(rctx, config, parameters), nil
 	}
-	return o.status(rctx), nil
+	return syncLatestConfigStatus(rctx), nil
 }
 
 func (o *syncPolicy) update(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string) returnedStatus {
@@ -106,13 +106,13 @@ func (o *syncPolicy) update(rctx reconfigureContext, config *apisappsv1.ClusterC
 	return makeReturnedStatus(ESRetry, withExpected(replicas), withSucceed(0))
 }
 
-func (o *syncPolicy) status(rctx reconfigureContext) returnedStatus {
+func syncLatestConfigStatus(rctx reconfigureContext) returnedStatus {
 	var (
 		replicas    = rctx.getTargetReplicas()
 		versionHash = rctx.getTargetVersionHash()
 	)
 	updated := int32(0)
-	for _, inst := range rctx.ITS.Status.InstanceStatus {
+	for _, inst := range rctx.its.Status.InstanceStatus {
 		idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
 			return cfg.Name == rctx.ConfigTemplate.Name
 		})

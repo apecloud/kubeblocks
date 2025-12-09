@@ -83,7 +83,7 @@ var _ = Describe("Reconfigure SyncPolicy", func() {
 			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
 			By("mock the instance status")
-			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
+			rctx.its.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
 					PodName: "0",
 					Configs: []workloads.InstanceConfigStatus{
@@ -112,7 +112,7 @@ var _ = Describe("Reconfigure SyncPolicy", func() {
 			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
 			By("mock the instance status")
-			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
+			rctx.its.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
 					PodName: "0",
 					Configs: []workloads.InstanceConfigStatus{

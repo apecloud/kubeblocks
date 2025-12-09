@@ -20,20 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"fmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
-
-var restartPolicyInstance = &restartPolicy{}
-
-type restartPolicy struct{}
 
 func init() {
 	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInstance)
 }
+
+var restartPolicyInstance = &restartPolicy{}
+
+type restartPolicy struct{}
 
 func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	rctx.Log.V(1).Info("simple policy begin....")
@@ -41,36 +45,60 @@ func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error)
 	var (
 		newVersion = rctx.getTargetVersionHash()
 		configKey  = rctx.generateConfigIdentifier()
-
-		retStatus = ESRetry
-		progress  = core.NotStarted
 	)
 
-	if err := restartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, rctx.Cluster, rctx.ClusterComponent.Name); err != nil {
+	if err := s.restart(rctx.Client, rctx.RequestCtx, configKey, newVersion, rctx.Cluster, rctx.ClusterComponent.Name); err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
+	return syncLatestConfigStatus(rctx), nil
+}
 
-	pods, err := getPodsForOnlineUpdate(rctx)
+func (s *restartPolicy) restart(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, cluster *appsv1.Cluster, compName string) error {
+	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+
+	compSpec, err := s.getComponentSpecPtrByName(cli, ctx, cluster, compName)
 	if err != nil {
-		return makeReturnedStatus(ESFailedAndRetry), err
+		return err
 	}
 
-	if len(pods) != 0 {
-		progress = checkReconfigureUpdateProgress(pods, configKey, newVersion)
+	if compSpec.Annotations == nil {
+		compSpec.Annotations = map[string]string{}
 	}
 
-	if len(pods) == int(progress) {
-		// check component phase when all pods are of expected version and ready
-		comp, err := intctrlcomp.GetComponentByName(rctx.Ctx, rctx.Client, rctx.Cluster.Namespace, constant.GenerateClusterComponentName(rctx.Cluster.Name, rctx.ClusterComponent.Name))
-		if err != nil {
-			return makeReturnedStatus(ESFailedAndRetry), err
+	if compSpec.Annotations[cfgAnnotationKey] == newVersion {
+		return nil
+	}
+
+	compSpec.Annotations[cfgAnnotationKey] = newVersion
+
+	return cli.Update(ctx.Ctx, cluster)
+}
+
+func (s *restartPolicy) getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
+	for i := range cluster.Spec.ComponentSpecs {
+		componentSpec := &cluster.Spec.ComponentSpecs[i]
+		if componentSpec.Name == compName {
+			return componentSpec, nil
 		}
-
-		if comp.Status.Phase != appsv1.RunningComponentPhase {
-			retStatus = ESRetry
-		} else {
-			retStatus = ESNone
+	}
+	// check if the component is a sharding component
+	compObjList := &appsv1.ComponentList{}
+	if err := cli.List(ctx.Ctx, compObjList, client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compName,
+	}); err != nil {
+		return nil, err
+	}
+	if len(compObjList.Items) > 0 {
+		shardingName := compObjList.Items[0].Labels[constant.KBAppShardingNameLabelKey]
+		if shardingName != "" {
+			for i := range cluster.Spec.Shardings {
+				shardSpec := &cluster.Spec.Shardings[i]
+				if shardSpec.Name == shardingName {
+					return &shardSpec.Template, nil
+				}
+			}
 		}
 	}
-	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
+	return nil, fmt.Errorf("component %s not found", compName)
 }

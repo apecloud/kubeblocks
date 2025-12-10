@@ -158,6 +158,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		instanceTemplatesList = append(instanceTemplatesList, instanceTemplate)
 		template2OrdinalSetMap[instanceTemplate.Name] = sets.New[int32]()
 	}
+	template2OrdinalSetMap[""] = sets.New[int32]() // always add the default template
 	slices.SortFunc(instanceTemplatesList, func(a, b *workloads.InstanceTemplate) int {
 		return strings.Compare(a.Name, b.Name)
 	})
@@ -177,9 +178,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
 	}
 
-	if _, ok := template2OrdinalSetMap[""]; ok {
-		template2OrdinalSetMap[""].Insert(itsExt.InstanceSet.Status.Ordinals...)
-	}
+	template2OrdinalSetMap[""].Insert(itsExt.InstanceSet.Status.Ordinals...)
 	globalUsedOrdinalSet.Insert(itsExt.InstanceSet.Status.Ordinals...)
 	for _, status := range itsExt.InstanceSet.Status.TemplatesStatus {
 		if _, ok := template2OrdinalSetMap[status.Name]; ok {

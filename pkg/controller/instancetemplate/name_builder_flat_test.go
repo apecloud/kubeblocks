@@ -472,7 +472,59 @@ var _ = Describe("flat name builder tests", func() {
 			"t2": sets.New[int32](4),
 		}, false),
 
-		Entry("move replicas into instance templates - mixed", &workloads.InstanceSet{
+		Entry("move replicas into instance templates - take over last one", &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](5),
+				Instances: []workloads.InstanceTemplate{
+					{
+						Name:     "t1",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{0},
+						},
+					},
+					{
+						Name:     "t2",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{1},
+						},
+					},
+					{
+						Name:     "t3",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{2},
+						},
+					},
+					{
+						Name:     "t4",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{3},
+						},
+					},
+					{
+						Name:     "t5",
+						Replicas: ptr.To[int32](1),
+						Ordinals: workloads.Ordinals{
+							Discrete: []int32{4},
+						},
+					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				Ordinals: []int32{0, 1, 2, 3, 4},
+			},
+		}, map[string]sets.Set[int32]{
+			"t1": sets.New[int32](0),
+			"t2": sets.New[int32](1),
+			"t3": sets.New[int32](2),
+			"t4": sets.New[int32](3),
+			"t5": sets.New[int32](4),
+		}, false),
+
+		Entry("move replicas into instance templates - take over and replace", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
 				Instances: []workloads.InstanceTemplate{
@@ -507,10 +559,12 @@ var _ = Describe("flat name builder tests", func() {
 				TemplatesStatus: []workloads.InstanceTemplateStatus{
 					{
 						Name:     "t1",
+						Replicas: 1,
 						Ordinals: []int32{3},
 					},
 					{
 						Name:     "t2",
+						Replicas: 1,
 						Ordinals: []int32{4},
 					},
 				},

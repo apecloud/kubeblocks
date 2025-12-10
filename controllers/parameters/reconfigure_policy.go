@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"strings"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -79,20 +77,11 @@ type reconfigurePolicy interface {
 }
 
 var (
-	upgradePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
+	reconfigurePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
 )
 
 func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
-	upgradePolicyMap[policy] = action
-}
-
-func (param *reconfigureContext) generateConfigIdentifier() string {
-	key := param.ConfigTemplate.Name
-	if param.ConfigDescription != nil && param.ConfigDescription.Name != "" {
-		hash, _ := util.ComputeHash(param.ConfigDescription.Name)
-		key = key + "-" + hash
-	}
-	return strings.ReplaceAll(key, "_", "-")
+	reconfigurePolicyMap[policy] = action
 }
 
 func (param *reconfigureContext) getTargetVersionHash() string {

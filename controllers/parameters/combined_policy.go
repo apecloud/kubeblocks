@@ -23,29 +23,32 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
-var combineUpgradePolicyInstance = &combineUpgradePolicy{
-	policyExecutors: []reconfigurePolicy{
-		syncPolicyInstance,
-		restartPolicyInstance,
+func init() {
+	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combinedPolicyInst)
+}
+
+var combinedPolicyInst = &combinedPolicy{
+	policies: []reconfigurePolicy{
+		syncPolicyInst,
+		restartPolicyInst,
 	},
 }
 
-type combineUpgradePolicy struct {
-	policyExecutors []reconfigurePolicy
+type combinedPolicy struct {
+	policies []reconfigurePolicy
 }
 
-func init() {
-	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combineUpgradePolicyInstance)
-}
-
-func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
-	var ret returnedStatus
-	for _, executor := range h.policyExecutors {
-		retStatus, err := executor.Upgrade(rctx)
+func (h *combinedPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
+	var (
+		status returnedStatus
+		err    error
+	)
+	for _, policy := range h.policies {
+		status, err = policy.Upgrade(rctx)
 		if err != nil {
-			return retStatus, err
+			return status, err
 		}
-		ret = retStatus
 	}
-	return ret, nil
+	// TODO: how to merge the status?
+	return status, nil
 }

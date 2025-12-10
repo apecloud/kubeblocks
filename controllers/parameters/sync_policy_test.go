@@ -32,8 +32,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-var _ = Describe("Reconfigure SyncPolicy", func() {
-	Context("sync reconfigure policy test", func() {
+var _ = Describe("Reconfigure syncPolicy test", func() {
+	Context("sync reconfigure policy", func() {
 		var (
 			rctx   reconfigureContext
 			policy = &syncPolicy{}

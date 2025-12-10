@@ -21,32 +21,16 @@ package parameters
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 func init() {
-	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInstance)
+	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInst)
 }
 
-var restartPolicyInstance = &restartPolicy{}
+var restartPolicyInst = &restartPolicy{}
 
 type restartPolicy struct{}
 
 func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
-	return syncUpdatedConfig(rctx, nil, true)
-}
-
-func (s *restartPolicy) restart(rctx reconfigureContext) {
-	var (
-		configKey        = rctx.generateConfigIdentifier()
-		newVersion       = rctx.getTargetVersionHash()
-		cfgAnnotationKey = core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-	)
-	if rctx.ClusterComponent.Annotations == nil {
-		rctx.ClusterComponent.Annotations = map[string]string{}
-	}
-	if rctx.ClusterComponent.Annotations[cfgAnnotationKey] != newVersion {
-		rctx.ClusterComponent.Annotations[cfgAnnotationKey] = newVersion
-	}
+	return submitUpdatedConfig(rctx, nil, true)
 }

@@ -23,16 +23,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-var _ = Describe("Reconfigure restartPolicy", func() {
+var _ = Describe("Reconfigure restartPolicy test", func() {
 	var (
-		policy = upgradePolicyMap[parametersv1alpha1.RestartPolicy]
+		policy = &restartPolicy{}
 	)
 
-	Context("restart policy test", func() {
+	Context("restart policy", func() {
 		It("should success without error", func() {
 			mockParam := newMockReconfigureParams("restartPolicy", k8sClient,
 				withConfigSpec("test", map[string]string{
@@ -55,7 +54,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 					PodName: "pod1",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        mockParam.generateConfigIdentifier(),
+							Name:        mockParam.ConfigTemplate.Name,
 							VersionHash: mockParam.getTargetVersionHash(),
 						},
 					},
@@ -72,7 +71,7 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 					PodName: "pod2",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        mockParam.generateConfigIdentifier(),
+							Name:        mockParam.ConfigTemplate.Name,
 							VersionHash: mockParam.getTargetVersionHash(),
 						},
 					},

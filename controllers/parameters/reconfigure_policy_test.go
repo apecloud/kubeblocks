@@ -20,13 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -36,11 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-)
-
-var (
-	defaultNamespace = "default"
-	// itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.InstanceSetKind)
 )
 
 type paramsOps func(params *reconfigureContext)
@@ -107,7 +98,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...pa
 			Recorder: record.NewFakeRecorder(100),
 		},
 		SynthesizedComponent: &component.SynthesizedComponent{
-			Namespace:   defaultNamespace,
+			Namespace:   testCtx.DefaultNamespace,
 			ClusterName: "test",
 			Name:        "test",
 			PodSpec: &corev1.PodSpec{
@@ -136,7 +127,7 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...pa
 		},
 		Cluster: &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: defaultNamespace,
+				Namespace: testCtx.DefaultNamespace,
 				Name:      "test",
 			}},
 		ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{},
@@ -151,128 +142,4 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...pa
 		}
 	}
 	return params
-}
-
-func Test_resolveReloadActionPolicy(t *testing.T) {
-	type args struct {
-		jsonPatch string
-		format    *parametersv1alpha1.FileFormatConfig
-		pd        *parametersv1alpha1.ParametersDefinitionSpec
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    parametersv1alpha1.ReloadPolicy
-		wantErr bool
-	}{{
-		name: "restart policy",
-		args: args{
-			jsonPatch: `{"static1": "value1"}`,
-			format: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.JSON,
-			},
-			pd: &parametersv1alpha1.ParametersDefinitionSpec{
-				StaticParameters: []string{
-					"static1",
-					"static2",
-				},
-				DynamicParameters: []string{
-					"dynamic1",
-					"dynamic2",
-				},
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{
-						Command: []string{"/bin/true"},
-					},
-				},
-			},
-		},
-		want: parametersv1alpha1.RestartPolicy,
-	}, {
-		name: "restart and reload policy",
-		args: args{
-			jsonPatch: `{"static1": "value1"}`,
-			format: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.JSON,
-			},
-			pd: &parametersv1alpha1.ParametersDefinitionSpec{
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{
-						Command: []string{"/bin/true"},
-					},
-				},
-				MergeReloadAndRestart: pointer.Bool(false),
-			},
-		},
-		want: parametersv1alpha1.DynamicReloadAndRestartPolicy,
-	}, {
-		name: "hot update policy",
-		args: args{
-			jsonPatch: `{"dynamic1": "value1"}`,
-			format: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.JSON,
-			},
-			pd: &parametersv1alpha1.ParametersDefinitionSpec{
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					AutoTrigger: &parametersv1alpha1.AutoTrigger{},
-				},
-				DynamicParameters: []string{
-					"dynamic1",
-					"dynamic2",
-				},
-			},
-		},
-		want: parametersv1alpha1.AsyncDynamicReloadPolicy,
-	}, {
-		name: "sync reload policy",
-		args: args{
-			jsonPatch: `{"dynamic1": "value1"}`,
-			format: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.JSON,
-			},
-			pd: &parametersv1alpha1.ParametersDefinitionSpec{
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{
-						Command: []string{"/bin/true"},
-						Sync:    pointer.Bool(true),
-					},
-				},
-				DynamicParameters: []string{
-					"dynamic1",
-					"dynamic2",
-				},
-			},
-		},
-		want: parametersv1alpha1.SyncDynamicReloadPolicy,
-	}, {
-		name: "async reload policy",
-		args: args{
-			jsonPatch: `{"dynamic1": "value1"}`,
-			format: &parametersv1alpha1.FileFormatConfig{
-				Format: parametersv1alpha1.JSON,
-			},
-			pd: &parametersv1alpha1.ParametersDefinitionSpec{
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					ShellTrigger: &parametersv1alpha1.ShellTrigger{
-						Command: []string{"/bin/true"},
-						Sync:    pointer.Bool(false),
-					},
-				},
-				DynamicParameters: []string{
-					"dynamic1",
-					"dynamic2",
-				},
-			},
-		},
-		want: parametersv1alpha1.AsyncDynamicReloadPolicy,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveReconfigurePolicy(tt.args.jsonPatch, tt.args.format, tt.args.pd)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("resolveReloadActionPolicy(%v, %v, %v)", tt.args.jsonPatch, tt.args.format, tt.args.pd)
-			}
-			assert.Equalf(t, tt.want, got, "resolveReloadActionPolicy(%v, %v, %v)", tt.args.jsonPatch, tt.args.format, tt.args.pd)
-		})
-	}
 }

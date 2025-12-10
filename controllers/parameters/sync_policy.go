@@ -32,20 +32,20 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-var syncPolicyInstance = &syncPolicy{}
+func init() {
+	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicyInst)
+}
+
+var syncPolicyInst = &syncPolicy{}
 
 type syncPolicy struct{}
-
-func init() {
-	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicyInstance)
-}
 
 func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
 	updateParams := o.updateParameters(rctx)
 	if len(updateParams) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
-	return syncUpdatedConfig(rctx, updateParams, false)
+	return submitUpdatedConfig(rctx, updateParams, false)
 }
 
 func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string {
@@ -73,7 +73,7 @@ func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string
 	return params
 }
 
-func syncUpdatedConfig(rctx reconfigureContext, parameters map[string]string, restart bool) (returnedStatus, error) {
+func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, restart bool) (returnedStatus, error) {
 	var config *apisappsv1.ClusterComponentConfig
 	for i, cfg := range rctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == rctx.ConfigTemplate.Name {
@@ -85,31 +85,23 @@ func syncUpdatedConfig(rctx reconfigureContext, parameters map[string]string, re
 		return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
 	}
 	if config.VersionHash != rctx.getTargetVersionHash() {
-		return submitUpdatedConfig(rctx, config, parameters, restart), nil
+		return applyConfigChangesToCluster(rctx, config, parameters, restart), nil
 	}
-	return syncLatestConfigStatus(rctx), nil
+	return syncConfigStatus(rctx), nil
 }
 
-func submitUpdatedConfig(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) returnedStatus {
-	var (
-		replicas = rctx.getTargetReplicas()
-		// fileName string
-	)
-	// if rctx.ConfigDescription != nil {
-	//	fileName = rctx.ConfigDescription.Name
-	// }
-
-	// TODO: config file?
-	config.Variables = parameters // TODO: variables vs parameters?
+func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) returnedStatus {
+	config.Variables = parameters
 	config.VersionHash = rctx.getTargetVersionHash()
 	if restart {
 		config.RestartOnChange = ptr.To(true)
+	} else {
+		config.RestartOnChange = nil
 	}
-
-	return makeReturnedStatus(ESRetry, withExpected(replicas), withSucceed(0))
+	return makeReturnedStatus(ESRetry, withExpected(rctx.getTargetReplicas()), withSucceed(0))
 }
 
-func syncLatestConfigStatus(rctx reconfigureContext) returnedStatus {
+func syncConfigStatus(rctx reconfigureContext) returnedStatus {
 	var (
 		replicas    = rctx.getTargetReplicas()
 		versionHash = rctx.getTargetVersionHash()

@@ -570,49 +570,59 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"": sets.New[int32](0, 1, 2, 5, 6),
+			"": sets.New[int32](0, 1, 2, 5, 6), // replace 3 and 4 with 5 and 6
 		}, false),
 
-		PEntry("move replicas out of instance templates - taken over instances", &workloads.InstanceSet{
+		Entry("move replicas out of instance templates - take back", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
+				DefaultTemplateOrdinals: workloads.Ordinals{
+					Discrete: []int32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+				},
 			},
 			Status: workloads.InstanceSetStatus{
 				Ordinals: []int32{0, 1, 2},
 				TemplatesStatus: []workloads.InstanceTemplateStatus{
 					{
 						Name:     "t1",
+						Replicas: 1,
 						Ordinals: []int32{3},
 					},
 					{
 						Name:     "t2",
+						Replicas: 1,
 						Ordinals: []int32{4},
 					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"": sets.New[int32](0, 1, 2, 3, 4),
+			"": sets.New[int32](0, 1, 2, 3, 4), // take back 3 and 4
 		}, false),
 
-		PEntry("move replicas out of instance templates - mixed", &workloads.InstanceSet{
+		Entry("move replicas out of instance templates - take back and replace", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
+				DefaultTemplateOrdinals: workloads.Ordinals{
+					Discrete: []int32{0, 1, 2, 3, 5, 6, 7, 8, 9}, // without ordinal 4
+				},
 			},
 			Status: workloads.InstanceSetStatus{
 				Ordinals: []int32{0, 1, 2},
 				TemplatesStatus: []workloads.InstanceTemplateStatus{
 					{
 						Name:     "t1",
+						Replicas: 1,
 						Ordinals: []int32{3},
 					},
 					{
 						Name:     "t2",
+						Replicas: 1,
 						Ordinals: []int32{4},
 					},
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"": sets.New[int32](0, 1, 2, 5, 4),
+			"": sets.New[int32](0, 1, 2, 3, 5), // take back 3 and replace 4 with 5
 		}, false),
 	)
 

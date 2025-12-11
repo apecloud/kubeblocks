@@ -855,6 +855,22 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -3388,6 +3404,22 @@ starting with an ordinal of 0.
 It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of replicas specified for the Component.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 </td>
 </tr>
 <tr>
@@ -6727,6 +6759,22 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -9160,7 +9208,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.Ordinals">Ordinals
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>Ordinals represents a combination of continuous segments and individual values.</p>
@@ -11929,6 +11977,20 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <em>(Optional)</em>
 <p>Specifies an override for the custom instances of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the desired Ordinals of the shard.</p>
 </td>
 </tr>
 <tr>

@@ -66,9 +66,9 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1),
-			"t1": sets.New[int32](2, 3),
-			"t2": sets.New[int32](4),
+			defaultTemplateName: sets.New[int32](0, 1),
+			"t1":                sets.New[int32](2, 3),
+			"t2":                sets.New[int32](4),
 		}, false),
 
 		Entry("with running instances", &workloads.InstanceSet{
@@ -95,9 +95,9 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1),
-			"t1": sets.New[int32](2, 4),
-			"t2": sets.New[int32](3),
+			defaultTemplateName: sets.New[int32](0, 1),
+			"t1":                sets.New[int32](2, 4),
+			"t2":                sets.New[int32](3),
 		}, false),
 
 		Entry("deal with scale in", &workloads.InstanceSet{
@@ -124,9 +124,9 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1, 5),
-			"t1": sets.New[int32](2),
-			"t2": sets.New[int32](6),
+			defaultTemplateName: sets.New[int32](0, 1, 5),
+			"t1":                sets.New[int32](2),
+			"t2":                sets.New[int32](6),
 		}, false),
 
 		Entry("with ordinal spec", &workloads.InstanceSet{
@@ -188,8 +188,8 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1),
-			"t1": sets.New[int32](100, 101),
+			defaultTemplateName: sets.New[int32](0, 1),
+			"t1":                sets.New[int32](100, 101),
 		}, false),
 
 		Entry("with ordinal spec - a newly defined ordinal spec takes an ordinal of the default template", &workloads.InstanceSet{
@@ -209,8 +209,8 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: []int32{0, 1},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 3, 4),
-			"t1": sets.New[int32](1, 2),
+			defaultTemplateName: sets.New[int32](0, 3, 4),
+			"t1":                sets.New[int32](1, 2),
 		}, false),
 
 		Entry("with ordinal spec - replicas < length of ordinals range", &workloads.InstanceSet{
@@ -252,9 +252,9 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1),
-			"t1": sets.New[int32](100, 150),
-			"t2": sets.New[int32](500),
+			defaultTemplateName: sets.New[int32](0, 1),
+			"t1":                sets.New[int32](100, 150),
+			"t2":                sets.New[int32](500),
 		}, false),
 
 		Entry("with ordinal spec - zero replica", &workloads.InstanceSet{
@@ -335,8 +335,8 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: []int32{0, 1, 2},
 			},
 		}, map[string]sets.Set[int32]{
-			"t1": sets.New[int32](2, 3),
-			"":   sets.New[int32](0, 1),
+			"t1":                sets.New[int32](2, 3),
+			defaultTemplateName: sets.New[int32](0, 1),
 		}, false),
 
 		Entry("partially exchange ordinal spec", &workloads.InstanceSet{
@@ -397,8 +397,8 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1, 4),
-			"t1": sets.New[int32](3, 5),
+			defaultTemplateName: sets.New[int32](0, 1, 4),
+			"t1":                sets.New[int32](3, 5),
 		}, false),
 
 		Entry("with offline instances conflicts template ordinals", &workloads.InstanceSet{
@@ -438,9 +438,9 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: []int32{0, 1, 2, 3, 4},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1, 2),
-			"t1": sets.New[int32](5),
-			"t2": sets.New[int32](6),
+			defaultTemplateName: sets.New[int32](0, 1, 2),
+			"t1":                sets.New[int32](5),
+			"t2":                sets.New[int32](6),
 		}, false),
 
 		Entry("move replicas into instance templates - take over", &workloads.InstanceSet{
@@ -467,9 +467,9 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: []int32{0, 1, 2, 3, 4},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1, 2),
-			"t1": sets.New[int32](3),
-			"t2": sets.New[int32](4),
+			defaultTemplateName: sets.New[int32](0, 1, 2),
+			"t1":                sets.New[int32](3),
+			"t2":                sets.New[int32](4),
 		}, false),
 
 		Entry("move replicas into instance templates - take over last one", &workloads.InstanceSet{
@@ -545,9 +545,9 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: []int32{0, 1, 2, 3, 4},
 			},
 		}, map[string]sets.Set[int32]{
-			"":   sets.New[int32](0, 1, 2),
-			"t1": sets.New[int32](5),
-			"t2": sets.New[int32](4),
+			defaultTemplateName: sets.New[int32](0, 1, 2),
+			"t1":                sets.New[int32](5),
+			"t2":                sets.New[int32](4),
 		}, false),
 
 		Entry("move replicas out of instance templates", &workloads.InstanceSet{
@@ -570,7 +570,7 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"": sets.New[int32](0, 1, 2, 5, 6), // replace 3 and 4 with 5 and 6
+			defaultTemplateName: sets.New[int32](0, 1, 2, 5, 6), // replace 3 and 4 with 5 and 6
 		}, false),
 
 		Entry("move replicas out of instance templates - take back", &workloads.InstanceSet{
@@ -596,7 +596,7 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"": sets.New[int32](0, 1, 2, 3, 4), // take back 3 and 4
+			defaultTemplateName: sets.New[int32](0, 1, 2, 3, 4), // take back 3 and 4
 		}, false),
 
 		Entry("move replicas out of instance templates - take back and replace", &workloads.InstanceSet{
@@ -622,7 +622,7 @@ var _ = Describe("flat name builder tests", func() {
 				},
 			},
 		}, map[string]sets.Set[int32]{
-			"": sets.New[int32](0, 1, 2, 3, 5), // take back 3 and replace 4 with 5
+			defaultTemplateName: sets.New[int32](0, 1, 2, 3, 5), // take back 3 and replace 4 with 5
 		}, false),
 	)
 

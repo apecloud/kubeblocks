@@ -38,25 +38,26 @@ import (
 )
 
 const (
-	maxRetryAttempts = 30
-	retryInterval    = 10 * time.Second
+	defaultRetryInterval    = 10 * time.Second
+	defaultMaxRetryAttempts = 30
+
+	syncRetryInterval    = 200 * time.Millisecond
+	syncMaxRetryAttempts = 3
 )
 
 func SendEventWithMessage(logger *logr.Logger, reason string, message string, sync bool) error {
-	send := func() error {
-		err := createOrUpdateEvent(reason, message)
-		if logger != nil && err != nil {
-			logger.Error(err, "failed to send event",
-				"reason", reason,
-				"message", message)
+	send := func(retryInterval time.Duration, retryAttempts int32) error {
+		err := createOrUpdateEvent(reason, message, retryInterval, retryAttempts)
+		if err != nil && logger != nil {
+			logger.Error(err, "failed to send event", "reason", reason, "message", message)
 		}
 		return err
 	}
 	if sync {
-		return send()
+		return send(syncRetryInterval, syncMaxRetryAttempts)
 	}
 	go func() {
-		_ = send()
+		_ = send(defaultRetryInterval, defaultMaxRetryAttempts)
 	}()
 	return nil
 }
@@ -92,7 +93,7 @@ func newEvent(reason string, message string) *corev1.Event {
 	}
 }
 
-func createOrUpdateEvent(reason, message string) error {
+func createOrUpdateEvent(reason, message string, retryInterval time.Duration, retryAttempts int32) error {
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return err
@@ -101,30 +102,28 @@ func createOrUpdateEvent(reason, message string) error {
 	eventName := generateEventName(reason, message)
 
 	var event *corev1.Event
-	for i := 0; i < maxRetryAttempts; i++ {
+	attempts := max(retryAttempts, 1)
+	for i := int32(0); i < attempts; i++ {
 		event, err = eventsClient.Get(context.Background(), eventName, metav1.GetOptions{})
 		if err == nil {
-			// update
 			event.Count++
 			// the granularity of lastTimestamp is second and it is not enough for the event.
 			// there may multiple events in the same second, so we need to use EventTime here.
 			// event.LastTimestamp = metav1.Now()
 			event.EventTime = metav1.NowMicro()
 			_, err = eventsClient.Update(context.Background(), event, metav1.UpdateOptions{})
-			if err == nil {
-				return nil
-			}
 		} else if k8serrors.IsNotFound(err) {
-			// create
 			event = newEvent(reason, message)
 			_, err = eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
-			if err == nil {
-				return nil
-			}
 		}
-		time.Sleep(retryInterval)
+		if err == nil {
+			return nil
+		}
+		if retryInterval > 0 && i < attempts-1 {
+			time.Sleep(retryInterval)
+		}
 	}
-	return errors.Wrapf(err, "failed to handle event after %d attempts", maxRetryAttempts)
+	return errors.Wrapf(err, "failed to create or update event after %d attempts", retryAttempts)
 }
 
 func getK8sClientSet() (*kubernetes.Clientset, error) {

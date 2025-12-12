@@ -40,6 +40,11 @@ const (
 	defaultProbePeriodSeconds = 60
 )
 
+var (
+	defaultRetrySendEventInterval = 1 * time.Minute
+	retrySendEventInterval        = defaultRetrySendEventInterval
+)
+
 func newProbeService(logger logr.Logger, actionService *actionService, probes []proto.Probe) (*probeService, error) {
 	sp := &probeService{
 		logger:        logger,
@@ -58,10 +63,11 @@ func newProbeService(logger logr.Logger, actionService *actionService, probes []
 }
 
 type probeService struct {
-	logger        logr.Logger
-	actionService *actionService
-	probes        map[string]*proto.Probe
-	runners       map[string]*probeRunner
+	logger               logr.Logger
+	actionService        *actionService
+	probes               map[string]*proto.Probe
+	runners              map[string]*probeRunner
+	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
 }
 
 var _ Service = &probeService{}
@@ -77,9 +83,10 @@ func (s *probeService) URI() string {
 func (s *probeService) Start() error {
 	for name := range s.probes {
 		runner := &probeRunner{
-			logger:        s.logger.WithValues("probe", name),
-			actionService: s.actionService,
-			latestEvent:   make(chan proto.ProbeEvent, 1),
+			logger:               s.logger.WithValues("probe", name),
+			actionService:        s.actionService,
+			latestEvent:          make(chan proto.ProbeEvent, 1),
+			sendEventWithMessage: s.sendEventWithMessage,
 		}
 		go runner.run(s.probes[name])
 		s.runners[name] = runner
@@ -87,22 +94,23 @@ func (s *probeService) Start() error {
 	return nil
 }
 
-func (s *probeService) HandleConn(ctx context.Context, conn net.Conn) error {
+func (s *probeService) HandleConn(context.Context, net.Conn) error {
 	return nil
 }
 
-func (s *probeService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
+func (s *probeService) HandleRequest(context.Context, []byte) ([]byte, error) {
 	return nil, errors.Wrapf(proto.ErrNotImplemented, "service %s does not support request handling", s.Kind())
 }
 
 type probeRunner struct {
-	logger        logr.Logger
-	actionService *actionService
-	ticker        *time.Ticker
-	succeedCount  int64
-	failedCount   int64
-	latestOutput  []byte
-	latestEvent   chan proto.ProbeEvent
+	logger               logr.Logger
+	actionService        *actionService
+	ticker               *time.Ticker
+	succeedCount         int64
+	failedCount          int64
+	latestOutput         []byte
+	latestEvent          chan proto.ProbeEvent
+	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
 }
 
 func (r *probeRunner) run(probe *proto.Probe) {
@@ -220,7 +228,7 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 			reportChan = ticker.C
 		}
 
-		retryTicker := time.NewTicker(1 * time.Minute)
+		retryTicker := time.NewTicker(retrySendEventInterval)
 		defer retryTicker.Stop()
 
 		var event proto.ProbeEvent
@@ -252,7 +260,10 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 				return true
 			}
 
-			err = util.SendEventWithMessage(&r.logger, event.Probe, string(msg), true)
+			if r.sendEventWithMessage == nil {
+				r.sendEventWithMessage = util.SendEventWithMessage
+			}
+			err = r.sendEventWithMessage(&r.logger, event.Probe, string(msg), true)
 			if err == nil {
 				log(nil, "succeed to send the probe event", retry, periodically)
 			} else {

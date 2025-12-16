@@ -120,7 +120,7 @@ func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName strin
 }
 
 func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
-	if templateName == "" {
+	if templateName == defaultTemplateName {
 		return its.Spec.DefaultTemplateOrdinals, nil
 	}
 	for _, template := range its.Spec.Instances {

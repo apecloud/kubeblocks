@@ -342,6 +342,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
+	itsObjCopy.Spec.DefaultTemplateOrdinals = itsProto.Spec.DefaultTemplateOrdinals
 	itsObjCopy.Spec.FlatInstanceOrdinal = itsProto.Spec.FlatInstanceOrdinal
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds

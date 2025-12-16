@@ -154,6 +154,11 @@ func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTe
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetOrdinals(ordinals kbappsv1.Ordinals) *InstanceSetBuilder {
+	builder.get().Spec.DefaultTemplateOrdinals = ordinals
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *InstanceSetBuilder {
 	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
 	return builder

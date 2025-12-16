@@ -106,7 +106,7 @@ func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) 
 	updatedReplicas := int32(0)
 	for i := range pods {
 		pod, _ := pods[i].(*corev1.Pod)
-		updated, err := IsPodUpdated(its, pod)
+		updated, err := isPodUpdated(its, pod)
 		if err != nil {
 			return 0, nil
 		}

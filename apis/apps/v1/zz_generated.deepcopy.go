@@ -393,6 +393,7 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	in.Ordinals.DeepCopyInto(&out.Ordinals)
 	if in.OfflineInstances != nil {
 		in, out := &in.OfflineInstances, &out.OfflineInstances
 		*out = make([]string, len(*in))
@@ -1608,6 +1609,7 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	in.Ordinals.DeepCopyInto(&out.Ordinals)
 	if in.OfflineInstances != nil {
 		in, out := &in.OfflineInstances, &out.OfflineInstances
 		*out = make([]string, len(*in))
@@ -3300,6 +3302,11 @@ func (in *ShardTemplate) DeepCopyInto(out *ShardTemplate) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.Ordinals != nil {
+		in, out := &in.Ordinals, &out.Ordinals
+		*out = new(Ordinals)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.FlatInstanceOrdinal != nil {
 		in, out := &in.FlatInstanceOrdinal, &out.FlatInstanceOrdinal

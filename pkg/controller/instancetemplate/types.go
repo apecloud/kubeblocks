@@ -31,6 +31,8 @@ const (
 	TemplateRefDataKey       = "instances"
 
 	TemplateNameLabelKey = "workloads.kubeblocks.io/template-name"
+
+	defaultTemplateName = ""
 )
 
 // InstanceSetExt has a complete list of instance templates.

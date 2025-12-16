@@ -2832,6 +2832,35 @@ spec:
                       items:
                         type: string
                       type: array
+                    ordinals:
+                      description: |-
+                        Specifies the desired Ordinals.
+                        The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+                        If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+                      properties:
+                        discrete:
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        ranges:
+                          items:
+                            description: |-
+                              Range represents a range with a start and an end value. Both start and end are included.
+                              It is used to define a continuous segment.
+                            properties:
+                              end:
+                                format: int32
+                                type: integer
+                              start:
+                                format: int32
+                                type: integer
+                            required:
+                            - end
+                            - start
+                            type: object
+                          type: array
+                      type: object
                     parallelPodManagementConcurrency:
                       anyOf:
                       - type: integer
@@ -9896,6 +9925,33 @@ spec:
                             maxLength: 15
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
+                          ordinals:
+                            description: Specifies an override for the desired Ordinals
+                              of the shard.
+                            properties:
+                              discrete:
+                                items:
+                                  format: int32
+                                  type: integer
+                                type: array
+                              ranges:
+                                items:
+                                  description: |-
+                                    Range represents a range with a start and an end value. Both start and end are included.
+                                    It is used to define a continuous segment.
+                                  properties:
+                                    end:
+                                      format: int32
+                                      type: integer
+                                    start:
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - end
+                                  - start
+                                  type: object
+                                type: array
+                            type: object
                           replicas:
                             default: 1
                             description: Specifies the desired number of replicas
@@ -14120,6 +14176,35 @@ spec:
                           items:
                             type: string
                           type: array
+                        ordinals:
+                          description: |-
+                            Specifies the desired Ordinals.
+                            The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+                            If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+                          properties:
+                            discrete:
+                              items:
+                                format: int32
+                                type: integer
+                              type: array
+                            ranges:
+                              items:
+                                description: |-
+                                  Range represents a range with a start and an end value. Both start and end are included.
+                                  It is used to define a continuous segment.
+                                properties:
+                                  end:
+                                    format: int32
+                                    type: integer
+                                  start:
+                                    format: int32
+                                    type: integer
+                                required:
+                                - end
+                                - start
+                                type: object
+                              type: array
+                          type: object
                         parallelPodManagementConcurrency:
                           anyOf:
                           - type: integer

@@ -71,6 +71,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetInstances(getInstanceTemplates(synthesizedComp)).
+		SetOrdinals(synthesizedComp.Ordinals).
 		SetFlatInstanceOrdinal(synthesizedComp.FlatInstanceOrdinal).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).
 		SetRoles(synthesizedComp.Roles).

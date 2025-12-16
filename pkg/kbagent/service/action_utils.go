@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -601,9 +600,11 @@ func renderTemplateData(action string, parameters map[string]string, data string
 	return buf.String(), nil
 }
 
-func mergeEnvWith(parameters map[string]string) map[string]string {
-	result := make(map[string]string)
-	maps.Copy(result, parameters)
+func mergeEnvWith(parameters map[string]string) map[string]any {
+	result := make(map[string]any)
+	for k, v := range parameters {
+		result[k] = v
+	}
 	for _, e := range os.Environ() {
 		kv := strings.Split(e, "=")
 		if _, ok := result[kv[0]]; !ok {

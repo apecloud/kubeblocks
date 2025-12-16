@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,9 +36,10 @@ import (
 var _ = Describe("probe", func() {
 	Context("probe", func() {
 		var (
-			actions = []proto.Action{
+			probeName = "roleProbe"
+			actions   = []proto.Action{
 				{
-					Name: "roleProbe",
+					Name: probeName,
 					Exec: &proto.ExecAction{
 						Commands: []string{"/bin/bash", "-c", "echo -n leader"},
 					},
@@ -44,7 +47,7 @@ var _ = Describe("probe", func() {
 			}
 			probes = []proto.Probe{
 				{
-					Action:              "roleProbe",
+					Action:              probeName,
 					InitialDelaySeconds: 0,
 					PeriodSeconds:       1,
 					SuccessThreshold:    1,
@@ -90,6 +93,8 @@ var _ = Describe("probe", func() {
 
 		It("initial delay seconds", func() {
 			probes[0].InitialDelaySeconds = 60
+			defer func() { probes[0].InitialDelaySeconds = 0 }()
+
 			service, err := newProbeService(logr.New(nil), actionSvc, probes)
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
@@ -97,9 +102,105 @@ var _ = Describe("probe", func() {
 			Expect(service.Start()).Should(Succeed())
 
 			time.Sleep(1 * time.Second)
-			r := service.runners["roleProbe"]
+			r := service.runners[probeName]
 			Expect(r).ShouldNot(BeNil())
 			Expect(r.ticker).Should(BeNil())
+		})
+
+		It("send event", func() {
+			By("create probe service")
+			service, err := newProbeService(logr.New(nil), actionSvc, probes)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			By("mock send event function")
+			eventChan := make(chan struct {
+				reason  string
+				message string
+			}, 128)
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+				eventChan <- struct{ reason, message string }{reason, message}
+				return nil
+			}
+
+			By("start probe service")
+			Expect(service.Start()).Should(Succeed())
+
+			By("check received event")
+			var receivedData struct{ reason, message string }
+			Eventually(eventChan).Should(Receive(&receivedData))
+			Expect(receivedData.reason).Should(Equal(probeName))
+			var event proto.ProbeEvent
+			Expect(json.Unmarshal([]byte(receivedData.message), &event)).Should(Succeed())
+			Eventually(event.Probe).Should(Equal(probeName))
+			Eventually(event.Code).Should(Equal(int32(0)))
+			Eventually(event.Output).Should(Equal([]byte("leader")))
+		})
+
+		It("send event - API server error", func() {
+			By("create probe service")
+			service, err := newProbeService(logr.New(nil), actionSvc, probes)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			By("mock send event function with error")
+			var (
+				count = 0
+			)
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+				count += 1
+				return fmt.Errorf("API server error")
+			}
+			retrySendEventInterval = 1 * time.Second
+			defer func() { retrySendEventInterval = defaultRetrySendEventInterval }()
+
+			By("start probe service")
+			Expect(service.Start()).Should(Succeed())
+
+			By("wait for probe to send event error")
+			Eventually(func() int { return count }, 2*retrySendEventInterval).Should(BeNumerically(">", 1))
+		})
+
+		It("send event - after API server recover", func() {
+			By("create probe service")
+			service, err := newProbeService(logr.New(nil), actionSvc, probes)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			By("mock send event function with temporary error")
+			var (
+				count     = 0
+				eventChan = make(chan struct {
+					reason  string
+					message string
+				}, 128)
+			)
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+				count += 1
+				if count <= 2 {
+					return fmt.Errorf("API server error")
+				}
+				eventChan <- struct{ reason, message string }{reason, message}
+				return nil
+			}
+			retrySendEventInterval = 1 * time.Second
+			defer func() { retrySendEventInterval = defaultRetrySendEventInterval }()
+
+			By("start probe service")
+			Expect(service.Start()).Should(Succeed())
+
+			By("wait for probe to send event error")
+			Eventually(func() int { return count }, 2*retrySendEventInterval).Should(BeNumerically(">", 1))
+
+			By("check received event after recover")
+			var receivedData struct{ reason, message string }
+			Eventually(eventChan, 2*retrySendEventInterval).Should(Receive(&receivedData))
+			Expect(receivedData.reason).Should(Equal(probeName))
+			var event proto.ProbeEvent
+			Expect(json.Unmarshal([]byte(receivedData.message), &event)).Should(Succeed())
+			Eventually(event.Probe).Should(Equal(probeName))
+			Eventually(event.Code).Should(Equal(int32(0)))
+			Eventually(event.Output).Should(Equal([]byte("leader")))
 		})
 
 		// TODO: more test cases

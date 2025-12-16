@@ -239,7 +239,7 @@ func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]core
 func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []corev1.EnvVar, vars *[]corev1.EnvVar) error {
 	var (
 		isValues = make(map[string]bool)
-		values   = make(map[string]string)
+		values   = make(map[string]any)
 	)
 	normalize := func(name string) string {
 		return strings.ReplaceAll(name, "-", "_")

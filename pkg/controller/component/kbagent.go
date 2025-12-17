@@ -229,7 +229,7 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 		}
 	}
 
-	if synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+	if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 		for _, action := range []*appsv1.Action{
 			synthesizedComp.LifecycleActions.PostProvision,
 			synthesizedComp.LifecycleActions.PreTerminate,
@@ -264,7 +264,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		streaming []string
 	)
 
-	if synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+	if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PostProvision, "postProvision"); a != nil {
 			actions = append(actions, *a)
 		}
@@ -437,7 +437,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 	}
 
 	actions := make([]*appsv1.Action, 0)
-	if synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+	if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 		actions = append(actions, []*appsv1.Action{
 			synthesizedComp.LifecycleActions.PostProvision,
 			synthesizedComp.LifecycleActions.PreTerminate,
@@ -542,8 +542,7 @@ func iterAvailablePort(port int32, set map[int32]bool) (int32, error) {
 }
 
 func hasActionDefined(synthesizedComp *SynthesizedComponent) bool {
-	if synthesizedComp.LifecycleActions != nil &&
-		(synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil || len(synthesizedComp.LifecycleActions.CustomActions) > 0) {
+	if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil || len(synthesizedComp.LifecycleActions.CustomActions) > 0 {
 		return true
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
@@ -561,10 +560,8 @@ func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(na
 			f(lifecycle.UDFActionName(UDFReconfigureActionName(tpl)), synthesizedComp.FileTemplates[i].Reconfigure)
 		}
 	}
-
-	if synthesizedComp.LifecycleActions != nil {
-		for _, action := range synthesizedComp.LifecycleActions.CustomActions {
-			f(lifecycle.UDFActionName(action.Name), action.Action)
-		}
+	
+	for _, action := range synthesizedComp.LifecycleActions.CustomActions {
+		f(lifecycle.UDFActionName(action.Name), action.Action)
 	}
 }

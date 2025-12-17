@@ -88,7 +88,7 @@ var _ = Describe("kb-agent", func() {
 						},
 					},
 				},
-				LifecycleActions: &SynthesizedLifecycleActions{
+				LifecycleActions: SynthesizedLifecycleActions{
 					ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
 						PostProvision: &appsv1.Action{
 							Exec: &appsv1.ExecAction{
@@ -129,7 +129,8 @@ var _ = Describe("kb-agent", func() {
 		})
 
 		It("nil", func() {
-			synthesizedComp.LifecycleActions = nil
+			synthesizedComp.LifecycleActions.ComponentLifecycleActions = nil
+			synthesizedComp.LifecycleActions.CustomActions = nil
 
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())

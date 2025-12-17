@@ -156,7 +156,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 
 	deleteReplicasSet := sets.New(deleteReplicas...)
 	joinedReplicasSet := sets.New(joinedReplicas...)
-	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil
+	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions.MemberLeave != nil
 	r.transCtx.Logger.Info("leave member at scaling-in", "delete replicas", deleteReplicas,
 		"joined replicas", joinedReplicas, "has member-leave action defined", hasMemberLeaveDefined)
 
@@ -217,7 +217,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return nil
 	}
 
-	if lifecycleActions == nil || (lifecycleActions.Switchover == nil && lifecycleActions.MemberLeave == nil) {
+	if lifecycleActions.Switchover == nil && lifecycleActions.MemberLeave == nil {
 		return nil
 	}
 
@@ -460,7 +460,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 		}
 		action = tpl.Reconfigure
 		actionName = component.UDFReconfigureActionName(tpl)
-		if action == nil && synthesizedComp.LifecycleActions != nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+		if action == nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 			action = synthesizedComp.LifecycleActions.Reconfigure
 			actionName = "" // default reconfigure action
 		}

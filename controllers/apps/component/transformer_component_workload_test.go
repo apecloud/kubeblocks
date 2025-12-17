@@ -81,7 +81,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			ClusterName: clusterName,
 			Name:        compName,
 			Roles:       roles,
-			LifecycleActions: &component.SynthesizedLifecycleActions{
+			LifecycleActions: component.SynthesizedLifecycleActions{
 				ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
 					MemberJoin: &appsv1.Action{
 						Exec: &appsv1.ExecAction{

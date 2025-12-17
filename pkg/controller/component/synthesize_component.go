@@ -121,7 +121,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 		EnableInstanceAPI:                comp.Spec.EnableInstanceAPI,
-		LifecycleActions: &SynthesizedLifecycleActions{
+		LifecycleActions: SynthesizedLifecycleActions{
 			ComponentLifecycleActions: compDefObj.Spec.LifecycleActions,
 			CustomActions:             comp.Spec.CustomActions,
 		},

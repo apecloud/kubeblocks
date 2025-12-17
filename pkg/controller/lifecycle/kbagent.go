@@ -147,10 +147,10 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
 	if err := a.precondition(ctx, cli, spec, func() client.MatchingLabels {
-		if opts == nil || opts.PreConditionCheckLabels == nil {
+		if opts == nil || opts.PreConditionObjectSelector == nil {
 			return nil
 		}
-		return opts.PreConditionCheckLabels
+		return opts.PreConditionObjectSelector
 	}()); err != nil {
 		return nil, err
 	}

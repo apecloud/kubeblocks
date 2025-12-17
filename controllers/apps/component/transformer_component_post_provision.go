@@ -46,7 +46,8 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	if synthesizedComp == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil ||
+		synthesizedComp.LifecycleActions.PostProvision == nil {
 		return nil
 	}
 
@@ -109,7 +110,8 @@ func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *
 
 func checkPostProvisionDone(transCtx *componentTransformContext) bool {
 	synthesizedComp := transCtx.SynthesizeComponent
-	if synthesizedComp == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil ||
+		synthesizedComp.LifecycleActions.PostProvision == nil {
 		return true
 	}
 

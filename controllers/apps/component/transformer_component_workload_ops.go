@@ -156,7 +156,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 
 	deleteReplicasSet := sets.New(deleteReplicas...)
 	joinedReplicasSet := sets.New(joinedReplicas...)
-	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions.MemberLeave != nil
+	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions.ComponentLifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil
 	r.transCtx.Logger.Info("leave member at scaling-in", "delete replicas", deleteReplicas,
 		"joined replicas", joinedReplicas, "has member-leave action defined", hasMemberLeaveDefined)
 

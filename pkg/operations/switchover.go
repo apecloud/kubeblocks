@@ -115,7 +115,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 			return err
 		}
 		compName := switchover.GetComponentName()
-		if synthesizedComp.LifecycleActions.Switchover == nil {
+		if synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, compName))
 		}
 

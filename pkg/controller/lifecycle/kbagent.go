@@ -196,15 +196,17 @@ func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader, labels 
 		comp := object.(*appsv1.Component)
 		return comp.Status.Phase == appsv1.RunningComponentPhase
 	}
-	return a.readyCheck(ctx, cli, constant.GenerateClusterComponentName(a.clusterName, a.compName), "component", &appsv1.Component{}, &appsv1.ComponentList{}, ready, labels)
+	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
+	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, &appsv1.ComponentList{}, ready, labels)
 }
 
 func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
+	name := constant.GenerateWorkloadNamePattern(a.clusterName, a.compName)
 	ready := func(object client.Object) bool {
 		its := object.(*workloads.InstanceSet)
 		return its.IsInstancesReady()
 	}
-	return a.readyCheck(ctx, cli, constant.GenerateWorkloadNamePattern(a.clusterName, a.compName), "runtime", &workloads.InstanceSet{}, &workloads.InstanceSetList{}, ready, labels)
+	return a.readyCheck(ctx, cli, name, "runtime", &workloads.InstanceSet{}, &workloads.InstanceSetList{}, ready, labels)
 }
 
 func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string,

@@ -560,7 +560,7 @@ func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(na
 			f(lifecycle.UDFActionName(UDFReconfigureActionName(tpl)), synthesizedComp.FileTemplates[i].Reconfigure)
 		}
 	}
-	
+
 	for _, action := range synthesizedComp.LifecycleActions.CustomActions {
 		f(lifecycle.UDFActionName(action.Name), action.Action)
 	}

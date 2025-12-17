@@ -146,11 +146,11 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	if !spec.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
-	if err := a.precondition(ctx, cli, spec, func() map[appsv1.PreConditionType]client.MatchingLabels {
-		if opts == nil || opts.PreConditionCheckScope == nil {
-			return map[appsv1.PreConditionType]client.MatchingLabels{}
+	if err := a.precondition(ctx, cli, spec, func() client.MatchingLabels {
+		if opts == nil || opts.PreConditionCheckLabels == nil {
+			return nil
 		}
-		return opts.PreConditionCheckScope
+		return opts.PreConditionCheckLabels
 	}()); err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec 
 	return a.checkedCallAction(ctx, cli, &spec.Action, lfa, opts)
 }
 
-func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action, scope map[appsv1.PreConditionType]client.MatchingLabels) error {
+func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action, labels client.MatchingLabels) error {
 	if spec.PreCondition == nil {
 		return nil
 	}
@@ -173,11 +173,11 @@ func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *app
 	case appsv1.ImmediatelyPreConditionType:
 		return nil
 	case appsv1.RuntimeReadyPreConditionType:
-		return a.runtimeReadyCheck(ctx, cli, scope[appsv1.RuntimeReadyPreConditionType])
+		return a.runtimeReadyCheck(ctx, cli, labels)
 	case appsv1.ComponentReadyPreConditionType:
-		return a.compReadyCheck(ctx, cli, scope[appsv1.ComponentReadyPreConditionType])
+		return a.compReadyCheck(ctx, cli, labels)
 	case appsv1.ClusterReadyPreConditionType:
-		return a.clusterReadyCheck(ctx, cli, scope[appsv1.ComponentReadyPreConditionType])
+		return a.clusterReadyCheck(ctx, cli, labels)
 	default:
 		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
 	}

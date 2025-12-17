@@ -1528,9 +1528,7 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 	}
 
 	err = lfa.UserDefined(transCtx.Context, transCtx.Client, &lifecycle.Options{
-		PreConditionCheckScope: map[appsv1.PreConditionType]client.MatchingLabels{
-			appsv1.ComponentReadyPreConditionType: constant.GetClusterLabels(transCtx.Cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
-		},
+		PreConditionCheckLabels: constant.GetClusterLabels(transCtx.Cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
 	}, actionName, action, args)
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)

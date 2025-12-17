@@ -30,10 +30,10 @@ import (
 )
 
 type Options struct {
-	NonBlocking            *bool
-	TimeoutSeconds         *int32
-	RetryPolicy            *appsv1.RetryPolicy
-	PreConditionCheckScope map[appsv1.PreConditionType]client.MatchingLabels
+	NonBlocking             *bool
+	TimeoutSeconds          *int32
+	RetryPolicy             *appsv1.RetryPolicy
+	PreConditionCheckLabels client.MatchingLabels
 }
 
 type Lifecycle interface {

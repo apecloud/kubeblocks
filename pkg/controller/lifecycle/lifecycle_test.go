@@ -486,7 +486,7 @@ var _ = Describe("lifecycle", func() {
 			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
 		})
 
-		It("precondition check scope", func() {
+		It("precondition check labels", func() {
 			componentReady := appsv1.ComponentReadyPreConditionType
 			labels := map[string]string{
 				"test": "test",
@@ -530,9 +530,7 @@ var _ = Describe("lifecycle", func() {
 
 			customAction.PreCondition = &componentReady
 			err = lifecycle.UserDefined(ctx, reader, &Options{
-				PreConditionCheckScope: map[appsv1.PreConditionType]client.MatchingLabels{
-					componentReady: labels,
-				},
+				PreConditionCheckLabels: labels,
 			}, "custom-action", customAction, nil)
 			Expect(err).Should(BeNil())
 		})
@@ -575,9 +573,7 @@ var _ = Describe("lifecycle", func() {
 
 			customAction.PreCondition = &componentReady
 			err = lifecycle.UserDefined(ctx, reader, &Options{
-				PreConditionCheckScope: map[appsv1.PreConditionType]client.MatchingLabels{
-					componentReady: labels,
-				},
+				PreConditionCheckLabels: labels,
 			}, "custom-action", customAction, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))

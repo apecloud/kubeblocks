@@ -217,7 +217,8 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return nil
 	}
 
-	if lifecycleActions.Switchover == nil && lifecycleActions.MemberLeave == nil {
+	if lifecycleActions.ComponentLifecycleActions == nil ||
+		(lifecycleActions.Switchover == nil && lifecycleActions.MemberLeave == nil) {
 		return nil
 	}
 

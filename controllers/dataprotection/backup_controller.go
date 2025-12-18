@@ -1071,7 +1071,7 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 		return nil, fmt.Errorf("backupRepo for incremental backup can't be empty")
 	}
 	// get and validate parent backup
-	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod, request.BackupRepo.Name)
+	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod, request.BackupPolicy, request.BackupRepo.Name)
 	if err != nil {
 		return nil, err
 	}

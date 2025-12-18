@@ -590,7 +590,7 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 // then validate and return the parent backup.
 // If parentBackupName is not specified, find the latest valid parent backup.
 func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod, backupRepoName string) (*dpv1alpha1.Backup, error) {
+	backupMethod *dpv1alpha1.BackupMethod, backupPolicy *dpv1alpha1.BackupPolicy, backupRepoName string) (*dpv1alpha1.Backup, error) {
 	if backup == nil || backupMethod == nil {
 		return nil, fmt.Errorf("backup or backupMethod is nil")
 	}
@@ -616,16 +616,23 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 		}, parentBackup); err != nil {
 			return nil, err
 		}
-		if err := ValidateParentBackup(ctx, cli, backup, parentBackup, backupMethod, backupRepoName); err != nil {
+		if err := ValidateParentBackup(ctx, cli, backup, parentBackup, backupMethod, backupPolicy, backupRepoName); err != nil {
 			return nil, fmt.Errorf("failed to validate parent backup %s: %w", parentBackupName, err)
 		}
 		return parentBackup, nil
 	}
-	parentBackup, err := FindParentBackupIfNotSet(ctx, cli, backup, backupMethod, backupRepoName)
+	parentBackup, err := FindParentBackupIfNotSet(ctx, cli, backup, backupMethod, backupPolicy, backupRepoName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find parent backup: %w", err)
 	}
 	if parentBackup == nil {
+		// output sharding message
+		expectedTargets := dputils.GetBackupTargets(backupPolicy, backupMethod)
+		if len(expectedTargets) > 0 {
+			return nil, fmt.Errorf("failed to find a valid parent backup for backup %s/%s: "+
+				"current backup expects %d shards, this may be due to shard count mismatch with existing backups",
+				backup.Namespace, backup.Name, len(expectedTargets))
+		}
 		return nil, fmt.Errorf("failed to find a valid parent backup for backup %s/%s", backup.Namespace, backup.Name)
 	}
 	return parentBackup, nil
@@ -637,7 +644,7 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 // b. return the latest incremental backup.
 // c. return the latest full backup if incremental backups are not found.
 func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod, backupRepoName string) (*dpv1alpha1.Backup, error) {
+	backupMethod *dpv1alpha1.BackupMethod, backupPolicy *dpv1alpha1.BackupPolicy, backupRepoName string) (*dpv1alpha1.Backup, error) {
 	getLatestBackup := func(backupList []*dpv1alpha1.Backup) *dpv1alpha1.Backup {
 		if len(backupList) == 0 {
 			return nil
@@ -655,7 +662,7 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 			client.MatchingLabels(labels)); err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		filteredbackupList := FilterParentBackups(ctx, cli, backupList, backup, backupMethod, incremental, backupRepoName)
+		filteredbackupList := FilterParentBackups(ctx, cli, backupList, backup, backupMethod, backupPolicy, incremental, backupRepoName)
 		return getLatestBackup(filteredbackupList), nil
 	}
 
@@ -701,13 +708,13 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 
 // FilterParentBackups filters the parent backups by backup phase, backup method and end time.
 func FilterParentBackups(ctx context.Context, cli client.Client, backupList *dpv1alpha1.BackupList, targetBackup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod, incremental bool, backupRepoName string) []*dpv1alpha1.Backup {
+	backupMethod *dpv1alpha1.BackupMethod, backupPolicy *dpv1alpha1.BackupPolicy, incremental bool, backupRepoName string) []*dpv1alpha1.Backup {
 	var res []*dpv1alpha1.Backup
 	if backupList == nil || len(backupList.Items) == 0 {
 		return res
 	}
 	for i, backup := range backupList.Items {
-		if err := ValidateParentBackup(ctx, cli, targetBackup, &backup, backupMethod, backupRepoName); err != nil {
+		if err := ValidateParentBackup(ctx, cli, targetBackup, &backup, backupMethod, backupPolicy, backupRepoName); err != nil {
 			continue
 		}
 		// backups are listed by backup type label, validate if the backup method matches
@@ -728,7 +735,7 @@ func FilterParentBackups(ctx context.Context, cli client.Client, backupList *dpv
 
 // ValidateParentBackup validates the parent backup.
 func ValidateParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod, backupRepoName string) error {
+	backupMethod *dpv1alpha1.BackupMethod, backupPolicy *dpv1alpha1.BackupPolicy, backupRepoName string) error {
 	// validate parent backup is completed
 	if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf("parent backup %s/%s is not completed", parentBackup.Namespace, parentBackup.Name)
@@ -758,6 +765,13 @@ func ValidateParentBackup(ctx context.Context, cli client.Client, backup *dpv1al
 			return fmt.Errorf("parent backup %s/%s encryption config is invalid: %w",
 				parentBackup.Namespace, parentBackup.Name, err)
 		}
+	}
+	// validate shard count consistency for incremental backup
+	expectedTargets := dputils.GetBackupTargets(backupPolicy, backupMethod)
+	if len(expectedTargets) > 0 && len(parentBackup.Status.Targets) != len(expectedTargets) {
+		return fmt.Errorf("parent backup %s/%s has %d shards, but current backup expects %d shards; "+
+			"incremental backup requires consistent shard count",
+			parentBackup.Namespace, parentBackup.Name, len(parentBackup.Status.Targets), len(expectedTargets))
 	}
 	return nil
 }

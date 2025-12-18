@@ -33,6 +33,7 @@ const (
 	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
 
 	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"

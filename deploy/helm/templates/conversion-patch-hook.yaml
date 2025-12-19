@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ .Release.Name }}-crd-patch
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:
@@ -76,7 +77,7 @@ spec:
               ${patch_crd_cmd} "componentversions.apps.kubeblocks.io"
               ${patch_crd_cmd} "instancesets.workloads.kubeblocks.io"
               ${patch_crd_cmd} "servicedescriptors.apps.kubeblocks.io"
-              
+
               # 3. start KubeBlocks
               kubectl patch deployment {{ include "kubeblocks.fullname" . }} -n {{ .Release.Namespace }} -p '{"spec":{"replicas":{{ .Values.replicaCount }}}}'
               {{- if .Values.dataProtection.enabled }}

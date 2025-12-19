@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ .Release.Name }}-upgrade-hook-job
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:
@@ -41,6 +42,10 @@ spec:
                  echo "ERROR: can not upgrade KubeBlocks from $version to {{ .Chart.AppVersion }}"
                  exit 1
               fi
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}

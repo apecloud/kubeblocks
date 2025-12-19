@@ -116,7 +116,11 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				replicas := template.GetReplicas()
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					templatePodNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, nil)
+					ords, err := instanceset.ConvertOrdinalsToSortedList(template.Ordinals)
+					if err != nil {
+						return 0, 0, err
+					}
+					templatePodNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, ords)
 					if err != nil {
 						return 0, 0, err
 					}

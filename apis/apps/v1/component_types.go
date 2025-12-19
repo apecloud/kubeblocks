@@ -224,8 +224,18 @@ type ComponentSpec struct {
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
 	// Default value is "PreferInPlace"
 	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +kubebuilder:default=PreferInPlace
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+	//
+	// If not specified, the value of PodUpdatePolicy will be used.
+	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +optional
+	PodUpgradePolicy *PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
 
 	// Provides fine-grained control over the spec update process of all instances.
 	//
@@ -268,6 +278,13 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies the desired Ordinals.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+	//
+	// +optional
+	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
 	// globally uniquely ordinal scheme, regardless of the instance template.

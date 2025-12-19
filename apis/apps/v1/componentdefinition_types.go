@@ -469,6 +469,21 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	PodManagementPolicy *appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
 
+	// Specifies the default update policy for pods when the Component is updated.
+	//
+	// +kubebuilder:validation:Enum={PreferInPlace,ReCreate}
+	// +kubebuilder:default=PreferInPlace
+	// +optional
+	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// Specifies the default update policy for pods when the Component is upgraded (the service version changes).
+	//
+	// If not specified, the default behavior is the same as `podUpdatePolicy`.
+	//
+	// +kubebuilder:validation:Enum={PreferInPlace,ReCreate}
+	// +optional
+	PodUpgradePolicy *PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
+
 	// Defines the namespaced policy rules required by the Component.
 	//
 	// The `policyRules` field is an array of `rbacv1.PolicyRule` objects that define the policy rules
@@ -852,6 +867,11 @@ type ComponentVars struct {
 	//
 	// +optional
 	PodFQDNsForRole *RoledVar `json:"podFQDNsForRole,omitempty"`
+
+	// Reference to the service version of the component.
+	//
+	// +optional
+	ServiceVersion *VarOption `json:"serviceVersion,omitempty"`
 }
 
 // ClusterVarSelector selects a var from a Cluster.
@@ -1516,6 +1536,9 @@ type ComponentLifecycleActions struct {
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 	// In a typical consensus system, this action is used to transfer leader role to another replica.
 	//
+	// When a pod is about to be updated, a switchover action will be triggered for it. So addon implementation must determine
+	// if the pod's current role needs to be transferred.
+	//
 	// The container executing this action has access to following variables:
 	//
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role's candidate, which may not be specified (empty).
@@ -1696,6 +1719,9 @@ type ComponentLifecycleActions struct {
 // Action defines a customizable hook or procedure tailored for different database engines,
 // designed to be invoked at predetermined points within the lifecycle of a Component instance.
 // It provides a modular and extensible way to customize a Component's behavior through the execution of defined actions.
+//
+// Action should be idempotent if possible. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
+// the action may be retried even after a success.
 //
 // Available Action triggers include:
 //

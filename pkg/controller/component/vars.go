@@ -55,7 +55,7 @@ func VarReferenceRegExp() *regexp.Regexp {
 }
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
-func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
 	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 }
 
@@ -95,14 +95,14 @@ func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []c
 }
 
 func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
+	definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
 	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	formattedTemplateVars := func() map[string]any {
-		vars := make(map[string]any)
+	formattedTemplateVars := func() map[string]string {
+		vars := make(map[string]string)
 		for _, v := range templateVars {
 			vars[v.Name] = v.Value
 		}
@@ -239,7 +239,7 @@ func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]core
 func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []corev1.EnvVar, vars *[]corev1.EnvVar) error {
 	var (
 		isValues = make(map[string]bool)
-		values   = make(map[string]string)
+		values   = make(map[string]any)
 	)
 	normalize := func(name string) string {
 		return strings.ReplaceAll(name, "-", "_")
@@ -418,7 +418,7 @@ func resolveNativeObjectKey(ctx context.Context, cli client.Reader, synthesizedC
 	}
 
 	objKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: objName}
-	if err := cli.Get(ctx, objKey, obj, inDataContext()); err != nil {
+	if err := cli.Get(ctx, objKey, obj); err != nil {
 		if apierrors.IsNotFound(err) && _optional() {
 			return nil, nil, nil
 		}
@@ -458,7 +458,8 @@ func resolveHostNetworkPortRef(ctx context.Context, cli client.Reader, synthesiz
 	defineKey string, selector appsv1.HostNetworkVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		compName := obj.(string)
-		port, _ := getHostNetworkPort(ctx, cli, synthesizedComp.ClusterName, compName, selector.Container.Name, selector.Container.Port.Name)
+		port, _ := getHostNetworkPort(synthesizedComp,
+			synthesizedComp.ClusterName, compName, selector.Container.Name, selector.Container.Port.Name)
 		if port > 0 {
 			return &corev1.EnvVar{
 				Name:  defineKey,
@@ -925,7 +926,7 @@ func resolveServiceVarRefLow(ctx context.Context, cli client.Reader, synthesized
 	selector appsv1.ServiceVarSelector, option *appsv1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveObjs := func() (map[string]any, error) {
 		headlessGetter := func(compName string) (any, error) {
-			return headlessCompServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName)
+			return headlessServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName)
 		}
 		getter := func(compName string) (any, error) {
 			return compServiceGetter(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, compName, selector.Name)
@@ -944,7 +945,7 @@ func clusterServiceGetter(ctx context.Context, cli client.Reader, namespace, clu
 		Name:      constant.GenerateClusterServiceName(clusterName, name),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj, inDataContext())
+	err := cli.Get(ctx, key, obj, inDataContext()) // TODO: cluster service
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -975,18 +976,18 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 		Name:      svcName,
 	}
 	obj := &corev1.Service{}
-	err = cli.Get(ctx, key, obj, inDataContext())
+	err = cli.Get(ctx, key, obj, inDataContext()) // TODO: cmp service
 	if err == nil {
 		return &resolvedServiceObj{service: obj}, nil
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
 	// fall-back to list services and find the matched prefix
 	svcList := &corev1.ServiceList{}
 	matchingLabels := client.MatchingLabels(constant.GetCompLabels(clusterName, compName))
-	err = cli.List(ctx, svcList, matchingLabels, inDataContext())
+	err = cli.List(ctx, svcList, matchingLabels, inDataContext()) // TODO: cmp service
 	if err != nil {
 		return nil, err
 	}
@@ -1003,13 +1004,13 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 	return &resolvedServiceObj{podServices: objs}, nil
 }
 
-func headlessCompServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (any, error) {
+func headlessServiceGetter(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) (any, error) {
 	key := types.NamespacedName{
 		Namespace: namespace,
 		Name:      constant.GenerateDefaultComponentHeadlessServiceName(clusterName, compName),
 	}
 	obj := &corev1.Service{}
-	err := cli.Get(ctx, key, obj, inDataContext())
+	err := cli.Get(ctx, key, obj)
 	return &resolvedServiceObj{service: obj}, err
 }
 
@@ -1022,7 +1023,7 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
 			}
 			obj := &corev1.Secret{}
-			err := cli.Get(ctx, key, obj, inDataContext())
+			err := cli.Get(ctx, key, obj)
 			return obj, err
 		}
 		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
@@ -1035,10 +1036,11 @@ func resolveServiceRefVarRefLow(ctx context.Context, cli client.Reader, synthesi
 	resolveObjs := func() (map[string]any, error) {
 		getter := func(compName string) (any, error) {
 			if compName == synthesizedComp.Name {
-				if synthesizedComp.ServiceReferences == nil {
-					return nil, nil
+				descriptor, ok := synthesizedComp.ServiceReferences[selector.Name]
+				if ok && descriptor != nil { // the descriptor may be nil
+					return descriptor, nil
 				}
-				return synthesizedComp.ServiceReferences[selector.Name], nil
+				return nil, nil
 			}
 			// TODO: service ref about other components?
 			return nil, nil
@@ -1145,6 +1147,8 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 		resolveFunc = resolveComponentPodsRef
 	case selector.PodNamesForRole != nil || selector.PodFQDNsForRole != nil:
 		resolveFunc = resolveComponentPodsForRoleRef
+	case selector.ServiceVersion != nil:
+		resolveFunc = resolveComponentServiceVersionRef
 	default:
 		return nil, nil, nil
 	}
@@ -1231,7 +1235,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 			Name:      constant.GenerateClusterComponentName(clusterName, compName),
 		}
 		comp = &appsv1.Component{}
-		err := cli.Get(ctx, key, comp, inDataContext())
+		err := cli.Get(ctx, key, comp)
 		if err != nil {
 			return "", err
 		}
@@ -1243,7 +1247,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		Namespace: namespace,
 		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
 	}
-	err := cli.Get(ctx, itsKey, its, inDataContext())
+	err := cli.Get(ctx, itsKey, its)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
@@ -1268,8 +1272,13 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 
 func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	namespace, clusterName, compName, roles string, fqdn bool) (string, error) {
-	pods, err := ListOwnedPods(ctx, cli, namespace, clusterName, compName)
-	if err != nil {
+	its := &workloadsv1.InstanceSet{}
+	itsKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
+	}
+	err := cli.Get(ctx, itsKey, its)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 
@@ -1277,13 +1286,10 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	targetRoles := strings.Split(roles, ",")
 
 	names := make([]string, 0)
-	for _, pod := range pods {
-		role := ""
-		if pod.Labels != nil {
-			role = pod.Labels[constant.RoleLabelKey]
-		}
+	for _, inst := range its.Status.InstanceStatus {
+		role := inst.Role
 		if slices.Index(targetRoles, role) >= 0 {
-			names = append(names, pod.Name)
+			names = append(names, inst.PodName)
 		}
 	}
 
@@ -1296,6 +1302,15 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	return strings.Join(names, ","), nil
 }
 
+func resolveComponentServiceVersionRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
+	resolveServiceVersion := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
+		comp := obj.(*appsv1.Component)
+		return &corev1.EnvVar{Name: defineKey, Value: comp.Spec.ServiceVersion}, nil, nil
+	}
+	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.ServiceVersion, resolveServiceVersion)
+}
+
 func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	objRef appsv1.ClusterObjectReference, option *appsv1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveObjs := func() (map[string]any, error) {
@@ -1305,7 +1320,7 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 				Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
 			}
 			obj := &appsv1.Component{}
-			err := cli.Get(ctx, key, obj, inDataContext())
+			err := cli.Get(ctx, key, obj)
 			return obj, err // TODO: what if the component is being deleted?
 		}
 		return resolveReferentObjects(synthesizedComp, objRef, getter)

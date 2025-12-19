@@ -27,10 +27,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 func TestGcConfigRevision(t *testing.T) {
@@ -97,7 +97,7 @@ func TestParseRevision(t *testing.T) {
 			StrRevision: "120000",
 			Revision:    120000,
 			Phase:       parametersv1alpha1.CPendingPhase,
-			Result: intctrlutil.Result{
+			Result: parameters.Result{
 				Phase:    parametersv1alpha1.CPendingPhase,
 				Revision: "120000",
 			},
@@ -181,7 +181,7 @@ func TestGetLastRevision(t *testing.T) {
 			Revision:    2,
 			StrRevision: "2",
 			Phase:       parametersv1alpha1.CRunningPhase,
-			Result: intctrlutil.Result{
+			Result: parameters.Result{
 				Phase:    parametersv1alpha1.CRunningPhase,
 				Revision: "2",
 			},

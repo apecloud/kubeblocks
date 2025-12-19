@@ -2703,13 +2703,13 @@ spec:
                         The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
                         but required otherwise.
                       maxLength: 22
-                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      pattern: ^$|^[a-z]([a-z0-9-]*[a-z0-9])?$
                       type: string
                     network:
                       description: Defines the network configuration for the Component.
                       properties:
                         dnsConfig:
-                          description: Specifies the DNS parameters of a pod.
+                          description: Specifies the DNS parameters of the pod.
                           properties:
                             nameservers:
                               description: |-
@@ -2774,6 +2774,40 @@ spec:
                           description: Host networking requested for this pod. Use
                             the host's network namespace.
                           type: boolean
+                        hostPorts:
+                          description: |-
+                            HostPorts specifies the mapping of container ports to host ports.
+                            The behavior varies based on the HostNetwork setting:
+
+
+                            1. When HostNetwork is enabled:
+                               - If this field is empty: All ports are automatically allocated by the host-port manager.
+                               - If this field is specified:
+                                 a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
+                                 b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+                                    You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+
+
+                            2. When HostNetwork is disabled:
+                               It allows optional mapping for container ports to host ports.
+                               - Mappings are restricted to ports defined in `cmpd.spec.runtime.containers.ports`.
+                               - Any specified container ports not present in the runtime definition will be ignored.
+                          items:
+                            properties:
+                              name:
+                                description: The name of the container port.
+                                type: string
+                              port:
+                                description: The port number of the host port.
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            required:
+                            - name
+                            - port
+                            type: object
+                          type: array
                       type: object
                     offlineInstances:
                       description: |-
@@ -2794,6 +2828,35 @@ spec:
                       items:
                         type: string
                       type: array
+                    ordinals:
+                      description: |-
+                        Specifies the desired Ordinals.
+                        The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+                        If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+                      properties:
+                        discrete:
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        ranges:
+                          items:
+                            description: |-
+                              Range represents a range with a start and an end value. Both start and end are included.
+                              It is used to define a continuous segment.
+                            properties:
+                              end:
+                                format: int32
+                                type: integer
+                              start:
+                                format: int32
+                                type: integer
+                            required:
+                            - end
+                            - start
+                            type: object
+                          type: array
+                      type: object
                     parallelPodManagementConcurrency:
                       anyOf:
                       - type: integer
@@ -2832,6 +2895,7 @@ spec:
                           type: string
                       type: object
                     podUpdatePolicy:
+                      default: PreferInPlace
                       description: |-
                         PodUpdatePolicy indicates how pods should be updated
 
@@ -2841,6 +2905,16 @@ spec:
                         - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
                         If that fails, it will fall back to the ReCreate, where pod will be recreated.
                         Default value is "PreferInPlace"
+                      enum:
+                      - StrictInPlace
+                      - PreferInPlace
+                      type: string
+                    podUpgradePolicy:
+                      description: |-
+                        PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+
+
+                        If not specified, the value of PodUpdatePolicy will be used.
                       enum:
                       - StrictInPlace
                       - PreferInPlace
@@ -9847,6 +9921,33 @@ spec:
                             maxLength: 15
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
+                          ordinals:
+                            description: Specifies an override for the desired Ordinals
+                              of the shard.
+                            properties:
+                              discrete:
+                                items:
+                                  format: int32
+                                  type: integer
+                                type: array
+                              ranges:
+                                items:
+                                  description: |-
+                                    Range represents a range with a start and an end value. Both start and end are included.
+                                    It is used to define a continuous segment.
+                                  properties:
+                                    end:
+                                      format: int32
+                                      type: integer
+                                    start:
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - end
+                                  - start
+                                  type: object
+                                type: array
+                            type: object
                           replicas:
                             default: 1
                             description: Specifies the desired number of replicas
@@ -13942,13 +14043,13 @@ spec:
                             The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
                             but required otherwise.
                           maxLength: 22
-                          pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                          pattern: ^$|^[a-z]([a-z0-9-]*[a-z0-9])?$
                           type: string
                         network:
                           description: Defines the network configuration for the Component.
                           properties:
                             dnsConfig:
-                              description: Specifies the DNS parameters of a pod.
+                              description: Specifies the DNS parameters of the pod.
                               properties:
                                 nameservers:
                                   description: |-
@@ -14013,6 +14114,40 @@ spec:
                               description: Host networking requested for this pod.
                                 Use the host's network namespace.
                               type: boolean
+                            hostPorts:
+                              description: |-
+                                HostPorts specifies the mapping of container ports to host ports.
+                                The behavior varies based on the HostNetwork setting:
+
+
+                                1. When HostNetwork is enabled:
+                                   - If this field is empty: All ports are automatically allocated by the host-port manager.
+                                   - If this field is specified:
+                                     a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
+                                     b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+                                        You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+
+
+                                2. When HostNetwork is disabled:
+                                   It allows optional mapping for container ports to host ports.
+                                   - Mappings are restricted to ports defined in `cmpd.spec.runtime.containers.ports`.
+                                   - Any specified container ports not present in the runtime definition will be ignored.
+                              items:
+                                properties:
+                                  name:
+                                    description: The name of the container port.
+                                    type: string
+                                  port:
+                                    description: The port number of the host port.
+                                    format: int32
+                                    maximum: 65535
+                                    minimum: 1
+                                    type: integer
+                                required:
+                                - name
+                                - port
+                                type: object
+                              type: array
                           type: object
                         offlineInstances:
                           description: |-
@@ -14033,6 +14168,35 @@ spec:
                           items:
                             type: string
                           type: array
+                        ordinals:
+                          description: |-
+                            Specifies the desired Ordinals.
+                            The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+                            If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+                          properties:
+                            discrete:
+                              items:
+                                format: int32
+                                type: integer
+                              type: array
+                            ranges:
+                              items:
+                                description: |-
+                                  Range represents a range with a start and an end value. Both start and end are included.
+                                  It is used to define a continuous segment.
+                                properties:
+                                  end:
+                                    format: int32
+                                    type: integer
+                                  start:
+                                    format: int32
+                                    type: integer
+                                required:
+                                - end
+                                - start
+                                type: object
+                              type: array
+                          type: object
                         parallelPodManagementConcurrency:
                           anyOf:
                           - type: integer
@@ -14071,6 +14235,7 @@ spec:
                               type: string
                           type: object
                         podUpdatePolicy:
+                          default: PreferInPlace
                           description: |-
                             PodUpdatePolicy indicates how pods should be updated
 
@@ -14080,6 +14245,16 @@ spec:
                             - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
                             If that fails, it will fall back to the ReCreate, where pod will be recreated.
                             Default value is "PreferInPlace"
+                          enum:
+                          - StrictInPlace
+                          - PreferInPlace
+                          type: string
+                        podUpgradePolicy:
+                          description: |-
+                            PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+
+
+                            If not specified, the value of PodUpdatePolicy will be used.
                           enum:
                           - StrictInPlace
                           - PreferInPlace
@@ -17627,6 +17802,7 @@ spec:
                       type: object
                   required:
                   - name
+                  - shards
                   type: object
                 maxItems: 128
                 minItems: 1

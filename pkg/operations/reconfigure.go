@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 type reconfigureAction struct {
@@ -64,21 +65,21 @@ func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx,
 
 func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 
-	var parameters = parametersv1alpha1.Parameter{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(resource.OpsRequest), &parameters); err != nil {
+	var parameter = parametersv1alpha1.Parameter{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(resource.OpsRequest), &parameter); err != nil {
 		return "", noRequeueAfter, err
 	}
 
 	opsDeepCopy := resource.OpsRequest.DeepCopy()
-	if !intctrlutil.IsParameterFinished(parameters.Status.Phase) {
+	if !parameters.IsParameterFinished(parameter.Status.Phase) {
 		return syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsRunningPhase)
 	}
 
-	if parameters.Status.Phase == parametersv1alpha1.CFinishedPhase {
+	if parameter.Status.Phase == parametersv1alpha1.CFinishedPhase {
 		return syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsSucceedPhase)
 	}
 
-	return syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsFailedPhase)
+	return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(fmt.Sprintf("reconfigure parameter failed: %s", parameter.Status.Message))
 }
 
 func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource, opsDeepCopy *opsv1alpha1.OpsRequest, phase opsv1alpha1.OpsPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
@@ -119,8 +120,16 @@ func buildReconfigureParameter(ops *opsv1alpha1.OpsRequest) *parametersv1alpha1.
 		ClusterRef(ops.Spec.ClusterName)
 	for _, reconfigure := range ops.Spec.Reconfigures {
 		if len(reconfigure.Parameters) != 0 {
-			paramBuilder.SetComponentParameters(reconfigure.ComponentName, intctrlutil.TransformComponentParameters(reconfigure.Parameters))
+			paramBuilder.SetComponentParameters(reconfigure.ComponentName, transformComponentParameters(reconfigure.Parameters))
 		}
 	}
 	return paramBuilder.GetObject()
+}
+
+func transformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
+	ret := make(parametersv1alpha1.ComponentParameters, len(params))
+	for _, param := range params {
+		ret[param.Key] = param.Value
+	}
+	return ret
 }

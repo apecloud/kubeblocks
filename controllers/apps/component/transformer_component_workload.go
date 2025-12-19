@@ -34,7 +34,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -125,12 +124,14 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 }
 
 func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {
-	p := appsutil.Placement(comp)
-	if len(p) > 0 {
-		if its.Annotations == nil {
-			its.Annotations = make(map[string]string)
+	if comp.Annotations != nil {
+		placement := comp.Annotations[constant.KBAppMultiClusterPlacementKey]
+		if len(placement) > 0 {
+			if its.Annotations == nil {
+				its.Annotations = make(map[string]string)
+			}
+			its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement
 		}
-		its.Annotations[constant.KBAppMultiClusterPlacementKey] = p
 	}
 }
 
@@ -173,7 +174,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 
 func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransformContext, cli model.GraphClient, dag *graph.DAG,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	start, stop, err := t.handleWorkloadStartNStop(synthesizedComp, runningITS, &protoITS)
+	start, stop, err := t.handleWorkloadStartNStop(transCtx, synthesizedComp, runningITS, &protoITS)
 	if err != nil {
 		return err
 	}
@@ -196,15 +197,11 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 			},
 		})
 	}
-
-	// if start {
-	//	return intctrlutil.NewDelayedRequeueError(time.Second, "workload is starting")
-	// }
 	return nil
 }
 
-func (t *componentWorkloadTransformer) handleWorkloadStartNStop(
-	synthesizedComp *component.SynthesizedComponent, runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
+func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *componentTransformContext, synthesizedComp *component.SynthesizedComponent,
+	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
 	var (
 		stop  = isCompStopped(synthesizedComp)
 		start = !stop && isWorkloadStopped(runningITS)
@@ -212,7 +209,7 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(
 	if start || stop {
 		*protoITS = runningITS.DeepCopy() // don't modify the runningITS except for the replicas
 	}
-	if stop {
+	if stop && checkPostProvisionDone(transCtx) {
 		return start, stop, t.stopWorkload(synthesizedComp, runningITS, *protoITS)
 	}
 	if start {
@@ -343,9 +340,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Template = podTemplateCopy
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
-	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
-	itsObjCopy.Spec.TemplateVars = itsProto.Spec.TemplateVars
+	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
+	itsObjCopy.Spec.DefaultTemplateOrdinals = itsProto.Spec.DefaultTemplateOrdinals
 	itsObjCopy.Spec.FlatInstanceOrdinal = itsProto.Spec.FlatInstanceOrdinal
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
@@ -353,6 +350,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.PersistentVolumeClaimRetentionPolicy = itsProto.Spec.PersistentVolumeClaimRetentionPolicy
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
+	itsObjCopy.Spec.PodUpgradePolicy = itsProto.Spec.PodUpgradePolicy
 	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Paused = itsProto.Spec.Paused

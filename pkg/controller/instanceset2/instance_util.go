@@ -36,7 +36,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -136,9 +136,9 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetInstanceTemplateName(template.Name).
 		SetInstanceUpdateStrategyType(its.Spec.InstanceUpdateStrategy).
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
+		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
-		SetMembershipReconfiguration(its.Spec.MembershipReconfiguration).
-		SetTemplateVars(its.Spec.TemplateVars)
+		SetLifecycleActions(its.Spec.LifecycleActions)
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).
@@ -309,9 +309,9 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.InstanceTemplateName = newInst.Spec.InstanceTemplateName
 	targetInst.Spec.InstanceUpdateStrategyType = newInst.Spec.InstanceUpdateStrategyType
 	targetInst.Spec.PodUpdatePolicy = newInst.Spec.PodUpdatePolicy
+	targetInst.Spec.PodUpgradePolicy = newInst.Spec.PodUpgradePolicy
 	targetInst.Spec.Roles = newInst.Spec.Roles
-	// targetInst.Spec.MembershipReconfiguration = newInst.Spec.MembershipReconfiguration
-	targetInst.Spec.TemplateVars = newInst.Spec.TemplateVars
+	targetInst.Spec.LifecycleActions = newInst.Spec.LifecycleActions
 
 	// object meta
 	mergeMap(&newInst.Labels, &targetInst.Labels)

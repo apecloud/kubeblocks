@@ -27,10 +27,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
-	mockproto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
+	mockproto "github.com/apecloud/kubeblocks/pkg/parameters/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -54,9 +56,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	Context("sync reconfigure policy test", func() {
 		It("Should success without error", func() {
-			By("check policy name")
-			Expect(operatorSyncPolicy.GetPolicyName()).Should(BeEquivalentTo("syncReload"))
-
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
@@ -65,8 +64,15 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(map[string]string{
-					"a": "c b e f",
+				withUpdatedParameters(&core.ConfigPatchInfo{
+					IsModify: true,
+					UpdateConfig: map[string][]byte{
+						"for-test": []byte(`{"a":"c b e f"}`),
+					},
+				}),
+				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
+					MergeReloadAndRestart:           pointer.Bool(false),
+					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
 				}),
 				withClusterComponent(3))
 
@@ -105,9 +111,6 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	Context("sync reconfigure policy with selector test", func() {
 		It("Should success without error", func() {
-			By("check policy name")
-			Expect(operatorSyncPolicy.GetPolicyName()).Should(BeEquivalentTo("syncReload"))
-
 			By("prepare reconfigure policy params")
 			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
 				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
@@ -116,21 +119,24 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
 				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(map[string]string{
-					"a": "c b e f",
+				withUpdatedParameters(&core.ConfigPatchInfo{
+					IsModify: true,
+					UpdateConfig: map[string][]byte{
+						"for-test": []byte(`{"a":"c b e f"}`),
+					},
 				}),
-				withClusterComponent(3))
-
-			// add selector
-			mockParam.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
-				ReloadAction: &parametersv1alpha1.ReloadAction{
-					TargetPodSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"primary": "true",
+				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
+					MergeReloadAndRestart:           pointer.Bool(false),
+					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
+					ReloadAction: &parametersv1alpha1.ReloadAction{
+						TargetPodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"primary": "true",
+							},
 						},
 					},
-				},
-			}
+				}),
+				withClusterComponent(3))
 
 			By("mock client get pod caller")
 			k8sMockClient.MockListMethod(testutil.WithListReturned(

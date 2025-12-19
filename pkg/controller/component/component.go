@@ -79,6 +79,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetParallelPodManagementConcurrency(compSpec.ParallelPodManagementConcurrency).
 		SetPodUpdatePolicy(compSpec.PodUpdatePolicy).
+		SetPodUpgradePolicy(compSpec.PodUpgradePolicy).
 		SetInstanceUpdateStrategy(compSpec.InstanceUpdateStrategy).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetPVCRetentionPolicy(compSpec.PersistentVolumeClaimRetentionPolicy).
@@ -89,6 +90,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
+		SetOrdinals(compSpec.Ordinals).
 		SetFlatInstanceOrdinal(compSpec.FlatInstanceOrdinal).
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).

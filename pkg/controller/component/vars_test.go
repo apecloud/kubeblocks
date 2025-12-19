@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -330,16 +331,13 @@ var _ = Describe("vars", func() {
 			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
 
 			By("has no host-network port")
-			synthesizedComp.Annotations = map[string]string{
-				constant.HostNetworkAnnotationKey: synthesizedComp.Name,
-			}
+			synthesizedComp.Network = &appsv1.ComponentNetwork{HostNetwork: true}
 			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
 			By("ok")
-			ctx := mockHostNetworkPort(testCtx.Ctx, testCtx.Cli,
-				synthesizedComp.ClusterName, synthesizedComp.Name, "default", "default", 30001)
+			synthesizedComp.Network.HostPorts = []appsv1.HostPort{{Name: "default", Port: 30001}}
 			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
@@ -374,7 +372,7 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
 
 			By("w/ default value - back-off to default value")
-			synthesizedComp.Annotations = nil // disable the host-network
+			synthesizedComp.Network = nil // disable the host-network
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "3306"))
@@ -1855,6 +1853,20 @@ var _ = Describe("vars", func() {
 							},
 						},
 					},
+					{
+						Name: "serviceVersion",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									ServiceVersion: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
 				}
 				podName := func(suffix string) string {
 					return fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name), suffix)
@@ -1868,47 +1880,35 @@ var _ = Describe("vars", func() {
 								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
 							},
 							Spec: appsv1.ComponentSpec{
-								CompDef:  synthesizedComp.CompDefName,
-								Replicas: 3,
+								CompDef:        synthesizedComp.CompDefName,
+								Replicas:       3,
+								ServiceVersion: "v3.6.5",
 							},
 						},
-						&corev1.Pod{
+						&workloads.InstanceSet{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: testCtx.DefaultNamespace,
-								Name:      podName("leader"),
-								Labels: map[string]string{
-									constant.AppManagedByLabelKey:   constant.AppName,
-									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
-									constant.KBAppComponentLabelKey: synthesizedComp.Name,
-									constant.RoleLabelKey:           "leader",
+								Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+							},
+							Spec: workloads.InstanceSetSpec{
+								Replicas: ptr.To(int32(3)),
+							},
+							Status: workloads.InstanceSetStatus{
+								InstanceStatus: []workloads.InstanceStatus{
+									{
+										PodName: podName("leader"),
+										Role:    "leader",
+									},
+									{
+										PodName: podName("follower"),
+										Role:    "follower",
+									},
+									{
+										PodName: podName("empty"),
+										Role:    "",
+									},
 								},
 							},
-							Spec: corev1.PodSpec{},
-						},
-						&corev1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: testCtx.DefaultNamespace,
-								Name:      podName("follower"),
-								Labels: map[string]string{
-									constant.AppManagedByLabelKey:   constant.AppName,
-									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
-									constant.KBAppComponentLabelKey: synthesizedComp.Name,
-									constant.RoleLabelKey:           "follower",
-								},
-							},
-							Spec: corev1.PodSpec{},
-						},
-						&corev1.Pod{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: testCtx.DefaultNamespace,
-								Name:      podName("empty"),
-								Labels: map[string]string{
-									constant.AppManagedByLabelKey:   constant.AppName,
-									constant.AppInstanceLabelKey:    synthesizedComp.ClusterName,
-									constant.KBAppComponentLabelKey: synthesizedComp.Name,
-								},
-							},
-							Spec: corev1.PodSpec{},
 						},
 					},
 				}
@@ -1936,6 +1936,7 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
 				checkEnvVarWithValue(envVars, "podFQDNs4Leader",
 					intctrlutil.PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
+				checkEnvVarWithValue(envVars, "serviceVersion", "v3.6.5")
 			})
 		})
 

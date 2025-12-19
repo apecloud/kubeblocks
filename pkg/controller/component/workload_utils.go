@@ -35,7 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -54,23 +54,9 @@ func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, cl
 	return listPods(ctx, cli, namespace, clusterName, compName, roleLabel, opts...)
 }
 
-func ListOwnedPVCs(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
-	opts ...client.ListOption) ([]*corev1.PersistentVolumeClaim, error) {
-	labels := constant.GetCompLabels(clusterName, compName)
-	if opts == nil {
-		opts = make([]client.ListOption, 0)
-	}
-	opts = append(opts, inDataContext())
-	return listObjWithLabelsInNamespace(ctx, cli, generics.PersistentVolumeClaimSignature, namespace, labels, opts...)
-}
-
 func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Service, error) {
 	labels := constant.GetCompLabels(clusterName, compName)
-	if opts == nil {
-		opts = make([]client.ListOption, 0)
-	}
-	opts = append(opts, inDataContext())
 	return listObjWithLabelsInNamespace(ctx, cli, generics.ServiceSignature, namespace, labels, opts...)
 }
 
@@ -103,7 +89,7 @@ func listPods(ctx context.Context, cli client.Reader, namespace, clusterName, co
 	if opts == nil {
 		opts = make([]client.ListOption, 0)
 	}
-	opts = append(opts, inDataContext())
+	opts = append(opts, inDataContext()) // TODO: pod
 	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels, opts...)
 }
 
@@ -161,10 +147,11 @@ func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
 			Annotations: comp.Annotations,
 		},
 		Spec: workloads.InstanceSetSpec{
-			Replicas:            &comp.Spec.Replicas,
-			Instances:           instanceTemplates(),
-			FlatInstanceOrdinal: comp.Spec.FlatInstanceOrdinal,
-			OfflineInstances:    comp.Spec.OfflineInstances,
+			Replicas:                &comp.Spec.Replicas,
+			Instances:               instanceTemplates(),
+			DefaultTemplateOrdinals: comp.Spec.Ordinals,
+			FlatInstanceOrdinal:     comp.Spec.FlatInstanceOrdinal,
+			OfflineInstances:        comp.Spec.OfflineInstances,
 		},
 	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)

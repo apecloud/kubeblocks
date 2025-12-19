@@ -27,7 +27,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -138,14 +137,11 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}
 
 	// check if the volume expansion is running
-	hasRunningVolumeExpansion, hasFailedVolumeExpansion, err := t.hasVolumeExpansionRunning(transCtx)
-	if err != nil {
-		return err
-	}
+	hasRunningVolumeExpansion := t.hasVolumeExpansionRunning()
 
-	// calculate if the component has failure
+	// check if the component has failure
 	hasFailure := func() bool {
-		return hasFailedPod || hasFailedScaleOut || hasFailedVolumeExpansion
+		return hasFailedPod || hasFailedScaleOut
 	}()
 
 	// check if the component is in creating phase
@@ -170,7 +166,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	switch {
 	case isDeleting:
 		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
-	case stopped && hasRunningPods:
+	case stopped && (hasRunningPods || !checkPostProvisionDone(transCtx)):
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
@@ -245,41 +241,13 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 	return true, false, nil
 }
 
-// hasVolumeExpansionRunning checks if the volume expansion is running.
-func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
-	for _, vct := range t.runningITS.Spec.VolumeClaimTemplates {
-		volumes, err := t.getRunningVolumes(transCtx, vct.Name)
-		if err != nil {
-			return false, false, err
-		}
-		for _, v := range volumes {
-			if v.Status.Capacity == nil || v.Status.Capacity.Storage().Cmp(v.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
-				continue
-			}
-			running = true
-			// TODO: how to check the expansion failed?
+func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
+	for _, inst := range t.runningITS.Status.InstanceStatus {
+		if inst.VolumeExpansion {
+			return true
 		}
 	}
-	return running, failed, nil
-}
-
-func (t *componentStatusTransformer) getRunningVolumes(transCtx *componentTransformContext, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
-	synthesizedComp := t.synthesizeComp
-	pvcs, err := component.ListOwnedPVCs(transCtx.Context, t.Client, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	matchedPVCs := make([]*corev1.PersistentVolumeClaim, 0)
-	prefix := fmt.Sprintf("%s-%s", vctName, t.runningITS.Name)
-	for _, pvc := range pvcs {
-		if strings.HasPrefix(pvc.Name, prefix) {
-			matchedPVCs = append(matchedPVCs, pvc)
-		}
-	}
-	return matchedPVCs, nil
+	return false
 }
 
 // hasFailedPod checks if the instance set has failed pod.
@@ -299,10 +267,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 	}
 
 	// all instances are in Ready condition, check role probe
-	if len(t.runningITS.Spec.Roles) == 0 {
-		return false, nil
-	}
-	if len(t.runningITS.Status.MembersStatus) == int(t.runningITS.Status.Replicas) {
+	if t.runningITS.IsRoleProbeDone() {
 		return false, nil
 	}
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
@@ -428,9 +393,9 @@ func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransf
 	if its == nil {
 		return metav1.ConditionFalse, "Unavailable", "the workload is not present"
 	}
-	for _, member := range its.Status.MembersStatus {
-		if member.ReplicaRole != nil {
-			if strings.EqualFold(member.ReplicaRole.Name, *policy.WithRole) {
+	for _, inst := range its.Status.InstanceStatus {
+		if len(inst.Role) > 0 {
+			if strings.EqualFold(inst.Role, *policy.WithRole) {
 				return metav1.ConditionTrue, "Available", fmt.Sprintf("the role %s is present", *policy.WithRole)
 			}
 		}

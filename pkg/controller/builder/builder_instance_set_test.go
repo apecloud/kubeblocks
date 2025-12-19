@@ -47,6 +47,7 @@ var _ = Describe("instance_set builder", func() {
 			port                         = int32(12345)
 			policy                       = appsv1.OrderedReadyPodManagement
 			podUpdatePolicy              = kbappsv1.PreferInPlacePodUpdatePolicyType
+			podUpgradePolicy             = kbappsv1.ReCreatePodUpdatePolicyType
 		)
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey1: selectorValue1, selectorKey2: selectorValue2, selectorKey3: selectorValue3, selectorKey4: selectorValue4}
@@ -131,6 +132,7 @@ var _ = Describe("instance_set builder", func() {
 			SetPodManagementPolicy(policy).
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
 			SetPodUpdatePolicy(podUpdatePolicy).
+			SetPodUpgradePolicy(podUpgradePolicy).
 			SetInstanceUpdateStrategy(&strategy).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
@@ -149,7 +151,7 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.Selector.MatchLabels[selectorKey4]).Should(Equal(selectorValue4))
 		Expect(its.Spec.Roles).Should(HaveLen(1))
 		Expect(its.Spec.Roles[0]).Should(Equal(role))
-		Expect(its.Spec.MembershipReconfiguration).Should(BeNil())
+		Expect(its.Spec.LifecycleActions).Should(BeNil())
 		Expect(its.Spec.Template).Should(Equal(template))
 		Expect(its.Spec.VolumeClaimTemplates).Should(HaveLen(2))
 		Expect(its.Spec.VolumeClaimTemplates[0]).Should(Equal(vcs[0]))
@@ -157,6 +159,7 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
 		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
+		Expect(its.Spec.PodUpgradePolicy).Should(Equal(podUpgradePolicy))
 		Expect(its.Spec.InstanceUpdateStrategy).ShouldNot(BeNil())
 		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate).ShouldNot(BeNil())
 		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas).ShouldNot(BeNil())

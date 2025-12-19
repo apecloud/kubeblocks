@@ -20,15 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var syncPolicyInstance = &syncPolicy{}
@@ -39,12 +42,8 @@ func init() {
 	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicyInstance)
 }
 
-func (o *syncPolicy) GetPolicyName() string {
-	return string(parametersv1alpha1.SyncDynamicReloadPolicy)
-}
-
-func (o *syncPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
-	updatedParameters := rctx.UpdatedParameters
+func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
+	updatedParameters := generateOnlineUpdateParams(rctx.Patch, rctx.ParametersDef, *rctx.ConfigDescription)
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
@@ -72,7 +71,7 @@ func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod
 	return result, nil
 }
 
-func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (returnedStatus, error) {
 	var (
 		r        = ESNone
 		total    = int32(len(pods))
@@ -83,7 +82,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 		ctx         = rctx.Ctx
 		configKey   = rctx.generateConfigIdentifier()
 		versionHash = rctx.getTargetVersionHash()
-		selector    = intctrlutil.GetPodSelector(rctx.ParametersDef)
+		selector    = parameters.GetPodSelector(rctx.ParametersDef)
 		fileName    string
 	)
 
@@ -124,4 +123,13 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 		r = ESRetry
 	}
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
+}
+
+func updatePodLabelsWithConfigVersion(pod *corev1.Pod, labelKey, configVersion string, cli client.Client, ctx context.Context) error {
+	patch := client.MergeFrom(pod.DeepCopy())
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string, 1)
+	}
+	pod.Labels[labelKey] = configVersion
+	return cli.Patch(ctx, pod, patch)
 }

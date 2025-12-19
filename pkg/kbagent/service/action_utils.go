@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -115,10 +114,10 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
-			return nil, errors.Wrapf(kbaproto.ErrFailed, errMsg)
+			return nil, errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg)
 		}
 		if errMsg := result.stderr.String(); len(errMsg) > 0 {
-			return nil, errors.Wrapf(err, errMsg)
+			return nil, errors.Wrapf(err, "%s", errMsg)
 		}
 		return nil, err
 	}
@@ -601,9 +600,11 @@ func renderTemplateData(action string, parameters map[string]string, data string
 	return buf.String(), nil
 }
 
-func mergeEnvWith(parameters map[string]string) map[string]string {
-	result := make(map[string]string)
-	maps.Copy(result, parameters)
+func mergeEnvWith(parameters map[string]string) map[string]any {
+	result := make(map[string]any)
+	for k, v := range parameters {
+		result[k] = v
+	}
 	for _, e := range os.Environ() {
 		kv := strings.Split(e, "=")
 		if _, ok := result[kv[0]]; !ok {

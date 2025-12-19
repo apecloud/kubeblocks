@@ -21,7 +21,6 @@ package component
 
 import (
 	"fmt"
-	"maps"
 	"reflect"
 	"strings"
 	"text/template"
@@ -259,8 +258,8 @@ func renderFileTemplateData(transCtx *componentTransformContext,
 	)
 
 	variables := make(map[string]any)
-	if synthesizedComp.TemplateVars != nil {
-		maps.Copy(variables, synthesizedComp.TemplateVars)
+	for k, v := range synthesizedComp.TemplateVars {
+		variables[k] = v
 	}
 	for k, v := range fileTemplate.Variables {
 		variables[k] = v // override

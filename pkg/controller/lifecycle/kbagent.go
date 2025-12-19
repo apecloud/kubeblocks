@@ -49,9 +49,9 @@ type kbagent struct {
 	clusterName      string
 	compName         string
 	lifecycleActions *appsv1.ComponentLifecycleActions
-	templateVars     map[string]any
-	pods             []*corev1.Pod
-	pod              *corev1.Pod
+	templateVars     map[string]string
+	pods             []*corev1.Pod // available pods to execute action, typically all pods of the component
+	pod              *corev1.Pod   // target pod the action will be effective on. Some actions, like postprovision, does not care about this field.
 }
 
 var _ Lifecycle = &kbagent{}
@@ -273,7 +273,7 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 	m := map[string]string{}
 	for k, v := range a.templateVars {
-		m[k] = v.(string)
+		m[k] = v
 	}
 	return m, nil
 }

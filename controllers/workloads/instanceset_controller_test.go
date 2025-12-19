@@ -180,8 +180,7 @@ var _ = Describe("InstanceSet Controller", func() {
 				Should(Succeed())
 		})
 
-		// TODO: updatedPods -> updatingPods in updateReconciler
-		PIt("rolling", func() {
+		It("rolling", func() {
 			replicas := int32(3)
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetReplicas(replicas).

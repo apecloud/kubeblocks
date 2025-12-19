@@ -95,6 +95,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		StaticAnnotations:                compDef.Spec.Annotations,
 		DynamicAnnotations:               comp.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
+		Network:                          comp.Spec.Network,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
 		LogConfigs:                       compDefObj.Spec.LogConfigs,
@@ -107,6 +108,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Resources:                        comp.Spec.Resources,
 		TLSConfig:                        comp.Spec.TLSConfig,
 		Instances:                        comp.Spec.Instances,
+		Ordinals:                         comp.Spec.Ordinals,
 		FlatInstanceOrdinal:              comp.Spec.FlatInstanceOrdinal,
 		InstanceImages:                   make(map[string]map[string]string),
 		OfflineInstances:                 comp.Spec.OfflineInstances,
@@ -114,7 +116,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Stop:                             comp.Spec.Stop,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
-		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		PodUpdatePolicy:                  getPodUpdatePolicy(comp, compDef),
+		PodUpgradePolicy:                 getPodUpgradePolicy(comp, compDef),
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 		EnableInstanceAPI:                comp.Spec.EnableInstanceAPI,
@@ -510,4 +513,33 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
+}
+
+func getPodUpdatePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) appsv1.PodUpdatePolicyType {
+	policy := compDef.Spec.PodUpdatePolicy
+	if policy != nil && *policy == appsv1.ReCreatePodUpdatePolicyType {
+		return appsv1.ReCreatePodUpdatePolicyType
+	}
+	if comp.Spec.PodUpdatePolicy != nil {
+		return *comp.Spec.PodUpdatePolicy
+	}
+	return appsv1.PreferInPlacePodUpdatePolicyType // default
+}
+
+func getPodUpgradePolicy(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) appsv1.PodUpdatePolicyType {
+	policy := compDef.Spec.PodUpgradePolicy
+	if policy == nil {
+		policy = compDef.Spec.PodUpdatePolicy
+	}
+	if policy != nil && *policy == appsv1.ReCreatePodUpdatePolicyType {
+		return appsv1.ReCreatePodUpdatePolicyType
+	}
+	policy = comp.Spec.PodUpgradePolicy
+	if policy == nil {
+		policy = comp.Spec.PodUpdatePolicy
+	}
+	if policy != nil {
+		return *policy
+	}
+	return appsv1.PreferInPlacePodUpdatePolicyType // default
 }

@@ -189,22 +189,20 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		lifecycleActions = synthesizedComp.LifecycleActions
 	)
 
-	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+	switchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		if lifecycleActions.Switchover == nil {
 			return nil
 		}
 		err := lfa.Switchover(r.transCtx.Context, r.cli, nil, "")
-		if err != nil {
-			if errors.Is(err, lifecycle.ErrActionNotDefined) {
-				return nil
-			}
-			return err
+		if err == nil {
+			r.transCtx.Logger.Info("succeed to call switchover action", "pod", pod.Name)
+		} else if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			r.transCtx.Logger.Info("failed to call switchover action, ignore it", "pod", pod.Name, "error", err)
 		}
-		r.transCtx.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
 		return nil
 	}
 
-	tryMemberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+	leaveMember := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		if lifecycleActions.MemberLeave == nil {
 			return nil
 		}
@@ -215,7 +213,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			}
 			return err
 		}
-		r.transCtx.Logger.Info("successfully call leave member action for pod", "pod", pod.Name)
+		r.transCtx.Logger.Info("succeed to call leave member action", "pod", pod.Name)
 		return nil
 	}
 
@@ -224,19 +222,17 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 	}
 
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		lifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+		lifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}
 
-	if err := trySwitchover(lfa, pod); err != nil {
+	if err = switchover(lfa, pod); err != nil {
 		return err
 	}
-
-	if err := tryMemberLeave(lfa, pod); err != nil {
+	if err = leaveMember(lfa, pod); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -257,18 +253,18 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 		return nil
 	}
 
-	// replicas to be created
+	// replicas to be provisioned
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
-	if len(newReplicas) == 0 {
-		return nil
-	}
-
 	// replicas in provisioning that the data has not been loaded
 	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
 		return s.DataLoaded != nil && !*s.DataLoaded
 	})
 	if err != nil {
 		return err
+	}
+
+	if len(newReplicas) == 0 && len(provisioningReplicas) == 0 {
+		return nil
 	}
 
 	// the source replica
@@ -289,7 +285,7 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 		SynthesizeComponent: r.synthesizeComp,
 		Component:           r.component,
 	}
-	return createOrUpdateEnvConfigMap(transCtx, r.dag, parameters)
+	return createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {
@@ -391,7 +387,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
 	synthesizedComp := r.synthesizeComp
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}

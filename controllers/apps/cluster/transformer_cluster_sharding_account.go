@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -62,7 +63,7 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *
 		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
-				if account.Shared != nil && *account.Shared {
+				if ptr.Deref(account.Shared, false) {
 					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, sharding, account.Name); err != nil {
 						return err
 					}
@@ -159,7 +160,7 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) ([]byte, error) {
 	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation", account.Name, shardingName)
+		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation, err: %w", account.Name, shardingName, err)
 	}
 	if len(password) == 0 {
 		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
@@ -195,7 +196,8 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		cluster = transCtx.Cluster
 	)
 	newAccount := appsv1.ComponentSystemAccount{
-		Name: accountName,
+		Name:     accountName,
+		Disabled: ptr.To(false), // default to false
 		SecretRef: &appsv1.ProvisionSecretRef{
 			Name:      shardingAccountSecretName(cluster.Name, shardingName, accountName),
 			Namespace: cluster.Namespace,

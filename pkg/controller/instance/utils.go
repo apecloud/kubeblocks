@@ -29,9 +29,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -347,4 +349,17 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	default:
 		return newObj
 	}
+}
+
+func newLifecycleAction(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+	var (
+		clusterName      = inst.Labels[constant.AppInstanceLabelKey]
+		compName         = inst.Labels[constant.KBAppComponentLabelKey]
+		lifecycleActions = &kbappsv1.ComponentLifecycleActions{
+			Switchover:  inst.Spec.LifecycleActions.Switchover,
+			Reconfigure: inst.Spec.LifecycleActions.Reconfigure,
+		}
+	)
+	return lifecycle.New(inst.Namespace, clusterName, compName,
+		lifecycleActions, inst.Spec.LifecycleActions.TemplateVars, pod, pods)
 }

@@ -274,10 +274,12 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
 	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy
+	compObjCopy.Spec.PodUpgradePolicy = compProto.Spec.PodUpgradePolicy
 	compObjCopy.Spec.InstanceUpdateStrategy = compProto.Spec.InstanceUpdateStrategy
 	compObjCopy.Spec.SchedulingPolicy = compProto.Spec.SchedulingPolicy
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
 	compObjCopy.Spec.Instances = compProto.Spec.Instances
+	compObjCopy.Spec.Ordinals = compProto.Spec.Ordinals
 	compObjCopy.Spec.FlatInstanceOrdinal = compProto.Spec.FlatInstanceOrdinal
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName
@@ -946,7 +948,7 @@ func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
 			if err != nil {
 				return nil, err
 			}
-			h.buildShardPodAntiAffinity(transCtx, sharding.Name, spec.Name, obj)
+			h.buildShardSchedulingPolicy(transCtx, sharding.Name, spec.Name, obj)
 			objs = append(objs, obj)
 		}
 	}
@@ -983,6 +985,52 @@ func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformCont
 		}
 	}
 	return annotations
+}
+
+func (h *clusterShardingHandler) buildShardSchedulingPolicy(transCtx *clusterTransformContext,
+	shardingName, compName string, comp *appsv1.Component) {
+	var affinity *corev1.Affinity
+	if comp.Spec.SchedulingPolicy != nil {
+		affinity = comp.Spec.SchedulingPolicy.Affinity // topologySpreadConstraints?
+	}
+	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
+		h.buildShardPodAntiAffinity(transCtx, shardingName, compName, comp) // fallback
+		return
+	}
+
+	replace := func(terms1 []corev1.PodAffinityTerm, terms2 []corev1.WeightedPodAffinityTerm) bool {
+		found := false
+		for i := range terms1 {
+			val, ok := terms1[i].LabelSelector.MatchLabels[constant.KBAppComponentLabelKey]
+			if ok && len(val) == 0 {
+				terms1[i].LabelSelector.MatchLabels[constant.KBAppComponentLabelKey] = compName
+				found = true
+			}
+		}
+		for i := range terms2 {
+			val, ok := terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[constant.KBAppComponentLabelKey]
+			if ok && len(val) == 0 {
+				terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[constant.KBAppComponentLabelKey] = compName
+				found = true
+			}
+		}
+		return found
+	}
+
+	found1, found2 := false, false
+	if affinity.PodAffinity != nil {
+		found1 = replace(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+
+	}
+	if affinity.PodAntiAffinity != nil {
+		found2 = replace(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+
+	if !found1 && !found2 {
+		h.buildShardPodAntiAffinity(transCtx, shardingName, compName, comp) // fallback
+	}
 }
 
 func (h *clusterShardingHandler) buildShardPodAntiAffinity(transCtx *clusterTransformContext,

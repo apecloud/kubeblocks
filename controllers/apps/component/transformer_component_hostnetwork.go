@@ -43,18 +43,18 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	ports, err := allocateHostPorts(synthesizedComp)
+	ports, err := t.allocateHostPorts(synthesizedComp)
 	if err != nil {
 		return err
 	}
 
 	comp := transCtx.Component
-	updateObjectsWithAllocatedPorts(synthesizedComp, comp, ports)
+	t.updateObjectsWithAllocatedPorts(synthesizedComp, comp, ports)
 
 	return nil
 }
 
-func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
+func (t *componentHostNetworkTransformer) allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]bool{}
 	for _, c := range synthesizedComp.HostNetwork.ContainerPorts {
 		for _, p := range c.Ports {
@@ -65,7 +65,7 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 		}
 	}
 
-	pm := intctrlutil.GetPortManager()
+	pm := intctrlutil.GetPortManager(synthesizedComp.Network)
 	needAllocate := func(c string, p string) bool {
 		containerPorts, ok := ports[c]
 		if !ok {
@@ -73,10 +73,10 @@ func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[str
 		}
 		return containerPorts[p]
 	}
-	return allocateHostPortsWithFunc(pm, synthesizedComp, needAllocate)
+	return t.allocateHostPortsWithFunc(pm, synthesizedComp, needAllocate)
 }
 
-func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
+func (t *componentHostNetworkTransformer) allocateHostPortsWithFunc(pm intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
 	needAllocate func(string, string) bool) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]int32{}
 	insert := func(c, pk string, pv int32) {
@@ -87,7 +87,7 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 	}
 	for _, c := range synthesizedComp.PodSpec.Containers {
 		for _, p := range c.Ports {
-			portKey := intctrlutil.BuildHostPortName(synthesizedComp.ClusterName, synthesizedComp.Name, c.Name, p.Name)
+			portKey := pm.PortKey(synthesizedComp.ClusterName, synthesizedComp.Name, c.Name, p.Name)
 			if needAllocate(c.Name, p.Name) {
 				port, err := pm.AllocatePort(portKey)
 				if err != nil {
@@ -104,7 +104,7 @@ func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *com
 	return ports, nil
 }
 
-func updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedComponent,
+func (t *componentHostNetworkTransformer) updateObjectsWithAllocatedPorts(synthesizedComp *component.SynthesizedComponent,
 	comp *appsv1.Component, ports map[string]map[string]int32) {
 	synthesizedComp.PodSpec.HostNetwork = true
 	if comp.Spec.Network != nil && comp.Spec.Network.DNSPolicy != nil {

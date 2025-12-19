@@ -35,12 +35,12 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -74,16 +74,17 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetInstances(getInstanceTemplates(synthesizedComp)).
+		SetOrdinals(synthesizedComp.Ordinals).
 		SetFlatInstanceOrdinal(synthesizedComp.FlatInstanceOrdinal).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).
 		SetRoles(synthesizedComp.Roles).
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
 		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
-		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
+		SetPodUpdatePolicy(synthesizedComp.PodUpdatePolicy).
+		SetPodUpgradePolicy(synthesizedComp.PodUpgradePolicy).
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
-		SetLifecycleActions(synthesizedComp.LifecycleActions).
-		SetTemplateVars(synthesizedComp.TemplateVars).
+		SetLifecycleActions(synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars).
 		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
 		SetInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects)
 	if compDef != nil {
@@ -190,13 +191,6 @@ func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedC
 		return synthesizedComp.ParallelPodManagementConcurrency
 	}
 	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"} // default value
-}
-
-func getPodUpdatePolicy(synthesizedComp *component.SynthesizedComponent) workloads.PodUpdatePolicyType {
-	if synthesizedComp.PodUpdatePolicy != nil {
-		return *synthesizedComp.PodUpdatePolicy
-	}
-	return kbappsv1.PreferInPlacePodUpdatePolicyType // default value
 }
 
 func getInstanceUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.InstanceUpdateStrategy {
@@ -332,12 +326,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 		SetImage(sidecarRenderedParam.Image).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
 		AddVolumeMounts(sidecarRenderedParam.Volumes...)
-	if sidecarRenderedParam.ShareProcessNamespace {
-		user := int64(0)
-		containerBuilder.SetSecurityContext(corev1.SecurityContext{
-			RunAsUser: &user,
-		})
-	}
 	return containerBuilder.GetObject(), nil
 }
 

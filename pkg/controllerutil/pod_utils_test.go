@@ -436,64 +436,6 @@ var _ = Describe("pod utils", func() {
 		})
 	})
 
-	Context("testGetContainerID", func() {
-		It("Should succeed with no error", func() {
-			pods := []*corev1.Pod{{
-				Status: corev1.PodStatus{
-					ContainerStatuses: []corev1.ContainerStatus{
-						{
-							Name:        "a",
-							ContainerID: "docker://27d1586d53ef9a6af5bd983831d13b6a38128119fadcdc22894d7b2397758eb5",
-						},
-						{
-							Name:        "b",
-							ContainerID: "docker://6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
-						},
-					},
-				},
-			}, {
-				Status: corev1.PodStatus{
-					ContainerStatuses: []corev1.ContainerStatus{},
-				},
-			}}
-
-			type args struct {
-				pod           *corev1.Pod
-				containerName string
-			}
-			tests := []struct {
-				name string
-				args args
-				want string
-			}{{
-				name: "test1",
-				args: args{
-					pod:           pods[0],
-					containerName: "b",
-				},
-				want: "6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
-			}, {
-				name: "test2",
-				args: args{
-					pod:           pods[0],
-					containerName: "f",
-				},
-				want: "",
-			}, {
-				name: "test3",
-				args: args{
-					pod:           pods[1],
-					containerName: "a",
-				},
-				want: "",
-			}}
-			for _, tt := range tests {
-				Expect(GetContainerID(tt.args.pod, tt.args.containerName)).Should(BeEquivalentTo(tt.want))
-			}
-
-		})
-	})
-
 	Context("common funcs test", func() {
 		It("GetContainersByConfigmap Should succeed with no error", func() {
 			type args struct {
@@ -555,42 +497,6 @@ var _ = Describe("pod utils", func() {
 				Expect(GetContainersByConfigmap(tt.args.containers, tt.args.volumeName, tt.args.envFrom, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
 			}
 
-		})
-
-		It("GetIntOrPercentValue Should succeed with no error", func() {
-			fn := func(v intstr.IntOrString) *intstr.IntOrString { return &v }
-			tests := []struct {
-				name      string
-				args      *intstr.IntOrString
-				want      int
-				isPercent bool
-				wantErr   bool
-			}{{
-				name:      "test",
-				args:      fn(intstr.FromString("10")),
-				want:      0,
-				isPercent: false,
-				wantErr:   true,
-			}, {
-				name:      "test",
-				args:      fn(intstr.FromString("10%")),
-				want:      10,
-				isPercent: true,
-				wantErr:   false,
-			}, {
-				name:      "test",
-				args:      fn(intstr.FromInt(60)),
-				want:      60,
-				isPercent: false,
-				wantErr:   false,
-			}}
-
-			for _, tt := range tests {
-				val, isPercent, err := GetIntOrPercentValue(tt.args)
-				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
-				Expect(val).Should(BeEquivalentTo(tt.want))
-				Expect(isPercent).Should(BeEquivalentTo(tt.isPercent))
-			}
 		})
 	})
 

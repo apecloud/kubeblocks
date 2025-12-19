@@ -33,9 +33,9 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
@@ -65,7 +65,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
-			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName).
+			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName, true).
 			Create(&testCtx).
 			GetObject()
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
@@ -133,7 +133,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.Payload).Should(HaveKey(constant.ReplicasPayload))
 				g.Expect(item.Payload).Should(HaveKey(constant.ComponentResourcePayload))
@@ -153,7 +153,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			compDefObj := testapps.NewComponentDefinitionFactory(key.Name).
 				WithRandomName().
 				SetDefaultSpec().
-				AddConfigTemplate(configSpecName, configSpecName, testCtx.DefaultNamespace, configVolumeName).
+				AddConfigTemplate(configSpecName, configSpecName, testCtx.DefaultNamespace, configVolumeName, true).
 				Create(&testCtx).
 				GetObject()
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {

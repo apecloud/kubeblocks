@@ -115,6 +115,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	// mark component restore done
 	if compObj.Annotations != nil {
 		compObj.Annotations[constant.RestoreDoneAnnotationKey] = "true"
+		delete(compObj.Annotations, constant.RestoreFromBackupAnnotationKey)
 	}
 	// do clean up
 	return r.cleanupRestoreAnnotations(comp.Name)
@@ -177,8 +178,11 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	}
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
-	pvcLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
+	pvcLabels := map[string]string{}
 	intctrlutil.MergeMetadataMapInplace(comp.Labels, &pvcLabels)
+	intctrlutil.MergeMetadataMapInplace(comp.StaticLabels, &pvcLabels)
+	intctrlutil.MergeMetadataMapInplace(comp.DynamicLabels, &pvcLabels)
+	intctrlutil.MergeMetadataMapInplace(constant.GetCompLabels(r.Cluster.Name, comp.Name), &pvcLabels)
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for _, v := range comp.VolumeClaimTemplates {
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {
@@ -461,7 +465,7 @@ func (r *RestoreManager) createRestoreAndWait(compObj *appsv1.Component, restore
 		}
 	}
 	if errType != "" {
-		return intctrlutil.NewErrorf(errType, strings.Join(msgs, ";"))
+		return intctrlutil.NewErrorf(errType, "%s", strings.Join(msgs, ";"))
 	}
 	return nil
 }

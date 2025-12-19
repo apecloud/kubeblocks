@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -149,14 +148,14 @@ var _ = Describe("lifecycle", func() {
 
 	Context("new", func() {
 		It("nil pod", func() {
-			_, err := New("", "", "", nil, nil, nil)
+			_, err := New("", "", "", nil, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("either pod or pods must be provided to call lifecycle actions"))
+			Expect(err.Error()).Should(ContainSubstring("pods must be provided to call lifecycle actions"))
 		})
 
 		It("pod", func() {
 			pod := pods[0]
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, pod)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, pod, pods)
 			Expect(err).Should(BeNil())
 
 			Expect(lifecycle).ShouldNot(BeNil())
@@ -172,7 +171,7 @@ var _ = Describe("lifecycle", func() {
 
 		It("pods", func() {
 			pod := pods[0]
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 
 			Expect(lifecycle).ShouldNot(BeNil())
@@ -189,7 +188,7 @@ var _ = Describe("lifecycle", func() {
 
 	Context("call action", func() {
 		It("not defined", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -199,7 +198,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("action request", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -207,7 +206,7 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
+					Expect(req.Parameters).Should(BeEmpty())
 					Expect(req.NonBlocking).ShouldNot(BeNil())
 					Expect(*req.NonBlocking).Should(BeTrue())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
@@ -229,7 +228,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("succeed", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -244,7 +243,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("succeed and stdout", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -262,7 +261,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("fail - error code", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -331,7 +330,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("fail - error msg", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -351,7 +350,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("parameters", func() {
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -382,8 +381,7 @@ var _ = Describe("lifecycle", func() {
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
-					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
-					Expect(req.Parameters[hackedAllCompList]).Should(Equal(strings.Join([]string{compName, "another"}, ",")))
+					Expect(req.Parameters).Should(BeEmpty())
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})
@@ -396,7 +394,7 @@ var _ = Describe("lifecycle", func() {
 			key := "TEMPLATE_VAR1"
 			val := "template-vars1"
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, map[string]any{key: val}, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, map[string]string{key: val}, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -420,7 +418,7 @@ var _ = Describe("lifecycle", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
 			lifecycleActions.PostProvision.PreCondition = &clusterReady
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -453,7 +451,7 @@ var _ = Describe("lifecycle", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
 			lifecycleActions.PostProvision.PreCondition = &clusterReady
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -518,7 +516,7 @@ var _ = Describe("lifecycle", func() {
 				},
 			}
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -528,7 +526,34 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - all", func() {
-			// TODO: impl
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-1",
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
 		})
 
 		It("pod selector - role", func() {
@@ -579,7 +604,7 @@ var _ = Describe("lifecycle", func() {
 				},
 			}
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -612,7 +637,7 @@ var _ = Describe("lifecycle", func() {
 				},
 			}
 
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 

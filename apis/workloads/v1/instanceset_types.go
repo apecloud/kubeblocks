@@ -196,16 +196,15 @@ type InstanceSetSpec struct {
 	// +optional
 	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
 
-	// PodUpdatePolicy indicates how pods should be updated
-	//
-	// - `StrictInPlace` indicates that only allows in-place upgrades.
-	// Any attempt to modify other fields will be rejected.
-	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
-	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
-	// Default value is "PreferInPlace"
+	// PodUpdatePolicy indicates how pods should be updated.
 	//
 	// +optional
 	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// PodUpgradePolicy indicates how pods should be upgraded.
+	//
+	// +optional
+	PodUpgradePolicy PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
 
 	// Provides fine-grained control over the spec update process of all instances.
 	//
@@ -227,15 +226,10 @@ type InstanceSetSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Provides actions to do membership dynamic reconfiguration.
+	// Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.
 	//
 	// +optional
-	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
-
-	// Provides variables which are used to call Actions.
-	//
-	// +optional
-	TemplateVars map[string]string `json:"templateVars,omitempty"`
+	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
 	//
@@ -332,22 +326,15 @@ type InstanceSetStatus struct {
 
 	// Defines the initial number of instances when the cluster is first initialized.
 	// This value is set to spec.Replicas at the time of object creation and remains constant thereafter.
-	// Used only when spec.roles set.
 	//
 	// +optional
 	InitReplicas int32 `json:"initReplicas"`
 
-	// Represents the number of instances that have already reached the MembersStatus during the cluster initialization stage.
+	// Represents the number of instances that have already reached the InstanceStatus during the cluster initialization stage.
 	// This value remains constant once it equals InitReplicas.
-	// Used only when spec.roles set.
 	//
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
-
-	// Provides the status of each member in the cluster.
-	//
-	// +optional
-	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
 	// Provides the status of each instance in the ITS.
 	//
@@ -500,13 +487,27 @@ const (
 // +kubebuilder:object:generate=false
 type ReplicaRole = kbappsv1.ReplicaRole
 
-type MembershipReconfiguration struct {
+// Action defines a customizable hook or procedure tailored for different database engines,
+// designed to be invoked at predetermined points within the lifecycle of a Component instance.
+//
+// +kubebuilder:object:generate=false
+type Action = kbappsv1.Action
+
+type LifecycleActions struct {
+	// Provides variables which are used to call Actions.
+	//
+	// +optional
+	TemplateVars map[string]string `json:"templateVars,omitempty"`
+
 	// Defines the procedure for a controlled transition of a role to a new replica.
 	//
 	// +optional
-	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
+	Switchover *Action `json:"switchover,omitempty"`
 
-	// TODO: member join/leave
+	// Defines the procedure that update a replica with new configuration.
+	//
+	// +optional
+	Reconfigure *Action `json:"reconfigure,omitempty"`
 }
 
 type ConfigTemplate struct {
@@ -534,19 +535,6 @@ type ConfigTemplate struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-type MemberStatus struct {
-	// Represents the name of the pod.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=Unknown
-	PodName string `json:"podName"`
-
-	// Defines the role of the replica in the cluster.
-	//
-	// +optional
-	ReplicaRole *ReplicaRole `json:"role,omitempty"`
-}
-
 type InstanceStatus struct {
 	// Represents the name of the pod.
 	//
@@ -554,10 +542,20 @@ type InstanceStatus struct {
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
 
+	// Represents the role of the instance observed.
+	//
+	// +optional
+	Role string `json:"role,omitempty"`
+
 	// The status of configs.
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+
+	// Represents whether the instance is in volume expansion.
+	//
+	// +optional
+	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
 }
 
 type InstanceConfigStatus struct {
@@ -676,17 +674,25 @@ func (r *InstanceSet) IsInstancesReady() bool {
 
 // IsInstanceSetReady gives InstanceSet level 'ready' state:
 // 1. all instances are available
-// 2. and all members have role set (if they are role-ful)
+// 2. and all instances have role set (if they are role-ful)
 func (r *InstanceSet) IsInstanceSetReady() bool {
 	instancesReady := r.IsInstancesReady()
 	if !instancesReady {
 		return false
 	}
+	return r.IsRoleProbeDone()
+}
 
-	// check whether role probe has done
+func (r *InstanceSet) IsRoleProbeDone() bool {
+	replicas := int(*r.Spec.Replicas)
 	if len(r.Spec.Roles) == 0 {
-		return true
+		replicas = 0
 	}
-	membersStatus := r.Status.MembersStatus
-	return len(membersStatus) == int(*r.Spec.Replicas)
+	cnt := 0
+	for _, inst := range r.Status.InstanceStatus {
+		if len(inst.Role) > 0 {
+			cnt++
+		}
+	}
+	return cnt == replicas
 }

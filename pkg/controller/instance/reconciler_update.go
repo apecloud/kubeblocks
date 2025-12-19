@@ -31,7 +31,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -80,7 +79,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// podUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
-		updatePolicy, err := getPodUpdatePolicy(inst, pod)
+		updatePolicy, _, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -120,11 +119,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		updatePolicy, err := getPodUpdatePolicy(inst, pod)
+		updatePolicy, specUpdatePolicy, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if inst.Spec.PodUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType && updatePolicy == recreatePolicy {
+		if updatePolicy == recreatePolicy && specUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType {
 			message := fmt.Sprintf("Instance %s/%s blocks on update as the podUpdatePolicy is %s and the pod %s can not inplace update",
 				inst.Namespace, inst.Name, kbappsv1.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
@@ -133,6 +132,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			meta.SetStatusCondition(&inst.Status.Conditions, *buildBlockedCondition(inst, message))
 			isBlocked = true
 			break
+		}
+		if updatePolicy == inPlaceUpdatePolicy && specUpdatePolicy == kbappsv1.ReCreatePodUpdatePolicyType {
+			updatePolicy = recreatePolicy
 		}
 		if updatePolicy == inPlaceUpdatePolicy {
 			newPod, err := buildInstancePod(inst, getPodRevision(pod))
@@ -189,40 +191,22 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 }
 
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) error {
-	if inst.Spec.MembershipReconfiguration == nil || inst.Spec.MembershipReconfiguration.Switchover == nil {
+	if inst.Spec.LifecycleActions == nil || inst.Spec.LifecycleActions.Switchover == nil {
 		return nil
 	}
 
-	clusterName, err := r.clusterName(inst)
-	if err != nil {
-		return err
-	}
-	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-		Switchover: inst.Spec.MembershipReconfiguration.Switchover,
-	}
-	templateVars := func() map[string]any {
-		if inst.Spec.TemplateVars == nil {
-			return nil
-		}
-		m := make(map[string]any)
-		for k, v := range inst.Spec.TemplateVars {
-			m[k] = v
-		}
-		return m
-	}()
-	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod)
+	// FIXME: select all available pods
+	lfa, err := newLifecycleAction(inst, []*corev1.Pod{pod}, pod)
 	if err != nil {
 		return err
 	}
 
 	err = lfa.Switchover(tree.Context, nil, nil, "")
-	if err != nil {
-		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
-		}
-		return err
+	if err == nil {
+		tree.Logger.Info("succeed to call switchover action", "pod", pod.Name)
+	} else if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+		tree.Logger.Info("failed to call switchover action, ignore it", "pod", pod.Name, "error", err)
 	}
-	tree.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
 	return nil
 }
 
@@ -346,17 +330,6 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 //	}
 //	return config.Generation <= 0
 // }
-
-func (r *updateReconciler) clusterName(inst *workloads.Instance) (string, error) {
-	var clusterName string
-	if inst.Labels != nil {
-		clusterName = inst.Labels[constant.AppInstanceLabelKey]
-	}
-	if len(clusterName) == 0 {
-		return "", fmt.Errorf("instance %s/%s has no label %s", inst.Namespace, inst.Name, constant.AppInstanceLabelKey)
-	}
-	return clusterName, nil
-}
 
 func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Condition {
 	return &metav1.Condition{

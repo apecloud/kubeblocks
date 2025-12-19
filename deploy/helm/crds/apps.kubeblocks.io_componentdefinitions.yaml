@@ -9802,6 +9802,10 @@ spec:
                       In a typical consensus system, this action is used to transfer leader role to another replica.
 
 
+                      When a pod is about to be updated, a switchover action will be triggered for it. So addon implementation must determine
+                      if the pod's current role needs to be transferred.
+
+
                       The container executing this action has access to following variables:
 
 
@@ -10320,6 +10324,24 @@ spec:
                   is ready before continuing. Pods are removed in reverse order when scaling down.
                   - `Parallel`: Creates pods in parallel to match the desired scale without waiting. All pods are deleted at once
                   when scaling down.
+                type: string
+              podUpdatePolicy:
+                default: PreferInPlace
+                description: Specifies the default update policy for pods when the
+                  Component is updated.
+                enum:
+                - PreferInPlace
+                - ReCreate
+                type: string
+              podUpgradePolicy:
+                description: |-
+                  Specifies the default update policy for pods when the Component is upgraded (the service version changes).
+
+
+                  If not specified, the default behavior is the same as `podUpdatePolicy`.
+                enum:
+                - PreferInPlace
+                - ReCreate
                 type: string
               policyRules:
                 description: |-
@@ -19083,6 +19105,13 @@ spec:
                               type: object
                             replicas:
                               description: Reference to the replicas of the component.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            serviceVersion:
+                              description: Reference to the service version of the
+                                component.
                               enum:
                               - Required
                               - Optional

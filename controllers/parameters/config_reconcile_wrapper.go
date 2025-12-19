@@ -27,22 +27,20 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 type ReconcileContext struct {
 	intctrlutil.RequestCtx
-	configctrl.ResourceFetcher[ReconcileContext]
+	parameters.ResourceFetcher[ReconcileContext]
 
-	Name             string
 	MatchingLabels   client.MatchingLabels
 	ConfigMap        *corev1.ConfigMap
 	BuiltinComponent *component.SynthesizedComponent
 
-	Containers      []string
 	InstanceSetList []workloads.InstanceSet
 
 	ConfigRender   *parametersv1alpha1.ParamConfigRenderer
@@ -53,15 +51,13 @@ func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
 	resourceCtx *render.ResourceCtx,
 	cm *corev1.ConfigMap,
 	cluster *appsv1.Cluster,
-	configSpecName string,
 	matchingLabels client.MatchingLabels) *ReconcileContext {
 	configContext := ReconcileContext{
-		ResourceFetcher: configctrl.ResourceFetcher[ReconcileContext]{
+		ResourceFetcher: parameters.ResourceFetcher[ReconcileContext]{
 			ClusterObj: cluster,
 		},
 		RequestCtx:     reqCtx,
 		ConfigMap:      cm,
-		Name:           configSpecName,
 		MatchingLabels: matchingLabels,
 	}
 	return configContext.Init(resourceCtx, &configContext)
@@ -79,10 +75,9 @@ func (c *ReconcileContext) GetRelatedObjects() error {
 
 func (c *ReconcileContext) Workload() *ReconcileContext {
 	instanceSetFn := func() (err error) {
-		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
+		c.InstanceSetList, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
-			c.Name,
 			generics.InstanceSetSignature,
 			client.ObjectKeyFromObject(c.ConfigMap),
 			client.InNamespace(c.Namespace),
@@ -102,7 +97,7 @@ func (c *ReconcileContext) SynthesizedComponent() *ReconcileContext {
 
 func (c *ReconcileContext) ParametersDefinitions() *ReconcileContext {
 	return c.Wrap(func() (err error) {
-		configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
+		configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
 		if err != nil {
 			return err
 		}

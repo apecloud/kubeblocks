@@ -31,8 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/integer"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 )
 
 const defaultPriority = 0
@@ -198,4 +201,21 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 		updateStrategy = *its.Spec.MemberUpdateStrategy
 	}
 	return updateStrategy
+}
+
+func newLifecycleAction(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+	var (
+		clusterName      = its.Labels[constant.AppInstanceLabelKey]
+		compName         = its.Labels[constant.KBAppComponentLabelKey]
+		lifecycleActions = &kbappsv1.ComponentLifecycleActions{
+			Switchover:  its.Spec.LifecycleActions.Switchover,
+			Reconfigure: its.Spec.LifecycleActions.Reconfigure,
+		}
+	)
+	pods := make([]*corev1.Pod, 0)
+	for _, object := range tree.List(&corev1.Pod{}) {
+		pods = append(pods, object.(*corev1.Pod))
+	}
+	return lifecycle.New(its.Namespace, clusterName, compName,
+		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, pod, pods)
 }

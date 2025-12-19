@@ -113,20 +113,20 @@ type InstanceSpec struct {
 	// +optional
 	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
+	// PodUpdatePolicy indicates how pods should be upgraded.
+	//
+	// +optional
+	PodUpgradePolicy PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
+
 	// A list of roles defined in the system. Instanceset obtains role through pods' role label `kubeblocks.io/role`.
 	//
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Provides actions to do membership dynamic reconfiguration.
+	// Defines a set of hooks that customize the behavior of an Instance throughout its lifecycle.
 	//
 	// +optional
-	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
-
-	// Provides variables which are used to call Actions.
-	//
-	// +optional
-	TemplateVars map[string]string `json:"templateVars,omitempty"`
+	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
 	// Assistant objects that are necessary to run the instance.
 	//
@@ -182,6 +182,11 @@ type InstanceStatus2 struct {
 	//
 	// +optional
 	Role string `json:"role,omitempty"`
+
+	// Represents whether the instance is in volume expansion.
+	//
+	// +optional
+	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
 }
 
 type InstanceAssistantObject struct {

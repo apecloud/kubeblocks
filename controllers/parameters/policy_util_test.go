@@ -22,7 +22,6 @@ package parameters
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/sethvargo/go-password/password"
 	"github.com/stretchr/testify/assert"
@@ -41,6 +40,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var (
@@ -80,6 +80,14 @@ func newMockInstanceSet(replicas int, name string, labels map[string]string) wor
 						}}},
 				},
 			},
+		},
+	}
+}
+
+func newMockRunningComponent() *appsv1.Component {
+	return &appsv1.Component{
+		Status: appsv1.ComponentStatus{
+			Phase: appsv1.RunningComponentPhase,
 		},
 	}
 }
@@ -129,9 +137,15 @@ func withConfigDescription(formatter *parametersv1alpha1.FileFormatConfig) Param
 	}
 }
 
-func withUpdatedParameters(patch map[string]string) ParamsOps {
+func withUpdatedParameters(patch *core.ConfigPatchInfo) ParamsOps {
 	return func(params *reconfigureContext) {
-		params.UpdatedParameters = patch
+		params.Patch = patch
+	}
+}
+
+func withParamDef(pd *parametersv1alpha1.ParametersDefinitionSpec) ParamsOps {
+	return func(params *reconfigureContext) {
+		params.ParametersDef = pd
 	}
 }
 
@@ -167,6 +181,12 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 	for _, customFn := range paramOps {
 		customFn(&params)
 	}
+
+	if params.ClusterComponent != nil {
+		params.Cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{
+			*params.ClusterComponent,
+		}
+	}
 	return params
 }
 
@@ -201,26 +221,6 @@ func withReadyPod(rMin, rMax int) PodOptions {
 			Status: corev1.ConditionTrue,
 		})
 
-		pod.Status.Phase = corev1.PodRunning
-	}
-}
-
-func withAvailablePod(rMin, rMax int) PodOptions {
-	return func(pod *corev1.Pod, index int) {
-		if index < rMin || index >= rMax {
-			return
-		}
-
-		if pod.Status.Conditions == nil {
-			pod.Status.Conditions = make([]corev1.PodCondition, 0)
-		}
-
-		h, _ := time.ParseDuration("-1h")
-		pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
-			Type:               corev1.PodReady,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.NewTime(time.Now().Add(h)),
-		})
 		pod.Status.Phase = corev1.PodRunning
 	}
 }

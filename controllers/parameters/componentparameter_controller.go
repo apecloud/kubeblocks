@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -169,9 +170,9 @@ func updateCompParamStatus(status *parametersv1alpha1.ComponentParameterStatus, 
 		var phase = parametersv1alpha1.CFinishedPhase
 		for _, s := range ss {
 			switch {
-			case intctrlutil.IsFailedPhase(s.Phase):
+			case parameters.IsFailedPhase(s.Phase):
 				return s.Phase
-			case !intctrlutil.IsParameterFinished(s.Phase):
+			case !parameters.IsParameterFinished(s.Phase):
 				phase = parametersv1alpha1.CRunningPhase
 			}
 		}

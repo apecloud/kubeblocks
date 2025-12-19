@@ -24,10 +24,12 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -180,6 +182,9 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 	}
 
 	controllerutil.AddFinalizer(cronjob, dptypes.DataProtectionFinalizerName)
+	if err = controllerutil.SetControllerReference(s.BackupSchedule, cronjob, s.Scheme); err != nil {
+		return nil, err
+	}
 	// set labels
 	for k, v := range s.BackupSchedule.Labels {
 		cronjob.Labels[k] = v
@@ -425,6 +430,19 @@ func (s *Scheduler) getLastAppliedConfigsMap() (map[string]string, error) {
 	return resMap, nil
 }
 
+func (s *Scheduler) getReconfigureGenerationKey() (int, error) {
+	reconfigureGenStr := s.BackupSchedule.Annotations[dptypes.ReConfigureGenerationKey]
+	if reconfigureGenStr == "" {
+		return 0, nil
+	}
+	reconfigureGen, err := strconv.Atoi(reconfigureGenStr)
+	if err != nil {
+		return -1, err
+	}
+
+	return reconfigureGen, nil
+}
+
 func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
 	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
 	if reCfgRef == "" {
@@ -476,10 +494,19 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	if !slices.Contains(appsv1.GetReconfiguringRunningPhases(), cluster.Status.Phase) {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for the cluster %s to be available.", clusterName)
 	}
+	reconfigureGen, err := s.getReconfigureGenerationKey()
+	if err != nil {
+		return err
+	}
 	ops := opsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: s.BackupSchedule.Name + "-",
-			Namespace:    s.BackupSchedule.Namespace,
+			Name: fmt.Sprintf("%s-%s-%d", s.BackupSchedule.Name, func() string {
+				if enable {
+					return "enable"
+				}
+				return "disable"
+			}(), reconfigureGen+1),
+			Namespace: s.BackupSchedule.Namespace,
 			Labels: map[string]string{
 				dptypes.BackupScheduleLabelKey: s.BackupSchedule.Name,
 			},
@@ -499,7 +526,11 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			},
 		},
 	}
-	if err := s.Client.Create(s.Ctx, &ops); err != nil {
+	if err = s.Client.Create(s.Ctx, &ops); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"waiting for existing ops %s finished.", ops.Name)
+		}
 		return err
 	}
 	s.Recorder.Eventf(s.BackupSchedule, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
@@ -510,6 +541,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	lastAppliedConfigsMap[schedulePolicy.BackupMethod] = updateParameterPairs
 	updateParameterPairsBytes, _ = json.Marshal(lastAppliedConfigsMap)
 	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(updateParameterPairsBytes)
+	s.BackupSchedule.Annotations[dptypes.ReConfigureGenerationKey] = fmt.Sprintf("%d", reconfigureGen+1)
 	delete(s.BackupSchedule.Annotations, constant.LastAppliedConfigAnnotationKey)
 	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
 		return err

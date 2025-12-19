@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -181,10 +181,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	// 4. set members status
-	setMembersStatus(its, instanceList)
-
-	// 5. set instance status
+	// 4. set instance status
 	setInstanceStatus(its, instanceList)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
@@ -276,61 +273,53 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setMembersStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
-	// no roles defined
-	if its.Spec.Roles == nil {
-		return
-	}
-	// compose new status
-	newMembersStatus := make([]workloads.MemberStatus, 0)
-	roleMap := composeRoleMap(*its)
-	for _, inst := range instances {
-		if !intctrlutil.IsInstanceReadyWithRole(inst) {
-			continue
-		}
-		roleName := getInstanceRoleName(inst)
-		role, ok := roleMap[roleName]
-		if !ok {
-			continue
-		}
-		memberStatus := workloads.MemberStatus{
-			PodName:     inst.Name,
-			ReplicaRole: &role,
-		}
-		newMembersStatus = append(newMembersStatus, memberStatus)
-	}
-
-	// sort and set
-	rolePriorityMap := composeRolePriorityMap(its.Spec.Roles)
-	sortMembersStatus(newMembersStatus, rolePriorityMap)
-	its.Status.MembersStatus = newMembersStatus
-}
-
-func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
-	getRolePriorityFunc := func(i int) int {
-		role := membersStatus[i].ReplicaRole.Name
-		return rolePriorityMap[role]
-	}
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(membersStatus[i].PodName)
-	}
-	baseSort(membersStatus, getNameNOrdinalFunc, getRolePriorityFunc, true)
-}
-
 func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
 	// compose new instance status
-	newInstanceStatus := make([]workloads.InstanceStatus, 0)
+	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, inst := range instances {
-		instanceStatus := workloads.InstanceStatus{
+		status := workloads.InstanceStatus{
 			PodName: inst.Name,
 		}
-		newInstanceStatus = append(newInstanceStatus, instanceStatus)
+		instanceStatus = append(instanceStatus, status)
 	}
 
-	syncInstanceConfigStatus(its, newInstanceStatus)
+	syncMemberStatus(its, instanceStatus, instances)
 
-	sortInstanceStatus(newInstanceStatus)
-	its.Status.InstanceStatus = newInstanceStatus
+	syncInstanceConfigStatus(its, instanceStatus)
+
+	syncInstancePVCStatus(its, instanceStatus, instances)
+
+	sortInstanceStatus(instanceStatus)
+	its.Status.InstanceStatus = instanceStatus
+}
+
+func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
+	getNameNOrdinalFunc := func(i int) (string, int) {
+		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+	}
+	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
+}
+
+func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+	if its.Spec.Roles != nil {
+		roleMap := composeRoleMap(*its)
+		for _, inst := range instances {
+			if !intctrlutil.IsInstanceReadyWithRole(inst) {
+				continue
+			}
+			roleName := getInstanceRoleName(inst)
+			role, ok := roleMap[roleName]
+			if !ok {
+				continue
+			}
+			for i, status := range instanceStatus {
+				if status.PodName == inst.Name {
+					instanceStatus[i].Role = role.Name
+					break
+				}
+			}
+		}
+	}
 }
 
 func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
@@ -370,9 +359,13 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 	}
 }
 
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
+func syncInstancePVCStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+	for _, inst := range instances {
+		for i, status := range instanceStatus {
+			if status.PodName == inst.Name {
+				instanceStatus[i].VolumeExpansion = inst.Status.VolumeExpansion
+				break
+			}
+		}
 	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
 }

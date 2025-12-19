@@ -264,7 +264,7 @@ type ClusterComponentSpec struct {
 	// but required otherwise.
 	//
 	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^$|^[a-z]([a-z0-9-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -451,8 +451,17 @@ type ClusterComponentSpec struct {
 	// Default value is "PreferInPlace"
 	//
 	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +kubebuilder:default=PreferInPlace
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
+	//
+	// If not specified, the value of PodUpdatePolicy will be used.
+	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +optional
+	PodUpgradePolicy *PodUpdatePolicyType `json:"podUpgradePolicy,omitempty"`
 
 	// Provides fine-grained control over the spec update process of all instances.
 	//
@@ -484,6 +493,13 @@ type ClusterComponentSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies the desired Ordinals.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+	//
+	// +optional
+	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
 	// globally uniquely ordinal scheme, regardless of the instance template.
@@ -623,7 +639,7 @@ type ClusterSharding struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
 	// +kubebuilder:validation:Required
-	Shards int32 `json:"shards,omitempty"`
+	Shards int32 `json:"shards"`
 
 	// The default template for generating Components for shards, where each shard consists of one Component.
 	//
@@ -736,6 +752,11 @@ type ShardTemplate struct {
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies an override for the desired Ordinals of the shard.
+	//
+	// +optional
+	Ordinals *Ordinals `json:"ordinals,omitempty"`
 
 	// Specifies an override for the instance naming of the shard.
 	//

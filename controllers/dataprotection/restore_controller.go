@@ -131,10 +131,14 @@ func (r *RestoreReconciler) parseRestorePod(ctx context.Context, object client.O
 	pod := object.(*corev1.Pod)
 	var requests []reconcile.Request
 	restoreName := pod.Labels[dprestore.DataProtectionRestoreLabelKey]
+	restoreNamespace := pod.Labels[dprestore.DataProtectionRestoreNamespaceLabelKey]
+	if restoreNamespace == "" {
+		restoreNamespace = object.GetNamespace()
+	}
 	if restoreName != "" {
 		requests = append(requests, reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Namespace: pod.Namespace,
+				Namespace: restoreNamespace,
 				Name:      restoreName,
 			},
 		})

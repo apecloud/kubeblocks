@@ -110,6 +110,11 @@ func (builder *InstanceSetBuilder) SetPodUpdatePolicy(policy workloads.PodUpdate
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetPodUpgradePolicy(policy workloads.PodUpdatePolicyType) *InstanceSetBuilder {
+	builder.get().Spec.PodUpgradePolicy = policy
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetInstanceUpdateStrategy(strategy *workloads.InstanceUpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.InstanceUpdateStrategy = strategy
 	return builder
@@ -120,21 +125,20 @@ func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.M
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions) *InstanceSetBuilder {
-	if lifecycleActions != nil && lifecycleActions.Switchover != nil {
-		if builder.get().Spec.MembershipReconfiguration == nil {
-			builder.get().Spec.MembershipReconfiguration = &workloads.MembershipReconfiguration{}
+func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions, templateVars map[string]string) *InstanceSetBuilder {
+	if lifecycleActions != nil || templateVars != nil {
+		if builder.get().Spec.LifecycleActions == nil {
+			builder.get().Spec.LifecycleActions = &workloads.LifecycleActions{}
 		}
-		builder.get().Spec.MembershipReconfiguration.Switchover = lifecycleActions.Switchover
 	}
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetTemplateVars(templateVars map[string]any) *InstanceSetBuilder {
+	if lifecycleActions != nil {
+		builder.get().Spec.LifecycleActions.Switchover = lifecycleActions.Switchover
+		builder.get().Spec.LifecycleActions.Reconfigure = lifecycleActions.Reconfigure
+	}
 	if templateVars != nil {
-		builder.get().Spec.TemplateVars = make(map[string]string)
+		builder.get().Spec.LifecycleActions.TemplateVars = make(map[string]string)
 		for k, v := range templateVars {
-			builder.get().Spec.TemplateVars[k] = v.(string)
+			builder.get().Spec.LifecycleActions.TemplateVars[k] = v
 		}
 	}
 	return builder
@@ -147,6 +151,11 @@ func (builder *InstanceSetBuilder) SetPaused(paused bool) *InstanceSetBuilder {
 
 func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTemplate) *InstanceSetBuilder {
 	builder.get().Spec.Instances = instances
+	return builder
+}
+
+func (builder *InstanceSetBuilder) SetOrdinals(ordinals kbappsv1.Ordinals) *InstanceSetBuilder {
+	builder.get().Spec.DefaultTemplateOrdinals = ordinals
 	return builder
 }
 

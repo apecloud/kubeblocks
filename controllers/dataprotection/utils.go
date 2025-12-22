@@ -766,7 +766,7 @@ func ValidateParentBackup(ctx context.Context, cli client.Client, backup *dpv1al
 				parentBackup.Namespace, parentBackup.Name, err)
 		}
 	}
-	// validate shard count consistency for incremental backup
+	// validate target count consistency for incremental backup
 	expectedTargets := dputils.GetBackupTargets(backupPolicy, backupMethod)
 	parentTargetCount := len(parentBackup.Status.Targets)
 	if parentBackup.Status.Target != nil {

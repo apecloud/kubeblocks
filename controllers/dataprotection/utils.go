@@ -768,10 +768,14 @@ func ValidateParentBackup(ctx context.Context, cli client.Client, backup *dpv1al
 	}
 	// validate shard count consistency for incremental backup
 	expectedTargets := dputils.GetBackupTargets(backupPolicy, backupMethod)
-	if len(expectedTargets) > 0 && len(parentBackup.Status.Targets) != len(expectedTargets) {
-		return fmt.Errorf("parent backup %s/%s has %d shards, but current backup expects %d shards; "+
-			"incremental backup requires consistent shard count",
-			parentBackup.Namespace, parentBackup.Name, len(parentBackup.Status.Targets), len(expectedTargets))
+	parentTargetCount := len(parentBackup.Status.Targets)
+	if parentBackup.Status.Target != nil {
+		parentTargetCount = 1
+	}
+	if parentTargetCount != len(expectedTargets) {
+		return fmt.Errorf("parent backup %s/%s has %d targets, but current backup expects %d targets; "+
+			"incremental backup requires consistent targets, it may happen by shards changed",
+			parentBackup.Namespace, parentBackup.Name, parentTargetCount, len(expectedTargets))
 	}
 	return nil
 }

@@ -271,7 +271,6 @@ autoscaling:
   # targetMemoryUtilizationPercentage: 80
 
 
-
 ## @param nodeSelector
 ##
 nodeSelector: {}
@@ -283,7 +282,6 @@ tolerations:
   operator: Equal
   value: "true"
   effect: NoSchedule
-
 
 ## @param affinity
 ##
@@ -297,25 +295,7 @@ affinity:
           operator: In
           values:
           - "true"
-## @param data plane settings
-##
-dataPlane:
-  tolerations:
-  - key: kb-data
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
 
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-          - key: kb-data
-            operator: In
-            values:
-            - "true"
 
 # dynamically replace instance's registry. ref: https://github.com/apecloud/kubeblocks/pull/8018
 # e.g.

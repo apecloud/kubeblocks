@@ -39,10 +39,6 @@ const (
 	// addon charts config keys
 	CfgAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"
 
-	// data plane config key
-	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
-	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
-
 	// storage config keys
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"
 

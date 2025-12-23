@@ -7,14 +7,6 @@ metadata:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 data:
   config.yaml: |
-    {{- with .Values.dataPlane }}
-    # data plane tolerations
-    DATA_PLANE_TOLERATIONS: {{ toJson .tolerations | squote }}
-
-    # data plane affinity
-    DATA_PLANE_AFFINITY: {{ toJson .affinity | squote }}
-    {{- end }}
-
     # the default storage class name.
     DEFAULT_STORAGE_CLASS: {{ include "kubeblocks.defaultStorageClass" . | quote }}
 

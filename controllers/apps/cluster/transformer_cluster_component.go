@@ -1381,16 +1381,16 @@ func buildComponentCustomActions(transCtx *clusterTransformContext, proto, runni
 	}
 
 	if shardingDef.Spec.LifecycleActions.ShardAdd != nil {
-		checkNAppend(kbShardingAddAction, shardingDef.Spec.LifecycleActions.ShardAdd)
+		checkNAppend(kbShardingAddAction, &shardingDef.Spec.LifecycleActions.ShardAdd.Action)
 	}
 	if shardingDef.Spec.LifecycleActions.ShardRemove != nil {
-		checkNAppend(kbShardingRemoveAction, shardingDef.Spec.LifecycleActions.ShardRemove)
+		checkNAppend(kbShardingRemoveAction, &shardingDef.Spec.LifecycleActions.ShardRemove.Action)
 	}
 	if shardingDef.Spec.LifecycleActions.PostProvision != nil {
-		checkNAppend(kbShardingPostProvisionAction, shardingDef.Spec.LifecycleActions.PostProvision)
+		checkNAppend(kbShardingPostProvisionAction, &shardingDef.Spec.LifecycleActions.PostProvision.Action)
 	}
 	if shardingDef.Spec.LifecycleActions.PreTerminate != nil {
-		checkNAppend(kbShardingPreTerminateAction, shardingDef.Spec.LifecycleActions.PreTerminate)
+		checkNAppend(kbShardingPreTerminateAction, &shardingDef.Spec.LifecycleActions.PreTerminate.Action)
 	}
 
 	if len(customActions) > 0 {
@@ -1472,21 +1472,21 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 	case kbShardingPostProvisionAction:
 		checkAnnotationExist = false
 		annotation = kbShardingPostProvisionKey
-		action = shardingDef.Spec.LifecycleActions.PostProvision
+		action = &shardingDef.Spec.LifecycleActions.PostProvision.Action
 		needsAction = func() bool {
 			return action != nil
 		}
 	case kbShardingPreTerminateAction:
 		checkAnnotationExist = true
 		annotation = kbShardingPreTerminateDoneKey
-		action = shardingDef.Spec.LifecycleActions.PreTerminate
+		action = &shardingDef.Spec.LifecycleActions.PreTerminate.Action
 		needsAction = func() bool {
 			return action != nil
 		}
 	case kbShardingRemoveAction:
 		checkAnnotationExist = true
 		annotation = kbShardingRemoveDoneKey
-		action = shardingDef.Spec.LifecycleActions.ShardRemove
+		action = &shardingDef.Spec.LifecycleActions.ShardRemove.Action
 		needsAction = func() bool {
 			if action == nil {
 				return false
@@ -1503,7 +1503,7 @@ func doShardingLifecycleAction(transCtx *clusterTransformContext,
 	case kbShardingAddAction:
 		checkAnnotationExist = false
 		annotation = kbShardingAddKey
-		action = shardingDef.Spec.LifecycleActions.ShardAdd
+		action = &shardingDef.Spec.LifecycleActions.ShardAdd.Action
 		needsAction = func() bool {
 			return action != nil
 		}

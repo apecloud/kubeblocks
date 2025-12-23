@@ -495,6 +495,22 @@ spec:
                         - Role
                         - Ordinal
                         type: string
+                      targetShardSelector:
+                        description: |-
+                          Defines the criteria used to select the target Shard(s) for executing the Action.
+                          It allows for precise control over which Shard(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the Shard where the Action is triggered, such as the Shard
+                          to be removed or added; or a random Shard if the Action is triggered at the Sharding level, such as
+                          post-provision or pre-terminate of the Sharding.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-
@@ -936,6 +952,22 @@ spec:
                         - Role
                         - Ordinal
                         type: string
+                      targetShardSelector:
+                        description: |-
+                          Defines the criteria used to select the target Shard(s) for executing the Action.
+                          It allows for precise control over which Shard(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the Shard where the Action is triggered, such as the Shard
+                          to be removed or added; or a random Shard if the Action is triggered at the Sharding level, such as
+                          post-provision or pre-terminate of the Sharding.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-
@@ -1375,6 +1407,22 @@ spec:
                         - Role
                         - Ordinal
                         type: string
+                      targetShardSelector:
+                        description: |-
+                          Defines the criteria used to select the target Shard(s) for executing the Action.
+                          It allows for precise control over which Shard(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the Shard where the Action is triggered, such as the Shard
+                          to be removed or added; or a random Shard if the Action is triggered at the Sharding level, such as
+                          post-provision or pre-terminate of the Sharding.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
+                        type: string
                       timeoutSeconds:
                         default: 0
                         description: |-
@@ -1813,6 +1861,22 @@ spec:
                         - All
                         - Role
                         - Ordinal
+                        type: string
+                      targetShardSelector:
+                        description: |-
+                          Defines the criteria used to select the target Shard(s) for executing the Action.
+                          It allows for precise control over which Shard(s) the Action should run in.
+
+
+                          If not specified, the Action will be executed in the Shard where the Action is triggered, such as the Shard
+                          to be removed or added; or a random Shard if the Action is triggered at the Sharding level, such as
+                          post-provision or pre-terminate of the Sharding.
+
+
+                          This field cannot be updated.
+                        enum:
+                        - Any
+                        - All
                         type: string
                       timeoutSeconds:
                         default: 0

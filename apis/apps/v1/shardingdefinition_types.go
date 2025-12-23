@@ -171,7 +171,7 @@ type ShardingLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PostProvision *Action `json:"postProvision,omitempty"`
+	PostProvision *ShardingAction `json:"postProvision,omitempty"`
 
 	// Specifies the hook to be executed prior to terminating a sharding.
 	//
@@ -184,7 +184,7 @@ type ShardingLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PreTerminate *Action `json:"preTerminate,omitempty"`
+	PreTerminate *ShardingAction `json:"preTerminate,omitempty"`
 
 	// Specifies the hook to be executed after a shard added.
 	//
@@ -195,7 +195,7 @@ type ShardingLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	ShardAdd *Action `json:"shardAdd,omitempty"`
+	ShardAdd *ShardingAction `json:"shardAdd,omitempty"`
 
 	// Specifies the hook to be executed prior to remove a shard.
 	//
@@ -206,7 +206,7 @@ type ShardingLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	ShardRemove *Action `json:"shardRemove,omitempty"`
+	ShardRemove *ShardingAction `json:"shardRemove,omitempty"`
 }
 
 type ShardingSystemAccount struct {
@@ -229,3 +229,29 @@ type ShardingTLS struct {
 	// +optional
 	Shared *bool `json:"shared,omitempty"`
 }
+
+type ShardingAction struct {
+	Action `json:",inline"`
+
+	// Defines the criteria used to select the target Shard(s) for executing the Action.
+	// It allows for precise control over which Shard(s) the Action should run in.
+	//
+	// If not specified, the Action will be executed in the Shard where the Action is triggered, such as the Shard
+	// to be removed or added; or a random Shard if the Action is triggered at the Sharding level, such as
+	// post-provision or pre-terminate of the Sharding.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	TargetShardSelector TargetShardSelector `json:"targetShardSelector,omitempty"`
+}
+
+// TargetShardSelector defines how to select shard(s) to execute an Action.
+// +enum
+// +kubebuilder:validation:Enum={Any,All}
+type TargetShardSelector string
+
+const (
+	AnyShard  TargetShardSelector = "Any"
+	AllShards TargetShardSelector = "All"
+)

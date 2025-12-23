@@ -97,9 +97,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		if err != nil {
 			return err
 		}
+		lastServiceAccountName := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
 		if rollback {
-			transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has rolled back to prevent pod restart")
+			transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
 			// don't change anything, just return
+			synthesizedComp.PodSpec.ServiceAccountName = lastServiceAccountName
 			return nil
 		}
 		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
@@ -108,7 +110,10 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			return err
 		}
 		synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
-		transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
+		if lastServiceAccountName != serviceAccountName {
+			transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
+			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
+		}
 	}
 	role, err := createOrUpdateRole(transCtx, graphCli, dag)
 	if err != nil {

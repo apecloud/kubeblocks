@@ -263,49 +263,48 @@ var _ = Describe("object rbac transformer test.", func() {
 				SetDefaultSpec().
 				Create(&testCtx).
 				GetObject()
+			hash, err := computeServiceAccountRuleHash(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			// Case: No label, should return false
 			needRollback, err := needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
 
-			// Case: With label but component definitions are the same
+			// Case: With same cmpd
+			ctx.Component.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
 			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + compDefObj.Name
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
 
-			// Case: with a non-exist cmpd
-			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-non-existent"
-			needRollback, err = needRollbackServiceAccount(ctx)
-			Expect(err).Should(BeNil())
-			Expect(needRollback).Should(BeFalse())
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, anotherCompDef, compObj)
+			Expect(err).Should(Succeed())
 
 			// Case: Different cmpd, same spec
-			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + anotherCompDef.Name
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeTrue())
 
 			// Case: Different cmpd, different policy rules
-			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
-				cmpd.Spec.PolicyRules = []rbacv1.PolicyRule{
-					{
-						APIGroups: []string{""},
-						Resources: []string{"pods"},
-						Verbs:     []string{"get"},
-					},
-				}
-			})).Should(Succeed())
+			anotherCompDef.Spec.PolicyRules = []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"pods"},
+					Verbs:     []string{"get"},
+				},
+			}
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, anotherCompDef, compObj)
+			Expect(err).Should(Succeed())
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
 
 			// Case: Different cmpd, different lifecycle action
-			Expect(testapps.ChangeObj(&testCtx, anotherCompDef, func(cmpd *appsv1.ComponentDefinition) {
-				cmpd.Spec.PolicyRules = nil
-				cmpd.Spec.LifecycleActions = nil
-			})).Should(Succeed())
+			anotherCompDef.Spec.PolicyRules = nil
+			anotherCompDef.Spec.LifecycleActions = nil
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, anotherCompDef, compObj)
+			Expect(err).Should(Succeed())
 			needRollback, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())

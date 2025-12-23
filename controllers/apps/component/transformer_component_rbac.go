@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
+	"hash/fnv"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -109,9 +111,15 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		if err != nil {
 			return err
 		}
+		hash, err := computeServiceAccountRuleHash(transCtx)
+		if err != nil {
+			return err
+		}
 		synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
 		if lastServiceAccountName != serviceAccountName {
-			transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
+			comp := transCtx.Component
+			comp.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
+			comp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
 			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
 		}
 	}
@@ -144,27 +152,40 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
+func computeServiceAccountRuleHash(transCtx *componentTransformContext) (string, error) {
+	hash := fnv.New32a()
+	data, err := json.Marshal(transCtx.SynthesizeComponent.PolicyRules)
+	if err != nil {
+		return "", err
+	}
+	hash.Write(data)
+	enabled := transCtx.SynthesizeComponent.LifecycleActions != nil
+	fmt.Fprint(hash, enabled)
+	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
+}
+
 func needRollbackServiceAccount(transCtx *componentTransformContext) (bool, error) {
 	lastName, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
 	if !ok {
 		return false, nil
 	}
 
-	// this logic is in line with GenerateDefaultServiceAccountName
-	lastCmpdName := strings.Join(strings.Split(lastName, "-")[1:], "-")
-	if lastCmpdName == transCtx.CompDef.Name {
+	curName := constant.GenerateDefaultServiceAccountName(transCtx.SynthesizeComponent.CompDefName)
+	if lastName == curName {
 		return false, nil
 	}
 
-	lastCmpd, err := component.GetCompDefByName(transCtx.Context, transCtx.Client, lastCmpdName)
+	hash, err := computeServiceAccountRuleHash(transCtx)
 	if err != nil {
-		return false, client.IgnoreNotFound(err)
+		return false, err
 	}
 
-	curLifecycleActionEnabled := transCtx.SynthesizeComponent.LifecycleActions != nil
-	lastLifecycleActionEnabled := lastCmpd.Spec.LifecycleActions != nil
-	if equality.Semantic.DeepEqual(transCtx.SynthesizeComponent.PolicyRules, lastCmpd.Spec.PolicyRules) &&
-		curLifecycleActionEnabled == lastLifecycleActionEnabled {
+	lastHash, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey]
+	if !ok {
+		return false, nil
+	}
+
+	if hash == lastHash {
 		return true, nil
 	}
 	return false, nil

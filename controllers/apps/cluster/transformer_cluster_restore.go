@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"sort"
+
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -72,6 +74,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
+
 		targets := backup.Status.Targets
 		// obtain components that have already been assigned targets.
 		allocateTargetMap := map[string]string{}
@@ -98,6 +101,10 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 				return err
 			}
 		}
+		// guarantee that when available targets are fewer than shards, the first shards are prioritized for restore.
+		sort.Slice(c.shardingComps[spec.Name], func(i, j int) bool {
+			return c.shardingComps[spec.Name][i].Name < c.shardingComps[spec.Name][j].Name
+		})
 		for _, target := range targets {
 			if _, ok = allocateTargetMap[target.Name]; ok {
 				continue

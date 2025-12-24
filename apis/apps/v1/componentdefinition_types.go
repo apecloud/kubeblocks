@@ -1811,10 +1811,14 @@ type Action struct {
 
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//
-	// If the Action does not complete within this time frame, it will be terminated.
+	// Behavior based on the value:
+	// - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+	// - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+	// - Negative (< 0): No timeout is applied; the action runs until the command completes.
 	//
 	// This field cannot be updated.
 	//
+	// +kubebuilder:validation:Maximum=60
 	// +kubebuilder:default=0
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`

@@ -70,12 +70,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var serviceAccountName string
-	var sa *corev1.ServiceAccount
+	sa := &corev1.ServiceAccount{}
 	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now
 	// the user's responsibility to provide appropriate serviceaccount.
 	if serviceAccountName = transCtx.Component.Spec.ServiceAccountName; serviceAccountName != "" {
 		// if user provided serviceaccount does not exist, raise error
-		sa := &corev1.ServiceAccount{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: serviceAccountName}, sa); err != nil {
 			if errors.IsNotFound(err) {
 				transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeWarning, EventReasonRBACManager,
@@ -98,12 +97,12 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 		// check if sa with old naming rule exists
 		newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.ClusterName, synthesizedComp.Name)
-		newNameExists := false
+		newNameExists := true
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: newName}, sa); err != nil {
 			if !errors.IsNotFound(err) {
 				return err
 			}
-			newNameExists = true
+			newNameExists = false
 		}
 		if newNameExists || transCtx.RunningWorkload == nil {
 			return t.handleRBACNewRule(transCtx, dag)
@@ -118,9 +117,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if useNewRule {
 		return t.handleRBACNewRule(transCtx, dag)
 	}
-	lastServiceAccountName := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
-	if rollback {
-		transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
+	comp := transCtx.Component
+	lastServiceAccountName := comp.Labels[constant.ComponentLastServiceAccountNameLabelKey]
+	lastHash := comp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey]
+	if rollback && serviceAccountName != lastServiceAccountName {
+		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
 		// don't change anything, just return
 		synthesizedComp.PodSpec.ServiceAccountName = lastServiceAccountName
 		return nil
@@ -135,8 +136,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 	synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
-	if lastServiceAccountName != serviceAccountName {
-		comp := transCtx.Component
+	if lastServiceAccountName != serviceAccountName || lastHash == "" {
 		comp.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
 		comp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
 		graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
@@ -217,7 +217,7 @@ func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
 		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
-			Name:     cmpd.Name,
+			Name:     constant.GenerateDefaultRoleName(cmpd.Name),
 		}, serviceAccountName)
 		if err := intctrlutil.SetOwnership(transCtx.Component, cmpdRoleBinding, model.GetScheme(), ""); err != nil {
 			return nil, err
@@ -263,21 +263,11 @@ func computeServiceAccountRuleHash(transCtx *componentTransformContext) (string,
 	enabled := transCtx.SynthesizeComponent.LifecycleActions != nil
 	fmt.Fprint(hash, enabled)
 	// when a restart ops is triggered, change to new rule
-	fmt.Fprint(hash, transCtx.SynthesizeComponent.Annotations[constant.RestartAnnotationKey])
+	fmt.Fprint(hash, transCtx.SynthesizeComponent.DynamicAnnotations[constant.RestartAnnotationKey])
 	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
 }
 
 func needRollbackServiceAccount(transCtx *componentTransformContext) (rollback bool, useNewRule bool, err error) {
-	lastName, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey]
-	if !ok {
-		return false, false, nil
-	}
-
-	curName := constant.GenerateDefaultServiceAccountName(transCtx.SynthesizeComponent.CompDefName)
-	if lastName == curName {
-		return false, false, nil
-	}
-
 	hash, err := computeServiceAccountRuleHash(transCtx)
 	if err != nil {
 		return false, false, err

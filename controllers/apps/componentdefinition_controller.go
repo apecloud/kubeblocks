@@ -206,7 +206,7 @@ func (r *ComponentDefinitionReconciler) clusterRole(cli client.Client, rctx intc
 		return nil
 	}
 
-	clusterRole := builder.NewClusterRoleBuilder(cmpd.Name).
+	clusterRole := builder.NewClusterRoleBuilder(constant.GenerateDefaultRoleName(cmpd.Name)).
 		AddLabelsInMap(cmpd.Labels).
 		AddAnnotationsInMap(cmpd.Annotations).
 		AddPolicyRules(cmpd.Spec.PolicyRules).

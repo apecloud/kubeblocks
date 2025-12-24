@@ -236,9 +236,9 @@ type ShardingAction struct {
 	// Defines the criteria used to select the target Shard(s) for executing the Action.
 	// It allows for precise control over which Shard(s) the Action should run in.
 	//
-	// If not specified, the Action will be executed in the Shard where the Action is triggered, such as the Shard
-	// to be removed or added; or a random Shard if the Action is triggered at the Sharding level, such as
-	// post-provision or pre-terminate of the Sharding.
+	// For shardAdd or shardRemove, the Action will be executed in the Shard where the Action is triggered.
+	// For other actions, you can choose to execute the action randomly on one shard or on all shards,
+	// if not specified, a shard is randomly selected by default.
 	//
 	// This field cannot be updated.
 	//

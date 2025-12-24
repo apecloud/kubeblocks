@@ -2355,7 +2355,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -12019,6 +12019,57 @@ bool
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingAction">ShardingAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Action</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetShardSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TargetShardSelector">
+TargetShardSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the criteria used to select the target Shard(s) for executing the Action.
+It allows for precise control over which Shard(s) the Action should run in.</p>
+<p>For shardAdd or shardRemove, the Action will be executed in the Shard where the Action is triggered.
+For other actions, you can choose to execute the action randomly on one shard or on all shards,
+if not specified, a shard is randomly selected by default.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec
 </h3>
 <p>
@@ -12217,8 +12268,8 @@ string
 <td>
 <code>postProvision</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
@@ -12237,8 +12288,8 @@ and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> con
 <td>
 <code>preTerminate</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
@@ -12256,8 +12307,8 @@ until the PreTerminate action has completed successfully.</p>
 <td>
 <code>shardAdd</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
@@ -12275,8 +12326,8 @@ Action
 <td>
 <code>shardRemove</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
@@ -13136,6 +13187,27 @@ VarOption
 </tr><tr><td><p>&#34;Ordinal&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Role&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TargetShardSelector">TargetShardSelector
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>)
+</p>
+<div>
+<p>TargetShardSelector defines how to select shard(s) to execute an Action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;All&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Any&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

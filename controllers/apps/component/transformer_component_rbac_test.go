@@ -258,7 +258,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			ctx := transCtx.(*componentTransformContext)
 
 			By("create another cmpd")
-			anotherCompDef := testapps.NewComponentDefinitionFactory(compDefName).
+			anotherTpl := testapps.NewComponentDefinitionFactory(compDefName).
 				WithRandomName().
 				SetDefaultSpec().
 				Create(&testCtx).
@@ -267,47 +267,56 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			// Case: No label, should return false
-			needRollback, err := needRollbackServiceAccount(ctx)
+			needRollback, useNewRule, err := needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeFalse())
 
 			// Case: With same cmpd
 			ctx.Component.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
 			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = "kb-" + compDefObj.Name
-			needRollback, err = needRollbackServiceAccount(ctx)
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
-
-			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, anotherCompDef, compObj)
-			Expect(err).Should(Succeed())
+			Expect(useNewRule).To(BeFalse())
 
 			// Case: Different cmpd, same spec
-			needRollback, err = needRollbackServiceAccount(ctx)
+			another := anotherTpl.DeepCopy()
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, another, compObj)
+			Expect(err).Should(Succeed())
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeTrue())
+			Expect(useNewRule).To(BeFalse())
 
 			// Case: Different cmpd, different policy rules
-			anotherCompDef.Spec.PolicyRules = []rbacv1.PolicyRule{
+			another = anotherTpl.DeepCopy()
+			another.Spec.PolicyRules = []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{""},
 					Resources: []string{"pods"},
 					Verbs:     []string{"get"},
 				},
 			}
-			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, anotherCompDef, compObj)
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, another, compObj)
 			Expect(err).Should(Succeed())
-			needRollback, err = needRollbackServiceAccount(ctx)
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeTrue())
 
 			// Case: Different cmpd, different lifecycle action
-			anotherCompDef.Spec.PolicyRules = nil
-			anotherCompDef.Spec.LifecycleActions = nil
-			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, anotherCompDef, compObj)
+			another = anotherTpl.DeepCopy()
+			another.Spec.PolicyRules = nil
+			another.Spec.LifecycleActions = nil
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, another, compObj)
 			Expect(err).Should(Succeed())
-			needRollback, err = needRollbackServiceAccount(ctx)
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
 			Expect(err).Should(BeNil())
 			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeTrue())
+
+			// Case: restart ops triggered
 		})
 	})
 })

@@ -197,11 +197,15 @@ type ComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
-	// "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+	// "kb-{clusterName}-{compName}", bound to a cluster role with rules defined in ComponentDefinition's
 	// `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
-	// it will also be bound to a default role named
+	// it will also be bound to a default cluster role named
 	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
 	// If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
+	//
+	// Before KubeBlocks 1.0.2, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
+	// To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+	// when a restart ops is triggered for the component.
 	//
 	// If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 	// create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.

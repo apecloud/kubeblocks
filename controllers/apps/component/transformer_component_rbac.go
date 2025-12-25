@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -96,7 +97,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
 
 		// check if sa with old naming rule exists
-		newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.ClusterName, synthesizedComp.Name)
+		newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
 		newNameExists := true
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: newName}, sa); err != nil {
 			if !errors.IsNotFound(err) {
@@ -104,7 +105,19 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			}
 			newNameExists = false
 		}
-		if newNameExists || transCtx.RunningWorkload == nil {
+
+		isRunningWorkloadNil := func() bool {
+			if transCtx.RunningWorkload == nil {
+				return true
+			} else {
+				if reflect.ValueOf(transCtx.RunningWorkload).IsNil() {
+					return true
+				}
+				return false
+			}
+		}
+
+		if newNameExists || isRunningWorkloadNil() {
 			return t.handleRBACNewRule(transCtx, dag)
 		}
 	}
@@ -174,7 +187,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransformContext, dag *graph.DAG) error {
 	synthesizedComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	saName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.ClusterName, synthesizedComp.Name)
+	saName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
 	// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
 	sa, err := createOrUpdateServiceAccount(transCtx, saName, graphCli, dag)
 	if err != nil {

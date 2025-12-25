@@ -62,6 +62,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		clusterUID         = string(uuid.NewUUID())
 		compObj            *appsv1.Component
 		synthesizedComp    *component.SynthesizedComponent
+		fullCompName       string
 	)
 
 	AfterEach(func() {
@@ -94,7 +95,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		compDefObj = compDefFactory.GetObject()
 
 		By("Creating a component")
-		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
+		fullCompName = constant.GenerateClusterComponentName(clusterName, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
 			AddAnnotations(constant.KBAppClusterUIDKey, clusterUID).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
@@ -121,7 +122,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		dag = mockDAG(graphCli, compObj)
 		transformer = &componentRBACTransformer{}
 
-		serviceAccountName = constant.GenerateDefaultServiceAccountNameNew(clusterName, compName)
+		serviceAccountName = constant.GenerateDefaultServiceAccountNameNew(fullCompName)
 		saKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      serviceAccountName,
@@ -308,6 +309,9 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(useNewRule).To(BeTrue())
 
 			// Case: restart ops triggered
+			if compObj.Spec.Annotations == nil {
+				compObj.Spec.Annotations = make(map[string]string)
+			}
 			compObj.Spec.Annotations[constant.RestartAnnotationKey] = time.Now().String()
 			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj)
 			Expect(err).Should(Succeed())

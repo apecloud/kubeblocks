@@ -58,8 +58,8 @@ func Map[E any, F any](s []E, f func(E) F) []F {
 
 func SlicePtr[E any](s []E) []*E {
 	arr := make([]*E, len(s))
-	for i, e := range s {
-		arr[i] = &e
+	for i := range s {
+		arr[i] = &s[i]
 	}
 	return arr
 }

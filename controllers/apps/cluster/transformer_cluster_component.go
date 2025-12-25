@@ -903,9 +903,29 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 		return nil
 	}
 
-	shardingDef := transCtx.shardingDefs[runningComps[0].Annotations[constant.ShardingDefAnnotationKey]]
+	shardingDef := &appsv1.ShardingDefinition{}
+	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{
+		Name: runningComps[0].Annotations[constant.ShardingDefAnnotationKey],
+	}, shardingDef)
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	needPreTerminate := func() bool {
+		if shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.PreTerminate == nil {
+			return false
+		}
+
+		for _, comp := range runningComps {
+			if comp.Annotations != nil && comp.Annotations[kbShardingPreTerminateDoneKey] != "" {
+				return false
+			}
+		}
+		return true
+	}
+
 	errs := make([]error, 0)
-	if shardingDef != nil && shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.PreTerminate != nil {
+	if needPreTerminate() {
 		var shards []*appsv1.Component
 		shards, err = selectTargetShard(shardingDef.Spec.LifecycleActions.PreTerminate, generics.SlicePtr(runningComps))
 		if err != nil {

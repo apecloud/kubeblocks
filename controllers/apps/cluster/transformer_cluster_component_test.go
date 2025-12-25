@@ -2005,12 +2005,17 @@ var _ = Describe("cluster component transformer test", func() {
 
 			It("do pre-terminate action successfully", func() {
 				transCtx.shardings = nil
+				transCtx.shardingDefs = nil
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey:       "test-uid",
 					constant.ShardingDefAnnotationKey: shardingDefName,
 				})
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PreTerminate: mockShardingAction("shard-pre-terminate"),
+				}
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
-					return []client.Object{shardComp, pod}
+					return []client.Object{shardComp, pod, shardingDef}
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 

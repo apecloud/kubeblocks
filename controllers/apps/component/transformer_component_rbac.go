@@ -59,6 +59,7 @@ const EventReasonServiceAccountRollback = "ServiceAccountRollback"
 
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComp := transCtx.SynthesizeComponent
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
@@ -82,32 +83,32 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			}
 			return err
 		}
-		synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
 	}
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonRBACManager, "RBAC manager is disabled")
 		return nil
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
+	// user managed sa
+	if serviceAccountName != "" {
+		return t.handleRBACNewRule(transCtx, dag, serviceAccountName)
+	}
 
-	var err error
-	if serviceAccountName == "" {
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+	// kb managed sa
+	serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
 
-		// check if sa with old naming rule exists
-		newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
-		newNameExists := true
-		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: newName}, sa); err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
-			newNameExists = false
+	// check if sa with old naming rule exists
+	newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+	newNameExists := true
+	if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: newName}, sa); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
 		}
+		newNameExists = false
+	}
 
-		if newNameExists || transCtx.RunningWorkload == nil {
-			return t.handleRBACNewRule(transCtx, dag)
-		}
+	if newNameExists || transCtx.RunningWorkload == nil {
+		return t.handleRBACNewRule(transCtx, dag, "")
 	}
 
 	// old code path
@@ -116,7 +117,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 	if useNewRule {
-		return t.handleRBACNewRule(transCtx, dag)
+		return t.handleRBACNewRule(transCtx, dag, "")
 	}
 	comp := transCtx.Component
 	lastServiceAccountName := comp.Labels[constant.ComponentLastServiceAccountNameLabelKey]
@@ -172,14 +173,19 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransformContext, dag *graph.DAG) error {
+func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransformContext, dag *graph.DAG, userDefinedSAName string) error {
 	synthesizedComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	saName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
-	// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
-	sa, err := createOrUpdateServiceAccount(transCtx, saName, graphCli, dag)
-	if err != nil {
-		return err
+	saName := userDefinedSAName
+	var sa *corev1.ServiceAccount
+	var err error
+	if userDefinedSAName == "" {
+		saName = constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
+		sa, err = createOrUpdateServiceAccount(transCtx, saName, graphCli, dag)
+		if err != nil {
+			return err
+		}
 	}
 	synthesizedComp.PodSpec.ServiceAccountName = saName
 	rbs, err := createOrUpdateRoleBindingNew(transCtx, transCtx.CompDef, saName, graphCli, dag)

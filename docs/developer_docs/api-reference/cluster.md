@@ -719,8 +719,7 @@ with other Kubernetes resources, such as modifying Pod labels or sending events.
 &ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
 it will also be bound to a default cluster role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
 <p>Before KubeBlocks 1.0.2, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
 To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 when a restart ops is triggered for the component.</p>
@@ -3309,8 +3308,7 @@ with other Kubernetes resources, such as modifying Pod labels or sending events.
 &ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
 it will also be bound to a default cluster role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
 <p>Before KubeBlocks 1.0.2, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
 To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 when a restart ops is triggered for the component.</p>
@@ -6629,8 +6627,7 @@ with other Kubernetes resources, such as modifying Pod labels or sending events.
 &ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
 it will also be bound to a default cluster role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
 <p>Before KubeBlocks 1.0.2, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
 To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 when a restart ops is triggered for the component.</p>

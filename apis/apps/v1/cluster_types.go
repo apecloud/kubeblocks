@@ -427,7 +427,6 @@ type ClusterComponentSpec struct {
 	// `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
 	// it will also be bound to a default cluster role named
 	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
-	// If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
 	//
 	// Before KubeBlocks 1.0.2, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
 	// To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used

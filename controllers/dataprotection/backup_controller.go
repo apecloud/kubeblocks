@@ -206,6 +206,13 @@ func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Objec
 
 // deleteBackupFiles deletes the backup files stored in backup repository.
 func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	// If the dataprotection finalizer has already been removed, the deletion has succeeded.
+	// Skip creating a new deletion job to avoid a race condition with the garbage collector
+	// during foreground cascading deletion, which would cause an infinite loop of job creation.
+	if !controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
+		return nil
+	}
+
 	deleteBackup := func() error {
 		// remove backup finalizers to delete it
 		patch := client.MergeFrom(backup.DeepCopy())

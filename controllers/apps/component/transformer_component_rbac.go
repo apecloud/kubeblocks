@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -106,18 +105,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			newNameExists = false
 		}
 
-		isRunningWorkloadNil := func() bool {
-			if transCtx.RunningWorkload == nil {
-				return true
-			} else {
-				if reflect.ValueOf(transCtx.RunningWorkload).IsNil() {
-					return true
-				}
-				return false
-			}
-		}
-
-		if newNameExists || isRunningWorkloadNil() {
+		if newNameExists || transCtx.RunningWorkload == nil {
 			return t.handleRBACNewRule(transCtx, dag)
 		}
 	}

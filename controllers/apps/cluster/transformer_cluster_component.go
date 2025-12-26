@@ -1466,15 +1466,14 @@ func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Co
 }
 
 func handleShardingAddNPostProvision(transCtx *clusterTransformContext, dag *graph.DAG, shardingDef *appsv1.ShardingDefinition, comp *appsv1.Component, shardingName string) error {
-	var err error
 	// if both post-provision and shard-add annotations exist, do post-provision first
 	if comp.Annotations[kbShardingPostProvisionKey] != "" {
-		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingPostProvisionAction)
+		return doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingPostProvisionAction)
 	} else if comp.Annotations[kbShardingAddKey] != "" {
-		err = doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingAddAction)
+		return doShardingLifecycleAction(transCtx, dag, shardingDef, comp, shardingName, kbShardingAddAction)
 	}
 
-	return err
+	return nil
 }
 
 func doShardingLifecycleAction(transCtx *clusterTransformContext,

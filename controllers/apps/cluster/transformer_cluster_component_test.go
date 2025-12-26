@@ -1986,7 +1986,8 @@ var _ = Describe("cluster component transformer test", func() {
 				mockKBAgent(kbShardingPostProvisionAction)
 
 				err := transformer.Transform(transCtx, dag)
-				Expect(err).Should(BeNil())
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(ContainSubstring("requeue to waiting for shardPostProvision annotation to be removed"))
 				Expect(actionDone).Should(BeTrue())
 				graphCli := transCtx.Client.(model.GraphClient)
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
@@ -2022,7 +2023,8 @@ var _ = Describe("cluster component transformer test", func() {
 				mockKBAgent(kbShardingPreTerminateAction)
 
 				err := transformer.Transform(transCtx, dag)
-				Expect(err).Should(BeNil())
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(ContainSubstring("requeue to waiting for shardPreTerminate annotation to be set"))
 				graphCli := transCtx.Client.(model.GraphClient)
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))

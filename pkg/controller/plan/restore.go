@@ -86,6 +86,9 @@ func NewRestoreManager(ctx context.Context,
 }
 
 func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj *appsv1.Component, postProvisionDone bool) error {
+	if compObj.Annotations[constant.SkipRestoreAnnotationKey] == "true" {
+		return nil
+	}
 	backupObj, err := r.initFromAnnotation(comp, compObj)
 	if err != nil {
 		return err

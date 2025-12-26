@@ -88,6 +88,13 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 				Expiration:          &now,
 				StartTimestamp:      &now,
 				CompletionTimestamp: &now,
+				Target: &dpv1alpha1.BackupStatusTarget{
+					BackupTarget: dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							Strategy: dpv1alpha1.PodSelectionStrategyAny,
+						},
+					},
+				},
 			}
 			autoBackupLabel = map[string]string{
 				dptypes.AutoBackupLabelKey:     "true",
@@ -199,6 +206,13 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 			olderBackup.Status.CompletionTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour * 3)}
 			olderBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 			olderBackup.Status.BackupRepoName = testdp.BackupRepoName
+			olderBackup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						Strategy: dpv1alpha1.PodSelectionStrategyAny,
+					},
+				},
+			}
 			testdp.PatchBackupStatus(&testCtx, olderKey, olderBackup.Status)
 
 			By("the older full backup should be not deleted, it is the latest backup for now")
@@ -221,6 +235,13 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 			incrementalBackup.Status.StartTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour * 2)}
 			incrementalBackup.Status.CompletionTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour * 2)}
 			incrementalBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			incrementalBackup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						Strategy: dpv1alpha1.PodSelectionStrategyAny,
+					},
+				},
+			}
 			testdp.PatchBackupStatus(&testCtx, incrementalKey, incrementalBackup.Status)
 
 			By("the incremental backup should be not deleted, its parent is the latest backup for now")
@@ -243,6 +264,13 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 			latestBackup.Status.StartTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour)}
 			latestBackup.Status.CompletionTimestamp = &metav1.Time{Time: expiredTime.Time.Add(-time.Hour)}
 			latestBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+			latestBackup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						Strategy: dpv1alpha1.PodSelectionStrategyAny,
+					},
+				},
+			}
 			testdp.PatchBackupStatus(&testCtx, latestKey, latestBackup.Status)
 
 			By("verify the latest full backup is retained while older is deleted")

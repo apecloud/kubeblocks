@@ -41,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -1458,34 +1457,12 @@ func buildComponentCustomActions(transCtx *clusterTransformContext, proto, runni
 }
 
 func lifecycleAction4Sharding(transCtx *clusterTransformContext, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
-	synthesizedComp, err := synthesizedComponent(transCtx, comp)
-	if err != nil {
-		return nil, err
+	compDef := transCtx.componentDefs[comp.Spec.CompDef]
+	if compDef == nil {
+		return nil, fmt.Errorf("component definition not found for component %s", comp.Name)
 	}
 
-	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		return nil, err
-	}
-	if len(pods) == 0 {
-		return nil, fmt.Errorf("has no pods to running the sharding lifecycle action")
-	}
-
-	return lifecycle.New(transCtx.Cluster.Namespace, transCtx.Cluster.Name, synthesizedComp.Name, nil, synthesizedComp.TemplateVars, nil, pods)
-}
-
-func synthesizedComponent(transCtx *clusterTransformContext, comp *appsv1.Component) (*component.SynthesizedComponent, error) {
-	synthesizedComp, err := component.BuildSynthesizedComponent(transCtx.Context, transCtx.Client, transCtx.componentDefs[comp.Spec.CompDef], comp)
-	if err != nil {
-		return nil, ictrlutil.NewRequeueError(appsutil.RequeueDuration,
-			fmt.Sprintf("build synthesized component failed at shard lifecycle action: %s", err.Error()))
-	}
-	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(transCtx.Context, transCtx.Client, synthesizedComp, transCtx.componentDefs[comp.Spec.CompDef].Spec.Vars)
-	if err != nil {
-		return nil, err
-	}
-	return synthesizedComp, nil
+	return component.BuildLifecycleAgent(transCtx.Context, transCtx.Client, compDef, comp, transCtx.Cluster.Namespace, transCtx.Cluster.Name)
 }
 
 func handleShardingAddNPostProvision(transCtx *clusterTransformContext, dag *graph.DAG, shardingDef *appsv1.ShardingDefinition, comp *appsv1.Component, shardingName string) error {

@@ -580,7 +580,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		if len(targetPodList.Items) == 0 {
-			return nil, fmt.Errorf("can not found any pod by spec.readyConfig.%s.target.podSelector", msgKey)
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "can not found any pod by spec.readyConfig.%s.target.podSelector", msgKey)
 		}
 		return targetPodList, nil
 	}

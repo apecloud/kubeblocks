@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/go-logr/logr"
 
@@ -34,9 +33,8 @@ import (
 )
 
 const (
-	newReplicaDataDump              = "dataDump"
-	newReplicaDataLoad              = "dataLoad"
-	newReplicaConnectTimeoutSeconds = 10
+	newReplicaDataDump = "dataDump"
+	newReplicaDataLoad = "dataLoad"
 
 	targetPodNameEnv = "KB_TARGET_POD_NAME"
 )
@@ -60,7 +58,7 @@ func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
 		return nil, err
 	}
 
-	return nonBlockingCallActionX(ctx, action, s.task.Parameters, s.task.TimeoutSeconds, conn, nil, nil)
+	return nonBlockingCallActionX(ctx, action, s.task.Parameters, &action.TimeoutSeconds, conn, nil, nil)
 }
 
 func (s *newReplicaTask) status(ctx context.Context, event *proto.TaskEvent) {
@@ -78,9 +76,8 @@ func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
 
 	// reuse the action request as the handshake packet, define a new one when needed
 	req := proto.ActionRequest{
-		Action:         newReplicaDataDump,
-		Parameters:     s.task.Parameters,
-		TimeoutSeconds: s.task.TimeoutSeconds,
+		Action:     newReplicaDataDump,
+		Parameters: s.task.Parameters,
 	}
 	if req.Parameters == nil {
 		req.Parameters = make(map[string]string)
@@ -113,7 +110,7 @@ func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) 
 		return nil, fmt.Errorf("remote port is required")
 	}
 	dialer := &net.Dialer{
-		Timeout: newReplicaConnectTimeoutSeconds * time.Second,
+		Timeout: defaultConnectTimeout,
 	}
 	return dialer.Dial("tcp", net.JoinHostPort(s.task.Remote, strconv.Itoa(int(s.task.Port))))
 }

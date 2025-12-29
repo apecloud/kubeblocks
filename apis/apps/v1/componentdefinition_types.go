@@ -1125,19 +1125,6 @@ type ComponentFileTemplate struct {
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
-
-	// Defines the procedures that reload the configuration when the file changes if there are more than one files
-	// in the template, and they have different reload actions.
-	//
-	// Each key in the map represents a file name, and the corresponding value is the action to reload the
-	// configuration for that file. It takes precedence over the default @reconfigure action if set.
-	//
-	// When @restartOnFileChange is set to true, these actions will be ignored.
-	//
-	// Note: This field is immutable once it has been set.
-	//
-	// +optional
-	// Reconfigures *map[string]Action `json:"reconfigures,omitempty"`
 }
 
 type LogConfig struct {

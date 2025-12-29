@@ -4849,11 +4849,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   availableProbe:
@@ -5306,11 +5310,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   dataDump:
@@ -5760,11 +5768,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   dataLoad:
@@ -6207,11 +6219,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   memberJoin:
@@ -6653,11 +6669,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   memberLeave:
@@ -7101,11 +7121,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   postProvision:
@@ -7542,11 +7566,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   preTerminate:
@@ -7983,11 +8011,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   readonly:
@@ -8424,11 +8456,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   readwrite:
@@ -8867,11 +8903,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   reconfigure:
@@ -9303,11 +9343,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   roleProbe:
@@ -9779,11 +9823,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                   switchover:
@@ -10227,11 +10275,15 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                          If the Action does not complete within this time frame, it will be terminated.
+                          Behavior based on the value:
+                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                          - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                           This field cannot be updated.
                         format: int32
+                        maximum: 60
                         type: integer
                     type: object
                 type: object

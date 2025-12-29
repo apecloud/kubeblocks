@@ -471,7 +471,11 @@ func replaceShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha
 	replicas := spec.Template.Replicas
 	for _, status := range rollout.Status.Shardings {
 		if status.Name == sharding.Name {
-			replicas = status.Replicas
+			if spec.Shards == 0 {
+				replicas = 0
+			} else {
+				replicas = status.Replicas / spec.Shards
+			}
 			break
 		}
 	}

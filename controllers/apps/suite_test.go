@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -53,11 +52,6 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-const (
-	testDataPlaneNodeAffinityKey = "testDataPlaneNodeAffinityKey"
-	testDataPlaneTolerationKey   = "testDataPlaneTolerationKey"
-)
-
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -87,10 +81,6 @@ var _ = BeforeSuite(func() {
 	}
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 10)
-	viper.Set(constant.CfgKeyDataPlaneTolerations,
-		fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", testDataPlaneTolerationKey))
-	viper.Set(constant.CfgKeyDataPlaneAffinity,
-		fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", testDataPlaneNodeAffinityKey))
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()

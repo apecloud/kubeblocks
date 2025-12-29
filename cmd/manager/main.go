@@ -271,17 +271,11 @@ func validateRequiredToParseConfigs() error {
 	if err := validateAffinity(viper.GetString(constant.CfgKeyCtrlrMgrAffinity)); err != nil {
 		return err
 	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		nodeSelector := map[string]string{}
-		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
+	if nodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); nodeSelector != "" {
+		__ := map[string]string{}
+		if err := json.Unmarshal([]byte(nodeSelector), &__); err != nil {
 			return err
 		}
-	}
-	if err := validateTolerations(viper.GetString(constant.CfgKeyDataPlaneTolerations)); err != nil {
-		return err
-	}
-	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
-		return err
 	}
 
 	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {

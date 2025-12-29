@@ -168,8 +168,6 @@ func computeServiceAccountRuleHash(transCtx *componentTransformContext) (string,
 	hash.Write(data)
 	enabled := transCtx.SynthesizeComponent.LifecycleActions != nil
 	fmt.Fprint(hash, enabled)
-	// when a restart ops is triggered, change to new rule
-	fmt.Fprint(hash, transCtx.SynthesizeComponent.DynamicAnnotations[constant.RestartAnnotationKey])
 	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
 }
 

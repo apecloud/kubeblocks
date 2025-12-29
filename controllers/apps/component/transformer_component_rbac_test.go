@@ -189,7 +189,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			// sa should be created
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 
-			dagExpected := mockDAG(graphCli, compObj)
+			dagExpected := mockDAGWithUpdate(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
@@ -204,7 +204,7 @@ var _ = Describe("object rbac transformer test.", func() {
 				Name:     constant.RBACRoleName,
 			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			dagExpected := mockDAG(graphCli, compObj)
+			dagExpected := mockDAGWithUpdate(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, clusterPodRoleBinding)
 			graphCli.DependOn(dagExpected, clusterPodRoleBinding, serviceAccount)
@@ -225,7 +225,7 @@ var _ = Describe("object rbac transformer test.", func() {
 				Name:     cmpdRole.Name,
 			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			dagExpected := mockDAG(graphCli, compObj)
+			dagExpected := mockDAGWithUpdate(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, cmpdRoleBinding)
 			graphCli.Create(dagExpected, cmpdRole)
@@ -353,6 +353,14 @@ var _ = Describe("object rbac transformer test.", func() {
 func mockDAG(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 	d := graph.NewDAG()
 	graphCli.Root(d, comp, comp, model.ActionStatusPtr())
+	its := &workloads.InstanceSet{}
+	graphCli.Create(d, its)
+	return d
+}
+
+func mockDAGWithUpdate(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
+	d := graph.NewDAG()
+	graphCli.Root(d, comp, comp, model.ActionUpdatePtr())
 	its := &workloads.InstanceSet{}
 	graphCli.Create(d, its)
 	return d

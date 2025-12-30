@@ -9892,7 +9892,9 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The namespace where the secret is located.</p>
+<p>If not specified, the secret is assumed to be in the same namespace as the cluster.</p>
 </td>
 </tr>
 <tr>

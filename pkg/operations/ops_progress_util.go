@@ -204,16 +204,16 @@ func handleComponentStatusProgress(
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
 		// only rollback the actual re-created pod during cancelling and which belongs to this component.
 		progressDetailMap := map[string]any{}
-		var createdPodCount int32
+		var updatedPodCount int32
 		for _, v := range compStatus.ProgressDetails {
 			progressDetailMap[v.ObjectKey] = nil
 		}
 		for _, v := range pods {
 			if _, ok := progressDetailMap[getProgressObjectKey(constant.PodKind, v.Name)]; ok {
-				createdPodCount += 1
+				updatedPodCount += 1
 			}
 		}
-		expectReplicas = createdPodCount
+		expectReplicas = updatedPodCount
 	}
 	return expectReplicas, completedCount, err
 }

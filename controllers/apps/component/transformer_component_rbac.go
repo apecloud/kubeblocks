@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
 	"fmt"
+	"hash/fnv"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -50,9 +53,11 @@ type componentRBACTransformer struct{}
 var _ graph.Transformer = &componentRBACTransformer{}
 
 const EventReasonRBACManager = "RBACManager"
+const EventReasonServiceAccountRollback = "ServiceAccountRollback"
 
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComp := transCtx.SynthesizeComponent
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
@@ -83,17 +88,41 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-
 	var err error
+	comp := transCtx.Component
+	lastServiceAccountName := comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]
+	lastHash := comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]
 	if serviceAccountName == "" {
+		rollback, err := needRollbackServiceAccount(transCtx)
+		if err != nil {
+			return err
+		}
+
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+		if rollback {
+			transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
+			serviceAccountName = lastServiceAccountName
+		}
 		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
 		sa, err = createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
 		if err != nil {
 			return err
 		}
+
+		hash, err := computeServiceAccountRuleHash(transCtx)
+		if err != nil {
+			return err
+		}
+
+		if lastServiceAccountName != serviceAccountName || lastHash != hash {
+			comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey] = serviceAccountName
+			comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey] = hash
+			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
+		}
 	}
+
+	synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
+
 	role, err := createOrUpdateRole(transCtx, graphCli, dag)
 	if err != nil {
 		return err
@@ -104,8 +133,9 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 
-	objs := []client.Object{sa, role}
+	objs := []client.Object{role}
 	if sa != nil {
+		objs = append(objs, sa)
 		// serviceAccount should be created before roleBinding and role
 		for _, rb := range rbs {
 			objs = append(objs, rb)
@@ -129,6 +159,32 @@ func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.G
 		its := itsObj.(*workloads.InstanceSet)
 		component.AddInstanceAssistantObjectsToITS(its, objs...)
 	}
+}
+
+func computeServiceAccountRuleHash(transCtx *componentTransformContext) (string, error) {
+	hash := fnv.New32a()
+	data, err := json.Marshal(transCtx.SynthesizeComponent.PolicyRules)
+	if err != nil {
+		return "", err
+	}
+	hash.Write(data)
+	enabled := transCtx.SynthesizeComponent.LifecycleActions != nil
+	fmt.Fprint(hash, enabled)
+	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
+}
+
+func needRollbackServiceAccount(transCtx *componentTransformContext) (rollback bool, err error) {
+	hash, err := computeServiceAccountRuleHash(transCtx)
+	if err != nil {
+		return false, err
+	}
+
+	lastHash, ok := transCtx.Component.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]
+	if !ok {
+		return false, nil
+	}
+
+	return hash == lastHash, nil
 }
 
 func labelAndAnnotationEqual(old, new metav1.Object) bool {

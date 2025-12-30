@@ -93,7 +93,9 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	if err != nil {
 		return err
 	}
-	transCtx.RunningWorkload = runningITS
+	if runningITS != nil {
+		transCtx.RunningWorkload = runningITS
+	}
 
 	return nil
 }

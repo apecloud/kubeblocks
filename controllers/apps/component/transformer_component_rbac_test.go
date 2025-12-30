@@ -22,6 +22,7 @@ package component
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -61,6 +62,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		clusterUID         = string(uuid.NewUUID())
 		compObj            *appsv1.Component
 		synthesizedComp    *component.SynthesizedComponent
+		fullCompName       string
 	)
 
 	AfterEach(func() {
@@ -93,7 +95,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		compDefObj = compDefFactory.GetObject()
 
 		By("Creating a component")
-		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
+		fullCompName = constant.GenerateClusterComponentName(clusterName, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
 			AddAnnotations(constant.KBAppClusterUIDKey, clusterUID).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
@@ -120,7 +122,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		dag = mockDAG(graphCli, compObj)
 		transformer = &componentRBACTransformer{}
 
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(compDefObj.Name)
+		serviceAccountName = constant.GenerateDefaultServiceAccountNameNew(fullCompName)
 		saKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      serviceAccountName,
@@ -218,18 +220,16 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ cmpd's PolicyRules", func() {
 			init(false, true)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			cmpdRole := factory.BuildRole(synthesizedComp, compDefObj)
 			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
-				Kind:     "Role",
-				Name:     cmpdRole.Name,
+				Kind:     "ClusterRole",
+				Name:     constant.GenerateDefaultRoleName(compDefObj.Name),
 			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, cmpdRoleBinding)
-			graphCli.Create(dagExpected, cmpdRole)
-			graphCli.DependOn(dagExpected, cmpdRoleBinding, serviceAccount, cmpdRole)
+			graphCli.DependOn(dagExpected, cmpdRoleBinding, serviceAccount)
 			itsList := graphCli.FindAll(dagExpected, &workloads.InstanceSet{})
 			for i := range itsList {
 				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)
@@ -241,6 +241,128 @@ var _ = Describe("object rbac transformer test.", func() {
 			rb := actualRoleBinding[0].(*rbacv1.RoleBinding)
 			Expect(reflect.DeepEqual(rb.Subjects, cmpdRoleBinding.Subjects)).To(BeTrue())
 			Expect(reflect.DeepEqual(rb.RoleRef, cmpdRoleBinding.RoleRef)).To(BeTrue())
+		})
+	})
+
+	Context("old code path", func() {
+		It("tests needRollbackServiceAccount", func() {
+			init(true, false)
+			ctx := transCtx.(*componentTransformContext)
+
+			By("create another cmpd")
+			anotherTpl := testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			hash, err := computeServiceAccountRuleHash(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			// Case: No label, should return false
+			needRollback, useNewRule, err := needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeFalse())
+
+			// Case: With same cmpd
+			ctx.Component.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
+			ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeTrue())
+			Expect(useNewRule).To(BeFalse())
+
+			// Case: Different cmpd, same spec
+			another := anotherTpl.DeepCopy()
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, another, compObj)
+			Expect(err).Should(Succeed())
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeTrue())
+			Expect(useNewRule).To(BeFalse())
+
+			// Case: Different cmpd, different policy rules
+			another = anotherTpl.DeepCopy()
+			another.Spec.PolicyRules = []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"pods"},
+					Verbs:     []string{"get"},
+				},
+			}
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, another, compObj)
+			Expect(err).Should(Succeed())
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeTrue())
+
+			// Case: Different cmpd, different lifecycle action
+			another = anotherTpl.DeepCopy()
+			another.Spec.PolicyRules = nil
+			another.Spec.LifecycleActions = nil
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, another, compObj)
+			Expect(err).Should(Succeed())
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeTrue())
+
+			// Case: restart ops triggered
+			if compObj.Spec.Annotations == nil {
+				compObj.Spec.Annotations = make(map[string]string)
+			}
+			compObj.Spec.Annotations[constant.RestartAnnotationKey] = time.Now().String()
+			ctx.SynthesizeComponent, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj)
+			Expect(err).Should(Succeed())
+			needRollback, useNewRule, err = needRollbackServiceAccount(ctx)
+			Expect(err).Should(BeNil())
+			Expect(needRollback).Should(BeFalse())
+			Expect(useNewRule).To(BeTrue())
+		})
+
+		mockDAGWithUpdate := func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
+			d := graph.NewDAG()
+			graphCli.Root(d, comp, comp, model.ActionUpdatePtr())
+			its := &workloads.InstanceSet{}
+			graphCli.Create(d, its)
+			return d
+		}
+
+		less := func(v1, v2 graph.Vertex) bool {
+			o1, ok1 := v1.(*model.ObjectVertex)
+			o2, ok2 := v2.(*model.ObjectVertex)
+			if !ok1 || !ok2 {
+				return false
+			}
+			if o1.String() != o2.String() {
+				return o1.String() < o2.String()
+			}
+			if !reflect.DeepEqual(o1.Obj.GetLabels(), o2.Obj.GetLabels()) {
+				return true
+			}
+			return !reflect.DeepEqual(o1.Obj.GetAnnotations(), o2.Obj.GetAnnotations())
+		}
+
+		It("adds labels for an old component", func() {
+			init(false, false)
+			// mock a running workload
+			ctx := transCtx.(*componentTransformContext)
+			ctx.RunningWorkload = &workloads.InstanceSet{}
+			expectedComp := compObj.DeepCopy()
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+			// sa should be created
+			oldSAName := constant.GenerateDefaultServiceAccountName(compDefObj.Name)
+			serviceAccount := factory.BuildServiceAccount(synthesizedComp, oldSAName)
+
+			hash, err := computeServiceAccountRuleHash(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			expectedComp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
+			expectedComp.Labels[constant.ComponentLastServiceAccountNameLabelKey] = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+			dagExpected := mockDAGWithUpdate(graphCli, expectedComp)
+			graphCli.Create(dagExpected, serviceAccount)
+
+			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})
 	})
 })

@@ -134,7 +134,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	if sa != nil {
-		objs = append(objs, sa)
 		// serviceAccount should be created before roleBinding and role
 		for _, rb := range rbs {
 			graphCli.DependOn(dag, rb, sa, role)

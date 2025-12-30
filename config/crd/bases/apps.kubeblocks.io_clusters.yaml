@@ -4451,7 +4451,11 @@ spec:
                                 description: The unique identifier of the secret.
                                 type: string
                               namespace:
-                                description: The namespace where the secret is located.
+                                description: |-
+                                  The namespace where the secret is located.
+
+
+                                  If not specified, the secret is assumed to be in the same namespace as the cluster.
                                 type: string
                               password:
                                 default: password
@@ -4460,7 +4464,6 @@ spec:
                                 type: string
                             required:
                             - name
-                            - namespace
                             type: object
                         required:
                         - name
@@ -15807,8 +15810,11 @@ spec:
                                     description: The unique identifier of the secret.
                                     type: string
                                   namespace:
-                                    description: The namespace where the secret is
-                                      located.
+                                    description: |-
+                                      The namespace where the secret is located.
+
+
+                                      If not specified, the secret is assumed to be in the same namespace as the cluster.
                                     type: string
                                   password:
                                     default: password
@@ -15817,7 +15823,6 @@ spec:
                                     type: string
                                 required:
                                 - name
-                                - namespace
                                 type: object
                             required:
                             - name

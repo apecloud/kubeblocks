@@ -201,8 +201,18 @@ func handleComponentStatusProgress(
 		completedCount = handleProgressForPodsRollingUpdate(opsRes, pods, pgRes, compStatus, minReadySeconds, podApplyOps)
 	}
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
-		// only rollback the actual re-created pod during cancelling.
-		expectReplicas = int32(len(compStatus.ProgressDetails))
+		// only rollback the actual re-created pod during cancelling and which belongs to this component.
+		progressDetailMap := map[string]any{}
+		var updatedPodCount int32
+		for _, v := range compStatus.ProgressDetails {
+			progressDetailMap[v.ObjectKey] = nil
+		}
+		for _, v := range pods {
+			if _, ok := progressDetailMap[getProgressObjectKey(constant.PodKind, v.Name)]; ok {
+				updatedPodCount += 1
+			}
+		}
+		expectReplicas = updatedPodCount
 	}
 	return expectReplicas, completedCount, err
 }

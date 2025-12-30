@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -107,7 +106,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Replicas:                         comp.Spec.Replicas,
 		Resources:                        comp.Spec.Resources,
 		TLSConfig:                        comp.Spec.TLSConfig,
-		ServiceAccountName:               comp.Spec.ServiceAccountName,
 		Instances:                        comp.Spec.Instances,
 		OfflineInstances:                 comp.Spec.OfflineInstances,
 		DisableExporter:                  comp.Spec.DisableExporter,
@@ -141,9 +139,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
-
-	// build serviceAccountName
-	buildServiceAccountName(synthesizeComp)
 
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
@@ -478,19 +473,6 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 		return merge(stpl, appsv1.ClusterComponentConfig{})
 	}
 	return stpl
-}
-
-// buildServiceAccountName builds serviceAccountName for component and podSpec.
-func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
-	if synthesizeComp.ServiceAccountName != "" {
-		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
-		return
-	}
-	if !viper.GetBool(constant.EnableRBACManager) {
-		return
-	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
-	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 
 func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {

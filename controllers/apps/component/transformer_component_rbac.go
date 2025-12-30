@@ -90,8 +90,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	var err error
 	comp := transCtx.Component
-	lastServiceAccountName := comp.Labels[constant.ComponentLastServiceAccountNameLabelKey]
-	lastHash := comp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey]
+	lastServiceAccountName := comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]
+	lastHash := comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]
 	if serviceAccountName == "" {
 		rollback, err := needRollbackServiceAccount(transCtx)
 		if err != nil {
@@ -100,7 +100,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
 		if rollback {
-			lastServiceAccountName := comp.Labels[constant.ComponentLastServiceAccountNameLabelKey]
 			transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
 			serviceAccountName = lastServiceAccountName
 		}
@@ -109,17 +108,20 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		if err != nil {
 			return err
 		}
+
+		hash, err := computeServiceAccountRuleHash(transCtx)
+		if err != nil {
+			return err
+		}
+
+		if lastServiceAccountName != serviceAccountName || lastHash != hash {
+			comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey] = serviceAccountName
+			comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey] = hash
+			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
+		}
 	}
-	hash, err := computeServiceAccountRuleHash(transCtx)
-	if err != nil {
-		return err
-	}
+
 	synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
-	if lastServiceAccountName != serviceAccountName || lastHash != hash {
-		comp.Labels[constant.ComponentLastServiceAccountNameLabelKey] = serviceAccountName
-		comp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
-		graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
-	}
 
 	role, err := createOrUpdateRole(transCtx, graphCli, dag)
 	if err != nil {
@@ -177,15 +179,12 @@ func needRollbackServiceAccount(transCtx *componentTransformContext) (rollback b
 		return false, err
 	}
 
-	lastHash, ok := transCtx.Component.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey]
+	lastHash, ok := transCtx.Component.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]
 	if !ok {
 		return false, nil
 	}
 
-	if hash == lastHash {
-		return true, nil
-	}
-	return false, nil
+	return hash == lastHash, nil
 }
 
 func labelAndAnnotationEqual(old, new metav1.Object) bool {

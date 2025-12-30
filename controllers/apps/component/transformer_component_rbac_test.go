@@ -263,8 +263,8 @@ var _ = Describe("object rbac transformer test.", func() {
 				Expect(needRollback).Should(BeFalse())
 
 				// Case: With same cmpd
-				ctx.Component.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
-				ctx.Component.Labels[constant.ComponentLastServiceAccountNameLabelKey] = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+				ctx.Component.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey] = hash
+				ctx.Component.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey] = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
 				needRollback, err = needRollbackServiceAccount(ctx)
 				Expect(err).Should(BeNil())
 				Expect(needRollback).Should(BeTrue())
@@ -339,8 +339,8 @@ var _ = Describe("object rbac transformer test.", func() {
 
 				hash, err := computeServiceAccountRuleHash(ctx)
 				Expect(err).ShouldNot(HaveOccurred())
-				expectedComp.Labels[constant.ComponentLastServiceAccountRuleHashLabelKey] = hash
-				expectedComp.Labels[constant.ComponentLastServiceAccountNameLabelKey] = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+				expectedComp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey] = hash
+				expectedComp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey] = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
 				dagExpected := mockDAGWithUpdate(graphCli, expectedComp)
 				graphCli.Create(dagExpected, serviceAccount)
 

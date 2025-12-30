@@ -494,8 +494,10 @@ type ProvisionSecretRef struct {
 
 	// The namespace where the secret is located.
 	//
-	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace"`
+	// If not specified, the secret is assumed to be in the same namespace as the cluster.
+	//
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// The key in the secret data that contains the password.
 	//

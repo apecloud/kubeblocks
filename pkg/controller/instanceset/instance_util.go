@@ -613,6 +613,13 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 	return pvcs
 }
 
+func tryTakeOverExternalPVC(its *workloads.InstanceSet, pvc *corev1.PersistentVolumeClaim) error {
+	if controllerutil.HasControllerReference(pvc) {
+		return nil
+	}
+	return controllerutil.SetControllerReference(its, pvc, model.GetScheme())
+}
+
 // copyAndMerge merges two objects for updating:
 // 1. new an object targetObj by copying from oldObj
 // 2. merge all fields can be updated from newObj into targetObj

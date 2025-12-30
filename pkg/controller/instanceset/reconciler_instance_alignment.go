@@ -162,6 +162,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			default:
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
+					if err := tryTakeOverExternalPVC(its, pvcObj.(*corev1.PersistentVolumeClaim)); err != nil {
+						return kubebuilderx.Continue, err
+					}
 					if err = tree.Update(pvcObj); err != nil {
 						return kubebuilderx.Continue, err
 					}

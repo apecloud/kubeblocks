@@ -509,7 +509,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   preTerminate:
@@ -954,7 +953,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   shardAdd:
@@ -1391,7 +1389,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   shardRemove:
@@ -1828,7 +1825,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                 type: object

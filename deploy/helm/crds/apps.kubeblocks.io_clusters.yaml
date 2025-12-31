@@ -737,7 +737,6 @@ spec:
 
                                   This field cannot be updated.
                                 format: int32
-                                maximum: 60
                                 type: integer
                             type: object
                           variables:
@@ -12074,7 +12073,6 @@ spec:
 
                                       This field cannot be updated.
                                     format: int32
-                                    maximum: 60
                                     type: integer
                                 type: object
                               variables:

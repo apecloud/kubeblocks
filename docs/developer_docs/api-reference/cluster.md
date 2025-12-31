@@ -3186,10 +3186,18 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
-Each template specifies the desired characteristics of a persistent volume, such as storage class,
-size, and access modes.
-These templates are used to dynamically provision persistent volumes for the Component.</p>
+<p>Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.</p>
+<p>Each template defines the desired characteristics of a persistent volume, such as storage class,
+size, and access modes, used for dynamic provisioning.</p>
+<p>PVC Adoption Mechanism:
+KubeBlocks supports adopting existing PVCs (static provisioning) if they meet the following criteria
+before the Cluster is created:
+1. Naming: The PVC name must follow the KubeBlocks naming convention:
+   $(vct-name)-$(pod-name) (e.g., &ldquo;data-mycluster-mysql-0&rdquo;).
+2. Labeling: The PVC must carry the label &ldquo;app.kubernetes.io/managed-by=kubeblocks&rdquo;.
+3. Ownership: The PVC must not have any existing controller reference.</p>
+<p>If these conditions are met, KubeBlocks will automatically take over the PVCs and
+set the Component (or its controlled resources) as the owner/controller reference.</p>
 </td>
 </tr>
 <tr>
@@ -9930,7 +9938,9 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The namespace where the secret is located.</p>
+<p>If not specified, the secret is assumed to be in the same namespace as the cluster.</p>
 </td>
 </tr>
 <tr>

@@ -4711,7 +4711,6 @@ spec:
 
                             This field cannot be updated.
                           format: int32
-                          maximum: 60
                           type: integer
                       type: object
                     restartOnFileChange:
@@ -5307,7 +5306,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   availableProbe:
@@ -5768,7 +5766,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   dataDump:
@@ -6226,7 +6223,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   dataLoad:
@@ -6677,7 +6673,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   memberJoin:
@@ -7127,7 +7122,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   memberLeave:
@@ -7579,7 +7573,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   postProvision:
@@ -8024,7 +8017,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   preTerminate:
@@ -8469,7 +8461,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   readonly:
@@ -8914,7 +8905,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   readwrite:
@@ -9361,7 +9351,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   reconfigure:
@@ -9798,7 +9787,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   roleProbe:
@@ -10278,7 +10266,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   switchover:
@@ -10734,7 +10721,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                 type: object
@@ -18976,7 +18962,6 @@ spec:
 
                             This field cannot be updated.
                           format: int32
-                          maximum: 60
                           type: integer
                       type: object
                     restartOnFileChange:

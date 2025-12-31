@@ -51,6 +51,9 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
+
+	ComponentLastServiceAccountNameAnnotationKey     = "component.kubeblocks.io/last-service-account-name"
+	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
 )
 
 const (

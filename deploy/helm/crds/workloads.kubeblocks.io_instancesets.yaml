@@ -513,7 +513,6 @@ spec:
 
                             This field cannot be updated.
                           format: int32
-                          maximum: 60
                           type: integer
                       type: object
                     reconfigureActionName:
@@ -3001,7 +3000,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   switchover:
@@ -3435,7 +3433,6 @@ spec:
 
                           This field cannot be updated.
                         format: int32
-                        maximum: 60
                         type: integer
                     type: object
                   templateVars:

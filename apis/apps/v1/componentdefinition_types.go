@@ -1825,7 +1825,6 @@ type Action struct {
 	//
 	// This field cannot be updated.
 	//
-	// +kubebuilder:validation:Maximum=60
 	// +kubebuilder:default=0
 	// +optional
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`

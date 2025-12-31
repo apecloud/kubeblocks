@@ -167,10 +167,11 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentFileTemplateTransformer{},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
+			// handle RBAC for component workloads
+			// it should be put before workload transformer, because we modify podSpec's serviceaccount in it
+			&componentRBACTransformer{},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
-			// handle RBAC for component workloads
-			&componentRBACTransformer{},
 			// handle component postProvision lifecycle action
 			&componentPostProvisionTransformer{},
 			// update component status

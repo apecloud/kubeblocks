@@ -29,9 +29,9 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -255,8 +255,8 @@ func (b *PlanBuilder) defaultWalkFunc(v graph.Vertex) error {
 
 func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	err := b.cli.Create(ctx, vertex.Obj, clientOption(vertex))
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
+	if err != nil {
+		return fmt.Errorf("create %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
 	b.emitEvent(vertex.Obj, "SuccessfulCreate", model.CREATE)
 	return nil
@@ -272,8 +272,8 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 		err = b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
 		reason = "SuccessfulUpdate"
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
+	if err != nil {
+		return fmt.Errorf("update %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
 	b.emitEvent(vertex.Obj, reason, model.UPDATE)
 	return nil
@@ -290,8 +290,8 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 		err = b.cli.Patch(ctx, vertex.Obj, patch, clientOption(vertex))
 		reason = "SuccessfulPatch"
 	}
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
+	if err != nil {
+		return fmt.Errorf("patch %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
 	b.emitEvent(vertex.Obj, reason, model.PATCH)
 	return nil
@@ -304,15 +304,14 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 	}
 	if len(finalizer) > 0 && controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 		err := b.cli.Update(ctx, vertex.Obj, clientOption(vertex))
-		if err != nil && !apierrors.IsNotFound(err) {
-			b.transCtx.logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
-			return err
+		if err != nil {
+			return fmt.Errorf("delete %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 		}
 	}
 	if !model.IsObjectDeleting(vertex.Obj) {
 		err := b.cli.Delete(ctx, vertex.Obj, clientOption(vertex))
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+		if err != nil {
+			return fmt.Errorf("delete %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 		}
 		b.emitEvent(vertex.Obj, "SuccessfulDelete", model.DELETE)
 	}
@@ -321,7 +320,7 @@ func (b *PlanBuilder) deleteObject(ctx context.Context, vertex *model.ObjectVert
 
 func (b *PlanBuilder) statusObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	if err := b.cli.Status().Update(ctx, vertex.Obj, clientOption(vertex)); err != nil {
-		return err
+		return fmt.Errorf("status %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
 	return nil
 }

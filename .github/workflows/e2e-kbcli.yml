@@ -12,16 +12,13 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|elasticsearch|zookeeper|
-        rabbitmq|weaviate|qdrant|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|
-        orioledb|vanilla-pg|polardbx|opensearch|tdengine|milvus|clickhouse|mariadb|tidb|influxdb|mogdb|
-        yashandb|redis-cluster|minio|orchestrator)'
+        description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql)'
         required: false
         default: ''
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'eks'
+        default: 'aks'
         type: choice
         options:
           - eks

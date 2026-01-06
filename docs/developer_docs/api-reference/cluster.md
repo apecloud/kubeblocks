@@ -3946,6 +3946,9 @@ to be created with distinct configurations.</p>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus
 </h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus</a>)
+</p>
 <div>
 <p>ClusterShardingStatus records a sharding status.</p>
 </div>
@@ -4300,8 +4303,8 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
 <td>
 <code>shardings</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
+<a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterShardingStatus
 </a>
 </em>
 </td>

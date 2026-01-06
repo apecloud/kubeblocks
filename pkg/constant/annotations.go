@@ -50,9 +50,6 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
-
-	// ShardingDefAnnotationKey records the sharding definition name of the sharding component
-	ShardingDefAnnotationKey = "apps.kubeblocks.io/sharding-definition"
 )
 
 const (

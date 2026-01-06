@@ -1875,12 +1875,19 @@ var _ = Describe("cluster component transformer test", func() {
 	})
 
 	Context("sharding lifecycle actions", func() {
+		// TODO: remove this
+		const (
+			shardingPostProvisionKey    = "kubeblocks.io/sharding-post-provision"
+			shardingPreTerminateDoneKey = "kubeblocks.io/sharding-pre-terminate-done"
+		)
+
 		var (
 			transformer graph.Transformer
 			transCtx    *clusterTransformContext
 			dag         *graph.DAG
 			actionDone  bool
 		)
+
 		BeforeEach(func() {
 			actionDone = false
 			transformer, transCtx, dag = newTransformerNCtx(clusterTopologyShardingOnly, func(f *testapps.MockClusterFactory) {
@@ -1948,10 +1955,10 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
 				Expect(len(comp.Spec.CustomActions)).Should(Equal(4))
-				Expect(comp.Spec.CustomActions[0].Name).Should(Equal(kbShardingAddAction))
-				Expect(comp.Spec.CustomActions[1].Name).Should(Equal(kbShardingPostProvisionAction))
-				Expect(comp.Spec.CustomActions[2].Name).Should(Equal(kbShardingPreTerminateAction))
-				Expect(comp.Spec.CustomActions[3].Name).Should(Equal(kbShardingRemoveAction))
+				Expect(comp.Spec.CustomActions[0].Name).Should(Equal(shardingAddShardAction))
+				Expect(comp.Spec.CustomActions[1].Name).Should(Equal(shardingPostProvisionAction))
+				Expect(comp.Spec.CustomActions[2].Name).Should(Equal(shardingPreTerminateAction))
+				Expect(comp.Spec.CustomActions[3].Name).Should(Equal(shardingRemoveShardAction))
 			})
 		})
 
@@ -1970,12 +1977,12 @@ var _ = Describe("cluster component transformer test", func() {
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingPostProvisionKey]).ShouldNot(BeEmpty())
+				Expect(comp.Annotations[shardingPostProvisionKey]).ShouldNot(BeEmpty())
 			})
 
 			It("do post-provision action successfully", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
-					kbShardingPostProvisionKey:  "test",
+					shardingPostProvisionKey:    "test",
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
@@ -1983,7 +1990,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingPostProvisionAction)
+				mockKBAgent(shardingPostProvisionAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).ShouldNot(BeNil())
@@ -1993,7 +2000,7 @@ var _ = Describe("cluster component transformer test", func() {
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingPostProvisionKey]).Should(BeEmpty())
+				Expect(comp.Annotations[shardingPostProvisionKey]).Should(BeEmpty())
 			})
 		})
 
@@ -2008,8 +2015,7 @@ var _ = Describe("cluster component transformer test", func() {
 				transCtx.shardings = nil
 				transCtx.shardingDefs = nil
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
-					constant.KBAppClusterUIDKey:       "test-uid",
-					constant.ShardingDefAnnotationKey: shardingDefName,
+					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
@@ -2020,7 +2026,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingPreTerminateAction)
+				mockKBAgent(shardingPreTerminateAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).ShouldNot(BeNil())
@@ -2029,7 +2035,7 @@ var _ = Describe("cluster component transformer test", func() {
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingPreTerminateDoneKey]).ShouldNot(BeEmpty())
+				Expect(comp.Annotations[shardingPreTerminateDoneKey]).ShouldNot(BeEmpty())
 				Expect(actionDone).Should(BeTrue())
 			})
 		})
@@ -2061,7 +2067,7 @@ var _ = Describe("cluster component transformer test", func() {
 				for _, obj := range objs {
 					comp := obj.(*appsv1.Component)
 					if comp.Name == component.FullName(transCtx.Cluster.Name, "test") {
-						Expect(comp.Annotations[kbShardingAddKey]).ShouldNot(BeEmpty())
+						Expect(comp.Annotations[shardingAddShardKey]).ShouldNot(BeEmpty())
 					}
 				}
 			})
@@ -2069,14 +2075,14 @@ var _ = Describe("cluster component transformer test", func() {
 			It("do shard add action successfully", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
-					kbShardingAddKey:            "test",
+					shardingAddShardKey:         "test",
 				})
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
 					return []client.Object{shardComp, pod}
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingAddAction)
+				mockKBAgent(shardingAddShardAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
@@ -2084,7 +2090,7 @@ var _ = Describe("cluster component transformer test", func() {
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingAddKey]).Should(BeEmpty())
+				Expect(comp.Annotations[shardingAddShardKey]).Should(BeEmpty())
 				Expect(actionDone).Should(BeTrue())
 			})
 		})
@@ -2106,7 +2112,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingRemoveAction)
+				mockKBAgent(shardingRemoveShardAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
@@ -2114,7 +2120,7 @@ var _ = Describe("cluster component transformer test", func() {
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingRemoveDoneKey]).ShouldNot(BeEmpty())
+				Expect(comp.Annotations[shardingRemoveShardDoneKey]).ShouldNot(BeEmpty())
 				Expect(actionDone).Should(BeTrue())
 			})
 		})

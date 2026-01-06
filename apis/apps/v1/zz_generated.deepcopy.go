@@ -734,7 +734,7 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	}
 	if in.Shardings != nil {
 		in, out := &in.Shardings, &out.Shardings
-		*out = make(map[string]ClusterComponentStatus, len(*in))
+		*out = make(map[string]ClusterShardingStatus, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}

@@ -315,6 +315,10 @@ func (r *RestoreReconciler) handleRunningPhase(reqCtx intctrlutil.RequestCtx, re
 		r.Recorder.Event(restore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, err.Error())
 		err = nil
 	}
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+		r.Recorder.Event(restore, corev1.EventTypeWarning, corev1.EventTypeWarning, err.Error())
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	}
 	// patch restore status if changes occur
 	if !reflect.DeepEqual(restoreMgr.OriginalRestore.Status, restoreMgr.Restore.Status) {
 		err = r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))

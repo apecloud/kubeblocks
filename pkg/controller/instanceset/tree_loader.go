@@ -23,7 +23,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -85,7 +84,6 @@ func ownedKinds() []client.ObjectList {
 		&corev1.ConfigMapList{},
 		&corev1.PodList{},
 		&corev1.PersistentVolumeClaimList{},
-		&batchv1.JobList{},
 	}
 }
 

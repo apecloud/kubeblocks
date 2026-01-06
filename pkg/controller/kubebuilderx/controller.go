@@ -164,7 +164,7 @@ func (c *controller) emitFailureEvent() {
 		return
 	}
 	// TODO(free6om): make error message user-friendly
-	c.tree.EventRecorder.Eventf(c.tree.GetRoot(), corev1.EventTypeWarning, "FailedReconcile", "reconcile failed: %s", c.err.Error())
+	c.tree.EventRecorder.Eventf(c.tree.GetRoot(), corev1.EventTypeWarning, "FailedReconcile", "%s", c.err.Error())
 }
 
 func NewController(ctx context.Context, cli client.Client, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) Controller {

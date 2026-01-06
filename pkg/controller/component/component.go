@@ -57,10 +57,6 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
-	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
-	if err != nil {
-		return nil, err
-	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
@@ -73,7 +69,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
 		SetEnv(compSpec.Env).
-		SetSchedulingPolicy(schedulingPolicy).
+		SetSchedulingPolicy(scheduling.BuildSchedulingPolicy(cluster, compSpec)).
 		SetDisableExporter(compSpec.DisableExporter).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
@@ -91,6 +87,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
+		SetOrdinals(compSpec.Ordinals).
 		SetFlatInstanceOrdinal(compSpec.FlatInstanceOrdinal).
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).

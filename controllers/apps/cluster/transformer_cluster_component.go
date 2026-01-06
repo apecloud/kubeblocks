@@ -282,6 +282,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.SchedulingPolicy = compProto.Spec.SchedulingPolicy
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
 	compObjCopy.Spec.Instances = compProto.Spec.Instances
+	compObjCopy.Spec.Ordinals = compProto.Spec.Ordinals
 	compObjCopy.Spec.FlatInstanceOrdinal = compProto.Spec.FlatInstanceOrdinal
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName

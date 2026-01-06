@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -45,6 +44,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"k8s.io/utils/ptr"
 
 	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
@@ -151,11 +151,7 @@ func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, paramet
 func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
 	var cancel context.CancelFunc
-	if timeout == nil {
-		ctx, cancel = context.WithTimeout(ctx, defaultActionCallTimeout)
-	} else if *timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
-	}
+	ctx, cancel = actionCallTimeoutContext(ctx, timeout)
 
 	var err error
 	errChan := make(chan error, 1)
@@ -174,6 +170,17 @@ func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parame
 		return nil, err
 	}
 	return errChan, nil
+}
+
+func actionCallTimeoutContext(ctx context.Context, timeout *int32) (context.Context, context.CancelFunc) {
+	switch {
+	case ptr.Deref(timeout, 0) == 0:
+		return context.WithTimeout(ctx, defaultActionCallTimeout)
+	case *timeout > 0:
+		return context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
+	default:
+		return ctx, func() {}
+	}
 }
 
 func execActionCallX(ctx context.Context, cancel context.CancelFunc,
@@ -601,9 +608,11 @@ func renderTemplateData(action string, parameters map[string]string, data string
 	return buf.String(), nil
 }
 
-func mergeEnvWith(parameters map[string]string) map[string]string {
-	result := make(map[string]string)
-	maps.Copy(result, parameters)
+func mergeEnvWith(parameters map[string]string) map[string]any {
+	result := make(map[string]any)
+	for k, v := range parameters {
+		result[k] = v
+	}
 	for _, e := range os.Environ() {
 		kv := strings.Split(e, "=")
 		if _, ok := result[kv[0]]; !ok {

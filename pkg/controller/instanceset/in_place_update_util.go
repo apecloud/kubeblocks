@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -42,6 +43,10 @@ const (
 	noOpsPolicy         podUpdatePolicy = "noOps"
 	recreatePolicy      podUpdatePolicy = "recreate"
 	inPlaceUpdatePolicy podUpdatePolicy = "inPlaceUpdate"
+)
+
+var (
+	errTemplateNotFound = fmt.Errorf("no template found for pod")
 )
 
 func supportPodVerticalScaling() bool {
@@ -314,7 +319,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 		return templateName == templateExt.Name
 	})
 	if index < 0 {
-		return noOpsPolicy, "", fmt.Errorf("no corresponding template found for instance %s", pod.Name)
+		return noOpsPolicy, "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
 	}
 	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
 	if err != nil {
@@ -371,13 +376,19 @@ func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.P
 	if ok {
 		return tplExt.Name, nil
 	}
-	return "", fmt.Errorf("no template found for pod %s/%s", pod.Namespace, pod.Name)
+	return "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
 }
 
-// IsPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
+// isPodUpdated tells whether the pod's spec is as expected in the InstanceSet.
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
 // as the pod template revision has been redefined in instanceset.
-func IsPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	policy, _, err := getPodUpdatePolicy(its, pod)
+	if err != nil {
+		if errors.Is(err, errTemplateNotFound) {
+			return true, nil
+		}
+		return false, err
+	}
 	return policy == noOpsPolicy, err
 }

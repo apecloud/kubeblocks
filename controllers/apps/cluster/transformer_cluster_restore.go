@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"sort"
+
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -72,6 +74,8 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
+
+		targets := backup.Status.Targets
 		// obtain components that have already been assigned targets.
 		allocateTargetMap := map[string]string{}
 		restoreDoneForShardComponents := true
@@ -79,34 +83,45 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if model.IsObjectDeleting(&v) {
 				continue
 			}
-			if v.Annotations[constant.RestoreDoneAnnotationKey] != "true" {
+
+			compName := v.Labels[constant.KBAppComponentLabelKey]
+			compAnnotations := c.initClusterAnnotations(compName)
+
+			if v.Annotations[constant.BackupSourceTargetAnnotationKey] != "" && v.Annotations[constant.RestoreDoneAnnotationKey] != "true" {
 				restoreDoneForShardComponents = false
 			}
 			if targetName, ok := v.Annotations[constant.BackupSourceTargetAnnotationKey]; ok {
-				compName := v.Labels[constant.KBAppComponentLabelKey]
 				allocateTargetMap[targetName] = compName
-				c.initClusterAnnotations(compName)
-				c.annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
+				compAnnotations[constant.BackupSourceTargetAnnotationKey] = targetName
 			}
 		}
-		if len(allocateTargetMap) == len(backup.Status.Targets) {
+		if len(allocateTargetMap) == len(targets) {
 			// check if the restore is completed when all source target have allocated.
 			if err = c.cleanupRestoreAnnotationForSharding(dag, spec.Name, restoreDoneForShardComponents); err != nil {
 				return err
 			}
-			continue
 		}
-		for _, target := range backup.Status.Targets {
+		// guarantee that when available targets are fewer than shards, the first shards are prioritized for restore.
+		sort.Slice(c.shardingComps[spec.Name], func(i, j int) bool {
+			return c.shardingComps[spec.Name][i].Name < c.shardingComps[spec.Name][j].Name
+		})
+		for _, target := range targets {
 			if _, ok = allocateTargetMap[target.Name]; ok {
 				continue
 			}
 			for _, compSpec := range c.shardingComps[spec.Name] {
-				if _, ok = c.annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
+				compAnnotations := c.initClusterAnnotations(compSpec.Name)
+				if _, ok = compAnnotations[constant.BackupSourceTargetAnnotationKey]; ok {
 					continue
 				}
-				c.initClusterAnnotations(compSpec.Name)
-				c.annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
+				compAnnotations[constant.BackupSourceTargetAnnotationKey] = target.Name
 				break
+			}
+		}
+		for _, compSpec := range c.shardingComps[spec.Name] {
+			compAnnotations := c.initClusterAnnotations(compSpec.Name)
+			if compAnnotations[constant.BackupSourceTargetAnnotationKey] == "" {
+				compAnnotations[constant.SkipRestoreAnnotationKey] = "true"
 			}
 		}
 	}
@@ -132,13 +147,14 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 	return nil
 }
 
-func (c *clusterRestoreTransformer) initClusterAnnotations(compName string) {
+func (c *clusterRestoreTransformer) initClusterAnnotations(compName string) map[string]string {
 	if c.annotations == nil {
-		c.annotations = map[string]map[string]string{}
+		c.annotations = make(map[string]map[string]string)
 	}
 	if c.annotations[compName] == nil {
-		c.annotations[compName] = map[string]string{}
+		c.annotations[compName] = make(map[string]string)
 	}
+	return c.annotations[compName]
 }
 
 func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *graph.DAG,

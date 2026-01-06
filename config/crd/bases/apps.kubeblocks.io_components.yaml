@@ -600,7 +600,10 @@ spec:
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                            If the Action does not complete within this time frame, it will be terminated.
+                            Behavior based on the value:
+                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                            - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                            - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                             This field cannot be updated.
@@ -1048,7 +1051,10 @@ spec:
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                            If the Action does not complete within this time frame, it will be terminated.
+                            Behavior based on the value:
+                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                            - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                            - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                             This field cannot be updated.
@@ -3061,6 +3067,35 @@ spec:
                 items:
                   type: string
                 type: array
+              ordinals:
+                description: |-
+                  Specifies the desired Ordinals.
+                  The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+                  If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+                properties:
+                  discrete:
+                    items:
+                      format: int32
+                      type: integer
+                    type: array
+                  ranges:
+                    items:
+                      description: |-
+                        Range represents a range with a start and an end value. Both start and end are included.
+                        It is used to define a continuous segment.
+                      properties:
+                        end:
+                          format: int32
+                          type: integer
+                        start:
+                          format: int32
+                          type: integer
+                      required:
+                      - end
+                      - start
+                      type: object
+                    type: array
+                type: object
               parallelPodManagementConcurrency:
                 anyOf:
                 - type: integer
@@ -5068,7 +5103,11 @@ spec:
                           description: The unique identifier of the secret.
                           type: string
                         namespace:
-                          description: The namespace where the secret is located.
+                          description: |-
+                            The namespace where the secret is located.
+
+
+                            If not specified, the secret is assumed to be in the same namespace as the cluster.
                           type: string
                         password:
                           default: password
@@ -5077,7 +5116,6 @@ spec:
                           type: string
                       required:
                       - name
-                      - namespace
                       type: object
                   required:
                   - name

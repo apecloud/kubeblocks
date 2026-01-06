@@ -33,6 +33,7 @@ const (
 	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
 
 	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
@@ -50,6 +51,9 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
+
+	ComponentLastServiceAccountNameAnnotationKey     = "component.kubeblocks.io/last-service-account-name"
+	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
 
 	// ShardingDefAnnotationKey records the sharding definition name of the sharding component
 	ShardingDefAnnotationKey = "apps.kubeblocks.io/sharding-definition"

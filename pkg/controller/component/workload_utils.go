@@ -147,10 +147,11 @@ func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
 			Annotations: comp.Annotations,
 		},
 		Spec: workloads.InstanceSetSpec{
-			Replicas:            &comp.Spec.Replicas,
-			Instances:           instanceTemplates(),
-			FlatInstanceOrdinal: comp.Spec.FlatInstanceOrdinal,
-			OfflineInstances:    comp.Spec.OfflineInstances,
+			Replicas:                &comp.Spec.Replicas,
+			Instances:               instanceTemplates(),
+			DefaultTemplateOrdinals: comp.Spec.Ordinals,
+			FlatInstanceOrdinal:     comp.Spec.FlatInstanceOrdinal,
+			OfflineInstances:        comp.Spec.OfflineInstances,
 		},
 	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)

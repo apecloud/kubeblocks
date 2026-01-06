@@ -206,6 +206,13 @@ func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Objec
 
 // deleteBackupFiles deletes the backup files stored in backup repository.
 func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	// If the dataprotection finalizer has already been removed, the deletion has succeeded.
+	// Skip creating a new deletion job to avoid a race condition with the garbage collector
+	// during foreground cascading deletion, which would cause an infinite loop of job creation.
+	if !controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
+		return nil
+	}
+
 	deleteBackup := func() error {
 		// remove backup finalizers to delete it
 		patch := client.MergeFrom(backup.DeepCopy())
@@ -1071,7 +1078,7 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 		return nil, fmt.Errorf("backupRepo for incremental backup can't be empty")
 	}
 	// get and validate parent backup
-	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod, request.BackupRepo.Name)
+	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod, request.BackupPolicy, request.BackupRepo.Name)
 	if err != nil {
 		return nil, err
 	}

@@ -855,6 +855,22 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -2463,7 +2479,10 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
-<p>If the Action does not complete within this time frame, it will be terminated.</p>
+<p>Behavior based on the value:
+- Positive (&gt; 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+- Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+- Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -3160,10 +3179,18 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
-Each template specifies the desired characteristics of a persistent volume, such as storage class,
-size, and access modes.
-These templates are used to dynamically provision persistent volumes for the Component.</p>
+<p>Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.</p>
+<p>Each template defines the desired characteristics of a persistent volume, such as storage class,
+size, and access modes, used for dynamic provisioning.</p>
+<p>PVC Adoption Mechanism:
+KubeBlocks supports adopting existing PVCs (static provisioning) if they meet the following criteria
+before the Cluster is created:
+1. Naming: The PVC name must follow the KubeBlocks naming convention:
+   $(vct-name)-$(pod-name) (e.g., &ldquo;data-mycluster-mysql-0&rdquo;).
+2. Labeling: The PVC must carry the label &ldquo;app.kubernetes.io/managed-by=kubeblocks&rdquo;.
+3. Ownership: The PVC must not have any existing controller reference.</p>
+<p>If these conditions are met, KubeBlocks will automatically take over the PVCs and
+set the Component (or its controlled resources) as the owner/controller reference.</p>
 </td>
 </tr>
 <tr>
@@ -3404,6 +3431,22 @@ starting with an ordinal of 0.
 It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of replicas specified for the Component.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 </td>
 </tr>
 <tr>
@@ -6743,6 +6786,22 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -9234,7 +9293,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.Ordinals">Ordinals
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>Ordinals represents a combination of continuous segments and individual values.</p>
@@ -9915,7 +9974,9 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The namespace where the secret is located.</p>
+<p>If not specified, the secret is assumed to be in the same namespace as the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -12003,6 +12064,20 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <em>(Optional)</em>
 <p>Specifies an override for the custom instances of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the desired Ordinals of the shard.</p>
 </td>
 </tr>
 <tr>

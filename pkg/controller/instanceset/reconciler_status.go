@@ -124,7 +124,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := IsPodUpdated(its, pod)
+			isPodUpdated, err := isPodUpdated(its, pod)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}

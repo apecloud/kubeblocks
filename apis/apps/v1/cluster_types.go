@@ -355,9 +355,20 @@ type ClusterComponentSpec struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
-	// Each template specifies the desired characteristics of a persistent volume, such as storage class,
-	// size, and access modes.
-	// These templates are used to dynamically provision persistent volumes for the Component.
+	//
+	// Each template defines the desired characteristics of a persistent volume, such as storage class,
+	// size, and access modes, used for dynamic provisioning.
+	//
+	// PVC Adoption Mechanism:
+	// KubeBlocks supports adopting existing PVCs (static provisioning) if they meet the following criteria
+	// before the Cluster is created:
+	// 1. Naming: The PVC name must follow the KubeBlocks naming convention:
+	//    $(vct-name)-$(pod-name) (e.g., "data-mycluster-mysql-0").
+	// 2. Labeling: The PVC must carry the label "app.kubernetes.io/managed-by=kubeblocks".
+	// 3. Ownership: The PVC must not have any existing controller reference.
+	//
+	// If these conditions are met, KubeBlocks will automatically take over the PVCs and
+	// set the Component (or its controlled resources) as the owner/controller reference.
 	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -493,6 +504,13 @@ type ClusterComponentSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies the desired Ordinals.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+	//
+	// +optional
+	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
 	// globally uniquely ordinal scheme, regardless of the instance template.
@@ -745,6 +763,11 @@ type ShardTemplate struct {
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies an override for the desired Ordinals of the shard.
+	//
+	// +optional
+	Ordinals *Ordinals `json:"ordinals,omitempty"`
 
 	// Specifies an override for the instance naming of the shard.
 	//

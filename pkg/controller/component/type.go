@@ -49,7 +49,6 @@ type SynthesizedComponent struct {
 	FileTemplates                    []SynthesizedFileTemplate
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
-	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	Labels                           map[string]string                      `json:"labels,omitempty"`
 	StaticLabels                     map[string]string                      // labels defined by the component definition
@@ -61,6 +60,7 @@ type SynthesizedComponent struct {
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
+	Ordinals                         kbappsv1.Ordinals
 	FlatInstanceOrdinal              bool
 	InstanceImages                   map[string]map[string]string    `json:"instanceImages,omitempty"`
 	OfflineInstances                 []string                        `json:"offlineInstances,omitempty"`

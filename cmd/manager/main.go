@@ -150,7 +150,7 @@ func init() {
 	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
-	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
+	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)

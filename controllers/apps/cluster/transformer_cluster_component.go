@@ -1130,61 +1130,75 @@ func (h *clusterShardingHandler) handlePostProvision(transCtx *clusterTransformC
 	var (
 		shardingDef = h.shardingDef(transCtx, shardingName)
 
-		initAsNotDefined = func() error {
-			now := metav1.Now()
-			transCtx.Cluster.Status.Shardings[shardingName] = appsv1.ClusterShardingStatus{
-				ShardingDef: shardingDef.Name,
-				PostProvision: &appsv1.LifecycleActionStatus{
-					Phase:          appsv1.LifecycleActionSkipped,
-					Message:        "the PostProvision action is not defined",
-					StartTime:      &now,
-					CompletionTime: &now,
-				},
+		upsert = func(status appsv1.LifecycleActionStatus) {
+			shardingStatus := transCtx.Cluster.Status.Shardings[shardingName]
+			shardingStatus.ShardingDef = shardingDef.Name
+			if shardingStatus.PostProvision == nil {
+				shardingStatus.PostProvision = &status
+			} else {
+				shardingStatus.PostProvision.Phase = status.Phase
+				shardingStatus.PostProvision.Message = status.Message
+				if shardingStatus.PostProvision.StartTime == nil {
+					shardingStatus.PostProvision.StartTime = status.StartTime
+				}
+				if shardingStatus.PostProvision.CompletionTime == nil {
+					shardingStatus.PostProvision.CompletionTime = status.CompletionTime
+				}
 			}
-			return nil
+			transCtx.Cluster.Status.Shardings[shardingName] = shardingStatus
 		}
 
 		init = func() error {
-			transCtx.Cluster.Status.Shardings[shardingName] = appsv1.ClusterShardingStatus{
-				ShardingDef: shardingDef.Name,
-				PostProvision: &appsv1.LifecycleActionStatus{
-					Phase:     appsv1.LifecycleActionPending,
-					StartTime: &metav1.Time{Time: time.Now()},
-				},
-			}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:     appsv1.LifecycleActionPending,
+				StartTime: &metav1.Time{Time: time.Now()},
+			})
 			return ictrlutil.NewDelayedRequeueError(3*time.Second, "requeue to schedule the sharding post-provision action")
 		}
 
+		skip = func() error {
+			now := &metav1.Time{Time: time.Now()}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:          appsv1.LifecycleActionSkipped,
+				Message:        "the PostProvision action is not defined",
+				StartTime:      now,
+				CompletionTime: now,
+			})
+			return nil
+		}
+
 		succeed = func() error {
-			status := transCtx.Cluster.Status.Shardings[shardingName].PostProvision
-			status.Phase = appsv1.LifecycleActionSucceeded
-			status.Message = ""
-			status.CompletionTime = &metav1.Time{Time: time.Now()}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:          appsv1.LifecycleActionSucceeded,
+				Message:        "",
+				CompletionTime: &metav1.Time{Time: time.Now()},
+			})
 			return nil
 		}
 
 		fail = func(err error) error {
-			status := transCtx.Cluster.Status.Shardings[shardingName].PostProvision
-			status.Phase = appsv1.LifecycleActionFailed
-			status.Message = err.Error()
-			return err
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:   appsv1.LifecycleActionFailed,
+				Message: err.Error(),
+			})
+			return err // TODO: delay the requeue?
 		}
 
-		_, initialized = transCtx.Cluster.Status.Shardings[shardingName]
+		initialized = transCtx.Cluster.Status.Shardings[shardingName].PostProvision != nil
 
 		defined = func() bool {
-			return shardingDef.Spec.LifecycleActions != nil || shardingDef.Spec.LifecycleActions.PostProvision != nil
+			return shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.PostProvision != nil
 		}
 
 		done = func() bool {
 			status := transCtx.Cluster.Status.Shardings[shardingName].PostProvision
-			return status.Phase == appsv1.LifecycleActionSucceeded || status.Phase == appsv1.LifecycleActionSkipped
+			return status != nil && (status.Phase == appsv1.LifecycleActionSucceeded || status.Phase == appsv1.LifecycleActionSkipped)
 		}
 	)
 
 	if !defined() {
-		if !initialized {
-			return initAsNotDefined()
+		if !initialized || !done() {
+			return skip()
 		}
 		return nil
 	}
@@ -1218,75 +1232,86 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 			return obj
 		}()
 
-		initAsNotDefined = func() error {
-			now := metav1.Now()
-			transCtx.Cluster.Status.Shardings[shardingName] = appsv1.ClusterShardingStatus{
-				ShardingDef: shardingDef.Name,
-				PreTerminate: &appsv1.LifecycleActionStatus{
-					Phase:          appsv1.LifecycleActionSkipped,
-					Message:        "the PreTerminate action is not defined",
-					StartTime:      &now,
-					CompletionTime: &now,
-				},
+		upsert = func(status appsv1.LifecycleActionStatus) {
+			shardingStatus2 := transCtx.Cluster.Status.Shardings[shardingName]
+			shardingStatus2.ShardingDef = shardingDef.Name
+			if shardingStatus2.PreTerminate == nil {
+				shardingStatus2.PreTerminate = &status
+			} else {
+				shardingStatus2.PreTerminate.Phase = status.Phase
+				shardingStatus2.PreTerminate.Message = status.Message
+				if shardingStatus2.PreTerminate.StartTime == nil {
+					shardingStatus2.PreTerminate.StartTime = status.StartTime
+				}
+				if shardingStatus2.PreTerminate.CompletionTime == nil {
+					shardingStatus2.PreTerminate.CompletionTime = status.CompletionTime
+				}
 			}
-			return nil
-		}
-
-		initAsPostProvisionNotSucceeded = func() error {
-			now := metav1.Now()
-			transCtx.Cluster.Status.Shardings[shardingName] = appsv1.ClusterShardingStatus{
-				ShardingDef: shardingDef.Name,
-				PreTerminate: &appsv1.LifecycleActionStatus{
-					Phase:          appsv1.LifecycleActionSkipped,
-					Message:        "the PostProvision action is not succeeded",
-					StartTime:      &now,
-					CompletionTime: &now,
-				},
-			}
-			return nil
+			transCtx.Cluster.Status.Shardings[shardingName] = shardingStatus2
 		}
 
 		init = func() error {
-			transCtx.Cluster.Status.Shardings[shardingName] = appsv1.ClusterShardingStatus{
-				ShardingDef: shardingDef.Name,
-				PreTerminate: &appsv1.LifecycleActionStatus{
-					Phase:     appsv1.LifecycleActionPending,
-					StartTime: &metav1.Time{Time: time.Now()},
-				},
-			}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:     appsv1.LifecycleActionPending,
+				StartTime: &metav1.Time{Time: time.Now()},
+			})
 			return ictrlutil.NewDelayedRequeueError(time.Second, "requeue to schedule the sharding pre-terminate action")
 		}
 
+		skipAsNotDefined = func() error {
+			now := &metav1.Time{Time: time.Now()}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:          appsv1.LifecycleActionSkipped,
+				Message:        "the PreTerminate action is not defined",
+				StartTime:      now,
+				CompletionTime: now,
+			})
+			return nil
+		}
+
+		skipAsPostProvisionNotSucceeded = func() error {
+			now := &metav1.Time{Time: time.Now()}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:          appsv1.LifecycleActionSkipped,
+				Message:        "the PostProvision action is not succeeded",
+				StartTime:      now,
+				CompletionTime: now,
+			})
+			return nil
+		}
+
 		succeed = func() error {
-			status := transCtx.Cluster.Status.Shardings[shardingName].PreTerminate
-			status.Phase = appsv1.LifecycleActionSucceeded
-			status.Message = ""
-			status.CompletionTime = &metav1.Time{Time: time.Now()}
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:          appsv1.LifecycleActionSucceeded,
+				Message:        "",
+				CompletionTime: &metav1.Time{Time: time.Now()},
+			})
 			return nil
 		}
 
 		fail = func(err error) error {
-			status := transCtx.Cluster.Status.Shardings[shardingName].PreTerminate
-			status.Phase = appsv1.LifecycleActionFailed
-			status.Message = err.Error()
-			return err
+			upsert(appsv1.LifecycleActionStatus{
+				Phase:   appsv1.LifecycleActionFailed,
+				Message: err.Error(),
+			})
+			return err // TODO: delay the requeue?
 		}
 
-		_, initialized = transCtx.Cluster.Status.Shardings[shardingName]
+		initialized = transCtx.Cluster.Status.Shardings[shardingName].PreTerminate != nil
 
 		defined = func() bool {
-			return shardingDef.Spec.LifecycleActions != nil || shardingDef.Spec.LifecycleActions.PreTerminate != nil
+			return shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.PreTerminate != nil
 		}
 
 		done = func() bool {
 			status := transCtx.Cluster.Status.Shardings[shardingName].PreTerminate
-			return status.Phase == appsv1.LifecycleActionSucceeded || status.Phase == appsv1.LifecycleActionSkipped
+			return status != nil && (status.Phase == appsv1.LifecycleActionSucceeded || status.Phase == appsv1.LifecycleActionSkipped)
 		}
 	)
 
 	if !defined() {
-		if !initialized {
-			return initAsNotDefined()
+		if !initialized || !done() {
+			return skipAsNotDefined()
 		}
 		return nil
 	}
@@ -1298,7 +1323,7 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 	if shardingStatus.PostProvision != nil {
 		if shardingStatus.PostProvision.Phase != appsv1.LifecycleActionSucceeded &&
 			shardingStatus.PostProvision.Phase != appsv1.LifecycleActionSkipped {
-			return initAsPostProvisionNotSucceeded()
+			return skipAsPostProvisionNotSucceeded()
 		}
 	}
 

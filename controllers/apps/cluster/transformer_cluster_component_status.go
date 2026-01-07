@@ -220,26 +220,24 @@ func (t *clusterComponentStatusTransformer) transformShardingStatus(transCtx *cl
 
 	shardingStatus := make(map[string]appsv1.ClusterShardingStatus)
 	for name := range createSet {
-		// TODO: sharding status
-		shardingStatus[name] = appsv1.ClusterShardingStatus{
-			Phase: "",
-			Message: map[string]string{
-				"reason": "the sharding to be created",
-			},
-			ObservedGeneration: cluster.Generation,
-			UpToDate:           false,
+		status := cluster.Status.Shardings[name]
+		status.Phase = ""
+		status.Message = map[string]string{
+			"reason": "the sharding to be created",
 		}
+		status.ObservedGeneration = cluster.Generation
+		status.UpToDate = false
+		shardingStatus[name] = status
 	}
 	for name := range deleteSet {
-		// TODO: sharding status
-		shardingStatus[name] = appsv1.ClusterShardingStatus{
-			Phase: appsv1.DeletingComponentPhase,
-			Message: map[string]string{
-				"reason": "the sharding is under deleting",
-			},
-			ObservedGeneration: cluster.Generation,
-			UpToDate:           false,
+		status := cluster.Status.Shardings[name]
+		status.Phase = appsv1.DeletingComponentPhase
+		status.Message = map[string]string{
+			"reason": "the sharding is under deleting",
 		}
+		status.ObservedGeneration = cluster.Generation
+		status.UpToDate = false
+		shardingStatus[name] = status
 	}
 	for name := range updateSet {
 		shardingStatus[name] = t.buildClusterShardingStatus(transCtx, name, shardingComps[name])
@@ -266,7 +264,6 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 		transCtx.GetLogger().Info(fmt.Sprintf("cluster sharding phase transition: %s -> %s (%s)", oldStatus.Phase, status.Phase, msg))
 	}
 
-	// TODO: sharding status
 	status.ShardingDef = oldStatus.ShardingDef
 	status.PostProvision = oldStatus.PostProvision
 	status.PreTerminate = oldStatus.PreTerminate

@@ -974,7 +974,7 @@ type LifecycleActionStatus struct {
 	// e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
 	//
 	// +optional
-	Reason string `json:"reason,omitempty"`
+	// Reason string `json:"reason,omitempty"`
 
 	// Message is a human-readable message providing details about the current phase.
 	//

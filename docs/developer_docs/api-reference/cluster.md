@@ -9168,19 +9168,6 @@ LifecycleActionPhase
 </tr>
 <tr>
 <td>
-<code>reason</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Reason is a programmatic identifier indicating the reason for the current phase.
-e.g., &lsquo;PreconditionNotMet&rsquo; for Pending phase or &lsquo;PrerequisiteFailed&rsquo; for Skipped phase.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>message</code><br/>
 <em>
 string

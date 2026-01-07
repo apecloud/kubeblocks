@@ -18085,11 +18085,6 @@ spec:
                           - Failed
                           - Skipped
                           type: string
-                        reason:
-                          description: |-
-                            Reason is a programmatic identifier indicating the reason for the current phase.
-                            e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
-                          type: string
                         startTime:
                           description: StartTime records the time when the action
                             started execution.
@@ -18118,11 +18113,6 @@ spec:
                           - Succeeded
                           - Failed
                           - Skipped
-                          type: string
-                        reason:
-                          description: |-
-                            Reason is a programmatic identifier indicating the reason for the current phase.
-                            e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
                           type: string
                         startTime:
                           description: StartTime records the time when the action

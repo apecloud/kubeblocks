@@ -23,8 +23,12 @@ import (
 	"context"
 	"text/template"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -74,13 +78,19 @@ func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			continue
 		}
 		if _, err = template.New("opsDefTemplate").Parse(v.Rule.Expression); err != nil {
-			if patchErr := r.updateStatusUnavailable(reqCtx, opsDef, err); patchErr != nil {
-				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			}
-			return intctrlutil.Reconciled()
+			return r.updateStatusUnavailable(reqCtx, opsDef, err)
 		}
 	}
-
+	if opsDef.Spec.ParametersSchema != nil {
+		out := &apiextensions.JSONSchemaProps{}
+		if err = apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(opsDef.Spec.ParametersSchema.OpenAPIV3Schema, out, nil); err != nil {
+			return r.updateStatusUnavailable(reqCtx, opsDef, err)
+		}
+		openapiSchema := &spec.Schema{}
+		if err = validation.ConvertJSONSchemaPropsWithPostProcess(out, openapiSchema, validation.StripUnsupportedFormatsPostProcess); err != nil {
+			return r.updateStatusUnavailable(reqCtx, opsDef, err)
+		}
+	}
 	// TODO: check serviceKind, connectionCredentialName and serviceName
 	statusPatch := client.MergeFrom(opsDef.DeepCopy())
 	opsDef.Status.ObservedGeneration = opsDef.Generation
@@ -92,12 +102,15 @@ func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return intctrlutil.Reconciled()
 }
 
-func (r *OpsDefinitionReconciler) updateStatusUnavailable(reqCtx intctrlutil.RequestCtx, opsDef *opsv1alpha1.OpsDefinition, err error) error {
+func (r *OpsDefinitionReconciler) updateStatusUnavailable(reqCtx intctrlutil.RequestCtx, opsDef *opsv1alpha1.OpsDefinition, err error) (ctrl.Result, error) {
 	statusPatch := client.MergeFrom(opsDef.DeepCopy())
 	opsDef.Status.Phase = opsv1alpha1.UnavailablePhase
 	opsDef.Status.ObservedGeneration = opsDef.Generation
 	opsDef.Status.Message = err.Error()
-	return r.Client.Status().Patch(reqCtx.Ctx, opsDef, statusPatch)
+	if err = r.Client.Status().Patch(reqCtx.Ctx, opsDef, statusPatch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -166,8 +166,7 @@ func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
 	return nil
 }
 
-func BuildLifecycleAgent(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition, comp *appsv1.Component,
-	namespace, clusterName string) (lifecycle.Lifecycle, error) {
+func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
 	synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 	if err != nil {
 		return nil, err
@@ -182,8 +181,8 @@ func BuildLifecycleAgent(ctx context.Context, cli client.Reader, compDef *appsv1
 		return nil, err
 	}
 	if len(pods) == 0 {
-		return nil, fmt.Errorf("has no pods to running the sharding lifecycle action")
+		return nil, fmt.Errorf("has no pods to running the action")
 	}
 
-	return lifecycle.New(namespace, clusterName, synthesizedComp.Name, nil, synthesizedComp.TemplateVars, nil, pods)
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, nil, synthesizedComp.TemplateVars, nil, pods)
 }

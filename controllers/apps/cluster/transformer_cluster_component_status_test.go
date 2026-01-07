@@ -409,7 +409,7 @@ var _ = Describe("cluster component status transformer", func() {
 
 		It("sharding spec deleted", func() {
 			// have seen the sharding1 and sharding2 objects in the cluster
-			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
 				"sharding1": {
 					Phase: appsv1.RunningComponentPhase,
 				},
@@ -467,7 +467,7 @@ var _ = Describe("cluster component status transformer", func() {
 
 		It("sharding object deleted", func() {
 			// have seen the sharding1 and sharding2 objects in the cluster
-			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
 				"sharding1": {
 					Phase: appsv1.RunningComponentPhase,
 				},
@@ -509,7 +509,7 @@ var _ = Describe("cluster component status transformer", func() {
 
 		It("sharding deleted", func() {
 			// have seen the sharding1 and sharding2 objects in the cluster
-			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
 				"sharding1": {
 					Phase: appsv1.RunningComponentPhase,
 				},
@@ -642,7 +642,7 @@ var _ = Describe("cluster component status transformer", func() {
 		})
 
 		It("phase changed", func() {
-			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
 				"sharding1": {
 					Phase: appsv1.CreatingComponentPhase,
 				},

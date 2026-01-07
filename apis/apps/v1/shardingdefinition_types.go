@@ -166,7 +166,7 @@ type ShardingLifecycleActions struct {
 	//
 	// With `ComponentReady` being the default.
 	//
-	// The PostProvision Action is intended to run only once.
+	// The PostProvision action is intended to run only once.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -175,11 +175,14 @@ type ShardingLifecycleActions struct {
 
 	// Specifies the hook to be executed prior to terminating a sharding.
 	//
-	// The PreTerminate Action is intended to run only once.
+	// The PreTerminate action is intended to run only once.
 	//
 	// This action is executed immediately when a terminate operation for the sharding is initiated.
 	// The actual termination and cleanup of the sharding and its associated resources will not proceed
 	// until the PreTerminate action has completed successfully.
+	//
+	// If a PostProvision action is defined, this action will only execute if PostProvision reaches
+	// the 'Succeeded' phase. If the defined PostProvision fails, this action will be skipped.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -233,12 +236,14 @@ type ShardingTLS struct {
 type ShardingAction struct {
 	Action `json:",inline"`
 
-	// Defines the criteria used to select the target Shard(s) for executing the Action.
-	// It allows for precise control over which Shard(s) the Action should run in.
+	// Defines the criteria used to select the target shard(s) for executing the Action.
+	// It provides precise control over which shard(s) should be targeted.
 	//
-	// For shardAdd or shardRemove, the Action will be executed in the Shard where the Action is triggered.
-	// For other actions, you can choose to execute the action randomly on one shard or on all shards,
-	// if not specified, a shard is randomly selected by default.
+	// The default selection logic (when this field is omitted) is context-dependent:
+	// 1. Contextual Default: If the Action is triggered by or originates from a specific shard,
+	//    that shard is selected as the default target.
+	// 2. Global Default: In other cases (where no specific shard context exists),
+	//    one shard is selected randomly by default.
 	//
 	// This field cannot be updated.
 	//

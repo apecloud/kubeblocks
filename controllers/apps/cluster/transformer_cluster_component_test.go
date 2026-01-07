@@ -22,11 +22,13 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -1881,6 +1884,7 @@ var _ = Describe("cluster component transformer test", func() {
 			dag         *graph.DAG
 			actionDone  bool
 		)
+
 		BeforeEach(func() {
 			actionDone = false
 			transformer, transCtx, dag = newTransformerNCtx(clusterTopologyShardingOnly, func(f *testapps.MockClusterFactory) {
@@ -1931,8 +1935,19 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 		}
 
-		Context("build component custom actions", func() {
-			It("add all lifecycle actions", func() {
+		mockKBAgentWithError := func(actionName string) {
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "udf-"+actionName {
+						return kbagentproto.ActionResponse{}, fmt.Errorf("action call error")
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+		}
+
+		Context("custom actions", func() {
+			It("sharding lifecycle actions", func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("shard-post-provision"),
 					PreTerminate:  mockShardingAction("shard-pre-terminate"),
@@ -1941,41 +1956,59 @@ var _ = Describe("cluster component transformer test", func() {
 				}
 
 				err := transformer.Transform(transCtx, dag)
-				Expect(err).Should(BeNil())
+				Expect(err).ShouldNot(BeNil())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 
 				graphCli := transCtx.Client.(model.GraphClient)
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(1))
 				comp := objs[0].(*appsv1.Component)
 				Expect(len(comp.Spec.CustomActions)).Should(Equal(4))
-				Expect(comp.Spec.CustomActions[0].Name).Should(Equal(kbShardingAddAction))
-				Expect(comp.Spec.CustomActions[1].Name).Should(Equal(kbShardingPostProvisionAction))
-				Expect(comp.Spec.CustomActions[2].Name).Should(Equal(kbShardingPreTerminateAction))
-				Expect(comp.Spec.CustomActions[3].Name).Should(Equal(kbShardingRemoveAction))
+				Expect(comp.Spec.CustomActions[0].Name).Should(Equal(shardingPostProvisionAction))
+				Expect(comp.Spec.CustomActions[1].Name).Should(Equal(shardingPreTerminateAction))
+				Expect(comp.Spec.CustomActions[2].Name).Should(Equal(shardingAddShardAction))
+				Expect(comp.Spec.CustomActions[3].Name).Should(Equal(shardingRemoveShardAction))
 			})
 		})
 
-		Context("shard post provision", func() {
+		Context("post-provision", func() {
 			BeforeEach(func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
-					PostProvision: mockShardingAction("shard-post-provision"),
+					PostProvision: mockShardingAction("post-provision"),
 				}
 			})
 
-			It("add post-provision annotation", func() {
+			It("pending", func() {
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+
+				Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey(sharding1aName))
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.ShardingDef).Should(Equal(shardingDefName))
+				Expect(status.PostProvision).ShouldNot(BeNil())
+				Expect(status.PostProvision.Phase).Should(Equal(appsv1.LifecycleActionPending))
+				Expect(status.PostProvision.StartTime).ShouldNot(BeNil())
+				Expect(status.PostProvision.CompletionTime).Should(BeNil())
+			})
+
+			It("not defined", func() {
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = nil
+
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
 
-				graphCli := transCtx.Client.(model.GraphClient)
-				objs := graphCli.FindAll(dag, &appsv1.Component{})
-				Expect(len(objs)).Should(Equal(1))
-				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingPostProvisionKey]).ShouldNot(BeEmpty())
+				Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey(sharding1aName))
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.ShardingDef).Should(Equal(shardingDefName))
+				Expect(status.PostProvision).ShouldNot(BeNil())
+				Expect(status.PostProvision.Phase).Should(Equal(appsv1.LifecycleActionSkipped))
+				Expect(status.PostProvision.StartTime).ShouldNot(BeNil())
+				Expect(status.PostProvision.CompletionTime).ShouldNot(BeNil())
 			})
 
-			It("do post-provision action successfully", func() {
+			It("succeed", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
-					kbShardingPostProvisionKey:  "test",
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
@@ -1983,65 +2016,301 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingPostProvisionAction)
+				mockKBAgent(shardingPostProvisionAction)
 
+				By("trigger the post-provision action")
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).ShouldNot(BeNil())
-				Expect(err.Error()).Should(ContainSubstring("requeue to waiting for shardPostProvision annotation to be removed"))
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+
+				By("check the post-provision action status")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PostProvision.Phase).Should(Equal(appsv1.LifecycleActionPending))
+
+				By("check the post-provision action is not done")
+				Expect(actionDone).Should(BeFalse())
+
+				By("trigger the post-provision action second time")
+				err = transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the post-provision action status as succeeded")
+				status = transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PostProvision.Phase).Should(Equal(appsv1.LifecycleActionSucceeded))
+				Expect(status.PostProvision.CompletionTime).ShouldNot(BeNil())
+
+				By("check the post-provision action is done")
 				Expect(actionDone).Should(BeTrue())
-				graphCli := transCtx.Client.(model.GraphClient)
-				objs := graphCli.FindAll(dag, &appsv1.Component{})
-				Expect(len(objs)).Should(Equal(1))
-				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingPostProvisionKey]).Should(BeEmpty())
+			})
+
+			It("error", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgentWithError(shardingPostProvisionAction)
+
+				By("trigger the post-provision action")
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+
+				By("check the post-provision action status")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PostProvision.Phase).Should(Equal(appsv1.LifecycleActionPending))
+
+				By("check the post-provision action is not done")
+				Expect(actionDone).Should(BeFalse())
+
+				By("trigger the post-provision action second time")
+				err = transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+
+				By("check the post-provision action status as failed")
+				status = transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PostProvision.Phase).Should(Equal(appsv1.LifecycleActionFailed))
+				Expect(status.PostProvision.CompletionTime).Should(BeNil())
+
+				By("check the post-provision action is NOT done")
+				Expect(actionDone).Should(BeFalse())
 			})
 		})
 
-		Context("shard pre terminate", func() {
+		Context("pre-terminate", func() {
 			BeforeEach(func() {
-				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
-					PreTerminate: mockShardingAction("shard-pre-terminate"),
+				transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					sharding1aName: {
+						ShardingDef: shardingDefName,
+					},
 				}
-			})
-
-			It("do pre-terminate action successfully", func() {
 				transCtx.shardings = nil
 				transCtx.shardingDefs = nil
+			})
+
+			It("not defined", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
-					constant.KBAppClusterUIDKey:       "test-uid",
-					constant.ShardingDefAnnotationKey: shardingDefName,
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Spec.LifecycleActions = nil
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod, shardingDef}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgent(shardingPreTerminateAction)
+
+				By("trigger the pre-terminate action")
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the pre-terminate action status as succeeded")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PreTerminate).ShouldNot(BeNil())
+				Expect(status.PreTerminate.Phase).Should(Equal(appsv1.LifecycleActionSkipped))
+				Expect(status.PreTerminate.StartTime).ShouldNot(BeNil())
+				Expect(status.PreTerminate.CompletionTime).ShouldNot(BeNil())
+
+				By("check the pre-terminate action is NOT done")
+				Expect(actionDone).Should(BeFalse())
+			})
+
+			It("succeed", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
-					PreTerminate: mockShardingAction("shard-pre-terminate"),
+					PreTerminate: mockShardingAction("pre-terminate"),
 				}
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
 					return []client.Object{shardComp, pod, shardingDef}
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingPreTerminateAction)
+				mockKBAgent(shardingPreTerminateAction)
 
+				By("trigger the pre-terminate action")
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the pre-terminate action status as succeeded")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PreTerminate).ShouldNot(BeNil())
+				Expect(status.PreTerminate.Phase).Should(Equal(appsv1.LifecycleActionSucceeded))
+				Expect(status.PreTerminate.StartTime).ShouldNot(BeNil())
+				Expect(status.PreTerminate.CompletionTime).ShouldNot(BeNil())
+
+				By("check the pre-terminate action is done")
+				Expect(actionDone).Should(BeTrue())
+			})
+
+			It("error", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PreTerminate: mockShardingAction("pre-terminate"),
+				}
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod, shardingDef}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgentWithError(shardingPreTerminateAction)
+
+				By("trigger the pre-terminate action")
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).ShouldNot(BeNil())
-				Expect(err.Error()).Should(ContainSubstring("requeue to waiting for shardPreTerminate annotation to be set"))
-				graphCli := transCtx.Client.(model.GraphClient)
-				objs := graphCli.FindAll(dag, &appsv1.Component{})
-				Expect(len(objs)).Should(Equal(1))
-				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingPreTerminateDoneKey]).ShouldNot(BeEmpty())
+
+				By("check the pre-terminate action status as failed")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PreTerminate).ShouldNot(BeNil())
+				Expect(status.PreTerminate.Phase).Should(Equal(appsv1.LifecycleActionFailed))
+				Expect(status.PreTerminate.StartTime).ShouldNot(BeNil())
+				Expect(status.PreTerminate.CompletionTime).Should(BeNil())
+
+				By("check the pre-terminate action is NOT done")
+				Expect(actionDone).Should(BeFalse())
+			})
+
+			It("post-provision - succeed", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PostProvision: mockShardingAction("post-provision"),
+					PreTerminate:  mockShardingAction("pre-terminate"),
+				}
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod, shardingDef}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				By("mock post-provision action succeeded")
+				transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					sharding1aName: {
+						ShardingDef: shardingDefName,
+						PostProvision: &appsv1.LifecycleActionStatus{
+							Phase: appsv1.LifecycleActionSucceeded,
+						},
+					},
+				}
+
+				mockKBAgent(shardingPreTerminateAction)
+
+				By("trigger the pre-terminate action")
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the pre-terminate action status as succeeded")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PreTerminate).ShouldNot(BeNil())
+				Expect(status.PreTerminate.Phase).Should(Equal(appsv1.LifecycleActionSucceeded))
+				Expect(status.PreTerminate.StartTime).ShouldNot(BeNil())
+				Expect(status.PreTerminate.CompletionTime).ShouldNot(BeNil())
+
+				By("check the pre-terminate action is done")
 				Expect(actionDone).Should(BeTrue())
+			})
+
+			It("post-provision - pending", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PostProvision: mockShardingAction("post-provision"),
+					PreTerminate:  mockShardingAction("pre-terminate"),
+				}
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod, shardingDef}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				By("mock post-provision action pending")
+				transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					sharding1aName: {
+						ShardingDef: shardingDefName,
+						PostProvision: &appsv1.LifecycleActionStatus{
+							Phase: appsv1.LifecycleActionPending,
+						},
+					},
+				}
+
+				mockKBAgent(shardingPreTerminateAction)
+
+				By("trigger the pre-terminate action")
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the pre-terminate action status as skipped")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PreTerminate).ShouldNot(BeNil())
+				Expect(status.PreTerminate.Phase).Should(Equal(appsv1.LifecycleActionSkipped))
+				Expect(status.PreTerminate.StartTime).ShouldNot(BeNil())
+				Expect(status.PreTerminate.CompletionTime).ShouldNot(BeNil())
+
+				By("check the pre-terminate action is NOT done")
+				Expect(actionDone).Should(BeFalse())
+			})
+
+			It("post-provision - fail", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					PostProvision: mockShardingAction("post-provision"),
+					PreTerminate:  mockShardingAction("pre-terminate"),
+				}
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod, shardingDef}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				By("mock post-provision action failed")
+				transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					sharding1aName: {
+						ShardingDef: shardingDefName,
+						PostProvision: &appsv1.LifecycleActionStatus{
+							Phase: appsv1.LifecycleActionFailed,
+						},
+					},
+				}
+
+				mockKBAgent(shardingPreTerminateAction)
+
+				By("trigger the pre-terminate action")
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the pre-terminate action status as skipped")
+				status := transCtx.Cluster.Status.Shardings[sharding1aName]
+				Expect(status.PreTerminate).ShouldNot(BeNil())
+				Expect(status.PreTerminate.Phase).Should(Equal(appsv1.LifecycleActionSkipped))
+				Expect(status.PreTerminate.StartTime).ShouldNot(BeNil())
+				Expect(status.PreTerminate.CompletionTime).ShouldNot(BeNil())
+
+				By("check the pre-terminate action is NOT done")
+				Expect(actionDone).Should(BeFalse())
 			})
 		})
 
-		Context("shard add", func() {
+		Context("shard-add", func() {
 			BeforeEach(func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardAdd: mockShardingAction("shard-add"),
 				}
 			})
 
-			It("add shard add annotation", func() {
+			It("annotation", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
@@ -2055,48 +2324,79 @@ var _ = Describe("cluster component transformer test", func() {
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
+
 				graphCli := transCtx.Client.(model.GraphClient)
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
 				Expect(len(objs)).Should(Equal(2))
 				for _, obj := range objs {
 					comp := obj.(*appsv1.Component)
 					if comp.Name == component.FullName(transCtx.Cluster.Name, "test") {
-						Expect(comp.Annotations[kbShardingAddKey]).ShouldNot(BeEmpty())
+						Expect(comp.Annotations[shardingAddShardKey]).ShouldNot(BeEmpty())
 					}
 				}
 			})
 
-			It("do shard add action successfully", func() {
+			It("succeed", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
-					kbShardingAddKey:            "test",
+					shardingAddShardKey:         "test",
 				})
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
 					return []client.Object{shardComp, pod}
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingAddAction)
+				mockKBAgent(shardingAddShardAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
+
+				By("check the shard-add action status as succeeded")
 				graphCli := transCtx.Client.(model.GraphClient)
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
-				Expect(len(objs)).Should(Equal(1))
+				Expect(objs).Should(HaveLen(1))
 				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingAddKey]).Should(BeEmpty())
+				Expect(comp.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
+
+				By("check the shard-add action is done")
 				Expect(actionDone).Should(BeTrue())
+			})
+
+			It("error", func() {
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+					shardingAddShardKey:         "test",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgentWithError(shardingAddShardAction)
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+
+				By("check the shard-add action status as failed")
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(objs).Should(HaveLen(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(comp.Annotations).Should(HaveKeyWithValue(shardingAddShardKey, "test"))
+
+				By("check the shard-add action is NOT done")
+				Expect(actionDone).Should(BeFalse())
 			})
 		})
 
-		Context("shard remove", func() {
+		Context("shard-remove", func() {
 			BeforeEach(func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardRemove: mockShardingAction("shard-remove"),
 				}
 			})
 
-			It("do shard remove action successfully", func() {
+			It("succeed", func() {
 				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
@@ -2106,16 +2406,119 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(kbShardingRemoveAction)
+				mockKBAgent(shardingRemoveShardAction)
 
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).Should(BeNil())
+
+				By("check the shard being deleted")
+				walk := func(vertex graph.Vertex) error {
+					node, ok := vertex.(*model.ObjectVertex)
+					Expect(ok).Should(BeTrue())
+					if reflect.TypeOf(node.Obj).AssignableTo(reflect.TypeOf(&appsv1.Component{})) {
+						Expect(*node.Action).Should(BeElementOf(model.DELETE, model.UPDATE))
+					}
+					return nil
+				}
+				Expect(dag.WalkReverseTopoOrder(walk, nil)).Should(BeNil())
+
+				By("check the shard-remove action is done")
+				Expect(actionDone).Should(BeTrue())
+			})
+
+			It("error", func() {
+				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgentWithError(shardingRemoveShardAction)
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+
+				By("check the shard is not deleted")
 				graphCli := transCtx.Client.(model.GraphClient)
 				objs := graphCli.FindAll(dag, &appsv1.Component{})
-				Expect(len(objs)).Should(Equal(1))
-				comp := objs[0].(*appsv1.Component)
-				Expect(comp.Annotations[kbShardingRemoveDoneKey]).ShouldNot(BeEmpty())
+				Expect(objs).Should(HaveLen(0))
+
+				By("check the shard-remove action is NOT done")
+				Expect(actionDone).Should(BeFalse())
+			})
+
+			It("shard-add - succeed", func() {
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd:    mockShardingAction("shard-add"),
+					ShardRemove: mockShardingAction("shard-remove"),
+				}
+
+				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgent(shardingRemoveShardAction)
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the shard being deleted")
+				walk := func(vertex graph.Vertex) error {
+					node, ok := vertex.(*model.ObjectVertex)
+					Expect(ok).Should(BeTrue())
+					if reflect.TypeOf(node.Obj).AssignableTo(reflect.TypeOf(&appsv1.Component{})) {
+						Expect(*node.Action).Should(BeElementOf(model.DELETE, model.UPDATE))
+					}
+					return nil
+				}
+				Expect(dag.WalkReverseTopoOrder(walk, nil)).Should(BeNil())
+
+				By("check the shard-remove action is done")
 				Expect(actionDone).Should(BeTrue())
+			})
+
+			It("shard-add - pending or failed", func() {
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd:    mockShardingAction("shard-add"),
+					ShardRemove: mockShardingAction("shard-remove"),
+				}
+
+				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+					shardingAddShardKey:         "test",
+				})
+				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
+					return []client.Object{shardComp, pod}
+				}(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				mockKBAgent(shardingRemoveShardAction)
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				By("check the shard being deleted")
+				walk := func(vertex graph.Vertex) error {
+					node, ok := vertex.(*model.ObjectVertex)
+					Expect(ok).Should(BeTrue())
+					if reflect.TypeOf(node.Obj).AssignableTo(reflect.TypeOf(&appsv1.Component{})) {
+						Expect(*node.Action).Should(BeElementOf(model.DELETE, model.UPDATE))
+					}
+					return nil
+				}
+				Expect(dag.WalkReverseTopoOrder(walk, nil)).Should(BeNil())
+
+				By("check the shard-remove action is NOT done")
+				Expect(actionDone).Should(BeFalse())
 			})
 		})
 	})

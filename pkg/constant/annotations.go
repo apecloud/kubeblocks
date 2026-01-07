@@ -54,9 +54,6 @@ const (
 
 	ComponentLastServiceAccountNameAnnotationKey     = "component.kubeblocks.io/last-service-account-name"
 	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
-
-	// ShardingDefAnnotationKey records the sharding definition name of the sharding component
-	ShardingDefAnnotationKey = "apps.kubeblocks.io/sharding-definition"
 )
 
 const (

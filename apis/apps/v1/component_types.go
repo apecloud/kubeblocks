@@ -348,9 +348,6 @@ type ComponentSpec struct {
 
 	// Specifies custom actions that can be performed on the Component.
 	//
-	// Each custom action defines a specific operation that can be executed,
-	// will be merged with ComponentLifecycleActions defined in referenced ComponentDefinition.
-	//
 	// +optional
 	CustomActions []CustomAction `json:"customActions,omitempty"`
 }

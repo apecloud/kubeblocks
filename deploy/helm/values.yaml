@@ -541,10 +541,21 @@ hostPorts:
   # The TCP/IP port numbers below 1024 are special in that normal users are not allowed to run servers on them.
   # This is a security feaure, in that if you connect to a service on one of these ports you can be fairly sure
   # that you have the real thing, and not a fake which some hacker has put up for you.
+  # =================================================================================
+  # Default ports update in KubeBlocks 1.1
+  # Ports 49152–65535 is defined by IANA as the private (dynamic) port range,
+  # but this range may conflict with the node’s ephemeral ports.
+  # Therefore KubeBlocks reserves 55000–59999 as a dedicated hostPort range
+  # to reduce port collision risks and improve cluster stability.
+  # Users are recommended to update include/exclude ranges on demand
+  # =================================================================================
   include:
-  - "1025-65536"
+  - "55000-59999"
   # https://kubernetes.io/docs/reference/networking/ports-and-protocols/
   # exclude ports used by kubernetes
+  # =================================================================================
+  # Following ports are not in the 'include' range but are still kept as examples
+  # =================================================================================
   exclude:
   - "6443"
   - "10250"

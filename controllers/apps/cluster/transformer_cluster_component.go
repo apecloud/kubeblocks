@@ -909,7 +909,7 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
-	err3, errorSkip := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
+	errorSkip, err3 := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
 
 	// TODO: update strategy
 	h.deleteComps(transCtx, dag, runningCompsMap, toDelete.Difference(errorSkip))
@@ -1131,21 +1131,7 @@ func (h *clusterShardingHandler) handlePostProvision(transCtx *clusterTransformC
 		shardingDef = h.shardingDef(transCtx, shardingName)
 
 		upsert = func(status appsv1.LifecycleActionStatus) {
-			shardingStatus := transCtx.Cluster.Status.Shardings[shardingName]
-			shardingStatus.ShardingDef = shardingDef.Name
-			if shardingStatus.PostProvision == nil {
-				shardingStatus.PostProvision = &status
-			} else {
-				shardingStatus.PostProvision.Phase = status.Phase
-				shardingStatus.PostProvision.Message = status.Message
-				if shardingStatus.PostProvision.StartTime == nil {
-					shardingStatus.PostProvision.StartTime = status.StartTime
-				}
-				if shardingStatus.PostProvision.CompletionTime == nil {
-					shardingStatus.PostProvision.CompletionTime = status.CompletionTime
-				}
-			}
-			transCtx.Cluster.Status.Shardings[shardingName] = shardingStatus
+			h.updateActionStatus(transCtx, shardingName, shardingDef, status, true)
 		}
 
 		init = func() error {
@@ -1187,7 +1173,8 @@ func (h *clusterShardingHandler) handlePostProvision(transCtx *clusterTransformC
 		initialized = transCtx.Cluster.Status.Shardings[shardingName].PostProvision != nil
 
 		defined = func() bool {
-			return shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.PostProvision != nil
+			return shardingDef != nil && shardingDef.Spec.LifecycleActions != nil &&
+				shardingDef.Spec.LifecycleActions.PostProvision != nil
 		}
 
 		done = func() bool {
@@ -1220,42 +1207,20 @@ func (h *clusterShardingHandler) handlePostProvision(transCtx *clusterTransformC
 
 func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformContext, shardingName string, runningComps []*appsv1.Component) error {
 	var (
-		shardingStatus = transCtx.Cluster.Status.Shardings[shardingName]
-		shardingDef    = func() *appsv1.ShardingDefinition {
-			obj := &appsv1.ShardingDefinition{}
+		shardingStatus       = transCtx.Cluster.Status.Shardings[shardingName]
+		shardingDef, initErr = func() (*appsv1.ShardingDefinition, error) {
 			if shardingStatus.ShardingDef == "" {
-				return obj
+				return nil, nil
 			}
+			obj := &appsv1.ShardingDefinition{}
 			if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: shardingStatus.ShardingDef}, obj); err != nil {
-				return obj
+				return nil, client.IgnoreNotFound(err)
 			}
-			return obj
+			return obj, nil
 		}()
 
 		upsert = func(status appsv1.LifecycleActionStatus) {
-			shardingStatus2 := transCtx.Cluster.Status.Shardings[shardingName]
-			shardingStatus2.ShardingDef = shardingDef.Name
-			if shardingStatus2.PreTerminate == nil {
-				shardingStatus2.PreTerminate = &status
-			} else {
-				shardingStatus2.PreTerminate.Phase = status.Phase
-				shardingStatus2.PreTerminate.Message = status.Message
-				if shardingStatus2.PreTerminate.StartTime == nil {
-					shardingStatus2.PreTerminate.StartTime = status.StartTime
-				}
-				if shardingStatus2.PreTerminate.CompletionTime == nil {
-					shardingStatus2.PreTerminate.CompletionTime = status.CompletionTime
-				}
-			}
-			transCtx.Cluster.Status.Shardings[shardingName] = shardingStatus2
-		}
-
-		init = func() error {
-			upsert(appsv1.LifecycleActionStatus{
-				Phase:     appsv1.LifecycleActionPending,
-				StartTime: &metav1.Time{Time: time.Now()},
-			})
-			return ictrlutil.NewDelayedRequeueError(time.Second, "requeue to schedule the sharding pre-terminate action")
+			h.updateActionStatus(transCtx, shardingName, shardingDef, status, false)
 		}
 
 		skipAsNotDefined = func() error {
@@ -1281,18 +1246,21 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 		}
 
 		succeed = func() error {
+			now := &metav1.Time{Time: time.Now()}
 			upsert(appsv1.LifecycleActionStatus{
 				Phase:          appsv1.LifecycleActionSucceeded,
 				Message:        "",
-				CompletionTime: &metav1.Time{Time: time.Now()},
+				StartTime:      now,
+				CompletionTime: now,
 			})
 			return nil
 		}
 
 		fail = func(err error) error {
 			upsert(appsv1.LifecycleActionStatus{
-				Phase:   appsv1.LifecycleActionFailed,
-				Message: err.Error(),
+				Phase:     appsv1.LifecycleActionFailed,
+				Message:   err.Error(),
+				StartTime: &metav1.Time{Time: time.Now()},
 			})
 			return err // TODO: delay the requeue?
 		}
@@ -1300,7 +1268,8 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 		initialized = transCtx.Cluster.Status.Shardings[shardingName].PreTerminate != nil
 
 		defined = func() bool {
-			return shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.PreTerminate != nil
+			return shardingDef != nil && shardingDef.Spec.LifecycleActions != nil &&
+				shardingDef.Spec.LifecycleActions.PreTerminate != nil
 		}
 
 		done = func() bool {
@@ -1308,6 +1277,10 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 			return status != nil && (status.Phase == appsv1.LifecycleActionSucceeded || status.Phase == appsv1.LifecycleActionSkipped)
 		}
 	)
+
+	if initErr != nil {
+		return initErr
+	}
 
 	if !defined() {
 		if !initialized || !done() {
@@ -1327,10 +1300,6 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 		}
 	}
 
-	if !initialized {
-		return init()
-	}
-
 	if err := h.shardingAction(transCtx, shardingName, shardingPreTerminateAction,
 		shardingDef.Spec.LifecycleActions.PreTerminate, nil, runningComps, nil); err != nil {
 		return fail(err)
@@ -1338,15 +1307,55 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 	return succeed()
 }
 
+func (h *clusterShardingHandler) updateActionStatus(transCtx *clusterTransformContext,
+	shardingName string, shardingDef *appsv1.ShardingDefinition, status appsv1.LifecycleActionStatus, postProvision bool) {
+	shardingStatus := transCtx.Cluster.Status.Shardings[shardingName]
+	if shardingDef == nil {
+		shardingStatus.ShardingDef = ""
+	} else {
+		shardingStatus.ShardingDef = shardingDef.Name
+	}
+
+	merge := func(action *appsv1.LifecycleActionStatus) {
+		action.Phase = status.Phase
+		action.Message = status.Message
+		if action.StartTime == nil {
+			action.StartTime = status.StartTime
+		}
+		if action.CompletionTime == nil {
+			action.CompletionTime = status.CompletionTime
+		}
+	}
+
+	if postProvision {
+		if shardingStatus.PostProvision == nil {
+			shardingStatus.PostProvision = &status
+		} else {
+			merge(shardingStatus.PostProvision)
+		}
+	} else {
+		if shardingStatus.PreTerminate == nil {
+			shardingStatus.PreTerminate = &status
+		} else {
+			merge(shardingStatus.PreTerminate)
+		}
+	}
+
+	if transCtx.Cluster.Status.Shardings == nil {
+		transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{}
+	}
+	transCtx.Cluster.Status.Shardings[shardingName] = shardingStatus
+}
+
 func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransformContext, shardingName string,
 	runningCompsMap map[string]*appsv1.Component, protoCompsMap map[string]*appsv1.Component,
-	toCreate, toDelete, toUpdate sets.Set[string]) (error, sets.Set[string]) {
+	toCreate, toDelete, toUpdate sets.Set[string]) (sets.Set[string], error) {
 	var (
 		errorSkip = sets.Set[string]{}
 
 		create = func() {
 			shardingDef := h.shardingDef(transCtx, shardingName)
-			if shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.ShardAdd != nil {
+			if shardingDef != nil && shardingDef.Spec.LifecycleActions != nil && shardingDef.Spec.LifecycleActions.ShardAdd != nil {
 				now := time.Now().Format(time.RFC3339Nano)
 				for name := range toCreate {
 					protoComp := protoCompsMap[name]
@@ -1361,7 +1370,7 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 		update = func() error {
 			var err error
 			for name := range toUpdate {
-				err1 := h.handleShardAdd(transCtx, shardingName, maps.Values(runningCompsMap), runningCompsMap[name], protoCompsMap[name])
+				err1 := h.handleShardAdd(transCtx, shardingName, maps.Values(runningCompsMap), runningCompsMap[name])
 				if err1 != nil {
 					transCtx.Logger.Error(err, "failed to call the shard add action", "shard", name)
 					if err == nil {
@@ -1394,13 +1403,13 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 	err2 := _delete()
 
 	if err1 != nil {
-		return err1, errorSkip
+		return errorSkip, err1
 	}
-	return err2, errorSkip
+	return errorSkip, err2
 }
 
 func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContext,
-	shardingName string, runningComps []*appsv1.Component, runningComp, protoComp *appsv1.Component) error {
+	shardingName string, runningComps []*appsv1.Component, runningComp *appsv1.Component) error {
 	var (
 		shardingDef = h.shardingDef(transCtx, shardingName)
 
@@ -1408,16 +1417,13 @@ func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContex
 			return runningComp.Annotations[shardingAddShardKey] != ""
 		}
 
-		fail = func(err error) error {
-			if protoComp.Annotations == nil {
-				protoComp.Annotations = make(map[string]string)
-			}
-			protoComp.Annotations[shardingAddShardKey] = runningComp.Annotations[shardingAddShardKey]
-			return err
+		succeed = func() error {
+			delete(runningComp.Annotations, shardingAddShardKey)
+			return nil
 		}
 	)
 
-	if shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
+	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardAdd == nil {
 		return nil
 	}
 
@@ -1425,10 +1431,10 @@ func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContex
 		args := map[string]string{shardingAddShardNameVar: runningComp.Name}
 		if err := h.shardingAction(transCtx, shardingName, shardingAddShardAction,
 			shardingDef.Spec.LifecycleActions.ShardAdd, args, runningComps, runningComp); err != nil {
-			return fail(err)
+			return err
 		}
 	}
-	return nil
+	return succeed()
 }
 
 func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformContext,
@@ -1445,7 +1451,7 @@ func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformCon
 		}
 	)
 
-	if shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardRemove == nil {
+	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardRemove == nil {
 		return nil
 	}
 

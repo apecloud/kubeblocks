@@ -168,7 +168,7 @@ func computeServiceAccountRuleHash(transCtx *componentTransformContext) (string,
 		return "", err
 	}
 	hash.Write(data)
-	enabled := transCtx.SynthesizeComponent.LifecycleActions != nil
+	enabled := transCtx.SynthesizeComponent.LifecycleActions.ComponentLifecycleActions != nil
 	fmt.Fprint(hash, enabled)
 	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
 }

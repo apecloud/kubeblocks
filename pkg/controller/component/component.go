@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 )
 
@@ -163,4 +164,25 @@ func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
 		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}
 	return nil
+}
+
+func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
+	synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	if err != nil {
+		return nil, err
+	}
+	synthesizedComp.TemplateVars, _, err = ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+	if err != nil {
+		return nil, err
+	}
+
+	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("has no pods to running the action")
+	}
+
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, nil, synthesizedComp.TemplateVars, nil, pods)
 }

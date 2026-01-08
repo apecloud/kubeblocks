@@ -142,7 +142,7 @@ func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *compone
 		return nil, err
 	}
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods)
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, nil, pods)
 	if err != nil {
 		return nil, err
 	}

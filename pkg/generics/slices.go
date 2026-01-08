@@ -55,3 +55,11 @@ func Map[E any, F any](s []E, f func(E) F) []F {
 	}
 	return arr
 }
+
+func ElementPtr[E any](s []E) []*E {
+	arr := make([]*E, len(s))
+	for i := range s {
+		arr[i] = &s[i]
+	}
+	return arr
+}

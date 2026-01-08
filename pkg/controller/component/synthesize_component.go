@@ -102,7 +102,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
-		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
 		SystemAccounts:                   compDefObj.Spec.SystemAccounts,
 		Replicas:                         comp.Spec.Replicas,
 		Resources:                        comp.Spec.Resources,
@@ -121,6 +120,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 		EnableInstanceAPI:                comp.Spec.EnableInstanceAPI,
+		LifecycleActions: SynthesizedLifecycleActions{
+			ComponentLifecycleActions: compDefObj.Spec.LifecycleActions,
+			CustomActions:             comp.Spec.CustomActions,
+		},
 	}
 
 	// build scheduling policy for workload

@@ -69,12 +69,12 @@ type SynthesizedComponent struct {
 	ParallelPodManagementConcurrency *intstr.IntOrString             `json:"parallelPodManagementConcurrency,omitempty"`
 	PodUpdatePolicy                  kbappsv1.PodUpdatePolicyType    `json:"podUpdatePolicy,omitempty"`
 	PodUpgradePolicy                 kbappsv1.PodUpdatePolicyType
-	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
-	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy    `json:"instanceUpdateStrategy,omitempty"`
-	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
-	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
+	UpdateStrategy                   *kbappsv1.UpdateStrategy         `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+	PolicyRules                      []rbacv1.PolicyRule              `json:"policyRules,omitempty"`
+	LifecycleActions                 SynthesizedLifecycleActions      `json:"lifecycleActions,omitempty"`
+	SystemAccounts                   []kbappsv1.SystemAccount         `json:"systemAccounts,omitempty"`
+	Volumes                          []kbappsv1.ComponentVolume       `json:"volumes,omitempty"`
 	Network                          *kbappsv1.ComponentNetwork
 	HostNetwork                      *kbappsv1.HostNetwork       `json:"hostNetwork,omitempty"`
 	ComponentServices                []kbappsv1.ComponentService `json:"componentServices,omitempty"`
@@ -89,4 +89,9 @@ type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
 	Config    bool // whether the file is a config file
 	Variables map[string]string
+}
+
+type SynthesizedLifecycleActions struct {
+	*kbappsv1.ComponentLifecycleActions
+	CustomActions []kbappsv1.CustomAction
 }

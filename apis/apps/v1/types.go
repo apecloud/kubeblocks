@@ -529,21 +529,32 @@ type ClusterComponentConfig struct {
 	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
 
-	// ExternalManaged indicates whether the configuration is managed by an external system.
-	// When set to true, the controller will use the user-provided template and reconfigure action,
-	// ignoring the default template and update behavior.
+	// ExternalManaged specifies whether the configuration management is delegated to an external system
+	// or manual user control.
+	//
+	// When set to true, the controller will exclusively utilize the user-provided configuration source
+	// and the 'reconfigure' action defined in this config, bypassing the default templates and
+	// update behaviors specified in the ComponentDefinition.
 	//
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`
 
 	// Represents a checksum or hash of the configuration content.
+	//
 	// The controller uses this value to detect changes and determine if a reconfiguration or restart
 	// is necessary to apply updates.
 	//
 	// +optional
 	ConfigHash *string `json:"configHash,omitempty"`
 
+	// Specifies whether to restart the component to reload the updated configuration.
+	//
+	// +optional
+	RestartOnConfigChange *bool `json:"restartOnConfigChange,omitempty"`
+
 	// The custom reconfigure action to reload the updated configuration.
+	//
+	// When @restartOnConfigChange is set to true, this action will be ignored.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -553,11 +564,6 @@ type ClusterComponentConfig struct {
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
-
-	// Specifies whether to restart the component to reload the updated configuration.
-	//
-	// +optional
-	RestartOnChange *bool `json:"restartOnChange,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

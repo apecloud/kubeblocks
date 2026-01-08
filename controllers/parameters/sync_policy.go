@@ -94,9 +94,9 @@ func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.Clu
 	config.Variables = parameters
 	config.ConfigHash = rctx.getTargetConfigHash()
 	if restart {
-		config.RestartOnChange = ptr.To(true)
+		config.RestartOnConfigChange = ptr.To(true)
 	} else {
-		config.RestartOnChange = nil
+		config.RestartOnConfigChange = nil
 	}
 	return makeReturnedStatus(ESRetry, withExpected(rctx.getTargetReplicas()), withSucceed(0))
 }

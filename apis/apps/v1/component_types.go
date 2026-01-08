@@ -345,6 +345,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
+
+	// Specifies custom actions that can be performed on the Component.
+	//
+	// +optional
+	CustomActions []CustomAction `json:"customActions,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.
@@ -405,6 +410,20 @@ type Sidecar struct {
 	//
 	// +kubebuilder:validation:Required
 	SidecarDef string `json:"sidecarDef"`
+}
+
+type CustomAction struct {
+	// Name specifies the unique name of the custom action.
+	//
+	// The name will be used as the action name when invoking the action.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the action to be performed.
+	//
+	// +kubebuilder:validation:Required
+	Action *Action `json:"action"`
 }
 
 // ComponentPhase defines the phase of the Component within the .status.phase field.

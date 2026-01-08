@@ -88,36 +88,49 @@ var _ = Describe("kb-agent", func() {
 						},
 					},
 				},
-				LifecycleActions: &appsv1.ComponentLifecycleActions{
-					PostProvision: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Command: []string{"echo", "hello"},
-						},
-						TimeoutSeconds: 5,
-						RetryPolicy: &appsv1.RetryPolicy{
-							MaxRetries:    5,
-							RetryInterval: 10,
-						},
-						PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
-					},
-					RoleProbe: &appsv1.Probe{
-						Action: appsv1.Action{
+				LifecycleActions: SynthesizedLifecycleActions{
+					ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
+						PostProvision: &appsv1.Action{
 							Exec: &appsv1.ExecAction{
 								Command: []string{"echo", "hello"},
 							},
 							TimeoutSeconds: 5,
+							RetryPolicy: &appsv1.RetryPolicy{
+								MaxRetries:    5,
+								RetryInterval: 10,
+							},
+							PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
 						},
-						InitialDelaySeconds: 5,
-						PeriodSeconds:       1,
-						SuccessThreshold:    3,
-						FailureThreshold:    3,
+						RoleProbe: &appsv1.Probe{
+							Action: appsv1.Action{
+								Exec: &appsv1.ExecAction{
+									Command: []string{"echo", "hello"},
+								},
+								TimeoutSeconds: 5,
+							},
+							InitialDelaySeconds: 5,
+							PeriodSeconds:       1,
+							SuccessThreshold:    3,
+							FailureThreshold:    3,
+						},
+					},
+					CustomActions: []appsv1.CustomAction{
+						{
+							Name: "shardAdd",
+							Action: &appsv1.Action{
+								Exec: &appsv1.ExecAction{
+									Command: []string{"echo", "shardAdd"},
+								},
+							},
+						},
 					},
 				},
 			}
 		})
 
 		It("nil", func() {
-			synthesizedComp.LifecycleActions = nil
+			synthesizedComp.LifecycleActions.ComponentLifecycleActions = nil
+			synthesizedComp.LifecycleActions.CustomActions = nil
 
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
@@ -430,6 +443,12 @@ var _ = Describe("kb-agent", func() {
 				Name: "udf-reconfigure-server.conf",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "reconfigure"},
+				},
+			}))
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "udf-shardAdd",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "shardAdd"},
 				},
 			}))
 

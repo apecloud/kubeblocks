@@ -17,8 +17,6 @@ limitations under the License.
 package constant
 
 const (
-	ConfigManagerToolPath = "/bin/reloader"
-
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
 	// CMInsLastReconfigurePhaseKey defines the current phase
@@ -56,16 +54,10 @@ const (
 )
 
 const (
-	ConfigSidecarName        = "config-manager"
-	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
-	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
-
 	ConfigInstanceType = "instance"
 
 	ReconfigureManagerSource = "manager"
 	ReconfigureUserSource    = "ops"
-
-	ConfigManagerPortName = "config-manager"
 )
 
 const (

@@ -205,15 +205,25 @@ func (in *ClusterComponentConfig) DeepCopyInto(out *ClusterComponentConfig) {
 		}
 	}
 	in.ClusterComponentConfigSource.DeepCopyInto(&out.ClusterComponentConfigSource)
-	if in.Reconfigure != nil {
-		in, out := &in.Reconfigure, &out.Reconfigure
-		*out = new(Action)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.ExternalManaged != nil {
 		in, out := &in.ExternalManaged, &out.ExternalManaged
 		*out = new(bool)
 		**out = **in
+	}
+	if in.ConfigHash != nil {
+		in, out := &in.ConfigHash, &out.ConfigHash
+		*out = new(string)
+		**out = **in
+	}
+	if in.RestartOnConfigChange != nil {
+		in, out := &in.RestartOnConfigChange, &out.RestartOnConfigChange
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Reconfigure != nil {
+		in, out := &in.Reconfigure, &out.Reconfigure
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
 	}
 }
 
@@ -1320,13 +1330,18 @@ func (in *ComponentFileTemplate) DeepCopyInto(out *ComponentFileTemplate) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.ExternalManaged != nil {
-		in, out := &in.ExternalManaged, &out.ExternalManaged
+	if in.RestartOnFileChange != nil {
+		in, out := &in.RestartOnFileChange, &out.RestartOnFileChange
 		*out = new(bool)
 		**out = **in
 	}
-	if in.RestartOnFileChange != nil {
-		in, out := &in.RestartOnFileChange, &out.RestartOnFileChange
+	if in.Reconfigure != nil {
+		in, out := &in.Reconfigure, &out.Reconfigure
+		*out = new(Action)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ExternalManaged != nil {
+		in, out := &in.ExternalManaged, &out.ExternalManaged
 		*out = new(bool)
 		**out = **in
 	}

@@ -45,7 +45,7 @@ const (
 	clusterName      = "test-cluster"
 	defaultCompName  = "mysql"
 	shardingCompName = "sharding-test"
-	defaultITSName   = "mysql-statefulset"
+	defaultITSName   = "test-cluster-mysql"
 	configSpecName   = "mysql-config-tpl"
 	configVolumeName = "mysql-config"
 	cmName           = "mysql-tree-node-template-8.0"
@@ -118,10 +118,11 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-		AddComponent(defaultCompName, compDefObj.GetName()).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
+		AddComponent(defaultCompName, compDefObj.GetName()).
+		SetReplicas(1).
 		AddSharding(shardingCompName, "", compDefObj.GetName()).
-		SetShards(5).
+		SetShards(3).
 		Create(&testCtx).
 		GetObject()
 
@@ -141,13 +142,15 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 			Name:      configVolumeName,
 			MountPath: "/mnt/config",
 		}).GetObject()
-	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, defaultITSName, clusterObj.Name, defaultCompName).
+	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, defaultITSName, clusterName, defaultCompName).
 		AddConfigmapVolume(configVolumeName, configmap.Name).
 		AddContainer(container).
 		AddAppNameLabel(clusterName).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(defaultCompName).
-		Create(&testCtx).GetObject()
+		SetReplicas(1).
+		Create(&testCtx).
+		GetObject()
 
 	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)
 	Expect(err).ShouldNot(HaveOccurred())

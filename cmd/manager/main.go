@@ -146,8 +146,6 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
-	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
@@ -647,7 +645,7 @@ func main() {
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ParameterReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -655,7 +653,7 @@ func main() {
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ComponentDrivenParameterReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-driven-parameter-controller"),
 		}).SetupWithManager(mgr); err != nil {
@@ -663,18 +661,18 @@ func main() {
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ComponentParameterReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ReconfigureReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}

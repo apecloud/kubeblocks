@@ -23,31 +23,45 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+)
+
+const (
+	configReconcileInterval                 = time.Second * 1
+	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
+	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
+)
+
+var (
+	reconfigureRequiredLabels = []string{
+		constant.AppInstanceLabelKey,
+		constant.KBAppComponentLabelKey,
+		constant.CMConfigurationTemplateNameLabelKey,
+		constant.CMConfigurationTypeLabelKey,
+		constant.CMConfigurationSpecProviderLabelKey,
+	}
 )
 
 // ReconfigureReconciler reconciles a ReconfigureRequest object
@@ -57,33 +71,11 @@ type ReconfigureReconciler struct {
 	Recorder record.EventRecorder
 }
 
-const (
-	ConfigReconcileInterval = time.Second * 1
-)
-
-const (
-	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
-	configurationNotUsingMessage            = "the configmap is not used by any container, skip reconfigure"
-	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
-)
-
-var reconfigureRequiredLabels = []string{
-	constant.AppInstanceLabelKey,
-	constant.KBAppComponentLabelKey,
-	constant.CMConfigurationTemplateNameLabelKey,
-	constant.CMConfigurationTypeLabelKey,
-	constant.CMConfigurationSpecProviderLabelKey,
-}
-
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ReconfigureRequest object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
@@ -91,13 +83,12 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithName("ReconfigureRequestReconcile").WithValues("ConfigMap", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("configMap", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
 	config := &corev1.ConfigMap{}
-	// TODO(leon): data or universal?
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, inDataContextUnspecified()); err != nil {
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	if model.IsObjectDeleting(config) {
@@ -108,8 +99,8 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	reqCtx.Log = reqCtx.Log.
-		WithValues("ClusterName", config.Labels[constant.AppInstanceLabelKey]).
-		WithValues("ComponentName", config.Labels[constant.KBAppComponentLabelKey])
+		WithValues("cluster", config.Labels[constant.AppInstanceLabelKey]).
+		WithValues("component", config.Labels[constant.KBAppComponentLabelKey])
 
 	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
@@ -120,14 +111,14 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
-	resources, err := prepareRelatedResource(reqCtx, r.Client, config)
+	configSpec, err := r.getConfigSpec(reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to fetch related resources").Error())
 	}
-	if resources.configSpec == nil {
+	if configSpec == nil {
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].",
-			config.Labels[constant.CMConfigurationSpecProviderLabelKey], resources.componentName))
+			config.Labels[constant.CMConfigurationSpecProviderLabelKey], config.Labels[constant.KBAppComponentLabelKey]))
 		reqCtx.Recorder.Event(config,
 			corev1.EventTypeWarning,
 			appsv1alpha1.ReasonReconfigureFailed,
@@ -135,50 +126,65 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 
-	return r.sync(reqCtx, config, resources)
+	return r.sync(reqCtx, config, configSpec)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewControllerManagedBy(mgr).
+func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
-		})
-
-	if multiClusterMgr != nil {
-		eventHandler := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-			return []reconcile.Request{
-				{
-					NamespacedName: types.NamespacedName{
-						Namespace: obj.GetNamespace(),
-						Name:      obj.GetName(),
-					},
-				},
-			}
-		})
-		multiClusterMgr.Watch(b, &corev1.ConfigMap{}, eventHandler)
-	}
-
-	return b.WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).Complete(r)
+		}).
+		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
+		Complete(r)
 }
 
 func checkConfigurationObject(object client.Object) bool {
 	return checkConfigLabels(object, reconfigureRequiredLabels)
 }
 
-func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, resources *reconfigureRelatedResource) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) getConfigSpec(reqCtx intctrlutil.RequestCtx, cm *corev1.ConfigMap) (*appsv1.ComponentFileTemplate, error) {
+	configSpecName, ok := cm.Labels[constant.CMConfigurationSpecProviderLabelKey]
+	if !ok {
+		return nil, nil
+	}
+
+	key := client.ObjectKey{
+		Namespace: cm.Namespace,
+		Name:      cfgcore.GenerateComponentConfigurationName(cm.Labels[constant.AppInstanceLabelKey], cm.Labels[constant.KBAppComponentLabelKey]),
+	}
+	obj := &parametersv1alpha1.ComponentParameter{}
+	if err := r.Client.Get(reqCtx.Ctx, key, obj); err != nil {
+		return nil, err
+	}
+
+	configSpec := parameters.GetConfigTemplateItem(&obj.Spec, configSpecName)
+	if configSpec == nil {
+		return nil, fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, obj.Name)
+	}
+	return configSpec.ConfigSpec, nil
+}
+
+func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate) (ctrl.Result, error) {
+	var (
+		clusterName = configMap.Labels[constant.AppInstanceLabelKey]
+		compName    = configMap.Labels[constant.KBAppComponentLabelKey]
+	)
 	rctx := newParameterReconcileContext(reqCtx,
 		&render.ResourceCtx{
 			Context:       reqCtx.Ctx,
 			Client:        r.Client,
 			Namespace:     configMap.Namespace,
-			ClusterName:   resources.clusterName,
-			ComponentName: resources.componentName,
+			ClusterName:   clusterName,
+			ComponentName: compName,
 		},
 		configMap,
 		nil,
-		resources.componentMatchLabels())
+		map[string]string{
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: compName,
+		})
 	if err := rctx.GetRelatedObjects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -189,12 +195,6 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	if len(rctx.InstanceSetList) == 0 {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
-			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, parametersv1alpha1.CFinishedPhase, configurationNotUsingMessage)
-	}
-
 	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.ConfigRender, rctx.ParametersDefs)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
@@ -203,7 +203,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
 		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning, "nothing changed, skip reconfigure")
-		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
+		return r.updateConfigCMStatus(reqCtx, configMap, cfgcore.ReconfigureNoChangeType, nil)
 	}
 
 	if configPatch != nil {
@@ -214,7 +214,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			configPatch.UpdateConfig))
 	}
 
-	tasks, err := genReconfigureActionTasks(resources.configSpec, rctx, configPatch, forceRestart)
+	tasks, err := r.buildReconfigureTasks(configSpec, rctx, configPatch, forceRestart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -228,33 +228,51 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 	}
 
 	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType, result); err != nil || !ok {
-		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
+		return intctrlutil.RequeueAfter(configReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
-	var err error
-	var returnedStatus returnedStatus
-	var reloadType string
-
-	for _, task := range reloadTasks {
-		reloadType = task.ReloadType()
-		returnedStatus, err = task.ExecReload()
-		if err != nil || returnedStatus.Status != ESNone {
-			return r.status(rctx, returnedStatus, reloadType, err)
+func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, tasks []reconfigureTask) (ctrl.Result, error) {
+	var (
+		err        error
+		status     returnedStatus
+		reloadType string
+	)
+	for _, task := range tasks {
+		reloadType = string(task.policy)
+		status, err = task.reconfigure()
+		if err != nil || status.Status != ESNone {
+			break
 		}
 	}
-	return r.succeed(rctx, reloadType, returnedStatus)
+	// submit changes to the cluster
+	if err1 := r.submit(rctx); err1 != nil {
+		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit changes to the cluster", "error", err1)
+	}
+	if err != nil || status.Status != ESNone {
+		return r.status(rctx, reloadType, status, err)
+	}
+	return r.succeed(rctx, reloadType, status)
 }
 
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus returnedStatus, policy string, err error) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) submit(rctx *ReconcileContext) error {
+	if rctx.ClusterObj == nil || rctx.ClusterObjCopy == nil {
+		return fmt.Errorf("the cluster object is nil")
+	}
+	if reflect.DeepEqual(rctx.ClusterObj.Spec, rctx.ClusterObjCopy.Spec) {
+		return nil
+	}
+	return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
+}
+
+func (r *ReconfigureReconciler) status(rctx *ReconcileContext, reloadType string, status returnedStatus, err error) (ctrl.Result, error) {
 	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
-		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(returnedStatus, policy, phase, options...))
+		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(status, reloadType, phase, options...))
 	}
 
-	switch returnedStatus.Status {
+	switch status.Status {
 	case ESFailedAndRetry:
 		return updatePhase(parametersv1alpha1.CFailedPhase, withFailed(err, true))
 	case ESRetry:
@@ -262,19 +280,137 @@ func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus re
 	case ESFailed:
 		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
 	case ESNone:
-		return r.succeed(rctx, policy, returnedStatus)
+		return r.succeed(rctx, reloadType, status)
 	default:
-		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status"), false))
+		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(cfgcore.MakeError("unknown status"), false))
 	}
 }
 
-func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus returnedStatus) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, status returnedStatus) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,
 		"the reconfigure[%s] has been processed successfully",
 		reloadType)
 
-	result := reconciled(returnedStatus, reloadType, parametersv1alpha1.CFinishedPhase)
+	result := reconciled(status, reloadType, parametersv1alpha1.CFinishedPhase)
 	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, reloadType, &result)
+}
+
+type reconfigureTask struct {
+	policy  parametersv1alpha1.ReloadPolicy
+	taskCtx reconfigureContext
+}
+
+func (r reconfigureTask) reconfigure() (returnedStatus, error) {
+	if executor, ok := reconfigurePolicyMap[r.policy]; ok {
+		return executor.Upgrade(r.taskCtx)
+	}
+	return returnedStatus{}, fmt.Errorf("unknown reconfigure policy: %s", r.policy)
+}
+
+func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, patch *cfgcore.ConfigPatchInfo, restart bool) ([]reconfigureTask, error) {
+	var tasks []reconfigureTask
+
+	// If the patch or ConfigRender is nil, return a single restart task.
+	if patch == nil || rctx.ConfigRender == nil {
+		return []reconfigureTask{r.buildRestartTask(templateSpec, rctx)}, nil
+	}
+
+	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
+	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
+		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
+	}
+
+	for key, jsonPatch := range patch.UpdateConfig {
+		pd, ok := rctx.ParametersDefs[key]
+		// If the ParametersDefinition or its ReloadAction is nil, continue to the next iteration.
+		if !ok || pd.Spec.ReloadAction == nil {
+			continue
+		}
+		configFormat := parameters.GetComponentConfigDescription(&rctx.ConfigRender.Spec, key)
+		if configFormat == nil || configFormat.FileFormatConfig == nil {
+			continue
+		}
+		// Determine the appropriate ReloadPolicy.
+		policy, err := r.resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
+		if err != nil {
+			return nil, err
+		}
+		// If a reload action is needed, append a new reload action task to the tasks slice.
+		if needReloadAction(pd, policy) {
+			tasks = append(tasks, r.buildReloadTask(policy, templateSpec, rctx, pd, configFormat, patch))
+		}
+	}
+
+	// If no tasks were added, return a single restart task.
+	if len(tasks) == 0 {
+		return []reconfigureTask{r.buildRestartTask(templateSpec, rctx)}, nil
+	}
+
+	return tasks, nil
+}
+
+func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.ReloadPolicy,
+	templateSpec *appsv1.ComponentFileTemplate,
+	rctx *ReconcileContext,
+	pd *parametersv1alpha1.ParametersDefinition,
+	configDescription *parametersv1alpha1.ComponentConfigDescription,
+	patch *cfgcore.ConfigPatchInfo) reconfigureTask {
+	return reconfigureTask{
+		policy: policy,
+		taskCtx: reconfigureContext{
+			RequestCtx:           rctx.RequestCtx,
+			Client:               rctx.Client,
+			ConfigTemplate:       *templateSpec,
+			ConfigHash:           computeTargetConfigHash(rctx.RequestCtx, rctx.ConfigMap.Data),
+			ParametersDef:        &pd.Spec,
+			ConfigDescription:    configDescription,
+			Cluster:              rctx.ClusterObj,
+			ClusterComponent:     rctx.ClusterComObj,
+			SynthesizedComponent: rctx.BuiltinComponent,
+			its:                  rctx.its,
+			Patch:                patch,
+		},
+	}
+}
+
+func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) reconfigureTask {
+	return reconfigureTask{
+		policy: parametersv1alpha1.RestartPolicy,
+		taskCtx: reconfigureContext{
+			RequestCtx:           rctx.RequestCtx,
+			Client:               rctx.Client,
+			ConfigTemplate:       *configTemplate,
+			ConfigHash:           computeTargetConfigHash(rctx.RequestCtx, rctx.ConfigMap.Data),
+			ClusterComponent:     rctx.ClusterComObj,
+			Cluster:              rctx.ClusterObj,
+			SynthesizedComponent: rctx.BuiltinComponent,
+			its:                  rctx.its,
+		},
+	}
+}
+
+func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, format *parametersv1alpha1.FileFormatConfig,
+	pd *parametersv1alpha1.ParametersDefinitionSpec) (parametersv1alpha1.ReloadPolicy, error) {
+	var policy = parametersv1alpha1.NonePolicy
+	dynamicUpdate, err := cfgcore.CheckUpdateDynamicParameters(format, pd, jsonPatch)
+	if err != nil {
+		return policy, err
+	}
+
+	// make decision
+	switch {
+	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
+		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
+	case !dynamicUpdate: // static parameters update and only need to restart
+		policy = parametersv1alpha1.RestartPolicy
+	case parameters.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
+		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+	case enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
+		policy = parametersv1alpha1.SyncDynamicReloadPolicy
+	default: // config-manager auto trigger to hot update
+		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+	}
+	return policy, nil
 }

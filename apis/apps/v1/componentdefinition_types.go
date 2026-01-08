@@ -1106,16 +1106,35 @@ type ComponentFileTemplate struct {
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 
-	// ExternalManaged indicates whether the configuration is managed by an external system.
-	// When set to true, the controller will ignore the management of this configuration.
-	//
-	// +optional
-	ExternalManaged *bool `json:"externalManaged,omitempty"`
-
-	// Specifies whether to restart the pod when the file changes.
+	// Specifies whether to restart the workload when the file changes.
 	//
 	// +optional
 	RestartOnFileChange *bool `json:"restartOnFileChange,omitempty"`
+
+	// Defines the procedure that reloads the file when it's content changes.
+	//
+	// If specified, this action overrides the global reconfigure action defined in lifecycle actions
+	// for this specific file template.
+	//
+	// When @restartOnFileChange is set to true, this action will be ignored.
+	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_CONFIG_FILES_CREATED: file1,file2...
+	// - KB_CONFIG_FILES_REMOVED: file1,file2...
+	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	Reconfigure *Action `json:"reconfigure,omitempty"`
+
+	// ExternalManaged specifies whether the file management is delegated to an external system or manual user control.
+	//
+	// When set to true, the controller will ignore the management of this file.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
 type LogConfig struct {
@@ -1692,8 +1711,6 @@ type ComponentLifecycleActions struct {
 	// Defines the procedure that update a replica with new configuration.
 	//
 	// Note: This field is immutable once it has been set.
-	//
-	// This Action is reserved for future versions.
 	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`

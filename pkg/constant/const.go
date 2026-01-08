@@ -65,8 +65,6 @@ const (
 	KBLowerPrefix = "kb"
 )
 
-const InvalidContainerPort int32 = 0
-
 const EmptyInsTemplateName = ""
 
 type Key string

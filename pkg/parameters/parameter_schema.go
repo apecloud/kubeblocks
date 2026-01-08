@@ -166,7 +166,3 @@ func GetPodSelector(pd *parametersv1alpha1.ParametersDefinitionSpec) *metav1.Lab
 	}
 	return nil
 }
-
-func AsSidecarContainerImage(toolImage parametersv1alpha1.ToolConfig) bool {
-	return toolImage.AsContainerImage != nil && *toolImage.AsContainerImage
-}

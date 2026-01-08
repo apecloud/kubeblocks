@@ -20,12 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
@@ -33,14 +37,13 @@ import (
 )
 
 var _ = Describe("ComponentParameter Controller", func() {
-
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
 	Context("When updating configuration", func() {
 		It("Should reconcile success", func() {
-			mockReconcileResource()
+			_, _, _, _, synthesizedComp := mockReconcileResource()
 
 			cfgKey := client.ObjectKey{
 				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
@@ -54,7 +57,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 
 			By("reconfiguring parameters.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+			Expect(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
 				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
 					"my.cnf": {
@@ -64,7 +67,25 @@ var _ = Describe("ComponentParameter Controller", func() {
 						},
 					},
 				}
-			})).Should(Succeed())
+			})()).Should(Succeed())
+
+			By("mock the new parameter status")
+			itsKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      synthesizedComp.FullCompName,
+			}
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Status.Replicas = 1
+				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsKey.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       configSpecName,
+							ConfigHash: ptr.To("8665bf6888"),
+						},
+					},
+				})
+			})()).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				itemStatus := parameters.GetItemStatus(&cfg.Status, configSpecName)
@@ -73,6 +94,5 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 		})
-
 	})
 })

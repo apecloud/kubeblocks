@@ -214,6 +214,14 @@ spec:
                         description: ClusterComponentConfig represents a configuration
                           for a component.
                         properties:
+                          configHash:
+                            description: |-
+                              Represents a checksum or hash of the configuration content.
+
+
+                              The controller uses this value to detect changes and determine if a reconfiguration or restart
+                              is necessary to apply updates.
+                            type: string
                           configMap:
                             description: ConfigMap source for the config.
                             properties:
@@ -280,9 +288,13 @@ spec:
                             x-kubernetes-map-type: atomic
                           externalManaged:
                             description: |-
-                              ExternalManaged indicates whether the configuration is managed by an external system.
-                              When set to true, the controller will use the user-provided template and reconfigure action,
-                              ignoring the default template and update behavior.
+                              ExternalManaged specifies whether the configuration management is delegated to an external system
+                              or manual user control.
+
+
+                              When set to true, the controller will exclusively utilize the user-provided configuration source
+                              and the 'reconfigure' action defined in this config, bypassing the default templates and
+                              update behaviors specified in the ComponentDefinition.
                             type: boolean
                           name:
                             description: The name of the config.
@@ -291,7 +303,10 @@ spec:
                             type: string
                           reconfigure:
                             description: |-
-                              The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+                              The custom reconfigure action to reload the updated configuration.
+
+
+                              When @restartOnConfigChange is set to true, this action will be ignored.
 
 
                               The container executing this action has access to following variables:
@@ -300,9 +315,6 @@ spec:
                               - KB_CONFIG_FILES_CREATED: file1,file2...
                               - KB_CONFIG_FILES_REMOVED: file1,file2...
                               - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
-
-                              Note: This field is immutable once it has been set.
                             properties:
                               exec:
                                 description: |-
@@ -739,6 +751,10 @@ spec:
                                 format: int32
                                 type: integer
                             type: object
+                          restartOnConfigChange:
+                            description: Specifies whether to restart the component
+                              to reload the updated configuration.
+                            type: boolean
                           variables:
                             additionalProperties:
                               type: string
@@ -11546,6 +11562,14 @@ spec:
                             description: ClusterComponentConfig represents a configuration
                               for a component.
                             properties:
+                              configHash:
+                                description: |-
+                                  Represents a checksum or hash of the configuration content.
+
+
+                                  The controller uses this value to detect changes and determine if a reconfiguration or restart
+                                  is necessary to apply updates.
+                                type: string
                               configMap:
                                 description: ConfigMap source for the config.
                                 properties:
@@ -11612,9 +11636,13 @@ spec:
                                 x-kubernetes-map-type: atomic
                               externalManaged:
                                 description: |-
-                                  ExternalManaged indicates whether the configuration is managed by an external system.
-                                  When set to true, the controller will use the user-provided template and reconfigure action,
-                                  ignoring the default template and update behavior.
+                                  ExternalManaged specifies whether the configuration management is delegated to an external system
+                                  or manual user control.
+
+
+                                  When set to true, the controller will exclusively utilize the user-provided configuration source
+                                  and the 'reconfigure' action defined in this config, bypassing the default templates and
+                                  update behaviors specified in the ComponentDefinition.
                                 type: boolean
                               name:
                                 description: The name of the config.
@@ -11623,7 +11651,10 @@ spec:
                                 type: string
                               reconfigure:
                                 description: |-
-                                  The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+                                  The custom reconfigure action to reload the updated configuration.
+
+
+                                  When @restartOnConfigChange is set to true, this action will be ignored.
 
 
                                   The container executing this action has access to following variables:
@@ -11632,9 +11663,6 @@ spec:
                                   - KB_CONFIG_FILES_CREATED: file1,file2...
                                   - KB_CONFIG_FILES_REMOVED: file1,file2...
                                   - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
-
-                                  Note: This field is immutable once it has been set.
                                 properties:
                                   exec:
                                     description: |-
@@ -12075,6 +12103,10 @@ spec:
                                     format: int32
                                     type: integer
                                 type: object
+                              restartOnConfigChange:
+                                description: Specifies whether to restart the component
+                                  to reload the updated configuration.
+                                type: boolean
                               variables:
                                 additionalProperties:
                                   type: string

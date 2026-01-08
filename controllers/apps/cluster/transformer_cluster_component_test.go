@@ -33,7 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -203,7 +203,7 @@ var _ = Describe("cluster component transformer test", func() {
 					{
 						Name:     comp2aName,
 						CompDef:  compDefName,
-						Template: pointer.Bool(true),
+						Template: ptr.To(true),
 					},
 					{
 						Name:    comp2bName,
@@ -774,7 +774,7 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 			transCtx.Client = model.NewGraphClient(reader)
 			for i := range transCtx.components {
-				transCtx.components[i].Stop = pointer.Bool(true)
+				transCtx.components[i].Stop = ptr.To(true)
 			}
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
 
@@ -800,7 +800,7 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &appsutil.MockReader{
 				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Spec.Stop = pointer.Bool(true)
+						comp.Spec.Stop = ptr.To(true)
 						comp.Status.Phase = appsv1.StoppedComponentPhase
 					}),
 					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
@@ -813,7 +813,7 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 			transCtx.Client = model.NewGraphClient(reader)
 			for i := range transCtx.components {
-				transCtx.components[i].Stop = pointer.Bool(true)
+				transCtx.components[i].Stop = ptr.To(true)
 			}
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
 
@@ -1271,9 +1271,9 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 			transCtx.Client = model.NewGraphClient(reader)
 			for i, sharding := range transCtx.shardings {
-				transCtx.shardings[i].Template.Stop = pointer.Bool(true)
+				transCtx.shardings[i].Template.Stop = ptr.To(true)
 				for j := range transCtx.shardingComps[sharding.Name] {
-					transCtx.shardingComps[sharding.Name][j].Stop = pointer.Bool(true)
+					transCtx.shardingComps[sharding.Name][j].Stop = ptr.To(true)
 				}
 			}
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
@@ -1304,7 +1304,7 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &appsutil.MockReader{
 				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Spec.Stop = pointer.Bool(true)
+						comp.Spec.Stop = ptr.To(true)
 						comp.Status.Phase = appsv1.StoppedComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
@@ -1317,9 +1317,9 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 			transCtx.Client = model.NewGraphClient(reader)
 			for i, sharding := range transCtx.shardings {
-				transCtx.shardings[i].Template.Stop = pointer.Bool(true)
+				transCtx.shardings[i].Template.Stop = ptr.To(true)
 				for j := range transCtx.shardingComps[sharding.Name] {
-					transCtx.shardingComps[sharding.Name][j].Stop = pointer.Bool(true)
+					transCtx.shardingComps[sharding.Name][j].Stop = ptr.To(true)
 				}
 			}
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
@@ -1535,12 +1535,12 @@ var _ = Describe("cluster component transformer test", func() {
 				}
 				transCtx.Client = model.NewGraphClient(reader)
 				for i := range transCtx.components {
-					transCtx.components[i].Stop = pointer.Bool(true)
+					transCtx.components[i].Stop = ptr.To(true)
 				}
 				for i, sharding := range transCtx.shardings {
-					transCtx.shardings[i].Template.Stop = pointer.Bool(true)
+					transCtx.shardings[i].Template.Stop = ptr.To(true)
 					for j := range transCtx.shardingComps[sharding.Name] {
-						transCtx.shardingComps[sharding.Name][j].Stop = pointer.Bool(true)
+						transCtx.shardingComps[sharding.Name][j].Stop = ptr.To(true)
 					}
 				}
 				transCtx.OrigCluster.Generation += 1 // mock cluster spec update

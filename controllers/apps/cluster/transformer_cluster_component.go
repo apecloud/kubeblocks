@@ -36,7 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -83,7 +83,7 @@ func (t *clusterComponentTransformer) transform(transCtx *clusterTransformContex
 
 	createSet, deleteSet, updateSet := setDiff(runningSet, protoSet)
 
-	if err = deleteCompNShardingInOrder(transCtx, dag, deleteSet, pointer.Bool(true)); err != nil {
+	if err = deleteCompNShardingInOrder(transCtx, dag, deleteSet, ptr.To(true)); err != nil {
 		return err
 	}
 
@@ -240,7 +240,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 				continue
 			}
 			matchConfig := func(c appsv1.ClusterComponentConfig) bool {
-				return pointer.StringEqual(c.Name, config.Name)
+				return ptr.Equal(c.Name, config.Name)
 			}
 			index := generics.FindFirstFunc(mergedConfigs, matchConfig)
 			if index < 0 {
@@ -830,7 +830,6 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 	if err != nil {
 		return err
 	}
-
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range protoComps {
 		graphCli.Create(dag, protoComps[i])
@@ -932,7 +931,7 @@ func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, 
 	runningComps map[string]*appsv1.Component, deleteSet sets.Set[string]) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range deleteSet {
-		h.deleteComp(transCtx, graphCli, dag, runningComps[name], pointer.Bool(true))
+		h.deleteComp(transCtx, graphCli, dag, runningComps[name], ptr.To(true))
 	}
 }
 

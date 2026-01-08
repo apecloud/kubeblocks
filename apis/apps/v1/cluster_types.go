@@ -226,7 +226,7 @@ type ClusterStatus struct {
 	// Records the current status information of all shardings within the Cluster.
 	//
 	// +optional
-	Shardings map[string]ClusterComponentStatus `json:"shardings,omitempty"`
+	Shardings map[string]ClusterShardingStatus `json:"shardings,omitempty"`
 
 	// Represents a list of detailed status of the Cluster object.
 	// Each condition in the list provides real-time information about certain aspect of the Cluster object.
@@ -641,9 +641,9 @@ type ClusterSharding struct {
 	// between the desired and actual number of shards.
 	// KubeBlocks provides lifecycle management for sharding, including:
 	//
-	// - Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+	// - Executing the shardAdd Action defined in the ShardingDefinition when the number of shards increases.
 	//   This allows for custom actions to be performed after a new shard is provisioned.
-	// - Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+	// - Executing the shardRemove Action defined in the ShardingDefinition when the number of shards decreases.
 	//   This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 	//   Resources and data associated with the corresponding Component will also be deleted.
 	//
@@ -924,3 +924,95 @@ type ClusterComponentStatus struct {
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 }
+
+// ClusterShardingStatus records a sharding status.
+type ClusterShardingStatus struct {
+	// Specifies the current state of the sharding.
+	//
+	// +optional
+	Phase ComponentPhase `json:"phase,omitempty"`
+
+	// Records detailed information about the sharding in its current phase.
+	//
+	// +optional
+	Message map[string]string `json:"message,omitempty"`
+
+	// Indicates the most recent generation of the sharding state observed.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Indicates whether the sharding state observed is up-to-date with the desired state.
+	//
+	// +optional
+	UpToDate bool `json:"upToDate,omitempty"`
+
+	// Records the name of the sharding definition used.
+	//
+	// +optional
+	ShardingDef string `json:"shardingDef,omitempty"`
+
+	// PostProvision records the status of the sharding post-provision action.
+	//
+	// +optional
+	PostProvision *LifecycleActionStatus `json:"postProvision,omitempty"`
+
+	// PreTerminate records the status of the sharding pre-terminate action.
+	//
+	// +optional
+	PreTerminate *LifecycleActionStatus `json:"preTerminate,omitempty"`
+}
+
+// LifecycleActionStatus records the observed state of a lifecycle-related action.
+type LifecycleActionStatus struct {
+	// Phase is the current phase of the lifecycle action.
+	//
+	// +optional
+	Phase LifecycleActionPhase `json:"phase,omitempty"`
+
+	// Reason is a programmatic identifier indicating the reason for the current phase.
+	// e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
+	//
+	// +optional
+	// Reason string `json:"reason,omitempty"`
+
+	// Message is a human-readable message providing details about the current phase.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// StartTime records the time when the action started execution.
+	//
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// CompletionTime records the time when the action reached a terminal state (Succeeded, Failed, or Skipped).
+	//
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+}
+
+// LifecycleActionPhase describes the current phase of a lifecycle-related action.
+//
+// +enum
+// +kubebuilder:validation:Enum={Pending,Running,Succeeded,Failed,Skipped}
+type LifecycleActionPhase string
+
+const (
+	// LifecycleActionPending indicates the action is registered and waiting to be triggered or
+	// waiting for its dynamic preconditions to be met.
+	LifecycleActionPending LifecycleActionPhase = "Pending"
+
+	// LifecycleActionRunning indicates the preconditions are met and the action is currently being executed.
+	LifecycleActionRunning LifecycleActionPhase = "Running"
+
+	// LifecycleActionSucceeded indicates the action has completed successfully.
+	LifecycleActionSucceeded LifecycleActionPhase = "Succeeded"
+
+	// LifecycleActionFailed indicates the action has failed during execution or timed out.
+	LifecycleActionFailed LifecycleActionPhase = "Failed"
+
+	// LifecycleActionSkipped indicates the action was intentionally bypassed.
+	// Usually occurs if a prerequisite action failed or a permanent condition was not met.
+	LifecycleActionSkipped LifecycleActionPhase = "Skipped"
+)

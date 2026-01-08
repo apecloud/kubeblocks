@@ -97,6 +97,7 @@ var _ = Describe("lifecycle", func() {
 		compName         string
 		lifecycleActions *appsv1.ComponentLifecycleActions
 		pods             []*corev1.Pod
+		customAction     *appsv1.Action
 	)
 
 	cleanEnv := func() {
@@ -135,6 +136,16 @@ var _ = Describe("lifecycle", func() {
 				PeriodSeconds:       1,
 				SuccessThreshold:    3,
 				FailureThreshold:    3,
+			},
+		}
+		customAction = &appsv1.Action{
+			Exec: &appsv1.ExecAction{
+				Command: []string{"/bin/bash", "-c", "echo -n custom-action"},
+			},
+			TimeoutSeconds: 5,
+			RetryPolicy: &appsv1.RetryPolicy{
+				MaxRetries:    5,
+				RetryInterval: 10,
 			},
 		}
 		pods = []*corev1.Pod{{}}
@@ -471,6 +482,99 @@ var _ = Describe("lifecycle", func() {
 			}
 
 			err = lifecycle.PostProvision(ctx, reader, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
+		})
+
+		It("precondition - object selector", func() {
+			componentReady := appsv1.ComponentReadyPreConditionType
+			labels := map[string]string{
+				"test": "test",
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, nil, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-1",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.RunningComponentPhase,
+						},
+					},
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-2",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.RunningComponentPhase,
+						},
+					},
+				},
+			}
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			customAction.PreCondition = &componentReady
+			err = lifecycle.UserDefined(ctx, reader, &Options{
+				PreConditionObjectSelector: labels,
+			}, "custom-action", customAction, nil)
+			Expect(err).Should(BeNil())
+		})
+
+		It("precondition - object selector fail", func() {
+			componentReady := appsv1.ComponentReadyPreConditionType
+			labels := map[string]string{
+				"test": "test",
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, nil, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-1",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.RunningComponentPhase,
+						},
+					},
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-2",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.FailedComponentPhase,
+						},
+					},
+				},
+			}
+
+			customAction.PreCondition = &componentReady
+			err = lifecycle.UserDefined(ctx, reader, &Options{
+				PreConditionObjectSelector: labels,
+			}, "custom-action", customAction, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
 		})

@@ -976,6 +976,20 @@ bool
 <p>Specifies whether to enable the new Instance API.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -2355,7 +2369,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -3916,9 +3930,9 @@ KubeBlocks dynamically creates and deletes Components based on the difference
 between the desired and actual number of shards.
 KubeBlocks provides lifecycle management for sharding, including:</p>
 <ul>
-<li>Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+<li>Executing the shardAdd Action defined in the ShardingDefinition when the number of shards increases.
 This allows for custom actions to be performed after a new shard is provisioned.</li>
-<li>Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+<li>Executing the shardRemove Action defined in the ShardingDefinition when the number of shards decreases.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
@@ -3969,6 +3983,114 @@ to be created with distinct configurations.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the names of shards (components) to be transitioned to offline status.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus</a>)
+</p>
+<div>
+<p>ClusterShardingStatus records a sharding status.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentPhase">
+ComponentPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the current state of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records detailed information about the sharding in its current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the most recent generation of the sharding state observed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the sharding state observed is up-to-date with the desired state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the name of the sharding definition used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>postProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PostProvision records the status of the sharding post-provision action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PreTerminate records the status of the sharding pre-terminate action.</p>
 </td>
 </tr>
 </tbody>
@@ -4224,8 +4346,8 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
 <td>
 <code>shardings</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
+<a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterShardingStatus
 </a>
 </em>
 </td>
@@ -6235,7 +6357,7 @@ It allows optional mapping for container ports to host ports.</p>
 <h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
 </p>
 <div>
 <p>ComponentPhase defines the phase of the Component within the .status.phase field.</p>
@@ -6889,6 +7011,20 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -7758,6 +7894,48 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.CustomAction">CustomAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the custom action.</p>
+<p>The name will be used as the action name when invoking the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the action to be performed.</p>
 </td>
 </tr>
 </tbody>
@@ -8923,6 +9101,112 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 <td><p>UpperCases represents the use of upper case letters only.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LifecycleActionPhase">LifecycleActionPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus</a>)
+</p>
+<div>
+<p>LifecycleActionPhase describes the current phase of a lifecycle-related action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>LifecycleActionFailed indicates the action has failed during execution or timed out.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>LifecycleActionPending indicates the action is registered and waiting to be triggered or
+waiting for its dynamic preconditions to be met.</p>
+</td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td><p>LifecycleActionRunning indicates the preconditions are met and the action is currently being executed.</p>
+</td>
+</tr><tr><td><p>&#34;Skipped&#34;</p></td>
+<td><p>LifecycleActionSkipped indicates the action was intentionally bypassed.
+Usually occurs if a prerequisite action failed or a permanent condition was not met.</p>
+</td>
+</tr><tr><td><p>&#34;Succeeded&#34;</p></td>
+<td><p>LifecycleActionSucceeded indicates the action has completed successfully.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+</p>
+<div>
+<p>LifecycleActionStatus records the observed state of a lifecycle-related action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionPhase">
+LifecycleActionPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase is the current phase of the lifecycle action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message is a human-readable message providing details about the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>startTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>StartTime records the time when the action started execution.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completionTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CompletionTime records the time when the action reached a terminal state (Succeeded, Failed, or Skipped).</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.LogConfig">LogConfig
 </h3>
@@ -12020,6 +12304,59 @@ bool
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingAction">ShardingAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Action</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetShardSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TargetShardSelector">
+TargetShardSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the criteria used to select the target shard(s) for executing the Action.
+It provides precise control over which shard(s) should be targeted.</p>
+<p>The default selection logic (when this field is omitted) is context-dependent:
+1. Contextual Default: If the Action is triggered by or originates from a specific shard,
+   that shard is selected as the default target.
+2. Global Default: In other cases (where no specific shard context exists),
+one shard is selected randomly by default.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec
 </h3>
 <p>
@@ -12218,8 +12555,8 @@ string
 <td>
 <code>postProvision</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
@@ -12230,7 +12567,7 @@ Action
 the action should trigger, available conditions for sharding include: <code>Immediately</code>, <code>ComponentReady</code>,
 and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> condition means all components of the sharding are ready.</p>
 <p>With <code>ComponentReady</code> being the default.</p>
-<p>The PostProvision Action is intended to run only once.</p>
+<p>The PostProvision action is intended to run only once.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12238,18 +12575,20 @@ and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> con
 <td>
 <code>preTerminate</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed prior to terminating a sharding.</p>
-<p>The PreTerminate Action is intended to run only once.</p>
+<p>The PreTerminate action is intended to run only once.</p>
 <p>This action is executed immediately when a terminate operation for the sharding is initiated.
 The actual termination and cleanup of the sharding and its associated resources will not proceed
 until the PreTerminate action has completed successfully.</p>
+<p>If a PostProvision action is defined, this action will only execute if PostProvision reaches
+the &lsquo;Succeeded&rsquo; phase. If the defined PostProvision fails, this action will be skipped.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12257,14 +12596,18 @@ until the PreTerminate action has completed successfully.</p>
 <td>
 <code>shardAdd</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed after a shard added.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ADD_SHARD_NAME: The name of the shard being added.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12272,14 +12615,18 @@ Action
 <td>
 <code>shardRemove</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed prior to remove a shard.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -13129,6 +13476,27 @@ VarOption
 </tr><tr><td><p>&#34;Ordinal&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Role&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TargetShardSelector">TargetShardSelector
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>)
+</p>
+<div>
+<p>TargetShardSelector defines how to select shard(s) to execute an Action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;All&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Any&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

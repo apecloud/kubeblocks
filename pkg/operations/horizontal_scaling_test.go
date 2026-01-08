@@ -781,7 +781,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				comp5.Status.Phase = appsv1.RunningComponentPhase
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+				opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
 					secondaryCompName: {
 						Phase: appsv1.RunningComponentPhase,
 					},

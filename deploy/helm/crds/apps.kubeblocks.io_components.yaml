@@ -90,6 +90,12 @@ spec:
                   description: ClusterComponentConfig represents a configuration for
                     a component.
                   properties:
+                    configHash:
+                      description: |-
+                        Represents a checksum or hash of the configuration content.
+                        The controller uses this value to detect changes and determine if a reconfiguration or restart
+                        is necessary to apply updates.
+                      type: string
                     configMap:
                       description: ConfigMap source for the config.
                       properties:
@@ -617,9 +623,6 @@ spec:
                       description: Variables are key-value pairs for dynamic configuration
                         values that can be provided by the user.
                       type: object
-                    versionHash:
-                      description: The versioned hash of the config content.
-                      type: string
                   type: object
                 type: array
               customActions:

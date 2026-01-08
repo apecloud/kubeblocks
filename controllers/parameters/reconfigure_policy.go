@@ -59,7 +59,7 @@ type reconfigureContext struct {
 	Client client.Client
 
 	ConfigTemplate appsv1.ComponentFileTemplate
-	VersionHash    string // the version hash of the new configuration
+	ConfigHash     *string // the hash of the new configuration content
 
 	Cluster              *appsv1.Cluster
 	ClusterComponent     *appsv1.ClusterComponentSpec
@@ -84,8 +84,8 @@ func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePo
 	reconfigurePolicyMap[policy] = action
 }
 
-func (param *reconfigureContext) getTargetVersionHash() string {
-	return param.VersionHash
+func (param *reconfigureContext) getTargetConfigHash() *string {
+	return param.ConfigHash
 }
 
 func (param *reconfigureContext) getTargetReplicas() int32 {
@@ -102,13 +102,13 @@ func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
 	return false
 }
 
-func computeTargetVersionHash(rctx intctrlutil.RequestCtx, data map[string]string) string {
+func computeTargetConfigHash(rctx intctrlutil.RequestCtx, data map[string]string) *string {
 	hash, err := util.ComputeHash(data)
 	if err != nil {
 		rctx.Log.Error(err, "failed to get configuration version!")
-		return ""
+		return nil
 	}
-	return hash
+	return &hash
 }
 
 func withSucceed(succeedCount int32) func(status *returnedStatus) {

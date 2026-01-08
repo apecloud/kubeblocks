@@ -2856,14 +2856,16 @@ ignoring the default template and update behavior.</p>
 </tr>
 <tr>
 <td>
-<code>versionHash</code><br/>
+<code>configHash</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The versioned hash of the config content.</p>
+<p>Represents a checksum or hash of the configuration content.
+The controller uses this value to detect changes and determine if a reconfiguration or restart
+is necessary to apply updates.</p>
 </td>
 </tr>
 <tr>
@@ -32802,14 +32804,14 @@ int64
 </tr>
 <tr>
 <td>
-<code>versionHash</code><br/>
+<code>configHash</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The versioned hash of the config content.</p>
+<p>Represents a checksum or hash of the config content.</p>
 </td>
 </tr>
 <tr>
@@ -32982,14 +32984,14 @@ int64
 </tr>
 <tr>
 <td>
-<code>versionHash</code><br/>
+<code>configHash</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The hash of the config content.</p>
+<p>Represents a checksum or hash of the config content.</p>
 </td>
 </tr>
 </tbody>

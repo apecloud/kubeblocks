@@ -536,10 +536,12 @@ type ClusterComponentConfig struct {
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`
 
-	// The versioned hash of the config content.
+	// Represents a checksum or hash of the configuration content.
+	// The controller uses this value to detect changes and determine if a reconfiguration or restart
+	// is necessary to apply updates.
 	//
 	// +optional
-	VersionHash string `json:"versionHash,omitempty"`
+	ConfigHash *string `json:"configHash,omitempty"`
 
 	// The custom reconfigure action to reload the updated configuration.
 	//

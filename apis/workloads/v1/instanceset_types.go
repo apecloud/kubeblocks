@@ -519,10 +519,10 @@ type ConfigTemplate struct {
 	// +optional
 	Generation int64 `json:"generation,omitempty"`
 
-	// The versioned hash of the config content.
+	// Represents a checksum or hash of the config content.
 	//
 	// +optional
-	VersionHash string `json:"versionHash,omitempty"`
+	ConfigHash *string `json:"configHash,omitempty"`
 
 	// The custom reconfigure action.
 	//
@@ -576,10 +576,10 @@ type InstanceConfigStatus struct {
 	// +optional
 	Generation int64 `json:"generation,omitempty"`
 
-	// The hash of the config content.
+	// Represents a checksum or hash of the config content.
 	//
 	// +optional
-	VersionHash string `json:"versionHash,omitempty"`
+	ConfigHash *string `json:"configHash,omitempty"`
 }
 
 // InstanceTemplateStatus aggregates the status of replicas for each InstanceTemplate

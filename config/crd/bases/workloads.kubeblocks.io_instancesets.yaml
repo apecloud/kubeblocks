@@ -69,6 +69,9 @@ spec:
                 description: Describe the configs to be reconfigured.
                 items:
                   properties:
+                    configHash:
+                      description: Represents a checksum or hash of the config content.
+                      type: string
                     generation:
                       description: The generation of the config content.
                       format: int64
@@ -521,9 +524,6 @@ spec:
 
 
                         An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
-                      type: string
-                    versionHash:
-                      description: The versioned hash of the config content.
                       type: string
                   required:
                   - name
@@ -11720,15 +11720,16 @@ spec:
                       description: The status of configs.
                       items:
                         properties:
+                          configHash:
+                            description: Represents a checksum or hash of the config
+                              content.
+                            type: string
                           generation:
                             description: The generation of the config.
                             format: int64
                             type: integer
                           name:
                             description: The name of the config.
-                            type: string
-                          versionHash:
-                            description: The hash of the config content.
                             type: string
                         required:
                         - name

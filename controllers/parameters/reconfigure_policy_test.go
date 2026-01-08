@@ -64,7 +64,7 @@ func withWorkload() paramsOps {
 func withConfigSpec(configSpecName string, data map[string]string) paramsOps {
 	return func(params *reconfigureContext) {
 		params.ConfigTemplate.Name = configSpecName
-		params.VersionHash = computeTargetVersionHash(params.RequestCtx, data)
+		params.ConfigHash = computeTargetConfigHash(params.RequestCtx, data)
 	}
 }
 

@@ -84,7 +84,7 @@ func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, 
 	if config == nil {
 		return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
 	}
-	if config.VersionHash != rctx.getTargetVersionHash() {
+	if !ptr.Equal(config.ConfigHash, rctx.getTargetConfigHash()) {
 		return applyConfigChangesToCluster(rctx, config, parameters, restart), nil
 	}
 	return syncConfigStatus(rctx), nil
@@ -92,7 +92,7 @@ func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, 
 
 func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) returnedStatus {
 	config.Variables = parameters
-	config.VersionHash = rctx.getTargetVersionHash()
+	config.ConfigHash = rctx.getTargetConfigHash()
 	if restart {
 		config.RestartOnChange = ptr.To(true)
 	} else {
@@ -103,15 +103,15 @@ func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.Clu
 
 func syncConfigStatus(rctx reconfigureContext) returnedStatus {
 	var (
-		replicas    = rctx.getTargetReplicas()
-		versionHash = rctx.getTargetVersionHash()
+		replicas   = rctx.getTargetReplicas()
+		configHash = rctx.getTargetConfigHash()
 	)
 	updated := int32(0)
 	for _, inst := range rctx.its.Status.InstanceStatus {
 		idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
 			return cfg.Name == rctx.ConfigTemplate.Name
 		})
-		if idx >= 0 && inst.Configs[idx].VersionHash == versionHash {
+		if idx >= 0 && ptr.Equal(inst.Configs[idx].ConfigHash, configHash) {
 			updated++
 		}
 	}

@@ -54,8 +54,8 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 					PodName: "pod1",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        mockParam.ConfigTemplate.Name,
-							VersionHash: mockParam.getTargetVersionHash(),
+							Name:       mockParam.ConfigTemplate.Name,
+							ConfigHash: mockParam.getTargetConfigHash(),
 						},
 					},
 				})
@@ -71,8 +71,8 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 					PodName: "pod2",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        mockParam.ConfigTemplate.Name,
-							VersionHash: mockParam.getTargetVersionHash(),
+							Name:       mockParam.ConfigTemplate.Name,
+							ConfigHash: mockParam.getTargetConfigHash(),
 						},
 					},
 				})

@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -79,8 +80,8 @@ var _ = Describe("ComponentParameter Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsKey.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        configSpecName,
-							VersionHash: "8665bf6888",
+							Name:       configSpecName,
+							ConfigHash: ptr.To("8665bf6888"),
 						},
 					},
 				})

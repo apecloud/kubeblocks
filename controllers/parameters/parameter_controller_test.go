@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -86,12 +86,12 @@ var _ = Describe("Parameter Controller", func() {
 			if idx == -1 {
 				its.Status.InstanceStatus[0].Configs = []workloads.InstanceConfigStatus{
 					{
-						Name:        cfgName,
-						VersionHash: versionHash,
+						Name:       cfgName,
+						ConfigHash: ptr.To(versionHash),
 					},
 				}
 			} else {
-				its.Status.InstanceStatus[0].Configs[idx].VersionHash = versionHash
+				its.Status.InstanceStatus[0].Configs[idx].ConfigHash = ptr.To(versionHash)
 			}
 		})()).Should(Succeed())
 	}
@@ -126,8 +126,8 @@ var _ = Describe("Parameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
 				Expect(item).ShouldNot(BeNil())
-				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
-				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", ptr.To("100")))
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", ptr.To("1024M")))
 			})).Should(Succeed())
 
 			By("the second update parameters")
@@ -150,8 +150,8 @@ var _ = Describe("Parameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
 				Expect(item).ShouldNot(BeNil())
-				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("2000")))
-				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("gtid_mode", pointer.String("OFF")))
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", ptr.To("2000")))
+				Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("gtid_mode", ptr.To("OFF")))
 			})).Should(Succeed())
 		})
 

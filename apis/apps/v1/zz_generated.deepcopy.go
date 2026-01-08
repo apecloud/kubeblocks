@@ -210,6 +210,11 @@ func (in *ClusterComponentConfig) DeepCopyInto(out *ClusterComponentConfig) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ConfigHash != nil {
+		in, out := &in.ConfigHash, &out.ConfigHash
+		*out = new(string)
+		**out = **in
+	}
 	if in.Reconfigure != nil {
 		in, out := &in.Reconfigure, &out.Reconfigure
 		*out = new(Action)

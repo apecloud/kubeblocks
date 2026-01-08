@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	apisappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -51,8 +50,8 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					},
 				}),
 				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
-					MergeReloadAndRestart:           pointer.Bool(false),
-					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
+					MergeReloadAndRestart:           ptr.To(false),
+					ReloadStaticParamsBeforeRestart: ptr.To(true),
 				}),
 				withClusterComponentNConfigs(3, []apisappsv1.ClusterComponentConfig{
 					{
@@ -70,7 +69,7 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
 			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			Expect(rctx.ClusterComponent.Configs[0].VersionHash).Should(Equal(rctx.getTargetVersionHash()))
+			Expect(*rctx.ClusterComponent.Configs[0].ConfigHash).Should(Equal(*rctx.getTargetConfigHash()))
 			Expect(rctx.ClusterComponent.Configs[0].Variables).Should(HaveKeyWithValue("a", "c b e f"))
 		})
 
@@ -88,8 +87,8 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					PodName: "0",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        rctx.ConfigTemplate.Name,
-							VersionHash: rctx.getTargetVersionHash(),
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
 						},
 					},
 				},
@@ -117,8 +116,8 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					PodName: "0",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        rctx.ConfigTemplate.Name,
-							VersionHash: rctx.getTargetVersionHash(),
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
 						},
 					},
 				},
@@ -126,8 +125,8 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					PodName: "1",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        rctx.ConfigTemplate.Name,
-							VersionHash: rctx.getTargetVersionHash(),
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
 						},
 					},
 				},
@@ -135,8 +134,8 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					PodName: "2",
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:        rctx.ConfigTemplate.Name,
-							VersionHash: rctx.getTargetVersionHash(),
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
 						},
 					},
 				},

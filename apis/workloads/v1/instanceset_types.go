@@ -91,7 +91,31 @@ type InstanceSetSpec struct {
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under the default template would be
 	// $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
+	// +optional
 	DefaultTemplateOrdinals kbappsv1.Ordinals `json:"defaultTemplateOrdinals,omitempty"`
+
+	// Specifies the desired Ordinals.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+	//
+	// +optional
+	Ordinals Ordinals `json:"ordinals,omitempty"`
+
+	// AssignedOrdinals is the set of ordinals assigned to the current replicas.
+	//
+	// IMPORTANT: This field is managed automatically by the InstanceSet controller.
+	// Users should NOT manually modify this field.
+	//
+	// This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+	// It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.
+	//
+	// The controller uses this list to maintain identity consistency and to decide which specific ordinal
+	// to allocate next during scaling up, or which identity is preserved during a restart.
+	//
+	// +optional
+	AssignedOrdinals Ordinals `json:"assignedOrdinals,omitempty"`
 
 	// Defines the minimum number of seconds a newly created pod should be ready
 	// without any of its container crashing to be considered available.
@@ -236,6 +260,12 @@ type InstanceSetSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty"`
 
+	// Stop the InstanceSet.
+	// If set, all the computing resources will be released.
+	//
+	// +optional
+	Stop *bool `json:"stop,omitempty"`
+
 	// Describe the configs to be reconfigured.
 	//
 	// +optional
@@ -282,11 +312,6 @@ type InstanceSetStatus struct {
 
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
-
-	// Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.
-	//
-	// +optional
-	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// readyReplicas is the number of instances created for this InstanceSet with a Ready Condition.
 	//
@@ -402,7 +427,23 @@ type InstanceTemplate struct {
 	// then the instance names generated under this InstanceTemplate would be
 	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
 	// $(cluster.name)-$(component.name)-$(template.name)-7
+	//
+	// +optional
 	Ordinals Ordinals `json:"ordinals,omitempty"`
+
+	// AssignedOrdinals is the set of ordinals assigned to the current replicas of this InstanceTemplate.
+	//
+	// IMPORTANT: This field is managed automatically by the InstanceSet controller.
+	// Users should NOT manually modify this field.
+	//
+	// This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+	// It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.
+	//
+	// The controller uses this list to maintain identity consistency and to decide which specific ordinal
+	// to allocate next during scaling up, or which identity is preserved during a restart.
+	//
+	// +optional
+	AssignedOrdinals Ordinals `json:"assignedOrdinals,omitempty"`
 
 	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
 	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
@@ -578,10 +619,6 @@ type InstanceTemplateStatus struct {
 	// Replicas is the number of replicas of the InstanceTemplate.
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
-
-	// Ordinals is the ordinals used by the instances of the InstanceTemplate.
-	// +optional
-	Ordinals []int32 `json:"ordinals,omitempty"`
 
 	// ReadyReplicas is the number of Pods that have a Ready Condition.
 	// +optional

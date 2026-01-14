@@ -32316,12 +32316,49 @@ Ordinals
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired Ordinals of the default template.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
 If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>assignedOrdinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AssignedOrdinals is the set of ordinals assigned to the current replicas.</p>
+<p>IMPORTANT: This field is managed automatically by the InstanceSet controller.
+Users should NOT manually modify this field.</p>
+<p>This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.</p>
+<p>The controller uses this list to maintain identity consistency and to decide which specific ordinal
+to allocate next during scaling up, or which identity is preserved during a restart.</p>
 </td>
 </tr>
 <tr>
@@ -32599,6 +32636,19 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the InstanceSet.
+If set, all the computing resources will be released.</p>
 </td>
 </tr>
 <tr>
@@ -32970,12 +33020,49 @@ Ordinals
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired Ordinals of the default template.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
 If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under the default template would be
 $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>assignedOrdinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AssignedOrdinals is the set of ordinals assigned to the current replicas.</p>
+<p>IMPORTANT: This field is managed automatically by the InstanceSet controller.
+Users should NOT manually modify this field.</p>
+<p>This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.</p>
+<p>The controller uses this list to maintain identity consistency and to decide which specific ordinal
+to allocate next during scaling up, or which identity is preserved during a restart.</p>
 </td>
 </tr>
 <tr>
@@ -33257,6 +33344,19 @@ bool
 </tr>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the InstanceSet.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
@@ -33370,18 +33470,6 @@ int32
 </td>
 <td>
 <p>replicas is the number of instances created by the InstanceSet controller.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ordinals</code><br/>
-<em>
-[]int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.</p>
 </td>
 </tr>
 <tr>
@@ -34019,12 +34107,33 @@ Ordinals
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
 then the instance names generated under this InstanceTemplate would be
 $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
 $(cluster.name)-$(component.name)-$(template.name)-7</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>assignedOrdinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AssignedOrdinals is the set of ordinals assigned to the current replicas of this InstanceTemplate.</p>
+<p>IMPORTANT: This field is managed automatically by the InstanceSet controller.
+Users should NOT manually modify this field.</p>
+<p>This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.</p>
+<p>The controller uses this list to maintain identity consistency and to decide which specific ordinal
+to allocate next during scaling up, or which identity is preserved during a restart.</p>
 </td>
 </tr>
 <tr>
@@ -34162,18 +34271,6 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Replicas is the number of replicas of the InstanceTemplate.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ordinals</code><br/>
-<em>
-[]int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Ordinals is the ordinals used by the instances of the InstanceTemplate.</p>
 </td>
 </tr>
 <tr>

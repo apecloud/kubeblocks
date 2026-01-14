@@ -105,6 +105,19 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 
 func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
 	ctx := transCtx.GetContext()
+
+	getSpecField := func(obj client.Object) interface{} {
+		objValue := reflect.ValueOf(obj)
+		if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
+			return nil
+		}
+		field := objValue.Elem().FieldByName("Spec")
+		if !field.IsValid() {
+			return nil
+		}
+		return field.Interface()
+	}
+
 	getStatusField := func(obj client.Object) interface{} {
 		objValue := reflect.ValueOf(obj)
 		if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
@@ -130,10 +143,11 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 			root := model.NewObjectVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
 			vertices = append(vertices, root)
 		}
-		// if annotations, labels or finalizers updated, do both meta patch and status update.
+		// if annotations, labels, finalizers or spec updated, update the object
 		if !reflect.DeepEqual(currentTree.GetRoot().GetAnnotations(), desiredTree.GetRoot().GetAnnotations()) ||
 			!reflect.DeepEqual(currentTree.GetRoot().GetLabels(), desiredTree.GetRoot().GetLabels()) ||
-			!reflect.DeepEqual(currentTree.GetRoot().GetFinalizers(), desiredTree.GetRoot().GetFinalizers()) {
+			!reflect.DeepEqual(currentTree.GetRoot().GetFinalizers(), desiredTree.GetRoot().GetFinalizers()) ||
+			!reflect.DeepEqual(getSpecField(currentTree.GetRoot()), getSpecField(desiredTree.GetRoot())) {
 			currentRoot, _ := currentTree.GetRoot().DeepCopyObject().(client.Object)
 			desiredRoot, _ := desiredTree.GetRoot().DeepCopyObject().(client.Object)
 			patchRoot := model.NewObjectVertex(currentRoot, desiredRoot, model.ActionPatchPtr())

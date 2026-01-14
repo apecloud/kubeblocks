@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,17 +31,19 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-// revisionUpdateReconciler is responsible for updating the expected instance names and their corresponding revisions in the status when there are changes in the spec.
-type revisionUpdateReconciler struct{}
+func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
+	return &revisionUpdateReconciler{}
+}
 
 type instanceRevision struct {
 	name     string
 	revision string
 }
 
-func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
-	return &revisionUpdateReconciler{}
-}
+// revisionUpdateReconciler is responsible for updating the expected instance names and their corresponding revisions in the status when there are changes in the spec.
+type revisionUpdateReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}
 
 func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectUpdating(tree.GetRoot()) {
@@ -50,13 +54,11 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-
-	// build instance revision list from instance templates
-	var instanceRevisionList []instanceRevision
 	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -65,6 +67,13 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
+
+	if its.Spec.FlatInstanceOrdinal {
+		r.updateAssignedOrdinals(its, nameMap)
+	}
+
+	// build instance revision list from instance templates
+	var instanceRevisionList []instanceRevision
 	for instanceName, templateExt := range nameMap {
 		revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
 		if err != nil {
@@ -72,7 +81,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		}
 		instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
 	}
-
 	updatedRevisions := make(map[string]string, len(instanceRevisionList))
 	for _, r := range instanceRevisionList {
 		updatedRevisions[r.name] = r.revision
@@ -89,7 +97,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision
 	}
 	its.Status.UpdateRevision = updateRevision
-	updatedReplicas, err := calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
+	updatedReplicas, err := r.calculateUpdatedReplicas(its, tree.List(&corev1.Pod{}))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -102,7 +110,22 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
+func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.InstanceSet, nameMap map[string]*instancetemplate.InstanceTemplateExt) {
+	ordinals := make(map[string][]int32)
+	for name, tplExt := range nameMap {
+		_, ordinal := parseParentNameAndOrdinal(name)
+		ordinals[tplExt.Name] = append(ordinals[tplExt.Name], int32(ordinal))
+	}
+
+	its.Spec.AssignedOrdinals.Discrete = ordinals[instancetemplate.DefaultTemplateName]
+	slices.Sort(its.Spec.AssignedOrdinals.Discrete)
+	for i, tpl := range its.Spec.Instances {
+		its.Spec.Instances[i].AssignedOrdinals.Discrete = ordinals[tpl.Name]
+		slices.Sort(its.Spec.Instances[i].AssignedOrdinals.Discrete)
+	}
+}
+
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {
 	updatedReplicas := int32(0)
 	for i := range pods {
 		pod, _ := pods[i].(*corev1.Pod)
@@ -113,9 +136,6 @@ func calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) 
 		if updated {
 			updatedReplicas++
 		}
-
 	}
 	return updatedReplicas, nil
 }
-
-var _ kubebuilderx.Reconciler = &revisionUpdateReconciler{}

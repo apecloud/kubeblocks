@@ -32308,25 +32308,6 @@ Defaults to 1 if unspecified.</p>
 </tr>
 <tr>
 <td>
-<code>defaultTemplateOrdinals</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.Ordinals">
-Ordinals
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
-<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
-then the instance names generated under the default template would be
-$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>ordinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
@@ -33008,25 +32989,6 @@ int32
 <p>Specifies the desired number of replicas of the given Template.
 These replicas are instantiations of the same Template, with each having a consistent identity.
 Defaults to 1 if unspecified.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>defaultTemplateOrdinals</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.Ordinals">
-Ordinals
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
-<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
-then the instance names generated under the default template would be
-$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
 </td>
 </tr>
 <tr>

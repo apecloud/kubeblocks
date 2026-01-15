@@ -245,7 +245,6 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	in.DefaultTemplateOrdinals.DeepCopyInto(&out.DefaultTemplateOrdinals)
 	in.Ordinals.DeepCopyInto(&out.Ordinals)
 	in.AssignedOrdinals.DeepCopyInto(&out.AssignedOrdinals)
 	if in.Selector != nil {

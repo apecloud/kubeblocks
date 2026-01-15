@@ -84,18 +84,6 @@ type InstanceSetSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Specifies the desired Ordinals of the default template.
-	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
-	//
-	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
-	// then the instance names generated under the default template would be
-	// $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
-	// +optional
-	DefaultTemplateOrdinals kbappsv1.Ordinals `json:"defaultTemplateOrdinals,omitempty"`
-
 	// Specifies the desired Ordinals.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.
 	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.

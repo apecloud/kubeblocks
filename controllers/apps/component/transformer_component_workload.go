@@ -69,10 +69,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 	transCtx.ProtoWorkload = protoITS
-	if runningITS != nil {
-		// set status for the use of pod name builder
-		protoITS.Status = runningITS.Status
-	}
 
 	if err = t.reconcileWorkload(transCtx.Context, t.Client, synthesizeComp, comp, runningITS, protoITS); err != nil {
 		return err
@@ -198,7 +194,9 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 		start = !stop && ptr.Deref(runningITS.Spec.Stop, false)
 	)
 	if start || stop {
-		*protoITS = runningITS.DeepCopy() // don't modify the runningITS except for the stop flag
+		runningITSCopy := runningITS.DeepCopy() // don't modify the runningITS except for the stop flag
+		runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
+		*protoITS = runningITSCopy
 	}
 	if stop && checkPostProvisionDone(transCtx) {
 		(*protoITS).Spec.Stop = ptr.To(true)

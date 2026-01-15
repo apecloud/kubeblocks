@@ -295,10 +295,11 @@ func (t *rolloutReplaceTransformer) sharding(transCtx *rolloutTransformContext,
 		tpl = tpls[instTpl.Name]
 	}
 
+	totalReplicas := newReplicas * spec.Shards
 	if spec.Template.Replicas == replicas {
-		return t.shardingUp(rollout, sharding, spec, newReplicas, tpl)
+		return t.shardingUp(rollout, sharding, spec, totalReplicas, tpl)
 	} else {
-		return t.shardingDown(rollout, sharding, spec, newReplicas, instance, instTpl)
+		return t.shardingDown(rollout, sharding, spec, totalReplicas, instance, instTpl)
 	}
 }
 

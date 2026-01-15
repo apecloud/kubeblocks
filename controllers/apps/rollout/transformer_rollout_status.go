@@ -315,7 +315,7 @@ func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformCon
 	if !checkClusterNShardingRunning(transCtx, sharding.Name) || spec.Template.Replicas != newReplicas {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
-	if allPodCnt != spec.Template.Replicas {
+	if allPodCnt != spec.Template.Replicas*spec.Shards {
 		return appsv1alpha1.RollingRolloutState, nil // scaling down
 	}
 	return appsv1alpha1.SucceedRolloutState, nil

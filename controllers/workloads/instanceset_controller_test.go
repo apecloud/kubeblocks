@@ -718,4 +718,158 @@ var _ = Describe("InstanceSet Controller", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	Context("start & stop", func() {
+		var (
+			pvc = corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "data",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+		)
+
+		BeforeEach(func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetFlatInstanceOrdinal(true).
+					AddVolumeClaimTemplate(pvc)
+			})
+
+			By("check pods created")
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-0", itsObj.Name),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+
+			By("check PVCs created")
+			pvcKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+		})
+
+		It("stop", func() {
+			By("stop the its")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+			})()).Should(Succeed())
+
+			By("check pods deleted")
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-0", itsObj.Name),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+
+			By("check PVCs still exist")
+			pvcKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%s-0", pvc.Name, itsObj.Name),
+			}
+			Consistently(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+		})
+
+		It("start", func() {
+			By("stop the its first")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+			})()).Should(Succeed())
+
+			By("stop the its")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+			})()).Should(Succeed())
+
+			By("check pods deleted")
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-0", itsObj.Name),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+
+			By("start it")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = nil
+			})()).Should(Succeed())
+
+			By("check pods created")
+			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+		})
+
+		It("stop & start - discrete ordinals", func() {
+			By("scale up to 3 replicas")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+				its.Spec.Replicas = ptr.To(int32(3))
+			})()).Should(Succeed())
+
+			By("check pods created and mock them ready")
+			for i := 0; i < 3; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+
+				mockPodReady(podKey.Name)
+			}
+
+			By("offline instance 1")
+			offlineOrdinal := 1
+			offlinePodKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-%d", itsObj.Name, offlineOrdinal),
+			}
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To(int32(2))
+				its.Spec.OfflineInstances = []string{offlinePodKey.Name}
+			})()).Should(Succeed())
+
+			By("check instance 1 offline")
+			Eventually(testapps.CheckObjExists(&testCtx, offlinePodKey, &corev1.Pod{}, false)).Should(Succeed())
+
+			By("cleanup offline instances & stop the its")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.OfflineInstances = nil
+				its.Spec.Stop = ptr.To(true)
+			})()).Should(Succeed())
+
+			By("check pods deleted")
+			for i := 0; i < 3; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+			}
+
+			By("start it")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = nil
+			})()).Should(Succeed())
+
+			By("check pods created")
+			for i := 0; i < 3; i++ {
+				podKey := types.NamespacedName{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%d", itsObj.Name, i),
+				}
+				if i == offlineOrdinal {
+					Consistently(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, false)).Should(Succeed())
+				} else {
+					Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
+				}
+			}
+		})
+	})
 })

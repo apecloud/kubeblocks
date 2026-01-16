@@ -22,6 +22,9 @@ package rollout
 import (
 	"slices"
 
+	"k8s.io/utils/ptr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -97,6 +100,17 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 			}
 			return false
 		})
+		spec.Instances = slices.DeleteFunc(spec.Instances, func(tpl appsv1.InstanceTemplate) bool {
+			if ptr.Deref(tpl.Replicas, 0) > 0 {
+				return false
+			}
+			_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
+			return ok
+		})
+		for i := range spec.Instances {
+			spec.Instances[i].ServiceVersion = tpl.ServiceVersion
+			spec.Instances[i].CompDef = tpl.CompDef
+		}
 	}
 	return nil
 }
@@ -155,6 +169,17 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 			}
 			return false
 		})
+		spec.Template.Instances = slices.DeleteFunc(spec.Template.Instances, func(tpl appsv1.InstanceTemplate) bool {
+			if ptr.Deref(tpl.Replicas, 0) > 0 {
+				return false
+			}
+			_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
+			return ok
+		})
+		for i := range spec.Template.Instances {
+			spec.Template.Instances[i].ServiceVersion = tpl.ServiceVersion
+			spec.Template.Instances[i].CompDef = tpl.CompDef
+		}
 	}
 	return nil
 }

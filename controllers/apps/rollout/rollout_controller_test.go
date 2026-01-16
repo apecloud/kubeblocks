@@ -888,12 +888,12 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(spec.Instances[0].Name).Should(Equal(instanceTemplateName))
 				g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
 				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(1)))
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				for _, i := range []int{1, 2} {
 					tpl := spec.Instances[i]
 					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
-					g.Expect(tpl.Name).Should(HavePrefix(prefix))
-					if tpl.Name == prefix {
+					g.Expect(tpl.Name).Should(HaveSuffix(suffix))
+					if tpl.Name == suffix {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
 					} else {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
@@ -946,12 +946,12 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(spec.Instances[0].Name).Should(Equal(instanceTemplateName))
 				g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
 				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(1)))             // hasn't been scaled down
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				for _, i := range []int{1, 2} {
 					tpl := spec.Instances[i]
 					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
-					g.Expect(tpl.Name).Should(HavePrefix(prefix))
-					if tpl.Name == prefix {
+					g.Expect(tpl.Name).Should(HaveSuffix(suffix))
+					if tpl.Name == suffix {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
 					} else {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
@@ -997,12 +997,12 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(spec.Instances[0].Name).Should(Equal(instanceTemplateName))
 				g.Expect(spec.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
 				g.Expect(*spec.Instances[0].Replicas).Should(Equal(int32(0)))             // should be scaled down
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				for _, i := range []int{1, 2} {
 					tpl := spec.Instances[i]
 					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
-					g.Expect(tpl.Name).Should(HavePrefix(prefix))
-					if tpl.Name == prefix {
+					g.Expect(tpl.Name).Should(HaveSuffix(suffix))
+					if tpl.Name == suffix {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
 					} else {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
@@ -1023,11 +1023,11 @@ var _ = Describe("rollout controller", func() {
 			})
 
 			for i := int32(0); i < replicas; i++ {
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
-				newTplName := prefix
+				newTplName := suffix
 				if tplName != "" {
-					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+					newTplName = fmt.Sprintf("%s-%s", tplName, suffix)
 				}
 
 				mockClusterNCompRunning() // to up
@@ -1050,9 +1050,9 @@ var _ = Describe("rollout controller", func() {
 
 				By("creating the new pod")
 				if tplName == "" {
-					mockCreatePods([]int32{i + 10}, prefix)
+					mockCreatePods([]int32{i + 10}, suffix)
 				} else {
-					mockCreatePods([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+					mockCreatePods([]int32{i + 10}, fmt.Sprintf("%s-%s", tplName, suffix))
 				}
 
 				mockClusterNCompRunning() // to down
@@ -1102,11 +1102,11 @@ var _ = Describe("rollout controller", func() {
 			})
 
 			for i := int32(0); i < replicas; i++ {
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
-				newTplName := prefix
+				newTplName := suffix
 				if tplName != "" {
-					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+					newTplName = fmt.Sprintf("%s-%s", tplName, suffix)
 				}
 
 				mockClusterNCompRunning() // to up
@@ -1129,9 +1129,9 @@ var _ = Describe("rollout controller", func() {
 
 				By("creating the new pod")
 				if tplName == "" {
-					mockCreatePods([]int32{i + 10}, prefix)
+					mockCreatePods([]int32{i + 10}, suffix)
 				} else {
-					mockCreatePods([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+					mockCreatePods([]int32{i + 10}, fmt.Sprintf("%s-%s", tplName, suffix))
 				}
 
 				mockClusterNCompRunning() // to down
@@ -1397,12 +1397,12 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(spec.Template.Instances[0].Name).Should(Equal(instanceTemplateName))
 				g.Expect(spec.Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
 				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(1)))
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				for _, i := range []int{1, 2} {
 					tpl := spec.Template.Instances[i]
 					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
-					g.Expect(tpl.Name).Should(HavePrefix(prefix))
-					if tpl.Name == prefix {
+					g.Expect(tpl.Name).Should(HaveSuffix(suffix))
+					if tpl.Name == suffix {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
 					} else {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
@@ -1454,12 +1454,12 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(spec.Template.Instances[0].Name).Should(Equal(instanceTemplateName))
 				g.Expect(spec.Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
 				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(1)))             // hasn't been scaled down
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				for _, i := range []int{1, 2} {
 					tpl := spec.Template.Instances[i]
 					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
-					g.Expect(tpl.Name).Should(HavePrefix(prefix))
-					if tpl.Name == prefix {
+					g.Expect(tpl.Name).Should(HaveSuffix(suffix))
+					if tpl.Name == suffix {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
 					} else {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
@@ -1504,12 +1504,12 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(spec.Template.Instances[0].Name).Should(Equal(instanceTemplateName))
 				g.Expect(spec.Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion1)) // hasn't been updated
 				g.Expect(*spec.Template.Instances[0].Replicas).Should(Equal(int32(0)))             // should be scaled down
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				for _, i := range []int{1, 2} {
 					tpl := spec.Template.Instances[i]
 					g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
-					g.Expect(tpl.Name).Should(HavePrefix(prefix))
-					if tpl.Name == prefix {
+					g.Expect(tpl.Name).Should(HaveSuffix(suffix))
+					if tpl.Name == suffix {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(0)))
 					} else {
 						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
@@ -1529,11 +1529,11 @@ var _ = Describe("rollout controller", func() {
 			})
 
 			for i := int32(0); i < replicas; i++ {
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
-				newTplName := prefix
+				newTplName := suffix
 				if tplName != "" {
-					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+					newTplName = fmt.Sprintf("%s-%s", tplName, suffix)
 				}
 
 				mockClusterNShardingRunning() // to up
@@ -1556,9 +1556,9 @@ var _ = Describe("rollout controller", func() {
 
 				By("creating the new pod")
 				if tplName == "" {
-					mockCreatePods4Sharding([]int32{i + 10}, prefix)
+					mockCreatePods4Sharding([]int32{i + 10}, suffix)
 				} else {
-					mockCreatePods4Sharding([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+					mockCreatePods4Sharding([]int32{i + 10}, fmt.Sprintf("%s-%s", tplName, suffix))
 				}
 
 				mockClusterNShardingRunning() // to down
@@ -1607,11 +1607,11 @@ var _ = Describe("rollout controller", func() {
 			})
 
 			for i := int32(0); i < replicas; i++ {
-				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				suffix := replaceInstanceTemplateNameSuffix(rolloutObj)
 				tplName := pods[i].Labels[constant.KBAppInstanceTemplateLabelKey]
-				newTplName := prefix
+				newTplName := suffix
 				if tplName != "" {
-					newTplName = fmt.Sprintf("%s-%s", prefix, tplName)
+					newTplName = fmt.Sprintf("%s-%s", tplName, suffix)
 				}
 
 				mockClusterNShardingRunning() // to up
@@ -1634,9 +1634,9 @@ var _ = Describe("rollout controller", func() {
 
 				By("creating the new pod")
 				if tplName == "" {
-					mockCreatePods4Sharding([]int32{i + 10}, prefix)
+					mockCreatePods4Sharding([]int32{i + 10}, suffix)
 				} else {
-					mockCreatePods4Sharding([]int32{i + 10}, fmt.Sprintf("%s-%s", prefix, tplName))
+					mockCreatePods4Sharding([]int32{i + 10}, fmt.Sprintf("%s-%s", tplName, suffix))
 				}
 
 				mockClusterNShardingRunning() // to down

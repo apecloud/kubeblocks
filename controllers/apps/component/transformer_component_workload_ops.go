@@ -71,9 +71,7 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 	if err != nil {
 		return nil, err
 	}
-	protoITSCopy := protoITS.DeepCopy()
-	protoITSCopy.Status = *runningITS.Status.DeepCopy()
-	protoITSPodNames, err := component.GeneratePodNamesByITS(protoITSCopy)
+	protoITSPodNames, err := component.GenerateDesiredPodNamesByITS(runningITS, protoITS)
 	if err != nil {
 		return nil, err
 	}

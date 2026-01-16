@@ -51,7 +51,7 @@ func getInstanceTemplates(instances []workloads.InstanceTemplate, template *core
 	if template.BinaryData == nil {
 		return nil
 	}
-	templateData, ok := template.BinaryData[TemplateRefDataKey]
+	templateData, ok := template.BinaryData[templateRefDataKey]
 	if !ok {
 		return nil
 	}
@@ -94,7 +94,7 @@ func getInstanceTemplateMap(annotations map[string]string) (map[string]string, e
 	if annotations == nil {
 		return nil, nil
 	}
-	templateRef, ok := annotations[TemplateRefAnnotationKey]
+	templateRef, ok := annotations[templateRefAnnotationKey]
 	if !ok {
 		return nil, nil
 	}

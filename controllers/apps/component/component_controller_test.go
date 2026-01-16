@@ -1792,6 +1792,7 @@ var _ = Describe("Component Controller", func() {
 
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Stop).Should(BeNil())
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(1))
 				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).ShouldNot(BeNil())
 				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType))
@@ -1816,9 +1817,11 @@ var _ = Describe("Component Controller", func() {
 
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(0))
+				g.Expect(its.Spec.Stop).ShouldNot(BeNil())
+				g.Expect(*its.Spec.Stop).Should(BeTrue())
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(1))
 				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).ShouldNot(BeNil())
-				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType))
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType))
 			})).Should(Succeed())
 		}
 

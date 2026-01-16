@@ -26,13 +26,15 @@ import (
 )
 
 const (
-	// used to specify the configmap which stores the compressed instance template
-	TemplateRefAnnotationKey = "kubeblocks.io/template-ref"
-	TemplateRefDataKey       = "instances"
-
 	TemplateNameLabelKey = "workloads.kubeblocks.io/template-name"
 
-	defaultTemplateName = ""
+	DefaultTemplateName = ""
+)
+
+const (
+	// used to specify the configmap which stores the compressed instance template
+	templateRefAnnotationKey = "kubeblocks.io/template-ref"
+	templateRefDataKey       = "instances"
 )
 
 // InstanceSetExt has a complete list of instance templates.
@@ -52,9 +54,7 @@ type InstanceTemplateExt struct {
 }
 
 type PodNameBuilder interface {
-	BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error)
-	GenerateAllInstanceNames() ([]string, error)
-	// Validate will check nameBuilder-specific validation rules.
-	// Rules that apply to all nameBuilders will be checked in ValidateInstanceTemplates.
 	Validate() error
+	GenerateAllInstanceNames() ([]string, error)
+	BuildInstanceName2TemplateMap() (map[string]*InstanceTemplateExt, error)
 }

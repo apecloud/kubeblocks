@@ -443,7 +443,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		failedCount            int
 		completedCount         int
 	)
-	currPodSet, _ := component.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
+	currPodSet, _ := generateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
 		opsRes.Cluster.Name, compSpec.Name)
 	for _, instance := range rebuildInstance.Instances {
 		progressDetail := r.getInstanceProgressDetail(*compStatus, instance.Name)

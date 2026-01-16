@@ -51,7 +51,7 @@ func NewUpdateReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) || isStopRequested(tree.GetRoot().(*workloads.InstanceSet)) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	if model.IsReconciliationPaused(tree.GetRoot()) {

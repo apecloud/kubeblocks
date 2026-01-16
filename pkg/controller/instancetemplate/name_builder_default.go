@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -119,16 +118,16 @@ func getOrdinalListByTemplateName(its *workloads.InstanceSet, templateName strin
 	return convertOrdinalsToSortedList(ordinals), nil
 }
 
-func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
-	if templateName == defaultTemplateName {
-		return its.Spec.DefaultTemplateOrdinals, nil
+func getOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (workloads.Ordinals, error) {
+	if templateName == DefaultTemplateName {
+		return its.Spec.Ordinals, nil
 	}
 	for _, template := range its.Spec.Instances {
 		if template.Name == templateName {
 			return template.Ordinals, nil
 		}
 	}
-	return kbappsv1.Ordinals{}, fmt.Errorf("template %s not found", templateName)
+	return workloads.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
 func generateInstanceNamesFromTemplate(parentName, templateName string, replicas int32, offlineInstances []string, ordinalList []int32) ([]string, error) {

@@ -21,7 +21,6 @@ package instanceset2
 
 import (
 	"encoding/json"
-	"slices"
 	"sort"
 	"time"
 
@@ -62,7 +61,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	replicas := int32(0)
-	ordinals := make([]int32, 0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
@@ -85,22 +83,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// }
 
 	for _, inst := range instanceList {
-		_, ordinal := parseParentNameAndOrdinal(inst.Name)
 		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
-				Name:     templateName,
-				Ordinals: make([]int32, 0),
+				Name: templateName,
 			}
 		}
 		{
 			notReadyNames.Insert(inst.Name)
 			replicas++
-			if len(templateName) == 0 {
-				ordinals = append(ordinals, int32(ordinal))
-			}
 			template2TemplatesStatus[templateName].Replicas++
-			template2TemplatesStatus[templateName].Ordinals = append(template2TemplatesStatus[templateName].Ordinals, int32(ordinal))
 		}
 		if intctrlutil.IsInstanceReady(inst) {
 			readyReplicas++
@@ -134,8 +126,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		// }
 	}
 	its.Status.Replicas = replicas
-	its.Status.Ordinals = ordinals
-	slices.Sort(its.Status.Ordinals)
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
@@ -203,7 +193,6 @@ func buildTemplatesStatus(template2TemplatesStatus map[string]*workloads.Instanc
 		if len(templateName) == 0 {
 			continue
 		}
-		slices.Sort(templateStatus.Ordinals)
 		templatesStatus = append(templatesStatus, *templateStatus)
 	}
 	sort.Slice(templatesStatus, func(i, j int) bool {

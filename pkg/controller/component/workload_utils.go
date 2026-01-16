@@ -23,7 +23,6 @@ import (
 	"context"
 	"maps"
 	"reflect"
-	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,15 +124,7 @@ func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
 func GenerateDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]string, error) {
 	if runningITS != nil {
 		protoITS = protoITS.DeepCopy()
-		protoITS.Spec.AssignedOrdinals = runningITS.Spec.AssignedOrdinals
-		for _, tpl := range protoITS.Spec.Instances {
-			idx := slices.IndexFunc(runningITS.Spec.Instances, func(rtpl workloads.InstanceTemplate) bool {
-				return tpl.Name == rtpl.Name
-			})
-			if idx >= 0 {
-				tpl.AssignedOrdinals = runningITS.Spec.Instances[idx].AssignedOrdinals
-			}
-		}
+		protoITS.Status.AssignedOrdinals = runningITS.Status.AssignedOrdinals
 	}
 	return GeneratePodNamesByITS(protoITS)
 }

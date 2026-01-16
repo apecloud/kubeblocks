@@ -23,6 +23,7 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -54,7 +55,6 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
-
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -69,7 +69,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	}
 
 	if its.Spec.FlatInstanceOrdinal {
-		r.updateAssignedOrdinals(its, nameMap)
+		r.updateAssignedOrdinals(its, nameMap, tree.List(&corev1.Pod{}))
 	}
 
 	// build instance revision list from instance templates
@@ -110,19 +110,47 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.InstanceSet, nameMap map[string]*instancetemplate.InstanceTemplateExt) {
-	ordinals := make(map[string][]int32)
+func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.InstanceSet,
+	nameMap map[string]*instancetemplate.InstanceTemplateExt, pods []client.Object) {
+	ordinals := make(map[string]sets.Set[int32])
 	for name, tplExt := range nameMap {
 		_, ordinal := parseParentNameAndOrdinal(name)
-		ordinals[tplExt.Name] = append(ordinals[tplExt.Name], int32(ordinal))
+		if ordinals[tplExt.Name] == nil {
+			ordinals[tplExt.Name] = sets.New[int32](int32(ordinal))
+		} else {
+			ordinals[tplExt.Name].Insert(int32(ordinal))
+		}
 	}
 
-	its.Spec.AssignedOrdinals.Discrete = ordinals[instancetemplate.DefaultTemplateName]
-	slices.Sort(its.Spec.AssignedOrdinals.Discrete)
-	for i, tpl := range its.Spec.Instances {
-		its.Spec.Instances[i].AssignedOrdinals.Discrete = ordinals[tpl.Name]
-		slices.Sort(its.Spec.Instances[i].AssignedOrdinals.Discrete)
+	runningOrdinals := sets.New[int32]()
+	for _, pod := range pods {
+		if _, ok := nameMap[pod.GetName()]; ok {
+			continue // in-using, skip
+		}
+		_, ordinal := parseParentNameAndOrdinal(pod.GetName())
+		runningOrdinals.Insert(int32(ordinal))
 	}
+	for name, ordinal := range its.Status.AssignedOrdinals {
+		if _, ok := ordinals[name]; ok {
+			continue
+		}
+		// the instance template has been deleted
+		running := runningOrdinals.Intersection(sets.New(ordinal.Discrete...))
+		if running.Len() > 0 {
+			ordinals[name] = sets.New[int32](running.UnsortedList()...)
+		}
+	}
+
+	assignedOrdinals := make(map[string]workloads.Ordinals)
+	for name, ordinalSet := range ordinals {
+		assignedOrdinals[name] = workloads.Ordinals{Discrete: ordinalSet.UnsortedList()}
+		slices.Sort(assignedOrdinals[name].Discrete)
+	}
+
+	if len(assignedOrdinals) == 0 {
+		assignedOrdinals = nil
+	}
+	its.Status.AssignedOrdinals = assignedOrdinals
 }
 
 func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, pods []client.Object) (int32, error) {

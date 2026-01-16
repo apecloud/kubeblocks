@@ -149,6 +149,7 @@ func (c *flatNameBuilder) Validate() error {
 //
 // template ordinals are assumed to be valid at this time
 func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
+	its := itsExt.InstanceSet
 	// globalUsedOrdinalSet won't decrease, so that one ordinal couldn't suddenly change its template
 	globalUsedOrdinalSet := sets.New[int32]()
 	defaultTemplateUnavailableOrdinalSet := sets.New[int32]()
@@ -164,7 +165,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 	})
 
 	offlineOrdinalSet := sets.New[int32]()
-	for _, instance := range itsExt.InstanceSet.Spec.OfflineInstances {
+	for _, instance := range its.Spec.OfflineInstances {
 		ordinal, err := getOrdinal(instance)
 		if err != nil {
 			return nil, err
@@ -178,14 +179,14 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
 	}
 
-	template2OrdinalSetMap[DefaultTemplateName].Insert(itsExt.InstanceSet.Spec.AssignedOrdinals.Discrete...)
-	globalUsedOrdinalSet.Insert(itsExt.InstanceSet.Spec.AssignedOrdinals.Discrete...)
-	for _, tpl := range itsExt.InstanceSet.Spec.Instances {
-		if _, ok := template2OrdinalSetMap[tpl.Name]; !ok {
-			template2OrdinalSetMap[tpl.Name] = sets.New[int32]()
+	// template2OrdinalSetMap[DefaultTemplateName].Insert(its.Status.AssignedOrdinals[DefaultTemplateName].Discrete...)
+	// globalUsedOrdinalSet.Insert(its.Status.AssignedOrdinals[DefaultTemplateName].Discrete...)
+	for tplName, ordinals := range its.Status.AssignedOrdinals {
+		if _, ok := template2OrdinalSetMap[tplName]; !ok {
+			template2OrdinalSetMap[tplName] = sets.New[int32]()
 		}
-		template2OrdinalSetMap[tpl.Name].Insert(tpl.AssignedOrdinals.Discrete...)
-		globalUsedOrdinalSet.Insert(tpl.AssignedOrdinals.Discrete...)
+		template2OrdinalSetMap[tplName].Insert(ordinals.Discrete...)
+		globalUsedOrdinalSet.Insert(ordinals.Discrete...)
 	}
 
 	generateWithOrdinalsDefined := func(current, available sets.Set[int32], instanceTemplate *workloads.InstanceTemplate) (sets.Set[int32], error) {

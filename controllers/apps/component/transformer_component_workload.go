@@ -22,7 +22,6 @@ package component
 import (
 	"context"
 	"reflect"
-	"slices"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -254,9 +253,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions
 	itsObjCopy.Spec.Ordinals = itsProto.Spec.Ordinals
-	// IMPORTANT: The assignedOrdinals fields are managed automatically by the InstanceSet controller.
-	// itsObjCopy.Spec.AssignedOrdinals = itsProto.Spec.AssignedOrdinals
-	itsObjCopy.Spec.Instances = copyNMergeITSInstances(itsObjCopy, itsProto)
+	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.FlatInstanceOrdinal = itsProto.Spec.FlatInstanceOrdinal
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
@@ -298,34 +295,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 		return nil
 	}
 	return itsObjCopy
-}
-
-func copyNMergeITSInstances(oldITS, newITS *workloads.InstanceSet) []workloads.InstanceTemplate {
-	for i, ntpl := range newITS.Spec.Instances {
-		if idx := slices.IndexFunc(oldITS.Spec.Instances, func(otpl workloads.InstanceTemplate) bool {
-			return ntpl.Name == otpl.Name
-		}); idx >= 0 {
-			newITS.Spec.Instances[i].AssignedOrdinals = oldITS.Spec.Instances[idx].AssignedOrdinals
-		}
-	}
-	for _, otpl := range oldITS.Spec.Instances {
-		if idx := slices.IndexFunc(newITS.Spec.Instances, func(ntpl workloads.InstanceTemplate) bool {
-			return ntpl.Name == otpl.Name
-		}); idx < 0 {
-			newITS.Spec.Instances = append(newITS.Spec.Instances, workloads.InstanceTemplate{
-				Name:             otpl.Name,
-				Replicas:         ptr.To(int32(0)), // MUST set replicas to 0 explicitly
-				AssignedOrdinals: otpl.AssignedOrdinals,
-			})
-			slices.SortFunc(newITS.Spec.Instances, func(a, b workloads.InstanceTemplate) int {
-				return strings.Compare(a.Name, b.Name)
-			})
-		}
-	}
-	newITS.Spec.Instances = slices.DeleteFunc(newITS.Spec.Instances, func(tpl workloads.InstanceTemplate) bool {
-		return ptr.Deref(tpl.Replicas, 0) == 0 && len(tpl.AssignedOrdinals.Discrete) == 0
-	})
-	return newITS.Spec.Instances
 }
 
 func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {

@@ -65,45 +65,6 @@ spec:
             description: Defines the desired state of the state machine. It includes
               the configuration details for the state machine.
             properties:
-              assignedOrdinals:
-                description: |-
-                  AssignedOrdinals is the set of ordinals assigned to the current replicas.
-
-
-                  IMPORTANT: This field is managed automatically by the InstanceSet controller.
-                  Users should NOT manually modify this field.
-
-
-                  This field represents the authoritative set of ordinal identifiers currently in use by the workload.
-                  It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.
-
-
-                  The controller uses this list to maintain identity consistency and to decide which specific ordinal
-                  to allocate next during scaling up, or which identity is preserved during a restart.
-                properties:
-                  discrete:
-                    items:
-                      format: int32
-                      type: integer
-                    type: array
-                  ranges:
-                    items:
-                      description: |-
-                        Range represents a range with a start and an end value. Both start and end are included.
-                        It is used to define a continuous segment.
-                      properties:
-                        end:
-                          format: int32
-                          type: integer
-                        start:
-                          format: int32
-                          type: integer
-                      required:
-                      - end
-                      - start
-                      type: object
-                    type: array
-                type: object
               configs:
                 description: Describe the configs to be reconfigured.
                 items:
@@ -731,45 +692,6 @@ spec:
                       description: |-
                         Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
                         Existing keys will have their values overwritten, while new keys will be added to the annotations.
-                      type: object
-                    assignedOrdinals:
-                      description: |-
-                        AssignedOrdinals is the set of ordinals assigned to the current replicas of this InstanceTemplate.
-
-
-                        IMPORTANT: This field is managed automatically by the InstanceSet controller.
-                        Users should NOT manually modify this field.
-
-
-                        This field represents the authoritative set of ordinal identifiers currently in use by the workload.
-                        It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.
-
-
-                        The controller uses this list to maintain identity consistency and to decide which specific ordinal
-                        to allocate next during scaling up, or which identity is preserved during a restart.
-                      properties:
-                        discrete:
-                          items:
-                            format: int32
-                            type: integer
-                          type: array
-                        ranges:
-                          items:
-                            description: |-
-                              Range represents a range with a start and an end value. Both start and end are included.
-                              It is used to define a continuous segment.
-                            properties:
-                              end:
-                                format: int32
-                                type: integer
-                              start:
-                                format: int32
-                                type: integer
-                            required:
-                            - end
-                            - start
-                            type: object
-                          type: array
                       type: object
                     env:
                       description: |-
@@ -11684,6 +11606,45 @@ spec:
             description: Represents the current information about the state machine.
               This data may be out of date.
             properties:
+              assignedOrdinals:
+                additionalProperties:
+                  description: Ordinals represents a combination of continuous segments
+                    and individual values.
+                  properties:
+                    discrete:
+                      items:
+                        format: int32
+                        type: integer
+                      type: array
+                    ranges:
+                      items:
+                        description: |-
+                          Range represents a range with a start and an end value. Both start and end are included.
+                          It is used to define a continuous segment.
+                        properties:
+                          end:
+                            format: int32
+                            type: integer
+                          start:
+                            format: int32
+                            type: integer
+                        required:
+                        - end
+                        - start
+                        type: object
+                      type: array
+                  type: object
+                description: |-
+                  AssignedOrdinals is the ordinals assigned to the workload instances.
+
+
+                  This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+                  It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.
+
+
+                  The controller uses this to maintain identity consistency and to decide which specific ordinal
+                  to allocate next during scaling up, or which identity is preserved during a restart.
+                type: object
               availableReplicas:
                 description: Total number of available instances (ready for at least
                   minReadySeconds) targeted by this InstanceSet.
@@ -11846,7 +11807,7 @@ spec:
                 type: integer
               templatesStatus:
                 description: TemplatesStatus represents status of each instance generated
-                  by InstanceTemplates
+                  by InstanceTemplates.
                 items:
                   description: InstanceTemplateStatus aggregates the status of replicas
                     for each InstanceTemplate

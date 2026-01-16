@@ -74,21 +74,21 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("with running instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{2, 4},
-						},
 					},
 					{
 						Name:     "t2",
 						Replicas: ptr.To[int32](1),
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1}},
+					"t1":                {Discrete: []int32{2, 4}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -100,21 +100,21 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("deal with scale in", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](1),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{2, 3, 4},
-						},
 					},
 					{
 						Name:     "t2",
 						Replicas: ptr.To[int32](1),
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1}},
+					"t1":                {Discrete: []int32{2, 3, 4}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -157,9 +157,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("with ordinal spec - deal with scale out", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](4),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -172,10 +169,13 @@ var _ = Describe("flat name builder tests", func() {
 								},
 							},
 						},
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{100},
-						},
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1}},
+					"t1":                {Discrete: []int32{100}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -186,9 +186,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("with ordinal spec - a newly defined ordinal spec takes an ordinal of the default template", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -197,6 +194,11 @@ var _ = Describe("flat name builder tests", func() {
 							Discrete: []int32{1, 2},
 						},
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -219,9 +221,6 @@ var _ = Describe("flat name builder tests", func() {
 								},
 							},
 						},
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{150},
-						},
 					},
 					{
 						Name:     "t2",
@@ -235,6 +234,11 @@ var _ = Describe("flat name builder tests", func() {
 							},
 						},
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					"t1": {Discrete: []int32{150}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -302,9 +306,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("with ordinal spec replacing a normal one", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](4),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -318,6 +319,11 @@ var _ = Describe("flat name builder tests", func() {
 							},
 						},
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -335,9 +341,6 @@ var _ = Describe("flat name builder tests", func() {
 						Ordinals: workloads.Ordinals{
 							Discrete: []int32{0, 2},
 						},
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{0, 1},
-						},
 					},
 					{
 						Name:     "t2",
@@ -345,10 +348,13 @@ var _ = Describe("flat name builder tests", func() {
 						Ordinals: workloads.Ordinals{
 							Discrete: []int32{1, 3},
 						},
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{2, 3},
-						},
 					},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					"t1": {Discrete: []int32{0, 1}},
+					"t2": {Discrete: []int32{2, 3}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
@@ -359,19 +365,19 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("with offline instances", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{3},
-						},
 					},
 				},
 				OfflineInstances: []string{"-2"},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2}},
+					"t1":                {Discrete: []int32{3}},
+				},
 			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 4),
@@ -400,9 +406,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("move replicas into instance templates", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2, 3, 4},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -414,6 +417,11 @@ var _ = Describe("flat name builder tests", func() {
 					},
 				},
 			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2, 3, 4}},
+				},
+			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 2),
 			"t1":                sets.New[int32](5),
@@ -423,9 +431,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("move replicas into instance templates - take over", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2, 3, 4},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -443,6 +448,11 @@ var _ = Describe("flat name builder tests", func() {
 					},
 				},
 			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2, 3, 4}},
+				},
+			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 2),
 			"t1":                sets.New[int32](3),
@@ -452,9 +462,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("move replicas into instance templates - take over last one", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2, 3, 4},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -493,6 +500,11 @@ var _ = Describe("flat name builder tests", func() {
 					},
 				},
 			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2, 3, 4}},
+				},
+			},
 		}, map[string]sets.Set[int32]{
 			"t1": sets.New[int32](0),
 			"t2": sets.New[int32](1),
@@ -504,9 +516,6 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("move replicas into instance templates - take over and replace", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2, 3, 4},
-				},
 				Instances: []workloads.InstanceTemplate{
 					{
 						Name:     "t1",
@@ -521,6 +530,11 @@ var _ = Describe("flat name builder tests", func() {
 					},
 				},
 			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2, 3, 4}},
+				},
+			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 2),
 			"t1":                sets.New[int32](5),
@@ -530,30 +544,16 @@ var _ = Describe("flat name builder tests", func() {
 		Entry("move replicas out of instance templates", &workloads.InstanceSet{
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2},
-				},
-				Instances: []workloads.InstanceTemplate{
-					{
-						Name:     "t1",
-						Replicas: ptr.To[int32](0),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{3},
-						},
-					},
-					{
-						Name:     "t2",
-						Replicas: ptr.To[int32](0),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{4},
-						},
-					},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2}},
+					"t1":                {Discrete: []int32{3}},
+					"t2":                {Discrete: []int32{4}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 2, 5, 6), // replace 3 and 4 with 5 and 6
-			"t1":                sets.New[int32](),
-			"t2":                sets.New[int32](),
 		}, false),
 
 		Entry("move replicas out of instance templates - take back", &workloads.InstanceSet{
@@ -562,30 +562,16 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: workloads.Ordinals{
 					Discrete: []int32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
 				},
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2},
-				},
-				Instances: []workloads.InstanceTemplate{
-					{
-						Name:     "t1",
-						Replicas: ptr.To[int32](0),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{3},
-						},
-					},
-					{
-						Name:     "t2",
-						Replicas: ptr.To[int32](0),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{4},
-						},
-					},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2}},
+					"t1":                {Discrete: []int32{3}},
+					"t2":                {Discrete: []int32{4}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 2, 3, 4), // take back 3 and 4
-			"t1":                sets.New[int32](),
-			"t2":                sets.New[int32](),
 		}, false),
 
 		Entry("move replicas out of instance templates - take back and replace", &workloads.InstanceSet{
@@ -594,30 +580,16 @@ var _ = Describe("flat name builder tests", func() {
 				Ordinals: workloads.Ordinals{
 					Discrete: []int32{0, 1, 2, 3, 5, 6, 7, 8, 9}, // without ordinal 4
 				},
-				AssignedOrdinals: workloads.Ordinals{
-					Discrete: []int32{0, 1, 2},
-				},
-				Instances: []workloads.InstanceTemplate{
-					{
-						Name:     "t1",
-						Replicas: ptr.To[int32](0),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{3},
-						},
-					},
-					{
-						Name:     "t2",
-						Replicas: ptr.To[int32](0),
-						AssignedOrdinals: workloads.Ordinals{
-							Discrete: []int32{4},
-						},
-					},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					DefaultTemplateName: {Discrete: []int32{0, 1, 2}},
+					"t1":                {Discrete: []int32{3}},
+					"t2":                {Discrete: []int32{4}},
 				},
 			},
 		}, map[string]sets.Set[int32]{
 			DefaultTemplateName: sets.New[int32](0, 1, 2, 3, 5), // take back 3 and replace 4 with 5
-			"t1":                sets.New[int32](),
-			"t2":                sets.New[int32](),
 		}, false),
 	)
 

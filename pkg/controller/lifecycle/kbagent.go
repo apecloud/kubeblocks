@@ -358,7 +358,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), pod.Name)
 		}
 		if len(rsp.Error) > 0 {
-			return nil, a.formatError(lfa, rsp)
+			return nil, a.formatError(lfa, rsp, pod.Name)
 		}
 		// take first non-nil output
 		if output == nil && rsp.Output != nil {
@@ -385,9 +385,9 @@ func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
 	return host, port, nil
 }
 
-func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) error {
+func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, podName string) error {
 	wrapError := func(err error) error {
-		return errors.Wrapf(err, "action: %s, error: %s", lfa.name(), rsp.Message)
+		return errors.Wrapf(err, "action: %s, executed on pod: %s, error: %s", lfa.name(), podName, rsp.Message)
 	}
 	err := proto.Type2Error(rsp.Error)
 	switch {

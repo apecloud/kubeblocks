@@ -636,11 +636,12 @@ func replaceInstanceTemplateName(tpl appsv1.InstanceTemplate) string {
 	}
 	subs := strings.Split(tpl.Name, "-")
 	if len(subs) == 1 {
-		return tpl.Name
+		return tpl.Name // TODO: "" or tpl.Name
 	}
 	return strings.Join(subs[:len(subs)-1], "-")
 }
 
+// TODO: name
 func replaceInstanceTemplateName2(tpl appsv1.InstanceTemplate, suffix string) string {
 	tplName := replaceInstanceTemplateName(tpl)
 	if tplName == "" {

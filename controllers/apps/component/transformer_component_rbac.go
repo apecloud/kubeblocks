@@ -88,6 +88,26 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	// user managed sa
+	if serviceAccountName != "" {
+		return t.handleRBACNewRule(transCtx, dag, serviceAccountName)
+	}
+
+	// check if sa with old naming rule exists
+	newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+	newNameExists := true
+	if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: newName}, sa); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		newNameExists = false
+	}
+
+	if newNameExists || transCtx.RunningWorkload == nil {
+		return t.handleRBACNewRule(transCtx, dag, "")
+	}
+
+	// old code path
 	var err error
 	comp := transCtx.Component
 	lastServiceAccountName := comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]
@@ -151,6 +171,93 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
 
 	return nil
+}
+
+func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransformContext, dag *graph.DAG, userDefinedSAName string) error {
+	synthesizedComp := transCtx.SynthesizeComponent
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	saName := userDefinedSAName
+	var sa *corev1.ServiceAccount
+	var err error
+	if userDefinedSAName == "" {
+		saName = constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
+		sa, err = createOrUpdateServiceAccount(transCtx, saName, graphCli, dag)
+		if err != nil {
+			return err
+		}
+	}
+	synthesizedComp.PodSpec.ServiceAccountName = saName
+	rbs, err := createOrUpdateRoleBindingNew(transCtx, transCtx.CompDef, saName, graphCli, dag)
+	if err != nil {
+		return err
+	}
+	objs := []client.Object{sa}
+	if sa != nil {
+		// serviceAccount should be created before roleBinding and role
+		for _, rb := range rbs {
+			objs = append(objs, rb)
+			graphCli.DependOn(dag, rb, sa)
+		}
+		// serviceAccount should be created before workload
+		itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
+		for _, its := range itsList {
+			graphCli.DependOn(dag, its, sa)
+		}
+	}
+
+	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+	return nil
+}
+
+func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
+	cmpd *appsv1.ComponentDefinition, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) ([]*rbacv1.RoleBinding, error) {
+	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
+		return labelAndAnnotationEqual(old, new) &&
+			equality.Semantic.DeepEqual(old.Subjects, new.Subjects) &&
+			equality.Semantic.DeepEqual(old.RoleRef, new.RoleRef)
+	}
+	res := make([]*rbacv1.RoleBinding, 0)
+
+	if len(cmpd.Spec.PolicyRules) != 0 {
+		// cluster role is handled by cmpd controller
+		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     constant.GenerateDefaultRoleName(cmpd.Name),
+		}, serviceAccountName)
+		if err := intctrlutil.SetOwnership(transCtx.Component, cmpdRoleBinding, model.GetScheme(), ""); err != nil {
+			return nil, err
+		}
+		rb, err := createOrUpdate(transCtx, cmpdRoleBinding, graphCli, dag, cmpRoleBinding)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, rb)
+	}
+
+	if isLifecycleActionsEnabled(transCtx.CompDef) {
+		clusterPodRoleBinding := factory.BuildRoleBinding(
+			transCtx.SynthesizeComponent,
+			fmt.Sprintf("%v-pod", serviceAccountName),
+			&rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     constant.RBACRoleName,
+			},
+			serviceAccountName,
+		)
+		if err := intctrlutil.SetOwnership(transCtx.Component, clusterPodRoleBinding, model.GetScheme(), ""); err != nil {
+			return nil, err
+		}
+		rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, rb)
+	}
+
+	return res, nil
 }
 
 func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {

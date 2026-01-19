@@ -165,7 +165,7 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 }
 
 func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloadsv1.InstanceSet) (map[string]string, error) {
-	podNames, err := component.GenerateDesiredPodNamesByITS(runningITS, protoITS)
+	podNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
 	if err != nil {
 		return nil, err
 	}

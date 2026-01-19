@@ -146,7 +146,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 			podNameSet.Insert(pod.Name)
 		}
 
-		desiredPodNames, err := component.GenerateDesiredPodNamesByITS(runningITS, protoITS)
+		desiredPodNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
 		if err != nil {
 			return nil, err
 		}

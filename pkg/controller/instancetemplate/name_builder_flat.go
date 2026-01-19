@@ -179,8 +179,6 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
 	}
 
-	// template2OrdinalSetMap[DefaultTemplateName].Insert(its.Status.AssignedOrdinals[DefaultTemplateName].Discrete...)
-	// globalUsedOrdinalSet.Insert(its.Status.AssignedOrdinals[DefaultTemplateName].Discrete...)
 	for tplName, ordinals := range its.Status.AssignedOrdinals {
 		if _, ok := template2OrdinalSetMap[tplName]; !ok {
 			template2OrdinalSetMap[tplName] = sets.New[int32]()

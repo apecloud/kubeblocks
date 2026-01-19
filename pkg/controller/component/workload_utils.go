@@ -109,8 +109,8 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	return objs, nil
 }
 
-func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+func GetCurrentPodNamesByITS(runningITS *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(runningITS, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +121,12 @@ func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
 	return nameBuilder.GenerateAllInstanceNames()
 }
 
-func GenerateDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]string, error) {
+func GetDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]string, error) {
 	if runningITS != nil {
 		protoITS = protoITS.DeepCopy()
 		protoITS.Status.AssignedOrdinals = runningITS.Status.AssignedOrdinals
 	}
-	return GeneratePodNamesByITS(protoITS)
+	return GetCurrentPodNamesByITS(protoITS)
 }
 
 func generatePodNamesByComp(comp *appsv1.Component) ([]string, error) {
@@ -158,5 +158,5 @@ func generatePodNamesByComp(comp *appsv1.Component) ([]string, error) {
 			OfflineInstances:    comp.Spec.OfflineInstances,
 		},
 	}
-	return GeneratePodNamesByITS(its)
+	return GetCurrentPodNamesByITS(its)
 }

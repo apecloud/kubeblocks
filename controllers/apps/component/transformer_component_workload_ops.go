@@ -67,11 +67,11 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) (*componentWorkloadOps, error) {
-	runningITSPodNames, err := component.GeneratePodNamesByITS(runningITS)
+	runningITSPodNames, err := component.GetCurrentPodNamesByITS(runningITS)
 	if err != nil {
 		return nil, err
 	}
-	protoITSPodNames, err := component.GenerateDesiredPodNamesByITS(runningITS, protoITS)
+	protoITSPodNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
 	if err != nil {
 		return nil, err
 	}

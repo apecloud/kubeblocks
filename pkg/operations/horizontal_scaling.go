@@ -370,7 +370,7 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string, error) {
 	clusterName := opsRes.Cluster.Name
-	lastPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas,
+	lastPodSet, err := generateAllPodNamesToSet(*lastCompConfiguration.Replicas,
 		lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName)
 	if err != nil {
 		return nil, nil, err
@@ -379,7 +379,7 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	if err != nil {
 		return nil, nil, err
 	}
-	currPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
+	currPodSet, err := generateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
 		expectOfflineInstances, clusterName, fullCompName)
 	if err != nil {
 		return nil, nil, err
@@ -482,7 +482,7 @@ func filterHorizontalScalingSpec(
 	compOfflineInstances []string,
 	horizontalScaling *opsv1alpha1.HorizontalScaling) (*opsv1alpha1.HorizontalScaling, error) {
 	offlineInstances := sets.New(compOfflineInstances...)
-	podSet, err := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTpls, compOfflineInstances,
+	podSet, err := generateAllPodNamesToSet(compReplicas, compInstanceTpls, compOfflineInstances,
 		opsRes.Cluster.Name, horizontalScaling.ComponentName)
 	if err != nil {
 		return nil, err
@@ -595,7 +595,7 @@ func (hs horizontalScalingOpsHandler) getToOnlineInsCountMap(
 		}
 	}
 	// 2. obtain the updated Pod set after synchronization replicas.
-	podSet, err := intctrlcomp.GenerateAllPodNamesToSet(compReplicas, compInstanceTplsClone, compExpectOfflineInstances,
+	podSet, err := generateAllPodNamesToSet(compReplicas, compInstanceTplsClone, compExpectOfflineInstances,
 		opsRes.Cluster.Name, horizontalScaling.ComponentName)
 	if err != nil {
 		return nil, err
@@ -718,7 +718,7 @@ func (hs horizontalScalingOpsHandler) validateOnlineInstancesToOffline(
 	if len(toOfflineSet) < len(onlineInstancesToOffline) {
 		return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
 	}
-	currPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances,
+	currPodSet, err := generateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances,
 		lastCompConfiguration.OfflineInstances, clusterName, componentName)
 	if err != nil {
 		return err

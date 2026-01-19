@@ -21,7 +21,6 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"reflect"
 	"strings"
 
@@ -40,11 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-)
-
-const (
-	// TODO: use replicas status
-	stopReplicasSnapshotKey = "apps.kubeblocks.io/stop-replicas-snapshot"
 )
 
 // componentWorkloadTransformer handles component workload generation
@@ -74,10 +68,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 	transCtx.ProtoWorkload = protoITS
-	if runningITS != nil {
-		// set status for the use of pod name builder
-		protoITS.Status = runningITS.Status
-	}
 
 	if err = t.reconcileWorkload(transCtx.Context, t.Client, synthesizeComp, comp, runningITS, protoITS); err != nil {
 		return err
@@ -156,7 +146,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 			podNameSet.Insert(pod.Name)
 		}
 
-		desiredPodNames, err := component.GeneratePodNamesByITS(protoITS)
+		desiredPodNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
 		if err != nil {
 			return nil, err
 		}
@@ -174,11 +164,7 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 
 func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransformContext, cli model.GraphClient, dag *graph.DAG,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	start, stop, err := t.handleWorkloadStartNStop(transCtx, synthesizedComp, runningITS, &protoITS)
-	if err != nil {
-		return err
-	}
-
+	start, stop := t.handleWorkloadStartNStop(transCtx, synthesizedComp, runningITS, &protoITS)
 	if !(start || stop) {
 		// postpone the update of the workload until the component is back to running.
 		if err := t.handleWorkloadUpdate(transCtx, dag, synthesizedComp, comp, runningITS, protoITS); err != nil {
@@ -201,102 +187,27 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *componentTransformContext, synthesizedComp *component.SynthesizedComponent,
-	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
+	runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool) {
 	var (
 		stop  = isCompStopped(synthesizedComp)
-		start = !stop && isWorkloadStopped(runningITS)
+		start = !stop && ptr.Deref(runningITS.Spec.Stop, false)
 	)
 	if start || stop {
-		*protoITS = runningITS.DeepCopy() // don't modify the runningITS except for the replicas
+		runningITSCopy := runningITS.DeepCopy() // don't modify the runningITS except for the stop flag
+		runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
+		*protoITS = runningITSCopy
 	}
 	if stop && checkPostProvisionDone(transCtx) {
-		return start, stop, t.stopWorkload(synthesizedComp, runningITS, *protoITS)
+		(*protoITS).Spec.Stop = ptr.To(true)
 	}
 	if start {
-		return start, stop, t.startWorkload(synthesizedComp, runningITS, *protoITS)
+		(*protoITS).Spec.Stop = nil
 	}
-	return start, stop, nil
+	return start, stop
 }
 
 func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
-	return synthesizedComp.Stop != nil && *synthesizedComp.Stop
-}
-
-func isWorkloadStopped(runningITS *workloads.InstanceSet) bool {
-	_, ok := runningITS.Annotations[stopReplicasSnapshotKey]
-	return ok
-}
-
-func (t *componentWorkloadTransformer) stopWorkload(
-	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	// since its doesn't support stop, we achieve it by setting replicas to 0.
-	protoITS.Spec.Replicas = ptr.To(int32(0))
-	for i := range protoITS.Spec.Instances {
-		protoITS.Spec.Instances[i].Replicas = ptr.To(int32(0))
-	}
-
-	// set the pvc retention policy as Retain explicitly
-	if protoITS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-		protoITS.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{}
-	}
-	protoITS.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
-
-	// backup the replicas of runningITS
-	snapshot, ok := runningITS.Annotations[stopReplicasSnapshotKey]
-	if !ok {
-		replicas := map[string]int32{}
-		if runningITS.Spec.Replicas != nil {
-			replicas[""] = *runningITS.Spec.Replicas
-		}
-		for i := range runningITS.Spec.Instances {
-			if runningITS.Spec.Instances[i].Replicas != nil {
-				replicas[protoITS.Spec.Instances[i].Name] = *runningITS.Spec.Instances[i].Replicas
-			}
-		}
-		out, err := json.Marshal(replicas)
-		if err != nil {
-			return err
-		}
-		snapshot = string(out)
-
-		protoITS.Annotations[constant.KubeBlocksGenerationKey] = synthesizedComp.Generation
-	}
-	protoITS.Annotations[stopReplicasSnapshotKey] = snapshot
-	return nil
-}
-
-func (t *componentWorkloadTransformer) startWorkload(
-	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	snapshot := runningITS.Annotations[stopReplicasSnapshotKey]
-	replicas := map[string]int32{}
-	if err := json.Unmarshal([]byte(snapshot), &replicas); err != nil {
-		return err
-	}
-
-	restore := func(p **int32, key string) {
-		val, ok := replicas[key]
-		if ok {
-			*p = ptr.To(val)
-		} else {
-			*p = nil
-		}
-	}
-
-	// restore the replicas of runningITS
-	restore(&protoITS.Spec.Replicas, "")
-	for i := range runningITS.Spec.Instances {
-		for j := range protoITS.Spec.Instances {
-			if runningITS.Spec.Instances[i].Name == protoITS.Spec.Instances[j].Name {
-				restore(&protoITS.Spec.Instances[j].Replicas, runningITS.Spec.Instances[i].Name)
-				break
-			}
-		}
-	}
-
-	delete(protoITS.Annotations, stopReplicasSnapshotKey)
-	delete(runningITS.Annotations, stopReplicasSnapshotKey)
-
-	return nil
+	return ptr.Deref(synthesizedComp.Stop, false)
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentTransformContext, dag *graph.DAG,
@@ -341,8 +252,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions
+	itsObjCopy.Spec.Ordinals = itsProto.Spec.Ordinals
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
-	itsObjCopy.Spec.DefaultTemplateOrdinals = itsProto.Spec.DefaultTemplateOrdinals
 	itsObjCopy.Spec.FlatInstanceOrdinal = itsProto.Spec.FlatInstanceOrdinal
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
@@ -354,6 +265,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Paused = itsProto.Spec.Paused
+	itsObjCopy.Spec.Stop = itsProto.Spec.Stop
 	itsObjCopy.Spec.Configs = itsProto.Spec.Configs
 	itsObjCopy.Spec.Selector = itsProto.Spec.Selector
 	itsObjCopy.Spec.DisableDefaultHeadlessService = itsProto.Spec.DisableDefaultHeadlessService

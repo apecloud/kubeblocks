@@ -89,7 +89,7 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 	}
 	newReplicas := replaceInstanceTemplateReplicas(tpls)
 	if newReplicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
-		tpl := tpls[""] // use the default template
+		tpl := tpls[""].DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.ServiceVersion = tpl.ServiceVersion
 		spec.ComponentDef = tpl.CompDef
 		spec.OfflineInstances = slices.DeleteFunc(spec.OfflineInstances, func(instance string) bool {
@@ -107,9 +107,13 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 			_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
 			return ok
 		})
-		for i := range spec.Instances {
-			spec.Instances[i].ServiceVersion = tpl.ServiceVersion
-			spec.Instances[i].CompDef = tpl.CompDef
+		for i, inst := range spec.Instances {
+			if len(inst.ServiceVersion) > 0 {
+				spec.Instances[i].ServiceVersion = tpl.ServiceVersion
+			}
+			if len(inst.CompDef) > 0 {
+				spec.Instances[i].CompDef = tpl.CompDef
+			}
 		}
 	}
 	return nil
@@ -158,7 +162,7 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 	}
 	newReplicas := replaceInstanceTemplateReplicas(tpls)
 	if newReplicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
-		tpl := tpls[""] // use the default template
+		tpl := tpls[""].DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.Template.ServiceVersion = tpl.ServiceVersion
 		spec.Template.ComponentDef = tpl.CompDef
 		spec.Template.OfflineInstances = slices.DeleteFunc(spec.Template.OfflineInstances, func(instance string) bool {
@@ -176,9 +180,13 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 			_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
 			return ok
 		})
-		for i := range spec.Template.Instances {
-			spec.Template.Instances[i].ServiceVersion = tpl.ServiceVersion
-			spec.Template.Instances[i].CompDef = tpl.CompDef
+		for i, inst := range spec.Template.Instances {
+			if len(inst.ServiceVersion) > 0 {
+				spec.Template.Instances[i].ServiceVersion = tpl.ServiceVersion
+			}
+			if len(inst.CompDef) > 0 {
+				spec.Template.Instances[i].CompDef = tpl.CompDef
+			}
 		}
 	}
 	return nil

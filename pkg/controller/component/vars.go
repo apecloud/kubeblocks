@@ -1254,9 +1254,9 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 
 	var names []string
 	if err == nil {
-		names, err = GeneratePodNamesByITS(its)
+		names, err = GetCurrentPodNamesByITS(its)
 	} else {
-		names, err = GeneratePodNamesByComp(comp)
+		names, err = generatePodNamesByComp(comp)
 	}
 	if err != nil {
 		return "", err

@@ -36,14 +36,14 @@ var _ = Describe("Validation", func() {
 						{
 							Name:     "template1",
 							Replicas: ptr.To[int32](2),
-							Ordinals: kbappsv1.Ordinals{
+							Ordinals: workloads.Ordinals{
 								Discrete: []int32{0, 1},
 							},
 						},
 						{
 							Name:     "template2",
 							Replicas: ptr.To[int32](1),
-							Ordinals: kbappsv1.Ordinals{
+							Ordinals: workloads.Ordinals{
 								Discrete: []int32{2},
 							},
 						},
@@ -104,7 +104,7 @@ var _ = Describe("Validation", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
 					Replicas: ptr.To[int32](3),
-					DefaultTemplateOrdinals: kbappsv1.Ordinals{
+					Ordinals: workloads.Ordinals{
 						Ranges: []kbappsv1.Range{
 							{
 								Start: 1,
@@ -116,14 +116,14 @@ var _ = Describe("Validation", func() {
 						{
 							Name:     "template1",
 							Replicas: ptr.To[int32](1),
-							Ordinals: kbappsv1.Ordinals{
+							Ordinals: workloads.Ordinals{
 								Discrete: []int32{0},
 							},
 						},
 						{
 							Name:     "template2",
 							Replicas: ptr.To[int32](3),
-							Ordinals: kbappsv1.Ordinals{
+							Ordinals: workloads.Ordinals{
 								Ranges: []kbappsv1.Range{
 									{
 										Start: 2,

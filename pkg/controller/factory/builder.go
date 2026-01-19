@@ -85,6 +85,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars).
+		// SetStop(synthesizedComp.Stop).  # check handleWorkloadStartNStop
 		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
 		SetInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects)
 	if compDef != nil {

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -218,4 +219,8 @@ func newLifecycleAction(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTre
 	}
 	return lifecycle.New(its.Namespace, clusterName, compName,
 		lifecycleActions, its.Spec.LifecycleActions.TemplateVars, pod, pods)
+}
+
+func isStopRequested(its *workloads.InstanceSet) bool {
+	return ptr.Deref(its.Spec.Stop, false)
 }

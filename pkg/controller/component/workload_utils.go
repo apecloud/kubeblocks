@@ -21,11 +21,8 @@ package component
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"reflect"
-	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +31,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -113,8 +109,8 @@ func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	return objs, nil
 }
 
-func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+func GetCurrentPodNamesByITS(runningITS *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(runningITS, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +121,15 @@ func GeneratePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {
 	return nameBuilder.GenerateAllInstanceNames()
 }
 
-func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
+func GetDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]string, error) {
+	if runningITS != nil {
+		protoITS = protoITS.DeepCopy()
+		protoITS.Status.AssignedOrdinals = runningITS.Status.AssignedOrdinals
+	}
+	return GetCurrentPodNamesByITS(protoITS)
+}
+
+func generatePodNamesByComp(comp *appsv1.Component) ([]string, error) {
 	instanceTemplates := func() []workloads.InstanceTemplate {
 		if len(comp.Spec.Instances) == 0 {
 			return nil
@@ -147,80 +151,12 @@ func GeneratePodNamesByComp(comp *appsv1.Component) ([]string, error) {
 			Annotations: comp.Annotations,
 		},
 		Spec: workloads.InstanceSetSpec{
-			Replicas:                &comp.Spec.Replicas,
-			Instances:               instanceTemplates(),
-			DefaultTemplateOrdinals: comp.Spec.Ordinals,
-			FlatInstanceOrdinal:     comp.Spec.FlatInstanceOrdinal,
-			OfflineInstances:        comp.Spec.OfflineInstances,
+			Replicas:            &comp.Spec.Replicas,
+			Instances:           instanceTemplates(),
+			Ordinals:            comp.Spec.Ordinals,
+			FlatInstanceOrdinal: comp.Spec.FlatInstanceOrdinal,
+			OfflineInstances:    comp.Spec.OfflineInstances,
 		},
 	}
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
-	if err != nil {
-		return nil, err
-	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return nil, err
-	}
-	return nameBuilder.GenerateAllInstanceNames()
-}
-
-// GenerateAllPodNamesToSet generate all pod names for a component
-// and return a set which key is the pod name and value is a template name.
-//
-// Deprecated: should use instancetemplate.PodNameBuilder
-func GenerateAllPodNamesToSet(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	clusterName,
-	fullCompName string) (map[string]string, error) {
-	compName := constant.GenerateClusterComponentName(clusterName, fullCompName)
-	instanceNames, err := generateAllPodNames(compReplicas, instances, offlineInstances, compName)
-	if err != nil {
-		return nil, err
-	}
-	// key: podName, value: templateName
-	podSet := map[string]string{}
-	for _, insName := range instanceNames {
-		podSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
-	}
-	return podSet, nil
-}
-
-func generateAllPodNames(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	fullCompName string) ([]string, error) {
-	var templates []instanceset.InstanceTemplate
-	for i := range instances {
-		templates = append(templates, &workloads.InstanceTemplate{
-			Name:     instances[i].Name,
-			Replicas: instances[i].Replicas,
-			Ordinals: instances[i].Ordinals,
-		})
-	}
-	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
-}
-
-func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
-	podSuffix := strings.Replace(podName, workloadName+"-", "", 1)
-	lastDashIndex := strings.LastIndex(podSuffix, "-")
-	if lastDashIndex == len(podSuffix)-1 {
-		return "", 0, fmt.Errorf("no pod ordinal found after the last dash")
-	}
-	templateName := ""
-	indexStr := ""
-	if lastDashIndex == -1 {
-		indexStr = podSuffix
-	} else {
-		templateName = podSuffix[0:lastDashIndex]
-		indexStr = podSuffix[lastDashIndex+1:]
-	}
-	index, err := strconv.ParseInt(indexStr, 10, 32)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
-	}
-	return templateName, int32(index), nil
+	return GetCurrentPodNamesByITS(its)
 }

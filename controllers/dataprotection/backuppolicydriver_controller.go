@@ -456,24 +456,35 @@ func (r *backupPolicyAndScheduleBuilder) resolveBackupMethodEnv(compSpec *appsv1
 			continue
 		}
 		if v.ValueFrom != nil {
-			for _, versionMapping := range v.ValueFrom.VersionMapping {
-				if r.matchMappingName(versionMapping.ServiceVersions, compSpec.ServiceVersion) {
-					env = append(env, corev1.EnvVar{Name: v.Name, Value: versionMapping.MappedValue})
-					break
-				}
+			mappedValue := findBestMatchingValue(v.ValueFrom.VersionMapping, compSpec.ServiceVersion)
+			if mappedValue != "" {
+				env = append(env, corev1.EnvVar{Name: v.Name, Value: mappedValue})
 			}
 		}
 	}
 	return env
 }
 
-func (r *backupPolicyAndScheduleBuilder) matchMappingName(names []string, target string) bool {
-	for _, name := range names {
-		if component.PrefixOrRegexMatched(target, name) {
-			return true
+// findBestMatchingValue finds the best matching value for the given service version.
+// It prefers exact matches first, then falls back to prefix/regex matches.
+func findBestMatchingValue(versionMappings []dpv1alpha1.VersionMapping, serviceVersion string) string {
+	// First pass: look for exact match
+	for _, versionMapping := range versionMappings {
+		for _, v := range versionMapping.ServiceVersions {
+			if v == serviceVersion {
+				return versionMapping.MappedValue
+			}
 		}
 	}
-	return false
+	// Second pass: look for prefix/regex match
+	for _, versionMapping := range versionMappings {
+		for _, v := range versionMapping.ServiceVersions {
+			if component.PrefixOrRegexMatched(serviceVersion, v) {
+				return versionMapping.MappedValue
+			}
+		}
+	}
+	return ""
 }
 
 func (r *backupPolicyAndScheduleBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarget) ([]dpv1alpha1.BackupTarget, error) {

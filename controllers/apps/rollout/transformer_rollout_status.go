@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -205,8 +206,81 @@ func (t *rolloutStatusTransformer) compReplace(transCtx *rolloutTransformContext
 
 func (t *rolloutStatusTransformer) compCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
-	// TODO: impl
-	return "", createStrategyNotSupportedError
+	spec := t.compSpec(transCtx, comp.Name)
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+
+	// Check if the instance template exists
+	if slices.IndexFunc(spec.Instances, func(tpl appsv1.InstanceTemplate) bool {
+		return strings.HasPrefix(tpl.Name, prefix)
+	}) < 0 {
+		return appsv1alpha1.PendingRolloutState, nil
+	}
+
+	// Get pods for the component
+	pods := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(rollout.Namespace),
+		client.MatchingLabels(constant.GetCompLabels(rollout.Spec.ClusterName, comp.Name)),
+	}
+	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
+		return "", err
+	}
+
+	canaryPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
+		if pod.Labels != nil {
+			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
+		}
+		return false
+	}))
+
+	// Update status for the component
+	for i, status := range rollout.Status.Components {
+		if status.Name == comp.Name {
+			if checkClusterNCompRunning(transCtx, comp.Name) {
+				// Update timestamps when canary replicas change
+				if status.CanaryReplicas < canaryPodCnt {
+					rollout.Status.Components[i].LastScaleUpTimestamp = metav1.Now()
+				}
+
+				rollout.Status.Components[i].CanaryReplicas = canaryPodCnt
+				rollout.Status.Components[i].NewReplicas = canaryPodCnt
+				// For create strategy, rolled out replicas equals canary replicas
+				rollout.Status.Components[i].RolledOutReplicas = canaryPodCnt
+			}
+			break
+		}
+	}
+
+	// Determine state
+	if !checkClusterNCompRunning(transCtx, comp.Name) {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check if we have reached the target replicas from instance template
+	var templateTargetReplicas int32 = 0
+	for _, tpl := range spec.Instances {
+		if strings.HasPrefix(tpl.Name, prefix) && tpl.Replicas != nil {
+			templateTargetReplicas = *tpl.Replicas
+			break
+		}
+	}
+
+	if canaryPodCnt < templateTargetReplicas {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// All canary pods are ready and reached target count
+	// Check promotion strategy
+	if comp.Strategy.Create != nil && comp.Strategy.Create.Promotion != nil && ptr.Deref(comp.Strategy.Create.Promotion.Auto, false) {
+		// Auto promotion enabled
+		// For now, if all canary pods are ready and reached target, consider it succeed
+		// TODO: implement promotion delay and conditions
+		return appsv1alpha1.SucceedRolloutState, nil
+	}
+
+	// No auto promotion or promotion not configured
+	// Stay in rolling state until manual promotion
+	return appsv1alpha1.RollingRolloutState, nil
 }
 
 func (t *rolloutStatusTransformer) compSpec(transCtx *rolloutTransformContext, compName string) *appsv1.ClusterComponentSpec {

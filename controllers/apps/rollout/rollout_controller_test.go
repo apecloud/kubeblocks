@@ -1814,4 +1814,145 @@ var _ = Describe("rollout controller", func() {
 			})).Should(Succeed())
 		})
 	})
+
+	Context("create - sharding", func() {
+		var (
+			defaultCreateStrategy = appsv1alpha1.RolloutStrategy{
+				Create: &appsv1alpha1.RolloutStrategyCreate{
+					Canary: ptr.To(true),
+				},
+			}
+		)
+
+		BeforeEach(func() {
+			createClusterNShardingObj()
+		})
+
+		It("basic create strategy without promotion", func() {
+			By("creating rollout with create strategy for sharding")
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(defaultCreateStrategy)
+			})
+
+			By("checking rollout state is pending initially")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+			})).Should(Succeed())
+
+			By("mocking cluster and sharding as running")
+			mockClusterNShardingRunning()
+
+			By("checking rollout state transitions to rolling")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			By("checking canary instance template created in sharding template")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				shardingSpec := cluster.Spec.Shardings[0]
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				found := false
+				for _, tpl := range shardingSpec.Template.Instances {
+					if strings.HasPrefix(tpl.Name, prefix) {
+						found = true
+						g.Expect(tpl.Canary).ShouldNot(BeNil())
+						g.Expect(*tpl.Canary).Should(BeTrue())
+						g.Expect(tpl.ServiceVersion).Should(Equal(serviceVersion2))
+						break
+					}
+				}
+				g.Expect(found).Should(BeTrue())
+			})).Should(Succeed())
+		})
+
+		It("create strategy with auto promotion", func() {
+			By("creating rollout with create strategy and auto promotion for sharding")
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(appsv1alpha1.RolloutStrategy{
+						Create: &appsv1alpha1.RolloutStrategyCreate{
+							Canary: ptr.To(true),
+							Promotion: &appsv1alpha1.RolloutPromotion{
+								Auto:         ptr.To(true),
+								DelaySeconds: ptr.To[int32](1), // short delay for test
+							},
+						},
+					})
+			})
+
+			By("mocking cluster and sharding as running")
+			mockClusterNShardingRunning()
+
+			By("checking rollout state is rolling initially")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).Should(Succeed())
+
+			By("creating canary pods to reach target replicas")
+			prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+			// Create canary pods for sharding
+			_ = mockCreatePods4Sharding([]int32{10, 11, 12}, prefix)
+
+			By("waiting for promotion delay and checking state transitions to succeed")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
+			})).WithTimeout(5 * time.Second).Should(Succeed())
+
+			By("checking canary instance template marked as non-canary after promotion")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				shardingSpec := cluster.Spec.Shardings[0]
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, tpl := range shardingSpec.Template.Instances {
+					if strings.HasPrefix(tpl.Name, prefix) {
+						g.Expect(tpl.Canary).ShouldNot(BeNil())
+						g.Expect(*tpl.Canary).Should(BeFalse())
+						break
+					}
+				}
+			})).Should(Succeed())
+		})
+
+		It("create strategy with promotion delay", func() {
+			By("creating rollout with create strategy and promotion delay for sharding")
+			createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+				f.SetShardingServiceVersion(serviceVersion2).
+					SetShardingStrategy(appsv1alpha1.RolloutStrategy{
+						Create: &appsv1alpha1.RolloutStrategyCreate{
+							Canary: ptr.To(true),
+							Promotion: &appsv1alpha1.RolloutPromotion{
+								Auto:         ptr.To(true),
+								DelaySeconds: ptr.To[int32](30), // longer delay
+							},
+						},
+					})
+			})
+
+			By("mocking cluster and sharding as running")
+			mockClusterNShardingRunning()
+
+			By("creating canary pods")
+			prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+			// Create canary pods for sharding
+			_ = mockCreatePods4Sharding([]int32{10, 11, 12}, prefix)
+
+			By("checking rollout stays in rolling state during promotion delay")
+			Consistently(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).WithTimeout(2 * time.Second).Should(Succeed())
+
+			By("checking canary instance template still marked as canary")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				shardingSpec := cluster.Spec.Shardings[0]
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				for _, tpl := range shardingSpec.Template.Instances {
+					if strings.HasPrefix(tpl.Name, prefix) {
+						g.Expect(tpl.Canary).ShouldNot(BeNil())
+						g.Expect(*tpl.Canary).Should(BeTrue())
+						break
+					}
+				}
+			})).Should(Succeed())
+		})
+	})
 })

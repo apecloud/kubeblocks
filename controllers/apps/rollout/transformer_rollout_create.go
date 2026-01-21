@@ -51,7 +51,9 @@ func (t *rolloutCreateTransformer) rollout(transCtx *rolloutTransformContext) er
 	if err := t.components(transCtx); err != nil {
 		return err
 	}
-	// TODO: sharding
+	if err := t.shardings(transCtx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -279,6 +281,250 @@ func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 				if compStatus != nil {
 					// For simplicity, just mark that scaling down happened
 					compStatus.LastScaleDownTimestamp = metav1.Now()
+				}
+
+				if scaleDownCount <= 0 {
+					break
+				}
+			}
+		}
+	}
+
+	// Check post-promotion condition if specified
+	// if promotion.Condition != nil && promotion.Condition.Post != nil {
+	//	// TODO: implement condition checking
+	//	// For now, just log that condition checking is not implemented
+	//	// return fmt.Errorf("post-promotion condition checking not implemented yet")
+	// }
+
+	// Promotion completed
+	return nil
+}
+
+func (t *rolloutCreateTransformer) shardings(transCtx *rolloutTransformContext) error {
+	rollout := transCtx.Rollout
+	for _, sharding := range rollout.Spec.Shardings {
+		if sharding.Strategy.Create != nil {
+			if err := t.sharding(transCtx, rollout, sharding); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *rolloutCreateTransformer) sharding(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
+	// Get the sharding spec
+	spec := transCtx.ClusterShardings[sharding.Name]
+	if spec == nil {
+		// Sharding spec not found, should not happen
+		return nil
+	}
+
+	// Calculate replicas and target replicas for the sharding
+	replicas, targetReplicas, err := t.shardingReplicas(rollout, sharding, spec)
+	if err != nil {
+		return err
+	}
+
+	// Check if we're in rolling phase or promotion phase
+	if (replicas + targetReplicas) > spec.Template.Replicas {
+		return t.shardingRolling(transCtx, sharding, spec, replicas, targetReplicas)
+	}
+
+	return t.shardingPromote(transCtx, sharding, spec, replicas, targetReplicas)
+}
+
+func (t *rolloutCreateTransformer) shardingReplicas(rollout *appsv1alpha1.Rollout,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (int32, int32, error) {
+	// the original replicas per shard
+	replicas := spec.Template.Replicas
+	for _, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			replicas = status.Replicas
+			break
+		}
+	}
+
+	// the target replicas per shard
+	// For sharding create strategy, we need to handle replicas at shard level
+	// Since sharding.Spec doesn't have Replicas field like component does,
+	// we need to determine target replicas differently
+	// For now, assume target is 1 canary instance per shard
+	targetReplicas := int32(1)
+
+	return replicas, targetReplicas, nil
+}
+
+func (t *rolloutCreateTransformer) shardingRolling(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas, targetReplicas int32) error {
+	// Check if sharding is ready
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the sharding %s is not ready", sharding.Name))
+	}
+
+	// Create or get the canary instance template for sharding
+	tpl, err := t.shardingInstanceTemplate(transCtx, sharding, spec)
+	if err != nil {
+		return err
+	}
+
+	// Update replicas and instance template
+	spec.Template.Replicas += targetReplicas
+	tpl.Replicas = ptr.To(targetReplicas)
+
+	return nil
+}
+
+func (t *rolloutCreateTransformer) shardingInstanceTemplate(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (*appsv1.InstanceTemplate, error) {
+	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+
+	// Check if instance template already exists
+	for i, tpl := range spec.Template.Instances {
+		if tpl.Name == prefix {
+			return &spec.Template.Instances[i], nil
+		}
+	}
+
+	// Validate flat instance ordinal
+	if len(spec.Template.Instances) > 0 && !spec.Template.FlatInstanceOrdinal {
+		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
+	}
+
+	// Create new canary instance template
+	tpl := appsv1.InstanceTemplate{
+		Name:     prefix,
+		Canary:   sharding.Strategy.Create.Canary,
+		Replicas: ptr.To[int32](0),
+	}
+
+	// Set service version if specified
+	if sharding.ServiceVersion != nil {
+		tpl.ServiceVersion = *sharding.ServiceVersion
+	}
+
+	// Set component definition if specified
+	if sharding.CompDef != nil {
+		tpl.CompDef = *sharding.CompDef
+	}
+
+	// Set instance metadata if specified
+	if sharding.InstanceMeta != nil && sharding.InstanceMeta.Canary != nil {
+		tpl.Labels = sharding.InstanceMeta.Canary.Labels
+		tpl.Annotations = sharding.InstanceMeta.Canary.Annotations
+	}
+
+	// Add template to sharding spec
+	spec.Template.Instances = append(spec.Template.Instances, tpl)
+	spec.Template.FlatInstanceOrdinal = true
+
+	return &spec.Template.Instances[len(spec.Template.Instances)-1], nil
+}
+
+func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas, targetReplicas int32) error {
+	// Check if promotion is configured and auto promotion is enabled
+	if sharding.Strategy.Create.Promotion == nil || !ptr.Deref(sharding.Strategy.Create.Promotion.Auto, false) {
+		return nil
+	}
+
+	// Find the canary instance template
+	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+	var canaryTpl *appsv1.InstanceTemplate
+	for i := range spec.Template.Instances {
+		if spec.Template.Instances[i].Name == prefix {
+			canaryTpl = &spec.Template.Instances[i]
+			break
+		}
+	}
+	if canaryTpl == nil {
+		// Canary instance template not found, nothing to promote
+		return nil
+	}
+
+	// Check if canary replicas have reached target
+	if canaryTpl.Replicas == nil || *canaryTpl.Replicas < targetReplicas {
+		// Canary replicas not yet reached target, should still be in rolling phase
+		return nil
+	}
+
+	// Find the sharding status to check promotion timestamps
+	rollout := transCtx.Rollout
+	var shardingStatus *appsv1alpha1.RolloutShardingStatus
+	for i := range rollout.Status.Shardings {
+		if rollout.Status.Shardings[i].Name == sharding.Name {
+			shardingStatus = &rollout.Status.Shardings[i]
+			break
+		}
+	}
+	if shardingStatus == nil {
+		// Sharding status not found, should not happen
+		return nil
+	}
+
+	// Check promotion delay
+	promotion := sharding.Strategy.Create.Promotion
+	delaySeconds := ptr.Deref(promotion.DelaySeconds, 30)
+
+	// Use LastScaleUpTimestamp as promotion start time
+	if !shardingStatus.LastScaleUpTimestamp.IsZero() {
+		elapsed := time.Since(shardingStatus.LastScaleUpTimestamp.Time)
+		if elapsed < time.Duration(delaySeconds)*time.Second {
+			// Delay not yet passed, requeue
+			remaining := time.Duration(delaySeconds)*time.Second - elapsed
+			return controllerutil.NewDelayedRequeueError(remaining, fmt.Sprintf("waiting for promotion delay: %v remaining", remaining))
+		}
+	} else {
+		// First time reaching target, set the timestamp
+		shardingStatus.LastScaleUpTimestamp = metav1.Now()
+		return controllerutil.NewDelayedRequeueError(time.Second, "setting promotion start time")
+	}
+
+	// Check pre-promotion condition if specified
+	// if promotion.Condition != nil && promotion.Condition.Prev != nil {
+	//	// TODO: implement condition checking
+	//	// For now, just log that condition checking is not implemented
+	//	// return fmt.Errorf("pre-promotion condition checking not implemented yet")
+	// }
+
+	// Execute promotion: mark canary instance template as non-canary
+	canaryTpl.Canary = ptr.To(false)
+
+	// Check if we need to scale down old instances
+	scaleDownDelaySeconds := ptr.Deref(promotion.ScaleDownDelaySeconds, 30)
+	if scaleDownDelaySeconds > 0 {
+		// Check if scale down delay has passed since promotion started
+		elapsedSincePromotion := time.Since(shardingStatus.LastScaleUpTimestamp.Time)
+		if elapsedSincePromotion < time.Duration(scaleDownDelaySeconds)*time.Second {
+			// Scale down delay not yet passed
+			remaining := time.Duration(scaleDownDelaySeconds)*time.Second - elapsedSincePromotion
+			return controllerutil.NewDelayedRequeueError(remaining, fmt.Sprintf("waiting for scale down delay: %v remaining", remaining))
+		}
+	}
+
+	// Scale down old instances: reduce original replicas
+	scaleDownCount := replicas - targetReplicas
+	if scaleDownCount > 0 {
+		// Reduce total replicas per shard
+		spec.Template.Replicas -= scaleDownCount
+
+		// Also need to reduce replicas in the original instance template(s)
+		for i := range spec.Template.Instances {
+			if spec.Template.Instances[i].Name != prefix && spec.Template.Instances[i].Replicas != nil && *spec.Template.Instances[i].Replicas > 0 {
+				// Reduce replicas of this old instance template
+				oldReplicas := *spec.Template.Instances[i].Replicas
+				reduceBy := scaleDownCount
+				if reduceBy > oldReplicas {
+					reduceBy = oldReplicas
+				}
+				spec.Template.Instances[i].Replicas = ptr.To(oldReplicas - reduceBy)
+				scaleDownCount -= reduceBy
+
+				// Mark scale down in status
+				if shardingStatus != nil {
+					shardingStatus.LastScaleDownTimestamp = metav1.Now()
 				}
 
 				if scaleDownCount <= 0 {

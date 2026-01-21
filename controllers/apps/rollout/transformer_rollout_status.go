@@ -487,8 +487,178 @@ func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformCon
 
 func (t *rolloutStatusTransformer) shardingCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) (appsv1alpha1.RolloutState, error) {
-	// TODO: impl
-	return "", createStrategyNotSupportedError
+	spec := t.shardingSpec(transCtx, sharding.Name)
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+
+	// Check if the instance template exists in sharding template
+	if slices.IndexFunc(spec.Template.Instances, func(tpl appsv1.InstanceTemplate) bool {
+		return strings.HasPrefix(tpl.Name, prefix)
+	}) < 0 {
+		return appsv1alpha1.PendingRolloutState, nil
+	}
+
+	// Get pods for the sharding (all shards)
+	pods := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(rollout.Namespace),
+		client.MatchingLabels(constant.GetClusterLabels(rollout.Spec.ClusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: sharding.Name,
+		})),
+	}
+	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
+		return "", err
+	}
+
+	// Count canary pods across all shards
+	canaryPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
+		if pod.Labels != nil {
+			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
+		}
+		return false
+	}))
+
+	// Update status for the sharding
+	for i, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			if checkClusterNShardingRunning(transCtx, sharding.Name) {
+				// Update timestamps when canary replicas change
+				if status.CanaryReplicas < canaryPodCnt {
+					rollout.Status.Shardings[i].LastScaleUpTimestamp = metav1.Now()
+				}
+
+				rollout.Status.Shardings[i].CanaryReplicas = canaryPodCnt
+				rollout.Status.Shardings[i].NewReplicas = canaryPodCnt
+				// For create strategy, rolled out replicas equals canary replicas
+				rollout.Status.Shardings[i].RolledOutReplicas = canaryPodCnt
+			}
+			break
+		}
+	}
+
+	// Determine state
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check if we have reached the target replicas from instance template
+	var templateTargetReplicas int32 = 0
+	for _, tpl := range spec.Template.Instances {
+		if strings.HasPrefix(tpl.Name, prefix) && tpl.Replicas != nil {
+			templateTargetReplicas = *tpl.Replicas
+			break
+		}
+	}
+
+	// For sharding, total target replicas = templateTargetReplicas * number of shards
+	totalTargetReplicas := templateTargetReplicas * spec.Shards
+	if canaryPodCnt < totalTargetReplicas {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// All canary pods are ready and reached target count
+	// Check promotion strategy
+	if sharding.Strategy.Create == nil || sharding.Strategy.Create.Promotion == nil {
+		// No promotion configured, stay in rolling state until manual promotion
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	promotion := sharding.Strategy.Create.Promotion
+
+	// Find sharding status
+	var shardingStatus *appsv1alpha1.RolloutShardingStatus
+	for i := range rollout.Status.Shardings {
+		if rollout.Status.Shardings[i].Name == sharding.Name {
+			shardingStatus = &rollout.Status.Shardings[i]
+			break
+		}
+	}
+	if shardingStatus == nil {
+		// Sharding status not found, should not happen
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check if auto promotion is enabled
+	if !ptr.Deref(promotion.Auto, false) {
+		// Auto promotion not enabled, stay in rolling state
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Auto promotion enabled
+	// Check promotion delay
+	delaySeconds := ptr.Deref(promotion.DelaySeconds, 30)
+	if !shardingStatus.LastScaleUpTimestamp.IsZero() {
+		elapsed := time.Since(shardingStatus.LastScaleUpTimestamp.Time)
+		if elapsed < time.Duration(delaySeconds)*time.Second {
+			// Promotion delay not yet passed
+			return appsv1alpha1.RollingRolloutState, nil
+		}
+	} else {
+		// LastScaleUpTimestamp not set yet, promotion hasn't started
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check pre-promotion condition if specified
+	if promotion.Condition != nil && promotion.Condition.Prev != nil {
+		// TODO: implement condition checking
+		// For now, assume condition is not met if specified
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check if canary instance template is still marked as canary
+	// Find the canary instance template
+	var canaryTpl *appsv1.InstanceTemplate
+	for i := range spec.Template.Instances {
+		if strings.HasPrefix(spec.Template.Instances[i].Name, prefix) {
+			canaryTpl = &spec.Template.Instances[i]
+			break
+		}
+	}
+	if canaryTpl != nil && ptr.Deref(canaryTpl.Canary, false) {
+		// Canary instance template is still marked as canary
+		// Promotion hasn't been executed yet
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check scale down delay
+	scaleDownDelaySeconds := ptr.Deref(promotion.ScaleDownDelaySeconds, 30)
+	if scaleDownDelaySeconds > 0 {
+		// Check if scale down delay has passed since promotion started
+		// We use LastScaleUpTimestamp as promotion start time
+		elapsedSincePromotion := time.Since(shardingStatus.LastScaleUpTimestamp.Time)
+		if elapsedSincePromotion < time.Duration(scaleDownDelaySeconds)*time.Second {
+			// Scale down delay not yet passed
+			return appsv1alpha1.RollingRolloutState, nil
+		}
+	}
+
+	// Check if old instances have been scaled down
+	// Count total replicas from all instance templates
+	totalReplicasFromTemplates := int32(0)
+	for _, tpl := range spec.Template.Instances {
+		if tpl.Replicas != nil {
+			totalReplicasFromTemplates += *tpl.Replicas
+		}
+	}
+
+	// For sharding, total replicas = replicas per shard * number of shards
+	totalReplicasFromTemplates *= spec.Shards
+
+	// Check if total replicas match the target (canary replicas count)
+	// After promotion, total replicas should equal canaryPodCnt (promoted replicas)
+	if totalReplicasFromTemplates != canaryPodCnt {
+		// Old instances not fully scaled down yet
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// Check post-promotion condition if specified
+	if promotion.Condition != nil && promotion.Condition.Post != nil {
+		// TODO: implement condition checking
+		// For now, assume condition is not met if specified
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	// All promotion steps completed
+	return appsv1alpha1.SucceedRolloutState, nil
 }
 
 func (t *rolloutStatusTransformer) shardingSpec(transCtx *rolloutTransformContext, shardingName string) *appsv1.ClusterSharding {

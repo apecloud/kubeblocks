@@ -2,6 +2,8 @@ module github.com/apecloud/kubeblocks
 
 go 1.24.0
 
+toolchain go1.24.11
+
 require (
 	cuelang.org/go v0.8.0
 	github.com/Masterminds/semver/v3 v3.2.1

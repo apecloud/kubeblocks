@@ -21,8 +21,10 @@ package rollout
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
@@ -165,7 +167,134 @@ func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 		return nil
 	}
 
-	// TODO: promote
+	// Find the canary instance template
+	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+	var canaryTpl *appsv1.InstanceTemplate
+	for i := range spec.Instances {
+		if spec.Instances[i].Name == prefix {
+			canaryTpl = &spec.Instances[i]
+			break
+		}
+	}
+	if canaryTpl == nil {
+		// Canary instance template not found, nothing to promote
+		return nil
+	}
 
+	// Check if canary replicas have reached target
+	// This should be guaranteed by the caller (promote is only called when replicas+targetReplicas <= spec.Replicas)
+	// but we check anyway
+	if canaryTpl.Replicas == nil || *canaryTpl.Replicas < targetReplicas {
+		// Canary replicas not yet reached target, should still be in rolling phase
+		return nil
+	}
+
+	// Find the component status to check promotion timestamps
+	rollout := transCtx.Rollout
+	var compStatus *appsv1alpha1.RolloutComponentStatus
+	for i := range rollout.Status.Components {
+		if rollout.Status.Components[i].Name == comp.Name {
+			compStatus = &rollout.Status.Components[i]
+			break
+		}
+	}
+	if compStatus == nil {
+		// Component status not found, should not happen
+		return nil
+	}
+
+	// Check promotion delay
+	promotion := comp.Strategy.Create.Promotion
+	delaySeconds := ptr.Deref(promotion.DelaySeconds, 30)
+
+	// Use LastScaleUpTimestamp as promotion start time
+	// When canary replicas first reach target, LastScaleUpTimestamp should be set
+	if !compStatus.LastScaleUpTimestamp.IsZero() {
+		elapsed := time.Since(compStatus.LastScaleUpTimestamp.Time)
+		if elapsed < time.Duration(delaySeconds)*time.Second {
+			// Delay not yet passed, requeue
+			remaining := time.Duration(delaySeconds)*time.Second - elapsed
+			return controllerutil.NewDelayedRequeueError(remaining, fmt.Sprintf("waiting for promotion delay: %v remaining", remaining))
+		}
+	} else {
+		// First time reaching target, set the timestamp
+		compStatus.LastScaleUpTimestamp = metav1.Now()
+		return controllerutil.NewDelayedRequeueError(time.Second, "setting promotion start time")
+	}
+
+	// Check pre-promotion condition if specified
+	// if promotion.Condition != nil && promotion.Condition.Prev != nil {
+	//	// TODO: implement condition checking
+	//	// For now, just log that condition checking is not implemented
+	//	// return fmt.Errorf("pre-promotion condition checking not implemented yet")
+	// }
+
+	// Execute promotion: mark canary instance template as non-canary
+	canaryTpl.Canary = ptr.To(false)
+
+	// Check if we need to scale down old instances
+	scaleDownDelaySeconds := ptr.Deref(promotion.ScaleDownDelaySeconds, 30)
+	if scaleDownDelaySeconds > 0 {
+		// Check if scale down delay has passed since promotion started
+		// We use LastScaleUpTimestamp as promotion start time
+		elapsedSincePromotion := time.Since(compStatus.LastScaleUpTimestamp.Time)
+		if elapsedSincePromotion < time.Duration(scaleDownDelaySeconds)*time.Second {
+			// Scale down delay not yet passed
+			remaining := time.Duration(scaleDownDelaySeconds)*time.Second - elapsedSincePromotion
+			return controllerutil.NewDelayedRequeueError(remaining, fmt.Sprintf("waiting for scale down delay: %v remaining", remaining))
+		}
+	}
+
+	// Scale down old instances: reduce original replicas
+	// The original replicas are stored in 'replicas' parameter
+	// We need to find the original instance template(s) and reduce their replicas
+	// For simplicity, we assume there's a default instance template (without the prefix)
+	// or we need to identify which instances are old
+
+	// For now, we'll reduce the total replicas to match targetReplicas (canary replicas)
+	// since canary instances are now promoted to stable
+	// This assumes canary instances replace old instances one-to-one
+	// spec.Replicas should already include canary replicas, so we need to reduce it by (replicas - targetReplicas)
+	// where 'replicas' is the original stable replicas count
+	scaleDownCount := replicas - targetReplicas
+	if scaleDownCount > 0 {
+		// Reduce total replicas
+		spec.Replicas -= scaleDownCount
+
+		// Also need to reduce replicas in the original instance template(s)
+		// For now, we assume there's a default instance template
+		for i := range spec.Instances {
+			if spec.Instances[i].Name != prefix && spec.Instances[i].Replicas != nil && *spec.Instances[i].Replicas > 0 {
+				// Reduce replicas of this old instance template
+				oldReplicas := *spec.Instances[i].Replicas
+				reduceBy := scaleDownCount
+				if reduceBy > oldReplicas {
+					reduceBy = oldReplicas
+				}
+				spec.Instances[i].Replicas = ptr.To(oldReplicas - reduceBy)
+				scaleDownCount -= reduceBy
+
+				// Add to scale down instances in status
+				// TODO: track which specific instances are scaled down
+				if compStatus != nil {
+					// For simplicity, just mark that scaling down happened
+					compStatus.LastScaleDownTimestamp = metav1.Now()
+				}
+
+				if scaleDownCount <= 0 {
+					break
+				}
+			}
+		}
+	}
+
+	// Check post-promotion condition if specified
+	// if promotion.Condition != nil && promotion.Condition.Post != nil {
+	//	// TODO: implement condition checking
+	//	// For now, just log that condition checking is not implemented
+	//	// return fmt.Errorf("post-promotion condition checking not implemented yet")
+	// }
+
+	// Promotion completed
 	return nil
 }

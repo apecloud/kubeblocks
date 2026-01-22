@@ -68,14 +68,12 @@ func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 		return nil, err
 	}
 
-	if params.SynthesizedComponent != nil {
-		// TODO: implement pod sorting based on roles
-		// instanceset.SortPods(
-		// 	pods,
-		// 	instanceset.ComposeRolePriorityMap(params.SynthesizedComponent.Roles),
-		// 	true,
-		// )
-	}
+	// TODO: implement pod sorting based on roles when params.SynthesizedComponent is not nil
+	// instanceset.SortPods(
+	// 	pods,
+	// 	instanceset.ComposeRolePriorityMap(params.SynthesizedComponent.Roles),
+	// 	true,
+	// )
 	return pods, nil
 }
 

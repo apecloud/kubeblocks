@@ -133,3 +133,25 @@ func updatePodLabelsWithConfigVersion(pod *corev1.Pod, labelKey, configVersion s
 	pod.Labels[labelKey] = configVersion
 	return cli.Patch(ctx, pod, patch)
 }
+
+func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
+	params := make(map[string]string)
+	dynamicAction := parameters.NeedDynamicReloadAction(paramDef)
+	needReloadStaticParams := parameters.ReloadStaticParameters(paramDef)
+	visualizedParams := core.GenerateVisualizedParamsList(configPatch, []parametersv1alpha1.ComponentConfigDescription{description})
+
+	for _, key := range visualizedParams {
+		if key.UpdateType != core.UpdatedType {
+			continue
+		}
+		for _, p := range key.Parameters {
+			if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
+				continue
+			}
+			if p.Value != nil {
+				params[p.Key] = *p.Value
+			}
+		}
+	}
+	return params
+}

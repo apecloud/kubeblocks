@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )
@@ -51,4 +52,14 @@ func GetInstanceSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 		OnlineUpdatePodFunc: commonOnlineUpdateWithPod,
 		RestartComponent:    restartComponent,
 	}
+}
+
+type ReloadAction interface {
+	ExecReload() (returnedStatus, error)
+	ReloadType() string
+}
+
+type reconfigureTask struct {
+	parametersv1alpha1.ReloadPolicy
+	taskCtx reconfigureContext
 }

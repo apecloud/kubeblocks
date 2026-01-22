@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"fmt"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -170,4 +171,16 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *returnedStatus)) 
 		o(&ret)
 	}
 	return ret
+}
+
+func (r reconfigureTask) ReloadType() string {
+	return string(r.ReloadPolicy)
+}
+
+func (r reconfigureTask) ExecReload() (returnedStatus, error) {
+	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
+		return executor.Upgrade(r.taskCtx)
+	}
+
+	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
 }

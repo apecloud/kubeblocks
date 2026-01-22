@@ -19,20 +19,3 @@
 
 ##@ Sub-commands
 
-## reloader cmd
-
-RELOADER_LD_FLAGS = "-s -w"
-
-bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/main.go
-
-.PHONY: reloader
-reloader: OS=$(shell $(GO) env GOOS)
-reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: test-go-generate build-checks ## Build reloader related binaries
-	$(MAKE) bin/reloader.${OS}.${ARCH}
-	mv bin/reloader.${OS}.${ARCH} bin/reloader
-
-.PHONY: clean-reloader
-clean-reloader: ## Clean bin/reloader.
-	rm -f bin/reloader

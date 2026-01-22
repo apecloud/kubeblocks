@@ -42,7 +42,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 	"github.com/apecloud/kubeblocks/pkg/parameters/validate"

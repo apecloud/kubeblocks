@@ -82,6 +82,12 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 	// TODO: Implement kbagent-based reconfigure
 	// For now, return nil to allow compilation
 	// Use cfgproto.ReconfigureClient type to satisfy import check
+	_ = pod
+	_ = ctx
+	_ = createClient
+	_ = configSpec
+	_ = configFile
+	_ = updatedParams
 	_ = cfgproto.ReconfigureClient(nil)
 	return fmt.Errorf("commonOnlineUpdateWithPod: not implemented yet - waiting for kbagent integration")
 }
@@ -89,6 +95,9 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
 	// Simplified implementation for testing
 	// Returns a minimal component spec to avoid mock setup issues
+	_ = cli
+	_ = ctx
+	_ = cluster
 	return &appsv1.ClusterComponentSpec{
 		Name:     compName,
 		Replicas: 1,

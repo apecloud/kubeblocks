@@ -78,14 +78,14 @@ var _ = Describe("default name builder tests", func() {
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Discrete: []int32{10, 11},
 						},
 					},
 					{
 						Name:     "t2",
 						Replicas: ptr.To[int32](3),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
 									Start: 2,
@@ -106,14 +106,14 @@ var _ = Describe("default name builder tests", func() {
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Discrete: []int32{10, 11},
 						},
 					},
 					{
 						Name:     "t2",
 						Replicas: ptr.To[int32](1),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
 									Start: 2,
@@ -134,14 +134,14 @@ var _ = Describe("default name builder tests", func() {
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](0),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Discrete: []int32{10, 11},
 						},
 					},
 					{
 						Name:     "t2",
 						Replicas: ptr.To[int32](0),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
 									Start: 2,
@@ -162,14 +162,14 @@ var _ = Describe("default name builder tests", func() {
 					{
 						Name:     "t1",
 						Replicas: ptr.To[int32](2),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Discrete: []int32{10, 11},
 						},
 					},
 					{
 						Name:     "t2",
 						Replicas: ptr.To[int32](4),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
 									Start: 2,
@@ -207,7 +207,7 @@ var _ = Describe("default name builder tests", func() {
 			},
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				DefaultTemplateOrdinals: kbappsv1.Ordinals{
+				Ordinals: workloads.Ordinals{
 					Ranges: []kbappsv1.Range{
 						{
 							Start: 1,
@@ -219,14 +219,14 @@ var _ = Describe("default name builder tests", func() {
 					{
 						Name:     "foo",
 						Replicas: ptr.To[int32](1),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Discrete: []int32{0},
 						},
 					},
 					{
 						Name:     "bar",
 						Replicas: ptr.To[int32](2),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
 									Start: 2,
@@ -248,7 +248,7 @@ var _ = Describe("default name builder tests", func() {
 			},
 			Spec: workloads.InstanceSetSpec{
 				Replicas: ptr.To[int32](5),
-				DefaultTemplateOrdinals: kbappsv1.Ordinals{
+				Ordinals: workloads.Ordinals{
 					Ranges: []kbappsv1.Range{
 						{
 							Start: 1,
@@ -260,14 +260,14 @@ var _ = Describe("default name builder tests", func() {
 					{
 						Name:     "foo",
 						Replicas: ptr.To[int32](1),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Discrete: []int32{0},
 						},
 					},
 					{
 						Name:     "bar",
 						Replicas: ptr.To[int32](3),
-						Ordinals: kbappsv1.Ordinals{
+						Ordinals: workloads.Ordinals{
 							Ranges: []kbappsv1.Range{
 								{
 									Start: 2,

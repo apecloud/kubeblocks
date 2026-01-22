@@ -33,25 +33,10 @@ COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # RUN go mod download
-
-# Copy the go source
-#COPY pkg/ pkg/
-#COPY controllers/ controllers/
-#COPY cmd/reloader/ cmd/reloader/
-#COPY externalapis/ externalapis/
-#COPY version/ version/
-#COPY cmd/cli/ cmd/cli/
-#COPY apis/ apis/
-#COPY test/testdata/testdata.go test/testdata/testdata.go
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 # Build
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/reloader cmd/reloader/main.go
-
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
@@ -70,7 +55,6 @@ RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
 
 # copy kubeblocks tools
 COPY config/crd/bases /kubeblocks/crd
-COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/kbagent /bin
 
 # mkdir kbcli config dir and helm cache dir.

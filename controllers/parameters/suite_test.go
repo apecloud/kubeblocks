@@ -128,7 +128,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-parameter-controller"),
-	}).SetupWithManager(k8sManager, nil)
+	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&ParameterDrivenConfigRenderReconciler{
@@ -149,7 +149,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("reconfigure-controller"),
-	}).SetupWithManager(k8sManager, nil)
+	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&ComponentDrivenParameterReconciler{

@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -68,71 +67,6 @@ func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.Co
 	return nil
 }
 
-// GetPodContainerWithVolumeMount searches for containers mounting the volume
-func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) []*corev1.Container {
-	containers := podSpec.Containers
-	if len(containers) == 0 || volumeName == "" {
-		return nil
-	}
-	return getContainerWithVolumeMount(containers, volumeName)
-}
-
-// GetVolumeMountName finds the volume with mount name
-func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
-	for i := range volumes {
-		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
-			return &volumes[i]
-		}
-		if volumes[i].Projected == nil {
-			continue
-		}
-		for j := range volumes[i].Projected.Sources {
-			if volumes[i].Projected.Sources[j].ConfigMap != nil && volumes[i].Projected.Sources[j].ConfigMap.Name == resourceName {
-				return &volumes[i]
-			}
-		}
-	}
-	return nil
-}
-
-type containerNameFilter func(containerName string) bool
-
-func GetContainersByConfigmap(containers []corev1.Container, volumeName string, cmName string, filters ...containerNameFilter) []string {
-	containerFilter := func(c corev1.Container) bool {
-		for _, f := range filters {
-			if (len(c.VolumeMounts) == 0 && len(c.EnvFrom) == 0) ||
-				f(c.Name) {
-				return true
-			}
-		}
-		return false
-	}
-
-	tmpList := make([]string, 0, len(containers))
-	for _, c := range containers {
-		if containerFilter(c) {
-			continue
-		}
-		for _, vm := range c.VolumeMounts {
-			if vm.Name == volumeName {
-				tmpList = append(tmpList, c.Name)
-				goto breakHere
-			}
-		}
-		if cmName == "" {
-			continue
-		}
-		for _, source := range c.EnvFrom {
-			if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
-				tmpList = append(tmpList, c.Name)
-				break
-			}
-		}
-	breakHere:
-	}
-	return tmpList
-}
-
 func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
@@ -157,30 +91,6 @@ func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []
 		}
 	}
 	return len(configs) == len(volumes)
-}
-
-func getContainerWithVolumeMount(containers []corev1.Container, volumeName string) []*corev1.Container {
-	mountContainers := make([]*corev1.Container, 0, len(containers))
-	for i, c := range containers {
-		volumeMounts := c.VolumeMounts
-		for _, vm := range volumeMounts {
-			if vm.Name == volumeName {
-				mountContainers = append(mountContainers, &containers[i])
-				break
-			}
-		}
-	}
-	return mountContainers
-}
-
-func GetVolumeMountByVolume(container *corev1.Container, volumeName string) *corev1.VolumeMount {
-	for _, volume := range container.VolumeMounts {
-		if volume.Name == volumeName {
-			return &volume
-		}
-	}
-
-	return nil
 }
 
 // GetCoreNum gets content of Resources.Limits.cpu
@@ -251,17 +161,6 @@ func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodCondition
 		}
 	}
 	return nil
-}
-
-func IsMatchConfigVersion(obj client.Object, labelKey string, version string) bool {
-	labels := obj.GetLabels()
-	if len(labels) == 0 {
-		return false
-	}
-	if lastVersion, ok := labels[labelKey]; ok && lastVersion == version {
-		return true
-	}
-	return false
 }
 
 func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {

@@ -481,17 +481,18 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 			tpl.Namespace = comp.Namespace
 			tpl.Template = utpl.ConfigMap.Name
 		}
-		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
 		if utpl.ExternalManaged != nil {
 			tpl.ExternalManaged = utpl.ExternalManaged
 		}
-
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+		if ptr.Deref(tpl.ExternalManaged, false) {
 			if utpl.ConfigMap == nil {
 				// reset the template and wait the external system to provision it.
 				tpl.Namespace = ""
 				tpl.Template = ""
 			}
+		}
+		if utpl.Reconfigure != nil {
+			tpl.Reconfigure = utpl.Reconfigure // use the custom reconfigure action
 		}
 		return tpl
 	}

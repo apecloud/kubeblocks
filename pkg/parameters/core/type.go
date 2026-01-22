@@ -182,11 +182,6 @@ func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }
 
-// GenerateEnvFromName generates env configmap name
-func GenerateEnvFromName(originName string) string {
-	return strings.Join([]string{originName, "envfrom"}, "-")
-}
-
 func GenerateRevisionPhaseKey(revision string) string {
 	return strings.Join([]string{constant.LastConfigurationRevisionPhase, revision}, "-")
 }

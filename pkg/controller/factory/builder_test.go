@@ -31,13 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("builder", func() {
@@ -140,39 +137,6 @@ var _ = Describe("builder", func() {
 			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
 				"test-cm", tplCfg)
 			Expect(configmap).ShouldNot(BeNil())
-		})
-
-		It("builds config manager sidecar container correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
-				ManagerName:   "cfgmgr",
-				ComponentName: synthesizedComponent.Name,
-				Image:         constant.KBToolsImage,
-				Args:          []string{},
-				Envs:          []corev1.EnvVar{},
-				Volumes:       []corev1.VolumeMount{},
-				Cluster:       cluster,
-			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
-			Expect(err).Should(BeNil())
-			Expect(configmap).ShouldNot(BeNil())
-			Expect(configmap.SecurityContext).Should(BeNil())
-		})
-
-		It("builds cfg manager tools  correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
-			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-				ManagerName: constant.ConfigSidecarName,
-				Image:       viper.GetString(constant.KBToolsImage),
-				Cluster:     cluster,
-			}
-			toolContainers := []parametersv1alpha1.ToolConfig{
-				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
-			}
-
-			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, map[string]cfgcm.ConfigSpecMeta{})
-			Expect(err).Should(BeNil())
-			Expect(obj).ShouldNot(BeEmpty())
 		})
 
 		It("builds serviceaccount correctly", func() {

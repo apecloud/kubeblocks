@@ -187,3 +187,11 @@ func splitParameters(params []core.VisualizedParam) map[string]map[string]*strin
 	}
 	return r
 }
+
+func copyMap(data map[string]string) map[string]string {
+	r := make(map[string]string, len(data))
+	for k, v := range data {
+		r[k] = v
+	}
+	return r
+}

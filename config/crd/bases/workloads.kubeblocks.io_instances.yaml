@@ -1096,8 +1096,8 @@ spec:
                   an Instance throughout its lifecycle.
                 properties:
                   reconfigure:
-                    description: Defines the procedure that update a replica with
-                      new configuration.
+                    description: Defines the procedure that update replicas with new
+                      configuration.
                     properties:
                       exec:
                         description: |-

@@ -2369,7 +2369,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -2842,6 +2842,48 @@ ClusterComponentConfigSource
 </tr>
 <tr>
 <td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged specifies whether the configuration management is delegated to an external system
+or manual user control.</p>
+<p>When set to true, the controller will exclusively utilize the user-provided configuration source
+and the &lsquo;reconfigure&rsquo; action defined in this config, bypassing the default templates and
+update behaviors specified in the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a checksum or hash of the configuration content.</p>
+<p>The controller uses this value to detect changes and determine if a reconfiguration or restart
+is necessary to apply updates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restartOnConfigChange</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart the component to reload the updated configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reconfigure</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -2851,28 +2893,14 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>The custom reconfigure action to reload the service configuration whenever changes to this config are detected.</p>
+<p>The custom reconfigure action to reload the updated configuration.</p>
+<p>When @restartOnConfigChange is set to true, this action will be ignored.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
 </ul>
-<p>Note: This field is immutable once it has been set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>externalManaged</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ExternalManaged indicates whether the configuration is managed by an external system.
-When set to true, the controller will use the user-provided template and reconfigure action,
-ignoring the default template and update behavior.</p>
 </td>
 </tr>
 </tbody>
@@ -5895,19 +5923,6 @@ Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more informatio
 </tr>
 <tr>
 <td>
-<code>externalManaged</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ExternalManaged indicates whether the configuration is managed by an external system.
-When set to true, the controller will ignore the management of this configuration.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>restartOnFileChange</code><br/>
 <em>
 bool
@@ -5915,7 +5930,44 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to restart the pod when the file changes.</p>
+<p>Specifies whether to restart the workload when the file changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure that reloads the file when it&rsquo;s content changes.</p>
+<p>If specified, this action overrides the global reconfigure action defined in lifecycle actions
+for this specific file template.</p>
+<p>When @restartOnFileChange is set to true, this action will be ignored.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
+</ul>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged specifies whether the file management is delegated to an external system or manual user control.</p>
+<p>When set to true, the controller will ignore the management of this file.</p>
 </td>
 </tr>
 </tbody>
@@ -6221,7 +6273,6 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure that update a replica with new configuration.</p>
 <p>Note: This field is immutable once it has been set.</p>
-<p>This Action is reserved for future versions.</p>
 </td>
 </tr>
 <tr>
@@ -32769,7 +32820,20 @@ int64
 </em>
 </td>
 <td>
-<p>The generation of the config.</p>
+<em>(Optional)</em>
+<p>The generation of the config content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a checksum or hash of the config content.</p>
 </td>
 </tr>
 <tr>
@@ -32936,7 +33000,20 @@ int64
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The generation of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a checksum or hash of the config content.</p>
 </td>
 </tr>
 </tbody>
@@ -34296,7 +34373,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the procedure that update a replica with new configuration.</p>
+<p>Defines the procedure that update replicas with new configuration.</p>
 </td>
 </tr>
 </tbody>

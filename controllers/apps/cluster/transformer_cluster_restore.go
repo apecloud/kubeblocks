@@ -74,7 +74,11 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
-
+		if int(spec.Shards) > len(backup.Status.Targets) && len(shardComponents) < int(spec.Shards) {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+				`wait for all shard components of sharding "%s" to be created before restoring from backup "%s"`,
+				backup.Name, spec.Name)
+		}
 		targets := backup.Status.Targets
 		// obtain components that have already been assigned targets.
 		allocateTargetMap := map[string]string{}

@@ -69,8 +69,11 @@ spec:
                 description: Describe the configs to be reconfigured.
                 items:
                   properties:
+                    configHash:
+                      description: Represents a checksum or hash of the config content.
+                      type: string
                     generation:
-                      description: The generation of the config.
+                      description: The generation of the config content.
                       format: int64
                       type: integer
                     name:
@@ -523,7 +526,6 @@ spec:
                         An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
                       type: string
                   required:
-                  - generation
                   - name
                   type: object
                 type: array
@@ -2534,8 +2536,8 @@ spec:
                   an Instance throughout its lifecycle.
                 properties:
                   reconfigure:
-                    description: Defines the procedure that update a replica with
-                      new configuration.
+                    description: Defines the procedure that update replicas with new
+                      configuration.
                     properties:
                       exec:
                         description: |-
@@ -11757,6 +11759,10 @@ spec:
                       description: The status of configs.
                       items:
                         properties:
+                          configHash:
+                            description: Represents a checksum or hash of the config
+                              content.
+                            type: string
                           generation:
                             description: The generation of the config.
                             format: int64
@@ -11765,7 +11771,6 @@ spec:
                             description: The name of the config.
                             type: string
                         required:
-                        - generation
                         - name
                         type: object
                       type: array

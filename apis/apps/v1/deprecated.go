@@ -50,18 +50,18 @@ func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec
 }
 
 func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.ComponentSpecs {
+	for i, v := range r.ComponentSpecs {
 		if v.Name == componentName {
-			return &v
+			return &r.ComponentSpecs[i]
 		}
 	}
 	return nil
 }
 
 func (r *ClusterSpec) GetShardingByName(shardingName string) *ClusterSharding {
-	for _, v := range r.Shardings {
+	for i, v := range r.Shardings {
 		if v.Name == shardingName {
-			return &v
+			return &r.Shardings[i]
 		}
 	}
 	return nil

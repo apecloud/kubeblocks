@@ -25,8 +25,8 @@ import (
 
 var combineUpgradePolicyInstance = &combineUpgradePolicy{
 	policyExecutors: []reconfigurePolicy{
-		syncPolicyInstance,
-		restartPolicyInstance,
+		syncPolicyInst,
+		restartPolicyInst,
 	},
 }
 

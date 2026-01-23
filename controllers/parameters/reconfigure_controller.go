@@ -95,7 +95,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	config := &corev1.ConfigMap{}
 	// TODO(leon): data or universal?
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, inDataContextUnspecified()); err != nil {
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	if model.IsObjectDeleting(config) {
@@ -200,12 +200,6 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	if len(rctx.InstanceSetList) == 0 {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
-			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, parametersv1alpha1.CFinishedPhase, configurationNotUsingMessage)
-	}
-
 	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.ConfigRender, rctx.ParametersDefs)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
@@ -281,18 +275,17 @@ func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.Reload
 	configDescription *parametersv1alpha1.ComponentConfigDescription,
 	patch *core.ConfigPatchInfo) ReloadAction {
 	reCtx := reconfigureContext{
-		RequestCtx:               rctx.RequestCtx,
-		Client:                   rctx.Client,
-		ConfigTemplate:           *templateSpec,
-		ConfigMap:                rctx.ConfigMap,
-		ParametersDef:            &pd.Spec,
-		ConfigDescription:        configDescription,
-		Cluster:                  rctx.ClusterObj,
-		InstanceSetUnits:         rctx.InstanceSetList,
-		ClusterComponent:         rctx.ClusterComObj,
-		SynthesizedComponent:     rctx.BuiltinComponent,
-		ReconfigureClientFactory: getClientFactory(),
-		Patch:                    patch,
+		RequestCtx:           rctx.RequestCtx,
+		Client:               rctx.Client,
+		ConfigTemplate:       *templateSpec,
+		ConfigHash:           nil, // TODO: set appropriate config hash
+		Cluster:              rctx.ClusterObj,
+		ClusterComponent:     rctx.ClusterComObj,
+		SynthesizedComponent: rctx.BuiltinComponent,
+		its:                  rctx.its,
+		ConfigDescription:    configDescription,
+		ParametersDef:        &pd.Spec,
+		Patch:                patch,
 	}
 
 	return reconfigureTask{ReloadPolicy: policy, taskCtx: reCtx}
@@ -305,10 +298,11 @@ func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.Componen
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,
 			ConfigTemplate:       *configTemplate,
-			ClusterComponent:     rctx.ClusterComObj,
+			ConfigHash:           nil, // TODO: set appropriate config hash
 			Cluster:              rctx.ClusterObj,
+			ClusterComponent:     rctx.ClusterComObj,
 			SynthesizedComponent: rctx.BuiltinComponent,
-			InstanceSetUnits:     rctx.InstanceSetList,
+			its:                  rctx.its,
 		},
 	}
 }

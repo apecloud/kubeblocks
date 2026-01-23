@@ -20,182 +20,171 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
-	mockproto "github.com/apecloud/kubeblocks/pkg/parameters/proto/mocks"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
-var operatorSyncPolicy = &syncPolicy{}
+var _ = Describe("Reconfigure syncPolicy test", func() {
+	Context("sync reconfigure policy", func() {
+		var (
+			rctx   reconfigureContext
+			policy = &syncPolicy{}
+		)
 
-var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
-
-	var (
-		k8sMockClient     *testutil.K8sClientMockHelper
-		reconfigureClient *mockproto.MockReconfigureClient
-	)
-
-	BeforeEach(func() {
-		k8sMockClient = testutil.NewK8sMockClient()
-		reconfigureClient = mockproto.NewMockReconfigureClient(k8sMockClient.Controller())
-	})
-
-	AfterEach(func() {
-		k8sMockClient.Finish()
-	})
-
-	Context("sync reconfigure policy test", func() {
-		It("Should success without error", func() {
-			By("prepare reconfigure policy params")
-			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
-					return reconfigureClient, nil
-				}),
-				withMockInstanceSet(3, nil),
-				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(&core.ConfigPatchInfo{
-					IsModify: true,
-					UpdateConfig: map[string][]byte{
-						"for-test": []byte(`{"a":"c b e f"}`),
+		BeforeEach(func() {
+			configHash := "test-config-hash"
+			rctx = reconfigureContext{
+				RequestCtx: intctrlutil.RequestCtx{
+					Ctx: context.Background(),
+					Log: log.FromContext(context.Background()),
+				},
+				Client: nil,
+				ConfigTemplate: appsv1.ComponentFileTemplate{
+					Name: "for_test",
+				},
+				ConfigHash: &configHash,
+				Cluster: &appsv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: "default",
 					},
-				}),
-				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
-					MergeReloadAndRestart:           pointer.Bool(false),
-					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
-				}),
-				withClusterComponent(3))
-
-			By("mock client get pod caller")
-			k8sMockClient.MockListMethod(testutil.WithListReturned(
-				testutil.WithConstructListSequenceResult([][]runtime.Object{
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
-						withReadyPod(0, 1))),
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
-						withReadyPod(0, 3))),
-				}),
-				testutil.WithAnyTimes()))
-
-			By("mock client patch caller")
-			// mock client update caller
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithMinTimes(3)))
-
-			By("mock remote online update caller")
-			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
-				MinTimes(3)
-
-			status, err := operatorSyncPolicy.Upgrade(mockParam)
-			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
-
-			status, err = operatorSyncPolicy.Upgrade(mockParam)
-			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(BeEquivalentTo(ESNone))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
-		})
-	})
-
-	Context("sync reconfigure policy with selector test", func() {
-		It("Should success without error", func() {
-			By("prepare reconfigure policy params")
-			mockParam := newMockReconfigureParams("operatorSyncPolicy", k8sMockClient.Client(),
-				withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
-					return reconfigureClient, nil
-				}),
-				withMockInstanceSet(3, nil),
-				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
-				withUpdatedParameters(&core.ConfigPatchInfo{
-					IsModify: true,
-					UpdateConfig: map[string][]byte{
-						"for-test": []byte(`{"a":"c b e f"}`),
-					},
-				}),
-				withParamDef(&parametersv1alpha1.ParametersDefinitionSpec{
-					MergeReloadAndRestart:           pointer.Bool(false),
-					ReloadStaticParamsBeforeRestart: pointer.Bool(true),
-					ReloadAction: &parametersv1alpha1.ReloadAction{
-						TargetPodSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"primary": "true",
-							},
+				},
+				ClusterComponent: &appsv1.ClusterComponentSpec{
+					Name:     "test-component",
+					Replicas: 3,
+					Configs: []appsv1.ClusterComponentConfig{
+						{
+							Name: ptr.To("for_test"),
 						},
 					},
-				}),
-				withClusterComponent(3))
+				},
+				SynthesizedComponent: &component.SynthesizedComponent{
+					Name: "test-component",
+				},
+				its: &workloads.InstanceSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-instanceset",
+						Namespace: "default",
+					},
+				},
+				ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{
+					Name: "for_test",
+					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+						Format: parametersv1alpha1.RedisCfg,
+					},
+				},
+				ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{
+					MergeReloadAndRestart:           ptr.To(false),
+					ReloadStaticParamsBeforeRestart: ptr.To(true),
+				},
+				Patch: &core.ConfigPatchInfo{
+					IsModify: true,
+					UpdateConfig: map[string][]byte{
+						"for-test": []byte(`{"a":"c b e f"}`),
+					},
+				},
+			}
+		})
 
-			By("mock client get pod caller")
-			k8sMockClient.MockListMethod(testutil.WithListReturned(
-				testutil.WithConstructListReturnedResult(
-					fromPodObjectList(newMockPodsWithInstanceSet(&mockParam.InstanceSetUnits[0], 3,
-						withReadyPod(0, 1), func(pod *corev1.Pod, index int) {
-							if index == 0 {
-								if pod.Labels == nil {
-									pod.Labels = make(map[string]string)
-								}
-								pod.Labels["primary"] = "true"
-							}
-						}))),
-				testutil.WithAnyTimes()))
+		It("update cluster spec", func() {
+			By("update cluster spec")
+			status, err := policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			By("mock client patch caller")
-			// mock client update caller
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithTimes(1)))
+			Expect(*rctx.ClusterComponent.Configs[0].ConfigHash).Should(Equal(*rctx.getTargetConfigHash()))
+			Expect(rctx.ClusterComponent.Configs[0].Variables).Should(HaveKeyWithValue("a", "c b e f"))
+		})
 
-			By("mock remote online update caller")
-			reconfigureClient.EXPECT().OnlineUpgradeParams(gomock.Any(), gomock.Any()).Return(
-				&cfgproto.OnlineUpgradeParamsResponse{}, nil).
-				Times(1)
+		It("status replicas - partially updated", func() {
+			By("update cluster spec")
+			status, err := policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			status, err := operatorSyncPolicy.Upgrade(mockParam)
+			By("mock the instance status")
+			rctx.its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{
+					PodName: "pod-0",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
+						},
+					},
+				},
+			}
+
+			By("status check")
+			status, err = policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
+		})
+
+		It("status replicas - all", func() {
+			By("update cluster spec")
+			status, err := policy.Upgrade(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
+
+			By("mock the instance status")
+			rctx.its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{
+					PodName: "pod-0",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
+						},
+					},
+				},
+				{
+					PodName: "pod-1",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
+						},
+					},
+				},
+				{
+					PodName: "pod-2",
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       rctx.ConfigTemplate.Name,
+							ConfigHash: rctx.getTargetConfigHash(),
+						},
+					},
+				},
+			}
+
+			By("status check")
+			status, err = policy.Upgrade(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(1))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
 		})
 	})
-
 })
-
-// Additional mock helper functions for sync policy testing
-func withGRPCClient(fn func(addr string) (cfgproto.ReconfigureClient, error)) paramsOps {
-	return func(rc *reconfigureContext) {
-		rc.ReconfigureClientFactory = fn
-	}
-}
-
-func withConfigDescription(format *parametersv1alpha1.FileFormatConfig) paramsOps {
-	return func(rc *reconfigureContext) {
-		if rc.ConfigDescription == nil {
-			rc.ConfigDescription = &parametersv1alpha1.ComponentConfigDescription{
-				FileFormatConfig: format,
-			}
-		}
-	}
-}
-
-func withUpdatedParameters(patch *core.ConfigPatchInfo) paramsOps {
-	return func(rc *reconfigureContext) {
-		rc.Patch = patch
-	}
-}
-
-func withParamDef(def *parametersv1alpha1.ParametersDefinitionSpec) paramsOps {
-	return func(rc *reconfigureContext) {
-		rc.ParametersDef = def
-	}
-}

@@ -182,6 +182,7 @@ func withConfigDescription(format *parametersv1alpha1.FileFormatConfig) paramsOp
 	return func(rc *reconfigureContext) {
 		if rc.ConfigDescription == nil {
 			rc.ConfigDescription = &parametersv1alpha1.ComponentConfigDescription{
+				Name:             "for-test",
 				FileFormatConfig: format,
 			}
 		}

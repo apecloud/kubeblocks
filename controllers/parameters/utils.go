@@ -22,8 +22,12 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/netip"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -31,8 +35,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func inDataContextUnspecified() *multicluster.ClientOption {
@@ -79,17 +85,75 @@ func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline
 func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
-	// TODO: Implement kbagent-based reconfigure
-	// For now, return nil to allow compilation
-	// Use cfgproto.ReconfigureClient type to satisfy import check
-	_ = pod
-	_ = ctx
-	_ = createClient
-	_ = configSpec
-	_ = configFile
-	_ = updatedParams
-	_ = cfgproto.ReconfigureClient(nil)
-	return fmt.Errorf("commonOnlineUpdateWithPod: not implemented yet - waiting for kbagent integration")
+	address, err := resolveReloadServerGrpcURL(pod)
+	if err != nil {
+		return err
+	}
+	client, err := createClient(address)
+	if err != nil {
+		return err
+	}
+
+	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
+		ConfigSpec: configSpec,
+		Params:     updatedParams,
+		ConfigFile: ptr.To(configFile),
+	})
+	if err != nil {
+		return err
+	}
+
+	errMessage := response.GetErrMessage()
+	if errMessage != "" {
+		return core.MakeError("%s", errMessage)
+	}
+	return nil
+}
+
+func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
+	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
+	if pod.Spec.HostNetwork {
+		containerPort, err := parameters.ResolveReloadServerGRPCPort(pod.Spec.Containers)
+		if err != nil {
+			return "", err
+		}
+		podPort = int(containerPort)
+	}
+	return generateGrpcURL(pod, podPort)
+}
+
+func generateGrpcURL(pod *corev1.Pod, portPort int) (string, error) {
+	ip, err := ipAddressFromPod(pod.Status)
+	if err != nil {
+		return "", err
+	}
+	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
+}
+
+func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
+	// IPv4 address priority
+	for _, ip := range status.PodIPs {
+		address, err := netip.ParseAddr(ip.IP)
+		if err != nil || address.Is6() {
+			continue
+		}
+		return net.ParseIP(ip.IP), nil
+	}
+
+	// Using status.PodIP
+	address := net.ParseIP(status.PodIP)
+	if !validIPv4Address(address) && !validIPv6Address(address) {
+		return nil, fmt.Errorf("%s is not a valid IPv4/IPv6 address", status.PodIP)
+	}
+	return address, nil
+}
+
+func validIPv4Address(ip net.IP) bool {
+	return ip != nil && ip.To4() != nil
+}
+
+func validIPv6Address(ip net.IP) bool {
+	return ip != nil && ip.To16() != nil
 }
 
 func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {

@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -375,16 +376,13 @@ func newMockPodsWithInstanceSet(its *workloads.InstanceSet, count int, opts ...f
 	for i := 0; i < count; i++ {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("mock-pod-%d", i),
-				Namespace: "default",
+				Namespace:       "default",
+				Name:            fmt.Sprintf("mock-pod-%d", i),
+				OwnerReferences: []metav1.OwnerReference{newControllerRef(its, workloads.GroupVersion.WithKind(workloads.InstanceSetKind))},
 			},
+			Spec: *its.Spec.Template.Spec.DeepCopy(),
 			Status: corev1.PodStatus{
-				Conditions: []corev1.PodCondition{
-					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
+				PodIP: "1.1.1.1",
 			},
 		}
 		// Apply options
@@ -406,6 +404,19 @@ func withReadyPod(start, end int) func(*corev1.Pod, int) {
 					Status: corev1.ConditionTrue,
 				},
 			}
+			pod.Status.Phase = corev1.PodRunning
 		}
+	}
+}
+
+func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.OwnerReference {
+	bRefFn := func(b bool) *bool { return &b }
+	return metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               owner.GetName(),
+		UID:                owner.GetUID(),
+		Controller:         bRefFn(true),
+		BlockOwnerDeletion: bRefFn(false),
 	}
 }

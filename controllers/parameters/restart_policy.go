@@ -63,7 +63,7 @@ func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs
 	}
 
 	if len(pods) != 0 {
-		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
+		progress = checkReconfigureUpdateProgress(pods, configKey, newVersion)
 	}
 
 	if len(pods) == int(progress) {
@@ -82,8 +82,8 @@ func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs
 	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
 }
 
-// CheckReconfigureUpdateProgress checks pods of the component is ready.
-func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
+// checkReconfigureUpdateProgress checks pods of the component is ready.
+func checkReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
 	var (
 		readyPods        int32 = 0
 		cfgAnnotationKey       = core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)

@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -35,6 +36,9 @@ import (
 )
 
 var _ = Describe("Reconfigure restartPolicy test", func() {
+	const (
+		cfgName = "test"
+	)
 
 	var (
 		policy = &restartPolicy{}
@@ -50,7 +54,7 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 				},
 				Client: nil,
 				ConfigTemplate: appsv1.ComponentFileTemplate{
-					Name: "test",
+					Name: cfgName,
 				},
 				ConfigHash: &configHash,
 				Cluster: &appsv1.Cluster{
@@ -62,6 +66,11 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 				ClusterComponent: &appsv1.ClusterComponentSpec{
 					Name:     "test-component",
 					Replicas: 2,
+					Configs: []appsv1.ClusterComponentConfig{
+						{
+							Name: ptr.To(cfgName),
+						},
+					},
 				},
 				SynthesizedComponent: &component.SynthesizedComponent{
 					Name: "test-component",

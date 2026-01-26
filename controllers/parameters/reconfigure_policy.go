@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
 // ExecStatus defines running result for Reconfiguring policy (fsm).
@@ -111,6 +112,17 @@ func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
 		return !core.IsWatchModuleForShellTrigger(reloadAction.ShellTrigger)
 	}
 	return false
+}
+
+func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]string) *string {
+	hash, err := cfgutil.ComputeHash(data)
+	if err != nil {
+		if reqCtx != nil {
+			reqCtx.Log.Error(err, "failed to get configuration version!")
+		}
+		return nil
+	}
+	return &hash
 }
 
 func withSucceed(succeedCount int32) func(status *returnedStatus) {

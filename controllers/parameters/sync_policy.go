@@ -82,6 +82,7 @@ func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, 
 		}
 	}
 	if config == nil {
+		// TODO: fix me
 		return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
 	}
 	if !ptr.Equal(config.ConfigHash, rctx.getTargetConfigHash()) {
@@ -107,12 +108,14 @@ func syncConfigStatus(rctx reconfigureContext) returnedStatus {
 		configHash = rctx.getTargetConfigHash()
 	)
 	updated := int32(0)
-	for _, inst := range rctx.its.Status.InstanceStatus {
-		idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
-			return cfg.Name == rctx.ConfigTemplate.Name
-		})
-		if idx >= 0 && ptr.Equal(inst.Configs[idx].ConfigHash, configHash) {
-			updated++
+	if rctx.its != nil {
+		for _, inst := range rctx.its.Status.InstanceStatus {
+			idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
+				return cfg.Name == rctx.ConfigTemplate.Name
+			})
+			if idx >= 0 && ptr.Equal(inst.Configs[idx].ConfigHash, configHash) {
+				updated++
+			}
 		}
 	}
 	if updated == replicas {

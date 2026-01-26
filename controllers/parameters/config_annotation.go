@@ -127,7 +127,7 @@ func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, 
 		return intctrlutil.RequeueWithError(err, ctx.Log, "")
 	}
 	if result.Retry {
-		return intctrlutil.RequeueAfter(ConfigReconcileInterval, ctx.Log, "")
+		return intctrlutil.RequeueAfter(configReconcileInterval, ctx.Log, "")
 	}
 	return intctrlutil.Reconciled()
 }

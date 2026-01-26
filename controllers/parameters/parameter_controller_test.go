@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
@@ -41,22 +43,24 @@ import (
 )
 
 var _ = Describe("Parameter Controller", func() {
-
-	var compParamKey types.NamespacedName
-	var comp *component.SynthesizedComponent
-	var clusterObj *appsv1.Cluster
+	var (
+		compParamKey    types.NamespacedName
+		clusterObj      *appsv1.Cluster
+		synthesizedComp *component.SynthesizedComponent
+		itsObj          *workloads.InstanceSet
+	)
 
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
 	prepareTestEnv := func() {
-		_, _, clusterObj, _, comp = mockReconcileResource()
+		_, clusterObj, _, synthesizedComp, itsObj = mockReconcileResource()
+
 		compParamKey = types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
-			Name:      configcore.GenerateComponentConfigurationName(comp.ClusterName, comp.Name),
+			Name:      configcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name),
 		}
-
 		Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 			g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
@@ -68,12 +72,35 @@ var _ = Describe("Parameter Controller", func() {
 			prepareTestEnv()
 
 			By("submit the parameter update request")
-			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
 				AddParameters("innodb_buffer_pool_size", "1024M").
 				AddParameters("max_connections", "100").
 				Create(&testCtx).
 				GetObject()
+
+			By("mock the reconfigure done")
+			itsKey := client.ObjectKey{
+				Namespace: itsObj.Namespace,
+				Name:      itsObj.Name,
+			}
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Status.Replicas = int32(1)
+				its.Status.InstanceStatus = []workloads.InstanceStatus{
+					{
+						PodName: fmt.Sprintf("%s-0", its.Name),
+						Configs: []workloads.InstanceConfigStatus{
+							{
+								Name: configSpecName,
+								ConfigHash: computeTargetConfigHash(nil, map[string]string{
+									"innodb_buffer_pool_size": "1024M",
+									"max_connections":         "100",
+								}),
+							},
+						},
+					},
+				}
+			})()).Should(Succeed())
 
 			By("check component parameter status")
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
@@ -95,12 +122,30 @@ var _ = Describe("Parameter Controller", func() {
 			})).Should(Succeed())
 
 			By("the second update parameters")
-			key = testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj = testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
+			key = testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj = testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
 				AddParameters("max_connections", "2000").
 				AddParameters("gtid_mode", "OFF").
 				Create(&testCtx).
 				GetObject()
+
+			By("mock the reconfigure done")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Status.InstanceStatus = []workloads.InstanceStatus{
+					{
+						PodName: fmt.Sprintf("%s-0", its.Name),
+						Configs: []workloads.InstanceConfigStatus{
+							{
+								Name: configSpecName,
+								ConfigHash: computeTargetConfigHash(nil, map[string]string{
+									"max_connections": "2000",
+									"gtid_mode":       "OFF",
+								}),
+							},
+						},
+					},
+				}
+			})()).Should(Succeed())
 
 			By("check parameter status")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
@@ -120,8 +165,8 @@ var _ = Describe("Parameter Controller", func() {
 			prepareTestEnv()
 
 			By("submit the parameter update request with invalid max_connection")
-			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
 				AddParameters("max_connections", "-100").
 				Create(&testCtx).
 				GetObject()
@@ -144,8 +189,8 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("submit the custom template request")
-			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
 				AddCustomTemplate(configSpecName, configmap.Name, configmap.Namespace).
 				Create(&testCtx).
 				GetObject()
@@ -166,8 +211,8 @@ var _ = Describe("Parameter Controller", func() {
 			prepareTestEnv()
 
 			By("submit the custom template request")
-			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, comp.Name).
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
 				AddCustomTemplate(configSpecName, "not-exist-tpl", testCtx.DefaultNamespace).
 				Create(&testCtx).
 				GetObject()
@@ -187,21 +232,23 @@ var _ = Describe("Parameter Controller", func() {
 			shardingCompSpecList, err := sharding.GenShardingCompSpecList4Test(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.Shardings[0])
 			Expect(err).ShouldNot(HaveOccurred())
 			for _, spec := range shardingCompSpecList {
+				By("create a sharding component: " + spec.Name)
 				shardingLabels := map[string]string{
-					constant.AppInstanceLabelKey:       comp.ClusterName,
+					constant.AppInstanceLabelKey:       synthesizedComp.ClusterName,
 					constant.KBAppShardingNameLabelKey: shardingCompName,
 				}
-				By("create a sharding component: " + spec.Name)
 				comp, err := component.BuildComponent(clusterObj, spec, shardingLabels, nil)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(testCtx.Create(testCtx.Ctx, comp)).Should(Succeed())
 
+				By("create the ITS of sharding component: " + spec.Name)
+				mockCreateITSObject(comp.Namespace, comp.Name, synthesizedComp.ClusterName, spec.Name)
+
+				By("check ComponentParameters cr for sharding component : " + spec.Name)
 				shardingCompParamKey := types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      configcore.GenerateComponentConfigurationName(clusterObj.Name, spec.Name),
 				}
-
-				By("check ComponentParameters cr for sharding component : " + spec.Name)
 				Eventually(testapps.CheckObj(&testCtx, shardingCompParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 					g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 					g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
@@ -209,19 +256,43 @@ var _ = Describe("Parameter Controller", func() {
 			}
 
 			By("submit the parameter update request")
-			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, shardingCompName).
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, shardingCompName).
 				AddParameters("innodb_buffer_pool_size", "1024M").
 				AddParameters("max_connections", "100").
 				Create(&testCtx).
 				GetObject()
 
+			updatedData := map[string]string{
+				"innodb_buffer_pool_size": "1024M",
+				"max_connections":         "100",
+			}
 			for _, spec := range shardingCompSpecList {
+				By("mock the reconfigure done")
+				itsKey := client.ObjectKey{
+					Namespace: synthesizedComp.Namespace,
+					Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name),
+				}
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+					its.Status.Replicas = int32(1)
+					its.Status.InstanceStatus = []workloads.InstanceStatus{
+						{
+							PodName: fmt.Sprintf("%s-0", its.Name),
+							Configs: []workloads.InstanceConfigStatus{
+								{
+									Name:       configSpecName,
+									ConfigHash: computeTargetConfigHash(nil, updatedData),
+								},
+							},
+						},
+					}
+				})()).Should(Succeed())
+
+				By("check component parameter status")
 				shardingCompParamKey := types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      configcore.GenerateComponentConfigurationName(clusterObj.Name, spec.Name),
 				}
-				By("check component parameter status")
 				Eventually(testapps.CheckObj(&testCtx, shardingCompParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 					g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
 					g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
@@ -238,8 +309,8 @@ var _ = Describe("Parameter Controller", func() {
 			prepareTestEnv()
 
 			By("submit the parameter update request with invalid max_connection")
-			key := testapps.GetRandomizedKey(comp.Namespace, comp.FullCompName)
-			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, comp.ClusterName, "invalid component").
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, "invalid component").
 				AddParameters("max_connections", "100").
 				Create(&testCtx).
 				GetObject()

@@ -271,3 +271,15 @@ func (factory *MockClusterFactory) SetFlatInstanceOrdinal(flatInstanceOrdinal bo
 		comp.FlatInstanceOrdinal = flatInstanceOrdinal
 	})
 }
+
+func (factory *MockClusterFactory) SetConfig(config appsv1.ClusterComponentConfig) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
+		comp.Configs = append(comp.Configs, config)
+	})
+}
+
+func (factory *MockClusterFactory) SetShardingConfig(config appsv1.ClusterComponentConfig) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.Configs = append(sharding.Template.Configs, config)
+	})
+}

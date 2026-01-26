@@ -39,6 +39,10 @@ import (
 
 var _ = Describe("Reconfigure syncPolicy test", func() {
 	Context("sync reconfigure policy", func() {
+		const (
+			cfgName = "for-test"
+		)
+
 		var (
 			rctx   reconfigureContext
 			policy = &syncPolicy{}
@@ -53,7 +57,7 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 				},
 				Client: nil,
 				ConfigTemplate: appsv1.ComponentFileTemplate{
-					Name: "for_test",
+					Name: cfgName,
 				},
 				ConfigHash: &configHash,
 				Cluster: &appsv1.Cluster{
@@ -67,7 +71,7 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					Replicas: 3,
 					Configs: []appsv1.ClusterComponentConfig{
 						{
-							Name: ptr.To("for_test"),
+							Name: ptr.To(cfgName),
 						},
 					},
 				},
@@ -81,7 +85,7 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 					},
 				},
 				ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{
-					Name: "for_test",
+					Name: cfgName,
 					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
 						Format: parametersv1alpha1.RedisCfg,
 					},
@@ -93,7 +97,7 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 				Patch: &core.ConfigPatchInfo{
 					IsModify: true,
 					UpdateConfig: map[string][]byte{
-						"for-test": []byte(`{"a":"c b e f"}`),
+						cfgName: []byte(`{"a":"c b e f"}`),
 					},
 				},
 			}

@@ -54,7 +54,7 @@ var _ = Describe("ParameterExtension Controller", func() {
 		AfterEach(cleanEnv)
 
 		It("Should reconcile success", func() {
-			_, _, clusterObj, compObj, _ := mockReconcileResource()
+			_, clusterObj, compObj, _, _ := mockReconcileResource()
 
 			By("check cm resource")
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: configcore.GetComponentCfgName(clusterObj.Name, defaultCompName, configSpecName), Namespace: clusterObj.Namespace}, &corev1.ConfigMap{}, true)).Should(Succeed())
@@ -77,7 +77,7 @@ var _ = Describe("ParameterExtension Controller", func() {
 		})
 
 		It("Should reconcile success for sharding component", func() {
-			_, _, clusterObj, _, _ := mockReconcileResource()
+			_, clusterObj, _, _, _ := mockReconcileResource()
 
 			By("Create sharding component objs")
 			shardingCompSpecList, err := sharding.GenShardingCompSpecList4Test(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.Shardings[0])

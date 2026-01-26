@@ -27,10 +27,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -45,7 +47,6 @@ const (
 	clusterName      = "test-cluster"
 	defaultCompName  = "mysql"
 	shardingCompName = "sharding-test"
-	defaultITSName   = "mysql-statefulset"
 	configSpecName   = "mysql-config-tpl"
 	configVolumeName = "mysql-config"
 	cmName           = "mysql-tree-node-template-8.0"
@@ -92,7 +93,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 	return configmap, paramsdef
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent, *workloads.InstanceSet) {
 	configmap, paramsDef := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
@@ -119,9 +120,16 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 		AddComponent(defaultCompName, compDefObj.GetName()).
+		SetConfig(appsv1.ClusterComponentConfig{
+			Name: ptr.To(configSpecName),
+		}).
+		SetReplicas(1).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddSharding(shardingCompName, "", compDefObj.GetName()).
-		SetShards(5).
+		SetShards(1).
+		SetShardingConfig(appsv1.ClusterComponentConfig{
+			Name: ptr.To(configSpecName),
+		}).
 		Create(&testCtx).
 		GetObject()
 
@@ -136,23 +144,30 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		Create(&testCtx).
 		GetObject()
 
+	By("Create a ITS obj")
+	itsObj := mockCreateITSObject(testCtx.DefaultNamespace, fullCompName, clusterObj.Name, defaultCompName)
+
+	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)
+	Expect(err).ShouldNot(HaveOccurred())
+
+	return configmap, clusterObj, compObj, synthesizedComp, itsObj
+}
+
+func mockCreateITSObject(namespace, name, clusterName, compName string) *workloads.InstanceSet {
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,
 			MountPath: "/mnt/config",
 		}).GetObject()
-	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, defaultITSName, clusterObj.Name, defaultCompName).
-		AddConfigmapVolume(configVolumeName, configmap.Name).
+	itsObj := testapps.NewInstanceSetFactory(namespace, name, clusterName, compName).
 		AddContainer(container).
+		SetReplicas(1).
 		AddAppNameLabel(clusterName).
 		AddAppInstanceLabel(clusterName).
-		AddAppComponentLabel(defaultCompName).
-		Create(&testCtx).GetObject()
-
-	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)
-	Expect(err).ShouldNot(HaveOccurred())
-
-	return configmap, paramsDef, clusterObj, compObj, synthesizedComp
+		AddAppComponentLabel(compName).
+		Create(&testCtx).
+		GetObject()
+	return itsObj
 }
 
 func cleanEnv() {

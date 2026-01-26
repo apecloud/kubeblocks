@@ -30,7 +30,6 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -38,10 +37,10 @@ type ResourceFetcher[T any] struct {
 	obj *T
 	*render.ResourceCtx
 
-	ClusterObj      *appsv1.Cluster
-	ComponentObj    *appsv1.Component
-	ComponentDefObj *appsv1.ComponentDefinition
-	ClusterComObj   *appsv1.ClusterComponentSpec
+	ClusterObj, ClusterObjCopy *appsv1.Cluster
+	ComponentObj               *appsv1.Component
+	ComponentDefObj            *appsv1.ComponentDefinition
+	ClusterComObj              *appsv1.ClusterComponentSpec
 
 	ConfigMapObj          *corev1.ConfigMap
 	ComponentParameterObj *parametersv1alpha1.ComponentParameter
@@ -63,13 +62,18 @@ func (r *ResourceFetcher[T]) Wrap(fn func() error) (ret *T) {
 }
 
 func (r *ResourceFetcher[T]) Cluster() *T {
-	clusterKey := client.ObjectKey{
-		Namespace: r.Namespace,
-		Name:      r.ClusterName,
-	}
 	return r.Wrap(func() error {
-		r.ClusterObj = &appsv1.Cluster{}
-		return r.Client.Get(r.Context, clusterKey, r.ClusterObj)
+		clusterKey := client.ObjectKey{
+			Namespace: r.Namespace,
+			Name:      r.ClusterName,
+		}
+		cluster := &appsv1.Cluster{}
+		err := r.Client.Get(r.Context, clusterKey, cluster)
+		if err == nil {
+			r.ClusterObj = cluster
+			r.ClusterObjCopy = r.ClusterObj.DeepCopy()
+		}
+		return err
 	})
 }
 
@@ -116,16 +120,9 @@ func (r *ResourceFetcher[T]) getComponentSpecByName() (*appsv1.ClusterComponentS
 	if compSpec != nil {
 		return compSpec, nil
 	}
-	for _, spec := range r.ClusterObj.Spec.Shardings {
-		shardingCompList, err := sharding.ListShardingCompSpecs(r.Context, r.Client, r.ClusterObj, &spec)
-		if err != nil {
-			return nil, err
-		}
-		for i, shardingComp := range shardingCompList {
-			if shardingComp.Name == r.ComponentName {
-				return shardingCompList[i], nil
-			}
-		}
+	sharding := r.ClusterObj.Spec.GetShardingByName(r.ComponentName)
+	if sharding != nil {
+		return &sharding.Template, nil
 	}
 	return nil, nil
 }

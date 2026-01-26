@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"fmt"
 	"sort"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,9 +77,8 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			return err
 		}
 		if int(spec.Shards) > len(backup.Status.Targets) && len(shardComponents) < int(spec.Shards) {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
-				`wait for all shard components of sharding "%s" to be created before restoring from backup "%s"`,
-				backup.Name, spec.Name)
+			return intctrlutil.NewRequeueError(time.Second,
+				fmt.Sprintf(`the shard components of sharding "%s" are not ready, wait for next loop to allocate source targets`, spec.Name))
 		}
 		targets := backup.Status.Targets
 		// obtain components that have already been assigned targets.

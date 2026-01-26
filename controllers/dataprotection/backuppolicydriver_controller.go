@@ -217,13 +217,17 @@ func (r *backupPolicyAndScheduleBuilder) transformBackupPolicy() (*dpv1alpha1.Ba
 				Annotations: r.buildAnnotations(),
 			},
 		}
-		r.buildBackupPolicy(backupPolicy)
+		if err := r.buildBackupPolicy(backupPolicy); err != nil {
+			return nil, err
+		}
 		if err := controllerutil.SetControllerReference(r.Cluster, backupPolicy, r.schema); err != nil {
 			return nil, err
 		}
 		return backupPolicy, r.Client.Create(r.Context, backupPolicy)
 	}
-	r.buildBackupPolicy(backupPolicy)
+	if err := r.buildBackupPolicy(backupPolicy); err != nil {
+		return nil, err
+	}
 	return backupPolicy, r.Client.Update(r.Context, backupPolicy)
 }
 
@@ -324,7 +328,7 @@ func (r *backupPolicyAndScheduleBuilder) syncBackupSchedule(backupSchedule *dpv1
 }
 
 // buildBackupPolicy builds a new backup policy by the backup policy template.
-func (r *backupPolicyAndScheduleBuilder) buildBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) {
+func (r *backupPolicyAndScheduleBuilder) buildBackupPolicy(backupPolicy *dpv1alpha1.BackupPolicy) error {
 	bpSpec := &backupPolicy.Spec
 	// if cluster have backup repo, set backup repo name to backup policy.
 	if r.Cluster.Spec.Backup != nil && r.Cluster.Spec.Backup.RepoName != "" {
@@ -337,17 +341,24 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupPolicy(backupPolicy *dpv1alp
 	intctrlutil.MergeMetadataMapInplace(r.buildAnnotations(), &backupPolicy.Annotations)
 	intctrlutil.MergeMetadataMapInplace(r.buildLabels(), &backupPolicy.Labels)
 
-	r.buildBackupMethods(backupPolicy)
+	if err := r.buildBackupMethods(backupPolicy); err != nil {
+		return err
+	}
 
 	if needSyncFromTemplate(backupPolicy) {
 		bpSpec.BackoffLimit = r.backupPolicyTPL.Spec.BackoffLimit
 		bpSpec.RetentionPolicy = r.backupPolicyTPL.Spec.RetentionPolicy
 		if r.isSharding {
-			bpSpec.Targets = r.buildBackupTargets(backupPolicy.Spec.Targets)
+			targets, err := r.buildBackupTargets(backupPolicy.Spec.Targets)
+			if err != nil {
+				return err
+			}
+			bpSpec.Targets = targets
 		} else {
 			bpSpec.Target = r.buildBackupTarget(backupPolicy.Spec.Target, r.backupPolicyTPL.Spec.Target, r.componentName)
 		}
 	}
+	return nil
 }
 
 func (r *backupPolicyAndScheduleBuilder) setDefaultEncryptionConfig(backupPolicy *dpv1alpha1.BackupPolicy) {
@@ -399,7 +410,7 @@ func (r *backupPolicyAndScheduleBuilder) syncRoleLabelSelectorWhenReplicaChanges
 }
 
 // buildBackupMethods build the backupMethod of tpl to backupPolicy.
-func (r *backupPolicyAndScheduleBuilder) buildBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy) {
+func (r *backupPolicyAndScheduleBuilder) buildBackupMethods(backupPolicy *dpv1alpha1.BackupPolicy) error {
 	var backupMethods []dpv1alpha1.BackupMethod
 	oldBackupMethodMap := map[string]dpv1alpha1.BackupMethod{}
 	for _, v := range backupPolicy.Spec.BackupMethods {
@@ -420,7 +431,11 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupMethods(backupPolicy *dpv1al
 		}
 		if backupMethodTPL.Target != nil {
 			if r.isSharding {
-				backupMethod.Targets = r.buildBackupTargets(backupMethod.Targets)
+				targets, err := r.buildBackupTargets(backupMethod.Targets)
+				if err != nil {
+					return err
+				}
+				backupMethod.Targets = targets
 			} else {
 				backupMethod.Target = r.buildBackupTarget(backupMethod.Target, *backupMethodTPL.Target, r.componentName)
 			}
@@ -429,6 +444,7 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupMethods(backupPolicy *dpv1al
 		backupMethods = append(backupMethods, backupMethod)
 	}
 	backupPolicy.Spec.BackupMethods = backupMethods
+	return nil
 }
 
 func (r *backupPolicyAndScheduleBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterComponentSpec, envs []dpv1alpha1.EnvVar) []corev1.EnvVar {
@@ -470,8 +486,15 @@ func findBestMatchingValue(versionMappings []dpv1alpha1.VersionMapping, serviceV
 	return ""
 }
 
-func (r *backupPolicyAndScheduleBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarget) []dpv1alpha1.BackupTarget {
-	shardComponents, _ := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, r.componentName)
+func (r *backupPolicyAndScheduleBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarget) ([]dpv1alpha1.BackupTarget, error) {
+	shardComponents, err := intctrlutil.ListShardingComponents(r.Context, r.Client, r.Cluster, r.componentName)
+	if err != nil {
+		return nil, err
+	}
+	if len(shardComponents) == 0 {
+		return nil, fmt.Errorf("sharding components %s not found", r.componentName)
+	}
+
 	sourceTargetMap := map[string]*dpv1alpha1.BackupTarget{}
 	for i := range targets {
 		sourceTargetMap[targets[i].Name] = &targets[i]
@@ -484,7 +507,7 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupTargets(targets []dpv1alpha1
 			backupTargets = append(backupTargets, *target)
 		}
 	}
-	return backupTargets
+	return backupTargets, nil
 }
 
 func (r *backupPolicyAndScheduleBuilder) buildBackupTarget(

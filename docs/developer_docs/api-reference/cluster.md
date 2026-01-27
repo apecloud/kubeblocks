@@ -4776,6 +4776,9 @@ VarOption
 </p>
 <div>
 <p>ComponentAvailable defines the strategies for determining whether the component is available.</p>
+<p>If both <code>WithPhases</code> and <code>WithRole</code> are specified, the component will be considered
+unavailable if any of them fail.
+If <code>WithProbe</code> is specified, <code>WithPhases</code> and <code>WithRole</code> fields are ignored.</p>
 </div>
 <table>
 <thead>
@@ -4794,7 +4797,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the phases that the component will go through to be considered available.</p>
+<p>Specifies the phases that the component will go through to be considered available.
+Multiple phases are separated by comma.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -4823,7 +4827,6 @@ ComponentAvailableWithProbe
 <td>
 <em>(Optional)</em>
 <p>Specifies the strategies for determining whether the component is available based on the available probe.</p>
-<p>If specified, it will take precedence over the WithPhases and WithRole fields.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

@@ -170,3 +170,33 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 	})
 
 })
+
+// Additional mock helper functions for sync policy testing
+func withGRPCClient(fn func(addr string) (cfgproto.ReconfigureClient, error)) paramsOps {
+	return func(rc *reconfigureContext) {
+		rc.ReconfigureClientFactory = fn
+	}
+}
+
+func withConfigDescription(format *parametersv1alpha1.FileFormatConfig) paramsOps {
+	return func(rc *reconfigureContext) {
+		if rc.ConfigDescription == nil {
+			rc.ConfigDescription = &parametersv1alpha1.ComponentConfigDescription{
+				Name:             "for-test",
+				FileFormatConfig: format,
+			}
+		}
+	}
+}
+
+func withUpdatedParameters(patch *core.ConfigPatchInfo) paramsOps {
+	return func(rc *reconfigureContext) {
+		rc.Patch = patch
+	}
+}
+
+func withParamDef(def *parametersv1alpha1.ParametersDefinitionSpec) paramsOps {
+	return func(rc *reconfigureContext) {
+		rc.ParametersDef = def
+	}
+}

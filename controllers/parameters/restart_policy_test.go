@@ -20,15 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -268,3 +277,146 @@ var _ = Describe("Reconfigure restartPolicy", func() {
 	//	})
 	// })
 })
+
+// Mock helper functions for testing
+type paramsOps func(*reconfigureContext)
+
+func withMockInstanceSet(replicas int, labels map[string]string) paramsOps {
+	return func(rc *reconfigureContext) {
+		// Create a simple InstanceSet for testing
+		if rc.InstanceSetUnits == nil {
+			rc.InstanceSetUnits = make([]workloads.InstanceSet, 0)
+		}
+		// Add minimal InstanceSet structure
+		rc.InstanceSetUnits = append(rc.InstanceSetUnits, workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mock-instanceset",
+				Namespace: "default",
+			},
+		})
+	}
+}
+
+func withConfigSpec(configSpecName string, data map[string]string) paramsOps {
+	return func(rc *reconfigureContext) {
+		// Create minimal ConfigTemplate
+		rc.ConfigTemplate = appsv1.ComponentFileTemplate{
+			Name: configSpecName,
+		}
+		// Create ConfigMap with data
+		if rc.ConfigMap == nil {
+			rc.ConfigMap = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mock-configmap",
+					Namespace: "default",
+				},
+				Data: data,
+			}
+		} else {
+			rc.ConfigMap.Data = data
+		}
+	}
+}
+
+func withClusterComponent(replicas int) paramsOps {
+	return func(rc *reconfigureContext) {
+		if rc.ClusterComponent == nil {
+			rc.ClusterComponent = &appsv1.ClusterComponentSpec{
+				Name:     "mock-component",
+				Replicas: int32(replicas),
+			}
+		}
+	}
+}
+
+func newMockReconfigureParams(testName string, cli client.Client, paramOps ...paramsOps) reconfigureContext {
+	rc := reconfigureContext{
+		RequestCtx: intctrlutil.RequestCtx{
+			Ctx: context.Background(),
+			Log: log.FromContext(context.Background()),
+		},
+		Client: cli,
+		Cluster: &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mock-cluster",
+				Namespace: "default",
+			},
+			Spec: appsv1.ClusterSpec{},
+		},
+	}
+
+	// Apply all parameter operations
+	for _, op := range paramOps {
+		op(&rc)
+	}
+
+	return rc
+}
+
+func newMockRunningComponent() client.Object {
+	// Return a minimal Component object
+	return &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mock-component",
+			Namespace: "default",
+		},
+		Status: appsv1.ComponentStatus{
+			Phase: appsv1.RunningComponentPhase,
+		},
+	}
+}
+
+func fromPodObjectList(pods []runtime.Object) []runtime.Object {
+	// Simple conversion function
+	return pods
+}
+
+func newMockPodsWithInstanceSet(its *workloads.InstanceSet, count int, opts ...func(*corev1.Pod, int)) []runtime.Object {
+	pods := make([]runtime.Object, count)
+	for i := 0; i < count; i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:       "default",
+				Name:            fmt.Sprintf("mock-pod-%d", i),
+				OwnerReferences: []metav1.OwnerReference{newControllerRef(its, workloads.GroupVersion.WithKind(workloads.InstanceSetKind))},
+			},
+			Spec: *its.Spec.Template.Spec.DeepCopy(),
+			Status: corev1.PodStatus{
+				PodIP: "1.1.1.1",
+			},
+		}
+		// Apply options
+		for _, opt := range opts {
+			opt(pod, i)
+		}
+		pods[i] = pod
+	}
+	return pods
+}
+
+func withReadyPod(start, end int) func(*corev1.Pod, int) {
+	return func(pod *corev1.Pod, index int) {
+		// Mark pod as ready if within range
+		if index >= start && index < end {
+			pod.Status.Conditions = []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			pod.Status.Phase = corev1.PodRunning
+		}
+	}
+}
+
+func newControllerRef(owner client.Object, gvk schema.GroupVersionKind) metav1.OwnerReference {
+	bRefFn := func(b bool) *bool { return &b }
+	return metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               owner.GetName(),
+		UID:                owner.GetUID(),
+		Controller:         bRefFn(true),
+		BlockOwnerDeletion: bRefFn(false),
+	}
+}

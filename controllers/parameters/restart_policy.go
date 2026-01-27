@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -60,7 +63,7 @@ func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs
 	}
 
 	if len(pods) != 0 {
-		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
+		progress = checkReconfigureUpdateProgress(pods, configKey, newVersion)
 	}
 
 	if len(pods) == int(progress) {
@@ -77,4 +80,20 @@ func (s *restartPolicy) restartAndVerifyComponent(rctx reconfigureContext, funcs
 		}
 	}
 	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
+}
+
+// checkReconfigureUpdateProgress checks pods of the component is ready.
+func checkReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
+	var (
+		readyPods        int32 = 0
+		cfgAnnotationKey       = core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+	)
+
+	for _, pod := range pods {
+		annotations := pod.Annotations
+		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.IsPodReady(&pod) {
+			readyPods++
+		}
+	}
+	return readyPods
 }

@@ -21,11 +21,13 @@ package parameters
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 )
@@ -51,4 +53,16 @@ func GetInstanceSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 		OnlineUpdatePodFunc: commonOnlineUpdateWithPod,
 		RestartComponent:    restartComponent,
 	}
+}
+
+type reconfigureTask struct {
+	policy  parametersv1alpha1.ReloadPolicy
+	taskCtx reconfigureContext
+}
+
+func (r reconfigureTask) reconfigure() (returnedStatus, error) {
+	if executor, ok := upgradePolicyMap[r.policy]; ok {
+		return executor.Upgrade(r.taskCtx)
+	}
+	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.policy)
 }

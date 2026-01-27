@@ -69,12 +69,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var serviceAccountName string
-	var sa *corev1.ServiceAccount
+	sa := &corev1.ServiceAccount{}
 	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now
 	// the user's responsibility to provide appropriate serviceaccount.
 	if serviceAccountName = transCtx.Component.Spec.ServiceAccountName; serviceAccountName != "" {
 		// if user provided serviceaccount does not exist, raise error
-		sa := &corev1.ServiceAccount{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: serviceAccountName}, sa); err != nil {
 			if errors.IsNotFound(err) {
 				transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeWarning, EventReasonRBACManager,

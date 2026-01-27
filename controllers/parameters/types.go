@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,12 +55,14 @@ func GetInstanceSetRollingUpgradeFuncs() RollingUpgradeFuncs {
 	}
 }
 
-type ReloadAction interface {
-	ExecReload() (returnedStatus, error)
-	ReloadType() string
+type reconfigureTask struct {
+	policy  parametersv1alpha1.ReloadPolicy
+	taskCtx reconfigureContext
 }
 
-type reconfigureTask struct {
-	parametersv1alpha1.ReloadPolicy
-	taskCtx reconfigureContext
+func (r reconfigureTask) reconfigure() (returnedStatus, error) {
+	if executor, ok := upgradePolicyMap[r.policy]; ok {
+		return executor.Upgrade(r.taskCtx)
+	}
+	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.policy)
 }

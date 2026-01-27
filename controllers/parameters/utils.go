@@ -33,17 +33,12 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-func inDataContextUnspecified() *multicluster.ClientOption {
-	return multicluster.InDataContextUnspecified()
-}
 
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {

@@ -125,7 +125,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}()
 
 	// check if the ITS is running
-	isITSUpdatedNRunning := t.isInstanceSetRunning()
+	isITSUpdatedNRunning := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeWorkloadRunning).Status
 
 	// check if the component has failed pod
 	hasFailedPod, messages := t.hasFailedPod()
@@ -170,7 +170,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
-	case isITSUpdatedNRunning && !hasRunningScaleOut && !hasRunningVolumeExpansion:
+	case isITSUpdatedNRunning == metav1.ConditionTrue && !hasRunningScaleOut && !hasRunningVolumeExpansion:
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
@@ -206,17 +206,6 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	}
 	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
-}
-
-// isRunning checks if the component's underlying workload is running.
-func (t *componentStatusTransformer) isInstanceSetRunning() bool {
-	if t.runningITS == nil {
-		return false
-	}
-	if !t.isWorkloadUpdated() {
-		return false
-	}
-	return t.runningITS.IsInstanceSetReady()
 }
 
 // hasScaleOutRunning checks if the scale out is running.
@@ -322,13 +311,47 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 }
 
 func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
-	return t.reconcileAvailableCondition(transCtx)
+	t.reconcileAvailableCondition(transCtx)
+	t.reconcileWorkloadRunningCondition(transCtx)
+	return nil
 }
 
-func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) error {
+func (t *componentStatusTransformer) reconcileWorkloadRunningCondition(transCtx *componentTransformContext) {
+	status := metav1.ConditionTrue
+	reason := ""
+	message := ""
+	comp := t.comp
+
+	if t.runningITS == nil {
+		status = metav1.ConditionFalse
+		reason = "WorkloadNotExist"
+		message = "waiting for workload to be created"
+	} else if !t.isWorkloadUpdated() {
+		status = metav1.ConditionFalse
+		reason = "WorkloadNotUpdated"
+		message = "observed workload's generation not matching component's"
+	} else if !t.runningITS.IsInstanceSetReady() {
+		status = metav1.ConditionFalse
+		reason = "WorkloadNotReady"
+		message = "workload not ready"
+	}
+
+	cond := metav1.Condition{
+		Type:               appsv1.ConditionTypeWorkloadRunning,
+		Status:             status,
+		ObservedGeneration: comp.Generation,
+		Reason:             reason,
+		Message:            message,
+	}
+	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
+		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, reason, message)
+	}
+}
+
+func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) {
 	policy := component.GetComponentAvailablePolicy(transCtx.CompDef)
 	if policy.WithPhases == nil && policy.WithRole == nil {
-		return nil
+		return
 	}
 
 	var (
@@ -365,14 +388,12 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 		Type:               appsv1.ConditionTypeAvailable,
 		Status:             status,
 		ObservedGeneration: comp.Generation,
-		LastTransitionTime: metav1.Now(),
 		Reason:             reason,
 		Message:            message,
 	}
 	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
 		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, reason, message)
 	}
-	return nil
 }
 
 func (t *componentStatusTransformer) availableWithPhases(_ *componentTransformContext,

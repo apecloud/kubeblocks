@@ -29,7 +29,7 @@ func init() {
 
 type autoReloadPolicy struct{}
 
-func (receiver autoReloadPolicy) Upgrade(params reconfigureContext) (returnedStatus, error) {
+func (receiver autoReloadPolicy) Upgrade(params reconfigureContext) (reconfigureStatus, error) {
 	_ = params
-	return makeReturnedStatus(ESNone), nil
+	return makeReconfigureStatus(reconfigureStatusNone), nil
 }

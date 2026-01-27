@@ -87,9 +87,9 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{}
 			status, err := policy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(0)))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
+			Expect(status.succeedCount).Should(BeEquivalentTo(int32(0)))
+			Expect(status.expectedCount).Should(BeEquivalentTo(int32(2)))
 
 			// only one pod ready
 			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{
@@ -105,9 +105,9 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 			}
 			status, err = policy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(1)))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
+			Expect(status.succeedCount).Should(BeEquivalentTo(int32(1)))
+			Expect(status.expectedCount).Should(BeEquivalentTo(int32(2)))
 
 			// succeed update pod
 			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{
@@ -132,9 +132,9 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 			}
 			status, err = policy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(BeEquivalentTo(ESNone))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusNone))
+			Expect(status.succeedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.expectedCount).Should(BeEquivalentTo(int32(2)))
 		})
 	})
 })

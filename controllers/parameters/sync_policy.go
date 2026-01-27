@@ -40,10 +40,10 @@ var syncPolicyInst = &syncPolicy{}
 
 type syncPolicy struct{}
 
-func (o *syncPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
+func (o *syncPolicy) Upgrade(rctx reconfigureContext) (reconfigureStatus, error) {
 	updateParams := o.updateParameters(rctx)
 	if len(updateParams) == 0 {
-		return makeReturnedStatus(ESNone), nil
+		return makeReconfigureStatus(reconfigureStatusNone), nil
 	}
 	return submitUpdatedConfig(rctx, updateParams, false)
 }
@@ -73,7 +73,7 @@ func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string
 	return params
 }
 
-func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, restart bool) (returnedStatus, error) {
+func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, restart bool) (reconfigureStatus, error) {
 	var config *apisappsv1.ClusterComponentConfig
 	for i, cfg := range rctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == rctx.ConfigTemplate.Name {
@@ -83,7 +83,7 @@ func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, 
 	}
 	if config == nil {
 		// TODO: fix me
-		return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
+		return makeReconfigureStatus(reconfigureStatusFailedAndRetry), fmt.Errorf("config %s not found", rctx.ConfigTemplate.Name)
 	}
 	if !ptr.Equal(config.ConfigHash, rctx.getTargetConfigHash()) {
 		return applyConfigChangesToCluster(rctx, config, parameters, restart), nil
@@ -91,7 +91,7 @@ func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, 
 	return syncConfigStatus(rctx), nil
 }
 
-func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) returnedStatus {
+func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) reconfigureStatus {
 	config.Variables = parameters
 	config.ConfigHash = rctx.getTargetConfigHash()
 	if restart {
@@ -99,10 +99,10 @@ func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.Clu
 	} else {
 		config.RestartOnConfigChange = nil
 	}
-	return makeReturnedStatus(ESRetry, withExpected(int32(rctx.getTargetReplicas())), withSucceed(0))
+	return makeReconfigureStatus(reconfigureStatusRetry, withExpected(int32(rctx.getTargetReplicas())), withSucceed(0))
 }
 
-func syncConfigStatus(rctx reconfigureContext) returnedStatus {
+func syncConfigStatus(rctx reconfigureContext) reconfigureStatus {
 	var (
 		replicas   = int32(rctx.getTargetReplicas())
 		configHash = rctx.getTargetConfigHash()
@@ -119,7 +119,7 @@ func syncConfigStatus(rctx reconfigureContext) returnedStatus {
 		}
 	}
 	if updated == replicas {
-		return makeReturnedStatus(ESNone, withExpected(replicas), withSucceed(updated))
+		return makeReconfigureStatus(reconfigureStatusNone, withExpected(replicas), withSucceed(updated))
 	}
-	return makeReturnedStatus(ESRetry, withExpected(replicas), withSucceed(updated))
+	return makeReconfigureStatus(reconfigureStatusRetry, withExpected(replicas), withSucceed(updated))
 }

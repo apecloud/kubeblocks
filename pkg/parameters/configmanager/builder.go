@@ -37,7 +37,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -116,12 +115,12 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		if err := controllerutil.SetOwnerReference(manager.Cluster, cmObj, scheme); err != nil {
 			return err
 		}
-		return cli.Create(ctx, cmObj, inDataContext())
+		return cli.Create(ctx, cmObj)
 	}
 	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
 		patch := client.MergeFrom(cm.DeepCopy())
 		cm.Data[configManagerConfig] = newConfig
-		return cli.Patch(ctx, cm, patch, inDataContext())
+		return cli.Patch(ctx, cm, patch)
 	}
 
 	config, err := cfgutil.ToYamlConfig(configInfo)
@@ -133,7 +132,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		Namespace: manager.Cluster.GetNamespace(),
 		Name:      fmt.Sprintf("%s%s-%s-config-manager-config", configManagerCMPrefix, manager.Cluster.GetName(), manager.ComponentName),
 	}
-	err = cli.Get(ctx, cmKey, cmObj, inDataContext())
+	err = cli.Get(ctx, cmKey, cmObj)
 	switch {
 	default:
 		return err
@@ -278,8 +277,4 @@ func buildConfigManagerCommonArgs() []string {
 	// args = append(args, "--tcp", viper.GetString(cfgcore.ConfigManagerGPRCPortEnv))
 	args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
 	return args
-}
-
-func inDataContext() *multicluster.ClientOption {
-	return multicluster.InDataContext()
 }

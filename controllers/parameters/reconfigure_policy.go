@@ -33,27 +33,29 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
-// ExecStatus defines running result for Reconfiguring policy (fsm).
-// ESNone describes policy has finished and quit.
-// ESRetry describes fsm is running.
-// ESFailed describes fsm is failed and exited.
-// ESNotSupport describes fsm does not support the feature.
-// ESFailedAndRetry describes fsm is failed in current state, but can be retried.
-// +enum
-type ExecStatus string
-
 const (
-	ESNone           ExecStatus = "None"
-	ESRetry          ExecStatus = "Retry"
-	ESFailed         ExecStatus = "Failed"
-	ESNotSupport     ExecStatus = "NotSupport"
-	ESFailedAndRetry ExecStatus = "FailedAndRetry"
+	reconfigureStatusNone           string = "None"           // finished and quit
+	reconfigureStatusRetry          string = "Retry"          // running
+	reconfigureStatusFailed         string = "Failed"         // failed and exited
+	reconfigureStatusFailedAndRetry string = "FailedAndRetry" // failed but can be retried
 )
 
-type returnedStatus struct {
-	Status        ExecStatus
-	SucceedCount  int32
-	ExpectedCount int32
+type reconfigureStatus struct {
+	status        string
+	expectedCount int32
+	succeedCount  int32
+}
+
+func makeReconfigureStatus(status string, ops ...func(status *reconfigureStatus)) reconfigureStatus {
+	ret := reconfigureStatus{
+		status:        status,
+		expectedCount: core.Unconfirmed,
+		succeedCount:  core.Unconfirmed,
+	}
+	for _, o := range ops {
+		o(&ret)
+	}
+	return ret
 }
 
 type reconfigureContext struct {
@@ -73,35 +75,24 @@ type reconfigureContext struct {
 	Patch             *core.ConfigPatchInfo
 }
 
-type reconfigurePolicy interface {
-	// Upgrade is to enable the configuration to take effect.
-	Upgrade(rctx reconfigureContext) (returnedStatus, error)
-}
-
-type ReloadAction interface {
-	ExecReload() (returnedStatus, error)
-	ReloadType() string
-}
-
-var (
-	reconfigurePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
-)
-
-type reconfigureTask struct {
-	parametersv1alpha1.ReloadPolicy
-	taskCtx reconfigureContext
-}
-
-func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
-	reconfigurePolicyMap[policy] = action
-}
-
 func (param *reconfigureContext) getTargetConfigHash() *string {
 	return param.ConfigHash
 }
 
 func (param *reconfigureContext) getTargetReplicas() int {
 	return int(param.ClusterComponent.Replicas)
+}
+
+type reconfigurePolicy interface {
+	Upgrade(rctx reconfigureContext) (reconfigureStatus, error)
+}
+
+var (
+	reconfigurePolicyMap = map[parametersv1alpha1.ReloadPolicy]reconfigurePolicy{}
+)
+
+func registerPolicy(policy parametersv1alpha1.ReloadPolicy, action reconfigurePolicy) {
+	reconfigurePolicyMap[policy] = action
 }
 
 func enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
@@ -125,38 +116,26 @@ func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]str
 	return &hash
 }
 
-func withSucceed(succeedCount int32) func(status *returnedStatus) {
-	return func(status *returnedStatus) {
-		status.SucceedCount = succeedCount
+func withSucceed(succeedCount int32) func(status *reconfigureStatus) {
+	return func(status *reconfigureStatus) {
+		status.succeedCount = succeedCount
 	}
 }
 
-func withExpected(expectedCount int32) func(status *returnedStatus) {
-	return func(status *returnedStatus) {
-		status.ExpectedCount = expectedCount
+func withExpected(expectedCount int32) func(status *reconfigureStatus) {
+	return func(status *reconfigureStatus) {
+		status.expectedCount = expectedCount
 	}
 }
 
-func makeReturnedStatus(status ExecStatus, ops ...func(status *returnedStatus)) returnedStatus {
-	ret := returnedStatus{
-		Status:        status,
-		SucceedCount:  core.Unconfirmed,
-		ExpectedCount: core.Unconfirmed,
-	}
-	for _, o := range ops {
-		o(&ret)
-	}
-	return ret
+type reconfigureTask struct {
+	policy  parametersv1alpha1.ReloadPolicy
+	taskCtx reconfigureContext
 }
 
-func (r reconfigureTask) ReloadType() string {
-	return string(r.ReloadPolicy)
-}
-
-func (r reconfigureTask) ExecReload() (returnedStatus, error) {
-	if executor, ok := reconfigurePolicyMap[r.ReloadPolicy]; ok {
+func (r reconfigureTask) reconfigure() (reconfigureStatus, error) {
+	if executor, ok := reconfigurePolicyMap[r.policy]; ok {
 		return executor.Upgrade(r.taskCtx)
 	}
-
-	return returnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
+	return reconfigureStatus{}, fmt.Errorf("not support reload action[%s]", r.policy)
 }

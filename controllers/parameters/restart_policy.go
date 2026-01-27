@@ -31,6 +31,6 @@ var restartPolicyInst = &restartPolicy{}
 
 type restartPolicy struct{}
 
-func (s *restartPolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
+func (s *restartPolicy) Upgrade(rctx reconfigureContext) (reconfigureStatus, error) {
 	return submitUpdatedConfig(rctx, nil, true)
 }

@@ -38,13 +38,13 @@ import (
 
 type options = func(*parameters.Result)
 
-func reconciled(status returnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) parameters.Result {
+func reconciled(status reconfigureStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) parameters.Result {
 	result := parameters.Result{
 		Policy:        policy,
 		Phase:         phase,
-		ExecResult:    string(status.Status),
-		SucceedCount:  status.SucceedCount,
-		ExpectedCount: status.ExpectedCount,
+		ExecResult:    status.status,
+		ExpectedCount: status.expectedCount,
+		SucceedCount:  status.succeedCount,
 		Retry:         true,
 	}
 	for _, option := range options {

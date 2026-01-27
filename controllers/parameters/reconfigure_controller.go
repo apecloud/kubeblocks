@@ -223,12 +223,12 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	return r.performUpgrade(rctx, tasks)
 }
 
-func (r *ReconfigureReconciler) genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]ReloadAction, error) {
-	var tasks []ReloadAction
+func (r *ReconfigureReconciler) genReconfigureActionTasks(templateSpec *appsv1.ComponentFileTemplate, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]reconfigureTask, error) {
+	var tasks []reconfigureTask
 
 	// If the patch or ConfigRender is nil, return a single restart task.
 	if patch == nil || rctx.ConfigRender == nil {
-		return []ReloadAction{r.buildRestartTask(templateSpec, rctx)}, nil
+		return []reconfigureTask{r.buildRestartTask(templateSpec, rctx)}, nil
 	}
 
 	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
@@ -259,7 +259,7 @@ func (r *ReconfigureReconciler) genReconfigureActionTasks(templateSpec *appsv1.C
 
 	// If no tasks were added, return a single restart task.
 	if len(tasks) == 0 {
-		return []ReloadAction{r.buildRestartTask(templateSpec, rctx)}, nil
+		return []reconfigureTask{r.buildRestartTask(templateSpec, rctx)}, nil
 	}
 
 	return tasks, nil
@@ -270,7 +270,7 @@ func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.Reload
 	rctx *ReconcileContext,
 	pd *parametersv1alpha1.ParametersDefinition,
 	configDescription *parametersv1alpha1.ComponentConfigDescription,
-	patch *core.ConfigPatchInfo) ReloadAction {
+	patch *core.ConfigPatchInfo) reconfigureTask {
 	reCtx := reconfigureContext{
 		RequestCtx:           rctx.RequestCtx,
 		Client:               rctx.Client,
@@ -284,13 +284,12 @@ func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.Reload
 		ParametersDef:        &pd.Spec,
 		Patch:                patch,
 	}
-
-	return reconfigureTask{ReloadPolicy: policy, taskCtx: reCtx}
+	return reconfigureTask{policy: policy, taskCtx: reCtx}
 }
 
-func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) ReloadAction {
+func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *ReconcileContext) reconfigureTask {
 	return reconfigureTask{
-		ReloadPolicy: parametersv1alpha1.RestartPolicy,
+		policy: parametersv1alpha1.RestartPolicy,
 		taskCtx: reconfigureContext{
 			RequestCtx:           rctx.RequestCtx,
 			Client:               rctx.Client,
@@ -341,17 +340,17 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []reconfigureTask) (ctrl.Result, error) {
 	var (
-		err        error
-		status     returnedStatus
-		reloadType string
+		err    error
+		policy string
+		status reconfigureStatus
 	)
 
 	for _, task := range reloadTasks {
-		reloadType = task.ReloadType()
-		status, err = task.ExecReload()
-		if err != nil || status.Status != ESNone {
+		policy = string(task.policy)
+		status, err = task.reconfigure()
+		if err != nil || status.status != reconfigureStatusNone {
 			break
 		}
 	}
@@ -359,10 +358,10 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTas
 	if err1 := r.submit(rctx); err1 != nil {
 		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit changes to the cluster", "error", err1)
 	}
-	if err != nil || status.Status != ESNone {
-		return r.status(rctx, reloadType, status, err)
+	if err != nil || status.status != reconfigureStatusNone {
+		return r.status(rctx, policy, status, err)
 	}
-	return r.succeed(rctx, reloadType, status)
+	return r.succeed(rctx, policy, status)
 }
 
 func (r *ReconfigureReconciler) submit(rctx *ReconcileContext) error {
@@ -375,32 +374,31 @@ func (r *ReconfigureReconciler) submit(rctx *ReconcileContext) error {
 	return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
 }
 
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, reloadType string, status returnedStatus, err error) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) status(rctx *ReconcileContext, reloadType string, status reconfigureStatus, err error) (ctrl.Result, error) {
 	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
 		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(status, reloadType, phase, options...))
 	}
 
-	switch status.Status {
-	case ESFailedAndRetry:
+	switch status.status {
+	case reconfigureStatusFailedAndRetry:
 		return updatePhase(parametersv1alpha1.CFailedPhase, withFailed(err, true))
-	case ESRetry:
+	case reconfigureStatusRetry:
 		return updatePhase(parametersv1alpha1.CUpgradingPhase)
-	case ESFailed:
+	case reconfigureStatusFailed:
 		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
-	case ESNone:
+	case reconfigureStatusNone:
 		return r.succeed(rctx, reloadType, status)
 	default:
 		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status"), false))
 	}
 }
 
-func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, status returnedStatus) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, policy string, status reconfigureStatus) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,
 		"the reconfigure[%s] has been processed successfully",
-		reloadType)
-
-	result := reconciled(status, reloadType, parametersv1alpha1.CFinishedPhase)
-	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, reloadType, &result)
+		policy)
+	result := reconciled(status, policy, parametersv1alpha1.CFinishedPhase)
+	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, policy, &result)
 }

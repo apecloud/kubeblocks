@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	apisappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
@@ -74,7 +74,7 @@ func (o *syncPolicy) updateParameters(rctx reconfigureContext) map[string]string
 }
 
 func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, restart bool) (reconfigureStatus, error) {
-	var config *apisappsv1.ClusterComponentConfig
+	var config *appsv1.ClusterComponentConfig
 	for i, cfg := range rctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == rctx.ConfigTemplate.Name {
 			config = &rctx.ClusterComponent.Configs[i]
@@ -91,7 +91,7 @@ func submitUpdatedConfig(rctx reconfigureContext, parameters map[string]string, 
 	return syncConfigStatus(rctx), nil
 }
 
-func applyConfigChangesToCluster(rctx reconfigureContext, config *apisappsv1.ClusterComponentConfig, parameters map[string]string, restart bool) reconfigureStatus {
+func applyConfigChangesToCluster(rctx reconfigureContext, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) reconfigureStatus {
 	config.Variables = parameters
 	config.ConfigHash = rctx.getTargetConfigHash()
 	if restart {

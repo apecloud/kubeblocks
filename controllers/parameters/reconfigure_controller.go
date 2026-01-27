@@ -340,18 +340,17 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []reconfigureTask) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, tasks []reconfigureTask) (ctrl.Result, error) {
 	var (
 		err    error
 		policy string
 		status reconfigureStatus
 	)
-
-	for _, task := range reloadTasks {
+	for _, task := range tasks {
 		policy = string(task.policy)
 		status, err = task.reconfigure()
 		if err != nil || status.status != reconfigureStatusNone {
-			break
+			return r.status(rctx, policy, status, err)
 		}
 	}
 	// submit changes to the cluster

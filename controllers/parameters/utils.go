@@ -33,17 +33,12 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-func inDataContextUnspecified() *multicluster.ClientOption {
-	return multicluster.InDataContextUnspecified()
-}
 
 // GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {
@@ -62,7 +57,7 @@ func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {
 
 func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 	if len(params.InstanceSetUnits) > 1 {
-		return nil, fmt.Errorf("component require only one InstanceSet, actual %d components", len(params.InstanceSetUnits))
+		return nil, fmt.Errorf("component require only one InstanceSet, actual %d", len(params.InstanceSetUnits))
 	}
 
 	if len(params.InstanceSetUnits) == 0 {
@@ -122,12 +117,12 @@ func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	return generateGrpcURL(pod, podPort)
 }
 
-func generateGrpcURL(pod *corev1.Pod, portPort int) (string, error) {
+func generateGrpcURL(pod *corev1.Pod, podPort int) (string, error) {
 	ip, err := ipAddressFromPod(pod.Status)
 	if err != nil {
 		return "", err
 	}
-	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
+	return net.JoinHostPort(ip.String(), strconv.Itoa(podPort)), nil
 }
 
 func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {

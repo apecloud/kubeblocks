@@ -126,7 +126,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 		SetReplicas(1).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddSharding(shardingCompName, "", compDefObj.GetName()).
-		SetShards(1).
+		SetShards(3).
 		SetShardingConfig(appsv1.ClusterComponentConfig{
 			Name: ptr.To(configSpecName),
 		}).
@@ -168,6 +168,33 @@ func mockCreateITSObject(namespace, name, clusterName, compName string) *workloa
 		Create(&testCtx).
 		GetObject()
 	return itsObj
+}
+
+const (
+	configHash1 = "6c5b4466f"  // innodb_buffer_pool_size=1024M && max_connections=100
+	configHash2 = "5b46b78c8d" // max_connections=2000 && gtid_mode=OFF
+	configHash3 = "8665bf6888" // max_connections=1000 && gtid_mode=ON
+)
+
+func mockReconfigureDone(namespace, itsName, configName, configHash string) {
+	itsKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      itsName,
+	}
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+		its.Status.Replicas = int32(1)
+		its.Status.InstanceStatus = []workloads.InstanceStatus{
+			{
+				PodName: fmt.Sprintf("%s-0", its.Name),
+				Configs: []workloads.InstanceConfigStatus{
+					{
+						Name:       configName,
+						ConfigHash: ptr.To(configHash),
+					},
+				},
+			},
+		}
+	})()).Should(Succeed())
 }
 
 func cleanEnv() {

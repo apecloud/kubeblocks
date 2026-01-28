@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -68,7 +67,7 @@ var _ = Describe("Parameter Controller", func() {
 	}
 
 	Context("parameter update", func() {
-		It("Should reconcile success", func() {
+		It("should reconcile success", func() {
 			prepareTestEnv()
 
 			By("submit the parameter update request")
@@ -80,27 +79,7 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("mock the reconfigure done")
-			itsKey := client.ObjectKey{
-				Namespace: itsObj.Namespace,
-				Name:      itsObj.Name,
-			}
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Status.Replicas = int32(1)
-				its.Status.InstanceStatus = []workloads.InstanceStatus{
-					{
-						PodName: fmt.Sprintf("%s-0", its.Name),
-						Configs: []workloads.InstanceConfigStatus{
-							{
-								Name: configSpecName,
-								ConfigHash: computeTargetConfigHash(nil, map[string]string{
-									"innodb_buffer_pool_size": "1024M",
-									"max_connections":         "100",
-								}),
-							},
-						},
-					},
-				}
-			})()).Should(Succeed())
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash1)
 
 			By("check component parameter status")
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
@@ -130,22 +109,7 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("mock the reconfigure done")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Status.InstanceStatus = []workloads.InstanceStatus{
-					{
-						PodName: fmt.Sprintf("%s-0", its.Name),
-						Configs: []workloads.InstanceConfigStatus{
-							{
-								Name: configSpecName,
-								ConfigHash: computeTargetConfigHash(nil, map[string]string{
-									"max_connections": "2000",
-									"gtid_mode":       "OFF",
-								}),
-							},
-						},
-					},
-				}
-			})()).Should(Succeed())
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash2)
 
 			By("check parameter status")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
@@ -225,33 +189,33 @@ var _ = Describe("Parameter Controller", func() {
 	})
 
 	Context("sharding component parameter update", func() {
-		It("Should reconcile success", func() {
+		It("should reconcile success", func() {
 			prepareTestEnv()
 
-			By("Create sharding component objs")
+			By("create sharding component objs")
 			shardingCompSpecList, err := sharding.GenShardingCompSpecList4Test(testCtx.Ctx, k8sClient, clusterObj, &clusterObj.Spec.Shardings[0])
 			Expect(err).ShouldNot(HaveOccurred())
 			for _, spec := range shardingCompSpecList {
 				By("create a sharding component: " + spec.Name)
-				shardingLabels := map[string]string{
+				labels := map[string]string{
 					constant.AppInstanceLabelKey:       synthesizedComp.ClusterName,
 					constant.KBAppShardingNameLabelKey: shardingCompName,
 				}
-				comp, err := component.BuildComponent(clusterObj, spec, shardingLabels, nil)
+				comp, err := component.BuildComponent(clusterObj, spec, labels, nil)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(testCtx.Create(testCtx.Ctx, comp)).Should(Succeed())
 
 				By("create the ITS of sharding component: " + spec.Name)
 				mockCreateITSObject(comp.Namespace, comp.Name, synthesizedComp.ClusterName, spec.Name)
 
-				By("check ComponentParameters cr for sharding component : " + spec.Name)
-				shardingCompParamKey := types.NamespacedName{
+				By("check ComponentParameters for sharding component : " + spec.Name)
+				cpkey := types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      configcore.GenerateComponentConfigurationName(clusterObj.Name, spec.Name),
 				}
-				Eventually(testapps.CheckObj(&testCtx, shardingCompParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
-					g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-					g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
+				Eventually(testapps.CheckObj(&testCtx, cpkey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+					g.Expect(cp.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+					g.Expect(cp.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
 				})).Should(Succeed())
 			}
 
@@ -263,46 +227,25 @@ var _ = Describe("Parameter Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
-			updatedData := map[string]string{
-				"innodb_buffer_pool_size": "1024M",
-				"max_connections":         "100",
-			}
 			for _, spec := range shardingCompSpecList {
-				By("mock the reconfigure done")
-				itsKey := client.ObjectKey{
-					Namespace: synthesizedComp.Namespace,
-					Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name),
-				}
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-					its.Status.Replicas = int32(1)
-					its.Status.InstanceStatus = []workloads.InstanceStatus{
-						{
-							PodName: fmt.Sprintf("%s-0", its.Name),
-							Configs: []workloads.InstanceConfigStatus{
-								{
-									Name:       configSpecName,
-									ConfigHash: computeTargetConfigHash(nil, updatedData),
-								},
-							},
-						},
-					}
-				})()).Should(Succeed())
+				By("mock the reconfigure done: " + spec.Name)
+				mockReconfigureDone(synthesizedComp.Namespace, constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name), configSpecName, configHash1)
 
-				By("check component parameter status")
-				shardingCompParamKey := types.NamespacedName{
+				By("check component parameter status: " + spec.Name)
+				cpkey := types.NamespacedName{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      configcore.GenerateComponentConfigurationName(clusterObj.Name, spec.Name),
 				}
-				Eventually(testapps.CheckObj(&testCtx, shardingCompParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
-					g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
-					g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+				Eventually(testapps.CheckObj(&testCtx, cpkey, func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+					g.Expect(cp.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
+					g.Expect(cp.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 				}), time.Second*10).Should(Succeed())
-
-				By("check parameter status")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
-					g.Expect(parameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-				})).Should(Succeed())
 			}
+
+			By("check parameter status")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
+				g.Expect(parameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
 		})
 
 		It("component name validate fails", func() {
@@ -321,5 +264,4 @@ var _ = Describe("Parameter Controller", func() {
 			})).Should(Succeed())
 		})
 	})
-
 })

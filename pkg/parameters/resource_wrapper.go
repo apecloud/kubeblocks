@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,7 +121,12 @@ func (r *ResourceFetcher[T]) getComponentSpecByName() (*appsv1.ClusterComponentS
 	if compSpec != nil {
 		return compSpec, nil
 	}
-	sharding := r.ClusterObj.Spec.GetShardingByName(r.ComponentName)
+	tokens := strings.Split(r.ComponentName, "-")
+	if len(tokens) < 2 {
+		return nil, nil
+	}
+	shardingName := strings.Join(tokens[0:len(tokens)-1], "-")
+	sharding := r.ClusterObj.Spec.GetShardingByName(shardingName)
 	if sharding != nil {
 		return &sharding.Template, nil
 	}

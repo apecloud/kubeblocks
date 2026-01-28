@@ -17,12 +17,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package parameters
+package reconfigure
 
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,23 +31,14 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var _ = Describe("Reconfigure restartPolicy test", func() {
-	const (
-		cfgName = "test"
-	)
-
-	var (
-		policy = &restartPolicy{}
-	)
-
-	Context("restart policy", func() {
-		It("should success without error", func() {
+var _ = ginkgo.Describe("Reconfigure restartPolicy test", func() {
+	ginkgo.Context("restart policy", func() {
+		ginkgo.It("should success without error", func() {
 			configHash := "test-hash"
-			mockParam := reconfigureContext{
+			mockParam := Context{
 				RequestCtx: intctrlutil.RequestCtx{
 					Ctx: context.Background(),
 					Log: log.FromContext(context.Background()),
@@ -72,10 +63,7 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 						},
 					},
 				},
-				SynthesizedComponent: &component.SynthesizedComponent{
-					Name: "test-component",
-				},
-				its: &workloads.InstanceSet{
+				ITS: &workloads.InstanceSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-instanceset",
 						Namespace: "default",
@@ -84,15 +72,15 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 			}
 
 			// first upgrade, no pod is ready
-			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{}
-			status, err := policy.Upgrade(mockParam)
+			mockParam.ITS.Status.InstanceStatus = []workloads.InstanceStatus{}
+			status, err := restartPolicy(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
-			Expect(status.succeedCount).Should(BeEquivalentTo(int32(0)))
-			Expect(status.expectedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(0)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
 
 			// only one pod ready
-			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{
+			mockParam.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
 					PodName: "pod1",
 					Configs: []workloads.InstanceConfigStatus{
@@ -103,14 +91,14 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 					},
 				},
 			}
-			status, err = policy.Upgrade(mockParam)
+			status, err = restartPolicy(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
-			Expect(status.succeedCount).Should(BeEquivalentTo(int32(1)))
-			Expect(status.expectedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(1)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
 
 			// succeed update pod
-			mockParam.its.Status.InstanceStatus = []workloads.InstanceStatus{
+			mockParam.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
 					PodName: "pod1",
 					Configs: []workloads.InstanceConfigStatus{
@@ -130,11 +118,11 @@ var _ = Describe("Reconfigure restartPolicy test", func() {
 					},
 				},
 			}
-			status, err = policy.Upgrade(mockParam)
+			status, err = restartPolicy(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusNone))
-			Expect(status.succeedCount).Should(BeEquivalentTo(int32(2)))
-			Expect(status.expectedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.Status).Should(BeEquivalentTo(StatusNone))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
 		})
 	})
 })

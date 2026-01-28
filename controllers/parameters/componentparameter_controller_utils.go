@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 
@@ -32,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -49,10 +51,10 @@ type Task struct {
 	Status *parametersv1alpha1.ConfigTemplateItemDetailStatus
 	Name   string
 
-	Do func(resource *Task, taskCtx *TaskContext, revision string) error
+	Do func(resource *Task, taskCtx *taskContext, revision string) error
 }
 
-type TaskContext struct {
+type taskContext struct {
 	componentParameter *parametersv1alpha1.ComponentParameter
 	configRender       *parametersv1alpha1.ParamConfigRenderer
 	ctx                context.Context
@@ -60,7 +62,7 @@ type TaskContext struct {
 	paramsDefs         []*parametersv1alpha1.ParametersDefinition
 }
 
-func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (*TaskContext, error) {
+func newTaskContext(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (*taskContext, error) {
 	// build synthesized component for the component
 	cmpd := fetchTask.ComponentDefObj
 	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, cmpd, fetchTask.ComponentObj)
@@ -98,7 +100,7 @@ func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *
 		}
 	}
 
-	return &TaskContext{ctx: ctx,
+	return &taskContext{ctx: ctx,
 		componentParameter: componentParameter,
 		configRender:       configRender,
 		component:          synthesizedComp,
@@ -106,10 +108,60 @@ func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	}, nil
 }
 
-func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) Task {
+func buildTemplateVars(ctx context.Context, cli client.Reader,
+	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+	if compDef != nil && len(compDef.Spec.Vars) > 0 {
+		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+		if err != nil {
+			return err
+		}
+		synthesizedComp.TemplateVars = templateVars
+	}
+	return nil
+}
+
+func generateReconcileTasks(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) []Task {
+	tasks := make([]Task, 0, len(componentParameter.Spec.ConfigItemDetails))
+	for _, item := range componentParameter.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &componentParameter.Status, item, componentParameter.GetGeneration()); status != nil {
+			tasks = append(tasks, newTask(item, status))
+		}
+	}
+	return tasks
+}
+
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *parametersv1alpha1.ComponentParameterStatus, item parametersv1alpha1.ConfigTemplateItemDetail, generation int64) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
+	if item.ConfigSpec == nil {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
+		return nil
+	}
+	itemStatus := parameters.GetItemStatus(status, item.Name)
+	if itemStatus == nil || itemStatus.Phase == "" {
+		ctx.Log.WithName(item.Name).Info(fmt.Sprintf("ComponentParameters cr is creating: %v", item))
+		status.ConfigurationItemStatus = append(status.ConfigurationItemStatus, parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			Name:           item.Name,
+			Phase:          parametersv1alpha1.CInitPhase,
+			UpdateRevision: strconv.FormatInt(generation, 10),
+		})
+		itemStatus = parameters.GetItemStatus(status, item.Name)
+	}
+	if !isReconcileStatus(itemStatus.Phase) {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating or deleting and pass: %v", itemStatus))
+		return nil
+	}
+	return itemStatus
+}
+
+func isReconcileStatus(phase parametersv1alpha1.ParameterPhase) bool {
+	return phase != "" &&
+		phase != parametersv1alpha1.CCreatingPhase &&
+		phase != parametersv1alpha1.CDeletingPhase
+}
+
+func newTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
-		Do: func(resource *Task, taskCtx *TaskContext, revision string) error {
+		Do: func(resource *Task, taskCtx *taskContext, revision string) error {
 			if item.ConfigSpec == nil {
 				return core.MakeError("not found config spec: %s", item.Name)
 			}
@@ -136,7 +188,7 @@ func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 	}
 }
 
-func syncImpl(taskCtx *TaskContext,
+func syncImpl(taskCtx *taskContext,
 	fetcher *Task,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
@@ -292,7 +344,7 @@ func updateConfigLabels(obj *corev1.ConfigMap,
 func syncStatus(configMap *corev1.ConfigMap, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
 	annotations := configMap.GetAnnotations()
 	// status.CurrentRevision = GetCurrentRevision(annotations)
-	revisions := RetrieveRevision(annotations)
+	revisions := retrieveRevision(annotations)
 	if len(revisions) == 0 {
 		return
 	}
@@ -305,22 +357,22 @@ func syncStatus(configMap *corev1.ConfigMap, status *parametersv1alpha1.ConfigTe
 	return
 }
 
-func updateLastDoneRevision(revision ConfigurationRevision, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
-	if revision.Phase == parametersv1alpha1.CFinishedPhase {
-		status.LastDoneRevision = strconv.FormatInt(revision.Revision, 10)
+func updateLastDoneRevision(revision configurationRevision, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+	if revision.phase == parametersv1alpha1.CFinishedPhase {
+		status.LastDoneRevision = strconv.FormatInt(revision.revision, 10)
 	}
 }
 
-func updateRevision(revision ConfigurationRevision, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
-	if revision.StrRevision == status.UpdateRevision {
-		status.Phase = revision.Phase
+func updateRevision(revision configurationRevision, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+	if revision.strRevision == status.UpdateRevision {
+		status.Phase = revision.phase
 		status.ReconcileDetail = &parametersv1alpha1.ReconcileDetail{
-			CurrentRevision: revision.StrRevision,
-			Policy:          revision.Result.Policy,
-			SucceedCount:    revision.Result.SucceedCount,
-			ExpectedCount:   revision.Result.ExpectedCount,
-			ExecResult:      revision.Result.ExecResult,
-			ErrMessage:      revision.Result.Message,
+			CurrentRevision: revision.strRevision,
+			Policy:          revision.result.Policy,
+			SucceedCount:    revision.result.SucceedCount,
+			ExpectedCount:   revision.result.ExpectedCount,
+			ExecResult:      revision.result.ExecResult,
+			ErrMessage:      revision.result.Message,
 		}
 	}
 }

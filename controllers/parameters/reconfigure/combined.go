@@ -17,35 +17,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package parameters
+package reconfigure
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
-var combineUpgradePolicyInstance = &combineUpgradePolicy{
-	policyExecutors: []reconfigurePolicy{
-		syncPolicyInst,
-		restartPolicyInst,
-	},
-}
-
-type combineUpgradePolicy struct {
-	policyExecutors []reconfigurePolicy
-}
-
 func init() {
-	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combineUpgradePolicyInstance)
-}
-
-func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (reconfigureStatus, error) {
-	var ret reconfigureStatus
-	for _, executor := range h.policyExecutors {
-		retStatus, err := executor.Upgrade(rctx)
-		if err != nil {
-			return retStatus, err
+	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, func(ctx Context) (Status, error) {
+		var ret Status
+		for _, policy := range []func(Context) (Status, error){syncPolicy, restartPolicy} {
+			status, err := policy(ctx)
+			if err != nil {
+				return status, err
+			}
+			ret = status
 		}
-		ret = retStatus
-	}
-	return ret, nil
+		return ret, nil
+	})
 }

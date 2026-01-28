@@ -17,12 +17,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package parameters
+package reconfigure
 
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,25 +32,19 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-var _ = Describe("Reconfigure syncPolicy test", func() {
-	Context("sync reconfigure policy", func() {
-		const (
-			cfgName = "for-test"
-		)
-
+var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
+	ginkgo.Context("sync reconfigure policy", func() {
 		var (
-			rctx   reconfigureContext
-			policy = &syncPolicy{}
+			rctx Context
 		)
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			configHash := "test-config-hash"
-			rctx = reconfigureContext{
+			rctx = Context{
 				RequestCtx: intctrlutil.RequestCtx{
 					Ctx: context.Background(),
 					Log: log.FromContext(context.Background()),
@@ -75,10 +69,7 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 						},
 					},
 				},
-				SynthesizedComponent: &component.SynthesizedComponent{
-					Name: "test-component",
-				},
-				its: &workloads.InstanceSet{
+				ITS: &workloads.InstanceSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-instanceset",
 						Namespace: "default",
@@ -103,28 +94,28 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 			}
 		})
 
-		It("update cluster spec", func() {
-			By("update cluster spec")
-			status, err := policy.Upgrade(rctx)
+		ginkgo.It("update cluster spec", func() {
+			ginkgo.By("update cluster spec")
+			status, err := syncPolicy(rctx)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
-			Expect(status.expectedCount).Should(BeEquivalentTo(3))
-			Expect(status.succeedCount).Should(BeEquivalentTo(0))
+			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
 			Expect(*rctx.ClusterComponent.Configs[0].ConfigHash).Should(Equal(*rctx.getTargetConfigHash()))
 			Expect(rctx.ClusterComponent.Configs[0].Variables).Should(HaveKeyWithValue("a", "c b e f"))
 		})
 
-		It("status replicas - partially updated", func() {
-			By("update cluster spec")
-			status, err := policy.Upgrade(rctx)
+		ginkgo.It("status replicas - partially updated", func() {
+			ginkgo.By("update cluster spec")
+			status, err := syncPolicy(rctx)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
-			Expect(status.expectedCount).Should(BeEquivalentTo(3))
-			Expect(status.succeedCount).Should(BeEquivalentTo(0))
+			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			By("mock the instance status")
-			rctx.its.Status.InstanceStatus = []workloads.InstanceStatus{
+			ginkgo.By("mock the instance status")
+			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
 					PodName: "pod-0",
 					Configs: []workloads.InstanceConfigStatus{
@@ -136,24 +127,24 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 				},
 			}
 
-			By("status check")
-			status, err = policy.Upgrade(rctx)
+			ginkgo.By("status check")
+			status, err = syncPolicy(rctx)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
-			Expect(status.expectedCount).Should(BeEquivalentTo(3))
-			Expect(status.succeedCount).Should(BeEquivalentTo(1))
+			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(1))
 		})
 
-		It("status replicas - all", func() {
-			By("update cluster spec")
-			status, err := policy.Upgrade(rctx)
+		ginkgo.It("status replicas - all", func() {
+			ginkgo.By("update cluster spec")
+			status, err := syncPolicy(rctx)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusRetry))
-			Expect(status.expectedCount).Should(BeEquivalentTo(3))
-			Expect(status.succeedCount).Should(BeEquivalentTo(0))
+			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
-			By("mock the instance status")
-			rctx.its.Status.InstanceStatus = []workloads.InstanceStatus{
+			ginkgo.By("mock the instance status")
+			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
 					PodName: "pod-0",
 					Configs: []workloads.InstanceConfigStatus{
@@ -183,12 +174,12 @@ var _ = Describe("Reconfigure syncPolicy test", func() {
 				},
 			}
 
-			By("status check")
-			status, err = policy.Upgrade(rctx)
+			ginkgo.By("status check")
+			status, err = syncPolicy(rctx)
 			Expect(err).Should(Succeed())
-			Expect(status.status).Should(BeEquivalentTo(reconfigureStatusNone))
-			Expect(status.expectedCount).Should(BeEquivalentTo(3))
-			Expect(status.succeedCount).Should(BeEquivalentTo(3))
+			Expect(status.Status).Should(BeEquivalentTo(StatusNone))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
 		})
 	})
 })

@@ -17,20 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package parameters
+package reconfigure
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 func init() {
-	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInst)
-}
-
-var restartPolicyInst = &restartPolicy{}
-
-type restartPolicy struct{}
-
-func (s *restartPolicy) Upgrade(rctx reconfigureContext) (reconfigureStatus, error) {
-	return submitUpdatedConfig(rctx, nil, true)
+	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, func(Context) (Status, error) {
+		return makeStatus(StatusNone), nil
+	})
 }

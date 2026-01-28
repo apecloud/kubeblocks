@@ -27,53 +27,42 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
-type ReconcileContext struct {
+type reconcileContext struct {
 	intctrlutil.RequestCtx
-	parameters.ResourceFetcher[ReconcileContext]
+	parameters.ResourceFetcher[reconcileContext]
 
-	MatchingLabels   client.MatchingLabels
-	ConfigMap        *corev1.ConfigMap
-	BuiltinComponent *component.SynthesizedComponent
-
-	its *workloads.InstanceSet
-
-	ConfigRender   *parametersv1alpha1.ParamConfigRenderer
-	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
+	configMap      *corev1.ConfigMap
+	its            *workloads.InstanceSet
+	configRender   *parametersv1alpha1.ParamConfigRenderer
+	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
-	resourceCtx *render.ResourceCtx,
-	cm *corev1.ConfigMap,
-	cluster *appsv1.Cluster,
-	matchingLabels client.MatchingLabels) *ReconcileContext {
-	configContext := ReconcileContext{
-		ResourceFetcher: parameters.ResourceFetcher[ReconcileContext]{
+func newReconcileContext(reqCtx intctrlutil.RequestCtx, resource *render.ResourceCtx, cm *corev1.ConfigMap, cluster *appsv1.Cluster) *reconcileContext {
+	rctx := reconcileContext{
+		ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
 			ClusterObj: cluster,
 		},
-		RequestCtx:     reqCtx,
-		ConfigMap:      cm,
-		MatchingLabels: matchingLabels,
+		RequestCtx: reqCtx,
+		configMap:  cm,
 	}
-	return configContext.Init(resourceCtx, &configContext)
+	return rctx.Init(resource, &rctx)
 }
 
-func (c *ReconcileContext) GetRelatedObjects() error {
+func (c *reconcileContext) objects() error {
 	return c.Cluster().
 		ComponentAndComponentDef().
 		ComponentSpec().
 		workload().
-		SynthesizedComponent().
-		ParametersDefinitions().
+		parametersDefinitions().
 		Complete()
 }
 
-func (c *ReconcileContext) workload() *ReconcileContext {
+func (c *reconcileContext) workload() *reconcileContext {
 	return c.Wrap(func() error {
 		itsKey := client.ObjectKey{
 			Namespace: c.Namespace,
@@ -87,15 +76,7 @@ func (c *ReconcileContext) workload() *ReconcileContext {
 	})
 }
 
-func (c *ReconcileContext) SynthesizedComponent() *ReconcileContext {
-	return c.Wrap(func() (err error) {
-		// build synthesized component for the component
-		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.Ctx, c.Client, c.ComponentDefObj, c.ComponentObj)
-		return err
-	})
-}
-
-func (c *ReconcileContext) ParametersDefinitions() *ReconcileContext {
+func (c *reconcileContext) parametersDefinitions() *reconcileContext {
 	return c.Wrap(func() (err error) {
 		configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
 		if err != nil {
@@ -106,8 +87,8 @@ func (c *ReconcileContext) ParametersDefinitions() *ReconcileContext {
 		for _, paramsDef := range paramsDefs {
 			paramsDefMap[paramsDef.Spec.FileName] = paramsDef
 		}
-		c.ConfigRender = configRender
-		c.ParametersDefs = paramsDefMap
+		c.configRender = configRender
+		c.parametersDefs = paramsDefMap
 		return nil
 	})
 }

@@ -40,6 +40,7 @@ const (
 
 type Status struct {
 	Status        string
+	Reason        string
 	ExpectedCount int32
 	SucceedCount  int32
 }
@@ -54,6 +55,12 @@ func makeStatus(status string, ops ...func(status *Status)) Status {
 		o(&ret)
 	}
 	return ret
+}
+
+func withReason(reason string) func(status *Status) {
+	return func(status *Status) {
+		status.Reason = reason
+	}
 }
 
 func withSucceed(succeedCount int32) func(status *Status) {

@@ -409,7 +409,7 @@ func (r *ReconfigureReconciler) status(rctx *reconcileContext, policy string, st
 	case reconfigure.StatusNone:
 		return r.succeed(rctx, policy, status)
 	default:
-		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status"), false))
+		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status: %s", status.Status), false))
 	}
 }
 
@@ -477,6 +477,7 @@ func reconciled(status reconfigure.Status, policy string, phase parametersv1alph
 		ExpectedCount: status.ExpectedCount,
 		SucceedCount:  status.SucceedCount,
 		Retry:         true,
+		Message:       status.Reason,
 	}
 	for _, option := range options {
 		option(&result)

@@ -25,6 +25,6 @@ import (
 
 func init() {
 	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, func(Context) (Status, error) {
-		return makeStatus(StatusNone), nil
+		return makeStatus(StatusNone, withReason("async dynamic reload")), nil
 	})
 }

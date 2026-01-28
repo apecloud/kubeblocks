@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconfigure
 
 import (
-	"fmt"
 	"slices"
 
 	"k8s.io/utils/ptr"
@@ -34,10 +33,16 @@ import (
 
 func init() {
 	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicy)
+	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, syncNRestartPolicy)
 }
 
 var (
-	syncPolicy = func(ctx Context) (Status, error) {
+	syncPolicy         = createSyncPolicy(false)
+	syncNRestartPolicy = createSyncPolicy(true)
+)
+
+func createSyncPolicy(restart bool) func(Context) (Status, error) {
+	return func(ctx Context) (Status, error) {
 		var (
 			paramDef               = ctx.ParametersDef
 			dynamicAction          = parameters.NeedDynamicReloadAction(paramDef)
@@ -60,13 +65,13 @@ var (
 			}
 		}
 		if len(params) == 0 {
-			return makeStatus(StatusNone), nil
+			return makeStatus(StatusNone, withReason("has no updated parameters")), nil
 		}
-		return submitUpdatedConfig(ctx, params, false)
+		return submit(ctx, params, restart)
 	}
-)
+}
 
-func submitUpdatedConfig(ctx Context, parameters map[string]string, restart bool) (Status, error) {
+func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
 	var config *appsv1.ClusterComponentConfig
 	for i, cfg := range ctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == ctx.ConfigTemplate.Name {
@@ -75,16 +80,20 @@ func submitUpdatedConfig(ctx Context, parameters map[string]string, restart bool
 		}
 	}
 	if config == nil {
-		// TODO: fix me
-		return makeStatus(StatusFailedAndRetry), fmt.Errorf("config %s not found", ctx.ConfigTemplate.Name)
+		// TODO: remove me after the ConfigMap source is set to the Cluster object
+		ctx.ClusterComponent.Configs = append(ctx.ClusterComponent.Configs, appsv1.ClusterComponentConfig{
+			Name: ptr.To(ctx.ConfigTemplate.Name),
+			// do not set the ConfigMap source here, it will be merged in copyAndMergeComponent on the Component object
+		})
+		config = &ctx.ClusterComponent.Configs[len(ctx.ClusterComponent.Configs)-1]
 	}
 	if !ptr.Equal(config.ConfigHash, ctx.getTargetConfigHash()) {
-		return applyConfigChangesToCluster(ctx, config, parameters, restart), nil
+		return applyChangesToCluster(ctx, config, parameters, restart), nil
 	}
-	return syncConfigStatus(ctx), nil
+	return syncReconfigureStatus(ctx), nil
 }
 
-func applyConfigChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) Status {
+func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) Status {
 	config.Variables = parameters
 	config.ConfigHash = ctx.getTargetConfigHash()
 	if restart {
@@ -92,10 +101,10 @@ func applyConfigChangesToCluster(ctx Context, config *appsv1.ClusterComponentCon
 	} else {
 		config.RestartOnConfigChange = nil
 	}
-	return makeStatus(StatusRetry, withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
 
-func syncConfigStatus(ctx Context) Status {
+func syncReconfigureStatus(ctx Context) Status {
 	var (
 		replicas   = int32(ctx.getTargetReplicas())
 		configHash = ctx.getTargetConfigHash()
@@ -112,7 +121,7 @@ func syncConfigStatus(ctx Context) Status {
 		}
 	}
 	if updated == replicas {
-		return makeStatus(StatusNone, withExpected(replicas), withSucceed(updated))
+		return makeStatus(StatusNone, withReason("reconfigure completed"), withExpected(replicas), withSucceed(updated))
 	}
-	return makeStatus(StatusRetry, withExpected(replicas), withSucceed(updated))
+	return makeStatus(StatusRetry, withReason("reconfiguring"), withExpected(replicas), withSucceed(updated))
 }

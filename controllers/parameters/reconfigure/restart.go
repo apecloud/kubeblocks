@@ -29,6 +29,6 @@ func init() {
 
 var (
 	restartPolicy = func(ctx Context) (Status, error) {
-		return submitUpdatedConfig(ctx, nil, true)
+		return submit(ctx, nil, true)
 	}
 )

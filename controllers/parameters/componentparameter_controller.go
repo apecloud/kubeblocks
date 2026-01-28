@@ -112,7 +112,7 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 		return r.failWithInvalidComponent(componentParameter, reqCtx)
 	}
 
-	taskCtx, err := NewTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)
+	taskCtx, err := newTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to create task context").Error())
 	}
@@ -136,7 +136,7 @@ func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *
 	return intctrlutil.Reconciled()
 }
 
-func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Task, resource *Task) error {
+func (r *ComponentParameterReconciler) runTasks(taskCtx *taskContext, tasks []Task, resource *Task) error {
 	var (
 		errs          []error
 		compParameter = taskCtx.componentParameter

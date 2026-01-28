@@ -124,7 +124,7 @@ func (r *redisConfig) GetString(key string) (string, error) {
 	res := make([]string, 0)
 	for i := len(keys); i < len(item.Values); i++ {
 		v := item.Values[i]
-		if ContainerEscapeString(v) {
+		if v == "" || ContainerEscapeString(v) {
 			res = append(res, strconv.Quote(v))
 		} else {
 			res = append(res, v)

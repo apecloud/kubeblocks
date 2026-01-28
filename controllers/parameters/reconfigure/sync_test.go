@@ -39,7 +39,8 @@ import (
 var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 	ginkgo.Context("sync reconfigure policy", func() {
 		var (
-			rctx Context
+			rctx   Context
+			policy = syncPolicy(false)
 		)
 
 		ginkgo.BeforeEach(func() {
@@ -96,7 +97,7 @@ var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 
 		ginkgo.It("update cluster spec", func() {
 			ginkgo.By("update cluster spec")
-			status, err := syncPolicy(rctx)
+			status, err := policy(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
@@ -108,7 +109,7 @@ var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 
 		ginkgo.It("status replicas - partially updated", func() {
 			ginkgo.By("update cluster spec")
-			status, err := syncPolicy(rctx)
+			status, err := policy(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
@@ -128,7 +129,7 @@ var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 			}
 
 			ginkgo.By("status check")
-			status, err = syncPolicy(rctx)
+			status, err = policy(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
@@ -137,7 +138,7 @@ var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 
 		ginkgo.It("status replicas - all", func() {
 			ginkgo.By("update cluster spec")
-			status, err := syncPolicy(rctx)
+			status, err := policy(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(StatusRetry))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
@@ -175,7 +176,7 @@ var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 			}
 
 			ginkgo.By("status check")
-			status, err = syncPolicy(rctx)
+			status, err = policy(rctx)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(StatusNone))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))

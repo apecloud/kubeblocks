@@ -33,40 +33,43 @@ import (
 )
 
 func init() {
-	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicy)
+	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicy(false))
+	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, syncPolicy(true))
 }
 
 var (
-	syncPolicy = func(ctx Context) (Status, error) {
-		var (
-			paramDef               = ctx.ParametersDef
-			dynamicAction          = parameters.NeedDynamicReloadAction(paramDef)
-			needReloadStaticParams = parameters.ReloadStaticParameters(paramDef)
-			visualizedParams       = core.GenerateVisualizedParamsList(ctx.Patch,
-				[]parametersv1alpha1.ComponentConfigDescription{*ctx.ConfigDescription})
-		)
-		params := make(map[string]string)
-		for _, key := range visualizedParams {
-			if key.UpdateType != core.UpdatedType {
-				continue
-			}
-			for _, p := range key.Parameters {
-				if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
+	syncPolicy = func(restart bool) func(Context) (Status, error) {
+		return func(ctx Context) (Status, error) {
+			var (
+				paramDef               = ctx.ParametersDef
+				dynamicAction          = parameters.NeedDynamicReloadAction(paramDef)
+				needReloadStaticParams = parameters.ReloadStaticParameters(paramDef)
+				visualizedParams       = core.GenerateVisualizedParamsList(ctx.Patch,
+					[]parametersv1alpha1.ComponentConfigDescription{*ctx.ConfigDescription})
+			)
+			params := make(map[string]string)
+			for _, key := range visualizedParams {
+				if key.UpdateType != core.UpdatedType {
 					continue
 				}
-				if p.Value != nil {
-					params[p.Key] = *p.Value
+				for _, p := range key.Parameters {
+					if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
+						continue
+					}
+					if p.Value != nil {
+						params[p.Key] = *p.Value
+					}
 				}
 			}
+			if len(params) == 0 {
+				return makeStatus(StatusNone), nil
+			}
+			return submit(ctx, params, restart)
 		}
-		if len(params) == 0 {
-			return makeStatus(StatusNone), nil
-		}
-		return submitUpdatedConfig(ctx, params, false)
 	}
 )
 
-func submitUpdatedConfig(ctx Context, parameters map[string]string, restart bool) (Status, error) {
+func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
 	var config *appsv1.ClusterComponentConfig
 	for i, cfg := range ctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == ctx.ConfigTemplate.Name {
@@ -79,12 +82,12 @@ func submitUpdatedConfig(ctx Context, parameters map[string]string, restart bool
 		return makeStatus(StatusFailedAndRetry), fmt.Errorf("config %s not found", ctx.ConfigTemplate.Name)
 	}
 	if !ptr.Equal(config.ConfigHash, ctx.getTargetConfigHash()) {
-		return applyConfigChangesToCluster(ctx, config, parameters, restart), nil
+		return applyChangesToCluster(ctx, config, parameters, restart), nil
 	}
-	return syncConfigStatus(ctx), nil
+	return syncReconfigureStatus(ctx), nil
 }
 
-func applyConfigChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) Status {
+func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) Status {
 	config.Variables = parameters
 	config.ConfigHash = ctx.getTargetConfigHash()
 	if restart {
@@ -95,7 +98,7 @@ func applyConfigChangesToCluster(ctx Context, config *appsv1.ClusterComponentCon
 	return makeStatus(StatusRetry, withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
 
-func syncConfigStatus(ctx Context) Status {
+func syncReconfigureStatus(ctx Context) Status {
 	var (
 		replicas   = int32(ctx.getTargetReplicas())
 		configHash = ctx.getTargetConfigHash()

@@ -133,14 +133,25 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	updatingPods := 0
+	unavailableConsumed := 0
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
-		if updatingPods >= rollingUpdateQuota || updatingPods >= unavailableQuota {
+		if updatingPods >= rollingUpdateQuota {
 			break
 		}
 		if updatingPods >= memberUpdateQuota {
 			break
+		}
+		// determine whether updating this pod would consume unavailable quota
+		// updating an already-unavailable pod should not consume unavailable quota
+		wouldConsumeUnavailable := 0
+		if intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+			wouldConsumeUnavailable = 1
+		}
+		if unavailableConsumed+wouldConsumeUnavailable > unavailableQuota {
+			// skip pods that would exceed unavailable quota; try next pod
+			continue
 		}
 		if canBeUpdated, retry := r.isPodCanBeUpdated(tree, its, pod); !canBeUpdated {
 			needRetry = retry
@@ -190,6 +201,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++
+			unavailableConsumed += wouldConsumeUnavailable
 		} else if updatePolicy == recreatePolicy {
 			if !isTerminating(pod) {
 				if err = r.switchover(tree, its, pod); err != nil {
@@ -200,6 +212,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				}
 			}
 			updatingPods++
+			unavailableConsumed += wouldConsumeUnavailable
 		}
 
 		// actively reload the new configuration when the pod or container has not been updated
@@ -258,19 +271,8 @@ func (r *updateReconciler) isPodCanBeUpdated(tree *kubebuilderx.ObjectTree, its 
 		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s does not have the same image(s) in the status and in the spec", its.Namespace, its.Name, pod.Name))
 		return false, false
 	}
-	if !intctrlutil.IsPodReady(pod) {
-		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not ready", its.Namespace, its.Name, pod.Name))
-		return false, false
-	}
-	if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
-		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
-		// no pod event will trigger the next reconciliation, so retry it
-		return false, true
-	}
-	if !isRoleReady(pod, its.Spec.Roles) {
-		tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
-		return false, false
-	}
+	// Allow updates even when the pod is not ready/available or its role is not ready.
+	// Rolling constraints are enforced by quotas; do not block here.
 	return true, false
 }
 

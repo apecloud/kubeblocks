@@ -59,6 +59,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx, _ := ctx.(*componentTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComp := transCtx.SynthesizeComponent
+	comp := transCtx.Component
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
@@ -97,14 +98,21 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 	newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
 	runningITS := transCtx.RunningWorkload
+	// new code path
 	if runningITS == nil ||
 		(runningITS.Annotations != nil && runningITS.Annotations[constant.ServiceAccountInUseAnnotationKey] == newName) {
+		delete(comp.Annotations, constant.ComponentLastServiceAccountNameAnnotationKey)
+		delete(comp.Annotations, constant.ComponentLastServiceAccountRuleHashAnnotationKey)
+
+		// to prevent when an instanceset is newly created, its controller doesn't have time
+		// to add the annoation for it. Then the component's reconciliation will
+		// fall into old code path.
+		synthesizedComp.AnnotaionsInjectedToWorkload[constant.ServiceAccountInUseAnnotationKey] = newName
 		return nil
 	}
 
 	// old code path
 	var err error
-	comp := transCtx.Component
 	lastServiceAccountName := comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]
 	lastHash := comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]
 	if serviceAccountName == "" {

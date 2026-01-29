@@ -28,6 +28,7 @@ linters:
         - '-ST1001' # Dot imports are discouraged
         - '-SA1019' # Using a deprecated function, variable, constant or field
         - '-QF1008' # Omit embedded fields from selector expression
+        - '-QF1001' # Apply De Morgan’s law
   exclusions:
     generated: lax
     presets:

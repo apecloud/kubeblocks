@@ -164,7 +164,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatePolicy == inPlaceUpdatePolicy && specUpdatePolicy == kbappsv1.ReCreatePodUpdatePolicyType {
 			updatePolicy = recreatePolicy
 		}
-		if updatePolicy == inPlaceUpdatePolicy {
+		switch updatePolicy {
+		case inPlaceUpdatePolicy:
 			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
@@ -190,7 +191,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++
-		} else if updatePolicy == recreatePolicy {
+		case recreatePolicy:
 			if !isTerminating(pod) {
 				if err = r.switchover(tree, its, pod); err != nil {
 					return kubebuilderx.Continue, err

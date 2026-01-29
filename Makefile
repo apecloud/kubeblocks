@@ -386,7 +386,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-GOLANGCILINT_VERSION = v1.64.8
+GOLANGCILINT_VERSION = v2.8.0
 GOLANGCILINT = $(LOCALBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
 .PHONY: golangci-lint-bin
 golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.

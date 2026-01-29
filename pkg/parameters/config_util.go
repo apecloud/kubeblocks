@@ -641,3 +641,7 @@ func ResolveShardingReference(ctx context.Context, reader client.Reader, comp *a
 	}
 	return nil, nil
 }
+
+func IsConfigManagerContainer(c *corev1.Container) bool {
+	return c.Name == constant.ConfigSidecarName || c.Name == installConfigMangerToolContainerName
+}

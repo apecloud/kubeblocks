@@ -109,6 +109,7 @@ type ConfigTemplateExtension struct {
 }
 
 // LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
+//
 // Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0
 type LegacyRenderedTemplateSpec struct {
 	// Extends the configuration template.

@@ -58,11 +58,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
 
-	var runningITS *workloads.InstanceSet
-	if transCtx.RunningWorkload != nil {
-		runningITS = transCtx.RunningWorkload.(*workloads.InstanceSet)
-	}
-
+	runningITS := transCtx.RunningWorkload
 	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
 		return err

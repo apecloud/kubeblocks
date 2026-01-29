@@ -1,52 +1,53 @@
-# options for analysis running
+version: "2"
 run:
-  # default concurrency is a available CPU number
-  concurrency: 4
-
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 15m
-
-  timeout: 30m
-
-issues:
-  exclude-files:
-    - "^zz_generated.*"
-
-#  build-tags:
-#    - containers_image_openpgp
-
 output:
-  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
   formats:
-    - format: colored-line-number
+    text:
       path: stdout
-
-  # print lines of code with issue, default is true
-  print-issued-lines: true
-
-  # print linter name in the end of issue text, default is true
-  print-linter-name: true
-
-# check available linters @ https://golangci-lint.run/usage/linters/
+      print-linter-name: true
+      print-issued-lines: true
 linters:
-  disable-all: true
-  enable: # please keep this alphabetized
-  # - gocyclo
-    - loggercheck
+  default: none
+  enable:
     - errcheck
     - gocritic
-    # - goconst
-    - goimports
-    - gofmt  # We enable this as well as goimports for its simplify mode.
-    - gosimple
     - govet
     - ineffassign
-    - typecheck
+    - loggercheck
     - misspell
     - nakedret
+    - staticcheck
     - unconvert
     - unused
-
-linters-settings:
-  errcheck:
-    check-blank: false # to keep `_ = viper.BindPFlag(...)` from throwing errors
+  settings:
+    errcheck:
+      check-blank: false
+    staticcheck:
+      checks:
+        - all
+        - '-ST1001' # Dot imports are discouraged
+        - '-SA1019' # Using a deprecated function, variable, constant or field
+        - '-QF1008' # Omit embedded fields from selector expression
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - ^zz_generated.*
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - ^zz_generated.*
+      - third_party$
+      - builtin$
+      - examples$

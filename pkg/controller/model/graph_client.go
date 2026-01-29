@@ -137,8 +137,8 @@ func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, actio
 		ClientOpt:         graphOpts.clientOpt,
 		PropagationPolicy: graphOpts.propagationPolicy,
 	}
-	switch {
-	case parent == nil:
+	switch parent {
+	case nil:
 		dag.AddConnectRoot(vertex)
 	default:
 		dag.AddConnect(parent, vertex)

@@ -387,15 +387,16 @@ func (t *componentStatusTransformer) reconcileWorkloadRunningCondition(transCtx 
 	message := ""
 	comp := t.comp
 
-	if t.runningITS == nil {
+	switch {
+	case t.runningITS == nil:
 		status = metav1.ConditionFalse
 		reason = "WorkloadNotExist"
 		message = "waiting for workload to be created"
-	} else if !t.isWorkloadUpdated() {
+	case !t.isWorkloadUpdated():
 		status = metav1.ConditionFalse
 		reason = "WorkloadNotUpdated"
 		message = "observed workload's generation not matching component's"
-	} else if !t.runningITS.IsInstanceSetReady() {
+	case !t.runningITS.IsInstanceSetReady():
 		status = metav1.ConditionFalse
 		reason = "WorkloadNotReady"
 		message = "workload not ready"

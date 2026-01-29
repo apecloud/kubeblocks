@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -109,8 +110,11 @@ func (t *componentStatusTransformer) init(transCtx *componentTransformContext, d
 
 // reconcileStatus reconciles component status.
 func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
+	if err := t.reconcileStatusCondition(transCtx); err != nil {
+		return err
+	}
 	if t.runningITS == nil {
-		return t.reconcileStatusCondition(transCtx)
+		return nil
 	}
 
 	// check if the ITS is deleting
@@ -124,25 +128,11 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		return t.runningITS.Status.Replicas > 0
 	}()
 
-	// check if the ITS is running
 	isITSUpdatedNRunning := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeWorkloadRunning).Status
+	hasFailure := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeHasFailure).Status
+	isUpdating := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeUpdating).Status
 
-	// check if the component has failed pod
-	hasFailedPod, messages := t.hasFailedPod()
-
-	// check if the component scale out failed
-	hasRunningScaleOut, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
-	if err != nil {
-		return err
-	}
-
-	// check if the volume expansion is running
-	hasRunningVolumeExpansion := t.hasVolumeExpansionRunning()
-
-	// check if the component has failure
-	hasFailure := func() bool {
-		return hasFailedPod || hasFailedScaleOut
-	}()
+	_, podMessages := t.hasFailedPod()
 
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
@@ -159,10 +149,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		}, phase)
 	}()
 
-	transCtx.Logger.Info(
-		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v",
-			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion))
-
 	switch {
 	case isDeleting:
 		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
@@ -170,19 +156,19 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
-	case isITSUpdatedNRunning == metav1.ConditionTrue && !hasRunningScaleOut && !hasRunningVolumeExpansion:
+	case isITSUpdatedNRunning == metav1.ConditionTrue && isUpdating == metav1.ConditionFalse:
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
-	case !hasFailure && isInCreatingPhase:
+	case hasFailure == metav1.ConditionFalse && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
-	case !hasFailure && isInStartingPhase:
+	case hasFailure == metav1.ConditionFalse && isInStartingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.StartingComponentPhase, nil, "component is Starting")
-	case !hasFailure:
+	case hasFailure == metav1.ConditionFalse:
 		t.setComponentStatusPhase(transCtx, appsv1.UpdatingComponentPhase, nil, "component is Updating")
 	default:
-		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
+		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, podMessages, "component is Failed")
 	}
 
-	return t.reconcileStatusCondition(transCtx)
+	return nil
 }
 
 func (t *componentStatusTransformer) workloadGeneration() (*int64, error) {
@@ -312,13 +298,92 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 
 func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
 	t.reconcileAvailableCondition(transCtx)
+	err1 := t.reconcileHasFailureCondition(transCtx)
+	err2 := t.reconcileUpdatingCondition(transCtx)
 	t.reconcileWorkloadRunningCondition(transCtx)
+	return errors.Join(err1, err2)
+}
+
+func (t *componentStatusTransformer) reconcileHasFailureCondition(transCtx *componentTransformContext) error {
+	status := metav1.ConditionFalse
+	reason := "NoFailure"
+	message := ""
+
+	hasFailedPod, messages := t.hasFailedPod()
+
+	if hasFailedPod {
+		status = metav1.ConditionTrue
+		reason = "PodFailure"
+		message = "component has failed pod(s)"
+		for _, msg := range messages {
+			message += "; " + msg
+		}
+	}
+
+	_, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
+	if err != nil {
+		return err
+	}
+
+	if hasFailedScaleOut {
+		status = metav1.ConditionTrue
+		reason = "ScaleOutFailure"
+		message = "component scale out has failure"
+	}
+
+	cond := metav1.Condition{
+		Type:               appsv1.ConditionTypeHasFailure,
+		Status:             status,
+		ObservedGeneration: t.comp.Generation,
+		Reason:             reason,
+		Message:            message,
+	}
+	if meta.SetStatusCondition(&t.comp.Status.Conditions, cond) {
+		transCtx.EventRecorder.Event(t.comp, corev1.EventTypeNormal, reason, message)
+	}
+	return nil
+}
+
+func (t *componentStatusTransformer) reconcileUpdatingCondition(transCtx *componentTransformContext) error {
+	status := metav1.ConditionFalse
+	reason := "NotUpdating"
+	message := ""
+
+	// check if the component scale out failed
+	hasRunningScaleOut, _, err := t.hasScaleOutRunning(transCtx)
+	if err != nil {
+		return err
+	}
+	if hasRunningScaleOut {
+		status = metav1.ConditionTrue
+		reason = "ScaleOutRunning"
+		message = "component scale out is running"
+	}
+
+	// check if the volume expansion is running
+	hasRunningVolumeExpansion := t.hasVolumeExpansionRunning()
+	if hasRunningVolumeExpansion {
+		status = metav1.ConditionTrue
+		reason = "VolumeExpansionRunning"
+		message = "component volume expansion is running"
+	}
+
+	cond := metav1.Condition{
+		Type:               appsv1.ConditionTypeUpdating,
+		Status:             status,
+		ObservedGeneration: t.comp.Generation,
+		Reason:             reason,
+		Message:            message,
+	}
+	if meta.SetStatusCondition(&t.comp.Status.Conditions, cond) {
+		transCtx.EventRecorder.Event(t.comp, corev1.EventTypeNormal, reason, message)
+	}
 	return nil
 }
 
 func (t *componentStatusTransformer) reconcileWorkloadRunningCondition(transCtx *componentTransformContext) {
 	status := metav1.ConditionTrue
-	reason := ""
+	reason := "WorkloadRunning"
 	message := ""
 	comp := t.comp
 

@@ -52,8 +52,13 @@ const (
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 
+	// These annoations serve in a transition period when existing clusters can adopt
+	// new serviceaccount naming rules.
+	// They will be removed in the future.
 	ComponentLastServiceAccountNameAnnotationKey     = "component.kubeblocks.io/last-service-account-name"
 	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
+	ProposedServiceAccountNameAnnotationKey          = "workloads.kubeblocks.io/proposed-service-account-name"
+	ServiceAccountInUseAnnotationKey                 = "workloads.kubeblocks.io/service-account-in-use"
 )
 
 const (

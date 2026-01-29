@@ -92,18 +92,14 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return t.handleRBACNewRule(transCtx, dag, serviceAccountName)
 	}
 
-	// check if sa with old naming rule exists
-	newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
-	newNameExists := true
-	if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: newName}, sa); err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		newNameExists = false
+	if err := t.handleRBACNewRule(transCtx, dag, ""); err != nil {
+		return err
 	}
-
-	if newNameExists || transCtx.RunningWorkload == nil {
-		return t.handleRBACNewRule(transCtx, dag, "")
+	newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+	runningITS := transCtx.RunningWorkload
+	if runningITS == nil ||
+		(runningITS.Annotations != nil && runningITS.Annotations[constant.ServiceAccountInUseAnnotationKey] == newName) {
+		return nil
 	}
 
 	// old code path
@@ -118,7 +114,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
-		if rollback {
+		if serviceAccountName != lastServiceAccountName && rollback {
 			transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
 			serviceAccountName = lastServiceAccountName
 		}
@@ -138,6 +134,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey] = hash
 			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
 		}
+
+		synthesizedComp.AnnotaionsInjectedToWorkload[constant.ProposedServiceAccountNameAnnotationKey] = newName
 	}
 
 	synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName

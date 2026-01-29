@@ -460,6 +460,15 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 		pod.Spec.NodeSelector[corev1.LabelHostname] = nodeName
 	}
 
+	// HACK: inject new serviceaccount name if possible
+	if parent.Annotations != nil {
+		newName, ok := parent.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+		if ok {
+			parent.Annotations[constant.ServiceAccountInUseAnnotationKey] = newName
+			pod.Spec.ServiceAccountName = newName
+		}
+	}
+
 	// 2. build pvcs from template
 	pvcNameMap := make(map[string]string)
 	for _, claimTemplate := range template.VolumeClaimTemplates {

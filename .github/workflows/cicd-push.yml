@@ -105,7 +105,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib

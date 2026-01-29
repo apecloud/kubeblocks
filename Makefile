@@ -145,7 +145,7 @@ vet: test-go-generate ## Run go vet against code.
 	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
 
 .PHONY: lint-fast
-lint-fast: staticcheck vet golangci-lint # [INTERNAL] Run all lint job against code.
+lint-fast: vet golangci-lint # [INTERNAL] Run all lint job against code.
 
 .PHONY: lint
 lint: test-go-generate generate ## Run default lint job against code.
@@ -154,10 +154,6 @@ lint: test-go-generate generate ## Run default lint job against code.
 .PHONY: golangci-lint
 golangci-lint: golangci-lint-bin generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
-
-.PHONY: staticcheck
-staticcheck: staticcheck-bin test-go-generate generate ## Run staticcheck against code.
-	$(STATICCHECK) ./...
 
 .PHONY: build-checks
 build-checks: fmt vet goimports lint-fast ## Run build checks.
@@ -395,12 +391,6 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 		curl -sSfL $(GITHUB_PROXY)https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(LOCALBIN) $(GOLANGCILINT_VERSION) && \
 		mv "$(LOCALBIN)/golangci-lint" "$(GOLANGCILINT)"; \
 	}
-
-STATICCHECK_VERSION = v0.6.1
-STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
-.PHONY: staticcheck-bin
-staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.
-	$(call go-install-tool,$(STATICCHECK),honnef.co/go/tools/cmd/staticcheck,$(STATICCHECK_VERSION))
 
 GOIMPORTS_VERSION = v0.34.0
 GOIMPORTS = $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)

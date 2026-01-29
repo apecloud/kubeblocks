@@ -122,10 +122,10 @@ func checkAndCreateConfigManagerToolsContainer(toolContainers []parametersv1alph
 }
 
 func replaceToolsImageHolder(toolConfig *parametersv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
-	switch {
-	case toolConfig.Image == kbToolsImagePlaceHolder:
+	switch toolConfig.Image {
+	case kbToolsImagePlaceHolder:
 		toolConfig.Image = viper.GetString(constant.KBToolsImage)
-	case toolConfig.Image == "":
+	case "":
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
 		if len(usingContainers) != 0 {
 			toolConfig.Image = usingContainers[0].Image

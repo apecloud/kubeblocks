@@ -357,11 +357,3 @@ func mockDAG(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 	graphCli.Create(d, its)
 	return d
 }
-
-func mockDAGWithUpdate(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
-	d := graph.NewDAG()
-	graphCli.Root(d, comp, comp, model.ActionUpdatePtr())
-	its := &workloads.InstanceSet{}
-	graphCli.Create(d, its)
-	return d
-}

@@ -489,8 +489,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 }
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster,
-	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec,
-) (*cfgcm.CfgManagerBuildParams, error) {
+	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:            constant.ConfigSidecarName,
 		ComponentName:          comp.Name,

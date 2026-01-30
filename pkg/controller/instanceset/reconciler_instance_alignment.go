@@ -142,6 +142,16 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+
+		// HACK: inject new serviceaccount name if possible
+		if its.Annotations != nil {
+			newName, ok := its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+			if ok {
+				its.Annotations[constant.ServiceAccountInUseAnnotationKey] = newName
+				newPod.Spec.ServiceAccountName = newName
+			}
+		}
+
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}

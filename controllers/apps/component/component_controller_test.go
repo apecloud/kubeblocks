@@ -116,9 +116,21 @@ var _ = Describe("Component Controller", func() {
 		resetTestContext()
 	}
 
+	randClusterName := func() {
+		By("randomize a cluster name and UID")
+		clusterKey = types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      testapps.GetRandomizedKey("", clusterName).Name,
+		}
+		clusterUID = string(uuid.NewUUID())
+		clusterGeneration = 1
+	}
+
 	BeforeEach(func() {
 		cleanEnv()
 		settings = viper.AllSettings()
+
+		randClusterName()
 	})
 
 	AfterEach(func() {
@@ -149,14 +161,6 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	createCompObjX := func(compName, compDefName string, processor func(*testapps.MockComponentFactory), phase *kbappsv1.ComponentPhase) {
-		By("randomize a cluster name and UID")
-		clusterKey = types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      testapps.GetRandomizedKey("", clusterName).Name,
-		}
-		clusterUID = string(uuid.NewUUID())
-		clusterGeneration = 1
-
 		By("creating a component")
 		compObjName := constant.GenerateClusterComponentName(clusterKey.Name, compName)
 		factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
@@ -807,6 +811,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("create component w/ replicas limit set - out-of-limit")
 		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
+			randClusterName()
 			createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(replicas)
 			}, "")
@@ -826,6 +831,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("create component w/ replicas limit set - ok")
 		for _, replicas := range []int32{replicasLimit.MinReplicas, (replicasLimit.MinReplicas + replicasLimit.MaxReplicas) / 2, replicasLimit.MaxReplicas} {
+			randClusterName()
 			createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(replicas)
 			})
@@ -969,11 +975,19 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCompRBAC := func(compName, compDefName, saName string) {
+	testCompRBAC := func(compName, compDefName, saName string, newSANamingRule bool) {
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
-			createCompObj(compName, compDefName, nil)
-			saName = constant.GenerateDefaultServiceAccountName(compDefName)
+			if newSANamingRule {
+				createCompObj(compName, compDefName, nil)
+				saName = constant.GenerateDefaultServiceAccountNameNew(compObj.Name)
+			} else {
+				saName = constant.GenerateDefaultServiceAccountName(compDefName)
+				By("mock an instanceset")
+				testapps.MockInstanceSetComponent(&testCtx, clusterKey.Name, compName)
+				// TODO: will comp controller read a stale cache?
+				createCompObj(compName, compDefName, nil)
+			}
 		} else {
 			createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetServiceAccountName(saName)
@@ -994,18 +1008,45 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompWithRBAC := func(compName, compDefName string) {
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", true)
 		By("delete the component")
 		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
 
-		By("check the RBAC resources orphaned")
+		By("check the RBAC resources deleted")
 		saName := constant.GenerateDefaultServiceAccountName(compDefName)
-		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
+	}
+
+	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
+		saName := "test-sa-non-exist" + randomStr()
+
+		// component controller won't complete reconciliation, so the phase will be empty
+		createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetServiceAccountName(saName)
+		}, "")
+		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
+	}
+
+	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
+		saName := "test-sa-exist" + randomStr()
+
+		By("user manually creates ServiceAccount and RoleBinding")
+		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
+		testapps.CheckedCreateK8sResource(&testCtx, sa)
+
+		testCompRBAC(compName, compDefName, saName, true)
+
+		By("delete the component")
+		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, true)).Should(Succeed())
+
+		By("check the serviceaccount not deleted")
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", false)
 
 		By("delete the component")
 		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
@@ -1016,11 +1057,13 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
 
 		By("re-create component with same name")
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", false)
 		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), false)
 	}
 
 	testSharedRBACResourceDeletion := func(compNamePrefix, compDefName string) {
+		By("mock first instanceset")
+		testapps.MockInstanceSetComponent(&testCtx, clusterKey.Name, compNamePrefix+"-comp1")
 		By("create first component")
 		createCompObj(compNamePrefix+"-comp1", compDefName, nil)
 		comp1Key := compKey
@@ -1040,7 +1083,9 @@ var _ = Describe("Component Controller", func() {
 
 		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
 
-		By("create second cluster")
+		By("mock second instanceset")
+		testapps.MockInstanceSetComponent(&testCtx, clusterKey.Name, compNamePrefix+"-comp2")
+		By("create second component")
 		createCompObj(compNamePrefix+"-comp2", compDefName, nil)
 		comp2Key := compKey
 		By("check rbac resources owner not modified")
@@ -1073,31 +1118,48 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
-		saName := "test-sa-non-exist" + randomStr()
+	testMigrateServiceAccountToNewRule := func(compName, compDefName string) {
+		testCompRBAC(compName, compDefName, "", false)
+		By("check hash key annoataion")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		newSAName := constant.GenerateDefaultServiceAccountNameNew(compObj.Name)
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(comp.Spec.CompDef).Should(Equal(compDefName))
+			g.Expect(comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]).ShouldNot(BeEmpty())
+			g.Expect(comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]).Should(Equal(saName))
+		})).Should(Succeed())
 
-		// component controller won't complete reconciliation, so the phase will be empty
-		createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetServiceAccountName(saName)
-		}, "")
-		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
-	}
+		By("check both old and new serviceaccounts are created")
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+		checkRBACResourcesExistence(newSAName, fmt.Sprintf("%v-pod", newSAName), true)
 
-	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
-		saName := "test-sa-exist" + randomStr()
+		By("create another componentDefinition obj")
+		compDefName2 := "another-cmpd"
+		compDefObj = testapps.NewComponentDefinitionFactory(compDefName2).
+			SetDefaultSpec().
+			Create(&testCtx).
+			GetObject()
 
-		By("user manually creates ServiceAccount and RoleBinding")
-		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
-		testapps.CheckedCreateK8sResource(&testCtx, sa)
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.CompDef = compDefName2
+		})()).Should(Succeed())
+		By("check serviceaccount not changed")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Annotations).ShouldNot(BeNil())
+			g.Expect(its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]).Should(Equal(newSAName))
+			g.Expect(its.Spec.Template.Spec.ServiceAccountName).Should(Equal(saName))
+		})).Should(Succeed())
 
-		testCompRBAC(compName, compDefName, saName)
+		By("mock its applies new serviceaccount")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(its *workloads.InstanceSet) {
+			its.Annotations[constant.ServiceAccountInUseAnnotationKey] = newSAName
+		})()).Should(Succeed())
 
-		By("delete the component")
-		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, true)).Should(Succeed())
-
-		By("check the serviceaccount not deleted")
-		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
+		By("check old annotation deleted")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(comp.Annotations).ShouldNot(ContainElement(constant.ComponentLastServiceAccountRuleHashAnnotationKey))
+			g.Expect(comp.Annotations).ShouldNot(ContainElement(constant.ComponentLastServiceAccountNameAnnotationKey))
+		})).Should(Succeed())
 	}
 
 	testCompSystemAccount := func(compName, compDefName string) {
@@ -1652,24 +1714,32 @@ var _ = Describe("Component Controller", func() {
 			testCompTLSConfig(defaultCompName, compDefObj.Name)
 		})
 
-		It("creates component RBAC resources", func() {
-			testCompWithRBAC(defaultCompName, compDefObj.Name)
+		Context("rbac", func() {
+			It("creates component RBAC resources", func() {
+				testCompWithRBAC(defaultCompName, compDefObj.Name)
+			})
+
+			It("creates component with non-exist serviceaccount", func() {
+				testCreateCompWithNonExistRBAC(defaultCompName, compDefObj.Name)
+			})
+
+			It("create component with custom RBAC which is already exist created by User", func() {
+				testCreateCompWithRBACCreateByUser(defaultCompName, compDefObj.Name)
+			})
 		})
 
-		It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
-			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefObj.Name)
-		})
+		Context("rbac, old code path", func() {
+			It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
+				testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefObj.Name)
+			})
 
-		It("adopts an orphaned rbac resource", func() {
-			testSharedRBACResourceDeletion(defaultCompName, compDefObj.Name)
-		})
+			It("adopts an orphaned rbac resource", func() {
+				testSharedRBACResourceDeletion(defaultCompName, compDefObj.Name)
+			})
 
-		It("creates component with non-exist serviceaccount", func() {
-			testCreateCompWithNonExistRBAC(defaultCompName, compDefObj.Name)
-		})
-
-		It("create component with custom RBAC which is already exist created by User", func() {
-			testCreateCompWithRBACCreateByUser(defaultCompName, compDefObj.Name)
+			It("migrates to new code path", func() {
+				testMigrateServiceAccountToNewRule(defaultCompName, compDefObj.Name)
+			})
 		})
 	})
 

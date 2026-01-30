@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -543,6 +544,18 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			r.setRequeueWithErr(err, "")
 			return
 		} else if err == nil {
+			// Check if the job is outdated (belongs to an older generation)
+			if isJobOutdated(helmInstallJob, addon) {
+				r.reqCtx.Log.Info("Deleting outdated install job", "job", key.Name, "jobGeneration",
+					helmInstallJob.Annotations[AddonGeneration], "addonGeneration", addon.Generation)
+				if err := r.reconciler.Delete(ctx, helmInstallJob); client.IgnoreNotFound(err) != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+				r.setRequeueAfter(time.Second, "recreating install job for new generation")
+				return
+			}
+
 			if helmInstallJob.Status.Succeeded > 0 {
 				return
 			}
@@ -710,6 +723,18 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			r.setRequeueWithErr(err, "")
 			return
 		} else if err == nil {
+			// Check if the job is outdated (belongs to an older generation)
+			if isJobOutdated(helmUninstallJob, addon) {
+				r.reqCtx.Log.Info("Deleting outdated uninstall job", "job", key.Name, "jobGeneration",
+					helmUninstallJob.Annotations[AddonGeneration], "addonGeneration", addon.Generation)
+				if err := r.reconciler.Delete(ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+				r.setRequeueAfter(time.Second, "recreating uninstall job for new generation")
+				return
+			}
+
 			if helmUninstallJob.Status.Succeeded > 0 {
 				r.reqCtx.Log.V(1).Info("helm uninstall job succeed", "job", key)
 				// TODO:
@@ -911,6 +936,17 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 	}
 	ttlSec := int32(ttl.Seconds())
 	backoffLimit := int32(3)
+
+	// Set job timeout to prevent jobs from running indefinitely
+	jobTimeout := time.Minute * 5
+	if timeout := viper.GetString(constant.CfgAddonJobTimeout); timeout != "" {
+		var err error
+		if jobTimeout, err = time.ParseDuration(timeout); err != nil {
+			return nil, err
+		}
+	}
+	activeDeadlineSeconds := int64(jobTimeout.Seconds())
+
 	container := corev1.Container{
 		Name:            getJobMainContainerName(addon),
 		Image:           viper.GetString(constant.KBToolsImage),
@@ -940,10 +976,15 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 				constant.AddonNameLabelKey:    addon.Name,
 				constant.AppManagedByLabelKey: constant.AppName,
 			},
+			Annotations: map[string]string{
+				// Add generation annotation to track which addon generation this job belongs to
+				AddonGeneration: fmt.Sprintf("%d", addon.Generation),
+			},
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit:            &backoffLimit,
 			TTLSecondsAfterFinished: &ttlSec,
+			ActiveDeadlineSeconds:   &activeDeadlineSeconds,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1073,6 +1114,26 @@ func setAddonErrorConditions(ctx context.Context,
 
 func getJobMainContainerName(addon *extensionsv1alpha1.Addon) string {
 	return strings.ToLower(string(addon.Spec.Type))
+}
+
+// isJobOutdated checks if the job belongs to an older generation of the addon
+func isJobOutdated(job *batchv1.Job, addon *extensionsv1alpha1.Addon) bool {
+	if job.Annotations == nil {
+		// Jobs without generation annotation are considered outdated
+		return true
+	}
+
+	jobGenStr, exists := job.Annotations[AddonGeneration]
+	if !exists {
+		return true
+	}
+
+	jobGen, err := strconv.ParseInt(jobGenStr, 10, 64)
+	if err != nil {
+		return true
+	}
+
+	return jobGen < addon.Generation
 }
 
 func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *extensionsv1alpha1.Addon,

@@ -25053,8 +25053,8 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
 </p>
 <div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
+<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.</p>
+<p>Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
 </div>
 <table>
 <thead>
@@ -36411,8 +36411,8 @@ RoleUpdateMechanism
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
-<p>SchedulingPolicy the scheduling policy.
-Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
+<p>SchedulingPolicy the scheduling policy.</p>
+<p>Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
 </div>
 <table>
 <thead>

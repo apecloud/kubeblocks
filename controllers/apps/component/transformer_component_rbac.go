@@ -99,7 +99,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
-		if rollback {
+		if serviceAccountName != lastServiceAccountName && rollback {
 			transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
 			serviceAccountName = lastServiceAccountName
 		}

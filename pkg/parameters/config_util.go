@@ -36,6 +36,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -333,7 +334,8 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 
 // BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) error {
+func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition,
+	runningITS *workloadsv1.InstanceSet) error {
 	var (
 		err         error
 		buildParams *cfgcm.CfgManagerBuildParams
@@ -384,6 +386,25 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	if len(buildParams.ToolsContainers) > 0 {
 		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
 	}
+
+	// Update the runningITS container in advance to prevent it from being rollback.
+	if runningITS != nil {
+		for i, c := range runningITS.Spec.Template.Spec.Containers {
+			if c.Name == container.Name {
+				runningITS.Spec.Template.Spec.Containers[i] = *container
+				break
+			}
+		}
+		for _, tc := range buildParams.ToolsContainers {
+			for j, ic := range runningITS.Spec.Template.Spec.InitContainers {
+				if ic.Name == tc.Name {
+					runningITS.Spec.Template.Spec.InitContainers[j] = tc
+					break
+				}
+			}
+		}
+	}
+
 	filter := func(c *corev1.Container) bool {
 		names := []string{container.Name}
 		for _, cc := range buildParams.ToolsContainers {
@@ -468,7 +489,8 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 }
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster,
-	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
+	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec,
+) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
 		ManagerName:            constant.ConfigSidecarName,
 		ComponentName:          comp.Name,
@@ -640,8 +662,4 @@ func ResolveShardingReference(ctx context.Context, reader client.Reader, comp *a
 		}
 	}
 	return nil, nil
-}
-
-func IsConfigManagerContainer(c *corev1.Container) bool {
-	return c.Name == constant.ConfigSidecarName || c.Name == installConfigMangerToolContainerName
 }

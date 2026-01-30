@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -45,6 +46,11 @@ func (t *componentReloadSidecarTransformer) Transform(ctx graph.TransformContext
 	comp := transCtx.Component
 	compOrig := transCtx.ComponentOrig
 	builtinComp := transCtx.SynthesizeComponent
+
+	var runningITS *workloadsv1.InstanceSet
+	if transCtx.RunningWorkload != nil {
+		runningITS = transCtx.RunningWorkload.(*workloadsv1.InstanceSet)
+	}
 
 	if isCompDeleting(compOrig) {
 		return nil
@@ -77,5 +83,5 @@ func (t *componentReloadSidecarTransformer) Transform(ctx graph.TransformContext
 		ClusterName:   builtinComp.ClusterName,
 		ComponentName: builtinComp.Name,
 	}
-	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef)
+	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef, runningITS)
 }

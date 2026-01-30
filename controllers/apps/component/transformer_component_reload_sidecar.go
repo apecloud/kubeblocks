@@ -77,5 +77,5 @@ func (t *componentReloadSidecarTransformer) Transform(ctx graph.TransformContext
 		ClusterName:   builtinComp.ClusterName,
 		ComponentName: builtinComp.Name,
 	}
-	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef)
+	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef, transCtx.RunningWorkload)
 }

@@ -36,6 +36,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -333,7 +334,8 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 
 // BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) error {
+func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster,
+	synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, itsObj client.Object) error {
 	var (
 		err         error
 		buildParams *cfgcm.CfgManagerBuildParams
@@ -384,6 +386,32 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	if len(buildParams.ToolsContainers) > 0 {
 		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
 	}
+
+	getRunningIts := func() *workloadsv1.InstanceSet {
+		if itsObj == nil {
+			return nil
+		}
+		return itsObj.(*workloadsv1.InstanceSet)
+	}
+
+	// Update the runningITS container in advance to prevent it from being rollback.
+	if runningITS := getRunningIts(); runningITS != nil {
+		for i, c := range runningITS.Spec.Template.Spec.Containers {
+			if c.Name == container.Name {
+				runningITS.Spec.Template.Spec.Containers[i].Image = container.Image
+				break
+			}
+		}
+		for _, tc := range buildParams.ToolsContainers {
+			for j, ic := range runningITS.Spec.Template.Spec.InitContainers {
+				if ic.Name == tc.Name {
+					runningITS.Spec.Template.Spec.InitContainers[j].Image = tc.Image
+					break
+				}
+			}
+		}
+	}
+
 	filter := func(c *corev1.Container) bool {
 		names := []string{container.Name}
 		for _, cc := range buildParams.ToolsContainers {

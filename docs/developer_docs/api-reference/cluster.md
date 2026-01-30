@@ -32838,6 +32838,18 @@ string
 </tr>
 <tr>
 <td>
+<code>restart</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reconfigure</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">

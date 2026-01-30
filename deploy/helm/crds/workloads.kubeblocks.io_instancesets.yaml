@@ -525,6 +525,9 @@ spec:
 
                         An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
                       type: string
+                    restart:
+                      description: Specifies whether to restart instances.
+                      type: boolean
                   required:
                   - name
                   type: object

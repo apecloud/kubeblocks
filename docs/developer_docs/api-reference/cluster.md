@@ -720,7 +720,7 @@ with other Kubernetes resources, such as modifying Pod labels or sending events.
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
 it will also be bound to a default cluster role named
 &ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
-<p>Before KubeBlocks 1.0.2, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
 To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
@@ -3362,7 +3362,7 @@ with other Kubernetes resources, such as modifying Pod labels or sending events.
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
 it will also be bound to a default cluster role named
 &ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
-<p>Before KubeBlocks 1.0.2, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
 To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
@@ -6812,7 +6812,7 @@ with other Kubernetes resources, such as modifying Pod labels or sending events.
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
 it will also be bound to a default cluster role named
 &ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
-<p>Before KubeBlocks 1.0.2, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
 To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not

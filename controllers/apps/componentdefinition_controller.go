@@ -75,11 +75,9 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 	rctx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("component", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("componentdefinition", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-
-	rctx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
 	cmpd := &appsv1.ComponentDefinition{}
 	if err := r.Client.Get(rctx.Ctx, rctx.Req.NamespacedName, cmpd); err != nil {
@@ -110,11 +108,6 @@ func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, componentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
 	if res != nil {
 		return *res, err
-	}
-
-	if cmpd.Status.ObservedGeneration == cmpd.Generation &&
-		slices.Contains([]appsv1.Phase{appsv1.AvailablePhase}, cmpd.Status.Phase) {
-		return intctrlutil.Reconciled()
 	}
 
 	if err = r.validate(r.Client, rctx, cmpd); err != nil {

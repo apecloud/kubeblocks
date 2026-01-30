@@ -439,7 +439,7 @@ type ClusterComponentSpec struct {
 	// it will also be bound to a default cluster role named
 	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
 	//
-	// Before KubeBlocks 1.0.2, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
+	// Before KubeBlocks 1.1, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
 	// To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
 	// when a workload has been restarted.
 	//

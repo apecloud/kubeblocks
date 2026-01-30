@@ -537,6 +537,11 @@ type ConfigTemplate struct {
 	// +optional
 	ConfigHash *string `json:"configHash,omitempty"`
 
+	// Specifies whether to restart instances.
+	//
+	// +optional
+	Restart *bool `json:"restart,omitempty"`
+
 	// The custom reconfigure action.
 	//
 	// +optional

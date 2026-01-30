@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -452,7 +453,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			action     *appsv1.Action
 			actionName string
 		)
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+		if ptr.Deref(tpl.ExternalManaged, false) {
 			if tpl.Reconfigure == nil {
 				return // disabled by the external system
 			}
@@ -467,12 +468,16 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			return // has no reconfigure action defined
 		}
 
+		parameters := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
+		maps.Copy(parameters, tpl.Variables)
 		config := workloads.ConfigTemplate{
 			Name:                  tpl.Name,
-			Generation:            r.component.Generation,
+			Generation:            r.component.Generation, // TODO: remove this field
+			ConfigHash:            tpl.ConfigHash,
+			Restart:               tpl.RestartOnFileChange,
 			Reconfigure:           action,
 			ReconfigureActionName: actionName,
-			Parameters:            lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
+			Parameters:            parameters,
 		}
 		if r.protoITS.Spec.Configs == nil {
 			r.protoITS.Spec.Configs = make([]workloads.ConfigTemplate, 0)

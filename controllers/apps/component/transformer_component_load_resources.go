@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -72,6 +73,12 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	}
 	transCtx.SynthesizeComponent = synthesizedComp
 
+	runningITS, err := t.runningInstanceSetObject(transCtx, synthesizedComp)
+	if err != nil {
+		return err
+	}
+	transCtx.RunningWorkload = runningITS
+
 	return nil
 }
 
@@ -90,4 +97,17 @@ func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string
 		return nil, fmt.Errorf("the referenced ComponentDefinition is unavailable: %s", compDef.Name)
 	}
 	return compDef, nil
+}
+
+func (t *componentLoadResourcesTransformer) runningInstanceSetObject(ctx *componentTransformContext,
+	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
+	objs, err := component.ListOwnedWorkloads(ctx.GetContext(), ctx.GetClient(),
+		synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	if len(objs) == 0 {
+		return nil, nil
+	}
+	return objs[0], nil
 }

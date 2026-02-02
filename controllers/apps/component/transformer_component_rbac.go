@@ -107,7 +107,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		// to prevent when an instanceset is newly created, its controller doesn't have time
 		// to add the annoation for it. Then the component's reconciliation will
 		// fall into old code path.
-		synthesizedComp.AnnotaionsInjectedToWorkload[constant.ServiceAccountInUseAnnotationKey] = newName
+		synthesizedComp.AnnotationsInjectedToWorkload[constant.ServiceAccountInUseAnnotationKey] = newName
 		return nil
 	}
 
@@ -143,7 +143,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
 		}
 
-		synthesizedComp.AnnotaionsInjectedToWorkload[constant.ProposedServiceAccountNameAnnotationKey] = newName
+		synthesizedComp.AnnotationsInjectedToWorkload[constant.ProposedServiceAccountNameAnnotationKey] = newName
 	}
 
 	synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName

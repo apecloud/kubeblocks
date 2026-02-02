@@ -67,7 +67,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, compDef)).
-		AddAnnotationsInMap(synthesizedComp.AnnotaionsInjectedToWorkload).
+		AddAnnotationsInMap(synthesizedComp.AnnotationsInjectedToWorkload).
 		SetTemplate(getTemplate(synthesizedComp)).
 		SetSelectorMatchLabel(getTemplateLabels(synthesizedComp)).
 		SetReplicas(synthesizedComp.Replicas).

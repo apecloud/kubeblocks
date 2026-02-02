@@ -415,7 +415,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.AddConfigs(workloads.ConfigTemplate{
 					Name:       "server",
-					Generation: int64(1),
+					ConfigHash: ptr.To("123456"),
 				})
 			})
 
@@ -427,7 +427,7 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
@@ -456,11 +456,11 @@ var _ = Describe("InstanceSet Controller", func() {
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
 						Name:       "server",
-						Generation: int64(1),
+						ConfigHash: ptr.To("123456"),
 					},
 					{
 						Name:       "logging",
-						Generation: int64(2),
+						ConfigHash: ptr.To("654321"),
 					},
 				}...)
 			})
@@ -498,11 +498,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(2),
+							ConfigHash: ptr.To("654321"),
 						},
 					},
 				}))
@@ -516,7 +516,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
 				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
 				its.Spec.Configs[1].ReconfigureActionName = ""
 				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
@@ -530,11 +530,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(128),
+							ConfigHash: ptr.To("abcdef"),
 						},
 					},
 				}))
@@ -570,11 +570,11 @@ var _ = Describe("InstanceSet Controller", func() {
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
 						Name:       "server",
-						Generation: int64(1),
+						ConfigHash: ptr.To("123456"),
 					},
 					{
 						Name:       "logging",
-						Generation: int64(2),
+						ConfigHash: ptr.To("654321"),
 					},
 				}...)
 			})
@@ -589,11 +589,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(2),
+							ConfigHash: ptr.To("654321"),
 						},
 					},
 				}))
@@ -607,7 +607,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
 				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
 				its.Spec.Configs[1].ReconfigureActionName = "reconfigure-server"
 				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
@@ -621,11 +621,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(128),
+							ConfigHash: ptr.To("abcdef"),
 						},
 					},
 				}))

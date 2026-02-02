@@ -472,7 +472,6 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 		maps.Copy(parameters, tpl.Variables)
 		config := workloads.ConfigTemplate{
 			Name:                  tpl.Name,
-			Generation:            r.component.Generation, // TODO: remove this field
 			ConfigHash:            tpl.ConfigHash,
 			Restart:               tpl.RestartOnFileChange,
 			Reconfigure:           action,

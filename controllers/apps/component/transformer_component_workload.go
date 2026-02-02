@@ -65,11 +65,10 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
 
-	runningITS, err := t.runningInstanceSetObject(ctx, synthesizeComp)
-	if err != nil {
-		return err
+	var runningITS *workloads.InstanceSet
+	if transCtx.RunningWorkload != nil {
+		runningITS = transCtx.RunningWorkload.(*workloads.InstanceSet)
 	}
-	transCtx.RunningWorkload = runningITS
 
 	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
@@ -98,19 +97,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		}
 	}
 	return err
-}
-
-func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent) (*workloads.InstanceSet, error) {
-	objs, err := component.ListOwnedWorkloads(ctx.GetContext(), ctx.GetClient(),
-		synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) == 0 {
-		return nil, nil
-	}
-	return objs[0], nil
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,

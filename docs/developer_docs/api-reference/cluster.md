@@ -33632,6 +33632,18 @@ key is the pod name, value is the revision.</p>
 </tr>
 <tr>
 <td>
+<code>proposedRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>revisions that will be applied during next pod update process</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>templatesStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceTemplateStatus">

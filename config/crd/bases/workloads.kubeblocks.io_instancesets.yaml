@@ -11794,6 +11794,12 @@ spec:
                   InstanceSet's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              proposedRevisions:
+                additionalProperties:
+                  type: string
+                description: revisions that will be applied during next pod update
+                  process
+                type: object
               readyInitReplicas:
                 description: |-
                   Represents the number of instances that have already reached the InstanceStatus during the cluster initialization stage.

@@ -191,6 +191,28 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
+
+	// serviceaccount name migration process
+	proposedRevisions, err := GetRevisions(its.Status.ProposedRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	updateDone := true
+	for podName, revision := range proposedRevisions {
+		if currentRevisions[podName] != revision {
+			updateDone = false
+			break
+		}
+	}
+	if updateDone {
+		_, ok1 := its.Annotations[constant.ServiceAccountInUseAnnotationKey]
+		proposedSA, ok2 := its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+		if !ok1 && ok2 {
+			its.Annotations[constant.ServiceAccountInUseAnnotationKey] = proposedSA
+		}
+	}
+
 	return kubebuilderx.Continue, nil
 }
 

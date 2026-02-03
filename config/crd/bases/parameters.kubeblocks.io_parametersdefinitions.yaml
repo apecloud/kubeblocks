@@ -449,6 +449,28 @@ spec:
                                 image:
                                   description: Specifies the tool container image.
                                   type: string
+                                imageMappings:
+                                  description: Defines image mapping for different
+                                    service versions.
+                                  items:
+                                    properties:
+                                      image:
+                                        description: Image is the container image
+                                          addresses to use for the matched service
+                                          versions.
+                                        type: string
+                                      serviceVersions:
+                                        description: ServiceVersions is a list of
+                                          service versions that this mapping applies
+                                          to.
+                                        items:
+                                          type: string
+                                        type: array
+                                    required:
+                                    - image
+                                    - serviceVersions
+                                    type: object
+                                  type: array
                                 name:
                                   description: Specifies the name of the init container.
                                   maxLength: 63

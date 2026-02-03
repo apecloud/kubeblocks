@@ -94,12 +94,64 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				}},
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec)).Should(Succeed())
+			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec, "1.0.1")).Should(Succeed())
 			Expect(3).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 			Expect(its.Spec.Template.Spec.Containers[0].Image).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[1].Image))
 			Expect(kbToolsImage).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[2].Image))
 		})
+	})
+
+	It("TesImageMappings", func() {
+		its, err := factory.BuildInstanceSet(clusterComponent, nil)
+		Expect(err).Should(Succeed())
+
+		cfgManagerParams := &cfgcm.CfgManagerBuildParams{
+			ManagerName:   constant.ConfigSidecarName,
+			ComponentName: clusterComponent.Name,
+			Image:         viper.GetString(constant.KBToolsImage),
+			Volumes:       make([]corev1.VolumeMount, 0),
+			Cluster:       clusterObj,
+			ConfigSpecsBuildParams: []cfgcm.ConfigSpecMeta{{
+				ConfigSpecInfo: cfgcm.ConfigSpecInfo{
+					ConfigSpec: component.ConfigTemplates(clusterComponent)[0],
+					ReloadType: parametersv1alpha1.ShellType,
+				},
+				ToolsImageSpec: &parametersv1alpha1.ToolsSetup{
+					MountPoint: "/opt/tools",
+					ToolConfigs: []parametersv1alpha1.ToolConfig{
+						{
+							Name:    "test",
+							Image:   "test_images",
+							Command: noneCommand,
+							ImageMappings: []parametersv1alpha1.ImageMapping{
+								{
+									ServiceVersions: []string{
+										"1.0.1",
+									},
+									Image: "test_images_v1.0.1",
+								},
+							},
+						},
+						{
+							Name:    "test2",
+							Image:   "",
+							Command: noneCommand,
+							// AsContainerImage: cfgutil.ToPointer(true),
+						},
+						{
+							Name:    "test3",
+							Image:   "$(KUBEBLOCKS_TOOLS_IMAGE)",
+							Command: noneCommand,
+						},
+					},
+				},
+			}},
+		}
+		cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
+		Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec, "1.0.1")).Should(Succeed())
+		Expect(3).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
+		Expect("test_images_v1.0.1").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 	})
 
 })

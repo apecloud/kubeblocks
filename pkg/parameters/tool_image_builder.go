@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"path/filepath"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -39,7 +40,7 @@ const (
 	kbToolsImagePlaceHolder              = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
-func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec) error {
+func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec, serviceVersion string) error {
 	if len(cfgManagerParams.ConfigSpecsBuildParams) == 0 {
 		return nil
 	}
@@ -57,6 +58,15 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 		for _, toolImage := range buildParam.ToolsImageSpec.ToolConfigs {
 			if _, ok := toolsImageMap[toolImage.Name]; ok {
 				continue
+			}
+			if len(toolImage.ImageMappings) > 0 {
+				for _, mapping := range toolImage.ImageMappings {
+					if !slices.Contains(mapping.ServiceVersions, serviceVersion) {
+						continue
+					}
+					toolImage.Image = mapping.Image
+					break
+				}
 			}
 			toolsImageMap[toolImage.Name] = buildParam
 			replaceToolsImageHolder(&toolImage, podSpec, buildParam.ConfigSpec.VolumeName)

@@ -490,7 +490,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams); err != nil {
 		return nil, err
 	}
-	if err := buildReloadToolsContainer(cfgManagerParams, podSpec); err != nil {
+	if err := buildReloadToolsContainer(cfgManagerParams, podSpec, comp.ServiceVersion); err != nil {
 		return nil, err
 	}
 	return cfgManagerParams, nil

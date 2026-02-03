@@ -457,3 +457,10 @@ const (
 	// FailedComponentPhase indicates that there are some pods of the component not in a 'Running' state.
 	FailedComponentPhase ComponentPhase = "Failed"
 )
+
+// component conditions
+const (
+	ConditionTypeUpdating        = "Updating"
+	ConditionTypeWorkloadRunning = "WorkloadRunning"
+	ConditionTypeHasFailure      = "HasFailure"
+)

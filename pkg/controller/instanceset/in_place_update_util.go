@@ -296,7 +296,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if err != nil {
 		return noOpsPolicy, "", err
 	}
-	proposedRevisions, err := GetRevisions(its.Status.ProposedRevisions)
+	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
 	if err != nil {
 		return noOpsPolicy, "", err
 	}

@@ -193,7 +193,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// serviceaccount name migration process
-	proposedRevisions, err := GetRevisions(its.Status.ProposedRevisions)
+	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

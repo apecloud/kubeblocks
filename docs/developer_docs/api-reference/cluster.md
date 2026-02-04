@@ -33632,14 +33632,16 @@ key is the pod name, value is the revision.</p>
 </tr>
 <tr>
 <td>
-<code>proposedRevisions</code><br/>
+<code>deferredUpdatedRevisions</code><br/>
 <em>
 map[string]string
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>revisions that will be applied during next pod update process</p>
+<p>revisions of desired pod template. But the update process is deferred until another pod update process is triggered.
+i.e. a running pod may still use a revision in <code>updateRevisions</code>.
+key is the pod name, value is the revision.</p>
 </td>
 </tr>
 <tr>

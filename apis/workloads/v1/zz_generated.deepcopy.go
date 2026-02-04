@@ -376,8 +376,8 @@ func (in *InstanceSetStatus) DeepCopyInto(out *InstanceSetStatus) {
 			(*out)[key] = val
 		}
 	}
-	if in.ProposedRevisions != nil {
-		in, out := &in.ProposedRevisions, &out.ProposedRevisions
+	if in.DeferredUpdatedRevisions != nil {
+		in, out := &in.DeferredUpdatedRevisions, &out.DeferredUpdatedRevisions
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

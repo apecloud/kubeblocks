@@ -111,7 +111,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	its.Status.ProposedRevisions = proposedRevisions
+	its.Status.DeferredUpdatedRevisions = proposedRevisions
 	updateRevision := ""
 	if len(instanceRevisionList) > 0 {
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision

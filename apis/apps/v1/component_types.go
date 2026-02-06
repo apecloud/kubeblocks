@@ -460,7 +460,9 @@ const (
 
 // component conditions
 const (
-	ConditionTypeUpdating        = "Updating"
-	ConditionTypeWorkloadRunning = "WorkloadRunning"
-	ConditionTypeHasFailure      = "HasFailure"
+	// ConditionTypeHealthy indicates component controller is applying updates
+	ConditionTypeProgressing = "Progressing"
+
+	// ConditionTypeHealthy indicates its workload resource is updated, running and ready.
+	ConditionTypeHealthy = "Healthy"
 )

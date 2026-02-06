@@ -20,10 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
+	"fmt"
 	"slices"
 
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -41,7 +45,7 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	defer func() { t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster) }()
-	if err := t.reconcileClusterStatus(cluster); err != nil {
+	if err := t.reconcileClusterStatus(transCtx.Context, transCtx.Client, cluster); err != nil {
 		return err
 	}
 	return nil
@@ -53,13 +57,12 @@ func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.Gra
 	}
 }
 
-func (t *clusterStatusTransformer) reconcileClusterStatus(cluster *appsv1.Cluster) error {
+func (t *clusterStatusTransformer) reconcileClusterStatus(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
 	if len(cluster.Status.Components) == 0 && len(cluster.Status.Shardings) == 0 {
 		return nil
 	}
 	oldPhase := t.reconcileClusterPhase(cluster)
-	t.syncClusterConditions(cluster, oldPhase)
-	return nil
+	return t.syncClusterConditions(ctx, cli, cluster, oldPhase)
 }
 
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster) appsv1.ClusterPhase {
@@ -89,29 +92,85 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster
 	return phase
 }
 
-func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster, oldPhase appsv1.ClusterPhase) {
+func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, oldPhase appsv1.ClusterPhase) error {
 	if cluster.Status.Phase == appsv1.RunningClusterPhase && oldPhase != cluster.Status.Phase {
 		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
-		return
-	}
-
-	kindNames := map[string][]string{}
-	for kind, statusMap := range map[string]map[string]appsv1.ClusterComponentStatus{
-		"component": cluster.Status.Components,
-		"sharding":  t.shardingToCompStatus(cluster.Status.Shardings),
-	} {
-		for name, status := range statusMap {
-			if status.Phase == appsv1.FailedComponentPhase {
-				if _, ok := kindNames[kind]; !ok {
-					kindNames[kind] = []string{}
+	} else {
+		kindNames := map[string][]string{}
+		for kind, statusMap := range map[string]map[string]appsv1.ClusterComponentStatus{
+			"component": cluster.Status.Components,
+			"sharding":  t.shardingToCompStatus(cluster.Status.Shardings),
+		} {
+			for name, status := range statusMap {
+				if status.Phase == appsv1.FailedComponentPhase {
+					if _, ok := kindNames[kind]; !ok {
+						kindNames[kind] = []string{}
+					}
+					kindNames[kind] = append(kindNames[kind], name)
 				}
-				kindNames[kind] = append(kindNames[kind], name)
 			}
 		}
+		if len(kindNames) > 0 {
+			meta.SetStatusCondition(&cluster.Status.Conditions, newClusterNotReadyCondition(cluster.Name, kindNames))
+		}
 	}
-	if len(kindNames) > 0 {
-		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterNotReadyCondition(cluster.Name, kindNames))
+
+	setAvailableCondition := func() error {
+		comps, shardingComps, err := listClusterComponents(ctx, cli, cluster)
+		if err != nil {
+			return err
+		}
+		available := true
+		message := ""
+		defer func() {
+			var condition metav1.Condition
+			if available {
+				condition = metav1.Condition{
+					Type:    appsv1.ConditionTypeAvailable,
+					Status:  metav1.ConditionTrue,
+					Message: "All components are either available or not reporting available condition",
+					Reason:  "Available",
+				}
+			} else {
+				condition = metav1.Condition{
+					Type:    appsv1.ConditionTypeAvailable,
+					Status:  metav1.ConditionFalse,
+					Message: message,
+					Reason:  "Unavailable",
+				}
+			}
+
+			meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+		}()
+
+		for _, comp := range comps {
+			compCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+			if compCond != nil {
+				if compCond.Status != metav1.ConditionTrue {
+					available = false
+					message = fmt.Sprintf("component %s is not available", comp.Name)
+					return nil
+				}
+			}
+		}
+
+		for shardingName, comps := range shardingComps {
+			for _, comp := range comps {
+				compCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				if compCond != nil {
+					if compCond.Status != metav1.ConditionTrue {
+						available = false
+						message = fmt.Sprintf("component %s of sharding %s is not available", comp.Name, shardingName)
+						return nil
+					}
+				}
+			}
+		}
+
+		return nil
 	}
+
+	return setAvailableCondition()
 }
 
 func (t *clusterStatusTransformer) shardingToCompStatus(shardingStatus map[string]appsv1.ClusterShardingStatus) map[string]appsv1.ClusterComponentStatus {

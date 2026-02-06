@@ -511,6 +511,13 @@ storageClass:
   ## specified or generated, this value will be ignored.
   ##
   create: true
+  ## @param storageClass.reclaimPolicy -- Specifies the reclaim policy for the storage class.
+  ## Valid options: Retain, Delete. Default is Delete to preserve existing behaviour.
+  ## Set to Retain for production datastore workloads to protect PVCs from deletion.
+  ## Note: reclaimPolicy is inherited by PVs at creation time only — existing PVs must
+  ## be patched individually if this value is changed after provisioning.
+  ##
+  reclaimPolicy: Delete
   mountOptions:
   - noatime
   - nobarrier

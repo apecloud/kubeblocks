@@ -14,7 +14,7 @@ parameters:
   type: {{ .Values.storageClass.provider.aws.volumeType }} # io2, io1, gp3, gp2 are all SSD variant
   "csi.storage.k8s.io/fstype": {{ .Values.storageClass.provider.aws.fsType | default "xfs" }}
 provisioner: ebs.csi.aws.com
-reclaimPolicy: Delete
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "gcp" }}
@@ -30,7 +30,7 @@ parameters:
   type: {{ .Values.storageClass.provider.gcp.volumeType }}
   csi.storage.k8s.io/fstype: {{ .Values.storageClass.provider.gcp.fsType | default "xfs" }}
 provisioner: pd.csi.storage.gke.io
-reclaimPolicy: Delete
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "aliyun" }}
@@ -46,7 +46,7 @@ parameters:
   fstype: {{ .Values.storageClass.provider.aliyun.fsType | default "xfs" }}
   type: {{ .Values.storageClass.provider.aliyun.volumeType }}
 provisioner: diskplugin.csi.alibabacloud.com
-reclaimPolicy: Delete
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "tencentCloud" }}
@@ -59,7 +59,7 @@ metadata:
 parameters:
   ## parameters references: https://cloud.tencent.com/document/product/457/44239, the fsType is not supported by tke.
   type: {{ .Values.storageClass.provider.tencentCloud.volumeType }}
-reclaimPolicy: Delete
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 provisioner: com.tencent.cloud.csi.cbs
 volumeBindingMode: WaitForFirstConsumer
 ---
@@ -78,7 +78,7 @@ parameters:
   kind: {{ .Values.storageClass.provider.azure.volumeType }}
   skuName: Standard_LRS
 provisioner: kubernetes.io/azure-disk
-reclaimPolicy: Delete
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 volumeBindingMode: WaitForFirstConsumer
 ---
 {{- else if eq $cloudProvider "huaweiCloud" }} # huawei cloud
@@ -95,7 +95,7 @@ parameters:
   everest.io/disk-volume-type: {{ .Values.storageClass.provider.huaweiCloud.volumeType }}
   everest.io/passthrough: "true"
 provisioner: everest-csi-provisioner
-reclaimPolicy: Delete
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 ---

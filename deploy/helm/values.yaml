@@ -447,6 +447,7 @@ addonController:
   enabled: true
   jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
+  jobTimeout: "5m"
 
 
 ## @param keepAddons - keep Addon CR objects when delete this chart.

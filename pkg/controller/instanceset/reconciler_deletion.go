@@ -23,6 +23,7 @@ import (
 	"maps"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -49,7 +50,7 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
 
 	// delete secondary objects first
-	if has, err := r.deleteSecondaryObjects(tree, retainPVC); has {
+	if has, err := r.deleteSecondaryObjects(tree, its, retainPVC); has {
 		return kubebuilderx.Continue, err
 	}
 
@@ -58,13 +59,34 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	return kubebuilderx.Continue, nil
 }
 
-func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, retainPVC bool) (bool, error) {
+func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, retainPVC bool) (bool, error) {
 	// secondary objects to be deleted
 	secondaryObjects := maps.Clone(tree.GetSecondaryObjects())
 	if retainPVC {
-		// exclude PVCs from them
+		// exclude PVCs from them and remove InstanceSet's owner references
 		pvcList := tree.List(&corev1.PersistentVolumeClaim{})
-		for _, pvc := range pvcList {
+		for _, pvcObj := range pvcList {
+			pvc, ok := pvcObj.(*corev1.PersistentVolumeClaim)
+			if !ok {
+				continue
+			}
+			// Remove InstanceSet's owner references to prevent garbage collection
+			ownerRefs := pvc.GetOwnerReferences()
+			if len(ownerRefs) > 0 {
+				// Filter out owner references that belong to this InstanceSet
+				filteredRefs := make([]metav1.OwnerReference, 0, len(ownerRefs))
+				for _, ref := range ownerRefs {
+					if ref.UID != its.UID {
+						filteredRefs = append(filteredRefs, ref)
+					}
+				}
+				if len(filteredRefs) != len(ownerRefs) {
+					pvc.SetOwnerReferences(filteredRefs)
+					if err := tree.Update(pvc); err != nil {
+						return true, err
+					}
+				}
+			}
 			name, err := model.GetGVKName(pvc)
 			if err != nil {
 				return true, err

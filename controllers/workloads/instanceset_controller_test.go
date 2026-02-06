@@ -344,6 +344,11 @@ var _ = Describe("InstanceSet Controller", func() {
 			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
 			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				// verify owner references are cleared to prevent garbage collection
+				ownerRefs := pvc.GetOwnerReferences()
+				g.Expect(ownerRefs).Should(HaveLen(0), "Owner references should be cleared when retention policy is Retain")
+			})).Should(Succeed())
 		})
 
 		It("when scaled - delete", func() {
@@ -405,6 +410,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+				// verify owner references still exist since InstanceSet is not deleted
+				ownerRefs := pvc.GetOwnerReferences()
+				g.Expect(ownerRefs).Should(HaveLen(1), "Owner references should still exist when scaling down and retention policy is Retain")
+				g.Expect(ownerRefs[0].Kind).Should(Equal("InstanceSet"))
 			})).Should(Succeed())
 		})
 	})

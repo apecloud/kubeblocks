@@ -716,11 +716,13 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
-&ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
+&ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
-it will also be bound to a default role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+it will also be bound to a default cluster role named
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.</p>
 </td>
@@ -3356,11 +3358,13 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
-&ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
+&ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
-it will also be bound to a default role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+it will also be bound to a default cluster role named
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.</p>
 </td>
@@ -6804,11 +6808,13 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
-&ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
+&ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
-it will also be bound to a default role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+it will also be bound to a default cluster role named
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.</p>
 </td>
@@ -33621,6 +33627,20 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>updateRevisions, if not empty, indicates the new version of the InstanceSet used to generate the underlying workload.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deferredUpdatedRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>revisions of desired pod template. But the update process is deferred until another pod update process is triggered.
+i.e. a running pod may still use a revision in <code>updateRevisions</code>.
 key is the pod name, value is the revision.</p>
 </td>
 </tr>

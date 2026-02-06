@@ -296,6 +296,10 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if err != nil {
 		return noOpsPolicy, "", err
 	}
+	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
+	if err != nil {
+		return noOpsPolicy, "", err
+	}
 
 	// In case of the ITS is stopping and replicas is 0, we can't compose the instance template and instance
 	// to choose the update policy, so we use the pod update policy directly.
@@ -327,7 +331,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	}
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
-	if getPodRevision(pod) != updateRevisions[pod.Name] {
+	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
 		return recreatePolicy, specUpdatePolicy, nil
 	}
 

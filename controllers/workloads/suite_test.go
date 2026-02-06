@@ -24,8 +24,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -52,6 +55,10 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 
+func init() {
+	// viper.Set("ENABLE_DEBUG_LOG", "true")
+}
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -59,7 +66,14 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+			o.Level = zapcore.Level(-5)
+		}))
+	} else {
+		logf.SetLogger(logr.New(logf.NullLogSink{}))
+	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

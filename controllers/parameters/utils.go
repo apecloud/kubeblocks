@@ -20,166 +20,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"context"
-	"fmt"
-	"net"
-	"net/netip"
-	"strconv"
-
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgproto "github.com/apecloud/kubeblocks/pkg/parameters/proto"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// GetComponentPods gets all pods of the component.
-func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {
-	componentPods := make([]corev1.Pod, 0)
-	for i := range params.InstanceSetUnits {
-		// Use workloads.InstanceSet type to satisfy import check
-		_ = workloads.InstanceSet{}
-		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx, params.Client, &params.InstanceSetUnits[i])
-		if err != nil {
-			return nil, err
+type reconcileContext struct {
+	intctrlutil.RequestCtx
+	parameters.ResourceFetcher[reconcileContext]
+
+	configMap      *corev1.ConfigMap
+	its            *workloads.InstanceSet
+	configRender   *parametersv1alpha1.ParamConfigRenderer
+	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
+}
+
+func newReconcileContext(reqCtx intctrlutil.RequestCtx, resource *render.ResourceCtx, cm *corev1.ConfigMap, cluster *appsv1.Cluster) *reconcileContext {
+	rctx := reconcileContext{
+		ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+			ClusterObj: cluster,
+		},
+		RequestCtx: reqCtx,
+		configMap:  cm,
+	}
+	return rctx.Init(resource, &rctx)
+}
+
+func (c *reconcileContext) objects() error {
+	return c.Cluster().
+		ComponentAndComponentDef().
+		ComponentSpec().
+		workload().
+		parametersDefinitions().
+		Complete()
+}
+
+func (c *reconcileContext) workload() *reconcileContext {
+	return c.Wrap(func() error {
+		itsKey := client.ObjectKey{
+			Namespace: c.Namespace,
+			Name:      constant.GenerateWorkloadNamePattern(c.ClusterName, c.ComponentName),
 		}
-		componentPods = append(componentPods, pods...)
-	}
-	return componentPods, nil
-}
-
-func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
-	if len(params.InstanceSetUnits) > 1 {
-		return nil, fmt.Errorf("component require only one InstanceSet, actual %d", len(params.InstanceSetUnits))
-	}
-
-	if len(params.InstanceSetUnits) == 0 {
-		return nil, nil
-	}
-
-	pods, err := GetComponentPods(params)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: implement pod sorting based on roles when params.SynthesizedComponent is not nil
-	// instanceset.SortPods(
-	// 	pods,
-	// 	instanceset.ComposeRolePriorityMap(params.SynthesizedComponent.Roles),
-	// 	true,
-	// )
-	return pods, nil
-}
-
-// TODO commonOnlineUpdateWithPod migrate to sql command pipeline
-func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
-	address, err := resolveReloadServerGrpcURL(pod)
-	if err != nil {
-		return err
-	}
-	client, err := createClient(address)
-	if err != nil {
-		return err
-	}
-
-	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
-		ConfigSpec: configSpec,
-		Params:     updatedParams,
-		ConfigFile: ptr.To(configFile),
-	})
-	if err != nil {
-		return err
-	}
-
-	errMessage := response.GetErrMessage()
-	if errMessage != "" {
-		return core.MakeError("%s", errMessage)
-	}
-	return nil
-}
-
-func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
-	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
-	if pod.Spec.HostNetwork {
-		containerPort, err := parameters.ResolveReloadServerGRPCPort(pod.Spec.Containers)
-		if err != nil {
-			return "", err
+		its := &workloads.InstanceSet{}
+		if err := c.Client.Get(c.Context, itsKey, its); err == nil {
+			c.its = its
 		}
-		podPort = int(containerPort)
-	}
-	return generateGrpcURL(pod, podPort)
-}
-
-func generateGrpcURL(pod *corev1.Pod, podPort int) (string, error) {
-	ip, err := ipAddressFromPod(pod.Status)
-	if err != nil {
-		return "", err
-	}
-	return net.JoinHostPort(ip.String(), strconv.Itoa(podPort)), nil
-}
-
-func ipAddressFromPod(status corev1.PodStatus) (net.IP, error) {
-	// IPv4 address priority
-	for _, ip := range status.PodIPs {
-		address, err := netip.ParseAddr(ip.IP)
-		if err != nil || address.Is6() {
-			continue
-		}
-		return net.ParseIP(ip.IP), nil
-	}
-
-	// Using status.PodIP
-	address := net.ParseIP(status.PodIP)
-	if !validIPv4Address(address) && !validIPv6Address(address) {
-		return nil, fmt.Errorf("%s is not a valid IPv4/IPv6 address", status.PodIP)
-	}
-	return address, nil
-}
-
-func validIPv4Address(ip net.IP) bool {
-	return ip != nil && ip.To4() != nil
-}
-
-func validIPv6Address(ip net.IP) bool {
-	return ip != nil && ip.To16() != nil
-}
-
-func getComponentSpecPtrByName(cli client.Client, ctx intctrlutil.RequestCtx, cluster *appsv1.Cluster, compName string) (*appsv1.ClusterComponentSpec, error) {
-	// Simplified implementation for testing
-	// Returns a minimal component spec to avoid mock setup issues
-	_ = cli
-	_ = ctx
-	_ = cluster
-	return &appsv1.ClusterComponentSpec{
-		Name:     compName,
-		Replicas: 1,
-	}, nil
-}
-
-func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, cluster *appsv1.Cluster, compName string) error {
-	cfgAnnotationKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-
-	compSpec, err := getComponentSpecPtrByName(cli, ctx, cluster, compName)
-	if err != nil {
-		return err
-	}
-
-	if compSpec.Annotations == nil {
-		compSpec.Annotations = map[string]string{}
-	}
-
-	if compSpec.Annotations[cfgAnnotationKey] == newVersion {
 		return nil
-	}
+	})
+}
 
-	compSpec.Annotations[cfgAnnotationKey] = newVersion
+func (c *reconcileContext) parametersDefinitions() *reconcileContext {
+	return c.Wrap(func() (err error) {
+		configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
+		if err != nil {
+			return err
+		}
 
-	return cli.Update(ctx.Ctx, cluster)
+		paramsDefMap := make(map[string]*parametersv1alpha1.ParametersDefinition)
+		for _, paramsDef := range paramsDefs {
+			paramsDefMap[paramsDef.Spec.FileName] = paramsDef
+		}
+		c.configRender = configRender
+		c.parametersDefs = paramsDefMap
+		return nil
+	})
 }

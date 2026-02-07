@@ -26,7 +26,6 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
@@ -36,18 +35,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
-	"github.com/apecloud/kubeblocks/pkg/controller/render"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 	"github.com/apecloud/kubeblocks/pkg/parameters/validate"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type Result struct {
@@ -330,229 +322,6 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 		return *pd.ReloadStaticParamsBeforeRestart
 	}
 	return false
-}
-
-// BuildReloadActionContainer build the configmgr sidecar container and update it
-// into PodSpec if configuration reload option is on
-func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, itsObj client.Object) error {
-	var (
-		err         error
-		buildParams *cfgcm.CfgManagerBuildParams
-
-		podSpec      = synthesizedComp.PodSpec
-		configSpecs  = component.ConfigTemplates(synthesizedComp)
-		configRender *parametersv1alpha1.ParamConfigRenderer
-		paramsDefs   []*parametersv1alpha1.ParametersDefinition
-	)
-
-	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
-	if len(volumeDirs) == 0 {
-		return nil
-	}
-	if configRender, paramsDefs, err = ResolveCmpdParametersDefs(resourceCtx.Context, resourceCtx.Client, cmpd); err != nil {
-		return err
-	}
-	if configRender == nil || len(configRender.Spec.Configs) == 0 {
-		return nil
-	}
-
-	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
-	if err != nil {
-		return err
-	}
-	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
-	// The files are being updated on the host VM, but can't be updated in the container.
-	configSpecMetas = cfgcm.FilterSupportReloadActionConfigSpecs(configSpecMetas, volumeDirs)
-	if len(configSpecMetas) == 0 {
-		return nil
-	}
-	if buildParams, err = buildConfigManagerParams(resourceCtx.Client, resourceCtx.Context, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
-		return err
-	}
-	if buildParams == nil {
-		return nil
-	}
-
-	container, err := factory.BuildCfgManagerContainer(buildParams)
-	if err != nil {
-		return err
-	}
-	updateEnvPath(container, buildParams)
-	updateCfgManagerVolumes(podSpec, buildParams)
-
-	// Add sidecar to podTemplate
-	podSpec.Containers = append(podSpec.Containers, *container)
-	if len(buildParams.ToolsContainers) > 0 {
-		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
-	}
-
-	getRunningIts := func() *workloadsv1.InstanceSet {
-		if itsObj == nil {
-			return nil
-		}
-		return itsObj.(*workloadsv1.InstanceSet)
-	}
-
-	// Update the runningITS container in advance to prevent it from being rollback.
-	if runningITS := getRunningIts(); runningITS != nil {
-		for i, c := range runningITS.Spec.Template.Spec.Containers {
-			if c.Name == container.Name {
-				runningITS.Spec.Template.Spec.Containers[i].Image = container.Image
-				break
-			}
-		}
-		for _, tc := range buildParams.ToolsContainers {
-			for j, ic := range runningITS.Spec.Template.Spec.InitContainers {
-				if ic.Name == tc.Name {
-					runningITS.Spec.Template.Spec.InitContainers[j].Image = tc.Image
-					break
-				}
-			}
-		}
-	}
-
-	filter := func(c *corev1.Container) bool {
-		names := []string{container.Name}
-		for _, cc := range buildParams.ToolsContainers {
-			names = append(names, cc.Name)
-		}
-		return slices.Contains(names, c.Name)
-	}
-	component.InjectEnvVars4Containers(synthesizedComp, synthesizedComp.EnvVars, synthesizedComp.EnvFromSources, filter)
-	return nil
-}
-
-func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
-	if len(params.ScriptVolume) == 0 {
-		return
-	}
-	scriptPath := make([]string, 0, len(params.ScriptVolume))
-	for _, volume := range params.ScriptVolume {
-		if vm := cfgcm.FindVolumeMount(params.Volumes, volume.Name); vm != nil {
-			scriptPath = append(scriptPath, vm.MountPath)
-		}
-	}
-	if len(scriptPath) != 0 {
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  cfgcm.KBConfigManagerPathEnv,
-			Value: strings.Join(scriptPath, ":"),
-		})
-	}
-}
-
-func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
-	scriptVolumes := configManager.ScriptVolume
-	if len(scriptVolumes) == 0 && len(configManager.CMConfigVolumes) == 0 {
-		return
-	}
-
-	podVolumes := podSpec.Volumes
-	for _, vm := range []*[]corev1.Volume{
-		&configManager.ScriptVolume,
-		&configManager.CMConfigVolumes,
-	} {
-		for i := range *vm {
-			podVolumes = intctrlutil.CreateVolumeIfNotExist(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
-				return (*vm)[i]
-			})
-		}
-	}
-	podSpec.Volumes = podVolumes
-}
-
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentFileTemplate) ([]corev1.VolumeMount, []appsv1.ComponentFileTemplate) {
-	// Ignore useless configTemplate
-	usingConfigSpecs := make([]appsv1.ComponentFileTemplate, 0, len(configSpecs))
-	config2Containers := make(map[string][]*corev1.Container)
-	for _, configSpec := range configSpecs {
-		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
-		if len(usingContainers) == 0 {
-			continue
-		}
-		usingConfigSpecs = append(usingConfigSpecs, configSpec)
-		config2Containers[configSpec.Name] = usingContainers
-	}
-
-	// No container using any config template
-	if len(usingConfigSpecs) == 0 {
-		log.Log.Info(fmt.Sprintf("configSpec config is not used by any container, and pass. configSpec configs: %v", configSpecs))
-		return nil, nil
-	}
-
-	// Find out which configurations are used by the container
-	volumeDirs := make([]corev1.VolumeMount, 0, len(configSpecs)+1)
-	for _, configSpec := range usingConfigSpecs {
-		sets := util.NewSet()
-		for _, container := range config2Containers[configSpec.Name] {
-			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
-			if volume != nil && !sets.InArray(volume.Name) {
-				volumeDirs = append(volumeDirs, *volume)
-				sets.Add(volume.Name)
-			}
-		}
-	}
-	return volumeDirs, usingConfigSpecs
-}
-
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster,
-	comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
-	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-		ManagerName:            constant.ConfigSidecarName,
-		ComponentName:          comp.Name,
-		Image:                  viper.GetString(constant.KBToolsImage),
-		Volumes:                volumeDirs,
-		Cluster:                cluster,
-		ConfigSpecsBuildParams: configSpecBuildParams,
-		ContainerPort:          viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
-	}
-
-	if podSpec.HostNetwork {
-		containerPort, err := allocConfigManagerHostPort(comp)
-		if err != nil {
-			return nil, err
-		}
-		cfgManagerParams.ContainerPort = containerPort
-	}
-
-	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams); err != nil {
-		return nil, err
-	}
-	if err := buildReloadToolsContainer(cfgManagerParams, podSpec, comp.ServiceVersion); err != nil {
-		return nil, err
-	}
-	return cfgManagerParams, nil
-}
-
-func ResolveReloadServerGRPCPort(containers []corev1.Container) (int32, error) {
-	for _, container := range containers {
-		if container.Name != constant.ConfigSidecarName {
-			continue
-		}
-		if port, ok := findPortByPortName(container); ok {
-			return port, nil
-		}
-	}
-	return constant.InvalidContainerPort, core.MakeError("failed to find config manager grpc port, please add named config-manager port")
-}
-
-func allocConfigManagerHostPort(comp *component.SynthesizedComponent) (int32, error) {
-	pm := intctrlutil.GetPortManager(comp.Network)
-	portKey := pm.PortKey(comp.ClusterName, comp.Name, constant.ConfigSidecarName, constant.ConfigManagerPortName)
-	port, err := pm.AllocatePort(portKey)
-	if err != nil {
-		return constant.InvalidContainerPort, err
-	}
-	return port, nil
-}
-
-func findPortByPortName(container corev1.Container) (int32, bool) {
-	for _, port := range container.Ports {
-		if port.Name == constant.ConfigManagerPortName {
-			return port.ContainerPort, true
-		}
-	}
-	return constant.InvalidContainerPort, false
 }
 
 // UpdateConfigPayload updates the configuration payload

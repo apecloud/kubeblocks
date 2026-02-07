@@ -355,10 +355,24 @@ type ToolConfig struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
+	// Defines image mapping for different service versions.
+	// +optional
+	ImageMappings []ImageMapping `json:"imageMappings,omitempty"`
+
 	// Specifies the command to be executed by the init container.
 	//
 	// +optional
 	Command []string `json:"command,omitempty"`
+}
+
+type ImageMapping struct {
+	// ServiceVersions is a list of service versions that this mapping applies to.
+	// +kubebuilder:validation:Required
+	ServiceVersions []string `json:"serviceVersions"`
+
+	// Image is the container image addresses to use for the matched service versions.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
 }
 
 // DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.

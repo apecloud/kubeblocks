@@ -1510,6 +1510,45 @@ IniConfig
 </tr>
 </tbody>
 </table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ImageMapping">ImageMapping
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ToolConfig">ToolConfig</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceVersions</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>ServiceVersions is a list of service versions that this mapping applies to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Image is the container image addresses to use for the matched service versions.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.IniConfig">IniConfig
 </h3>
 <p>
@@ -2988,6 +3027,20 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the tool container image.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>imageMappings</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ImageMapping">
+[]ImageMapping
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines image mapping for different service versions.</p>
 </td>
 </tr>
 <tr>

@@ -128,7 +128,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 				condition = metav1.Condition{
 					Type:    appsv1.ConditionTypeAvailable,
 					Status:  metav1.ConditionTrue,
-					Message: "All components are either available or not reporting available condition",
+					Message: "All components are available",
 					Reason:  "Available",
 				}
 			} else {

@@ -111,8 +111,8 @@ func (t *componentStatusTransformer) init(transCtx *componentTransformContext, d
 
 // reconcileStatus reconciles component status.
 func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
-	if err := t.reconcileStatusCondition(transCtx); err != nil {
-		return err
+	if t.runningITS == nil {
+		return t.reconcileStatusCondition(transCtx)
 	}
 
 	// check if the ITS is deleting
@@ -180,7 +180,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
 	}
 
-	return nil
+	return t.reconcileStatusCondition(transCtx)
 }
 
 func (t *componentStatusTransformer) workloadGeneration() (*int64, error) {

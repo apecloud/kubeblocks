@@ -17,21 +17,12 @@ limitations under the License.
 package constant
 
 const (
-	ConfigManagerToolPath = "/bin/reloader"
-
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
-
-	// CMInsLastReconfigurePhaseKey defines the current phase
-	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
 	// ConfigurationRevision defines the current revision
 	// TODO support multi version
 	ConfigurationRevision          = "config.kubeblocks.io/configuration-revision"
 	LastConfigurationRevisionPhase = "config.kubeblocks.io/revision-reconcile-phase"
-
-	// Deprecated: only compatible with version 0.6, will be removed in 0.8
-	// CMInsEnableRerenderTemplateKey is used to enable rerender template
-	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 )
 
 const (
@@ -50,22 +41,15 @@ const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
-	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 )
 
 const (
-	ConfigSidecarName        = "config-manager"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
 
 	ConfigInstanceType = "instance"
-
-	ReconfigureManagerSource = "manager"
-	ReconfigureUserSource    = "ops"
-
-	ConfigManagerPortName = "config-manager"
 )
 
 const (

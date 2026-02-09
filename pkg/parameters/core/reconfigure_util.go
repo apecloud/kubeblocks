@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"slices"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -192,46 +191,6 @@ func IsDynamicParameter(paramName string, paramsDef *parametersv1alpha1.Paramete
 		return !slices.Contains(paramsDef.StaticParameters, paramName)
 	}
 	return false
-}
-
-// IsParametersUpdateFromManager checks if the parameters are updated from manager
-func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
-	annotation := cm.ObjectMeta.Annotations
-	if annotation == nil {
-		return false
-	}
-	v := annotation[constant.KBParameterUpdateSourceAnnotationKey]
-	return v == constant.ReconfigureManagerSource
-}
-
-// IsNotUserReconfigureOperation checks if the parameters are updated from operation
-func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
-	labels := cm.GetLabels()
-	annotations := cm.GetAnnotations()
-	if labels == nil || annotations == nil {
-		return false
-	}
-	if _, ok := annotations[constant.CMInsEnableRerenderTemplateKey]; !ok {
-		return false
-	}
-	lastReconfigurePhase := labels[constant.CMInsLastReconfigurePhaseKey]
-	if annotations[constant.KBParameterUpdateSourceAnnotationKey] != constant.ReconfigureManagerSource {
-		return false
-	}
-	return lastReconfigurePhase == "" || ReconfigureCreatedPhase == lastReconfigurePhase
-}
-
-// SetParametersUpdateSource sets the parameters' update source
-// manager: parameter only updated from manager
-// external-template: parameter only updated from template
-// ops: parameter updated from operation
-func SetParametersUpdateSource(cm *corev1.ConfigMap, source string) {
-	annotation := cm.GetAnnotations()
-	if annotation == nil {
-		annotation = make(map[string]string)
-	}
-	annotation[constant.KBParameterUpdateSourceAnnotationKey] = source
-	cm.SetAnnotations(annotation)
 }
 
 func IsSchedulableConfigResource(object client.Object) bool {

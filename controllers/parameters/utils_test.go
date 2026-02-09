@@ -72,10 +72,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 			constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		).
-		AddAnnotations(
-			constant.KBParameterUpdateSourceAnnotationKey, constant.ReconfigureManagerSource,
-			constant.ConfigurationRevision, "1",
-			constant.CMInsEnableRerenderTemplateKey, "true").
+		AddAnnotations(constant.ConfigurationRevision, "1").
 		AddConfigFile(envTestFileKey, "abcde=1234").
 		Create(&testCtx).
 		GetObject()

@@ -2179,5 +2179,56 @@ var _ = Describe("Component Controller", func() {
 		It("reconfigure - restart", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
 		})
+
+		It("config hash generation - scenario 1 (user modifies variables)", func() {
+			By("create component with config template")
+			createCompObj(defaultCompName, compDefObj.Name, nil)
+
+			By("wait for ConfigMap creation")
+			cmName := fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(clusterName, defaultCompName), fileTemplate)
+			cmKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: cmName}
+			var configMap *corev1.ConfigMap
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
+				configMap = cm
+			}).Should(Succeed())
+
+			By("verify ConfigHash annotation is generated automatically")
+			Expect(configMap.Annotations).To(HaveKey(constant.CMInsConfigurationHashLabelKey))
+			configHash := configMap.Annotations[constant.CMInsConfigurationHashLabelKey]
+			Expect(configHash).NotTo(BeEmpty())
+
+			By("verify ConfigHash is stored in component status")
+			// TODO: check if ConfigHash is propagated to component/ITS status
+		})
+
+		It("config hash generation - scenario 2 (parameters controller provides hash)", func() {
+			By("create component with pre-defined ConfigHash")
+			preDefinedHash := "test-predefined-hash-123"
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetConfigs([]kbappsv1.ClusterComponentConfig{
+					{
+						Name:       &fileTemplate,
+						ConfigHash: &preDefinedHash,
+					},
+				})
+			})
+
+			By("wait for ConfigMap creation")
+			cmName := fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(clusterName, defaultCompName), fileTemplate)
+			cmKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: cmName}
+			var configMap *corev1.ConfigMap
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
+				configMap = cm
+			}).Should(Succeed())
+
+			By("verify pre-defined ConfigHash is used (not regenerated)")
+			Expect(configMap.Annotations).To(HaveKey(constant.CMInsConfigurationHashLabelKey))
+			actualHash := configMap.Annotations[constant.CMInsConfigurationHashLabelKey]
+			Expect(actualHash).To(Equal(preDefinedHash))
+		})
 	})
 })

@@ -148,16 +148,12 @@ func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return checkConfigLabels(object, reconfigureRequiredLabels)
-}
-
-func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 	labels := object.GetLabels()
 	if len(labels) == 0 {
 		return false
 	}
 
-	for _, label := range requiredLabs {
+	for _, label := range reconfigureRequiredLabels {
 		if _, ok := labels[label]; !ok {
 			return false
 		}
@@ -601,15 +597,6 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		return false, err
 	}
 	config.ObjectMeta.Labels[constant.CMInsConfigurationHashLabelKey] = hash
-
-	newReconfigurePhase := config.ObjectMeta.Labels[constant.CMInsLastReconfigurePhaseKey]
-	if newReconfigurePhase == "" {
-		newReconfigurePhase = core.ReconfigureCreatedPhase
-	}
-	if core.ReconfigureNoChangeType != reconfigurePhase && !core.IsParametersUpdateFromManager(config) {
-		newReconfigurePhase = reconfigurePhase
-	}
-	config.ObjectMeta.Labels[constant.CMInsLastReconfigurePhaseKey] = newReconfigurePhase
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)

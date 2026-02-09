@@ -42,7 +42,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 )
 
 type Task struct {
@@ -334,7 +333,7 @@ func updateConfigLabels(obj *corev1.ConfigMap,
 	if obj.Labels == nil {
 		obj.Labels = make(map[string]string)
 	}
-	hash, _ := cfgutil.ComputeHash(obj.Data)
+	hash, _ := intctrlutil.ComputeHash(obj.Data)
 	obj.Labels[constant.CMInsConfigurationHashLabelKey] = hash
 	obj.Labels[constant.CMConfigurationSpecProviderLabelKey] = item.Name
 	obj.Labels[constant.CMConfigurationTemplateNameLabelKey] = item.ConfigSpec.Template

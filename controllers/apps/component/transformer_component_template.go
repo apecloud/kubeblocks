@@ -188,16 +188,20 @@ func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*co
 
 func buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
 	objs := make(map[string]*corev1.ConfigMap)
-	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+	for i, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		// If the file template is managed by external, the cm object has been rendered by the external manager.
 		if isExternalManaged(tpl) {
 			continue
 		}
+
 		obj, err := buildFileTemplateObject(transCtx, tpl)
 		if err != nil {
 			return nil, err
 		}
 		objs[obj.Name] = obj
+
+		configHash := obj.Annotations[constant.CMInsConfigurationHashLabelKey]
+		transCtx.SynthesizeComponent.FileTemplates[i].ConfigHash = &configHash
 	}
 	return objs, nil
 }
@@ -213,12 +217,22 @@ func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.
 		return nil, err
 	}
 
+	configHash := tpl.ConfigHash
+	if configHash == nil {
+		hash, err1 := intctrlutil.ComputeHash(data)
+		if err1 != nil {
+			return nil, err1
+		}
+		configHash = &hash
+	}
+
 	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
 	obj := builder.NewConfigMapBuilder(synthesizedComp.Namespace, objName).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(constant.GetCompLabelsWithDef(synthesizedComp.ClusterName, synthesizedComp.Name, compDef.Name)).
 		AddLabels(kubeBlockFileTemplateLabelKey, "true").
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotations(constant.CMInsConfigurationHashLabelKey, *configHash).
 		SetData(data).
 		GetObject()
 	if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {

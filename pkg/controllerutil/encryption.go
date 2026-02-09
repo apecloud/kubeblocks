@@ -20,15 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/hkdf"
+	k8srandutil "k8s.io/apimachinery/pkg/util/rand"
 )
 
 const purposeEncryptionKey = "encryption"
@@ -102,4 +107,20 @@ func (e *encryptor) Decrypt(ciphertext []byte) (string, error) {
 		return "", err
 	}
 	return string(plaintext), nil
+}
+
+func ComputeHash(object interface{}) (string, error) {
+	str, err := json.Marshal(object)
+	if err != nil {
+		return "", errors.Wrap(err, "fail to marshal object")
+	}
+
+	// hasher := sha1.New()
+	hasher := fnv.New32()
+	if _, err = io.Copy(hasher, bytes.NewReader(str)); err != nil {
+		return "", errors.Wrapf(err, "fail to copy data to hasher")
+	}
+
+	sha := hasher.Sum32()
+	return k8srandutil.SafeEncodeString(fmt.Sprint(sha)), nil
 }

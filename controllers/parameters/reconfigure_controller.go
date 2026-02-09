@@ -49,7 +49,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -424,7 +423,7 @@ func (r *ReconfigureReconciler) succeed(rctx *reconcileContext, policy string, s
 }
 
 func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]string) *string {
-	hash, err := cfgutil.ComputeHash(data)
+	hash, err := intctrlutil.ComputeHash(data)
 	if err != nil {
 		if reqCtx != nil {
 			reqCtx.Log.Error(err, "failed to get configuration version!")
@@ -597,7 +596,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
 	}
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
-	hash, err := cfgutil.ComputeHash(config.Data)
+	hash, err := intctrlutil.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
 	}

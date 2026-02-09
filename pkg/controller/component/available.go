@@ -109,7 +109,7 @@ func (h *AvailableEventHandler) available(ctx context.Context, cli client.Client
 
 func (h *AvailableEventHandler) unavailable(ctx context.Context, cli client.Client,
 	recorder record.EventRecorder, compCopy, comp *appsv1.Component, message string) error {
-	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionFalse, "Unavailable", message)
+	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionFalse, "ProbeCheckFail", message)
 }
 
 func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, recorder record.EventRecorder,
@@ -575,6 +575,9 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 	// use phases as default policy
 	return appsv1.ComponentAvailable{
 		// TODO: replicas == 0, stopped, updating, abnormal?
-		WithPhases: pointer.String(string(appsv1.RunningComponentPhase)),
+		WithPhases: pointer.String(strings.Join(
+			[]string{string(appsv1.RunningComponentPhase), string(appsv1.UpdatingComponentPhase)},
+			",",
+		)),
 	}
 }

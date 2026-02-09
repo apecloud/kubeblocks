@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -159,10 +161,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		}, phase)
 	}()
 
-	transCtx.Logger.Info(
-		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v",
-			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion))
-
 	switch {
 	case isDeleting:
 		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
@@ -242,6 +240,9 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 }
 
 func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
+	if t.runningITS == nil {
+		return false
+	}
 	for _, inst := range t.runningITS.Status.InstanceStatus {
 		if inst.VolumeExpansion {
 			return true
@@ -252,6 +253,10 @@ func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
 
 // hasFailedPod checks if the instance set has failed pod.
 func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.ComponentMessageMap) {
+	if t.runningITS == nil {
+		return false, nil
+	}
+
 	messages := appsv1alpha1.ComponentMessageMap{}
 	// check InstanceFailure condition
 	hasFailedPod := meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
@@ -322,7 +327,91 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 }
 
 func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
-	return t.reconcileAvailableCondition(transCtx)
+	return errors.Join(
+		t.reconcileAvailableCondition(transCtx),
+		t.reconcileProgressingCondition(transCtx),
+		t.reconcileHealthyCondition(transCtx),
+	)
+}
+
+func (t *componentStatusTransformer) checkNSetCondition(
+	eventRecorder record.EventRecorder,
+	conditionType string,
+	checker func() (status metav1.ConditionStatus, reason, message string, err error),
+) error {
+	status, reason, message, err := checker()
+	if err != nil {
+		return err
+	}
+	cond := metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		ObservedGeneration: t.comp.Generation,
+		Reason:             reason,
+		Message:            message,
+	}
+	if meta.SetStatusCondition(&t.comp.Status.Conditions, cond) {
+		eventRecorder.Event(t.comp, corev1.EventTypeNormal, reason, message)
+	}
+	return nil
+}
+
+func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *componentTransformContext) error {
+	return t.checkNSetCondition(
+		transCtx.EventRecorder,
+		appsv1.ConditionTypeProgressing,
+		func() (status metav1.ConditionStatus, reason string, message string, err error) {
+			hasRunningScaleOut, _, err := t.hasScaleOutRunning(transCtx)
+			if err != nil {
+				return "", "", "", err
+			}
+			if hasRunningScaleOut {
+				return metav1.ConditionTrue, "ScaleOutRunning", "component scale out is running", nil
+			}
+
+			hasRunningVolumeExpansion := t.hasVolumeExpansionRunning()
+			if hasRunningVolumeExpansion {
+				return metav1.ConditionTrue, "VolumeExpansionRunning", "component volume expansion is running", nil
+			}
+
+			if !checkPostProvisionDone(transCtx) {
+				return metav1.ConditionTrue, "PostProvisioning", "component is running post-provision action", nil
+			}
+
+			return metav1.ConditionFalse, "NotProgressing", "", nil
+		},
+	)
+}
+
+func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *componentTransformContext) error {
+	return t.checkNSetCondition(
+		transCtx.EventRecorder,
+		appsv1.ConditionTypeHealthy,
+		func() (status metav1.ConditionStatus, reason string, message string, err error) {
+			if t.runningITS == nil {
+				return metav1.ConditionFalse, "WorkloadNotExist", "waiting for workload to be created", nil
+			}
+			if !t.isWorkloadUpdated() {
+				return metav1.ConditionFalse, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
+			}
+			if !t.runningITS.IsInstanceSetReady() {
+				return metav1.ConditionFalse, "WorkloadNotReady", "workload not ready", nil
+			}
+			if !t.runningITS.IsRoleProbeDone() {
+				return metav1.ConditionFalse, "RoleProbeNotDone", "some instances do not have roles", nil
+			}
+
+			_, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
+			if err != nil {
+				return "", "", "", err
+			}
+			if hasFailedScaleOut {
+				return metav1.ConditionFalse, "ScaleOutFailure", "component scale out has failure", nil
+			}
+
+			return metav1.ConditionTrue, "Healthy", "workload is healthy", nil
+		},
+	)
 }
 
 func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) error {
@@ -331,74 +420,57 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 		return nil
 	}
 
-	var (
-		comp                        = transCtx.Component
-		status, status1, status2    metav1.ConditionStatus
-		reason, reason1, reason2    string
-		message, message1, message2 string
+	return t.checkNSetCondition(
+		transCtx.EventRecorder,
+		appsv1.ConditionTypeAvailable,
+		func() (status metav1.ConditionStatus, reason string, message string, err error) {
+			if policy.WithPhases != nil {
+				status, message1 := t.availableWithPhases(transCtx, transCtx.Component, policy)
+				if status != metav1.ConditionTrue {
+					return status, "PhaseCheckFail", message1, nil
+				}
+				message += message1 + "; "
+			}
+			if policy.WithRole != nil {
+				status, message2 := t.availableWithRole(transCtx, transCtx.Component, policy)
+				if status != metav1.ConditionTrue {
+					return status, "RoleCheckFail", message2, nil
+				}
+				message += message2 + "; "
+			}
+
+			return metav1.ConditionTrue, "Available", message, nil
+		},
 	)
-	if policy.WithPhases != nil {
-		status1, reason1, message1 = t.availableWithPhases(transCtx, comp, policy)
-	}
-	if policy.WithRole != nil {
-		status2, reason2, message2 = t.availableWithRole(transCtx, comp, policy)
-	}
-
-	// merge conditions
-	switch {
-	case policy.WithPhases != nil && policy.WithRole == nil:
-		status, reason, message = status1, reason1, message1
-	case policy.WithPhases == nil && policy.WithRole != nil:
-		status, reason, message = status2, reason2, message2
-	default: // both are not nil
-		if status1 != metav1.ConditionTrue {
-			status, reason, message = status1, reason1, message1
-		} else {
-			status, reason, message = status2, reason2, message2
-		}
-	}
-
-	cond := metav1.Condition{
-		Type:               appsv1.ConditionTypeAvailable,
-		Status:             status,
-		ObservedGeneration: comp.Generation,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
-		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, reason, message)
-	}
-	return nil
 }
 
 func (t *componentStatusTransformer) availableWithPhases(_ *componentTransformContext,
-	comp *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string, string) {
+	comp *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
 	if comp.Status.Phase == "" {
-		return metav1.ConditionUnknown, "Unknown", "the component phase is unknown"
+		return metav1.ConditionUnknown, "the component phase is unknown"
 	}
-	phases := sets.New[string](strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
+	phases := sets.New(strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
 	if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
-		return metav1.ConditionTrue, "Available", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
+		return metav1.ConditionTrue, fmt.Sprintf("the component phase is %s", comp.Status.Phase)
 	}
-	return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
+	return metav1.ConditionFalse, fmt.Sprintf("the component phase is %s", comp.Status.Phase)
 }
 
 func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransformContext,
-	_ *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string, string) {
+	_ *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
 	var its *workloads.InstanceSet
 	if transCtx.RunningWorkload != nil {
 		its = transCtx.RunningWorkload.(*workloads.InstanceSet)
 	}
 	if its == nil {
-		return metav1.ConditionFalse, "Unavailable", "the workload is not present"
+		return metav1.ConditionFalse, "the workload is not present"
 	}
 	for _, inst := range its.Status.InstanceStatus {
 		if len(inst.Role) > 0 {
 			if strings.EqualFold(inst.Role, *policy.WithRole) {
-				return metav1.ConditionTrue, "Available", fmt.Sprintf("the role %s is present", *policy.WithRole)
+				return metav1.ConditionTrue, fmt.Sprintf("the role %s is present", *policy.WithRole)
 			}
 		}
 	}
-	return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the role %s is not present", *policy.WithRole)
+	return metav1.ConditionFalse, fmt.Sprintf("the role %s is not present", *policy.WithRole)
 }

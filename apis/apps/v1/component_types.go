@@ -457,3 +457,12 @@ const (
 	// FailedComponentPhase indicates that there are some pods of the component not in a 'Running' state.
 	FailedComponentPhase ComponentPhase = "Failed"
 )
+
+// component conditions
+const (
+	// ConditionTypeHealthy indicates component controller is applying updates
+	ConditionTypeProgressing = "Progressing"
+
+	// ConditionTypeHealthy indicates its workload resource is updated, running and ready.
+	ConditionTypeHealthy = "Healthy"
+)

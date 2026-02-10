@@ -381,6 +381,13 @@ func (in *InstanceSetStatus) DeepCopyInto(out *InstanceSetStatus) {
 			(*out)[key] = val
 		}
 	}
+	if in.DeferredUpdatedRevisions != nil {
+		in, out := &in.DeferredUpdatedRevisions, &out.DeferredUpdatedRevisions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.TemplatesStatus != nil {
 		in, out := &in.TemplatesStatus, &out.TemplatesStatus
 		*out = make([]InstanceTemplateStatus, len(*in))

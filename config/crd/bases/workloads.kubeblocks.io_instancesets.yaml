@@ -11743,6 +11743,14 @@ spec:
                   currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
                   key is the pod name, value is the revision.
                 type: object
+              deferredUpdatedRevisions:
+                additionalProperties:
+                  type: string
+                description: |-
+                  revisions of desired pod template. But the update process is deferred until another pod update process is triggered.
+                  i.e. a running pod may still use a revision in `updateRevisions`.
+                  key is the pod name, value is the revision.
+                type: object
               initReplicas:
                 description: |-
                   Defines the initial number of instances when the cluster is first initialized.

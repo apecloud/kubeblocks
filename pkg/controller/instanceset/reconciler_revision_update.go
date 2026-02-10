@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -74,12 +75,26 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 
 	// build instance revision list from instance templates
 	var instanceRevisionList []instanceRevision
+	proposedRevisions := make(map[string]string)
 	for instanceName, templateExt := range nameMap {
-		revision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its)
+		updatedRevision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its, nil)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: revision})
+
+		proposedRevision, err := buildInstanceTemplateRevision(&templateExt.PodTemplateSpec, its, func(template *corev1.PodTemplateSpec) {
+			newSAName, ok := its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+			if ok {
+				template.Spec.ServiceAccountName = newSAName
+			}
+		})
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if proposedRevision != updatedRevision {
+			proposedRevisions[instanceName] = proposedRevision
+		}
+		instanceRevisionList = append(instanceRevisionList, instanceRevision{name: instanceName, revision: updatedRevision})
 	}
 	updatedRevisions := make(map[string]string, len(instanceRevisionList))
 	for _, r := range instanceRevisionList {
@@ -92,6 +107,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdateRevisions = revisions
+	proposedRevisions, err = buildRevisions(proposedRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	its.Status.DeferredUpdatedRevisions = proposedRevisions
 	updateRevision := ""
 	if len(instanceRevisionList) > 0 {
 		updateRevision = instanceRevisionList[len(instanceRevisionList)-1].revision

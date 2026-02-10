@@ -142,6 +142,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}

@@ -30,6 +30,9 @@ import (
 
 	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,8 +43,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -69,11 +75,9 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 	rctx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("component", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("componentdefinition", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-
-	rctx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
 	cmpd := &appsv1.ComponentDefinition{}
 	if err := r.Client.Get(rctx.Ctx, rctx.Req.NamespacedName, cmpd); err != nil {
@@ -89,9 +93,14 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr).
-		For(&appsv1.ComponentDefinition{}).
-		Complete(r)
+	b := intctrlutil.NewControllerManagedBy(mgr).
+		For(&appsv1.ComponentDefinition{})
+
+	if viper.GetBool(constant.EnableRBACManager) {
+		b.Owns(&rbacv1.ClusterRole{})
+	}
+
+	return b.Complete(r)
 }
 
 func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
@@ -99,11 +108,6 @@ func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 	res, err := intctrlutil.HandleCRDeletion(rctx, r, cmpd, componentDefinitionFinalizerName, r.deletionHandler(rctx, cmpd))
 	if res != nil {
 		return *res, err
-	}
-
-	if cmpd.Status.ObservedGeneration == cmpd.Generation &&
-		slices.Contains([]appsv1.Phase{appsv1.AvailablePhase}, cmpd.Status.Phase) {
-		return intctrlutil.Reconciled()
 	}
 
 	if err = r.validate(r.Client, rctx, cmpd); err != nil {
@@ -115,6 +119,10 @@ func (r *ComponentDefinitionReconciler) reconcile(rctx intctrlutil.RequestCtx,
 
 	if err = r.immutableHash(r.Client, rctx, cmpd); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
+	}
+
+	if err = r.clusterRole(r.Client, rctx, cmpd); err != nil {
+		return intctrlutil.RequeueWithError(err, rctx.Log, "")
 	}
 
 	if err = r.available(r.Client, rctx, cmpd); err != nil {
@@ -179,6 +187,39 @@ func (r *ComponentDefinitionReconciler) immutableHash(cli client.Client, rctx in
 	}
 	cmpd.Annotations[immutableHashAnnotationKey], _ = r.cmpdHash(cmpd)
 	return cli.Patch(rctx.Ctx, cmpd, patch)
+}
+
+func (r *ComponentDefinitionReconciler) clusterRole(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
+	if !viper.GetBool(constant.EnableRBACManager) {
+		return nil
+	}
+
+	if len(cmpd.Spec.PolicyRules) == 0 {
+		return nil
+	}
+
+	clusterRole := builder.NewClusterRoleBuilder(constant.GenerateDefaultRoleName(cmpd.Name)).
+		AddLabelsInMap(cmpd.Labels).
+		AddAnnotationsInMap(cmpd.Annotations).
+		AddPolicyRules(cmpd.Spec.PolicyRules).
+		GetObject()
+	if err := intctrlutil.SetOwnership(cmpd, clusterRole, model.GetScheme(), ""); err != nil {
+		return err
+	}
+	oldClusterRole := &rbacv1.ClusterRole{}
+	if err := cli.Get(rctx.Ctx, client.ObjectKeyFromObject(clusterRole), oldClusterRole); err != nil {
+		if errors.IsNotFound(err) {
+			return cli.Create(rctx.Ctx, clusterRole)
+		}
+		return err
+	}
+	if equality.Semantic.DeepEqual(oldClusterRole.Labels, clusterRole.Labels) &&
+		equality.Semantic.DeepEqual(oldClusterRole.Annotations, clusterRole.Annotations) &&
+		equality.Semantic.DeepEqual(oldClusterRole.Rules, clusterRole.Rules) {
+		return nil
+	}
+	return cli.Update(rctx.Ctx, clusterRole)
 }
 
 func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -409,8 +450,8 @@ func (r *ComponentDefinitionReconciler) validateAvailable(cli client.Client, rct
 }
 
 func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1.ComponentDefinition) error {
-	phases := sets.New[string](strings.Split(strings.ToLower(*cmpd.Spec.Available.WithPhases), ",")...)
-	supported := sets.New[string](
+	phases := sets.New(strings.Split(strings.ToLower(*cmpd.Spec.Available.WithPhases), ",")...)
+	supported := sets.New(
 		strings.ToLower(string(appsv1.CreatingComponentPhase)),
 		strings.ToLower(string(appsv1.RunningComponentPhase)),
 		strings.ToLower(string(appsv1.UpdatingComponentPhase)),

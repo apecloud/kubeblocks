@@ -882,4 +882,71 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 		})
 	})
+
+	Context("deferred update", func() {
+		It("handles serviceaccount update", func() {
+			createITSObj(itsName, func(factory *testapps.MockInstanceSetFactory) {
+				factory.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				})
+			})
+			By("update proposed sa name")
+			newSAName := "new-sa"
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Annotations[constant.ProposedServiceAccountNameAnnotationKey] = newSAName
+			})).Should(Succeed())
+			podsKey := []types.NamespacedName{
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-0", itsObj.Name),
+				},
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-1", itsObj.Name),
+				},
+			}
+			mockPodReady(podsKey[0].Name)
+			Consistently(testapps.CheckObj(&testCtx, podsKey[0], func(g Gomega, pod *corev1.Pod) {
+				// default sa name is empty
+				g.Expect(pod.Spec.ServiceAccountName).Should(BeEmpty())
+			})).Should(Succeed())
+			By("check scale out does not affect current pod")
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](2)
+			})).Should(Succeed())
+			Consistently(testapps.CheckObj(&testCtx, podsKey[0], func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.Spec.ServiceAccountName).Should(BeEmpty())
+			})).Should(Succeed())
+			By("check new pod uses new sa name")
+			mockPodReady(podsKey[1].Name)
+			Eventually(testapps.CheckObj(&testCtx, podsKey[1], func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.Spec.ServiceAccountName).Should(Equal(newSAName))
+			})).Should(Succeed())
+
+			beforeUpdate := time.Now()
+			time.Sleep(time.Second)
+			By("update its spec")
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.Containers[0].Command = []string{"new-command"}
+			})).Should(Succeed())
+
+			replicas := 2
+			for i := replicas; i > 0; i-- {
+				By("wait new pod created")
+				podKey := podsKey[i-1]
+				Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+					g.Expect(pod.CreationTimestamp.After(beforeUpdate)).Should(BeTrue())
+					g.Expect(pod.Spec.ServiceAccountName).Should(Equal(newSAName))
+				})).Should(Succeed())
+
+				mockPodReady(podKey.Name)
+			}
+
+			By("check its ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.ServiceAccountInUseAnnotationKey, newSAName))
+			})).Should(Succeed())
+		})
+	})
 })

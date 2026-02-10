@@ -102,8 +102,8 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 func (t *componentStatusTransformer) init(transCtx *componentTransformContext, dag *graph.DAG) {
 	t.comp = transCtx.Component
 	t.synthesizeComp = transCtx.SynthesizeComponent
-	t.runningITS = transCtx.RunningWorkload.(*workloads.InstanceSet)
-	t.protoITS = transCtx.ProtoWorkload.(*workloads.InstanceSet)
+	t.runningITS = transCtx.RunningWorkload
+	t.protoITS = transCtx.ProtoWorkload
 	t.dag = dag
 }
 
@@ -386,10 +386,7 @@ func (t *componentStatusTransformer) availableWithPhases(_ *componentTransformCo
 
 func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransformContext,
 	_ *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string, string) {
-	var its *workloads.InstanceSet
-	if transCtx.RunningWorkload != nil {
-		its = transCtx.RunningWorkload.(*workloads.InstanceSet)
-	}
+	its := transCtx.RunningWorkload
 	if its == nil {
 		return metav1.ConditionFalse, "Unavailable", "the workload is not present"
 	}

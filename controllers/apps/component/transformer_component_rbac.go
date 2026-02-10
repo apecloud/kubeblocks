@@ -59,6 +59,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx, _ := ctx.(*componentTransformContext)
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComp := transCtx.SynthesizeComponent
+	comp := transCtx.Component
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
@@ -69,12 +70,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var serviceAccountName string
-	var sa *corev1.ServiceAccount
+	sa := &corev1.ServiceAccount{}
 	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now
 	// the user's responsibility to provide appropriate serviceaccount.
 	if serviceAccountName = transCtx.Component.Spec.ServiceAccountName; serviceAccountName != "" {
 		// if user provided serviceaccount does not exist, raise error
-		sa := &corev1.ServiceAccount{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: serviceAccountName}, sa); err != nil {
 			if errors.IsNotFound(err) {
 				transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeWarning, EventReasonRBACManager,
@@ -88,8 +88,31 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	// user managed sa
+	if serviceAccountName != "" {
+		return t.handleRBACNewRule(transCtx, dag, serviceAccountName)
+	}
+
+	if err := t.handleRBACNewRule(transCtx, dag, ""); err != nil {
+		return err
+	}
+	newName := constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+	runningITS := transCtx.RunningWorkload
+	// new code path
+	if runningITS == nil ||
+		(runningITS.Annotations != nil && runningITS.Annotations[constant.ServiceAccountInUseAnnotationKey] == newName) {
+		delete(comp.Annotations, constant.ComponentLastServiceAccountNameAnnotationKey)
+		delete(comp.Annotations, constant.ComponentLastServiceAccountRuleHashAnnotationKey)
+
+		// to prevent when an instanceset is newly created, its controller doesn't have time
+		// to add the annoation for it. Then the component's reconciliation will
+		// fall into old code path.
+		synthesizedComp.AnnotationsInjectedToWorkload[constant.ServiceAccountInUseAnnotationKey] = newName
+		return nil
+	}
+
+	// old code path
 	var err error
-	comp := transCtx.Component
 	lastServiceAccountName := comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]
 	lastHash := comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]
 	if serviceAccountName == "" {
@@ -99,7 +122,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
-		if rollback {
+		if serviceAccountName != lastServiceAccountName && rollback {
 			transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, EventReasonServiceAccountRollback, "Change to serviceaccount has been rolled back to prevent pod restart")
 			serviceAccountName = lastServiceAccountName
 		}
@@ -119,6 +142,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey] = hash
 			graphCli.Update(dag, transCtx.ComponentOrig, transCtx.Component)
 		}
+
+		synthesizedComp.AnnotationsInjectedToWorkload[constant.ProposedServiceAccountNameAnnotationKey] = newName
 	}
 
 	synthesizedComp.PodSpec.ServiceAccountName = serviceAccountName
@@ -151,6 +176,93 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
 
 	return nil
+}
+
+func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransformContext, dag *graph.DAG, userDefinedSAName string) error {
+	synthesizedComp := transCtx.SynthesizeComponent
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	saName := userDefinedSAName
+	var sa *corev1.ServiceAccount
+	var err error
+	if userDefinedSAName == "" {
+		saName = constant.GenerateDefaultServiceAccountNameNew(synthesizedComp.FullCompName)
+		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
+		sa, err = createOrUpdateServiceAccount(transCtx, saName, graphCli, dag)
+		if err != nil {
+			return err
+		}
+	}
+	synthesizedComp.PodSpec.ServiceAccountName = saName
+	rbs, err := createOrUpdateRoleBindingNew(transCtx, transCtx.CompDef, saName, graphCli, dag)
+	if err != nil {
+		return err
+	}
+	objs := []client.Object{sa}
+	if sa != nil {
+		// serviceAccount should be created before roleBinding and role
+		for _, rb := range rbs {
+			objs = append(objs, rb)
+			graphCli.DependOn(dag, rb, sa)
+		}
+		// serviceAccount should be created before workload
+		itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
+		for _, its := range itsList {
+			graphCli.DependOn(dag, its, sa)
+		}
+	}
+
+	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+	return nil
+}
+
+func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
+	cmpd *appsv1.ComponentDefinition, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) ([]*rbacv1.RoleBinding, error) {
+	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
+		return labelAndAnnotationEqual(old, new) &&
+			equality.Semantic.DeepEqual(old.Subjects, new.Subjects) &&
+			equality.Semantic.DeepEqual(old.RoleRef, new.RoleRef)
+	}
+	res := make([]*rbacv1.RoleBinding, 0)
+
+	if len(cmpd.Spec.PolicyRules) != 0 {
+		// cluster role is handled by cmpd controller
+		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     constant.GenerateDefaultRoleName(cmpd.Name),
+		}, serviceAccountName)
+		if err := intctrlutil.SetOwnership(transCtx.Component, cmpdRoleBinding, model.GetScheme(), ""); err != nil {
+			return nil, err
+		}
+		rb, err := createOrUpdate(transCtx, cmpdRoleBinding, graphCli, dag, cmpRoleBinding)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, rb)
+	}
+
+	if isLifecycleActionsEnabled(transCtx.CompDef) {
+		clusterPodRoleBinding := factory.BuildRoleBinding(
+			transCtx.SynthesizeComponent,
+			fmt.Sprintf("%v-pod", serviceAccountName),
+			&rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     constant.RBACRoleName,
+			},
+			serviceAccountName,
+		)
+		if err := intctrlutil.SetOwnership(transCtx.Component, clusterPodRoleBinding, model.GetScheme(), ""); err != nil {
+			return nil, err
+		}
+		rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, rb)
+	}
+
+	return res, nil
 }
 
 func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {

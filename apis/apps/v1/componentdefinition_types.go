@@ -1437,6 +1437,18 @@ type ReplicaRole struct {
 	// +kubebuilder:default=false
 	// +optional
 	ParticipatesInQuorum bool `json:"participatesInQuorum"`
+
+	// IsExclusive specifies if this role can be assigned to only one Pod at a time
+	// within a Component. If true, the controller ensures that when a new Pod
+	// claims this role, any existing Pods with the same role label will have
+	// their labels removed immediately.
+	// This helps prevent "Split-Brain" scenarios during network partitions or node failures.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	IsExclusive bool `json:"isExclusive"`
 }
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied

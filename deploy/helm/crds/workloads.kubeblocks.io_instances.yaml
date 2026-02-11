@@ -2017,6 +2017,18 @@ spec:
                   description: ReplicaRole represents a role that can be assigned
                     to a component instance, defining its behavior and responsibilities.
                   properties:
+                    isExclusive:
+                      default: false
+                      description: |-
+                        IsExclusive specifies if this role can be assigned to only one Pod at a time
+                        within a Component. If true, the controller ensures that when a new Pod
+                        claims this role, any existing Pods with the same role label will have
+                        their labels removed immediately.
+                        This helps prevent "Split-Brain" scenarios during network partitions or node failures.
+
+
+                        This field is immutable once set.
+                      type: boolean
                     name:
                       description: |-
                         Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label

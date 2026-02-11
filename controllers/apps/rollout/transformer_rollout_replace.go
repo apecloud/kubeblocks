@@ -109,7 +109,7 @@ func (t *rolloutReplaceTransformer) component(transCtx *rolloutTransformContext,
 	}
 	tpl := tpls[""]
 	if instTpl != nil {
-		tpl = tpls[instTpl.Name]
+		tpl = tpls[replaceInstanceTemplateName(*instTpl)]
 	}
 
 	if spec.Replicas == replicas {
@@ -223,9 +223,9 @@ func (t *rolloutReplaceTransformer) pickCompInstanceToRollout(transCtx *rolloutT
 	})
 
 	var targetPod *corev1.Pod
-	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+	suffix := replaceInstanceTemplateNameSuffix(transCtx.Rollout)
 	for i, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil && !strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix) {
+		if pod.DeletionTimestamp == nil && !strings.HasSuffix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], suffix) {
 			targetPod = &pods.Items[i]
 			break
 		}
@@ -292,7 +292,7 @@ func (t *rolloutReplaceTransformer) sharding(transCtx *rolloutTransformContext,
 	}
 	tpl := tpls[""]
 	if instTpl != nil {
-		tpl = tpls[instTpl.Name]
+		tpl = tpls[replaceInstanceTemplateName(*instTpl)]
 	}
 
 	totalReplicas := newReplicas * spec.Shards
@@ -409,9 +409,9 @@ func (t *rolloutReplaceTransformer) pickShardingInstancesToRollout(transCtx *rol
 	})
 
 	var targetPod *corev1.Pod
-	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+	suffix := replaceInstanceTemplateNameSuffix(transCtx.Rollout)
 	for i, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil && !strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix) {
+		if pod.DeletionTimestamp == nil && !strings.HasSuffix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], suffix) {
 			targetPod = &pods.Items[i]
 			break
 		}
@@ -494,25 +494,25 @@ func replaceCompInstanceTemplates(rollout *appsv1alpha1.Rollout,
 		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
 
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
-	tpls[""] = replaceCompInstanceTemplate(comp, prefix, nil)
+	suffix := replaceInstanceTemplateNameSuffix(rollout)
+	tpls[""] = replaceCompInstanceTemplate(comp, suffix, nil)
 	for _, tpl := range spec.Instances {
 		if ptr.Deref(tpl.Replicas, 0) > 0 {
-			tpls[tpl.Name] = replaceCompInstanceTemplate(comp, fmt.Sprintf("%s-%s", prefix, tpl.Name), &tpl)
+			tpls[tpl.Name] = replaceCompInstanceTemplate(comp, replaceInstanceTemplateName2(tpl, suffix), &tpl)
 		}
 	}
 	return tpls, false, nil
 }
 
 func replaceCompInstanceTemplatesFromSpec(rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterComponentSpec) map[string]*appsv1.InstanceTemplate {
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	suffix := replaceInstanceTemplateNameSuffix(rollout)
 	tpls := make(map[string]*appsv1.InstanceTemplate)
 	for i, tpl := range spec.Instances {
-		if strings.HasPrefix(tpl.Name, prefix) {
-			if tpl.Name == prefix {
+		if strings.HasSuffix(tpl.Name, suffix) {
+			if tpl.Name == suffix {
 				tpls[""] = &spec.Instances[i]
 			} else {
-				tpls[strings.TrimPrefix(tpl.Name, fmt.Sprintf("%s-", prefix))] = &spec.Instances[i]
+				tpls[strings.TrimSuffix(tpl.Name, fmt.Sprintf("-%s", suffix))] = &spec.Instances[i]
 			}
 		}
 	}
@@ -547,6 +547,10 @@ func replaceCompInstanceTemplate(comp appsv1alpha1.RolloutComponent, newTplName 
 		maps.Copy(newTpl.Labels, comp.InstanceMeta.Canary.Labels)
 		maps.Copy(newTpl.Annotations, comp.InstanceMeta.Canary.Annotations)
 	}
+	if newTpl.Annotations == nil {
+		newTpl.Annotations = map[string]string{}
+	}
+	newTpl.Annotations[instanceTemplateCreatedByAnnotationKey] = "yes"
 	return newTpl
 }
 
@@ -561,25 +565,25 @@ func replaceShardingInstanceTemplates(rollout *appsv1alpha1.Rollout,
 		return nil, false, fmt.Errorf("not support the replace strategy with the flatInstanceOrdinal is false")
 	}
 
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
-	tpls[""] = replaceShardingInstanceTemplate(sharding, prefix, nil)
+	suffix := replaceInstanceTemplateNameSuffix(rollout)
+	tpls[""] = replaceShardingInstanceTemplate(sharding, suffix, nil)
 	for _, tpl := range spec.Template.Instances {
 		if ptr.Deref(tpl.Replicas, 0) > 0 {
-			tpls[tpl.Name] = replaceShardingInstanceTemplate(sharding, fmt.Sprintf("%s-%s", prefix, tpl.Name), &tpl)
+			tpls[tpl.Name] = replaceShardingInstanceTemplate(sharding, replaceInstanceTemplateName2(tpl, suffix), &tpl)
 		}
 	}
 	return tpls, false, nil
 }
 
 func replaceShardingInstanceTemplatesFromSpec(rollout *appsv1alpha1.Rollout, spec *appsv1.ClusterSharding) map[string]*appsv1.InstanceTemplate {
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	suffix := replaceInstanceTemplateNameSuffix(rollout)
 	tpls := make(map[string]*appsv1.InstanceTemplate)
 	for i, tpl := range spec.Template.Instances {
-		if strings.HasPrefix(tpl.Name, prefix) {
-			if tpl.Name == prefix {
+		if strings.HasSuffix(tpl.Name, suffix) {
+			if tpl.Name == suffix {
 				tpls[""] = &spec.Template.Instances[i]
 			} else {
-				tpls[strings.TrimPrefix(tpl.Name, fmt.Sprintf("%s-", prefix))] = &spec.Template.Instances[i]
+				tpls[strings.TrimSuffix(tpl.Name, fmt.Sprintf("-%s", suffix))] = &spec.Template.Instances[i]
 			}
 		}
 	}
@@ -614,11 +618,36 @@ func replaceShardingInstanceTemplate(sharding appsv1alpha1.RolloutSharding, newT
 		maps.Copy(newTpl.Labels, sharding.InstanceMeta.Canary.Labels)
 		maps.Copy(newTpl.Annotations, sharding.InstanceMeta.Canary.Annotations)
 	}
+	if newTpl.Annotations == nil {
+		newTpl.Annotations = map[string]string{}
+	}
+	newTpl.Annotations[instanceTemplateCreatedByAnnotationKey] = "yes"
 	return newTpl
 }
 
-func replaceInstanceTemplateNamePrefix(rollout *appsv1alpha1.Rollout) string {
+func replaceInstanceTemplateNameSuffix(rollout *appsv1alpha1.Rollout) string {
 	return string(rollout.UID[:8])
+}
+
+func replaceInstanceTemplateName(tpl appsv1.InstanceTemplate) string {
+	_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
+	if !ok {
+		return tpl.Name
+	}
+	subs := strings.Split(tpl.Name, "-")
+	if len(subs) == 1 {
+		return tpl.Name // TODO: "" or tpl.Name
+	}
+	return strings.Join(subs[:len(subs)-1], "-")
+}
+
+// TODO: name
+func replaceInstanceTemplateName2(tpl appsv1.InstanceTemplate, suffix string) string {
+	tplName := replaceInstanceTemplateName(tpl)
+	if tplName == "" {
+		return suffix
+	}
+	return fmt.Sprintf("%s-%s", tplName, suffix)
 }
 
 func replaceInstanceTemplateReplicas(tpls map[string]*appsv1.InstanceTemplate) int32 {

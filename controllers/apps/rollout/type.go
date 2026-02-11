@@ -23,6 +23,10 @@ import (
 	"fmt"
 )
 
+const (
+	instanceTemplateCreatedByAnnotationKey = "apps.kubeblocks.io/instance-template-created-by-rollout"
+)
+
 func strategyNotSupportedError(strategy string) error {
 	return fmt.Errorf("the \"%s\" strategy is NOT supported yet", strategy)
 }

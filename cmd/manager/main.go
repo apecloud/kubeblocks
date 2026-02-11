@@ -266,6 +266,13 @@ func validateRequiredToParseConfigs() error {
 			return err
 		}
 	}
+
+	if jobTimeout := viper.GetString(constant.CfgAddonJobTimeout); jobTimeout != "" {
+		if _, err := time.ParseDuration(jobTimeout); err != nil {
+			return err
+		}
+	}
+
 	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
 		return err
 	}

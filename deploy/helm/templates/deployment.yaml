@@ -164,6 +164,8 @@ spec:
               value: {{ .jobTTL | quote }}
             - name: ADDON_JOB_IMAGE_PULL_POLICY
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
+            - name: ADDON_JOB_TIMEOUT
+              value: {{ .jobTimeout | quote }}
             {{- end }}
             - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
               value: {{ join " " .Values.addonHelmInstallOptions }}

@@ -33,6 +33,23 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
+func getCurrentRevision(annotations map[string]string) string {
+	if len(annotations) == 0 {
+		return ""
+	}
+	return annotations[constant.ConfigurationRevision]
+}
+
+func getLastRevision(annotations map[string]string, revision int64) (configurationRevision, bool) {
+	revisions := retrieveRevision(annotations)
+	for i := len(revisions) - 1; i >= 0; i-- {
+		if revisions[i].revision == revision {
+			return revisions[i], true
+		}
+	}
+	return configurationRevision{}, false
+}
+
 func TestGcConfigRevision(t *testing.T) {
 	cm := builder.NewConfigMapBuilder("default", "test").
 		AddAnnotations(core.GenerateRevisionPhaseKey("1"), "Finished").
@@ -40,7 +57,7 @@ func TestGcConfigRevision(t *testing.T) {
 		AddAnnotations(core.GenerateRevisionPhaseKey("3"), "Finished").
 		AddAnnotations(core.GenerateRevisionPhaseKey("4"), "Finished").
 		GetObject()
-	revisions := GcRevision(cm.GetAnnotations())
+	revisions := gcRevision(cm.GetAnnotations())
 	assert.Equal(t, 0, len(revisions))
 
 	cm = builder.NewConfigMapBuilder("default", "test").
@@ -58,15 +75,15 @@ func TestGcConfigRevision(t *testing.T) {
 		AddAnnotations(core.GenerateRevisionPhaseKey("12"), `{"Phase":"Finished","Revision":"12","Policy":"","ExecResult":"","SucceedCount":0,"ExpectedCount":0,"Retry":false,"Failed":false,"Message":"the configuration file has not been modified, skip reconfigure"}`).
 		GetObject()
 
-	assert.Equal(t, 12, len(RetrieveRevision(cm.GetAnnotations())))
+	assert.Equal(t, 12, len(retrieveRevision(cm.GetAnnotations())))
 
-	revisions = GcRevision(cm.GetAnnotations())
+	revisions = gcRevision(cm.GetAnnotations())
 	assert.Equal(t, 2, len(revisions))
-	assert.Equal(t, string(appsv1alpha1.CInitPhase), string(revisions[1].Phase))
-	assert.Equal(t, string(appsv1alpha1.CFinishedPhase), string(revisions[0].Phase))
+	assert.Equal(t, string(appsv1alpha1.CInitPhase), string(revisions[1].phase))
+	assert.Equal(t, string(appsv1alpha1.CFinishedPhase), string(revisions[0].phase))
 
-	GcConfigRevision(cm)
-	assert.Equal(t, 10, len(RetrieveRevision(cm.GetAnnotations())))
+	gcConfigRevision(cm)
+	assert.Equal(t, 10, len(retrieveRevision(cm.GetAnnotations())))
 }
 
 func TestParseRevision(t *testing.T) {
@@ -77,7 +94,7 @@ func TestParseRevision(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    ConfigurationRevision
+		want    configurationRevision
 		wantErr bool
 	}{{
 		name: "test",
@@ -85,7 +102,7 @@ func TestParseRevision(t *testing.T) {
 			revision: "12absdl",
 			phase:    "Init",
 		},
-		want:    ConfigurationRevision{},
+		want:    configurationRevision{},
 		wantErr: true,
 	}, {
 		name: "test",
@@ -93,11 +110,11 @@ func TestParseRevision(t *testing.T) {
 			revision: "120000",
 			phase:    "Pending",
 		},
-		want: ConfigurationRevision{
-			StrRevision: "120000",
-			Revision:    120000,
-			Phase:       parametersv1alpha1.CPendingPhase,
-			Result: parameters.Result{
+		want: configurationRevision{
+			revision:    120000,
+			strRevision: "120000",
+			phase:       parametersv1alpha1.CPendingPhase,
+			result: parameters.Result{
 				Phase:    parametersv1alpha1.CPendingPhase,
 				Revision: "120000",
 			},
@@ -109,7 +126,7 @@ func TestParseRevision(t *testing.T) {
 			revision: "",
 			phase:    "Init",
 		},
-		want:    ConfigurationRevision{},
+		want:    configurationRevision{},
 		wantErr: true,
 	}}
 	for _, tt := range tests {
@@ -153,7 +170,7 @@ func TestGetCurrentRevision(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, GetCurrentRevision(tt.args.annotations), "GetCurrentRevision(%v)", tt.args.annotations)
+			assert.Equalf(t, tt.want, getCurrentRevision(tt.args.annotations), "getCurrentRevision(%v)", tt.args.annotations)
 		})
 	}
 }
@@ -166,7 +183,7 @@ func TestGetLastRevision(t *testing.T) {
 	tests := []struct {
 		name  string
 		args  args
-		want  ConfigurationRevision
+		want  configurationRevision
 		want1 bool
 	}{{
 		name: "test",
@@ -177,11 +194,11 @@ func TestGetLastRevision(t *testing.T) {
 			},
 			revision: 2,
 		},
-		want: ConfigurationRevision{
-			Revision:    2,
-			StrRevision: "2",
-			Phase:       parametersv1alpha1.CRunningPhase,
-			Result: parameters.Result{
+		want: configurationRevision{
+			revision:    2,
+			strRevision: "2",
+			phase:       parametersv1alpha1.CRunningPhase,
+			result: parameters.Result{
 				Phase:    parametersv1alpha1.CRunningPhase,
 				Revision: "2",
 			},
@@ -200,9 +217,9 @@ func TestGetLastRevision(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := GetLastRevision(tt.args.annotations, tt.args.revision)
-			assert.Equalf(t, tt.want, got, "GetLastRevision(%v, %v)", tt.args.annotations, tt.args.revision)
-			assert.Equalf(t, tt.want1, got1, "GetLastRevision(%v, %v)", tt.args.annotations, tt.args.revision)
+			got, got1 := getLastRevision(tt.args.annotations, tt.args.revision)
+			assert.Equalf(t, tt.want, got, "getLastRevision(%v, %v)", tt.args.annotations, tt.args.revision)
+			assert.Equalf(t, tt.want1, got1, "getLastRevision(%v, %v)", tt.args.annotations, tt.args.revision)
 		})
 	}
 }

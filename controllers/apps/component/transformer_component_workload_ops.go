@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -423,6 +424,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 
 	if len(toCreate) > 0 || len(toDelete) > 0 {
 		// since pod volumes changed, the workload will be restarted
+		// TODO: sync reconfigure and then restart
 		r.protoITS.Spec.Configs = nil
 		return nil
 	}
@@ -437,6 +439,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			if tpl.Name == tplName {
 				if ptr.Deref(tpl.RestartOnFileChange, false) {
 					// restart
+					// TODO: restart on config
 					if r.protoITS.Spec.Template.Annotations == nil {
 						r.protoITS.Spec.Template.Annotations = map[string]string{}
 					}
@@ -452,7 +455,7 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			action     *appsv1.Action
 			actionName string
 		)
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+		if ptr.Deref(tpl.ExternalManaged, false) {
 			if tpl.Reconfigure == nil {
 				return // disabled by the external system
 			}
@@ -467,12 +470,15 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			return // has no reconfigure action defined
 		}
 
+		parameters := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
+		maps.Copy(parameters, tpl.Variables)
 		config := workloads.ConfigTemplate{
 			Name:                  tpl.Name,
-			Generation:            r.component.Generation,
+			ConfigHash:            tpl.ConfigHash,
+			Restart:               tpl.RestartOnFileChange,
 			Reconfigure:           action,
 			ReconfigureActionName: actionName,
-			Parameters:            lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
+			Parameters:            parameters,
 		}
 		if r.protoITS.Spec.Configs == nil {
 			r.protoITS.Spec.Configs = make([]workloads.ConfigTemplate, 0)

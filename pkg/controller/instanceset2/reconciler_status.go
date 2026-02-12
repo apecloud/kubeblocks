@@ -318,7 +318,7 @@ func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workl
 		for _, config := range its.Spec.Configs {
 			configs = append(configs, workloads.InstanceConfigStatus{
 				Name:       config.Name,
-				Generation: config.Generation,
+				ConfigHash: config.ConfigHash,
 			})
 		}
 		for i := range instanceStatus {

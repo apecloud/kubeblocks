@@ -32837,18 +32837,6 @@ string
 </tr>
 <tr>
 <td>
-<code>generation</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The generation of the config content.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>configHash</code><br/>
 <em>
 string
@@ -32857,6 +32845,18 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents a checksum or hash of the config content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restart</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart instances.</p>
 </td>
 </tr>
 <tr>
@@ -33013,18 +33013,6 @@ string
 </td>
 <td>
 <p>The name of the config.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>generation</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The generation of the config.</p>
 </td>
 </tr>
 <tr>

@@ -10374,6 +10374,23 @@ of 2 learners and 1 follower while maintaining quorum.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>isExclusive</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IsExclusive specifies if this role can be assigned to only one Pod at a time
+within a Component. If true, the controller ensures that when a new Pod
+claims this role, any existing Pods with the same role label will have
+their labels removed immediately.
+This helps prevent &ldquo;Split-Brain&rdquo; scenarios during network partitions or node failures.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ReplicasLimit">ReplicasLimit

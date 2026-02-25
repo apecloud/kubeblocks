@@ -107,8 +107,9 @@ var _ = Describe("InstanceSet Controller", func() {
 		).Should(Succeed())
 	}
 
-	mockPodReady := func(podNames ...string) {
+	mockPodReady := func(podNames ...string) []*corev1.Pod {
 		By("mock pods ready")
+		pods := make([]*corev1.Pod, 0)
 		for _, podName := range podNames {
 			podKey := types.NamespacedName{
 				Namespace: itsObj.Namespace,
@@ -132,8 +133,10 @@ var _ = Describe("InstanceSet Controller", func() {
 						Image: pod.Spec.Containers[0].Image,
 					},
 				}
+				pods = append(pods, pod)
 			})()).Should(Succeed())
 		}
+		return pods
 	}
 
 	Context("reconciliation", func() {
@@ -475,29 +478,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			})
 
 			By("mock pods running and available")
-			podKey := types.NamespacedName{
-				Namespace: itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-0", itsObj.Name),
-			}
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
-				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = []corev1.PodCondition{
-					{
-						Type:               corev1.PodReady,
-						Status:             corev1.ConditionTrue,
-						LastTransitionTime: metav1.Now(),
-					},
-				}
-				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-					{
-						Name: pod.Spec.Containers[0].Name,
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{},
-						},
-						Image: pod.Spec.Containers[0].Image,
-					},
-				}
-			})()).ShouldNot(HaveOccurred())
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -517,13 +498,13 @@ var _ = Describe("InstanceSet Controller", func() {
 				}))
 			})).Should(Succeed())
 
-			By("check the reconfigure action not called")
+			By("check the reconfigure action NOT called")
 			Eventually(func(g Gomega) {
 				g.Expect(reconfigure).Should(BeEmpty())
 				g.Expect(parameters).Should(BeNil())
 			}).Should(Succeed())
 
-			By("update configs")
+			By("update configs to reconfigure")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
 				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
@@ -608,13 +589,13 @@ var _ = Describe("InstanceSet Controller", func() {
 				}))
 			})).Should(Succeed())
 
-			By("check the reconfigure action not called")
+			By("check the reconfigure action NOT called")
 			Eventually(func(g Gomega) {
 				g.Expect(reconfigure).Should(BeEmpty())
 				g.Expect(parameters).Should(BeNil())
 			}).Should(Succeed())
 
-			By("update configs")
+			By("update configs to reconfigure")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
 				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
@@ -646,6 +627,173 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(parameters).ShouldNot(BeNil())
 				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
 			}).Should(Succeed())
+		})
+
+		It("restart", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				}).AddConfigs([]workloads.ConfigTemplate{
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+					{
+						Name:       "logging",
+						ConfigHash: ptr.To("654321"),
+					},
+				}...)
+			})
+
+			pods := mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			Expect(pods).Should(HaveLen(1))
+
+			By("check the init instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "logging",
+							ConfigHash: ptr.To("654321"),
+						},
+					},
+				}))
+			})).Should(Succeed())
+
+			By("update configs to restart")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[1].Restart = ptr.To(true)
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "logging",
+							ConfigHash: ptr.To("abcdef"),
+						},
+					},
+				}))
+			})).Should(Succeed())
+
+			By("check the instance restarted")
+			podKey := client.ObjectKeyFromObject(pods[0])
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				// g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID)) TODO: impl
+			})).Should(Succeed())
+		})
+
+		It("reconfigure and restart", func() {
+			By("mock reconfigure action calls")
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				}).AddConfigs([]workloads.ConfigTemplate{
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+					{
+						Name:       "logging",
+						ConfigHash: ptr.To("654321"),
+					},
+				}...)
+			})
+
+			pods := mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			Expect(pods).Should(HaveLen(1))
+
+			By("check the init instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "logging",
+							ConfigHash: ptr.To("654321"),
+						},
+					},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action NOT called")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
+
+			By("update configs to reconfigure and restart")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[1].Restart = ptr.To(true)
+				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[1].ReconfigureActionName = ""
+				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "logging",
+							ConfigHash: ptr.To("abcdef"),
+						},
+					},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).ShouldNot(BeNil())
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+
+			By("check the instance restarted")
+			podKey := client.ObjectKeyFromObject(pods[0])
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				// g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID)) TODO: impl
+			})).Should(Succeed())
 		})
 	})
 
@@ -947,151 +1095,6 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
 				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.ServiceAccountInUseAnnotationKey, newSAName))
 			})).Should(Succeed())
-		})
-	})
-
-	Context("Configuration management with ConfigHash", func() {
-		var (
-			configTemplateName = "test-config"
-			configHash1        = "config-hash-123"
-			configHash2        = "config-hash-456"
-		)
-
-		BeforeEach(func() {
-			By("create ITS with config template")
-			createITSObj(itsName, func(factory *testapps.MockInstanceSetFactory) {
-				factory.AddConfigs(workloads.ConfigTemplate{
-					Name:       configTemplateName,
-					ConfigHash: &configHash1,
-					Reconfigure: &kbappsv1.Action{
-						Exec: &kbappsv1.ExecAction{
-							Command: []string{"echo", "reconfigure"},
-						},
-					},
-				})
-			})
-		})
-
-		It("should detect config updates via ConfigHash", func() {
-			By("create pod and mock it ready")
-			podName := fmt.Sprintf("%s-0", itsObj.Name)
-			podKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName}
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
-			mockPodReady(podName)
-
-			By("initialize instance status with config hash")
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				if its.Status.InstanceStatus == nil {
-					its.Status.InstanceStatus = []workloads.InstanceStatus{}
-				}
-				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
-					PodName: podName,
-					Configs: []workloads.InstanceConfigStatus{
-						{
-							Name:       configTemplateName,
-							ConfigHash: &configHash1,
-						},
-					},
-				})
-			})()).Should(Succeed())
-
-			By("verify config is marked as updated when hashes match")
-			// This would test the isConfigUpdated function
-			// Since we can't directly test internal functions, we verify through behavior
-			// When ConfigHash matches, no reconfigure should be triggered
-
-			By("update config hash in spec")
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[0].ConfigHash = &configHash2
-			})()).Should(Succeed())
-
-			By("verify config update is detected")
-			// After updating ConfigHash, the controller should detect mismatch
-			// and trigger reconfigure action
-		})
-
-		It("should update instance config status", func() {
-			By("create pod and mock it ready")
-			podName := fmt.Sprintf("%s-0", itsObj.Name)
-			podKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName}
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
-			mockPodReady(podName)
-
-			By("verify instance status is updated with config info")
-			// The setInstConfigStatus function should update instance status
-			// This happens during reconciliation
-		})
-	})
-
-	Context("Reconfigure action and restart operations", func() {
-		var (
-			configTemplateName = "test-config"
-			configHash         = "config-hash-789"
-		)
-
-		BeforeEach(func() {
-			By("create ITS with config template and lifecycle actions")
-			createITSObj(itsName, func(factory *testapps.MockInstanceSetFactory) {
-				factory.AddConfigs(workloads.ConfigTemplate{
-					Name:       configTemplateName,
-					ConfigHash: &configHash,
-					Reconfigure: &kbappsv1.Action{
-						Exec: &kbappsv1.ExecAction{
-							Command: []string{"echo", "reconfigure"},
-						},
-					},
-				})
-				factory.SetLifecycleActions(&kbappsv1.ComponentLifecycleActions{
-					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
-				}, nil)
-			})
-		})
-
-		It("should trigger reconfigure action when config changes", func() {
-			By("create pod and mock it ready")
-			podName := fmt.Sprintf("%s-0", itsObj.Name)
-			podKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName}
-			Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
-			mockPodReady(podName)
-
-			By("initialize with old config hash")
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				if its.Status.InstanceStatus == nil {
-					its.Status.InstanceStatus = []workloads.InstanceStatus{}
-				}
-				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
-					PodName: podName,
-					Configs: []workloads.InstanceConfigStatus{
-						{
-							Name:       configTemplateName,
-							ConfigHash: &configHash,
-						},
-					},
-				})
-			})()).Should(Succeed())
-
-			By("update to new config hash")
-			newConfigHash := "config-hash-new"
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[0].ConfigHash = &newConfigHash
-			})()).Should(Succeed())
-
-			By("verify reconfigure is triggered")
-			// The controller should detect ConfigHash mismatch
-			// and trigger reconfigure lifecycle action
-			// This would involve checking that the action is called
-		})
-
-		It("should handle restart policy", func() {
-			By("update config with restart policy")
-			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				// Set a restart policy or condition that requires pod restart
-				// This might involve setting RestartOnFileChange or similar
-			})()).Should(Succeed())
-
-			By("verify restart is handled correctly")
-			// The controller should handle restart based on policy
-			// This might involve pod deletion and recreation
 		})
 	})
 })

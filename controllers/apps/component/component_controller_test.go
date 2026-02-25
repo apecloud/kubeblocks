@@ -1676,6 +1676,54 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
+	testReconfigureConfigHash := func(compName, compDefName, fileTemplate string) {
+		var (
+			initConfigHash, newConfigHash string
+		)
+
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+			initConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(initConfigHash).NotTo(BeEmpty())
+		})).Should(Succeed())
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+			newConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(newConfigHash).NotTo(BeEmpty())
+			g.Expect(newConfigHash).NotTo(Equal(initConfigHash))
+		})).Should(Succeed())
+
+		By("check the workload updated")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(newConfigHash))
+		})).Should(Succeed())
+	}
+
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createDefinitionObjects()
@@ -2250,55 +2298,8 @@ var _ = Describe("Component Controller", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
-		It("config hash generation - scenario 1 (user modifies variables)", func() {
-			By("create component with config template")
-			createCompObj(defaultCompName, compDefObj.Name, nil)
-
-			By("wait for ConfigMap creation")
-			cmName := fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(clusterName, defaultCompName), fileTemplate)
-			cmKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: cmName}
-			var configMap *corev1.ConfigMap
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
-				configMap = cm
-			}).Should(Succeed())
-
-			By("verify ConfigHash annotation is generated automatically")
-			Expect(configMap.Annotations).To(HaveKey(constant.CMInsConfigurationHashLabelKey))
-			configHash := configMap.Annotations[constant.CMInsConfigurationHashLabelKey]
-			Expect(configHash).NotTo(BeEmpty())
-
-			By("verify ConfigHash is stored in component status")
-			// TODO: check if ConfigHash is propagated to component/ITS status
-		})
-
-		It("config hash generation - scenario 2 (parameters controller provides hash)", func() {
-			By("create component with pre-defined ConfigHash")
-			preDefinedHash := "test-predefined-hash-123"
-			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
-				f.SetConfigs([]kbappsv1.ClusterComponentConfig{
-					{
-						Name:       &fileTemplate,
-						ConfigHash: &preDefinedHash,
-					},
-				})
-			})
-
-			By("wait for ConfigMap creation")
-			cmName := fmt.Sprintf("%s-%s", constant.GenerateClusterComponentName(clusterName, defaultCompName), fileTemplate)
-			cmKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: cmName}
-			var configMap *corev1.ConfigMap
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
-				configMap = cm
-			}).Should(Succeed())
-
-			By("verify pre-defined ConfigHash is used (not regenerated)")
-			Expect(configMap.Annotations).To(HaveKey(constant.CMInsConfigurationHashLabelKey))
-			actualHash := configMap.Annotations[constant.CMInsConfigurationHashLabelKey]
-			Expect(actualHash).To(Equal(preDefinedHash))
+		It("reconfigure - config hash", func() {
+			testReconfigureConfigHash(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

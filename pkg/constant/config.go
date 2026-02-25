@@ -41,7 +41,6 @@ const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 )
 

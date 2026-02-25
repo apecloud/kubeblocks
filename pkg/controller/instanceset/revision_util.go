@@ -28,7 +28,7 @@ import (
 	"strconv"
 
 	jsoniter "github.com/json-iterator/go"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,22 +42,22 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
-const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
+// controllerRevisionHashLabel is the label used to indicate the hash value of a controllerRevision's Data.
+const controllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
-var Codecs = serializer.NewCodecFactory(model.GetScheme())
-var patchCodec = Codecs.LegacyCodec(workloads.SchemeGroupVersion)
-var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+var codecs = serializer.NewCodecFactory(model.GetScheme())
+var patchCodec = codecs.LegacyCodec(workloads.SchemeGroupVersion)
+var controllerKind = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 
 var jsonIter = jsoniter.ConfigCompatibleWithStandardLibrary
 
-func NewRevision(its *workloads.InstanceSet) (*apps.ControllerRevision, error) {
+func newRevision(its *workloads.InstanceSet) (*appsv1.ControllerRevision, error) {
 	patch, err := getPatch(its)
 	if err != nil {
 		return nil, err
 	}
 	collision := int32(0)
-	cr, err := NewControllerRevision(its,
+	cr, err := newControllerRevision(its,
 		controllerKind,
 		its.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},
@@ -100,32 +100,31 @@ func getPatch(its *workloads.InstanceSet) ([]byte, error) {
 	return patch, err
 }
 
-// ControllerRevisionName returns the Name for a ControllerRevision in the form prefix-hash. If the length
+// controllerRevisionName returns the Name for a ControllerRevision in the form prefix-hash. If the length
 // of prefix is greater than 223 bytes, it is truncated to allow for a name that is no larger than 253 bytes.
-func ControllerRevisionName(prefix string, hash string) string {
+func controllerRevisionName(prefix string, hash string) string {
 	if len(prefix) > 223 {
 		prefix = prefix[:223]
 	}
-
 	return fmt.Sprintf("%s-%s", prefix, hash)
 }
 
-// NewControllerRevision returns a ControllerRevision with a ControllerRef pointing to parent and indicating that
+// newControllerRevision returns a ControllerRevision with a ControllerRef pointing to parent and indicating that
 // parent is of parentKind. The ControllerRevision has labels matching template labels, contains Data equal to data, and
 // has a Revision equal to revision. The collisionCount is used when creating the name of the ControllerRevision
 // so the name is likely unique. If the returned error is nil, the returned ControllerRevision is valid. If the
 // returned error is not nil, the returned ControllerRevision is invalid for use.
-func NewControllerRevision(parent metav1.Object,
+func newControllerRevision(parent metav1.Object,
 	parentKind schema.GroupVersionKind,
 	templateLabels map[string]string,
 	data runtime.RawExtension,
 	revision int64,
-	collisionCount *int32) (*apps.ControllerRevision, error) {
+	collisionCount *int32) (*appsv1.ControllerRevision, error) {
 	labelMap := make(map[string]string)
 	for k, v := range templateLabels {
 		labelMap[k] = v
 	}
-	cr := &apps.ControllerRevision{
+	cr := &appsv1.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labelMap,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
@@ -133,21 +132,21 @@ func NewControllerRevision(parent metav1.Object,
 		Data:     data,
 		Revision: revision,
 	}
-	hash := HashControllerRevision(cr, collisionCount)
-	cr.Name = ControllerRevisionName(parent.GetName(), hash)
-	cr.Labels[ControllerRevisionHashLabel] = hash
+	hash := hashControllerRevision(cr, collisionCount)
+	cr.Name = controllerRevisionName(parent.GetName(), hash)
+	cr.Labels[controllerRevisionHashLabel] = hash
 	return cr, nil
 }
 
-// HashControllerRevision hashes the contents of revision's Data using FNV hashing. If probe is not nil, the byte value
+// hashControllerRevision hashes the contents of revision's Data using FNV hashing. If probe is not nil, the byte value
 // of probe is added written to the hash as well. The returned hash will be a safe encoded string to avoid bad words.
-func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) string {
+func hashControllerRevision(revision *appsv1.ControllerRevision, probe *int32) string {
 	hf := fnv.New32()
 	if len(revision.Data.Raw) > 0 {
 		hf.Write(revision.Data.Raw)
 	}
 	if revision.Data.Object != nil {
-		DeepHashObject(hf, revision.Data.Object)
+		deepHashObject(hf, revision.Data.Object)
 	}
 	if probe != nil {
 		hf.Write([]byte(strconv.FormatInt(int64(*probe), 10)))
@@ -155,10 +154,10 @@ func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) str
 	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32()))
 }
 
-// DeepHashObject writes specified object to hash using the spew library
+// deepHashObject writes specified object to hash using the spew library
 // which follows pointers and prints actual values of the nested objects
 // ensuring the hash does not change when a pointer changes.
-func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
+func deepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }

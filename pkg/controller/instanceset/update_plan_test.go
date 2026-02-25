@@ -35,7 +35,7 @@ import (
 var _ = Describe("update plan test.", func() {
 	BeforeEach(func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).SetRoles(roles).GetObject()
-		its.Status.UpdateRevision = newRevision
+		its.Status.UpdateRevision = newRevisionStr
 	})
 
 	Context("plan build&Execute", func() {
@@ -44,36 +44,36 @@ var _ = Describe("update plan test.", func() {
 		resetPods := func() {
 			pod0 = builder.NewPodBuilder(namespace, getPodName(name, 0)).
 				AddLabels(RoleLabelKey, "follower").
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 
 			pod1 = builder.NewPodBuilder(namespace, getPodName(name, 1)).
 				AddLabels(RoleLabelKey, "logger").
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 
 			pod2 = builder.NewPodBuilder(namespace, getPodName(name, 2)).
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 
 			pod3 = builder.NewPodBuilder(namespace, getPodName(name, 3)).
 				AddLabels(RoleLabelKey, "learner").
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 
 			pod4 = builder.NewPodBuilder(namespace, getPodName(name, 4)).
 				AddLabels(RoleLabelKey, "candidate").
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 
 			pod5 = builder.NewPodBuilder(namespace, getPodName(name, 5)).
 				AddLabels(RoleLabelKey, "leader").
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 
 			pod6 = builder.NewPodBuilder(namespace, getPodName(name, 6)).
 				AddLabels(RoleLabelKey, "learner").
-				AddLabels(apps.StatefulSetRevisionLabel, oldRevision).
+				AddLabels(apps.StatefulSetRevisionLabel, oldRevisionStr).
 				GetObject()
 		}
 
@@ -104,7 +104,7 @@ var _ = Describe("update plan test.", func() {
 		checkPlan := func(expectedPlan [][]*corev1.Pod, roleful bool) {
 			for i, expectedPods := range expectedPlan {
 				if i > 0 {
-					makePodUpdateReady(newRevision, roleful, expectedPlan[i-1]...)
+					makePodUpdateReady(newRevisionStr, roleful, expectedPlan[i-1]...)
 				}
 				pods := buildPodList()
 				plan := newUpdatePlan(*its, pods)

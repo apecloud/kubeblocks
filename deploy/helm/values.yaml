@@ -62,10 +62,15 @@ fullnameOverride: ""
 ##
 ##   groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
 ##   groups=rbac.authorization.k8s.io,resources=roles/status,verbs=get;update;patch
+##   groups=rbac.authorization.k8s.io,resources=roles/finalizers,verbs=update
 ##
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
+##
+##   groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
+##   groups=rbac.authorization.k8s.io,resources=clusterroles/status,verbs=get;update;patch
+##   groups=rbac.authorization.k8s.io,resources=clusterroles/finalizers,verbs=update
 ##
 ##   groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 ##   groups=rbac.authorization.k8s.io,resources=clusterrolebindings/status,verbs=get;update;patch

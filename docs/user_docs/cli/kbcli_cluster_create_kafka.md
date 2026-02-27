@@ -48,6 +48,10 @@ kbcli cluster create kafka NAME [flags]
       --replicas int                                The number of Kafka broker replicas for combined mode. Legal values [1, 3, 5]. (default 1)
       --sasl-enable                                 Enable authentication using SASL/PLAIN for Kafka.
       --sasl-scram-enable                           Enable authentication using SASL/SCRAM for Kafka.
+      --sasl.enable                                 Enable SASL authentication.
+      --sasl.inter-broker-protocol string           SASL mechanism used for inter-broker communication. Should be one of sasl.mechanisms. Legal values [PLAIN, SCRAM-SHA-256, SCRAM-SHA-512]. (default "PLAIN")
+      --sasl.mechanisms stringArray                  Legal values [PLAIN, SCRAM-SHA-256, SCRAM-SHA-512].
+      --sasl.use-kb-build-in-sasl                   Whether to use the built-in SASL server callback handler. (default true)
       --storage float                               Data Storage size, the unit is Gi. Value range [1, 10000]. (default 10)
       --storage-class string                        The StorageClass for Kafka Data Storage.
       --storage-enable                              Enable storage for Kafka.

@@ -40,7 +40,6 @@ kbcli cluster create mongodb NAME [flags]
       --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Delete, WipeOut]. (default "Delete")
       --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
-      --version string                 Cluster version. Legal values [8.0.8, 7.0.18, 6.0.21, 5.0.29, 4.4.29, 4.2.25, 4.0.28]. (default "6.0.21")
 ```
 
 ### Options inherited from parent commands

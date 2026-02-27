@@ -55,14 +55,24 @@ kbcli cluster create [ClusterType] [flags]
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 * [kbcli cluster create apecloud-mysql](kbcli_cluster_create_apecloud-mysql.md)	 - Create a apecloud-mysql cluster.
+* [kbcli cluster create clickhouse](kbcli_cluster_create_clickhouse.md)	 - Create a clickhouse cluster.
 * [kbcli cluster create etcd](kbcli_cluster_create_etcd.md)	 - Create a etcd cluster.
+* [kbcli cluster create greptime](kbcli_cluster_create_greptime.md)	 - Create a greptime cluster.
 * [kbcli cluster create kafka](kbcli_cluster_create_kafka.md)	 - Create a kafka cluster.
+* [kbcli cluster create loki](kbcli_cluster_create_loki.md)	 - Create a loki cluster.
+* [kbcli cluster create milvus](kbcli_cluster_create_milvus.md)	 - Create a milvus cluster.
+* [kbcli cluster create minio](kbcli_cluster_create_minio.md)	 - Create a minio cluster.
 * [kbcli cluster create mongodb](kbcli_cluster_create_mongodb.md)	 - Create a mongodb cluster.
 * [kbcli cluster create mysql](kbcli_cluster_create_mysql.md)	 - Create a mysql cluster.
+* [kbcli cluster create oceanbase](kbcli_cluster_create_oceanbase.md)	 - Create a oceanbase cluster.
+* [kbcli cluster create orchestrator](kbcli_cluster_create_orchestrator.md)	 - Create a orchestrator cluster.
+* [kbcli cluster create polardbx](kbcli_cluster_create_polardbx.md)	 - Create a polardbx cluster.
 * [kbcli cluster create postgresql](kbcli_cluster_create_postgresql.md)	 - Create a postgresql cluster.
+* [kbcli cluster create pulsar](kbcli_cluster_create_pulsar.md)	 - Create a pulsar cluster.
 * [kbcli cluster create qdrant](kbcli_cluster_create_qdrant.md)	 - Create a qdrant cluster.
 * [kbcli cluster create rabbitmq](kbcli_cluster_create_rabbitmq.md)	 - Create a rabbitmq cluster.
 * [kbcli cluster create redis](kbcli_cluster_create_redis.md)	 - Create a redis cluster.
+* [kbcli cluster create victoria-metrics](kbcli_cluster_create_victoria-metrics.md)	 - Create a victoria-metrics cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

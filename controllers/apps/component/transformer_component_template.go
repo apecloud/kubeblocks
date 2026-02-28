@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"maps"
+	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -32,10 +36,13 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -58,7 +65,7 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		return err
 	}
 
-	runningObjs, protoObjs, err := prepareFileTemplateObjects(transCtx)
+	runningObjs, protoObjs, err := t.prepareFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
@@ -71,7 +78,12 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		component.AddInstanceAssistantObject(transCtx.SynthesizeComponent, obj)
 	}
 
-	return t.buildPodVolumes(transCtx)
+	if err = t.buildPodVolumes(transCtx); err != nil {
+		return err
+	}
+
+	// build config templates for the workload
+	return t.buildConfigTemplates(transCtx, runningObjs, protoObjs, toUpdate)
 }
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
@@ -142,13 +154,13 @@ func (t *componentFileTemplateTransformer) newVolume(tpl component.SynthesizedFi
 	return vol
 }
 
-func prepareFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, map[string]*corev1.ConfigMap, error) {
-	runningObjs, err := getFileTemplateObjects(transCtx)
+func (t *componentFileTemplateTransformer) prepareFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, map[string]*corev1.ConfigMap, error) {
+	runningObjs, err := t.getFileTemplateObjects(transCtx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	protoObjs, err := buildFileTemplateObjects(transCtx)
+	protoObjs, err := t.buildFileTemplateObjects(transCtx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -163,7 +175,7 @@ func prepareFileTemplateObjects(transCtx *componentTransformContext) (map[string
 	return runningObjs, protoObjs, nil
 }
 
-func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
+func (t *componentFileTemplateTransformer) getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
 	var (
 		synthesizedComp = transCtx.SynthesizeComponent
 	)
@@ -186,14 +198,15 @@ func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*co
 	return objs, nil
 }
 
-func buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
+func (t *componentFileTemplateTransformer) buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
 	objs := make(map[string]*corev1.ConfigMap)
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
-		// If the file template is managed by external, the cm object has been rendered by the external manager.
+		// If the file template is managed by external, the CM object has been rendered and created by the external manager.
 		if isExternalManaged(tpl) {
 			continue
 		}
-		obj, err := buildFileTemplateObject(transCtx, tpl)
+
+		obj, err := t.buildFileTemplateObject(transCtx, tpl)
 		if err != nil {
 			return nil, err
 		}
@@ -202,13 +215,13 @@ func buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*
 	return objs, nil
 }
 
-func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (*corev1.ConfigMap, error) {
+func (t *componentFileTemplateTransformer) buildFileTemplateObject(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (*corev1.ConfigMap, error) {
 	var (
 		compDef         = transCtx.CompDef
 		synthesizedComp = transCtx.SynthesizeComponent
 	)
 
-	data, err := buildFileTemplateData(transCtx, tpl)
+	data, err := t.buildFileTemplateData(transCtx, tpl)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +250,7 @@ func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.
 	return obj, nil
 }
 
-func buildFileTemplateData(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (map[string]string, error) {
+func (t *componentFileTemplateTransformer) buildFileTemplateData(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (map[string]string, error) {
 	cmObj, err := func() (*corev1.ConfigMap, error) {
 		cm := &corev1.ConfigMap{}
 		cmKey := types.NamespacedName{
@@ -257,10 +270,10 @@ func buildFileTemplateData(transCtx *componentTransformContext, tpl component.Sy
 	if err != nil {
 		return nil, err
 	}
-	return renderFileTemplateData(transCtx, tpl, cmObj.Data)
+	return t.renderFileTemplateData(transCtx, tpl, cmObj.Data)
 }
 
-func renderFileTemplateData(transCtx *componentTransformContext,
+func (t *componentFileTemplateTransformer) renderFileTemplateData(transCtx *componentTransformContext,
 	fileTemplate component.SynthesizedFileTemplate, data map[string]string) (map[string]string, error) {
 	var (
 		synthesizedComp = transCtx.SynthesizeComponent
@@ -301,4 +314,150 @@ func fileTemplateNameFromObject(synthesizedComp *component.SynthesizedComponent,
 
 func isExternalManaged(tpl component.SynthesizedFileTemplate) bool {
 	return ptr.Deref(tpl.ExternalManaged, false)
+}
+
+func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *componentTransformContext,
+	runningObjs, protoObjs map[string]*corev1.ConfigMap, toUpdate sets.Set[string]) error {
+	var (
+		synthesizedComp = transCtx.SynthesizeComponent
+		configHash      = func(tpl component.SynthesizedFileTemplate) *string {
+			if isExternalManaged(tpl) {
+				return tpl.ConfigHash
+			}
+			objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
+			obj := protoObjs[objName]
+			if obj == nil {
+				return nil
+			}
+			val, ok := obj.Annotations[constant.CMInsConfigurationHashLabelKey]
+			if !ok {
+				return nil
+			}
+			return &val
+		}
+		action = func(tpl component.SynthesizedFileTemplate) *kbappsv1.Action {
+			if tpl.Reconfigure == nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+				return synthesizedComp.LifecycleActions.Reconfigure
+			}
+			return tpl.Reconfigure
+		}
+
+		actionName = func(tpl component.SynthesizedFileTemplate) string {
+			name := component.UDFReconfigureActionName(tpl)
+			if tpl.Reconfigure == nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+				name = "" // default reconfigure action
+			}
+			return name
+		}
+		templateChanges = t.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
+		parameters      = func(tpl component.SynthesizedFileTemplate) map[string]string {
+			changes, ok := templateChanges[tpl.Name]
+			if !ok {
+				return nil
+			}
+			result := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
+			maps.Copy(result, tpl.Variables)
+			return result
+		}
+	)
+	for _, tpl := range synthesizedComp.FileTemplates {
+		if tpl.Config {
+			config := workloads.ConfigTemplate{
+				Name:                  tpl.Name,
+				ConfigHash:            configHash(tpl),
+				Restart:               tpl.RestartOnFileChange,
+				Reconfigure:           action(tpl),
+				ReconfigureActionName: actionName(tpl),
+				Parameters:            parameters(tpl),
+			}
+			synthesizedComp.Configs = append(synthesizedComp.Configs, config)
+		}
+	}
+	slices.SortFunc(synthesizedComp.Configs, func(a, b workloads.ConfigTemplate) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return nil
+}
+
+func (t *componentFileTemplateTransformer) templateFileChanges(transCtx *componentTransformContext,
+	runningObjs, protoObjs map[string]*corev1.ConfigMap, update sets.Set[string]) map[string]fileTemplateChanges {
+	diff := func(obj *corev1.ConfigMap, rData, pData map[string]string) fileTemplateChanges {
+		var (
+			tplName = fileTemplateNameFromObject(transCtx.SynthesizeComponent, obj)
+			items   = make([][]string, 3)
+		)
+
+		toAdd, toDelete, toUpdate := mapDiff(rData, pData)
+
+		items[0], items[1] = sets.List(toAdd), sets.List(toDelete)
+		for item := range toUpdate {
+			if !reflect.DeepEqual(rData[item], pData[item]) {
+				absPath := t.absoluteFilePath(transCtx, tplName, item)
+				if len(absPath) > 0 {
+					checksum := sha256.Sum256([]byte(pData[item]))
+					items[2] = append(items[2], fmt.Sprintf("%s:%x", absPath, checksum))
+				}
+			}
+		}
+
+		for i := range items {
+			slices.Sort(items[i])
+		}
+
+		return fileTemplateChanges{
+			Created: strings.Join(items[0], ","),
+			Removed: strings.Join(items[1], ","),
+			Updated: strings.Join(items[2], ","),
+		}
+	}
+
+	result := make(map[string]fileTemplateChanges)
+	for name := range update {
+		rData, pData := runningObjs[name].Data, protoObjs[name].Data
+		if !reflect.DeepEqual(rData, pData) {
+			tplName := fileTemplateNameFromObject(transCtx.SynthesizeComponent, runningObjs[name])
+			result[tplName] = diff(runningObjs[name], rData, pData)
+		}
+	}
+	return result
+}
+
+func (t *componentFileTemplateTransformer) absoluteFilePath(transCtx *componentTransformContext, tpl, file string) string {
+	var (
+		synthesizedComp = transCtx.SynthesizeComponent
+	)
+
+	var volName, mountPath string
+	for _, fileTpl := range synthesizedComp.FileTemplates {
+		if fileTpl.Name == tpl {
+			volName = fileTpl.VolumeName
+			break
+		}
+	}
+	if volName == "" {
+		return "" // has no volumes specified
+	}
+
+	for _, container := range synthesizedComp.PodSpec.Containers {
+		for _, mount := range container.VolumeMounts {
+			if mount.Name == volName {
+				mountPath = mount.MountPath
+				break
+			}
+		}
+		if mountPath != "" {
+			break
+		}
+	}
+	if mountPath == "" {
+		return "" // the template is not mounted, ignore it
+	}
+
+	return filepath.Join(mountPath, file)
+}
+
+type fileTemplateChanges struct {
+	Created string `json:"created,omitempty"`
+	Removed string `json:"removed,omitempty"`
+	Updated string `json:"updated,omitempty"`
 }

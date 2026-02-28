@@ -17,32 +17,31 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package factory
+package component
 
 import (
-	"encoding/json"
-	"strconv"
+	"context"
+	"maps"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-// BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		compDefName = synthesizedComp.CompDefName
 		namespace   = synthesizedComp.Namespace
@@ -63,10 +62,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, compDef)).
 		AddAnnotationsInMap(synthesizedComp.AnnotationsInjectedToWorkload).
-		SetTemplate(getTemplate(synthesizedComp)).
-		SetSelectorMatchLabel(getTemplateLabels(synthesizedComp)).
+		SetTemplate(getPodTemplate(synthesizedComp)).
+		SetSelectorMatchLabel(getPodTemplateLabels(synthesizedComp)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetVolumeClaimTemplates(defaultVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
@@ -102,12 +100,12 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, compDef *
 	return itsObj, nil
 }
 
-func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemplateSpec {
+func getPodTemplate(synthesizedComp *SynthesizedComponent) corev1.PodTemplateSpec {
 	podBuilder := builder.NewPodBuilder("", "").
 		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
-		AddLabelsInMap(getTemplateLabels(synthesizedComp)).
+		AddLabelsInMap(getPodTemplateLabels(synthesizedComp)).
 		AddLabelsInMap(map[string]string{
 			constant.AppComponentLabelKey:   synthesizedComp.CompDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
@@ -120,17 +118,17 @@ func getTemplate(synthesizedComp *component.SynthesizedComponent) corev1.PodTemp
 	}
 }
 
-func getTemplateLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {
+func getPodTemplateLabels(synthesizedComp *SynthesizedComponent) map[string]string {
 	labels := constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Labels)
 	labels[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
 	return labels
 }
 
-func defaultVolumeClaimTemplates(synthesizedComp *component.SynthesizedComponent) []corev1.PersistentVolumeClaim {
+func defaultVolumeClaimTemplates(synthesizedComp *SynthesizedComponent) []corev1.PersistentVolumeClaim {
 	return toPersistentVolumeClaims(synthesizedComp, synthesizedComp.VolumeClaimTemplates)
 }
 
-func toPersistentVolumeClaims(synthesizedComp *component.SynthesizedComponent, vcts []corev1.PersistentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
+func toPersistentVolumeClaims(synthesizedComp *SynthesizedComponent, vcts []corev1.PersistentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
 	pvc := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
@@ -149,7 +147,7 @@ func toPersistentVolumeClaims(synthesizedComp *component.SynthesizedComponent, v
 	return pvcs
 }
 
-func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []workloads.InstanceTemplate {
+func getInstanceTemplates(synthesizedComp *SynthesizedComponent) []workloads.InstanceTemplate {
 	instances := synthesizedComp.Instances
 	if instances == nil {
 		return nil
@@ -178,60 +176,30 @@ func getInstanceTemplates(synthesizedComp *component.SynthesizedComponent) []wor
 	return instanceTemplates
 }
 
-func getPodManagementPolicy(synthesizedComp *component.SynthesizedComponent) appsv1.PodManagementPolicyType {
+func getPodManagementPolicy(synthesizedComp *SynthesizedComponent) appsv1.PodManagementPolicyType {
 	if synthesizedComp.PodManagementPolicy != nil {
 		return *synthesizedComp.PodManagementPolicy
 	}
 	return appsv1.OrderedReadyPodManagement // default value
 }
 
-func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedComponent) *intstr.IntOrString {
+func getParallelPodManagementConcurrency(synthesizedComp *SynthesizedComponent) *intstr.IntOrString {
 	if synthesizedComp.ParallelPodManagementConcurrency != nil {
 		return synthesizedComp.ParallelPodManagementConcurrency
 	}
 	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"} // default value
 }
 
-func getInstanceUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.InstanceUpdateStrategy {
+func getInstanceUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.InstanceUpdateStrategy {
 	// TODO: on-delete if the member update strategy is not null?
 	return synthesizedComp.InstanceUpdateStrategy
 }
 
-func getMemberUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.MemberUpdateStrategy {
+func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.MemberUpdateStrategy {
 	if synthesizedComp.UpdateStrategy != nil {
 		return (*workloads.MemberUpdateStrategy)(synthesizedComp.UpdateStrategy)
 	}
 	return ptr.To(workloads.SerialUpdateStrategy)
-}
-
-// getMonitorAnnotations returns the annotations for the monitor.
-func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *kbappsv1.ComponentDefinition) map[string]string {
-	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
-		return nil
-	}
-
-	exporter := component.GetExporter(componentDef.Spec)
-	if exporter == nil {
-		return nil
-	}
-
-	// Node: If it is an old addon, containerName may be empty.
-	container := getBuiltinContainer(synthesizedComp, exporter.ContainerName)
-	if container == nil && exporter.ScrapePort == "" && exporter.TargetPort == nil {
-		klog.Warningf("invalid exporter port and ignore for component: %s, componentDef: %s", synthesizedComp.Name, componentDef.Name)
-		return nil
-	}
-	return instanceset.AddAnnotationScope(instanceset.HeadlessServiceScope, common.GetScrapeAnnotations(*exporter, container))
-}
-
-func getBuiltinContainer(synthesizedComp *component.SynthesizedComponent, containerName string) *corev1.Container {
-	containers := synthesizedComp.PodSpec.Containers
-	for i := range containers {
-		if containers[i].Name == containerName {
-			return &containers[i]
-		}
-	}
-	return nil
 }
 
 func setDefaultResourceLimits(its *workloads.InstanceSet) {
@@ -242,96 +210,128 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 	}
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from component to pvc.
-func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
-	pvcTplName, templateName string) {
-	// strict args checking.
-	if pvc == nil || component == nil {
+func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
+	return listWorkloads(ctx, cli, namespace, clusterName, compName)
+}
+
+func ListOwnedPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
+	opts ...client.ListOption) ([]*corev1.Pod, error) {
+	return listPods(ctx, cli, namespace, clusterName, compName, nil, opts...)
+}
+
+func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, clusterName, compName, role string,
+	opts ...client.ListOption) ([]*corev1.Pod, error) {
+	roleLabel := map[string]string{constant.RoleLabelKey: role}
+	return listPods(ctx, cli, namespace, clusterName, compName, roleLabel, opts...)
+}
+
+func ListOwnedServices(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
+	opts ...client.ListOption) ([]*corev1.Service, error) {
+	labels := constant.GetCompLabels(clusterName, compName)
+	return listObjWithLabelsInNamespace(ctx, cli, generics.ServiceSignature, namespace, labels, opts...)
+}
+
+// GetMinReadySeconds gets the underlying workload's minReadySeconds of the component.
+func GetMinReadySeconds(ctx context.Context, cli client.Client, cluster kbappsv1.Cluster, compName string) (minReadySeconds int32, err error) {
+	var its []*workloads.InstanceSet
+	its, err = listWorkloads(ctx, cli, cluster.Namespace, cluster.Name, compName)
+	if err != nil {
 		return
 	}
-	if pvc.Labels == nil {
-		pvc.Labels = make(map[string]string)
+	if len(its) > 0 {
+		minReadySeconds = its[0].Spec.MinReadySeconds
+		return
 	}
-	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
-	if templateName != "" {
-		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = templateName
-	}
+	return minReadySeconds, err
 }
 
-// GetRestorePassword gets restore password if exists during recovery.
-func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string {
-	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
-	if len(valueString) == 0 {
-		return ""
+func listWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
+	labels := constant.GetCompLabels(clusterName, compName)
+	return listObjWithLabelsInNamespace(ctx, cli, generics.InstanceSetSignature, namespace, labels)
+}
+
+func listPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
+	labels map[string]string, opts ...client.ListOption) ([]*corev1.Pod, error) {
+	if labels == nil {
+		labels = constant.GetCompLabels(clusterName, compName)
+	} else {
+		maps.Copy(labels, constant.GetCompLabels(clusterName, compName))
 	}
-	backupMap := map[string]map[string]string{}
-	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if opts == nil {
+		opts = make([]client.ListOption, 0)
+	}
+	opts = append(opts, inDataContext()) // TODO: pod
+	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels, opts...)
+}
+
+func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+	ctx context.Context, cli client.Reader, _ func(T, PT, L, PL), namespace string, labels client.MatchingLabels, opts ...client.ListOption) ([]PT, error) {
+	if opts == nil {
+		opts = make([]client.ListOption, 0)
+	}
+	opts = append(opts, []client.ListOption{labels, client.InNamespace(namespace)}...)
+
+	var objList L
+	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
+		return nil, err
+	}
+
+	objs := make([]PT, 0)
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for i := range items {
+		objs = append(objs, &items[i])
+	}
+	return objs, nil
+}
+
+func GetCurrentPodNamesByITS(runningITS *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(runningITS, nil)
 	if err != nil {
-		return ""
+		return nil, err
 	}
-	backupSource, ok := backupMap[synthesizedComp.Name]
-	if !ok {
-		return ""
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
 	}
-	password, ok := backupSource[constant.ConnectionPassword]
-	if !ok {
-		return ""
-	}
-	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	password, _ = e.Decrypt([]byte(password))
-	return password
+	return nameBuilder.GenerateAllInstanceNames()
 }
 
-// TODO: add dynamicLabels and dynamicAnnotations by @zhangtao
-
-func BuildConfigMapWithTemplate(cluster *kbappsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent,
-	configs map[string]string,
-	cmName string,
-	configTemplateSpec kbappsv1.ComponentFileTemplate) *corev1.ConfigMap {
-	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
-		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
-		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.Template).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
-		SetData(configs).
-		GetObject()
-}
-
-func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {
-	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
-		GetObject()
-}
-
-func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, name string, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
-	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, name).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetRoleRef(*roleRef).
-		AddSubjects(rbacv1.Subject{
-			Kind:      rbacv1.ServiceAccountKind,
-			Namespace: synthesizedComp.Namespace,
-			Name:      saName,
-		}).
-		GetObject()
-}
-
-func BuildRole(synthesizedComp *component.SynthesizedComponent, cmpd *kbappsv1.ComponentDefinition) *rbacv1.Role {
-	rules := cmpd.Spec.PolicyRules
-	if len(rules) == 0 {
-		return nil
+func GetDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]string, error) {
+	if runningITS != nil {
+		protoITS = protoITS.DeepCopy()
+		protoITS.Status.AssignedOrdinals = runningITS.Status.AssignedOrdinals
 	}
-	return builder.NewRoleBuilder(synthesizedComp.Namespace, constant.GenerateDefaultRoleName(cmpd.Name)).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddPolicyRules(rules).
-		GetObject()
+	return GetCurrentPodNamesByITS(protoITS)
+}
+
+func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
+	instanceTemplates := func() []workloads.InstanceTemplate {
+		if len(comp.Spec.Instances) == 0 {
+			return nil
+		}
+		templates := make([]workloads.InstanceTemplate, len(comp.Spec.Instances))
+		for i, tpl := range comp.Spec.Instances {
+			templates[i] = workloads.InstanceTemplate{
+				Name:     tpl.Name,
+				Replicas: tpl.Replicas,
+				Ordinals: tpl.Ordinals,
+			}
+		}
+		return templates
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   comp.Namespace,
+			Name:        comp.Name,
+			Annotations: comp.Annotations,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            &comp.Spec.Replicas,
+			Instances:           instanceTemplates(),
+			Ordinals:            comp.Spec.Ordinals,
+			FlatInstanceOrdinal: comp.Spec.FlatInstanceOrdinal,
+			OfflineInstances:    comp.Spec.OfflineInstances,
+		},
+	}
+	return GetCurrentPodNamesByITS(its)
 }

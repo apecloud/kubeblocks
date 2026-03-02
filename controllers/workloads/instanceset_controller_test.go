@@ -21,6 +21,7 @@ package workloads
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -43,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -423,13 +425,47 @@ var _ = Describe("InstanceSet Controller", func() {
 	})
 
 	Context("reconfigure", func() {
+		var (
+			supportResizeSubResource func() (bool, error)
+		)
+
+		BeforeEach(func() {
+			supportResizeSubResource = intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+		})
+
+		AfterEach(func() {
+			intctrlutil.SupportResizeSubResource = supportResizeSubResource
+		})
+
 		It("instance status", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
-				f.AddConfigs(workloads.ConfigTemplate{
-					Name:       "server",
-					ConfigHash: ptr.To("123456"),
-				})
+				f.AddConfigs([]workloads.ConfigTemplate{
+					{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				}...)
 			})
+
+			By("check pod config annotation")
+			configMap := map[string]string{
+				"log":    "123456",
+				"server": "123456",
+			}
+			configVal, err := json.Marshal(configMap)
+			Expect(err).NotTo(HaveOccurred())
+			podKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      fmt.Sprintf("%s-0", itsObj.Name),
+			}
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.Annotations).Should(HaveKeyWithValue(constant.CMInsConfigurationHashLabelKey, string(configVal)))
+			})).Should(Succeed())
 
 			By("check instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -437,6 +473,10 @@ var _ = Describe("InstanceSet Controller", func() {
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "log",
+							ConfigHash: ptr.To("123456"),
+						},
 						{
 							Name:       "server",
 							ConfigHash: ptr.To("123456"),
@@ -467,18 +507,24 @@ var _ = Describe("InstanceSet Controller", func() {
 					Type: kbappsv1.RollingUpdateStrategyType,
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
-						Name:       "server",
+						Name:       "log",
 						ConfigHash: ptr.To("123456"),
 					},
 					{
-						Name:       "logging",
-						ConfigHash: ptr.To("654321"),
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
 
 			By("mock pods running and available")
 			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+
+			By("check the reconfigure action NOT called")
+			Consistently(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -487,30 +533,31 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
+							Name:       "log",
 							ConfigHash: ptr.To("123456"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("654321"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
 
-			By("check the reconfigure action NOT called")
-			Eventually(func(g Gomega) {
-				g.Expect(reconfigure).Should(BeEmpty())
-				g.Expect(parameters).Should(BeNil())
-			}).Should(Succeed())
-
 			By("update configs to reconfigure")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
-				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
-				its.Spec.Configs[1].ReconfigureActionName = ""
-				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
+				its.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[0].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[0].ReconfigureActionName = ""
+				its.Spec.Configs[0].Parameters = map[string]string{"foo": "bar"}
 			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).ShouldNot(BeNil())
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
 
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -519,23 +566,16 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
-							ConfigHash: ptr.To("123456"),
+							Name:       "log",
+							ConfigHash: ptr.To("abcdef"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("abcdef"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
-
-			By("check the reconfigure action call")
-			Eventually(func(g Gomega) {
-				g.Expect(reconfigure).Should(Equal("reconfigure"))
-				g.Expect(parameters).ShouldNot(BeNil())
-				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
-			}).Should(Succeed())
 		})
 
 		It("reconfigure - udf", func() {
@@ -559,17 +599,23 @@ var _ = Describe("InstanceSet Controller", func() {
 					Type: kbappsv1.RollingUpdateStrategyType,
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
-						Name:       "server",
+						Name:       "log",
 						ConfigHash: ptr.To("123456"),
 					},
 					{
-						Name:       "logging",
-						ConfigHash: ptr.To("654321"),
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
 
 			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+
+			By("check the reconfigure action NOT called")
+			Consistently(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -578,30 +624,31 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
+							Name:       "log",
 							ConfigHash: ptr.To("123456"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("654321"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
 
-			By("check the reconfigure action NOT called")
-			Eventually(func(g Gomega) {
-				g.Expect(reconfigure).Should(BeEmpty())
-				g.Expect(parameters).Should(BeNil())
-			}).Should(Succeed())
-
 			By("update configs to reconfigure")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
-				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
-				its.Spec.Configs[1].ReconfigureActionName = "reconfigure-server"
-				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
+				its.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[0].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[0].ReconfigureActionName = "reconfigure-server"
+				its.Spec.Configs[0].Parameters = map[string]string{"foo": "bar"}
 			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(ContainSubstring("reconfigure-server"))
+				g.Expect(parameters).ShouldNot(BeNil())
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
 
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -610,23 +657,16 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
-							ConfigHash: ptr.To("123456"),
+							Name:       "log",
+							ConfigHash: ptr.To("abcdef"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("abcdef"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
-
-			By("check the reconfigure action call")
-			Eventually(func(g Gomega) {
-				g.Expect(reconfigure).Should(ContainSubstring("reconfigure-server"))
-				g.Expect(parameters).ShouldNot(BeNil())
-				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
-			}).Should(Succeed())
 		})
 
 		It("restart", func() {
@@ -635,12 +675,12 @@ var _ = Describe("InstanceSet Controller", func() {
 					Type: kbappsv1.RollingUpdateStrategyType,
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
-						Name:       "server",
+						Name:       "log",
 						ConfigHash: ptr.To("123456"),
 					},
 					{
-						Name:       "logging",
-						ConfigHash: ptr.To("654321"),
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
@@ -655,12 +695,12 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
+							Name:       "log",
 							ConfigHash: ptr.To("123456"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("654321"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
@@ -668,8 +708,8 @@ var _ = Describe("InstanceSet Controller", func() {
 
 			By("update configs to restart")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
-				its.Spec.Configs[1].Restart = ptr.To(true)
+				its.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[0].Restart = ptr.To(true)
 			})()).ShouldNot(HaveOccurred())
 
 			By("check the instance status updated")
@@ -679,12 +719,12 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
-							ConfigHash: ptr.To("123456"),
+							Name:       "log",
+							ConfigHash: ptr.To("abcdef"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("abcdef"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
@@ -718,18 +758,24 @@ var _ = Describe("InstanceSet Controller", func() {
 					Type: kbappsv1.RollingUpdateStrategyType,
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
-						Name:       "server",
+						Name:       "log",
 						ConfigHash: ptr.To("123456"),
 					},
 					{
-						Name:       "logging",
-						ConfigHash: ptr.To("654321"),
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
 
 			pods := mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
 			Expect(pods).Should(HaveLen(1))
+
+			By("check the reconfigure action NOT called")
+			Consistently(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -738,49 +784,25 @@ var _ = Describe("InstanceSet Controller", func() {
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
-							Name:       "server",
+							Name:       "log",
 							ConfigHash: ptr.To("123456"),
 						},
 						{
-							Name:       "logging",
-							ConfigHash: ptr.To("654321"),
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
-
-			By("check the reconfigure action NOT called")
-			Eventually(func(g Gomega) {
-				g.Expect(reconfigure).Should(BeEmpty())
-				g.Expect(parameters).Should(BeNil())
-			}).Should(Succeed())
 
 			By("update configs to reconfigure and restart")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
-				its.Spec.Configs[1].Restart = ptr.To(true)
-				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
-				its.Spec.Configs[1].ReconfigureActionName = ""
-				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
+				its.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[0].Restart = ptr.To(true)
+				its.Spec.Configs[0].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[0].ReconfigureActionName = ""
+				its.Spec.Configs[0].Parameters = map[string]string{"foo": "bar"}
 			})()).ShouldNot(HaveOccurred())
-
-			By("check the instance status updated")
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
-					Configs: []workloads.InstanceConfigStatus{
-						{
-							Name:       "server",
-							ConfigHash: ptr.To("123456"),
-						},
-						{
-							Name:       "logging",
-							ConfigHash: ptr.To("abcdef"),
-						},
-					},
-				}))
-			})).Should(Succeed())
 
 			By("check the reconfigure action call")
 			Eventually(func(g Gomega) {
@@ -793,6 +815,24 @@ var _ = Describe("InstanceSet Controller", func() {
 			podKey := client.ObjectKeyFromObject(pods[0])
 			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
 				// g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID)) TODO: impl
+			})).Should(Succeed())
+
+			By("check the instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "log",
+							ConfigHash: ptr.To("abcdef"),
+						},
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
+						},
+					},
+				}))
 			})).Should(Succeed())
 		})
 	})

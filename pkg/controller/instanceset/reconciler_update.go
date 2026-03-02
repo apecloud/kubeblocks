@@ -148,6 +148,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
+		// TODO(1): getPodUpdatePolicy should cover the changes of the configs
+		// TODO(2): support restart
 		updatePolicy, specUpdatePolicy, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -165,6 +167,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatePolicy == inPlaceUpdatePolicy && specUpdatePolicy == kbappsv1.ReCreatePodUpdatePolicyType {
 			updatePolicy = recreatePolicy
 		}
+
+		// reload the new config before updating pods
+		if updatePolicy != recreatePolicy {
+			allUpdated, err1 := r.reconfigure(tree, its, pod)
+			if err1 != nil {
+				return kubebuilderx.Continue, err1
+			}
+			if !allUpdated && updatePolicy == noOpsPolicy {
+				updatingPods++
+			}
+		}
+
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
 			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
@@ -203,17 +217,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingPods++
 		}
-
-		// actively reload the new configuration when the pod or container has not been updated
-		if updatePolicy == noOpsPolicy {
-			allUpdated, err := r.reconfigure(tree, its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			if !allUpdated {
-				updatingPods++
-			}
-		}
 	}
 
 	if !isBlocked {
@@ -245,7 +248,7 @@ func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(podList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, podList, r.isPodOrConfigUpdated)
+		plan := NewUpdatePlan(*its, podList, r.isInstUpdated)
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return -1, err
@@ -296,21 +299,36 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 }
 
 func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	allUpdated := true
-	for _, config := range its.Spec.Configs {
-		if !r.isConfigUpdated(its, pod, config) {
-			allUpdated = false
-			if err := r.reconfigureConfig(tree, its, pod, config); err != nil {
-				return false, err
-			}
-		}
-		// TODO: compose the status from pods but not the its spec and status
-		r.setInstanceConfigStatus(its, pod, config)
+	toUpdate, err := r.configsToUpdate(its, pod)
+	if err != nil {
+		return false, err
 	}
-	return allUpdated, nil
+	for _, config := range toUpdate {
+		if err = r.reconfigureInst(tree, its, pod, config); err != nil {
+			return false, err
+		}
+	}
+	return len(toUpdate) == 0, nil
 }
 
-func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+func (r *updateReconciler) configsToUpdate(its *workloads.InstanceSet, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	configs, err := configsFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	toUpdate := make([]workloads.ConfigTemplate, 0)
+	for i, config := range its.Spec.Configs {
+		idx := slices.IndexFunc(configs, func(inst workloads.ConfigTemplate) bool {
+			return inst.Name == config.Name
+		})
+		if idx < 0 || !ptr.Equal(config.ConfigHash, configs[idx].ConfigHash) {
+			toUpdate = append(toUpdate, its.Spec.Configs[i])
+		}
+	}
+	return toUpdate, nil
+}
+
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
 	if config.Reconfigure == nil {
 		return nil // skip
 	}
@@ -344,63 +362,13 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 	return nil
 }
 
-func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
-	if its.Status.InstanceStatus == nil {
-		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
+func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+	updated, err := isPodUpdated(its, pod)
+	if err != nil || !updated {
+		return updated, err
 	}
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-		return instance.PodName == pod.Name
-	})
-	if idx < 0 {
-		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
-		idx = len(its.Status.InstanceStatus) - 1
-	}
-
-	if its.Status.InstanceStatus[idx].Configs == nil {
-		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
-	}
-	status := workloads.InstanceConfigStatus{
-		Name:       config.Name,
-		ConfigHash: config.ConfigHash,
-	}
-	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
-		if configStatus.Name == config.Name {
-			its.Status.InstanceStatus[idx].Configs[i] = status
-			return
-		}
-	}
-	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
-}
-
-func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, _, err := getPodUpdatePolicy(its, pod)
-	if err != nil {
-		return false, err
-	}
-	if policy != noOpsPolicy {
-		return false, nil
-	}
-	for _, config := range its.Spec.Configs {
-		if !r.isConfigUpdated(its, pod, config) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
-	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-		return instance.PodName == pod.Name
-	})
-	if idx < 0 {
-		return true // new pod provisioned
-	}
-	for _, status := range its.Status.InstanceStatus[idx].Configs {
-		if status.Name == config.Name {
-			return ptr.Equal(config.ConfigHash, status.ConfigHash)
-		}
-	}
-	return ptr.Deref(config.ConfigHash, "") == ""
+	toUpdate, err2 := r.configsToUpdate(its, pod)
+	return len(toUpdate) == 0, err2
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

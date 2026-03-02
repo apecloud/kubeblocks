@@ -85,11 +85,10 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	}
 	resp, err := s.handleRequest(ctx, req)
 	result := string(resp)
-	logFields := []any{"action", req.Action, "result", result}
 	if err != nil {
-		logFields = append(logFields, "error", err.Error())
+		result = err.Error()
 	}
-	s.logger.Info("Action Executed", logFields...)
+	s.logger.Info("Action Executed", "action", req.Action, "result", result)
 	return s.encode(resp, err), nil
 }
 

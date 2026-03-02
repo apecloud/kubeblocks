@@ -116,9 +116,16 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
 			return nil, errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg)
-		}
-		if errMsg := result.stderr.String(); len(errMsg) > 0 {
-			return nil, errors.Wrapf(err, "%s", errMsg)
+		} else if errors.Is(err, kbaproto.ErrTimedOut) {
+			// use the stdout as the error message for timeout scenario
+			var errMsg string
+			if stdoutMsg := result.stdout.String(); len(stdoutMsg) > 0 {
+				errMsg = fmt.Sprintf("stdout: %s", stdoutMsg)
+			}
+			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
+				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
+			}
+			return nil, errors.Wrapf(kbaproto.ErrTimedOut, "%s", errMsg)
 		}
 		return nil, err
 	}

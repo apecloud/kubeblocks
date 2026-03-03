@@ -22,7 +22,6 @@ package instanceset
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -122,7 +121,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
-		updatePolicy, _, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -148,9 +147,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		// TODO(1): getPodUpdatePolicy should cover the changes of the configs
-		// TODO(2): support restart
-		updatePolicy, specUpdatePolicy, err := getPodUpdatePolicy(its, pod)
+		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -166,17 +163,16 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		if updatePolicy == inPlaceUpdatePolicy && specUpdatePolicy == kbappsv1.ReCreatePodUpdatePolicyType {
 			updatePolicy = recreatePolicy
+			recreateReason = "the API required"
 		}
 
-		// reload the new config before updating pods
-		if updatePolicy != recreatePolicy {
-			allUpdated, err1 := r.reconfigure(tree, its, pod)
-			if err1 != nil {
-				return kubebuilderx.Continue, err1
-			}
-			if !allUpdated && updatePolicy == noOpsPolicy {
-				updatingPods++
-			}
+		// Always call reconfigure to execute reconfigure actions
+		allUpdated, err1 := r.reconfigure(tree, its, pod)
+		if err1 != nil {
+			return kubebuilderx.Continue, err1
+		}
+		if !allUpdated && updatePolicy == noOpsPolicy {
+			updatingPods++
 		}
 
 		switch updatePolicy {
@@ -208,6 +204,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updatingPods++
 		case recreatePolicy:
 			if !isTerminating(pod) {
+				tree.Logger.Info("recreate pod", "name", pod.Name, "reason", recreateReason)
 				if err = r.switchover(tree, its, pod); err != nil {
 					return kubebuilderx.Continue, err
 				}
@@ -299,7 +296,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 }
 
 func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	toUpdate, err := r.configsToUpdate(its, pod)
+	toUpdate, err := configsToUpdate(its, pod)
 	if err != nil {
 		return false, err
 	}
@@ -309,23 +306,6 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		}
 	}
 	return len(toUpdate) == 0, nil
-}
-
-func (r *updateReconciler) configsToUpdate(its *workloads.InstanceSet, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
-	configs, err := configsFromPod(pod)
-	if err != nil {
-		return nil, err
-	}
-	toUpdate := make([]workloads.ConfigTemplate, 0)
-	for i, config := range its.Spec.Configs {
-		idx := slices.IndexFunc(configs, func(inst workloads.ConfigTemplate) bool {
-			return inst.Name == config.Name
-		})
-		if idx < 0 || !ptr.Equal(config.ConfigHash, configs[idx].ConfigHash) {
-			toUpdate = append(toUpdate, its.Spec.Configs[i])
-		}
-	}
-	return toUpdate, nil
 }
 
 func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
@@ -363,27 +343,12 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 }
 
 func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	updated, err := r.isPodUpdated(its, pod)
-	if err != nil || !updated {
-		return updated, err
+	updated, err1 := isPodUpdated(its, pod)
+	if err1 != nil || !updated {
+		return updated, err1
 	}
-	return r.isConfigUpdated(its, pod)
-}
-
-func (r *updateReconciler) isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, _, err := getPodUpdatePolicy(its, pod)
-	if err != nil {
-		return false, err
-	}
-	if policy != noOpsPolicy {
-		return false, nil
-	}
-	return true, nil
-}
-
-func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	toUpdate, err := r.configsToUpdate(its, pod)
-	return len(toUpdate) == 0, err
+	toUpdate, err2 := configsToUpdate(its, pod)
+	return len(toUpdate) == 0, err2
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

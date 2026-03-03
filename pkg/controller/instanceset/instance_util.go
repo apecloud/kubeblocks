@@ -707,3 +707,37 @@ func configsFromPod(pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
 	})
 	return configs, nil
 }
+
+func configsToUpdate(its *workloads.InstanceSet, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	configs, err := configsFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	toUpdate := make([]workloads.ConfigTemplate, 0)
+	for i, config := range its.Spec.Configs {
+		idx := slices.IndexFunc(configs, func(cfg workloads.ConfigTemplate) bool {
+			return cfg.Name == config.Name
+		})
+		if idx < 0 || !ptr.Equal(config.ConfigHash, configs[idx].ConfigHash) {
+			toUpdate = append(toUpdate, its.Spec.Configs[i])
+		}
+	}
+	return toUpdate, nil
+}
+
+func hasConfigRestart(its *workloads.InstanceSet, pod *corev1.Pod) (bool, []string, error) {
+	toUpdate, err := configsToUpdate(its, pod)
+	if err != nil {
+		return false, nil, err
+	}
+	toRestart := make([]string, 0)
+	for _, config := range toUpdate {
+		if ptr.Deref(config.Restart, false) {
+			toRestart = append(toRestart, config.Name) // Config requires restart and is not up-to-date
+		}
+	}
+	if len(toRestart) > 0 {
+		return true, toRestart, nil
+	}
+	return false, nil, nil
+}

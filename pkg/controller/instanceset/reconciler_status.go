@@ -116,12 +116,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := isPodUpdated(its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
+			updated, err1 := isPodUpdated(its, pod)
+			if err1 != nil {
+				return kubebuilderx.Continue, err1
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
-			case !ok, !isPodUpdated:
+			case !ok, !updated:
 				currentReplicas++
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			default:

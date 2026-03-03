@@ -2402,7 +2402,7 @@ var _ = Describe("Component Controller", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
-		PIt("reconfigure - config hash", func() {
+		It("reconfigure - config hash", func() {
 			testReconfigureConfigHash(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})

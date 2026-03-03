@@ -711,6 +711,12 @@ var _ = Describe("InstanceSet Controller", func() {
 				its.Spec.Configs[0].Restart = ptr.To(true)
 			})()).ShouldNot(HaveOccurred())
 
+			By("check the instance restarted")
+			podKey := client.ObjectKeyFromObject(pods[0])
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID))
+			})).Should(Succeed())
+
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
@@ -728,25 +734,22 @@ var _ = Describe("InstanceSet Controller", func() {
 					},
 				}))
 			})).Should(Succeed())
-
-			By("check the instance restarted")
-			podKey := client.ObjectKeyFromObject(pods[0])
-			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
-				// g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID)) TODO: impl
-			})).Should(Succeed())
 		})
 
-		It("reconfigure and restart", func() {
+		It("reconfigure & restart", func() {
 			By("mock reconfigure action calls")
 			var (
-				reconfigure string
-				parameters  map[string]string
+				reconfigure          string
+				parameters           map[string]string
+				reconfigureTimestamp time.Time
 			)
 			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
 					if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
 						reconfigure = req.Action
 						parameters = req.Parameters
+						reconfigureTimestamp = time.Now()
+						time.Sleep(1200 * time.Millisecond) // The precision of pod creationTimestamp is only in seconds.
 					}
 					return kbaproto.ActionResponse{}, nil
 				}).AnyTimes()
@@ -813,7 +816,9 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance restarted")
 			podKey := client.ObjectKeyFromObject(pods[0])
 			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
-				// g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID)) TODO: impl
+				g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID))
+				// Check that the new pod is created after reconfigure action called.
+				g.Expect(pod.CreationTimestamp.Time.After(reconfigureTimestamp)).Should(BeTrue())
 			})).Should(Succeed())
 
 			By("check the instance status updated")
@@ -829,6 +834,132 @@ var _ = Describe("InstanceSet Controller", func() {
 						{
 							Name:       "server",
 							ConfigHash: ptr.To("123456"),
+						},
+					},
+				}))
+			})).Should(Succeed())
+		})
+
+		It("reconfigure and restart", func() {
+			By("mock reconfigure action calls")
+			var (
+				cnt                  int32
+				reconfigure          string
+				parameters           map[string]string
+				reconfigureTimestamp time.Time
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+						cnt += 1
+						reconfigure = req.Action
+						parameters = req.Parameters
+						reconfigureTimestamp = time.Now()
+						time.Sleep(1200 * time.Millisecond) // The precision of pod creationTimestamp is only in seconds.
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				}).AddConfigs([]workloads.ConfigTemplate{
+					{
+						Name:       "client",
+						ConfigHash: ptr.To("123456"),
+					},
+					{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				}...)
+			})
+
+			pods := mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			Expect(pods).Should(HaveLen(1))
+
+			By("check the reconfigure action NOT called")
+			Consistently(func(g Gomega) {
+				g.Expect(cnt).Should(Equal(int32(0)))
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
+
+			By("check the init instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "client",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "log",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("123456"),
+						},
+					},
+				}))
+			})).Should(Succeed())
+
+			By("update configs to reconfigure and restart")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[0].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[0].ReconfigureActionName = ""
+				its.Spec.Configs[0].Parameters = map[string]string{"foo": "bar"}
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[1].Restart = ptr.To(true)
+				its.Spec.Configs[2].ConfigHash = ptr.To("abcdef")
+				its.Spec.Configs[2].Restart = ptr.To(true)
+				its.Spec.Configs[2].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[2].ReconfigureActionName = ""
+				its.Spec.Configs[2].Parameters = map[string]string{"foo": "bar"}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(cnt).Should(Equal(int32(2)))
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).ShouldNot(BeNil())
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+
+			By("check the instance restarted")
+			podKey := client.ObjectKeyFromObject(pods[0])
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.UID).ShouldNot(Equal(pods[0].UID))
+				// Check that the new pod is created after reconfigure action called.
+				g.Expect(pod.CreationTimestamp.Time.After(reconfigureTimestamp)).Should(BeTrue())
+			})).Should(Succeed())
+
+			By("check the instance status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					Configs: []workloads.InstanceConfigStatus{
+						{
+							Name:       "client",
+							ConfigHash: ptr.To("abcdef"),
+						},
+						{
+							Name:       "log",
+							ConfigHash: ptr.To("abcdef"),
+						},
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("abcdef"),
 						},
 					},
 				}))

@@ -782,7 +782,7 @@ var _ = Describe("revision util test", func() {
 			its := &workloads.InstanceSet{}
 			err := json.Unmarshal([]byte(stsJSON), its)
 			Expect(err).Should(Succeed())
-			cr, err := newRevision(its)
+			cr, err := NewRevision(its)
 			Expect(err).Should(Succeed())
 			Expect(cr.Name).Should(Equal("redis-test-redis-cc4cd5c55"))
 		})

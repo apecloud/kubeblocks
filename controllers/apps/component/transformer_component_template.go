@@ -188,20 +188,16 @@ func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*co
 
 func buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
 	objs := make(map[string]*corev1.ConfigMap)
-	for i, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		// If the file template is managed by external, the cm object has been rendered by the external manager.
 		if isExternalManaged(tpl) {
 			continue
 		}
-
 		obj, err := buildFileTemplateObject(transCtx, tpl)
 		if err != nil {
 			return nil, err
 		}
 		objs[obj.Name] = obj
-
-		configHash := obj.Annotations[constant.CMInsConfigurationHashLabelKey]
-		transCtx.SynthesizeComponent.FileTemplates[i].ConfigHash = &configHash
 	}
 	return objs, nil
 }

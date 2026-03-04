@@ -634,11 +634,11 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 		SetTemplate(*podTemplate).
 		GetObject()
 
-	cr, err := newRevision(its)
+	cr, err := NewRevision(its)
 	if err != nil {
 		return "", err
 	}
-	return cr.Labels[controllerRevisionHashLabel], nil
+	return cr.Labels[ControllerRevisionHashLabel], nil
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {

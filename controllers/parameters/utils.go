@@ -69,9 +69,10 @@ func (c *reconcileContext) workload() *reconcileContext {
 			Name:      constant.GenerateWorkloadNamePattern(c.ClusterName, c.ComponentName),
 		}
 		its := &workloads.InstanceSet{}
-		if err := c.Client.Get(c.Context, itsKey, its); err == nil {
-			c.its = its
+		if err := c.Client.Get(c.Context, itsKey, its); err != nil {
+			return err
 		}
+		c.its = its
 		return nil
 	})
 }

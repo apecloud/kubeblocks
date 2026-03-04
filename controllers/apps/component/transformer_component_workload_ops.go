@@ -424,7 +424,6 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 
 	if len(toCreate) > 0 || len(toDelete) > 0 {
 		// since pod volumes changed, the workload will be restarted
-		// TODO: sync reconfigure and then restart
 		r.protoITS.Spec.Configs = nil
 		return nil
 	}
@@ -439,7 +438,6 @@ func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformCon
 			if tpl.Name == tplName {
 				if ptr.Deref(tpl.RestartOnFileChange, false) {
 					// restart
-					// TODO: restart on config
 					if r.protoITS.Spec.Template.Annotations == nil {
 						r.protoITS.Spec.Template.Annotations = map[string]string{}
 					}

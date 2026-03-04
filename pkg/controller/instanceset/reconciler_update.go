@@ -245,7 +245,7 @@ func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(podList)
 	if len(its.Spec.Roles) > 0 {
-		plan := NewUpdatePlan(*its, podList, r.isInstUpdated)
+		plan := NewUpdatePlan(*its, podList, r.isPodOrConfigUpdated)
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return -1, err
@@ -300,17 +300,17 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 	for _, config := range its.Spec.Configs {
 		if !r.isConfigUpdated(its, pod, config) {
 			allUpdated = false
-			if err := r.reconfigureInst(tree, its, pod, config); err != nil {
+			if err := r.reconfigureConfig(tree, its, pod, config); err != nil {
 				return false, err
 			}
 		}
 		// TODO: compose the status from pods but not the its spec and status
-		r.setInstConfigStatus(its, pod, config)
+		r.setInstanceConfigStatus(its, pod, config)
 	}
 	return allUpdated, nil
 }
 
-func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
 	if config.Reconfigure == nil {
 		return nil // skip
 	}
@@ -344,7 +344,7 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 	return nil
 }
 
-func (r *updateReconciler) setInstConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
+func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
 	if its.Status.InstanceStatus == nil {
 		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
 	}
@@ -372,26 +372,18 @@ func (r *updateReconciler) setInstConfigStatus(its *workloads.InstanceSet, pod *
 	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
 }
 
-func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	updated, err := r.isPodUpdated(its, pod)
-	if err != nil || !updated {
-		return updated, err
-	}
-	for _, config := range its.Spec.Configs {
-		if !r.isConfigUpdated(its, pod, config) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (r *updateReconciler) isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+func (r *updateReconciler) isPodOrConfigUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	policy, _, err := getPodUpdatePolicy(its, pod)
 	if err != nil {
 		return false, err
 	}
 	if policy != noOpsPolicy {
 		return false, nil
+	}
+	for _, config := range its.Spec.Configs {
+		if !r.isConfigUpdated(its, pod, config) {
+			return false, nil
+		}
 	}
 	return true, nil
 }

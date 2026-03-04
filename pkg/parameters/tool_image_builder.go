@@ -27,7 +27,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
@@ -90,7 +90,7 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	if toolsPath != "" {
 		cfgManagerParams.ConfigManagerReloadPath = toolsPath
 	}
-	containers, err := factory.BuildCfgManagerToolsContainer(cfgManagerParams, toolContainers, toolsImageMap)
+	containers, err := buildCfgManagerToolsContainer(cfgManagerParams, toolContainers, toolsImageMap)
 	if err == nil {
 		cfgManagerParams.ToolsContainers = containers
 	}
@@ -164,4 +164,32 @@ func buildToolsVolumeMount(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpe
 	for _, container := range usingContainers {
 		container.VolumeMounts = append(container.VolumeMounts, cfgManagerParams.Volumes[n])
 	}
+}
+
+func buildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, toolsMetas []parametersv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
+	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
+	for _, toolConfig := range toolsMetas {
+		toolContainerBuilder := builder.NewContainerBuilder(toolConfig.Name).
+			AddCommands(toolConfig.Command...).
+			SetImagePullPolicy(corev1.PullIfNotPresent).
+			AddVolumeMounts(sidecarRenderedParam.Volumes...)
+		if len(toolConfig.Image) > 0 {
+			toolContainerBuilder.SetImage(toolConfig.Image)
+		}
+		toolContainers = append(toolContainers, *toolContainerBuilder.GetObject())
+	}
+	for i := range toolContainers {
+		container := &toolContainers[i]
+		if meta, ok := toolsMap[container.Name]; ok {
+			setToolsScriptsPath(container, meta)
+		}
+	}
+	return toolContainers, nil
+}
+
+func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta) {
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:  cfgcm.KBTOOLSScriptsPathEnv,
+		Value: filepath.Join(cfgcm.KBScriptVolumePath, meta.ConfigSpec.Name),
+	})
 }

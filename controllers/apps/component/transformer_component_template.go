@@ -226,13 +226,9 @@ func (t *componentFileTemplateTransformer) buildFileTemplateObject(transCtx *com
 		return nil, err
 	}
 
-	configHash := tpl.ConfigHash
-	if configHash == nil {
-		hash, err1 := intctrlutil.ComputeHash(data)
-		if err1 != nil {
-			return nil, err1
-		}
-		configHash = &hash
+	configHash, err1 := intctrlutil.ComputeHash(data)
+	if err1 != nil {
+		return nil, err1
 	}
 
 	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
@@ -241,7 +237,7 @@ func (t *componentFileTemplateTransformer) buildFileTemplateObject(transCtx *com
 		AddLabelsInMap(constant.GetCompLabelsWithDef(synthesizedComp.ClusterName, synthesizedComp.Name, compDef.Name)).
 		AddLabels(kubeBlockFileTemplateLabelKey, "true").
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotations(constant.CMInsConfigurationHashLabelKey, *configHash).
+		AddAnnotations(constant.CMInsConfigurationHashLabelKey, configHash).
 		SetData(data).
 		GetObject()
 	if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
@@ -336,24 +332,25 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			return &val
 		}
 		action = func(tpl component.SynthesizedFileTemplate) *kbappsv1.Action {
-			if tpl.Reconfigure == nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
-				return synthesizedComp.LifecycleActions.Reconfigure
+			if tpl.Reconfigure != nil {
+				return tpl.Reconfigure
 			}
-			return tpl.Reconfigure
+			if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
+				return synthesizedComp.LifecycleActions.ComponentLifecycleActions.Reconfigure
+			}
+			return nil
 		}
-
 		actionName = func(tpl component.SynthesizedFileTemplate) string {
-			name := component.UDFReconfigureActionName(tpl)
-			if tpl.Reconfigure == nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
-				name = "" // default reconfigure action
+			if tpl.Reconfigure != nil {
+				return component.UDFReconfigureActionName(tpl)
 			}
-			return name
+			return "" // default reconfigure action or empty
 		}
 		templateChanges = t.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
 		parameters      = func(tpl component.SynthesizedFileTemplate) map[string]string {
 			changes, ok := templateChanges[tpl.Name]
 			if !ok {
-				return nil
+				return tpl.Variables
 			}
 			result := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
 			maps.Copy(result, tpl.Variables)

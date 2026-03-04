@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -476,36 +477,36 @@ func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.C
 }
 
 func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
-	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
+	merge := func(stpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
 		if utpl.ConfigMap != nil {
-			tpl.Namespace = comp.Namespace
-			tpl.Template = utpl.ConfigMap.Name
+			stpl.Namespace = comp.Namespace
+			stpl.Template = utpl.ConfigMap.Name
 		}
 
-		tpl.Variables = utpl.Variables
-		tpl.ConfigHash = utpl.ConfigHash
+		stpl.Variables = utpl.Variables
+		stpl.ConfigHash = utpl.ConfigHash
 
 		// if restartOnFileChange is not specified as required, use the user specified value
-		if !ptr.Deref(tpl.RestartOnFileChange, false) {
-			tpl.RestartOnFileChange = utpl.RestartOnConfigChange
+		if !ptr.Deref(stpl.RestartOnFileChange, false) {
+			stpl.RestartOnFileChange = utpl.RestartOnConfigChange
 		}
 
 		if utpl.Reconfigure != nil {
-			tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+			stpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
 		}
 
 		// if externalManaged is not specified as required, use the user specified value
-		if !ptr.Deref(tpl.ExternalManaged, false) {
-			tpl.ExternalManaged = utpl.ExternalManaged
+		if !ptr.Deref(stpl.ExternalManaged, false) {
+			stpl.ExternalManaged = utpl.ExternalManaged
 		}
-		if ptr.Deref(tpl.ExternalManaged, false) {
+		if ptr.Deref(stpl.ExternalManaged, false) {
 			if utpl.ConfigMap == nil {
 				// reset the template and wait the external system to provision it.
-				tpl.Namespace = ""
-				tpl.Template = ""
+				stpl.Namespace = ""
+				stpl.Template = ""
 			}
 		}
-		return tpl
+		return stpl
 	}
 
 	stpl := SynthesizedFileTemplate{
@@ -513,14 +514,15 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 		Config:                config,
 	}
 	if config {
-		for _, utpl := range comp.Spec.Configs {
-			if utpl.Name != nil && *utpl.Name == tpl.Name {
-				return merge(stpl, utpl)
-			}
+		i := slices.IndexFunc(comp.Spec.Configs, func(c appsv1.ClusterComponentConfig) bool {
+			return ptr.Deref(c.Name, "") == tpl.Name
+		})
+		if i >= 0 {
+			return merge(stpl, comp.Spec.Configs[i])
 		}
 		return merge(stpl, appsv1.ClusterComponentConfig{})
 	}
-	return stpl
+	return stpl // script
 }
 
 func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {

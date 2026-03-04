@@ -176,8 +176,8 @@ var _ = Describe("synthesized component", func() {
 					Template:        comp.Spec.Configs[0].ConfigMap.Name,
 					Namespace:       comp.Namespace,
 					VolumeName:      compDef.Spec.Configs[1].VolumeName,
-					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 					Reconfigure:     comp.Spec.Configs[0].Reconfigure,
+					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
 				Config: true,
 			}))

@@ -472,12 +472,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					},
 					{
 						Name:       "logging",
-						ConfigHash: ptr.To("654321"),
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
 
-			By("mock pods running and available")
 			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
 
 			By("check the init instance status")
@@ -492,7 +491,7 @@ var _ = Describe("InstanceSet Controller", func() {
 						},
 						{
 							Name:       "logging",
-							ConfigHash: ptr.To("654321"),
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
@@ -564,7 +563,7 @@ var _ = Describe("InstanceSet Controller", func() {
 					},
 					{
 						Name:       "logging",
-						ConfigHash: ptr.To("654321"),
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
@@ -583,7 +582,7 @@ var _ = Describe("InstanceSet Controller", func() {
 						},
 						{
 							Name:       "logging",
-							ConfigHash: ptr.To("654321"),
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))

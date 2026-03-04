@@ -394,9 +394,8 @@ var _ = Describe("kb-agent", func() {
 				},
 				{
 					ComponentFileTemplate: appsv1.ComponentFileTemplate{
-						Name:            "server.conf",
-						Template:        "default",
-						ExternalManaged: ptr.To(true),
+						Name:     "server.conf",
+						Template: "default",
 						Reconfigure: &appsv1.Action{
 							Exec: &appsv1.ExecAction{
 								Env: []corev1.EnvVar{
@@ -408,6 +407,7 @@ var _ = Describe("kb-agent", func() {
 								Command: []string{"echo", "reconfigure"},
 							},
 						},
+						ExternalManaged: ptr.To(true),
 					},
 				},
 			}

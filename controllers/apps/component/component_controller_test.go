@@ -1522,6 +1522,7 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
+					ConfigHash: ptr.To("123456"),
 				},
 			}
 		})()).Should(Succeed())
@@ -1536,7 +1537,8 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
-			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
 			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty())
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
@@ -1571,6 +1573,7 @@ var _ = Describe("Component Controller", func() {
 			comp.Spec.Configs[0].Variables = map[string]string{
 				"LOG_LEVEL": "warn",
 			}
+			comp.Spec.Configs[0].ConfigHash = ptr.To("123456")
 		})()).Should(Succeed())
 
 		By("check the file template object again")
@@ -1583,7 +1586,8 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
-			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
 			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-%s", fileTemplate)))
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
@@ -1669,6 +1673,54 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs).Should(BeNil())
 			g.Expect(its.Spec.Template.Annotations).ShouldNot(BeNil())
 			g.Expect(its.Spec.Template.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+		})).Should(Succeed())
+	}
+
+	testReconfigureConfigHash := func(compName, compDefName, fileTemplate string) {
+		var (
+			initConfigHash, newConfigHash string
+		)
+
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+			initConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(initConfigHash).NotTo(BeEmpty())
+		})).Should(Succeed())
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+			newConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(newConfigHash).NotTo(BeEmpty())
+			g.Expect(newConfigHash).NotTo(Equal(initConfigHash))
+		})).Should(Succeed())
+
+		By("check the workload updated")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(newConfigHash))
 		})).Should(Succeed())
 	}
 
@@ -2244,6 +2296,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("reconfigure - restart", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - config hash", func() {
+			testReconfigureConfigHash(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

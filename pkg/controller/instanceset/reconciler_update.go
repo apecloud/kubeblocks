@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -339,7 +340,7 @@ func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, its 
 		}
 		return err
 	}
-	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "generation", config.Generation)
+	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
 	return nil
 }
 
@@ -360,7 +361,7 @@ func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, p
 	}
 	status := workloads.InstanceConfigStatus{
 		Name:       config.Name,
-		Generation: config.Generation,
+		ConfigHash: config.ConfigHash,
 	}
 	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
 		if configStatus.Name == config.Name {
@@ -394,12 +395,12 @@ func (r *updateReconciler) isConfigUpdated(its *workloads.InstanceSet, pod *core
 	if idx < 0 {
 		return true // new pod provisioned
 	}
-	for _, configStatus := range its.Status.InstanceStatus[idx].Configs {
-		if configStatus.Name == config.Name {
-			return config.Generation <= configStatus.Generation
+	for _, status := range its.Status.InstanceStatus[idx].Configs {
+		if status.Name == config.Name {
+			return ptr.Equal(config.ConfigHash, status.ConfigHash)
 		}
 	}
-	return config.Generation <= 0
+	return ptr.Deref(config.ConfigHash, "") == ""
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

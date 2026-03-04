@@ -19,14 +19,16 @@ package render
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -87,7 +89,7 @@ func (r *templateRenderWrapper) RenderComponentTemplate(
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return factory.BuildConfigMapWithTemplate(r.cluster, r.builtinComponent, configs, cmName, templateSpec), nil
+	return buildConfigMapWithTemplate(r.cluster, r.builtinComponent, configs, cmName, templateSpec), nil
 }
 
 // RenderConfigMapTemplate renders config file using template engine
@@ -151,4 +153,17 @@ func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, 
 		}
 	}
 	return nil
+}
+
+func buildConfigMapWithTemplate(cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent,
+	configs map[string]string, cmName string, configTemplateSpec appsv1.ComponentFileTemplate) *corev1.ConfigMap {
+	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
+		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
+		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.Template).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
+		SetData(configs).
+		GetObject()
 }

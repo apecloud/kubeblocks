@@ -40,6 +40,11 @@ func (in *ConfigTemplate) DeepCopyInto(out *ConfigTemplate) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Restart != nil {
+		in, out := &in.Restart, &out.Restart
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Reconfigure != nil {
 		in, out := &in.Reconfigure, &out.Reconfigure
 		*out = new(appsv1.Action)

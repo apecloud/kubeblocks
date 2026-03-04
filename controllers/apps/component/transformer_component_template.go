@@ -213,12 +213,22 @@ func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.
 		return nil, err
 	}
 
+	configHash := tpl.ConfigHash
+	if configHash == nil {
+		hash, err1 := intctrlutil.ComputeHash(data)
+		if err1 != nil {
+			return nil, err1
+		}
+		configHash = &hash
+	}
+
 	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
 	obj := builder.NewConfigMapBuilder(synthesizedComp.Namespace, objName).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(constant.GetCompLabelsWithDef(synthesizedComp.ClusterName, synthesizedComp.Name, compDef.Name)).
 		AddLabels(kubeBlockFileTemplateLabelKey, "true").
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotations(constant.CMInsConfigurationHashLabelKey, *configHash).
 		SetData(data).
 		GetObject()
 	if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {

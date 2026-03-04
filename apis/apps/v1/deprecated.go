@@ -40,18 +40,9 @@ func (r *Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 
-func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.Spec.ComponentSpecs {
-		if v.Name == componentName {
-			return &v
-		}
-	}
-	return nil
-}
-
-func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
+func (r *ClusterSpec) GetComponentByName(compName string) *ClusterComponentSpec {
 	for i, v := range r.ComponentSpecs {
-		if v.Name == componentName {
+		if v.Name == compName {
 			return &r.ComponentSpecs[i]
 		}
 	}

@@ -477,17 +477,28 @@ func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.C
 
 func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
 	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
-		tpl.Variables = utpl.Variables
 		if utpl.ConfigMap != nil {
 			tpl.Namespace = comp.Namespace
 			tpl.Template = utpl.ConfigMap.Name
 		}
-		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
-		if utpl.ExternalManaged != nil {
-			tpl.ExternalManaged = utpl.ExternalManaged
+
+		tpl.Variables = utpl.Variables
+		tpl.ConfigHash = utpl.ConfigHash
+
+		// if restartOnFileChange is not specified as required, use the user specified value
+		if !ptr.Deref(tpl.RestartOnFileChange, false) {
+			tpl.RestartOnFileChange = utpl.RestartOnConfigChange
 		}
 
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+		if utpl.Reconfigure != nil {
+			tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+		}
+
+		// if externalManaged is not specified as required, use the user specified value
+		if !ptr.Deref(tpl.ExternalManaged, false) {
+			tpl.ExternalManaged = utpl.ExternalManaged
+		}
+		if ptr.Deref(tpl.ExternalManaged, false) {
 			if utpl.ConfigMap == nil {
 				// reset the template and wait the external system to provision it.
 				tpl.Namespace = ""

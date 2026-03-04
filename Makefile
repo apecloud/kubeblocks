@@ -23,6 +23,8 @@ GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
 GENERATED_CLIENT_PKG = "pkg/client"
 GENERATED_DEEP_COPY_FILE = "zz_generated.deepcopy.go"
+OPERATOR_SDK_VERSION ?= v1.41.1
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -106,8 +108,9 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	$(MAKE) client-sdk-gen
 
 .PHONY: label-crds
+LABEL_CRD_DIR ?= config/crd/bases
 label-crds:
-	@for f in config/crd/bases/*.yaml; do \
+	@for f in $(LABEL_CRD_DIR)/*.yaml; do \
 		echo "applying app.kubernetes.io/name=kubeblocks label to $$f"; \
 		kubectl label --overwrite -f $$f --local=true -o yaml app.kubernetes.io/name=kubeblocks > bin/crd.yaml; \
 		mv bin/crd.yaml $$f; \
@@ -445,6 +448,71 @@ GOBIN=$(LOCALBIN) go install $${package} ;\
 mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 }
 endef
+
+.PHONY: operator-sdk
+OPERATOR_SDK = $(LOCALBIN)/operator-sdk
+operator-sdk: ## Install the operator-sdk app
+ifneq ($(shell $(OPERATOR_SDK) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+	@{ \
+	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(OPERATOR_SDK)" ;\
+	chmod +x "$(LOCALBIN)/operator-sdk" ;\
+	}
+endif
+
+##@ OLM Bundle
+
+BUNDLE_VERSION ?= $(VERSION)
+BUNDLE_IMG ?= docker.io/apecloud/kubeblocks-bundle:$(BUNDLE_VERSION)
+CHANNELS ?= stable
+DEFAULT_CHANNEL ?= stable
+OPENSHIFT_VERSIONS ?= "v4.17"
+BUNDLE_METADATA_OPTS ?= --channels=$(CHANNELS) --default-channel=$(DEFAULT_CHANNEL)
+
+.PHONY: olm-bundle
+olm-bundle: test-go-generate controller-gen kustomize operator-sdk ## Generate complete OLM bundle (all-in-one)
+	@echo "==> Generating OLM bundle for version $(BUNDLE_VERSION)"
+	set -xeEuo pipefail ;\
+	CONFIG_TMP_DIR=$$(mktemp -d) ;\
+	OLM_CRD_DIR=$$(mktemp -d) ;\
+	trap "rm -rf $${CONFIG_TMP_DIR} $${OLM_CRD_DIR}" EXIT ;\
+	echo "==> Generating CRDs for bundle in $${OLM_CRD_DIR}" ;\
+	$(CONTROLLER_GEN) rbac:roleName=manager-role \
+		crd:generateEmbeddedObjectMeta=true \
+		webhook \
+		paths="./cmd/manager/...;./apis/apps/v1;./apis/apps/v1beta1;./apis/trace/v1;./apis/workloads/v1;./apis/dataprotection/...;./apis/operations/...;./apis/parameters/...;./apis/extensions/...;./apis/experimental/...;./controllers/..." \
+		output:crd:artifacts:config="$${OLM_CRD_DIR}" ;\
+	$(MAKE) label-crds LABEL_CRD_DIR="$${OLM_CRD_DIR}" --no-print-directory ;\
+	cp -r config "$${CONFIG_TMP_DIR}" ;\
+	mkdir -p "$${CONFIG_TMP_DIR}/config/crd/olm-bases" ;\
+	cp "$${OLM_CRD_DIR}"/*.yaml "$${CONFIG_TMP_DIR}/config/crd/olm-bases/" ;\
+	echo "resources:" > "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ;\
+	for f in "$${CONFIG_TMP_DIR}/config/crd/olm-bases"/*.yaml; do \
+		[ "$$f" = "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ] && continue ;\
+		echo "- $$(basename $$f)" >> "$${CONFIG_TMP_DIR}/config/crd/olm-bases/kustomization.yaml" ;\
+	done ;\
+	echo "    - Manager: $(IMG)" ;\
+	( \
+		cd "$${CONFIG_TMP_DIR}/config/manager" ;\
+		$(KUSTOMIZE) edit set image controller="$(IMG)" ;\
+	) ;\
+	rm -fr bundle bundle.Dockerfile ;\
+	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
+	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata \
+		--package kubeblocks \
+		--channels $(CHANNELS) \
+		--default-channel $(DEFAULT_CHANNEL) \
+		--plugins=go.kubebuilder.io/v4 \
+		--use-image-digests \
+		--version "$(BUNDLE_VERSION)" ;\
+	echo "" >> bundle/metadata/annotations.yaml ;\
+	echo "  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
+	rm -rf "$${CONFIG_TMP_DIR}" ;\
+	$(OPERATOR_SDK) bundle validate --plugins=go.kubebuilder.io/v4  ./bundle ;\
+	echo "==> Bundle generated successfully at ./bundle"
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

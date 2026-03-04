@@ -38,8 +38,8 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -374,7 +374,7 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 		return nil
 	}
 
-	container, err := factory.BuildCfgManagerContainer(buildParams)
+	container, err := buildCfgManagerContainer(buildParams)
 	if err != nil {
 		return err
 	}
@@ -421,6 +421,41 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	}
 	component.InjectEnvVars4Containers(synthesizedComp, synthesizedComp.EnvVars, synthesizedComp.EnvFromSources, filter)
 	return nil
+}
+
+func buildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
+	var env []corev1.EnvVar
+	env = append(env, corev1.EnvVar{
+		Name: "CONFIG_MANAGER_POD_IP",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "status.podIP",
+			},
+		},
+	})
+	containerBuilder := builder.NewContainerBuilder(sidecarRenderedParam.ManagerName).
+		AddCommands("env").
+		AddArgs("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)").
+		AddArgs(getSidecarBinaryPath(sidecarRenderedParam)).
+		AddArgs(sidecarRenderedParam.Args...).
+		AddEnv(env...).
+		AddPorts(corev1.ContainerPort{
+			Name:          constant.ConfigManagerPortName,
+			ContainerPort: sidecarRenderedParam.ContainerPort,
+			Protocol:      "TCP",
+		}).
+		SetImage(sidecarRenderedParam.Image).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddVolumeMounts(sidecarRenderedParam.Volumes...)
+	return containerBuilder.GetObject(), nil
+}
+
+func getSidecarBinaryPath(buildParams *cfgcm.CfgManagerBuildParams) string {
+	if buildParams.ConfigManagerReloadPath != "" {
+		return buildParams.ConfigManagerReloadPath
+	}
+	return constant.ConfigManagerToolPath
 }
 
 func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {

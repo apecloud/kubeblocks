@@ -226,9 +226,13 @@ func (t *componentFileTemplateTransformer) buildFileTemplateObject(transCtx *com
 		return nil, err
 	}
 
-	configHash, err1 := intctrlutil.ComputeHash(data)
-	if err1 != nil {
-		return nil, err1
+	configHash := tpl.ConfigHash
+	if configHash == nil {
+		hash, err1 := intctrlutil.ComputeHash(data)
+		if err1 != nil {
+			return nil, err1
+		}
+		configHash = &hash
 	}
 
 	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
@@ -237,7 +241,7 @@ func (t *componentFileTemplateTransformer) buildFileTemplateObject(transCtx *com
 		AddLabelsInMap(constant.GetCompLabelsWithDef(synthesizedComp.ClusterName, synthesizedComp.Name, compDef.Name)).
 		AddLabels(kubeBlockFileTemplateLabelKey, "true").
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotations(constant.CMInsConfigurationHashLabelKey, configHash).
+		AddAnnotations(constant.CMInsConfigurationHashLabelKey, *configHash).
 		SetData(data).
 		GetObject()
 	if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {

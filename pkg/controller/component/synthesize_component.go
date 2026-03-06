@@ -488,7 +488,7 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 
 		// if restartOnFileChange is not specified as required, use the user specified value
 		if !ptr.Deref(stpl.RestartOnFileChange, false) {
-			stpl.RestartOnFileChange = utpl.RestartOnConfigChange
+			stpl.RestartOnFileChange = utpl.Restart
 		}
 
 		if utpl.Reconfigure != nil {

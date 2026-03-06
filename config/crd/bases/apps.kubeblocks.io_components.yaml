@@ -181,9 +181,6 @@ spec:
                         The custom reconfigure action to reload the updated configuration.
 
 
-                        When @restartOnConfigChange is set to true, this action will be ignored.
-
-
                         The container executing this action has access to following variables:
 
 
@@ -622,7 +619,7 @@ spec:
                           format: int32
                           type: integer
                       type: object
-                    restartOnConfigChange:
+                    restart:
                       description: Specifies whether to restart the component to reload
                         the updated configuration.
                       type: boolean

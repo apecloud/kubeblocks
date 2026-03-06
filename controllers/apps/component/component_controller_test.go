@@ -1538,9 +1538,9 @@ var _ = Describe("Component Controller", func() {
 							},
 						},
 					},
-					ConfigHash:            ptr.To(serverConfigHash),
-					RestartOnConfigChange: ptr.To(true),
-					Reconfigure:           serverConfigAction,
+					ConfigHash:  ptr.To(serverConfigHash),
+					Restart:     ptr.To(true),
+					Reconfigure: serverConfigAction,
 				},
 			})
 		})
@@ -1629,7 +1629,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
@@ -1643,7 +1643,7 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
-					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+					Reconfigure: testapps.NewLifecycleAction(fileTemplate),
 				},
 			})
 		})

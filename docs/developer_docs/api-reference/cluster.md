@@ -2874,7 +2874,7 @@ is necessary to apply updates.</p>
 </tr>
 <tr>
 <td>
-<code>restartOnConfigChange</code><br/>
+<code>restart</code><br/>
 <em>
 bool
 </em>
@@ -2896,7 +2896,6 @@ Action
 <td>
 <em>(Optional)</em>
 <p>The custom reconfigure action to reload the updated configuration.</p>
-<p>When @restartOnConfigChange is set to true, this action will be ignored.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
@@ -5951,7 +5950,6 @@ Action
 <p>Defines the procedure that reloads the file when it&rsquo;s content changes.</p>
 <p>If specified, this action overrides the global reconfigure action defined in lifecycle actions
 for this specific file template.</p>
-<p>When @restartOnFileChange is set to true, this action will be ignored.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>

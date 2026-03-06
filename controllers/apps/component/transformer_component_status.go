@@ -457,7 +457,7 @@ func (t *componentStatusTransformer) availableWithPhases(_ *componentTransformCo
 }
 
 func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransformContext,
-	_ *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string, string) {
+	_ *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
 	its := transCtx.RunningWorkload
 	if its == nil {
 		return metav1.ConditionFalse, "the workload is not present"

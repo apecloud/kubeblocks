@@ -56,6 +56,7 @@ type SynthesizedComponent struct {
 	Annotations                      map[string]string                      `json:"annotations,omitempty"`
 	StaticAnnotations                map[string]string                      // annotations defined by the component definition
 	DynamicAnnotations               map[string]string                      // annotations defined by the cluster and component API
+	AnnotationsInjectedToWorkload    map[string]string                      // annotations created by component controller which will be added to workload CR
 	TemplateVars                     map[string]string                      `json:"templateVars,omitempty"`
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
@@ -87,9 +88,9 @@ type SynthesizedComponent struct {
 
 type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
-	Config      bool
-	Variables   map[string]string
-	Reconfigure *kbappsv1.Action
+	Config     bool
+	Variables  map[string]string
+	ConfigHash *string
 }
 
 type SynthesizedLifecycleActions struct {

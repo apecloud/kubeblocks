@@ -345,6 +345,11 @@ var _ = Describe("InstanceSet Controller", func() {
 			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
 			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				// verify owner references are cleared to prevent garbage collection
+				ownerRefs := pvc.GetOwnerReferences()
+				g.Expect(ownerRefs).Should(HaveLen(0), "Owner references should be cleared when retention policy is Retain")
+			})).Should(Succeed())
 		})
 
 		It("when scaled - delete", func() {
@@ -406,6 +411,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+				// verify owner references still exist since InstanceSet is not deleted
+				ownerRefs := pvc.GetOwnerReferences()
+				g.Expect(ownerRefs).Should(HaveLen(1), "Owner references should still exist when scaling down and retention policy is Retain")
+				g.Expect(ownerRefs[0].Kind).Should(Equal("InstanceSet"))
 			})).Should(Succeed())
 		})
 	})
@@ -415,7 +424,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.AddConfigs(workloads.ConfigTemplate{
 					Name:       "server",
-					Generation: int64(1),
+					ConfigHash: ptr.To("123456"),
 				})
 			})
 
@@ -427,7 +436,7 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
@@ -456,39 +465,16 @@ var _ = Describe("InstanceSet Controller", func() {
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
 						Name:       "server",
-						Generation: int64(1),
+						ConfigHash: ptr.To("123456"),
 					},
 					{
 						Name:       "logging",
-						Generation: int64(2),
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
 
-			By("mock pods running and available")
-			podKey := types.NamespacedName{
-				Namespace: itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-0", itsObj.Name),
-			}
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, podKey, func(pod *corev1.Pod) {
-				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = []corev1.PodCondition{
-					{
-						Type:               corev1.PodReady,
-						Status:             corev1.ConditionTrue,
-						LastTransitionTime: metav1.Now(),
-					},
-				}
-				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-					{
-						Name: pod.Spec.Containers[0].Name,
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{},
-						},
-						Image: pod.Spec.Containers[0].Image,
-					},
-				}
-			})()).ShouldNot(HaveOccurred())
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
 
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -498,25 +484,25 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(2),
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
 
-			By("check the reconfigure action not called")
+			By("check the reconfigure action NOT called")
 			Eventually(func(g Gomega) {
 				g.Expect(reconfigure).Should(BeEmpty())
 				g.Expect(parameters).Should(BeNil())
 			}).Should(Succeed())
 
-			By("update configs")
+			By("update configs to reconfigure")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
 				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
 				its.Spec.Configs[1].ReconfigureActionName = ""
 				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
@@ -530,11 +516,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(128),
+							ConfigHash: ptr.To("abcdef"),
 						},
 					},
 				}))
@@ -570,11 +556,11 @@ var _ = Describe("InstanceSet Controller", func() {
 				}).AddConfigs([]workloads.ConfigTemplate{
 					{
 						Name:       "server",
-						Generation: int64(1),
+						ConfigHash: ptr.To("123456"),
 					},
 					{
 						Name:       "logging",
-						Generation: int64(2),
+						ConfigHash: ptr.To("123456"),
 					},
 				}...)
 			})
@@ -589,25 +575,25 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(2),
+							ConfigHash: ptr.To("123456"),
 						},
 					},
 				}))
 			})).Should(Succeed())
 
-			By("check the reconfigure action not called")
+			By("check the reconfigure action NOT called")
 			Eventually(func(g Gomega) {
 				g.Expect(reconfigure).Should(BeEmpty())
 				g.Expect(parameters).Should(BeNil())
 			}).Should(Succeed())
 
-			By("update configs")
+			By("update configs to reconfigure")
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
-				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].ConfigHash = ptr.To("abcdef")
 				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
 				its.Spec.Configs[1].ReconfigureActionName = "reconfigure-server"
 				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
@@ -621,11 +607,11 @@ var _ = Describe("InstanceSet Controller", func() {
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "server",
-							Generation: int64(1),
+							ConfigHash: ptr.To("123456"),
 						},
 						{
 							Name:       "logging",
-							Generation: int64(128),
+							ConfigHash: ptr.To("abcdef"),
 						},
 					},
 				}))
@@ -871,6 +857,73 @@ var _ = Describe("InstanceSet Controller", func() {
 					Eventually(testapps.CheckObjExists(&testCtx, podKey, &corev1.Pod{}, true)).Should(Succeed())
 				}
 			}
+		})
+	})
+
+	Context("deferred update", func() {
+		It("handles serviceaccount update", func() {
+			createITSObj(itsName, func(factory *testapps.MockInstanceSetFactory) {
+				factory.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				})
+			})
+			By("update proposed sa name")
+			newSAName := "new-sa"
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Annotations[constant.ProposedServiceAccountNameAnnotationKey] = newSAName
+			})).Should(Succeed())
+			podsKey := []types.NamespacedName{
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-0", itsObj.Name),
+				},
+				{
+					Namespace: itsObj.Namespace,
+					Name:      fmt.Sprintf("%s-1", itsObj.Name),
+				},
+			}
+			mockPodReady(podsKey[0].Name)
+			Consistently(testapps.CheckObj(&testCtx, podsKey[0], func(g Gomega, pod *corev1.Pod) {
+				// default sa name is empty
+				g.Expect(pod.Spec.ServiceAccountName).Should(BeEmpty())
+			})).Should(Succeed())
+			By("check scale out does not affect current pod")
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](2)
+			})).Should(Succeed())
+			Consistently(testapps.CheckObj(&testCtx, podsKey[0], func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.Spec.ServiceAccountName).Should(BeEmpty())
+			})).Should(Succeed())
+			By("check new pod uses new sa name")
+			mockPodReady(podsKey[1].Name)
+			Eventually(testapps.CheckObj(&testCtx, podsKey[1], func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.Spec.ServiceAccountName).Should(Equal(newSAName))
+			})).Should(Succeed())
+
+			beforeUpdate := time.Now()
+			time.Sleep(time.Second)
+			By("update its spec")
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.Containers[0].Command = []string{"new-command"}
+			})).Should(Succeed())
+
+			replicas := 2
+			for i := replicas; i > 0; i-- {
+				By("wait new pod created")
+				podKey := podsKey[i-1]
+				Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+					g.Expect(pod.CreationTimestamp.After(beforeUpdate)).Should(BeTrue())
+					g.Expect(pod.Spec.ServiceAccountName).Should(Equal(newSAName))
+				})).Should(Succeed())
+
+				mockPodReady(podKey.Name)
+			}
+
+			By("check its ready")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.ServiceAccountInUseAnnotationKey, newSAName))
+			})).Should(Succeed())
 		})
 	})
 })

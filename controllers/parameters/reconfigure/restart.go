@@ -17,31 +17,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package util
+package reconfigure
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"hash/fnv"
-	"io"
-
-	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/rand"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
-func ComputeHash(object interface{}) (string, error) {
-	objString, err := json.Marshal(object)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to compute hash.")
-	}
-
-	// hasher := sha1.New()
-	hasher := fnv.New32()
-	if _, err := io.Copy(hasher, bytes.NewReader(objString)); err != nil {
-		return "", errors.Wrapf(err, "failed to compute hash for sha256. [%s]", objString)
-	}
-
-	sha := hasher.Sum32()
-	return rand.SafeEncodeString(fmt.Sprint(sha)), nil
+func init() {
+	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicy)
 }
+
+var (
+	restartPolicy = func(ctx Context) (Status, error) {
+		return submit(ctx, nil, true)
+	}
+)

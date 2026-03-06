@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -236,27 +237,55 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 	return nil
 }
 
-// updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	its workloads.InstanceSet, pod *corev1.Pod, roleName string, version string) error {
-	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(its)
-	// role not defined in CR, ignore it
-	roleName = strings.ToLower(roleName)
-
+func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet,
+	pod *corev1.Pod, roleName string, version string) error {
+	var (
+		ctx                = reqCtx.Ctx
+		roleMap            = composeRoleMap(its)
+		normalizedRoleName = strings.ToLower(roleName)
+		role, defined      = roleMap[normalizedRoleName]
+	)
 	// update pod role label
 	newPod := pod.DeepCopy()
-	role, ok := roleMap[roleName]
-	switch ok {
-	case true:
-		newPod.Labels[RoleLabelKey] = role.Name
-	case false:
+	if defined {
+		newPod.Labels[RoleLabelKey] = normalizedRoleName
+	} else {
 		delete(newPod.Labels, RoleLabelKey)
 	}
-
 	if newPod.Annotations == nil {
 		newPod.Annotations = map[string]string{}
 	}
 	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Update(ctx, newPod)
+	if err := cli.Update(ctx, newPod); err != nil {
+		return err
+	}
+
+	if role.IsExclusive {
+		return removeExclusiveRoleLabels(cli, reqCtx, its, pod.Name, normalizedRoleName)
+	}
+	return nil
+}
+
+func removeExclusiveRoleLabels(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet, newPodName, roleName string) error {
+	labels := getMatchLabels(its.Name)
+	labels[RoleLabelKey] = roleName
+	var pods corev1.PodList
+	if err := cli.List(reqCtx.Ctx, &pods, client.InNamespace(its.Namespace), client.MatchingLabels(labels)); err != nil {
+		return err
+	}
+
+	var errs []error
+	for i, pod := range pods.Items {
+		if pod.Name == newPodName {
+			continue
+		}
+		newPod := pods.Items[i].DeepCopy()
+		delete(newPod.Labels, RoleLabelKey)
+		if err := cli.Update(reqCtx.Ctx, newPod); err != nil {
+			errs = append(errs, err)
+		} else {
+			reqCtx.Log.Info("remove exclusive role label", "pod", newPod.Name, "role", roleName)
+		}
+	}
+	return errors.Join(errs...)
 }

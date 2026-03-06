@@ -425,14 +425,23 @@ func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMappin
 }
 
 func buildInstancePodByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet, revision string) (*corev1.Pod, error) {
+	injectNewServiceAccount := func(template *corev1.PodTemplateSpec) {
+		newSAName, ok := parent.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+		if ok {
+			template.Spec.ServiceAccountName = newSAName
+		}
+	}
+
 	// 1. build a pod from template
 	var err error
 	if len(revision) == 0 {
-		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, parent)
+		revision, err = buildInstanceTemplateRevision(&template.PodTemplateSpec, parent, injectNewServiceAccount)
 		if err != nil {
 			return nil, err
 		}
 	}
+	podTemplate := template.PodTemplateSpec.DeepCopy()
+	injectNewServiceAccount(podTemplate)
 	labels := getMatchLabels(parent.Name)
 	pod := builder.NewPodBuilder(parent.Namespace, name).
 		AddAnnotationsInMap(template.Annotations).
@@ -442,7 +451,7 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 		AddLabels(instancetemplate.TemplateNameLabelKey, template.Name). // TODO: remove this label later
 		AddLabels(constant.KBAppInstanceTemplateLabelKey, template.Name).
 		AddControllerRevisionHashLabel(revision).
-		SetPodSpec(*template.Spec.DeepCopy()).
+		SetPodSpec(podTemplate.Spec).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
@@ -612,8 +621,12 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet) (string, error) {
-	podTemplate := filterInPlaceFields(template)
+func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *workloads.InstanceSet, mutateTemplateFn func(template *corev1.PodTemplateSpec)) (string, error) {
+	templateCopy := template.DeepCopy()
+	if mutateTemplateFn != nil {
+		mutateTemplateFn(templateCopy)
+	}
+	podTemplate := filterInPlaceFields(templateCopy)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).

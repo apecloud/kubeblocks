@@ -181,19 +181,6 @@ func UDFReconfigureActionName(tpl SynthesizedFileTemplate) string {
 	return fmt.Sprintf("reconfigure-%s", tpl.Name)
 }
 
-func ConfigTemplates(synthesizedComp *SynthesizedComponent) []appsv1.ComponentFileTemplate {
-	if synthesizedComp.FileTemplates == nil {
-		return nil
-	}
-	templates := make([]appsv1.ComponentFileTemplate, 0)
-	for i, tpl := range synthesizedComp.FileTemplates {
-		if tpl.Config {
-			templates = append(templates, synthesizedComp.FileTemplates[i].ComponentFileTemplate)
-		}
-	}
-	return templates
-}
-
 func AddInstanceAssistantObject(synthesizedComp *SynthesizedComponent, object client.Object) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{

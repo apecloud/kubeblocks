@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -58,19 +57,11 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	// filter annotations
 	var annotations map[string]string
 	if len(template.Annotations) > 0 {
-		annotations = make(map[string]string)
 		// keep Restart annotation
 		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations[constant.RestartAnnotationKey] = restart
-		}
-		// keep Reconfigure annotation
-		for k, v := range template.Annotations {
-			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
-				annotations[k] = v
+			annotations = map[string]string{
+				constant.RestartAnnotationKey: restart,
 			}
-		}
-		if len(annotations) == 0 {
-			annotations = nil
 		}
 	}
 	template.Annotations = annotations
@@ -296,6 +287,10 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if err != nil {
 		return noOpsPolicy, "", err
 	}
+	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
+	if err != nil {
+		return noOpsPolicy, "", err
+	}
 
 	// In case of the ITS is stopping and replicas is 0, we can't compose the instance template and instance
 	// to choose the update policy, so we use the pod update policy directly.
@@ -327,7 +322,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	}
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
-	if getPodRevision(pod) != updateRevisions[pod.Name] {
+	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
 		return recreatePolicy, specUpdatePolicy, nil
 	}
 

@@ -17,35 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package parameters
+package builder
 
 import (
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
-var combineUpgradePolicyInstance = &combineUpgradePolicy{
-	policyExecutors: []reconfigurePolicy{
-		syncPolicyInstance,
-		restartPolicyInstance,
-	},
+type ClusterRoleBuilder struct {
+	BaseBuilder[rbacv1.ClusterRole, *rbacv1.ClusterRole, ClusterRoleBuilder]
 }
 
-type combineUpgradePolicy struct {
-	policyExecutors []reconfigurePolicy
+func NewClusterRoleBuilder(name string) *ClusterRoleBuilder {
+	builder := &ClusterRoleBuilder{}
+	builder.init("", name, &rbacv1.ClusterRole{}, builder)
+	return builder
 }
 
-func init() {
-	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combineUpgradePolicyInstance)
-}
-
-func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (returnedStatus, error) {
-	var ret returnedStatus
-	for _, executor := range h.policyExecutors {
-		retStatus, err := executor.Upgrade(rctx)
-		if err != nil {
-			return retStatus, err
-		}
-		ret = retStatus
-	}
-	return ret, nil
+func (builder *ClusterRoleBuilder) AddPolicyRules(rules []rbacv1.PolicyRule) *ClusterRoleBuilder {
+	builder.get().Rules = append(builder.get().Rules, rules...)
+	return builder
 }

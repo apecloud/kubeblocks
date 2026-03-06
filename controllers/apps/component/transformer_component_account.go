@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -229,7 +228,7 @@ func (t *componentAccountTransformer) buildPassword(transCtx *componentTransform
 	if account.InitAccount && len(password) == 0 {
 		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(synthesizedComp, account).
 		// This is compatibility processing.
-		password = []byte(factory.GetRestorePassword(synthesizedComp))
+		password = []byte(appsutil.GetRestorePassword(synthesizedComp.Annotations, synthesizedComp.Name))
 	}
 	if len(password) == 0 {
 		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)

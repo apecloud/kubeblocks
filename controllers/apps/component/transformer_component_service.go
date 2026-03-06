@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -65,11 +64,8 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	var runningITS *workloadsv1.InstanceSet
-	if transCtx.RunningWorkload != nil {
-		runningITS = transCtx.RunningWorkload.(*workloadsv1.InstanceSet)
-	}
-	protoITS, err := factory.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
+	runningITS := transCtx.RunningWorkload
+	protoITS, err := component.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
 	if err != nil {
 		return err
 	}

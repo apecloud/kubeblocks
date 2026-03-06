@@ -40,6 +40,11 @@ func (in *ConfigTemplate) DeepCopyInto(out *ConfigTemplate) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Restart != nil {
+		in, out := &in.Restart, &out.Restart
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Reconfigure != nil {
 		in, out := &in.Reconfigure, &out.Reconfigure
 		*out = new(appsv1.Action)
@@ -371,6 +376,13 @@ func (in *InstanceSetStatus) DeepCopyInto(out *InstanceSetStatus) {
 	}
 	if in.UpdateRevisions != nil {
 		in, out := &in.UpdateRevisions, &out.UpdateRevisions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.DeferredUpdatedRevisions != nil {
+		in, out := &in.DeferredUpdatedRevisions, &out.DeferredUpdatedRevisions
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

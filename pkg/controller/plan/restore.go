@@ -37,7 +37,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -203,7 +202,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			},
 		}
 		// build pvc labels
-		factory.BuildPersistentVolumeClaimLabels(comp, pvc, v.Name, templateName)
+		BuildPersistentVolumeClaimLabels(comp, pvc, v.Name, templateName)
 		claimTemplate := dpv1alpha1.RestoreVolumeClaim{
 			ObjectMeta:      pvc.ObjectMeta,
 			VolumeClaimSpec: v.Spec,
@@ -529,4 +528,19 @@ func GetBackupFromClusterAnnotation(
 		return nil, err
 	}
 	return backup, nil
+}
+
+func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
+	pvcTplName, templateName string) {
+	// strict args checking.
+	if pvc == nil || component == nil {
+		return
+	}
+	if pvc.Labels == nil {
+		pvc.Labels = make(map[string]string)
+	}
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
+	if templateName != "" {
+		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = templateName
+	}
 }

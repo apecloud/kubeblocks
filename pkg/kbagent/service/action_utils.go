@@ -110,17 +110,29 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 	err = result.err
 	if err != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		stderrMsg := result.stderr.String()
+
+		switch {
+		case errors.As(err, &exitErr):
 			errMsg := fmt.Sprintf("exit code: %d", exitErr.ExitCode())
-			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
+			if len(stderrMsg) > 0 {
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
 			return nil, errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg)
+		case errors.Is(err, kbaproto.ErrTimedOut):
+			var errMsg string
+			if stdoutMsg := result.stdout.String(); len(stdoutMsg) > 0 {
+				errMsg = fmt.Sprintf("stdout: %s", stdoutMsg)
+			}
+			if len(stderrMsg) > 0 {
+				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
+			}
+			return nil, errors.Wrapf(kbaproto.ErrTimedOut, "%s", errMsg)
+		case len(stderrMsg) > 0:
+			return nil, errors.Wrapf(err, "%s", stderrMsg)
+		default:
+			return nil, err
 		}
-		if errMsg := result.stderr.String(); len(errMsg) > 0 {
-			return nil, errors.Wrapf(err, "%s", errMsg)
-		}
-		return nil, err
 	}
 	return result.stdout.Bytes(), nil
 }

@@ -165,8 +165,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountProvisionTransformer{},
 			// render config/script templates
 			&componentFileTemplateTransformer{},
-			// HACK: the legacy reload sidecar
-			&componentReloadSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
 			// handle RBAC for component workloads

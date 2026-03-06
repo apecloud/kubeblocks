@@ -108,48 +108,13 @@ var _ = Describe("Reconfigure Controller", func() {
 						g.Expect(config.Variables).Should(BeNil())
 						g.Expect(config.ConfigHash).ShouldNot(BeNil())
 						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
-						g.Expect(config.RestartOnConfigChange).ShouldNot(BeNil())
-						g.Expect(*config.RestartOnConfigChange).Should(BeTrue())
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
 						g.Expect(config.Reconfigure).Should(BeNil())
 					}
 				}
 			})).Should(Succeed())
 		})
-
-		// It("reconfigure", func() {
-		//	// TODO: mock pd a custom reconfigure action
-		//	By("mock parameters definition")
-		//	pdKey := types.NamespacedName{
-		//		Namespace: "",
-		//		Name:      paramsDefName,
-		//	}
-		//	Expect(testapps.GetAndChangeObj(&testCtx, pdKey, func(pd *parametersv1alpha1.ParametersDefinition) {
-		//		pd.Spec.ReloadAction = nil // TODO: custom reload action
-		//	})()).Should(Succeed())
-		//
-		//	By("submit a parameter update request")
-		//	key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
-		//	testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
-		//		AddParameters("innodb_buffer_pool_size", "1024M").
-		//		AddParameters("max_connections", "100").
-		//		Create(&testCtx).
-		//		GetObject()
-		//
-		//	By("verify changes submit to cluster")
-		//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-		//		for _, comp := range cluster.Spec.ComponentSpecs {
-		//			for _, config := range comp.Configs {
-		//				g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
-		//				g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
-		//				g.Expect(config.ConfigHash).ShouldNot(BeNil())
-		//				g.Expect(*config.ConfigHash).Should(Equal(configHash1))
-		//				g.Expect(config.RestartOnConfigChange).Should(BeNil())
-		//				g.Expect(config.Reconfigure).ShouldNot(BeNil())
-		//				// TODO: custom reload action
-		//			}
-		//		}
-		//	})).Should(Succeed())
-		// })
 
 		It("restart", func() {
 			By("mock parameters definition")
@@ -178,8 +143,8 @@ var _ = Describe("Reconfigure Controller", func() {
 						g.Expect(config.Variables).Should(BeNil())
 						g.Expect(config.ConfigHash).ShouldNot(BeNil())
 						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
-						g.Expect(config.RestartOnConfigChange).ShouldNot(BeNil())
-						g.Expect(*config.RestartOnConfigChange).Should(BeTrue())
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
 						g.Expect(config.Reconfigure).Should(BeNil())
 					}
 				}

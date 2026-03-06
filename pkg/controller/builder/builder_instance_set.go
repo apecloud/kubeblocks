@@ -149,6 +149,11 @@ func (builder *InstanceSetBuilder) SetPaused(paused bool) *InstanceSetBuilder {
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetConfigs(configs []workloads.ConfigTemplate) *InstanceSetBuilder {
+	builder.get().Spec.Configs = configs
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTemplate) *InstanceSetBuilder {
 	builder.get().Spec.Instances = instances
 	return builder

@@ -550,11 +550,9 @@ type ClusterComponentConfig struct {
 	// Specifies whether to restart the component to reload the updated configuration.
 	//
 	// +optional
-	RestartOnConfigChange *bool `json:"restartOnConfigChange,omitempty"`
+	Restart *bool `json:"restart,omitempty"`
 
 	// The custom reconfigure action to reload the updated configuration.
-	//
-	// When @restartOnConfigChange is set to true, this action will be ignored.
 	//
 	// The container executing this action has access to following variables:
 	//

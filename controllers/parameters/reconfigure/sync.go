@@ -97,11 +97,11 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	config.Variables = parameters
 	config.ConfigHash = ctx.getTargetConfigHash()
 	if restart {
-		config.RestartOnConfigChange = ptr.To(true)
+		config.Restart = ptr.To(true)
 	} else {
-		config.RestartOnConfigChange = nil
+		config.Restart = nil
 	}
-	// TODO: custom reconfigure action?
+	// TODO: reconfigure action?
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
 

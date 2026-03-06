@@ -214,9 +214,6 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentT
 	if err := cwo.horizontalScale(); err != nil {
 		return err
 	}
-	if err := cwo.reconfigure(); err != nil {
-		return err
-	}
 	return nil
 }
 

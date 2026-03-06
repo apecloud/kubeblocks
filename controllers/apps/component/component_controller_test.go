@@ -1502,6 +1502,95 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
 	}
 
+	testFileTemplateProvision := func(compName, compDefName, fileTemplate string) {
+		var (
+			serverConfigName   = "server-conf"
+			serverConfigHash   = "abcdefg"
+			serverConfigAction = testapps.NewLifecycleAction(serverConfigName)
+		)
+
+		By("mock the cmpd to add a new config template")
+		compDefKey := types.NamespacedName{Name: compDefName}
+		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+			cmpd.Spec.Configs = append(cmpd.Spec.Configs, kbappsv1.ComponentFileTemplate{
+				Name:            serverConfigName,
+				VolumeName:      "server-conf",
+				ExternalManaged: ptr.To(true),
+			})
+			for i := range cmpd.Spec.Runtime.Containers {
+				cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+					append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+						Name:      "server-conf",
+						MountPath: "/var/run/app/conf/server",
+					})
+			}
+			compDefObj = cmpd.DeepCopy()
+		})()).ShouldNot(HaveOccurred())
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(serverConfigName),
+					ClusterComponentConfigSource: kbappsv1.ClusterComponentConfigSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: compDefObj.Spec.Configs[0].Template, // reuse log-conf template
+							},
+						},
+					},
+					ConfigHash:  ptr.To(serverConfigHash),
+					Restart:     ptr.To(true),
+					Reconfigure: serverConfigAction,
+				},
+			})
+		})
+
+		By("check the file template objects")
+		var defaultInitConfigHash string
+		for _, tplName := range []string{fileTemplate, serverConfigName} {
+			cmKey := types.NamespacedName{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, tplName),
+			}
+			if tplName == fileTemplate {
+				Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+					g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+					defaultInitConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+					g.Expect(defaultInitConfigHash).NotTo(BeEmpty())
+				})).Should(Succeed())
+			} else {
+				// doesn't provision it
+				Consistently(testapps.CheckObjExists(&testCtx, cmKey, &corev1.ConfigMap{}, false)).Should(Succeed())
+			}
+		}
+
+		By("check the workload")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(2))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(defaultInitConfigHash))
+			g.Expect(its.Spec.Configs[0].Restart).Should(BeNil())
+			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].Reconfigure).Should(Equal(*compDefObj.Spec.LifecycleActions.Reconfigure))
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
+			g.Expect(its.Spec.Configs[1].Name).Should(Equal(serverConfigName))
+			g.Expect(its.Spec.Configs[1].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[1].ConfigHash).Should(Equal(serverConfigHash))
+			g.Expect(its.Spec.Configs[1].Restart).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[1].Restart).Should(BeTrue())
+			g.Expect(its.Spec.Configs[1].Reconfigure).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[1].Reconfigure).Should(Equal(*serverConfigAction))
+			g.Expect(its.Spec.Configs[1].ReconfigureActionName).Should(Equal(
+				component.UDFReconfigureActionName(component.SynthesizedFileTemplate{
+					ComponentFileTemplate: kbappsv1.ComponentFileTemplate{
+						Name: serverConfigName,
+					},
+				})))
+		})).Should(Succeed())
+	}
+
 	testReconfigureAction := func(compName, compDefName, fileTemplate string) {
 		createCompObj(compName, compDefName, nil)
 
@@ -1540,7 +1629,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
@@ -1554,7 +1643,7 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
-					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+					Reconfigure: testapps.NewLifecycleAction(fileTemplate),
 				},
 			})
 		})
@@ -1626,7 +1715,9 @@ var _ = Describe("Component Controller", func() {
 		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(its.Spec.Configs).Should(BeNil())
+			g.Expect(its.Spec.Configs).Should(HaveLen(2))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[1].Name).Should(Equal("server-conf"))
 		})).Should(Succeed())
 	}
 
@@ -1670,9 +1761,10 @@ var _ = Describe("Component Controller", func() {
 		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(its.Spec.Configs).Should(BeNil())
-			g.Expect(its.Spec.Template.Annotations).ShouldNot(BeNil())
-			g.Expect(its.Spec.Template.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Restart).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].Restart).Should(BeTrue())
 		})).Should(Succeed())
 	}
 
@@ -1692,6 +1784,15 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
 			initConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
 			g.Expect(initConfigHash).NotTo(BeEmpty())
+		})).Should(Succeed())
+
+		By("check the init workload")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(initConfigHash))
 		})).Should(Succeed())
 
 		By("update the config template variables")
@@ -1715,7 +1816,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 
 		By("check the workload updated")
-		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
@@ -2282,6 +2382,10 @@ var _ = Describe("Component Controller", func() {
 			testFileTemplateVolumes(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
+		It("config template provision", func() {
+			testFileTemplateProvision(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
 		It("reconfigure - action", func() {
 			testReconfigureAction(defaultCompName, compDefObj.Name, fileTemplate)
 		})
@@ -2298,7 +2402,7 @@ var _ = Describe("Component Controller", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
-		PIt("reconfigure - config hash", func() {
+		It("reconfigure - config hash", func() {
 			testReconfigureConfigHash(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})

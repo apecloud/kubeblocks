@@ -27,10 +27,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -45,7 +47,6 @@ const (
 	clusterName      = "test-cluster"
 	defaultCompName  = "mysql"
 	shardingCompName = "sharding-test"
-	defaultITSName   = "mysql-statefulset"
 	configSpecName   = "mysql-config-tpl"
 	configVolumeName = "mysql-config"
 	cmName           = "mysql-tree-node-template-8.0"
@@ -71,10 +72,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 			constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		).
-		AddAnnotations(
-			constant.KBParameterUpdateSourceAnnotationKey, constant.ReconfigureManagerSource,
-			constant.ConfigurationRevision, "1",
-			constant.CMInsEnableRerenderTemplateKey, "true").
+		AddAnnotations(constant.ConfigurationRevision, "1").
 		AddConfigFile(envTestFileKey, "abcde=1234").
 		Create(&testCtx).
 		GetObject()
@@ -92,7 +90,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 	return configmap, paramsdef
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
+func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent, *workloads.InstanceSet) {
 	configmap, paramsDef := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
@@ -119,9 +117,16 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 		AddComponent(defaultCompName, compDefObj.GetName()).
+		SetConfig(appsv1.ClusterComponentConfig{
+			Name: ptr.To(configSpecName),
+		}).
+		SetReplicas(1).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddSharding(shardingCompName, "", compDefObj.GetName()).
-		SetShards(5).
+		SetShards(3).
+		SetShardingConfig(appsv1.ClusterComponentConfig{
+			Name: ptr.To(configSpecName),
+		}).
 		Create(&testCtx).
 		GetObject()
 
@@ -136,23 +141,57 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		Create(&testCtx).
 		GetObject()
 
+	By("Create a ITS obj")
+	itsObj := mockCreateITSObject(testCtx.DefaultNamespace, fullCompName, clusterObj.Name, defaultCompName)
+
+	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)
+	Expect(err).ShouldNot(HaveOccurred())
+
+	return configmap, clusterObj, compObj, synthesizedComp, itsObj
+}
+
+func mockCreateITSObject(namespace, name, clusterName, compName string) *workloads.InstanceSet {
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,
 			MountPath: "/mnt/config",
 		}).GetObject()
-	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, defaultITSName, clusterObj.Name, defaultCompName).
-		AddConfigmapVolume(configVolumeName, configmap.Name).
+	itsObj := testapps.NewInstanceSetFactory(namespace, name, clusterName, compName).
 		AddContainer(container).
+		SetReplicas(1).
 		AddAppNameLabel(clusterName).
 		AddAppInstanceLabel(clusterName).
-		AddAppComponentLabel(defaultCompName).
-		Create(&testCtx).GetObject()
+		AddAppComponentLabel(compName).
+		Create(&testCtx).
+		GetObject()
+	return itsObj
+}
 
-	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)
-	Expect(err).ShouldNot(HaveOccurred())
+const (
+	configHash1 = "6c5b4466f"  // innodb_buffer_pool_size=1024M && max_connections=100
+	configHash2 = "5b46b78c8d" // max_connections=2000 && gtid_mode=OFF
+	configHash3 = "8665bf6888" // max_connections=1000 && gtid_mode=ON
+)
 
-	return configmap, paramsDef, clusterObj, compObj, synthesizedComp
+func mockReconfigureDone(namespace, itsName, configName, configHash string) {
+	itsKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      itsName,
+	}
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+		its.Status.Replicas = int32(1)
+		its.Status.InstanceStatus = []workloads.InstanceStatus{
+			{
+				PodName: fmt.Sprintf("%s-0", its.Name),
+				Configs: []workloads.InstanceConfigStatus{
+					{
+						Name:       configName,
+						ConfigHash: ptr.To(configHash),
+					},
+				},
+			},
+		}
+	})()).Should(Succeed())
 }
 
 func cleanEnv() {

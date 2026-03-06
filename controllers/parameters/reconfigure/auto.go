@@ -17,19 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package parameters
+package reconfigure
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 func init() {
-	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, &autoReloadPolicy{})
-}
-
-type autoReloadPolicy struct{}
-
-func (receiver autoReloadPolicy) Upgrade(params reconfigureContext) (returnedStatus, error) {
-	_ = params
-	return makeReturnedStatus(ESNone), nil
+	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, func(Context) (Status, error) {
+		return makeStatus(StatusNone, withReason("async dynamic reload")), nil
+	})
 }

@@ -45,9 +45,6 @@ var _ = Describe("instance util test", func() {
 			pod := buildRandomPod()
 			restartTime := (metav1.Time{Time: time.Now()}).Format(time.RFC3339)
 			pod.Annotations[constant.RestartAnnotationKey] = restartTime
-			reconfigureKey := "config.kubeblocks.io/restart-foo-bar-config"
-			reconfigureValue := "7cdb79ffdb"
-			pod.Annotations[reconfigureKey] = reconfigureValue
 			podTemplate := &corev1.PodTemplateSpec{
 				ObjectMeta: pod.ObjectMeta,
 				Spec:       pod.Spec,
@@ -56,8 +53,6 @@ var _ = Describe("instance util test", func() {
 			result := filterInPlaceFields(podTemplate)
 			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
 			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
-			Expect(result.Annotations).Should(HaveKey(reconfigureKey))
-			Expect(result.Annotations[reconfigureKey]).Should(Equal(reconfigureValue))
 			Expect(result.Labels).Should(BeNil())
 			Expect(result.Spec.ActiveDeadlineSeconds).Should(BeNil())
 			Expect(result.Spec.Tolerations).Should(BeNil())

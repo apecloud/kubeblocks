@@ -27,11 +27,9 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -54,7 +52,7 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 }
 
 func (t *clusterComponentStatusTransformer) transform(transCtx *clusterTransformContext) error {
-	comps, shardingComps, err := t.listClusterComponents(transCtx)
+	comps, shardingComps, err := listClusterComponents(transCtx.Context, transCtx.Client, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
@@ -63,55 +61,6 @@ func (t *clusterComponentStatusTransformer) transform(transCtx *clusterTransform
 	t.transformShardingStatus(transCtx, shardingComps)
 
 	return nil
-}
-
-func (t *clusterComponentStatusTransformer) listClusterComponents(
-	transCtx *clusterTransformContext) (map[string]*appsv1.Component, map[string][]*appsv1.Component, error) {
-	var (
-		cluster = transCtx.Cluster
-	)
-
-	compList := &appsv1.ComponentList{}
-	ml := client.MatchingLabels(constant.GetClusterLabels(cluster.Name))
-	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
-		return nil, nil, err
-	}
-
-	if len(compList.Items) == 0 {
-		return nil, nil, nil
-	}
-
-	comps := make(map[string]*appsv1.Component)
-	shardingComps := make(map[string][]*appsv1.Component)
-
-	sharding := func(comp *appsv1.Component) bool {
-		shardingName := shardingCompNName(comp)
-		if len(shardingName) == 0 {
-			return false
-		}
-
-		if _, ok := shardingComps[shardingName]; !ok {
-			shardingComps[shardingName] = []*appsv1.Component{comp}
-		} else {
-			shardingComps[shardingName] = append(shardingComps[shardingName], comp)
-		}
-		return true
-	}
-
-	for i, comp := range compList.Items {
-		if sharding(&compList.Items[i]) {
-			continue
-		}
-		compName, err := component.ShortName(cluster.Name, comp.Name)
-		if err != nil {
-			return nil, nil, err
-		}
-		if _, ok := comps[compName]; ok {
-			return nil, nil, fmt.Errorf("duplicate component name: %s", compName)
-		}
-		comps[compName] = &compList.Items[i]
-	}
-	return comps, shardingComps, nil
 }
 
 func (t *clusterComponentStatusTransformer) transformCompStatus(transCtx *clusterTransformContext, comps map[string]*appsv1.Component) {

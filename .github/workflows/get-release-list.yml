@@ -10,7 +10,7 @@ on:
 env:
   GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
-run-name: Get KubeBlocks Release List
+run-name: Get KubeBlocks Release List 20260309
 
 jobs:
   release-list:

@@ -47,7 +47,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -323,7 +322,7 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = parametersv1alpha1.RestartPolicy
-	case cfgcm.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
+	case isAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
 		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
 	case r.enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
 		policy = parametersv1alpha1.SyncDynamicReloadPolicy
@@ -443,7 +442,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.P
 		return nil, false, err
 	}
 	if !restart {
-		restart = cfgcm.NeedRestart(paramsDefs, patch)
+		restart = needRestart(paramsDefs, patch)
 	}
 	return patch, restart, nil
 }
@@ -460,6 +459,30 @@ func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	}
 
 	return data, nil
+}
+
+func needRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo) bool {
+	if patch == nil {
+		return false
+	}
+	for key := range patch.UpdateConfig {
+		if paramsDef, ok := paramsDefs[key]; !ok || !isSupportReload(paramsDef.Spec.ReloadAction) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
+	return reload != nil && isValidReloadPolicy(*reload)
+}
+
+func isValidReloadPolicy(reload parametersv1alpha1.ReloadAction) bool {
+	return reload.AutoTrigger != nil || reload.ShellTrigger != nil
+}
+
+func isAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
+	return reload != nil && reload.AutoTrigger != nil
 }
 
 type options = func(*parameters.Result)

@@ -113,14 +113,15 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	if runningITS := getRunningIts(); runningITS != nil {
 		for i, c := range runningITS.Spec.Template.Spec.Containers {
 			if c.Name == container.Name {
-				runningITS.Spec.Template.Spec.Containers[i].Image = container.Image
+				// replace the image registry here, other scenarios will be replaced in the component workload transformer
+				runningITS.Spec.Template.Spec.Containers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 				break
 			}
 		}
 		for _, tc := range buildParams.ToolsContainers {
 			for j, ic := range runningITS.Spec.Template.Spec.InitContainers {
 				if ic.Name == tc.Name {
-					runningITS.Spec.Template.Spec.InitContainers[j].Image = tc.Image
+					runningITS.Spec.Template.Spec.InitContainers[j].Image = intctrlutil.ReplaceImageRegistry(tc.Image)
 					break
 				}
 			}

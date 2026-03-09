@@ -394,8 +394,8 @@ func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *compone
 			if !t.isWorkloadUpdated() {
 				return metav1.ConditionFalse, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
 			}
-			if !t.runningITS.IsInstanceSetReady() {
-				return metav1.ConditionFalse, "WorkloadNotReady", "workload not ready", nil
+			if !t.runningITS.IsInstancesReady() {
+				return metav1.ConditionFalse, "WorkloadNotReady", "some instances are not ready", nil
 			}
 			if !t.runningITS.IsRoleProbeDone() {
 				return metav1.ConditionFalse, "RoleProbeNotDone", "some instances do not have roles", nil

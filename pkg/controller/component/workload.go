@@ -82,6 +82,7 @@ func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.C
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars).
 		// SetStop(synthesizedComp.Stop).  # check handleWorkloadStartNStop
+		SetConfigs(synthesizedComp.Configs).
 		SetEnableInstanceAPI(synthesizedComp.EnableInstanceAPI).
 		SetInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects)
 	if compDef != nil {

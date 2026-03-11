@@ -36,8 +36,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
-	ginkgo.Context("sync reconfigure policy", func() {
+var _ = ginkgo.Describe("syncPolicy test", func() {
+	ginkgo.Context("sync policy", func() {
 		var (
 			rctx Context
 		)
@@ -180,6 +180,118 @@ var _ = ginkgo.Describe("Reconfigure syncPolicy test", func() {
 			Expect(status.Status).Should(BeEquivalentTo(StatusNone))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
 			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
+		})
+	})
+
+	ginkgo.Context("reconfigure conditions", func() {
+		var (
+			rctx Context
+		)
+
+		ginkgo.BeforeEach(func() {
+			configHash := "test-config-hash"
+			rctx = Context{
+				RequestCtx: intctrlutil.RequestCtx{
+					Ctx: context.Background(),
+					Log: log.FromContext(context.Background()),
+				},
+				Client: nil,
+				ConfigTemplate: appsv1.ComponentFileTemplate{
+					Name: cfgName,
+				},
+				ConfigHash: &configHash,
+				Cluster: &appsv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: "default",
+					},
+				},
+				ClusterComponent: &appsv1.ClusterComponentSpec{
+					Name:     "test-component",
+					Replicas: 1,
+					Configs: []appsv1.ClusterComponentConfig{
+						{
+							Name: ptr.To(cfgName),
+						},
+					},
+				},
+				ITS: &workloads.InstanceSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-instanceset",
+						Namespace: "default",
+					},
+				},
+				ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{
+					Name: cfgName,
+					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+						Format: parametersv1alpha1.RedisCfg,
+					},
+				},
+				ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{
+					MergeReloadAndRestart:           ptr.To(false),
+					ReloadStaticParamsBeforeRestart: ptr.To(true),
+					ReloadAction: &parametersv1alpha1.ReloadAction{
+						ShellTrigger: &parametersv1alpha1.ShellTrigger{
+							Command: []string{"bash", "-c", "reload"},
+							Sync:    ptr.To(true),
+						},
+					},
+				},
+				Patch: &core.ConfigPatchInfo{
+					IsModify: true,
+					UpdateConfig: map[string][]byte{
+						cfgName: []byte(`{"a":"c b e f"}`),
+					},
+				},
+			}
+		})
+
+		ginkgo.It("set reconfigure when sync reload with shell trigger", func() {
+			_, err := syncPolicy(rctx)
+			Expect(err).Should(Succeed())
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(config.Reconfigure.Exec).ShouldNot(BeNil())
+			Expect(config.Reconfigure.Exec.Command).Should(Equal([]string{"bash", "-c", "reload"}))
+			Expect(config.Restart).Should(BeNil())
+		})
+
+		ginkgo.It("skip reconfigure when auto trigger", func() {
+			rctx.ParametersDef.ReloadAction.AutoTrigger = &parametersv1alpha1.AutoTrigger{
+				ProcessName: "mysqld",
+			}
+			_, err := syncPolicy(rctx)
+			Expect(err).Should(Succeed())
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).Should(BeNil())
+		})
+
+		ginkgo.It("skip reconfigure when no reload action", func() {
+			rctx.ParametersDef.ReloadAction = nil
+			_, err := syncPolicy(rctx)
+			Expect(err).Should(Succeed())
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).Should(BeNil())
+		})
+
+		ginkgo.It("skip reconfigure when restart merged", func() {
+			rctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
+			_, err := syncNRestartPolicy(rctx)
+			Expect(err).Should(Succeed())
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).Should(BeNil())
+			Expect(config.Restart).ShouldNot(BeNil())
+			Expect(*config.Restart).Should(BeTrue())
+		})
+
+		ginkgo.It("set reconfigure when reload before restart enabled", func() {
+			rctx.ParametersDef.MergeReloadAndRestart = ptr.To(false)
+			_, err := syncNRestartPolicy(rctx)
+			Expect(err).Should(Succeed())
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(config.Restart).ShouldNot(BeNil())
+			Expect(*config.Restart).Should(BeTrue())
 		})
 	})
 })

@@ -65,7 +65,13 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 			}
 		}
 		if len(params) == 0 {
-			return makeStatus(StatusNone, withReason("has no updated parameters")), nil
+			// No reloadable params, but a restart can still be required (static params change
+			// or merge-reload-and-restart). Aligns with release-1.1 behavior where we fall
+			// back to a restart task when no reload task is generated.
+			if restart {
+				return submit(ctx, nil, true)
+			}
+			return makeStatus(StatusNone, withReason("has NO updated parameters")), nil
 		}
 		return submit(ctx, params, restart)
 	}
@@ -93,16 +99,55 @@ func submit(ctx Context, parameters map[string]string, restart bool) (Status, er
 	return syncReconfigureStatus(ctx), nil
 }
 
-func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) Status {
-	config.Variables = parameters
+func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
+	config.Variables = params
 	config.ConfigHash = ctx.getTargetConfigHash()
 	if restart {
 		config.Restart = ptr.To(true)
 	} else {
 		config.Restart = nil
 	}
-	// TODO: reconfigure action?
+	if shouldCallReconfigure(ctx, params, restart) {
+		config.Reconfigure = reloadActionToReconfigureAction(ctx.ParametersDef)
+	} else {
+		config.Reconfigure = nil
+	}
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+}
+
+func shouldCallReconfigure(ctx Context, params map[string]string, restart bool) bool {
+	if len(params) == 0 {
+		return false
+	}
+	if ctx.ParametersDef == nil || ctx.ParametersDef.ReloadAction == nil {
+		return false
+	}
+	if ctx.ParametersDef.ReloadAction.AutoTrigger != nil {
+		return false
+	}
+	if ctx.ParametersDef.ReloadAction.ShellTrigger == nil {
+		return false
+	}
+	if restart && !parameters.NeedDynamicReloadAction(ctx.ParametersDef) {
+		return false
+	}
+	return true
+}
+
+func reloadActionToReconfigureAction(pd *parametersv1alpha1.ParametersDefinitionSpec) *appsv1.Action {
+	if pd == nil || pd.ReloadAction == nil || pd.ReloadAction.ShellTrigger == nil {
+		return nil
+	}
+	command := slices.Clone(pd.ReloadAction.ShellTrigger.Command)
+	if len(command) == 0 {
+		return nil
+	}
+	return &appsv1.Action{
+		Exec: &appsv1.ExecAction{
+			Command: command,
+		},
+		// TODO: toolsSetup && scriptConfig
+	}
 }
 
 func syncReconfigureStatus(ctx Context) Status {

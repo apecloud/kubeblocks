@@ -59,6 +59,10 @@ const (
 	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
 	ProposedServiceAccountNameAnnotationKey          = "workloads.kubeblocks.io/proposed-service-account-name"
 	ServiceAccountInUseAnnotationKey                 = "workloads.kubeblocks.io/service-account-in-use"
+
+	// LegacyConfigManagerRequiredAnnotationKey tells the component controller whether an existing workload must
+	// continue to keep the legacy config-manager sidecar for parameters compatibility.
+	LegacyConfigManagerRequiredAnnotationKey = "parameters.kubeblocks.io/legacy-config-manager-required"
 )
 
 const (
@@ -81,6 +85,7 @@ func InheritedAnnotations() []string {
 		BackupSourceTargetAnnotationKey,
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
+		LegacyConfigManagerRequiredAnnotationKey,
 		KBAppMultiClusterPlacementKey,
 	}
 }

@@ -300,7 +300,7 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	}
 
 	for i, item := range configDefList.Items {
-		if item.Spec.ComponentDef != cmpd.Name {
+		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {

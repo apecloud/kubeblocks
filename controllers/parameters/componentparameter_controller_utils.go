@@ -80,7 +80,7 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 	var configRender *parametersv1alpha1.ParamConfigRenderer
 	for i, item := range configDefList.Items {
-		if item.Spec.ComponentDef != cmpd.Name {
+		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {

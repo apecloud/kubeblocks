@@ -124,5 +124,35 @@ var _ = Describe("ParamConfigRenderer Controller", func() {
 				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
 			})).ShouldNot(Succeed())
 		})
+
+		It("regex componentDef matching", func() {
+			initPDCRTest()
+
+			pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
+				SetParametersDefs(paramsDefName).
+				SetComponentDefinition("^" + compDefName + ".*").
+				SetTemplateName(configSpecName).
+				Create(&testCtx).
+				GetObject()
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParamConfigRenderer) {
+				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
+			})).Should(Succeed())
+		})
+
+		It("prefix componentDef matching", func() {
+			initPDCRTest()
+
+			pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
+				SetParametersDefs(paramsDefName).
+				SetComponentDefinition(compDefName).
+				SetTemplateName(configSpecName).
+				Create(&testCtx).
+				GetObject()
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParamConfigRenderer) {
+				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
+			})).Should(Succeed())
+		})
 	})
 })

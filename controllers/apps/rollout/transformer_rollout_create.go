@@ -120,7 +120,7 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 	}
 
 	// the target replicas
-	target, err := createComponentTargetReplicas(comp, replicas)
+	target, err := createTargetReplicas(comp.Name, comp.Replicas, replicas, "component")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -129,17 +129,7 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 }
 
 func createComponentTargetReplicas(comp appsv1alpha1.RolloutComponent, originalReplicas int32) (int32, error) {
-	if comp.Replicas == nil {
-		return 0, nil
-	}
-	target, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(originalReplicas), false)
-	if err != nil {
-		return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
-	}
-	if target < 0 || int32(target) > originalReplicas {
-		return 0, errors.Errorf("the target replicas %d is out-of-range, component %s, replicas: %d", target, comp.Name, originalReplicas)
-	}
-	return int32(target), nil
+	return createTargetReplicas(comp.Name, comp.Replicas, originalReplicas, "component")
 }
 
 func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
@@ -148,46 +138,21 @@ func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
-	tpl, err := t.instanceTemplate(transCtx, comp, spec)
+	tpl, err := createOrUpdateInstanceTemplate(
+		string(transCtx.Rollout.UID[:8]),
+		&spec.Instances,
+		&spec.FlatInstanceOrdinal,
+		comp.Strategy.Create.Canary,
+		comp.ServiceVersion,
+		comp.CompDef,
+		comp.Strategy.Create.SchedulingPolicy,
+		comp.InstanceMeta,
+	)
 	if err != nil {
 		return err
 	}
-	spec.Replicas += targetReplicas
-	tpl.Replicas = ptr.To(targetReplicas)
-
+	applyCreateRolling(&spec.Replicas, tpl, targetReplicas)
 	return nil
-}
-
-func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformContext,
-	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec) (*appsv1.InstanceTemplate, error) {
-	name := string(transCtx.Rollout.UID[:8])
-	for i, tpl := range spec.Instances {
-		if tpl.Name == name {
-			return &spec.Instances[i], nil
-		}
-	}
-	if len(spec.Instances) > 0 && !spec.FlatInstanceOrdinal {
-		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
-	}
-	tpl := appsv1.InstanceTemplate{
-		Name:     name,
-		Canary:   comp.Strategy.Create.Canary,
-		Replicas: ptr.To[int32](0),
-	}
-	if comp.ServiceVersion != nil {
-		tpl.ServiceVersion = *comp.ServiceVersion
-	}
-	if comp.CompDef != nil {
-		tpl.CompDef = *comp.CompDef
-	}
-	tpl.SchedulingPolicy = rolloutSchedulingPolicy(comp.Strategy.Create.SchedulingPolicy)
-	if comp.InstanceMeta != nil && comp.InstanceMeta.Canary != nil {
-		tpl.Labels = comp.InstanceMeta.Canary.Labels
-		tpl.Annotations = comp.InstanceMeta.Canary.Annotations
-	}
-	spec.Instances = append(spec.Instances, tpl)
-	spec.FlatInstanceOrdinal = true
-	return &spec.Instances[len(spec.Instances)-1], nil
 }
 
 func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
@@ -206,26 +171,8 @@ func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 	if compStatus == nil || compStatus.CanaryReplicas < targetReplicas {
 		return nil
 	}
-	if promotion.Condition != nil && (promotion.Condition.Prev != nil || promotion.Condition.Post != nil) {
-		return createStrategyNotSupportedError
-	}
-
-	if ptr.Deref(canaryTpl.Canary, false) {
-		if compStatus.LastScaleUpTimestamp.IsZero() {
-			return nil
-		}
-		if diff := createDelayRemaining(compStatus.LastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)); diff > 0 {
-			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for promotion delay: %v remaining", diff))
-		}
-		canaryTpl.Canary = ptr.To(false)
-		compStatus.LastScaleDownTimestamp = metav1.Now()
-	}
-
-	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && compStatus.LastScaleDownTimestamp.IsZero() {
-		return nil
-	}
-	if diff := createDelayRemaining(compStatus.LastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)); diff > 0 {
-		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for scale down delay: %v remaining", diff))
+	if err := applyCreatePromotion(promotion, canaryTpl, &compStatus.LastScaleUpTimestamp, &compStatus.LastScaleDownTimestamp); err != nil {
+		return err
 	}
 
 	scaleDownCount := spec.Replicas - replicas
@@ -233,20 +180,7 @@ func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 		return nil
 	}
 	spec.Replicas = replicas
-	for i := range spec.Instances {
-		if spec.Instances[i].Name == prefix || spec.Instances[i].Replicas == nil || *spec.Instances[i].Replicas == 0 {
-			continue
-		}
-		reduceBy := scaleDownCount
-		if reduceBy > *spec.Instances[i].Replicas {
-			reduceBy = *spec.Instances[i].Replicas
-		}
-		spec.Instances[i].Replicas = ptr.To(*spec.Instances[i].Replicas - reduceBy)
-		scaleDownCount -= reduceBy
-		if scaleDownCount == 0 {
-			break
-		}
-	}
+	scaleDownInstanceTemplates(spec.Instances, prefix, scaleDownCount)
 
 	return nil
 }
@@ -257,45 +191,21 @@ func (t *rolloutCreateTransformer) shardingRolling(transCtx *rolloutTransformCon
 		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the sharding %s is not ready", sharding.Name))
 	}
 
-	tpl, err := t.shardingInstanceTemplate(transCtx, sharding, spec)
+	tpl, err := createOrUpdateInstanceTemplate(
+		string(transCtx.Rollout.UID[:8]),
+		&spec.Template.Instances,
+		&spec.Template.FlatInstanceOrdinal,
+		sharding.Strategy.Create.Canary,
+		sharding.ServiceVersion,
+		sharding.CompDef,
+		sharding.Strategy.Create.SchedulingPolicy,
+		sharding.InstanceMeta,
+	)
 	if err != nil {
 		return err
 	}
-	spec.Template.Replicas += targetReplicas
-	tpl.Replicas = ptr.To(targetReplicas)
+	applyCreateRolling(&spec.Template.Replicas, tpl, targetReplicas)
 	return nil
-}
-
-func (t *rolloutCreateTransformer) shardingInstanceTemplate(transCtx *rolloutTransformContext,
-	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (*appsv1.InstanceTemplate, error) {
-	name := string(transCtx.Rollout.UID[:8])
-	for i, tpl := range spec.Template.Instances {
-		if tpl.Name == name {
-			return &spec.Template.Instances[i], nil
-		}
-	}
-	if len(spec.Template.Instances) > 0 && !spec.Template.FlatInstanceOrdinal {
-		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
-	}
-	tpl := appsv1.InstanceTemplate{
-		Name:     name,
-		Canary:   sharding.Strategy.Create.Canary,
-		Replicas: ptr.To[int32](0),
-	}
-	if sharding.ServiceVersion != nil {
-		tpl.ServiceVersion = *sharding.ServiceVersion
-	}
-	if sharding.CompDef != nil {
-		tpl.CompDef = *sharding.CompDef
-	}
-	tpl.SchedulingPolicy = rolloutSchedulingPolicy(sharding.Strategy.Create.SchedulingPolicy)
-	if sharding.InstanceMeta != nil && sharding.InstanceMeta.Canary != nil {
-		tpl.Labels = sharding.InstanceMeta.Canary.Labels
-		tpl.Annotations = sharding.InstanceMeta.Canary.Annotations
-	}
-	spec.Template.Instances = append(spec.Template.Instances, tpl)
-	spec.Template.FlatInstanceOrdinal = true
-	return &spec.Template.Instances[len(spec.Template.Instances)-1], nil
 }
 
 func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformContext,
@@ -315,26 +225,8 @@ func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformCon
 	if shardingStatus == nil || shardingStatus.CanaryReplicas < desiredCanaryReplicas {
 		return nil
 	}
-	if promotion.Condition != nil && (promotion.Condition.Prev != nil || promotion.Condition.Post != nil) {
-		return createStrategyNotSupportedError
-	}
-
-	if ptr.Deref(canaryTpl.Canary, false) {
-		if shardingStatus.LastScaleUpTimestamp.IsZero() {
-			return nil
-		}
-		if diff := createDelayRemaining(shardingStatus.LastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)); diff > 0 {
-			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for promotion delay: %v remaining", diff))
-		}
-		canaryTpl.Canary = ptr.To(false)
-		shardingStatus.LastScaleDownTimestamp = metav1.Now()
-	}
-
-	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && shardingStatus.LastScaleDownTimestamp.IsZero() {
-		return nil
-	}
-	if diff := createDelayRemaining(shardingStatus.LastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)); diff > 0 {
-		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for scale down delay: %v remaining", diff))
+	if err := applyCreatePromotion(promotion, canaryTpl, &shardingStatus.LastScaleUpTimestamp, &shardingStatus.LastScaleDownTimestamp); err != nil {
+		return err
 	}
 
 	scaleDownCount := spec.Template.Replicas - replicas
@@ -342,20 +234,7 @@ func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformCon
 		return nil
 	}
 	spec.Template.Replicas = replicas
-	for i := range spec.Template.Instances {
-		if spec.Template.Instances[i].Name == prefix || spec.Template.Instances[i].Replicas == nil || *spec.Template.Instances[i].Replicas == 0 {
-			continue
-		}
-		reduceBy := scaleDownCount
-		if reduceBy > *spec.Template.Instances[i].Replicas {
-			reduceBy = *spec.Template.Instances[i].Replicas
-		}
-		spec.Template.Instances[i].Replicas = ptr.To(*spec.Template.Instances[i].Replicas - reduceBy)
-		scaleDownCount -= reduceBy
-		if scaleDownCount == 0 {
-			break
-		}
-	}
+	scaleDownInstanceTemplates(spec.Template.Instances, prefix, scaleDownCount)
 
 	return nil
 }
@@ -401,14 +280,79 @@ func createShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1
 	if sharding.Replicas == nil {
 		return replicas, 0, nil
 	}
-	target, err := intstr.GetScaledValueFromIntOrPercent(sharding.Replicas, int(replicas), false)
+	target, err := createTargetReplicas(sharding.Name, sharding.Replicas, replicas, "sharding")
 	if err != nil {
-		return 0, 0, errors.Wrapf(err, "failed to get scaled value for replicas of sharding %s", sharding.Name)
+		return 0, 0, err
 	}
-	if target < 0 || int32(target) > replicas {
-		return 0, 0, errors.Errorf("the target replicas %d is out-of-range, sharding %s, replicas: %d", target, sharding.Name, replicas)
+	return replicas, target, nil
+}
+
+func createTargetReplicas(name string, replicasSpec *intstr.IntOrString, originalReplicas int32, subject string) (int32, error) {
+	if replicasSpec == nil {
+		return 0, nil
 	}
-	return replicas, int32(target), nil
+	target, err := intstr.GetScaledValueFromIntOrPercent(replicasSpec, int(originalReplicas), false)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get scaled value for replicas of %s %s", subject, name)
+	}
+	if target < 0 || int32(target) > originalReplicas {
+		return 0, errors.Errorf("the target replicas %d is out-of-range, %s %s, replicas: %d", target, subject, name, originalReplicas)
+	}
+	return int32(target), nil
+}
+
+func createOrUpdateInstanceTemplate(name string,
+	instances *[]appsv1.InstanceTemplate,
+	flatInstanceOrdinal *bool,
+	canary *bool,
+	serviceVersion *string,
+	compDef *string,
+	schedulingPolicy *appsv1alpha1.SchedulingPolicy,
+	instanceMeta *appsv1alpha1.RolloutInstanceMeta) (*appsv1.InstanceTemplate, error) {
+	for i, tpl := range *instances {
+		if tpl.Name == name {
+			return &(*instances)[i], nil
+		}
+	}
+	if len(*instances) > 0 && !*flatInstanceOrdinal {
+		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
+	}
+	tpl := appsv1.InstanceTemplate{
+		Name:     name,
+		Canary:   canary,
+		Replicas: ptr.To[int32](0),
+	}
+	if serviceVersion != nil {
+		tpl.ServiceVersion = *serviceVersion
+	}
+	if compDef != nil {
+		tpl.CompDef = *compDef
+	}
+	tpl.SchedulingPolicy = rolloutSchedulingPolicy(schedulingPolicy)
+	if instanceMeta != nil && instanceMeta.Canary != nil {
+		tpl.Labels = instanceMeta.Canary.Labels
+		tpl.Annotations = instanceMeta.Canary.Annotations
+	}
+	*instances = append(*instances, tpl)
+	*flatInstanceOrdinal = true
+	return &(*instances)[len(*instances)-1], nil
+}
+
+func scaleDownInstanceTemplates(instances []appsv1.InstanceTemplate, prefix string, scaleDownCount int32) {
+	for i := range instances {
+		if instances[i].Name == prefix || instances[i].Replicas == nil || *instances[i].Replicas == 0 {
+			continue
+		}
+		reduceBy := scaleDownCount
+		if reduceBy > *instances[i].Replicas {
+			reduceBy = *instances[i].Replicas
+		}
+		instances[i].Replicas = ptr.To(*instances[i].Replicas - reduceBy)
+		scaleDownCount -= reduceBy
+		if scaleDownCount == 0 {
+			return
+		}
+	}
 }
 
 func createDelayRemaining(lastTimestamp metav1.Time, delaySeconds int32) time.Duration {
@@ -420,6 +364,38 @@ func createDelayRemaining(lastTimestamp metav1.Time, delaySeconds int32) time.Du
 		return 0
 	}
 	return diff
+}
+
+func applyCreateRolling(totalReplicas *int32, tpl *appsv1.InstanceTemplate, targetReplicas int32) {
+	*totalReplicas += targetReplicas
+	tpl.Replicas = ptr.To(targetReplicas)
+}
+
+func applyCreatePromotion(promotion *appsv1alpha1.RolloutPromotion,
+	canaryTpl *appsv1.InstanceTemplate,
+	lastScaleUpTimestamp, lastScaleDownTimestamp *metav1.Time) error {
+	if promotion.Condition != nil && (promotion.Condition.Prev != nil || promotion.Condition.Post != nil) {
+		return createStrategyNotSupportedError
+	}
+
+	if ptr.Deref(canaryTpl.Canary, false) {
+		if lastScaleUpTimestamp.IsZero() {
+			return nil
+		}
+		if diff := createDelayRemaining(*lastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)); diff > 0 {
+			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for promotion delay: %v remaining", diff))
+		}
+		canaryTpl.Canary = ptr.To(false)
+		*lastScaleDownTimestamp = metav1.Now()
+	}
+
+	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && lastScaleDownTimestamp.IsZero() {
+		return nil
+	}
+	if diff := createDelayRemaining(*lastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)); diff > 0 {
+		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for scale down delay: %v remaining", diff))
+	}
+	return nil
 }
 
 func rolloutSchedulingPolicy(policy *appsv1alpha1.SchedulingPolicy) *appsv1.SchedulingPolicy {

@@ -22,6 +22,8 @@ package rollout
 import (
 	"slices"
 
+	"k8s.io/utils/ptr"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -103,8 +105,22 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 
 func (t *rolloutTearDownTransformer) compCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
-	// TODO: impl
-	return createStrategyNotSupportedError
+	spec := transCtx.ClusterComps[comp.Name]
+	canaryTpl := createInstanceTemplate(spec.Instances, replaceInstanceTemplateNamePrefix(rollout))
+	if canaryTpl == nil || ptr.Deref(canaryTpl.Canary, false) || !checkClusterNCompRunning(transCtx, comp.Name) {
+		return nil
+	}
+	compStatus := createCompStatus(rollout, comp.Name)
+	if compStatus == nil || spec.Replicas != compStatus.Replicas {
+		return nil
+	}
+	targetReplicas, err := createComponentTargetReplicas(comp, compStatus.Replicas)
+	if err != nil || targetReplicas != compStatus.Replicas {
+		return err
+	}
+	spec.ServiceVersion = canaryTpl.ServiceVersion
+	spec.ComponentDef = canaryTpl.CompDef
+	return nil
 }
 
 func (t *rolloutTearDownTransformer) shardings(transCtx *rolloutTransformContext) error {
@@ -161,6 +177,20 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 
 func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
-	// TODO: impl
-	return createStrategyNotSupportedError
+	spec := transCtx.ClusterShardings[sharding.Name]
+	canaryTpl := createInstanceTemplate(spec.Template.Instances, replaceInstanceTemplateNamePrefix(rollout))
+	if canaryTpl == nil || ptr.Deref(canaryTpl.Canary, false) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return nil
+	}
+	shardingStatus := createShardingStatus(rollout, sharding.Name)
+	if shardingStatus == nil || spec.Template.Replicas*spec.Shards != shardingStatus.Replicas {
+		return nil
+	}
+	replicas, targetReplicas, err := createShardingReplicas(rollout, sharding, spec)
+	if err != nil || targetReplicas != replicas {
+		return err
+	}
+	spec.Template.ServiceVersion = canaryTpl.ServiceVersion
+	spec.Template.ComponentDef = canaryTpl.CompDef
+	return nil
 }

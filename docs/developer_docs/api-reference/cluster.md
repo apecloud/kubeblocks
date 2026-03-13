@@ -26951,6 +26951,8 @@ Kubernetes api utils intstr.IntOrString
 <td>
 <em>(Optional)</em>
 <p>Specifies the number of instances to be rolled out.</p>
+<p>For the <code>Create</code> strategy, this is the number of canary instances to create and promote, and it must be
+in the range [0, original stable replicas]. The rollout keeps the component stable replica count unchanged.</p>
 </td>
 </tr>
 <tr>
@@ -27323,6 +27325,22 @@ RolloutStrategy
 </td>
 <td>
 <p>Specifies the rollout strategy for the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of instances to be rolled out for each shard.</p>
+<p>For the <code>Create</code> strategy, this is the number of canary instances to create and promote in each shard, and it
+must be in the range [0, original stable replicas]. The rollout keeps the sharding stable replica count unchanged.</p>
 </td>
 </tr>
 <tr>
@@ -27784,7 +27802,8 @@ RolloutPromotion
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the promotion strategy for the component.</p>
+<p>Specifies the promotion strategy for the created instances.</p>
+<p>Promotion turns the created instances into stable instances without changing the stable replica count.</p>
 </td>
 </tr>
 </tbody>

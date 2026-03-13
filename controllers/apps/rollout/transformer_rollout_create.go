@@ -51,8 +51,7 @@ func (t *rolloutCreateTransformer) rollout(transCtx *rolloutTransformContext) er
 	if err := t.components(transCtx); err != nil {
 		return err
 	}
-	// TODO: sharding
-	return nil
+	return t.shardings(transCtx)
 }
 
 func (t *rolloutCreateTransformer) components(transCtx *rolloutTransformContext) error {
@@ -60,6 +59,18 @@ func (t *rolloutCreateTransformer) components(transCtx *rolloutTransformContext)
 	for _, comp := range rollout.Spec.Components {
 		if comp.Strategy.Create != nil {
 			if err := t.component(transCtx, rollout, comp); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *rolloutCreateTransformer) shardings(transCtx *rolloutTransformContext) error {
+	rollout := transCtx.Rollout
+	for _, sharding := range rollout.Spec.Shardings {
+		if sharding.Strategy.Create != nil {
+			if err := t.sharding(transCtx, rollout, sharding); err != nil {
 				return err
 			}
 		}
@@ -80,6 +91,18 @@ func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext,
 	}
 
 	return t.promote(transCtx, comp, spec, replicas, targetReplicas)
+}
+
+func (t *rolloutCreateTransformer) sharding(transCtx *rolloutTransformContext,
+	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
+	spec := transCtx.ClusterShardings[sharding.Name]
+	replicas := createShardingReplicas(rollout, sharding, spec)
+
+	if (replicas * 2) > spec.Template.Replicas {
+		return t.shardingRolling(transCtx, sharding, spec, replicas)
+	}
+
+	return t.shardingPromote(transCtx, sharding, spec, replicas)
 }
 
 func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
@@ -117,7 +140,7 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas, targetReplicas int32) error {
 	if !checkClusterNCompRunning(transCtx, comp.Name) {
-		return nil
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
 	}
 
 	tpl, err := t.instanceTemplate(transCtx, comp, spec)
@@ -222,6 +245,113 @@ func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 	return nil
 }
 
+func (t *rolloutCreateTransformer) shardingRolling(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas int32) error {
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the sharding %s is not ready", sharding.Name))
+	}
+
+	tpl, err := t.shardingInstanceTemplate(transCtx, sharding, spec)
+	if err != nil {
+		return err
+	}
+	spec.Template.Replicas += replicas
+	tpl.Replicas = ptr.To(replicas)
+	return nil
+}
+
+func (t *rolloutCreateTransformer) shardingInstanceTemplate(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (*appsv1.InstanceTemplate, error) {
+	name := string(transCtx.Rollout.UID[:8])
+	for i, tpl := range spec.Template.Instances {
+		if tpl.Name == name {
+			return &spec.Template.Instances[i], nil
+		}
+	}
+	if len(spec.Template.Instances) > 0 && !spec.Template.FlatInstanceOrdinal {
+		return nil, fmt.Errorf("not support the create strategy with the flatInstanceOrdinal is false")
+	}
+	tpl := appsv1.InstanceTemplate{
+		Name:     name,
+		Canary:   sharding.Strategy.Create.Canary,
+		Replicas: ptr.To[int32](0),
+	}
+	if sharding.ServiceVersion != nil {
+		tpl.ServiceVersion = *sharding.ServiceVersion
+	}
+	if sharding.CompDef != nil {
+		tpl.CompDef = *sharding.CompDef
+	}
+	if sharding.InstanceMeta != nil && sharding.InstanceMeta.Canary != nil {
+		tpl.Labels = sharding.InstanceMeta.Canary.Labels
+		tpl.Annotations = sharding.InstanceMeta.Canary.Annotations
+	}
+	spec.Template.Instances = append(spec.Template.Instances, tpl)
+	spec.Template.FlatInstanceOrdinal = true
+	return &spec.Template.Instances[len(spec.Template.Instances)-1], nil
+}
+
+func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformContext,
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas int32) error {
+	promotion := sharding.Strategy.Create.Promotion
+	if promotion == nil || !ptr.Deref(promotion.Auto, false) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return nil
+	}
+
+	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+	canaryTpl := createInstanceTemplate(spec.Template.Instances, prefix)
+	if canaryTpl == nil {
+		return nil
+	}
+	shardingStatus := createShardingStatus(transCtx.Rollout, sharding.Name)
+	if shardingStatus == nil || shardingStatus.CanaryReplicas < replicas {
+		return nil
+	}
+	if promotion.Condition != nil && (promotion.Condition.Prev != nil || promotion.Condition.Post != nil) {
+		return createStrategyNotSupportedError
+	}
+
+	if ptr.Deref(canaryTpl.Canary, false) {
+		if shardingStatus.LastScaleUpTimestamp.IsZero() {
+			return nil
+		}
+		if diff := createDelayRemaining(shardingStatus.LastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)); diff > 0 {
+			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for promotion delay: %v remaining", diff))
+		}
+		canaryTpl.Canary = ptr.To(false)
+		shardingStatus.LastScaleDownTimestamp = metav1.Now()
+	}
+
+	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && shardingStatus.LastScaleDownTimestamp.IsZero() {
+		return nil
+	}
+	if diff := createDelayRemaining(shardingStatus.LastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)); diff > 0 {
+		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for scale down delay: %v remaining", diff))
+	}
+
+	scaleDownCount := spec.Template.Replicas - replicas
+	if scaleDownCount <= 0 {
+		return nil
+	}
+	spec.Template.Replicas = replicas
+	for i := range spec.Template.Instances {
+		if spec.Template.Instances[i].Name == prefix || spec.Template.Instances[i].Replicas == nil || *spec.Template.Instances[i].Replicas == 0 {
+			continue
+		}
+		reduceBy := scaleDownCount
+		if reduceBy > *spec.Template.Instances[i].Replicas {
+			reduceBy = *spec.Template.Instances[i].Replicas
+		}
+		spec.Template.Instances[i].Replicas = ptr.To(*spec.Template.Instances[i].Replicas - reduceBy)
+		scaleDownCount -= reduceBy
+		if scaleDownCount == 0 {
+			break
+		}
+	}
+
+	return nil
+}
+
 func createInstanceTemplate(instances []appsv1.InstanceTemplate, name string) *appsv1.InstanceTemplate {
 	for i := range instances {
 		if instances[i].Name == name {
@@ -238,6 +368,29 @@ func createCompStatus(rollout *appsv1alpha1.Rollout, compName string) *appsv1alp
 		}
 	}
 	return nil
+}
+
+func createShardingStatus(rollout *appsv1alpha1.Rollout, shardingName string) *appsv1alpha1.RolloutShardingStatus {
+	for i := range rollout.Status.Shardings {
+		if rollout.Status.Shardings[i].Name == shardingName {
+			return &rollout.Status.Shardings[i]
+		}
+	}
+	return nil
+}
+
+func createShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) int32 {
+	replicas := spec.Template.Replicas
+	for _, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			if spec.Shards == 0 {
+				return 0
+			}
+			replicas = status.Replicas / spec.Shards
+			break
+		}
+	}
+	return replicas
 }
 
 func createDelayRemaining(lastTimestamp metav1.Time, delaySeconds int32) time.Duration {

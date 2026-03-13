@@ -427,8 +427,93 @@ func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformCon
 
 func (t *rolloutStatusTransformer) shardingCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) (appsv1alpha1.RolloutState, error) {
-	// TODO: impl
-	return "", createStrategyNotSupportedError
+	spec := t.shardingSpec(transCtx, sharding.Name)
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+
+	canaryTpl := createInstanceTemplate(spec.Template.Instances, prefix)
+	if canaryTpl == nil {
+		return appsv1alpha1.PendingRolloutState, nil
+	}
+
+	pods := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(rollout.Namespace),
+		client.MatchingLabels(constant.GetClusterLabels(rollout.Spec.ClusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: sharding.Name,
+		})),
+	}
+	if err := transCtx.Client.List(transCtx.Context, pods, listOpts...); err != nil {
+		return "", err
+	}
+
+	allPodCnt := int32(len(pods.Items))
+	canaryPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
+		if pod.Labels != nil {
+			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] == prefix
+		}
+		return false
+	}))
+
+	for i, status := range rollout.Status.Shardings {
+		if status.Name == sharding.Name {
+			if checkClusterNShardingRunning(transCtx, sharding.Name) {
+				if status.CanaryReplicas < canaryPodCnt {
+					rollout.Status.Shardings[i].LastScaleUpTimestamp = metav1.Now()
+				}
+				rollout.Status.Shardings[i].CanaryReplicas = canaryPodCnt
+				rollout.Status.Shardings[i].NewReplicas = canaryPodCnt
+				rollout.Status.Shardings[i].RolledOutReplicas = canaryPodCnt
+			}
+			break
+		}
+	}
+
+	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	templateTargetReplicas := ptr.Deref(canaryTpl.Replicas, 0)
+	if canaryPodCnt < templateTargetReplicas {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	if sharding.Strategy.Create == nil || sharding.Strategy.Create.Promotion == nil {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
+	promotion := sharding.Strategy.Create.Promotion
+	shardingStatus := createShardingStatus(rollout, sharding.Name)
+	if shardingStatus == nil {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if !ptr.Deref(promotion.Auto, false) {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if shardingStatus.LastScaleUpTimestamp.IsZero() {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if createDelayRemaining(shardingStatus.LastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)) > 0 {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if promotion.Condition != nil && promotion.Condition.Prev != nil {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if ptr.Deref(canaryTpl.Canary, false) {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && shardingStatus.LastScaleDownTimestamp.IsZero() {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if createDelayRemaining(shardingStatus.LastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)) > 0 {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if allPodCnt != spec.Template.Replicas*spec.Shards {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if promotion.Condition != nil && promotion.Condition.Post != nil {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	return appsv1alpha1.SucceedRolloutState, nil
 }
 
 func (t *rolloutStatusTransformer) shardingSpec(transCtx *rolloutTransformContext, shardingName string) *appsv1.ClusterSharding {

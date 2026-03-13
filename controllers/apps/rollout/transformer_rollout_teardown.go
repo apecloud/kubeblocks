@@ -171,8 +171,18 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 
 func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
-	// TODO: impl
-	return createStrategyNotSupportedError
+	spec := transCtx.ClusterShardings[sharding.Name]
+	canaryTpl := createInstanceTemplate(spec.Template.Instances, replaceInstanceTemplateNamePrefix(rollout))
+	if canaryTpl == nil || ptrToTrue(canaryTpl.Canary) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return nil
+	}
+	shardingStatus := createShardingStatus(rollout, sharding.Name)
+	if shardingStatus == nil || spec.Template.Replicas*spec.Shards != shardingStatus.Replicas {
+		return nil
+	}
+	spec.Template.ServiceVersion = canaryTpl.ServiceVersion
+	spec.Template.ComponentDef = canaryTpl.CompDef
+	return nil
 }
 
 func ptrToTrue(v *bool) bool {

@@ -90,7 +90,7 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 	if parameters.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
-	cmpd, err := r.resolveComponentDefinition(reqCtx, parameterTemplate.Spec.ComponentDef)
+	cmpd, err := r.resolveComponentDefinition(reqCtx, parameterTemplate)
 	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -111,7 +111,8 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 	return intctrlutil.Reconciled()
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) resolveComponentDefinition(reqCtx intctrlutil.RequestCtx, componentDefPattern string) (*appsv1.ComponentDefinition, error) {
+func (r *ParameterDrivenConfigRenderReconciler) resolveComponentDefinition(reqCtx intctrlutil.RequestCtx, pcr *parametersv1alpha1.ParamConfigRenderer) (*appsv1.ComponentDefinition, error) {
+	componentDefPattern := pcr.Spec.ComponentDef
 	if err := component.ValidateDefNameRegexp(componentDefPattern); err != nil {
 		return nil, fmt.Errorf("invalid componentDef pattern %q: %w", componentDefPattern, err)
 	}
@@ -133,7 +134,7 @@ func (r *ParameterDrivenConfigRenderReconciler) resolveComponentDefinition(reqCt
 		if !component.PrefixOrRegexMatched(item.Name, componentDefPattern) {
 			continue
 		}
-		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
+		if pcr.Spec.ServiceVersion == "" || pcr.Spec.ServiceVersion == item.Spec.ServiceVersion {
 			return &compDefList.Items[i], nil
 		}
 	}

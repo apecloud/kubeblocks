@@ -79,7 +79,7 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 		return nil, err
 	}
 	slices.SortFunc(configDefList.Items, func(a, b parametersv1alpha1.ParamConfigRenderer) int {
-		return strings.Compare(a.Spec.ComponentDef, b.Spec.ComponentDef)
+		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
 	})
 
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition

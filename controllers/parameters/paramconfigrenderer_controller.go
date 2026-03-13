@@ -127,7 +127,7 @@ func (r *ParameterDrivenConfigRenderReconciler) resolveComponentDefinition(reqCt
 		return nil, err
 	}
 	slices.SortFunc(compDefList.Items, func(a, b appsv1.ComponentDefinition) int {
-		return strings.Compare(a.Name, b.Name)
+		return strings.Compare(b.Name, a.Name)
 	})
 
 	for i, item := range compDefList.Items {

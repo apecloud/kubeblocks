@@ -22,6 +22,8 @@ package rollout
 import (
 	"slices"
 
+	"k8s.io/utils/ptr"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -105,12 +107,16 @@ func (t *rolloutTearDownTransformer) compCreate(transCtx *rolloutTransformContex
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
 	spec := transCtx.ClusterComps[comp.Name]
 	canaryTpl := createInstanceTemplate(spec.Instances, replaceInstanceTemplateNamePrefix(rollout))
-	if canaryTpl == nil || ptrToTrue(canaryTpl.Canary) || !checkClusterNCompRunning(transCtx, comp.Name) {
+	if canaryTpl == nil || ptr.Deref(canaryTpl.Canary, false) || !checkClusterNCompRunning(transCtx, comp.Name) {
 		return nil
 	}
 	compStatus := createCompStatus(rollout, comp.Name)
 	if compStatus == nil || spec.Replicas != compStatus.Replicas {
 		return nil
+	}
+	targetReplicas, err := createComponentTargetReplicas(comp, compStatus.Replicas)
+	if err != nil || targetReplicas != compStatus.Replicas {
+		return err
 	}
 	spec.ServiceVersion = canaryTpl.ServiceVersion
 	spec.ComponentDef = canaryTpl.CompDef
@@ -173,7 +179,7 @@ func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformCo
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
 	spec := transCtx.ClusterShardings[sharding.Name]
 	canaryTpl := createInstanceTemplate(spec.Template.Instances, replaceInstanceTemplateNamePrefix(rollout))
-	if canaryTpl == nil || ptrToTrue(canaryTpl.Canary) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
+	if canaryTpl == nil || ptr.Deref(canaryTpl.Canary, false) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
 		return nil
 	}
 	shardingStatus := createShardingStatus(rollout, sharding.Name)
@@ -183,8 +189,4 @@ func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformCo
 	spec.Template.ServiceVersion = canaryTpl.ServiceVersion
 	spec.Template.ComponentDef = canaryTpl.CompDef
 	return nil
-}
-
-func ptrToTrue(v *bool) bool {
-	return v != nil && *v
 }

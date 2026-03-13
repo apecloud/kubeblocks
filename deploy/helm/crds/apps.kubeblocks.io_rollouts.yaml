@@ -104,8 +104,12 @@ spec:
                       anyOf:
                       - type: integer
                       - type: string
-                      description: Specifies the number of instances to be rolled
-                        out.
+                      description: |-
+                        Specifies the number of instances to be rolled out.
+
+
+                        For the `Create` strategy, this is the number of canary instances to create and promote, and it must be
+                        in the range [0, comp.replicas]. The rollout keeps the component stable replica count unchanged.
                       x-kubernetes-int-or-string: true
                     serviceVersion:
                       description: Specifies the target ServiceVersion of the component.
@@ -126,8 +130,11 @@ spec:
                                 canary instances.
                               type: boolean
                             promotion:
-                              description: Specifies the promotion strategy for the
-                                component.
+                              description: |-
+                                Specifies the promotion strategy for the created instances.
+
+
+                                Promotion turns the created instances into stable instances without changing the stable replica count.
                               properties:
                                 auto:
                                   description: Specifies whether to automatically
@@ -3517,8 +3524,11 @@ spec:
                                 canary instances.
                               type: boolean
                             promotion:
-                              description: Specifies the promotion strategy for the
-                                component.
+                              description: |-
+                                Specifies the promotion strategy for the created instances.
+
+
+                                Promotion turns the created instances into stable instances without changing the stable replica count.
                               properties:
                                 auto:
                                   description: Specifies whether to automatically

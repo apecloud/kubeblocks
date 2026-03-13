@@ -117,24 +117,26 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 	}
 
 	// the target replicas
-	target, err := func() (int32, error) {
-		if comp.Replicas != nil {
-			replicas, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(replicas), false)
-			if err != nil {
-				return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
-			}
-			return int32(replicas), nil
-		}
-		return 0, nil
-	}()
+	target, err := createComponentTargetReplicas(comp, replicas)
 	if err != nil {
 		return 0, 0, err
 	}
-	if target < 0 {
-		return 0, 0, errors.Errorf("invalid target replicas %d for component %s", target, comp.Name)
-	}
 
 	return replicas, target, nil
+}
+
+func createComponentTargetReplicas(comp appsv1alpha1.RolloutComponent, originalReplicas int32) (int32, error) {
+	if comp.Replicas == nil {
+		return 0, nil
+	}
+	target, err := intstr.GetScaledValueFromIntOrPercent(comp.Replicas, int(originalReplicas), false)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get scaled value for replicas of component %s", comp.Name)
+	}
+	if target < 0 || int32(target) > originalReplicas {
+		return 0, errors.Errorf("the target replicas %d is out-of-range, component %s, replicas: %d", target, comp.Name, originalReplicas)
+	}
+	return int32(target), nil
 }
 
 func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
@@ -175,6 +177,7 @@ func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformCo
 	if comp.CompDef != nil {
 		tpl.CompDef = *comp.CompDef
 	}
+	tpl.SchedulingPolicy = rolloutSchedulingPolicy(comp.Strategy.Create.SchedulingPolicy)
 	if comp.InstanceMeta != nil && comp.InstanceMeta.Canary != nil {
 		tpl.Labels = comp.InstanceMeta.Canary.Labels
 		tpl.Annotations = comp.InstanceMeta.Canary.Annotations
@@ -282,6 +285,7 @@ func (t *rolloutCreateTransformer) shardingInstanceTemplate(transCtx *rolloutTra
 	if sharding.CompDef != nil {
 		tpl.CompDef = *sharding.CompDef
 	}
+	tpl.SchedulingPolicy = rolloutSchedulingPolicy(sharding.Strategy.Create.SchedulingPolicy)
 	if sharding.InstanceMeta != nil && sharding.InstanceMeta.Canary != nil {
 		tpl.Labels = sharding.InstanceMeta.Canary.Labels
 		tpl.Annotations = sharding.InstanceMeta.Canary.Annotations
@@ -402,4 +406,18 @@ func createDelayRemaining(lastTimestamp metav1.Time, delaySeconds int32) time.Du
 		return 0
 	}
 	return diff
+}
+
+func rolloutSchedulingPolicy(policy *appsv1alpha1.SchedulingPolicy) *appsv1.SchedulingPolicy {
+	if policy == nil {
+		return nil
+	}
+	return &appsv1.SchedulingPolicy{
+		SchedulerName:             policy.SchedulerName,
+		NodeSelector:              policy.NodeSelector,
+		NodeName:                  policy.NodeName,
+		Affinity:                  policy.Affinity,
+		Tolerations:               policy.Tolerations,
+		TopologySpreadConstraints: policy.TopologySpreadConstraints,
+	}
 }

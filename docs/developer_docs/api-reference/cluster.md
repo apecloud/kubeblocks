@@ -26951,6 +26951,8 @@ Kubernetes api utils intstr.IntOrString
 <td>
 <em>(Optional)</em>
 <p>Specifies the number of instances to be rolled out.</p>
+<p>For the <code>Create</code> strategy, this is the number of canary instances to create and promote, and it must be
+in the range [0, comp.replicas]. The rollout keeps the component stable replica count unchanged.</p>
 </td>
 </tr>
 <tr>
@@ -27784,7 +27786,8 @@ RolloutPromotion
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the promotion strategy for the component.</p>
+<p>Specifies the promotion strategy for the created instances.</p>
+<p>Promotion turns the created instances into stable instances without changing the stable replica count.</p>
 </td>
 </tr>
 </tbody>

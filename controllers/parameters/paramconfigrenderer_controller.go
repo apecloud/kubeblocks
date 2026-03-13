@@ -22,6 +22,8 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -123,8 +125,15 @@ func (r *ParameterDrivenConfigRenderReconciler) resolveComponentDefinition(reqCt
 	if err := r.List(reqCtx.Ctx, compDefList); err != nil {
 		return nil, err
 	}
+	slices.SortFunc(compDefList.Items, func(a, b appsv1.ComponentDefinition) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
 	for i, item := range compDefList.Items {
-		if component.PrefixOrRegexMatched(item.Name, componentDefPattern) {
+		if !component.PrefixOrRegexMatched(item.Name, componentDefPattern) {
+			continue
+		}
+		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
 			return &compDefList.Items[i], nil
 		}
 	}

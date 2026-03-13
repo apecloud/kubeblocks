@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
@@ -291,6 +292,9 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	if err := reader.List(ctx, configDefList); err != nil {
 		return nil, err
 	}
+	slices.SortFunc(configDefList.Items, func(a, b parametersv1alpha1.ParamConfigRenderer) int {
+		return strings.Compare(a.Spec.ComponentDef, b.Spec.ComponentDef)
+	})
 
 	checkAvailable := func(configDef parametersv1alpha1.ParamConfigRenderer) error {
 		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {

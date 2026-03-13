@@ -23,26 +23,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/parameters/reconfigure"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
@@ -58,12 +59,9 @@ type ReconfigureReconciler struct {
 }
 
 const (
-	ConfigReconcileInterval = time.Second * 1
-)
+	configReconcileInterval = time.Second * 1
 
-const (
 	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
-	configurationNotUsingMessage            = "the configmap is not used by any container, skip reconfigure"
 	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
 )
 
@@ -96,8 +94,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	config := &corev1.ConfigMap{}
-	// TODO(leon): data or universal?
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config, inDataContextUnspecified()); err != nil {
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	if model.IsObjectDeleting(config) {
@@ -120,14 +117,14 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
-	resources, err := prepareRelatedResource(reqCtx, r.Client, config)
+	configSpec, err := r.getConfigSpec(reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to fetch related resources").Error())
 	}
-	if resources.configSpec == nil {
+	if configSpec == nil {
 		reqCtx.Log.Info(fmt.Sprintf("not found configSpec[%s] in the component[%s].",
-			config.Labels[constant.CMConfigurationSpecProviderLabelKey], resources.componentName))
+			config.Labels[constant.CMConfigurationSpecProviderLabelKey], config.Labels[constant.KBAppComponentLabelKey]))
 		reqCtx.Recorder.Event(config,
 			corev1.EventTypeWarning,
 			appsv1alpha1.ReasonReconfigureFailed,
@@ -135,51 +132,71 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
 
-	return r.sync(reqCtx, config, resources)
+	return r.sync(reqCtx, config, configSpec)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewControllerManagedBy(mgr).
+func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
-		})
-
-	if multiClusterMgr != nil {
-		eventHandler := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-			return []reconcile.Request{
-				{
-					NamespacedName: types.NamespacedName{
-						Namespace: obj.GetNamespace(),
-						Name:      obj.GetName(),
-					},
-				},
-			}
-		})
-		multiClusterMgr.Watch(b, &corev1.ConfigMap{}, eventHandler)
-	}
-
-	return b.WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).Complete(r)
+		}).
+		WithEventFilter(predicate.NewPredicateFuncs(checkConfigurationObject)).
+		Complete(r)
 }
 
 func checkConfigurationObject(object client.Object) bool {
-	return checkConfigLabels(object, reconfigureRequiredLabels)
+	labels := object.GetLabels()
+	if len(labels) == 0 {
+		return false
+	}
+
+	for _, label := range reconfigureRequiredLabels {
+		if _, ok := labels[label]; !ok {
+			return false
+		}
+	}
+
+	// reconfigure ConfigMap for db instance
+	if ins, ok := labels[constant.CMConfigurationTypeLabelKey]; !ok || ins != constant.ConfigInstanceType {
+		return false
+	}
+
+	return checkEnableCfgUpgrade(object)
 }
 
-func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, resources *reconfigureRelatedResource) (ctrl.Result, error) {
-	rctx := newParameterReconcileContext(reqCtx,
-		&render.ResourceCtx{
-			Context:       reqCtx.Ctx,
-			Client:        r.Client,
-			Namespace:     configMap.Namespace,
-			ClusterName:   resources.clusterName,
-			ComponentName: resources.componentName,
-		},
-		configMap,
-		nil,
-		resources.componentMatchLabels())
-	if err := rctx.GetRelatedObjects(); err != nil {
+func (r *ReconfigureReconciler) getConfigSpec(reqCtx intctrlutil.RequestCtx, cm *corev1.ConfigMap) (*appsv1.ComponentFileTemplate, error) {
+	configSpecName, ok := cm.Labels[constant.CMConfigurationSpecProviderLabelKey]
+	if !ok {
+		return nil, nil
+	}
+
+	key := client.ObjectKey{
+		Namespace: cm.Namespace,
+		Name:      core.GenerateComponentConfigurationName(cm.Labels[constant.AppInstanceLabelKey], cm.Labels[constant.KBAppComponentLabelKey]),
+	}
+	obj := &parametersv1alpha1.ComponentParameter{}
+	if err := r.Client.Get(reqCtx.Ctx, key, obj); err != nil {
+		return nil, err
+	}
+
+	configSpec := parameters.GetConfigTemplateItem(&obj.Spec, configSpecName)
+	if configSpec == nil {
+		return nil, fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, obj.Name)
+	}
+	return configSpec.ConfigSpec, nil
+}
+
+func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate) (ctrl.Result, error) {
+	rctx := newReconcileContext(reqCtx, &render.ResourceCtx{
+		Context:       reqCtx.Ctx,
+		Client:        r.Client,
+		Namespace:     configMap.Namespace,
+		ClusterName:   configMap.Labels[constant.AppInstanceLabelKey],
+		ComponentName: configMap.Labels[constant.KBAppComponentLabelKey],
+	}, configMap, nil)
+	if err := rctx.objects(); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 
@@ -189,13 +206,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	if len(rctx.InstanceSetList) == 0 {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed,
-			"the configmap is not used by any container, skip reconfigure")
-		return updateConfigPhase(r.Client, reqCtx, configMap, parametersv1alpha1.CFinishedPhase, configurationNotUsingMessage)
-	}
-
-	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.ConfigRender, rctx.ParametersDefs)
+	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.configRender, rctx.parametersDefs)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -214,11 +225,121 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			configPatch.UpdateConfig))
 	}
 
-	tasks, err := genReconfigureActionTasks(resources.configSpec, rctx, configPatch, forceRestart)
+	tasks, err := r.buildReconfigureTasks(configSpec, rctx, configPatch, forceRestart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
 	return r.performUpgrade(rctx, tasks)
+}
+
+func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.ComponentFileTemplate,
+	rctx *reconcileContext, patch *core.ConfigPatchInfo, forceRestart bool) ([]reconfigure.Task, error) {
+
+	// If the patch or ConfigRender is nil, return a single restart task.
+	if patch == nil || rctx.configRender == nil {
+		return []reconfigure.Task{r.buildRestartTask(templateSpec, rctx)}, nil
+	}
+
+	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
+	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
+		return !forceRestart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
+	}
+
+	var tasks []reconfigure.Task
+	for key, jsonPatch := range patch.UpdateConfig {
+		pd, ok := rctx.parametersDefs[key]
+		// If the ParametersDefinition or its ReloadAction is nil, continue to the next iteration.
+		if !ok || pd.Spec.ReloadAction == nil {
+			continue
+		}
+		configFormat := parameters.GetComponentConfigDescription(&rctx.configRender.Spec, key)
+		if configFormat == nil || configFormat.FileFormatConfig == nil {
+			continue
+		}
+		// Determine the appropriate ReloadPolicy.
+		policy, err := r.resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
+		if err != nil {
+			return nil, err
+		}
+		// If a reload action is needed, append a new reload action task to the tasks slice.
+		if needReloadAction(pd, policy) {
+			tasks = append(tasks, r.buildReloadTask(policy, templateSpec, rctx, pd, configFormat, patch))
+		}
+	}
+
+	// If no tasks were added, return a single restart task.
+	if len(tasks) == 0 {
+		return []reconfigure.Task{r.buildRestartTask(templateSpec, rctx)}, nil
+	}
+
+	return tasks, nil
+}
+
+func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.ReloadPolicy,
+	templateSpec *appsv1.ComponentFileTemplate, rctx *reconcileContext, pd *parametersv1alpha1.ParametersDefinition,
+	configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigure.Task {
+	reCtx := reconfigure.Context{
+		RequestCtx:        rctx.RequestCtx,
+		Client:            rctx.Client,
+		ConfigTemplate:    *templateSpec,
+		ConfigHash:        computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
+		Cluster:           rctx.ClusterObj,
+		ClusterComponent:  rctx.ClusterComObj,
+		ITS:               rctx.its,
+		ConfigDescription: configDescription,
+		ParametersDef:     &pd.Spec,
+		Patch:             patch,
+	}
+	return reconfigure.Task{Policy: policy, Ctx: reCtx}
+}
+
+func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *reconcileContext) reconfigure.Task {
+	return reconfigure.Task{
+		Policy: parametersv1alpha1.RestartPolicy,
+		Ctx: reconfigure.Context{
+			RequestCtx:       rctx.RequestCtx,
+			Client:           rctx.Client,
+			ConfigTemplate:   *configTemplate,
+			ConfigHash:       computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
+			Cluster:          rctx.ClusterObj,
+			ClusterComponent: rctx.ClusterComObj,
+			ITS:              rctx.its,
+		},
+	}
+}
+
+func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, format *parametersv1alpha1.FileFormatConfig,
+	pd *parametersv1alpha1.ParametersDefinitionSpec) (parametersv1alpha1.ReloadPolicy, error) {
+	var policy = parametersv1alpha1.NonePolicy
+	dynamicUpdate, err := core.CheckUpdateDynamicParameters(format, pd, jsonPatch)
+	if err != nil {
+		return policy, err
+	}
+
+	// make decision
+	switch {
+	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
+		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
+	case !dynamicUpdate: // static parameters update and only need to restart
+		policy = parametersv1alpha1.RestartPolicy
+	case isAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
+		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+	case r.enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
+		policy = parametersv1alpha1.SyncDynamicReloadPolicy
+	default: // config-manager auto trigger to hot update
+		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+	}
+	return policy, nil
+}
+
+func (r *ReconfigureReconciler) enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {
+	if reloadAction == nil {
+		return false
+	}
+	if reloadAction.ShellTrigger != nil {
+		return !core.IsWatchModuleForShellTrigger(reloadAction.ShellTrigger)
+	}
+	return false
 }
 
 func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string, result *parameters.Result) (ctrl.Result, error) {
@@ -228,53 +349,283 @@ func (r *ReconfigureReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestC
 	}
 
 	if ok, err := updateAppliedConfigs(r.Client, reqCtx, cfg, configData, reconfigureType, result); err != nil || !ok {
-		return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
+		return intctrlutil.RequeueAfter(configReconcileInterval, reqCtx.Log, "failed to patch status and retry...", "error", err)
 	}
 
 	return intctrlutil.Reconciled()
 }
 
-func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTasks []ReloadAction) (ctrl.Result, error) {
-	var err error
-	var returnedStatus returnedStatus
-	var reloadType string
-
-	for _, task := range reloadTasks {
-		reloadType = task.ReloadType()
-		returnedStatus, err = task.ExecReload()
-		if err != nil || returnedStatus.Status != ESNone {
-			return r.status(rctx, returnedStatus, reloadType, err)
+func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []reconfigure.Task) (ctrl.Result, error) {
+	var (
+		err    error
+		policy string
+		status reconfigure.Status
+	)
+	for _, task := range tasks {
+		policy = string(task.Policy)
+		status, err = task.Reconfigure()
+		if err != nil || status.Status != reconfigure.StatusNone {
+			break
 		}
 	}
-	return r.succeed(rctx, reloadType, returnedStatus)
+	// submit changes to the cluster
+	if err1 := r.submit(rctx); err1 != nil {
+		return intctrlutil.RequeueAfter(configReconcileInterval, rctx.Log, "failed to submit changes to the cluster", "error", err1)
+	}
+	if err != nil || status.Status != reconfigure.StatusNone {
+		return r.status(rctx, policy, status, err)
+	}
+	return r.succeed(rctx, policy, status)
 }
 
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus returnedStatus, policy string, err error) (ctrl.Result, error) {
+func (r *ReconfigureReconciler) submit(rctx *reconcileContext) error {
+	if rctx.ClusterObj == nil || rctx.ClusterObjCopy == nil {
+		return fmt.Errorf("the cluster object is nil")
+	}
+	if reflect.DeepEqual(rctx.ClusterObj.Spec, rctx.ClusterObjCopy.Spec) {
+		return nil
+	}
+	return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
+}
+
+func (r *ReconfigureReconciler) status(rctx *reconcileContext, policy string, status reconfigure.Status, err error) (ctrl.Result, error) {
 	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
-		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(returnedStatus, policy, phase, options...))
+		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.configMap, reconciled(status, policy, phase, options...))
 	}
 
-	switch returnedStatus.Status {
-	case ESFailedAndRetry:
+	switch status.Status {
+	case reconfigure.StatusFailedAndRetry:
 		return updatePhase(parametersv1alpha1.CFailedPhase, withFailed(err, true))
-	case ESRetry:
+	case reconfigure.StatusRetry:
 		return updatePhase(parametersv1alpha1.CUpgradingPhase)
-	case ESFailed:
+	case reconfigure.StatusFailed:
 		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
-	case ESNone:
-		return r.succeed(rctx, policy, returnedStatus)
+	case reconfigure.StatusNone:
+		return r.succeed(rctx, policy, status)
 	default:
-		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status"), false))
+		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status: %s", status.Status), false))
 	}
 }
 
-func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus returnedStatus) (ctrl.Result, error) {
-	rctx.Recorder.Eventf(rctx.ConfigMap,
+func (r *ReconfigureReconciler) succeed(rctx *reconcileContext, policy string, status reconfigure.Status) (ctrl.Result, error) {
+	rctx.Recorder.Eventf(rctx.configMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,
 		"the reconfigure[%s] has been processed successfully",
-		reloadType)
+		policy)
+	result := reconciled(status, policy, parametersv1alpha1.CFinishedPhase)
+	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.configMap, policy, &result)
+}
 
-	result := reconciled(returnedStatus, reloadType, parametersv1alpha1.CFinishedPhase)
-	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, reloadType, &result)
+func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]string) *string {
+	hash, err := intctrlutil.ComputeHash(data)
+	if err != nil {
+		if reqCtx != nil {
+			reqCtx.Log.Error(err, "failed to get configuration version!")
+		}
+		return nil
+	}
+	return &hash
+}
+
+func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
+	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+		return nil, true, nil
+	}
+	lastConfig, err := getLastVersionConfig(cfg)
+	if err != nil {
+		return nil, false, core.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
+	}
+
+	patch, restart, err := core.CreateConfigPatch(lastConfig, cfg.Data, configRender.Spec, true)
+	if err != nil {
+		return nil, false, err
+	}
+	if !restart {
+		restart = needRestart(paramsDefs, patch)
+	}
+	return patch, restart, nil
+}
+
+func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
+	data := make(map[string]string, 0)
+	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotationKey]
+	if !ok {
+		return data, nil
+	}
+
+	if err := json.Unmarshal([]byte(cfgContent), &data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func needRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo) bool {
+	if patch == nil {
+		return false
+	}
+	for key := range patch.UpdateConfig {
+		if paramsDef, ok := paramsDefs[key]; !ok || !isSupportReload(paramsDef.Spec.ReloadAction) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
+	return reload != nil && isValidReloadPolicy(*reload)
+}
+
+func isValidReloadPolicy(reload parametersv1alpha1.ReloadAction) bool {
+	return reload.AutoTrigger != nil || reload.ShellTrigger != nil
+}
+
+func isAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
+	return reload != nil && reload.AutoTrigger != nil
+}
+
+type options = func(*parameters.Result)
+
+func reconciled(status reconfigure.Status, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) parameters.Result {
+	result := parameters.Result{
+		Policy:        policy,
+		Phase:         phase,
+		ExecResult:    status.Status,
+		ExpectedCount: status.ExpectedCount,
+		SucceedCount:  status.SucceedCount,
+		Retry:         true,
+		Message:       status.Reason,
+	}
+	for _, option := range options {
+		option(&result)
+	}
+	return result
+}
+
+func unReconciled(phase parametersv1alpha1.ParameterPhase, revision string, message string) parameters.Result {
+	return parameters.Result{
+		Phase:         phase,
+		Revision:      revision,
+		Message:       message,
+		SucceedCount:  core.NotStarted,
+		ExpectedCount: core.Unconfirmed,
+		Failed:        false,
+		Retry:         false,
+	}
+}
+
+func isReconciledResult(result parameters.Result) bool {
+	return result.ExecResult != "" && result.Policy != ""
+}
+
+func withFailed(err error, retry bool) options {
+	return func(result *parameters.Result) {
+		result.Retry = retry
+		if err != nil {
+			result.Failed = true
+			result.Message = err.Error()
+		}
+	}
+}
+
+func checkEnableCfgUpgrade(object client.Object) bool {
+	// check user's upgrade switch
+	// config.kubeblocks.io/disable-reconfigure = "false"
+	annotations := object.GetAnnotations()
+	value, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]
+	if !ok {
+		return true
+	}
+
+	enable, err := strconv.ParseBool(value)
+	if err == nil && enable {
+		return false
+	}
+
+	return true
+}
+
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase parametersv1alpha1.ParameterPhase, message string) (ctrl.Result, error) {
+	return updateConfigPhaseWithResult(cli, ctx, config, unReconciled(phase, "", message))
+}
+
+func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, result parameters.Result) (ctrl.Result, error) {
+	revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]
+	if !ok || revision == "" {
+		return intctrlutil.Reconciled()
+	}
+
+	patch := client.MergeFrom(config.DeepCopy())
+	if config.ObjectMeta.Annotations == nil {
+		config.ObjectMeta.Annotations = map[string]string{}
+	}
+
+	if result.Failed && !result.Retry {
+		ctx.Log.Info(fmt.Sprintf("failed to reconcile and disable retry for configmap[%+v]", client.ObjectKeyFromObject(config)))
+		config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(true)
+	}
+
+	gcConfigRevision(config)
+	if _, ok := config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)]; !ok || isReconciledResult(result) {
+		result.Revision = revision
+		b, _ := json.Marshal(result)
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
+	}
+
+	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+		return intctrlutil.RequeueWithError(err, ctx.Log, "")
+	}
+	if result.Retry {
+		return intctrlutil.RequeueAfter(configReconcileInterval, ctx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCtx, cm *corev1.ConfigMap) (bool, error) {
+	annotations := cm.GetAnnotations()
+
+	configData, err := json.Marshal(cm.Data)
+	if err != nil {
+		return false, err
+	}
+
+	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotationKey]
+	if !ok {
+		return updateAppliedConfigs(client, ctx, cm, configData, core.ReconfigureCreatedPhase, nil)
+	}
+
+	return lastConfig == string(configData), nil
+}
+
+func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string, result *parameters.Result) (bool, error) {
+
+	patch := client.MergeFrom(config.DeepCopy())
+	if config.ObjectMeta.Annotations == nil {
+		config.ObjectMeta.Annotations = map[string]string{}
+	}
+
+	gcConfigRevision(config)
+	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
+		if result == nil {
+			result = ptr.To(unReconciled(parametersv1alpha1.CFinishedPhase, "", fmt.Sprintf("phase: %s", reconfigurePhase)))
+		}
+		result.Revision = revision
+		b, _ := json.Marshal(result)
+		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
+	}
+	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
+	hash, err := intctrlutil.ComputeHash(config.Data)
+	if err != nil {
+		return false, err
+	}
+	config.ObjectMeta.Labels[constant.CMInsConfigurationHashLabelKey] = hash
+
+	// delete reconfigure-policy
+	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
+	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }

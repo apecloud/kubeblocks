@@ -20,24 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"reflect"
 	"slices"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
@@ -397,186 +391,4 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 	}
 	r.transCtx.Logger.Info("succeed to join member for pod", "pod", pod.Name)
 	return nil
-}
-
-func (r *componentWorkloadOps) reconfigure() error {
-	runningObjs, protoObjs, err := prepareFileTemplateObjects(r.transCtx)
-	if err != nil {
-		return err
-	}
-
-	toCreate, toDelete, toUpdate := mapDiff(runningObjs, protoObjs)
-
-	return r.handleReconfigure(r.transCtx, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
-}
-
-func (r *componentWorkloadOps) handleReconfigure(transCtx *componentTransformContext,
-	runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) error {
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-	)
-
-	if r.runningITS == nil {
-		r.protoITS.Spec.Configs = nil
-		return nil // the workload hasn't been provisioned
-	}
-
-	if len(toCreate) > 0 || len(toDelete) > 0 {
-		// since pod volumes changed, the workload will be restarted
-		r.protoITS.Spec.Configs = nil
-		return nil
-	}
-
-	templateChanges := r.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
-	for objName := range toUpdate {
-		tplName := fileTemplateNameFromObject(transCtx.SynthesizeComponent, protoObjs[objName])
-		if _, ok := templateChanges[tplName]; !ok {
-			continue
-		}
-		for _, tpl := range synthesizedComp.FileTemplates {
-			if tpl.Name == tplName {
-				if ptr.Deref(tpl.RestartOnFileChange, false) {
-					// restart
-					if r.protoITS.Spec.Template.Annotations == nil {
-						r.protoITS.Spec.Template.Annotations = map[string]string{}
-					}
-					r.protoITS.Spec.Template.Annotations[constant.RestartAnnotationKey] = metav1.NowMicro().Format(time.RFC3339)
-					return nil
-				}
-			}
-		}
-	}
-
-	reconfigure := func(tpl component.SynthesizedFileTemplate, changes fileTemplateChanges) {
-		var (
-			action     *appsv1.Action
-			actionName string
-		)
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
-			if tpl.Reconfigure == nil {
-				return // disabled by the external system
-			}
-		}
-		action = tpl.Reconfigure
-		actionName = component.UDFReconfigureActionName(tpl)
-		if action == nil && synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
-			action = synthesizedComp.LifecycleActions.Reconfigure
-			actionName = "" // default reconfigure action
-		}
-		if action == nil {
-			return // has no reconfigure action defined
-		}
-
-		config := workloads.ConfigTemplate{
-			Name:                  tpl.Name,
-			Generation:            r.component.Generation,
-			Reconfigure:           action,
-			ReconfigureActionName: actionName,
-			Parameters:            lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated),
-		}
-		if r.protoITS.Spec.Configs == nil {
-			r.protoITS.Spec.Configs = make([]workloads.ConfigTemplate, 0)
-		}
-		idx := slices.IndexFunc(r.protoITS.Spec.Configs, func(cfg workloads.ConfigTemplate) bool {
-			return cfg.Name == tpl.Name
-		})
-		if idx >= 0 {
-			r.protoITS.Spec.Configs[idx] = config
-		} else {
-			r.protoITS.Spec.Configs = append(r.protoITS.Spec.Configs, config)
-		}
-	}
-
-	// make a copy of configs from the running ITS
-	r.protoITS.Spec.Configs = slices.Clone(r.runningITS.Spec.Configs)
-
-	for _, tpl := range synthesizedComp.FileTemplates {
-		if changes, ok := templateChanges[tpl.Name]; ok {
-			reconfigure(tpl, changes)
-		}
-	}
-	return nil
-}
-
-func (r *componentWorkloadOps) templateFileChanges(transCtx *componentTransformContext,
-	runningObjs, protoObjs map[string]*corev1.ConfigMap, update sets.Set[string]) map[string]fileTemplateChanges {
-	diff := func(obj *corev1.ConfigMap, rData, pData map[string]string) fileTemplateChanges {
-		var (
-			tplName = fileTemplateNameFromObject(transCtx.SynthesizeComponent, obj)
-			items   = make([][]string, 3)
-		)
-
-		toAdd, toDelete, toUpdate := mapDiff(rData, pData)
-
-		items[0], items[1] = sets.List(toAdd), sets.List(toDelete)
-		for item := range toUpdate {
-			if !reflect.DeepEqual(rData[item], pData[item]) {
-				absPath := r.absoluteFilePath(transCtx, tplName, item)
-				if len(absPath) > 0 {
-					checksum := sha256.Sum256([]byte(pData[item]))
-					items[2] = append(items[2], fmt.Sprintf("%s:%x", absPath, checksum))
-				}
-			}
-		}
-
-		for i := range items {
-			slices.Sort(items[i])
-		}
-
-		return fileTemplateChanges{
-			Created: strings.Join(items[0], ","),
-			Removed: strings.Join(items[1], ","),
-			Updated: strings.Join(items[2], ","),
-		}
-	}
-
-	result := make(map[string]fileTemplateChanges)
-	for name := range update {
-		rData, pData := runningObjs[name].Data, protoObjs[name].Data
-		if !reflect.DeepEqual(rData, pData) {
-			tplName := fileTemplateNameFromObject(transCtx.SynthesizeComponent, runningObjs[name])
-			result[tplName] = diff(runningObjs[name], rData, pData)
-		}
-	}
-	return result
-}
-
-func (r *componentWorkloadOps) absoluteFilePath(transCtx *componentTransformContext, tpl, file string) string {
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-	)
-
-	var volName, mountPath string
-	for _, fileTpl := range synthesizedComp.FileTemplates {
-		if fileTpl.Name == tpl {
-			volName = fileTpl.VolumeName
-			break
-		}
-	}
-	if volName == "" {
-		return "" // has no volumes specified
-	}
-
-	for _, container := range synthesizedComp.PodSpec.Containers {
-		for _, mount := range container.VolumeMounts {
-			if mount.Name == volName {
-				mountPath = mount.MountPath
-				break
-			}
-		}
-		if mountPath != "" {
-			break
-		}
-	}
-	if mountPath == "" {
-		return "" // the template is not mounted, ignore it
-	}
-
-	return filepath.Join(mountPath, file)
-}
-
-type fileTemplateChanges struct {
-	Created string `json:"created,omitempty"`
-	Removed string `json:"removed,omitempty"`
-	Updated string `json:"updated,omitempty"`
 }

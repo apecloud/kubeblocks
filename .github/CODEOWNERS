@@ -1,42 +1,24 @@
 * @apecloud/kb-reviewers
 
-# Cluster APIs
-apis/**/cluster*.go @leon-inf @apecloud/kb-reviewers
-apis/**/component*.go @leon-inf @apecloud/kb-reviewers
-apis/**/service*.go @leon-inf @apecloud/kb-reviewers
-controllers/apps/cluster*.go @leon-inf @apecloud/kb-reviewers
-controllers/apps/transformer_cluster*.go @leon-inf @apecloud/kb-reviewers
-controllers/apps/component*.go @leon-inf @apecloud/kb-reviewers
-controllers/apps/transformer_component*.go @leon-inf @apecloud/kb-reviewers
-controllers/apps/service*.go @leon-inf @apecloud/kb-reviewers
+# Default
+apis/ @leon-ape @apecloud/kb-reviewers
+cmd/ @leon-ape @apecloud/kb-reviewers
+controllers/ @leon-ape @apecloud/kb-reviewers
+pkg/ @leon-ape @apecloud/kb-reviewers
 
-# OpsRequest API
-apis/**/opsrequest*.go @wangyelei @apecloud/kb-reviewers
-apis/**/opsdefinition*.go @wangyelei @apecloud/kb-reviewers
-controllers/apps/opsdefinition*.go @wangyelei @apecloud/kb-reviewers
-controllers/apps/operations/ @wangyelei @apecloud/kb-reviewers
+# Operations
+apis/operations/ @wangyelei @apecloud/kb-reviewers
+controllers/operations/ @wangyelei @apecloud/kb-reviewers
+pkg/operations/ @wangyelei @apecloud/kb-reviewers
 
-# Config API
-apis/**/config*.go @sophon-zt @apecloud/kb-reviewers
-controllers/apps/configuration/ @sophon-zt @apecloud/kb-reviewers
-controllers/apps/operations/reconfigure*.go @sophon-zt @apecloud/kb-reviewers
+# DataProtection
+apis/dataprotection/ @ldming @wangyelei @apecloud/kb-reviewers
+controllers/dataprotection/ @ldming @wangyelei @apecloud/kb-reviewers
+pkg/dataprotection/ @ldming @wangyelei @apecloud/kb-reviewers
 
-# DataProtection APIs
-apis/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
-controllers/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
-pkg/dataprotection/ @ldming @wangyelei @zjx20 @apecloud/kb-reviewers
-
-# Experimental APIs
-apis/experimental/ @apecloud/kb-reviewers
-controllers/experimental/ @apecloud/kb-reviewers
-
-# Extensions APIs
+# Extensions
 apis/extensions/ @ldming @apecloud/kb-reviewers
 controllers/extensions/ @ldming @apecloud/kb-reviewers
-
-# Workloads APIs
-apis/workloads/ @apecloud/kb-reviewers
-controllers/workloads/ @apecloud/kb-reviewers
 
 # Docs
 docs/ @shanshanying @apecloud/kb-reviewers

@@ -83,6 +83,10 @@ func GenerateDefaultServiceAccountName(cmpdName string) string {
 	return fmt.Sprintf("%s-%s", KBLowerPrefix, cmpdName)
 }
 
+func GenerateDefaultServiceAccountNameNew(fullCompName string) string {
+	return fmt.Sprintf("%s-%s", KBLowerPrefix, fullCompName)
+}
+
 // GenerateDefaultRoleName generates default role name for a component.
 func GenerateDefaultRoleName(cmpdName string) string {
 	return fmt.Sprintf("%s-%s", KBLowerPrefix, cmpdName)

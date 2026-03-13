@@ -17,6 +17,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package mocks
+package reconfigure
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination reconfigure_client_mocks.go github.com/apecloud/kubeblocks/pkg/parameters/proto ReconfigureClient
+import (
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+)
+
+func init() {
+	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicy)
+}
+
+var (
+	restartPolicy = func(ctx Context) (Status, error) {
+		return submit(ctx, nil, true)
+	}
+)

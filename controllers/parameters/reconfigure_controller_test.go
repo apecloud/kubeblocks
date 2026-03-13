@@ -24,11 +24,15 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("Reconfigure Controller", func() {
@@ -36,101 +40,119 @@ var _ = Describe("Reconfigure Controller", func() {
 
 	AfterEach(cleanEnv)
 
-	// TODO(component)
-	PContext("When updating configmap", func() {
-		It("Should rolling upgrade pod", func() {
-			configmap, _, clusterObj, _, _ := mockReconcileResource()
+	Context("reconfigure policy", func() {
+		// TODO: impl
+	})
 
-			By("Check config for instance")
-			var configHash string
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cm.Labels[constant.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
-				g.Expect(cm.Labels[constant.CMConfigurationTemplateNameLabelKey]).To(Equal(configSpecName))
-				g.Expect(cm.Labels[constant.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
-				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(core.ReconfigureCreatedPhase))
-				configHash = cm.Labels[constant.CMInsConfigurationHashLabelKey]
-				g.Expect(configHash).NotTo(Equal(""))
-				g.Expect(core.IsNotUserReconfigureOperation(cm)).To(BeTrue())
-				// g.Expect(cm.Annotations[constant.KBParameterUpdateSourceAnnotationKey]).To(Equal(constant.ReconfigureManagerSource))
-			}).Should(Succeed())
+	Context("reconfigure", func() {
+		var (
+			configmap                    *corev1.ConfigMap
+			clusterObj                   *appsv1.Cluster
+			synthesizedComp              *component.SynthesizedComponent
+			clusterKey, compParameterKey types.NamespacedName
+		)
 
-			By("manager changes will not change the phase of configmap.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
-				cm.Data["new_data"] = "###"
-				core.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+		BeforeEach(func() {
+			configmap, clusterObj, _, synthesizedComp, _ = mockReconcileResource()
+
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			compParameterKey = types.NamespacedName{
+				Namespace: synthesizedComp.Namespace,
+				Name:      parameterscore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name),
+			}
+			Eventually(testapps.CheckObj(&testCtx, compParameterKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
+				g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+				g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
 			})).Should(Succeed())
+		})
 
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
-				g.Expect(newHash).NotTo(Equal(configHash))
-				g.Expect(core.IsNotUserReconfigureOperation(cm)).To(BeTrue())
-			}).Should(Succeed())
+		It("compute config hash", func() {
+			By("compute hash for initial configuration")
+			initialHash := computeTargetConfigHash(nil, configmap.Data)
+			Expect(initialHash).NotTo(BeNil())
+			Expect(*initialHash).NotTo(BeEmpty())
 
-			By("recover normal update parameters")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
-				delete(cm.Data, "new_data")
-				core.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+			By("compute hash again for same data should give same result")
+			sameHash := computeTargetConfigHash(nil, configmap.Data)
+			Expect(sameHash).NotTo(BeNil())
+			Expect(*sameHash).To(Equal(*initialHash))
+
+			By("compute hash for different data should give different result")
+			modifiedData := make(map[string]string)
+			for k, v := range configmap.Data {
+				modifiedData[k] = v
+			}
+			modifiedData["new_key"] = "new_value"
+			differentHash := computeTargetConfigHash(nil, modifiedData)
+			Expect(differentHash).NotTo(BeNil())
+			Expect(*differentHash).NotTo(BeEmpty())
+			Expect(*differentHash).NotTo(Equal(*initialHash))
+		})
+
+		It("submit changes to cluster", func() {
+			By("submit a parameter update request")
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
+				AddParameters("innodb_buffer_pool_size", "1024M").
+				AddParameters("max_connections", "100").
+				Create(&testCtx).
+				GetObject()
+
+			By("verify changes submit to cluster")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				for _, comp := range cluster.Spec.ComponentSpecs {
+					for _, config := range comp.Configs {
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
+						g.Expect(config.Variables).Should(BeNil())
+						g.Expect(config.ConfigHash).ShouldNot(BeNil())
+						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
+						g.Expect(config.Reconfigure).Should(BeNil())
+					}
+				}
 			})).Should(Succeed())
+		})
 
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
-				g.Expect(newHash).To(Equal(configHash))
-				g.Expect(core.IsNotUserReconfigureOperation(cm)).To(BeTrue())
-			}).Should(Succeed())
+		It("restart", func() {
+			By("mock parameters definition")
+			pdKey := types.NamespacedName{
+				Namespace: "",
+				Name:      paramsDefName,
+			}
+			Expect(testapps.GetAndChangeObj(&testCtx, pdKey, func(pd *parametersv1alpha1.ParametersDefinition) {
+				pd.Spec.ReloadAction = nil // restart
+			})()).Should(Succeed())
 
-			By("Update config, old version: " + configHash)
-			updatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update.yaml", &corev1.ConfigMap{})
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
-				cm.Data = updatedCM.Data
-				core.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
+			By("submit a parameter update request")
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
+				AddParameters("innodb_buffer_pool_size", "1024M").
+				AddParameters("max_connections", "100").
+				Create(&testCtx).
+				GetObject()
+
+			By("verify changes submit to cluster")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				for _, comp := range cluster.Spec.ComponentSpecs {
+					for _, config := range comp.Configs {
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("innodb_buffer_pool_size", "1024M"))
+						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
+						g.Expect(config.Variables).Should(BeNil())
+						g.Expect(config.ConfigHash).ShouldNot(BeNil())
+						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
+						g.Expect(config.Restart).ShouldNot(BeNil())
+						g.Expect(*config.Restart).Should(BeTrue())
+						g.Expect(config.Reconfigure).Should(BeNil())
+					}
+				}
 			})).Should(Succeed())
-
-			By("check config new version")
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
-				g.Expect(newHash).NotTo(Equal(configHash))
-				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).To(Equal(core.ReconfigureAutoReloadPhase))
-				g.Expect(core.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
-			}).Should(Succeed())
-
-			By("invalid Update")
-			invalidUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-invalid-update.yaml", &corev1.ConfigMap{})
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
-				cm.Data = invalidUpdatedCM.Data
-				core.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
-			})).Should(Succeed())
-
-			By("check invalid update")
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(core.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
-				// g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(cfgcore.ReconfigureNoChangeType))
-			}).Should(Succeed())
-
-			By("restart Update")
-			restartUpdatedCM := testapps.NewCustomizedObj("resources/mysql-ins-config-update-with-restart.yaml", &corev1.ConfigMap{})
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
-				cm.Data = restartUpdatedCM.Data
-				core.SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
-			})).Should(Succeed())
-
-			By("check invalid update")
-			Eventually(func(g Gomega) {
-				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(core.IsNotUserReconfigureOperation(cm)).NotTo(BeTrue())
-				g.Expect(cm.Labels[constant.CMInsLastReconfigurePhaseKey]).Should(BeEquivalentTo(core.ReconfigureSimplePhase))
-			}).Should(Succeed())
 		})
 	})
 
+	Context("phase", func() {
+		// TODO: impl
+	})
 })

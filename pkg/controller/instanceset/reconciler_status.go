@@ -116,12 +116,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := isPodUpdated(its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
+			updated, err1 := isPodUpdated(its, pod)
+			if err1 != nil {
+				return kubebuilderx.Continue, err1
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
-			case !ok, !isPodUpdated:
+			case !ok, !updated:
 				currentReplicas++
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			default:
@@ -186,11 +186,35 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	setInstanceStatus(tree, its, podList)
+	if err = setInstanceStatus(tree, its, podList); err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
+
+	// serviceaccount name migration process
+	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	updateDone := true
+	for podName, revision := range proposedRevisions {
+		if currentRevisions[podName] != revision {
+			updateDone = false
+			break
+		}
+	}
+	if updateDone {
+		_, ok1 := its.Annotations[constant.ServiceAccountInUseAnnotationKey]
+		proposedSA, ok2 := its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+		if !ok1 && ok2 {
+			its.Annotations[constant.ServiceAccountInUseAnnotationKey] = proposedSA
+		}
+	}
+
 	return kubebuilderx.Continue, nil
 }
 
@@ -286,7 +310,7 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, pod := range pods {
 		status := workloads.InstanceStatus{
@@ -297,7 +321,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 
 	syncMemberStatus(its, instanceStatus, pods)
 
-	syncInstanceConfigStatus(its, instanceStatus)
+	if err := syncInstanceConfigStatus(its, instanceStatus, pods); err != nil {
+		return err
+	}
 
 	if tree != nil {
 		syncInstancePVCStatus(tree, its, instanceStatus)
@@ -305,6 +331,8 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 
 	sortInstanceStatus(instanceStatus)
 	its.Status.InstanceStatus = instanceStatus
+
+	return nil
 }
 
 func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
@@ -336,41 +364,25 @@ func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.Ins
 	}
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
-	if its.Status.InstanceStatus == nil {
-		// initialize
-		configs := make([]workloads.InstanceConfigStatus, 0)
-		for _, config := range its.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				Generation: config.Generation,
-			})
+func syncInstanceConfigStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) error {
+	for _, pod := range pods {
+		configs, err := configsFromPod(pod)
+		if err != nil {
+			return err
 		}
-		for i := range instanceStatus {
-			instanceStatus[i].Configs = configs
-		}
-	} else {
-		// HACK: copy the existing config status from the current its.status.instanceStatus
-		configs := sets.New[string]()
-		for _, config := range its.Spec.Configs {
-			configs.Insert(config.Name)
-		}
-		for i, newStatus := range instanceStatus {
-			for _, status := range its.Status.InstanceStatus {
-				if status.PodName == newStatus.PodName {
-					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
-					}
-					for j, config := range status.Configs {
-						if configs.Has(config.Name) {
-							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
-						}
-					}
-					break
+		for i, inst := range instanceStatus {
+			if inst.PodName == pod.Name {
+				for _, config := range configs {
+					instanceStatus[i].Configs = append(instanceStatus[i].Configs, workloads.InstanceConfigStatus{
+						Name:       config.Name,
+						ConfigHash: config.ConfigHash,
+					})
 				}
+				break
 			}
 		}
 	}
+	return nil
 }
 
 func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {

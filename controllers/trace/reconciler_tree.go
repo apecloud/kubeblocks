@@ -653,9 +653,10 @@ func (r *jobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 		// Update job status based on pod completion
 		if err = r.Get(ctx, client.ObjectKeyFromObject(pod), pod); err == nil {
-			if pod.Status.Phase == corev1.PodSucceeded {
+			switch pod.Status.Phase {
+			case corev1.PodSucceeded:
 				job.Status.Succeeded++
-			} else if pod.Status.Phase == corev1.PodFailed {
+			case corev1.PodFailed:
 				job.Status.Failed++
 			}
 		}

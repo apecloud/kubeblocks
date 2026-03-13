@@ -67,13 +67,13 @@ func createCompDef(testCtx *testutil.TestContext, compDefName string) *appsv1.Co
 	return NewComponentDefinitionFactory(compDefName).SetDefaultSpec().Create(testCtx).GetObject()
 }
 
-// MockInstanceSetComponent mocks the ITS component, just using in envTest
+// MockInstanceSetComponent mocks the ITS, just using in envTest
 func MockInstanceSetComponent(
 	testCtx *testutil.TestContext,
 	clusterName,
-	itsCompName string) *workloads.InstanceSet {
-	itsName := clusterName + "-" + itsCompName
-	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(replicas).
+	compName string) *workloads.InstanceSet {
+	itsName := clusterName + "-" + compName
+	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, compName).SetReplicas(replicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
 		SetRoles([]workloads.ReplicaRole{
 			{

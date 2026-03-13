@@ -17,28 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configmanager
+package reconfigure
 
 import (
-	"context"
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
-var ctx context.Context
-var cancel context.CancelFunc
-
-func TestConfigManger(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "ConfigManager Suite")
+func init() {
+	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, func(Context) (Status, error) {
+		return makeStatus(StatusNone, withReason("async dynamic reload")), nil
+	})
 }
-
-var _ = BeforeSuite(func() {
-	ctx, cancel = context.WithCancel(context.TODO())
-})
-
-var _ = AfterSuite(func() {
-	cancel()
-})

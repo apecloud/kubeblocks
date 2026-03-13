@@ -104,8 +104,7 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 			if ptr.Deref(tpl.Replicas, 0) > 0 {
 				return false
 			}
-			_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
-			return ok
+			return isRolloutManagedInstanceTemplate(rollout, tpl)
 		})
 		for i, inst := range spec.Instances {
 			if len(inst.ServiceVersion) > 0 {
@@ -177,8 +176,7 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 			if ptr.Deref(tpl.Replicas, 0) > 0 {
 				return false
 			}
-			_, ok := tpl.Annotations[instanceTemplateCreatedByAnnotationKey]
-			return ok
+			return isRolloutManagedInstanceTemplate(rollout, tpl)
 		})
 		for i, inst := range spec.Template.Instances {
 			if len(inst.ServiceVersion) > 0 {

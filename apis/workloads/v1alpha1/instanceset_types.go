@@ -27,6 +27,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // SchedulingPolicy the scheduling policy.
+//
 // Deprecated: Unify with apps/v1alpha1.SchedulingPolicy
 type SchedulingPolicy struct {
 	// If specified, the Pod will be dispatched by specified scheduler.

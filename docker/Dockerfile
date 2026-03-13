@@ -1,7 +1,7 @@
 # Build the manager binary
 ARG DIST_IMG=gcr.io/distroless/static:nonroot
 
-ARG GO_VERSION=1.24.9-alpine
+ARG GO_VERSION=1.24.11-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 

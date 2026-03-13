@@ -248,6 +248,11 @@ var _ = Describe("Instance Controller", func() {
 			Consistently(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc.DeletionTimestamp).Should(BeNil())
 			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+				// verify owner references are cleared to prevent garbage collection
+				ownerRefs := pvc.GetOwnerReferences()
+				g.Expect(ownerRefs).Should(HaveLen(0), "Owner references should be cleared when retention policy is Retain")
+			})).Should(Succeed())
 		})
 	})
 

@@ -20,9 +20,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
-func inDataContextUnspecified() *multicluster.ClientOption {
-	return multicluster.InDataContextUnspecified()
+type reconcileContext struct {
+	intctrlutil.RequestCtx
+	parameters.ResourceFetcher[reconcileContext]
+
+	configMap      *corev1.ConfigMap
+	its            *workloads.InstanceSet
+	configRender   *parametersv1alpha1.ParamConfigRenderer
+	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
+}
+
+func newReconcileContext(reqCtx intctrlutil.RequestCtx, resource *render.ResourceCtx, cm *corev1.ConfigMap, cluster *appsv1.Cluster) *reconcileContext {
+	rctx := reconcileContext{
+		ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+			ClusterObj: cluster,
+		},
+		RequestCtx: reqCtx,
+		configMap:  cm,
+	}
+	return rctx.Init(resource, &rctx)
+}
+
+func (c *reconcileContext) objects() error {
+	return c.Cluster().
+		ComponentAndComponentDef().
+		ComponentSpec().
+		workload().
+		parametersDefinitions().
+		Complete()
+}
+
+func (c *reconcileContext) workload() *reconcileContext {
+	return c.Wrap(func() error {
+		itsKey := client.ObjectKey{
+			Namespace: c.Namespace,
+			Name:      constant.GenerateWorkloadNamePattern(c.ClusterName, c.ComponentName),
+		}
+		its := &workloads.InstanceSet{}
+		if err := c.Client.Get(c.Context, itsKey, its); err != nil {
+			return err
+		}
+		c.its = its
+		return nil
+	})
+}
+
+func (c *reconcileContext) parametersDefinitions() *reconcileContext {
+	return c.Wrap(func() (err error) {
+		configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
+		if err != nil {
+			return err
+		}
+
+		paramsDefMap := make(map[string]*parametersv1alpha1.ParametersDefinition)
+		for _, paramsDef := range paramsDefs {
+			paramsDefMap[paramsDef.Spec.FileName] = paramsDef
+		}
+		c.configRender = configRender
+		c.parametersDefs = paramsDefMap
+		return nil
+	})
 }

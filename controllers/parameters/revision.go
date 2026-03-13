@@ -33,26 +33,28 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-type ConfigurationRevision struct {
-	Revision    int64
-	StrRevision string
-	Phase       parametersv1alpha1.ParameterPhase
-	Result      parameters.Result
+const (
+	revisionHistoryLimit = 10
+)
+
+type configurationRevision struct {
+	revision    int64
+	strRevision string
+	phase       parametersv1alpha1.ParameterPhase
+	result      parameters.Result
 }
 
-const revisionHistoryLimit = 10
-
-func GcConfigRevision(configObj *corev1.ConfigMap) {
-	revisions := GcRevision(configObj.ObjectMeta.Annotations)
+func gcConfigRevision(configObj *corev1.ConfigMap) {
+	revisions := gcRevision(configObj.Annotations)
 	if len(revisions) > 0 {
 		for _, v := range revisions {
-			delete(configObj.ObjectMeta.Annotations, core.GenerateRevisionPhaseKey(v.StrRevision))
+			delete(configObj.Annotations, core.GenerateRevisionPhaseKey(v.strRevision))
 		}
 	}
 }
 
-func GcRevision(annotations map[string]string) []ConfigurationRevision {
-	revisions := RetrieveRevision(annotations)
+func gcRevision(annotations map[string]string) []configurationRevision {
+	revisions := retrieveRevision(annotations)
 	if len(revisions) <= revisionHistoryLimit {
 		return nil
 	}
@@ -60,18 +62,8 @@ func GcRevision(annotations map[string]string) []ConfigurationRevision {
 	return revisions[0 : len(revisions)-revisionHistoryLimit]
 }
 
-func GetLastRevision(annotations map[string]string, revision int64) (ConfigurationRevision, bool) {
-	revisions := RetrieveRevision(annotations)
-	for i := len(revisions) - 1; i >= 0; i-- {
-		if revisions[i].Revision == revision {
-			return revisions[i], true
-		}
-	}
-	return ConfigurationRevision{}, false
-}
-
-func RetrieveRevision(annotations map[string]string) []ConfigurationRevision {
-	var revisions []ConfigurationRevision
+func retrieveRevision(annotations map[string]string) []configurationRevision {
+	var revisions []configurationRevision
 	var revisionPrefix = constant.LastConfigurationRevisionPhase + "-"
 
 	for key, value := range annotations {
@@ -86,22 +78,22 @@ func RetrieveRevision(annotations map[string]string) []ConfigurationRevision {
 
 	// for sort
 	sort.SliceStable(revisions, func(i, j int) bool {
-		return revisions[i].Revision < revisions[j].Revision
+		return revisions[i].revision < revisions[j].revision
 	})
 	return revisions
 }
 
-func parseRevision(revision string, data string) (ConfigurationRevision, error) {
+func parseRevision(revision string, data string) (configurationRevision, error) {
 	v, err := strconv.ParseInt(revision, 10, 64)
 	if err != nil {
-		return ConfigurationRevision{}, err
+		return configurationRevision{}, err
 	}
 	result := parseResult(data, revision)
-	return ConfigurationRevision{
-		StrRevision: revision,
-		Revision:    v,
-		Phase:       result.Phase,
-		Result:      result,
+	return configurationRevision{
+		revision:    v,
+		strRevision: revision,
+		phase:       result.Phase,
+		result:      result,
 	}, nil
 }
 
@@ -118,11 +110,4 @@ func parseResult(data string, revision string) parameters.Result {
 		result.Phase = parametersv1alpha1.ParameterPhase(data)
 	}
 	return result
-}
-
-func GetCurrentRevision(annotations map[string]string) string {
-	if len(annotations) == 0 {
-		return ""
-	}
-	return annotations[constant.ConfigurationRevision]
 }

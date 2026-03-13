@@ -78,13 +78,13 @@ func (r rebuildInstanceOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Req
 
 func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	for _, v := range opsRes.OpsRequest.Spec.RebuildFrom {
-		compStatus, ok := opsRes.Cluster.Status.Components[v.ComponentName]
-		if !ok {
+		compPhase := r.getCompStatusFromCluster(opsRes, v.ComponentName)
+		if compPhase == nil {
 			continue
 		}
 		// check if the component has matched the `Phase` condition
-		if !opsRes.OpsRequest.Spec.Force && !slices.Contains([]appsv1.ComponentPhase{appsv1.FailedComponentPhase, appsv1.UpdatingComponentPhase}, compStatus.Phase) {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, compStatus.Phase))
+		if !opsRes.OpsRequest.Spec.Force && !slices.Contains([]appsv1.ComponentPhase{appsv1.FailedComponentPhase, appsv1.UpdatingComponentPhase}, *compPhase) {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the phase of component "%s" can not be %s`, v.ComponentName, *compPhase))
 		}
 		var (
 			synthesizedComp *component.SynthesizedComponent
@@ -115,6 +115,16 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (r rebuildInstanceOpsHandler) getCompStatusFromCluster(opsRes *OpsResource, compName string) *appsv1.ComponentPhase {
+	if compStatus, exist := opsRes.Cluster.Status.Components[compName]; exist {
+		return &compStatus.Phase
+	}
+	if shardStatus, exist := opsRes.Cluster.Status.Shardings[compName]; exist {
+		return &shardStatus.Phase
 	}
 	return nil
 }

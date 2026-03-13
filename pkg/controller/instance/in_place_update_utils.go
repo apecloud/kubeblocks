@@ -22,7 +22,6 @@ package instance
 import (
 	"reflect"
 	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -50,19 +49,11 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	// filter annotations
 	var annotations map[string]string
 	if len(template.Annotations) > 0 {
-		annotations = make(map[string]string)
 		// keep Restart annotation
 		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations[constant.RestartAnnotationKey] = restart
-		}
-		// keep Reconfigure annotation
-		for k, v := range template.Annotations {
-			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
-				annotations[k] = v
+			annotations = map[string]string{
+				constant.RestartAnnotationKey: restart,
 			}
-		}
-		if len(annotations) == 0 {
-			annotations = nil
 		}
 	}
 	template.Annotations = annotations

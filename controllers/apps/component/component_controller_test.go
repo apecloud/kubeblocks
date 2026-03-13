@@ -116,9 +116,21 @@ var _ = Describe("Component Controller", func() {
 		resetTestContext()
 	}
 
+	randClusterName := func() {
+		By("randomize a cluster name and UID")
+		clusterKey = types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      testapps.GetRandomizedKey("", clusterName).Name,
+		}
+		clusterUID = string(uuid.NewUUID())
+		clusterGeneration = 1
+	}
+
 	BeforeEach(func() {
 		cleanEnv()
 		settings = viper.AllSettings()
+
+		randClusterName()
 	})
 
 	AfterEach(func() {
@@ -149,14 +161,6 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	createCompObjX := func(compName, compDefName string, processor func(*testapps.MockComponentFactory), phase *kbappsv1.ComponentPhase) {
-		By("randomize a cluster name and UID")
-		clusterKey = types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      testapps.GetRandomizedKey("", clusterName).Name,
-		}
-		clusterUID = string(uuid.NewUUID())
-		clusterGeneration = 1
-
 		By("creating a component")
 		compObjName := constant.GenerateClusterComponentName(clusterKey.Name, compName)
 		factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
@@ -807,6 +811,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("create component w/ replicas limit set - out-of-limit")
 		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
+			randClusterName()
 			createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(replicas)
 			}, "")
@@ -826,6 +831,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("create component w/ replicas limit set - ok")
 		for _, replicas := range []int32{replicasLimit.MinReplicas, (replicasLimit.MinReplicas + replicasLimit.MaxReplicas) / 2, replicasLimit.MaxReplicas} {
+			randClusterName()
 			createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(replicas)
 			})
@@ -969,11 +975,19 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCompRBAC := func(compName, compDefName, saName string) {
+	testCompRBAC := func(compName, compDefName, saName string, newSANamingRule bool) {
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
-			createCompObj(compName, compDefName, nil)
-			saName = constant.GenerateDefaultServiceAccountName(compDefName)
+			if newSANamingRule {
+				createCompObj(compName, compDefName, nil)
+				saName = constant.GenerateDefaultServiceAccountNameNew(compObj.Name)
+			} else {
+				saName = constant.GenerateDefaultServiceAccountName(compDefName)
+				By("mock an instanceset")
+				testapps.MockInstanceSetComponent(&testCtx, clusterKey.Name, compName)
+				// TODO: will comp controller read a stale cache?
+				createCompObj(compName, compDefName, nil)
+			}
 		} else {
 			createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetServiceAccountName(saName)
@@ -994,18 +1008,45 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompWithRBAC := func(compName, compDefName string) {
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", true)
 		By("delete the component")
 		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
 
-		By("check the RBAC resources orphaned")
+		By("check the RBAC resources deleted")
 		saName := constant.GenerateDefaultServiceAccountName(compDefName)
-		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
+	}
+
+	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
+		saName := "test-sa-non-exist" + randomStr()
+
+		// component controller won't complete reconciliation, so the phase will be empty
+		createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetServiceAccountName(saName)
+		}, "")
+		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
+	}
+
+	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
+		saName := "test-sa-exist" + randomStr()
+
+		By("user manually creates ServiceAccount and RoleBinding")
+		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
+		testapps.CheckedCreateK8sResource(&testCtx, sa)
+
+		testCompRBAC(compName, compDefName, saName, true)
+
+		By("delete the component")
+		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, true)).Should(Succeed())
+
+		By("check the serviceaccount not deleted")
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", false)
 
 		By("delete the component")
 		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
@@ -1016,11 +1057,13 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), true)
 
 		By("re-create component with same name")
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", false)
 		checkRBACResourceOrphaned(saName, fmt.Sprintf("%v-pod", saName), false)
 	}
 
 	testSharedRBACResourceDeletion := func(compNamePrefix, compDefName string) {
+		By("mock first instanceset")
+		testapps.MockInstanceSetComponent(&testCtx, clusterKey.Name, compNamePrefix+"-comp1")
 		By("create first component")
 		createCompObj(compNamePrefix+"-comp1", compDefName, nil)
 		comp1Key := compKey
@@ -1040,7 +1083,9 @@ var _ = Describe("Component Controller", func() {
 
 		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
 
-		By("create second cluster")
+		By("mock second instanceset")
+		testapps.MockInstanceSetComponent(&testCtx, clusterKey.Name, compNamePrefix+"-comp2")
+		By("create second component")
 		createCompObj(compNamePrefix+"-comp2", compDefName, nil)
 		comp2Key := compKey
 		By("check rbac resources owner not modified")
@@ -1073,31 +1118,48 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
-		saName := "test-sa-non-exist" + randomStr()
+	testMigrateServiceAccountToNewRule := func(compName, compDefName string) {
+		testCompRBAC(compName, compDefName, "", false)
+		By("check hash key annoataion")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		newSAName := constant.GenerateDefaultServiceAccountNameNew(compObj.Name)
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(comp.Spec.CompDef).Should(Equal(compDefName))
+			g.Expect(comp.Annotations[constant.ComponentLastServiceAccountRuleHashAnnotationKey]).ShouldNot(BeEmpty())
+			g.Expect(comp.Annotations[constant.ComponentLastServiceAccountNameAnnotationKey]).Should(Equal(saName))
+		})).Should(Succeed())
 
-		// component controller won't complete reconciliation, so the phase will be empty
-		createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetServiceAccountName(saName)
-		}, "")
-		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
-	}
+		By("check both old and new serviceaccounts are created")
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+		checkRBACResourcesExistence(newSAName, fmt.Sprintf("%v-pod", newSAName), true)
 
-	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
-		saName := "test-sa-exist" + randomStr()
+		By("create another componentDefinition obj")
+		compDefName2 := "another-cmpd"
+		compDefObj = testapps.NewComponentDefinitionFactory(compDefName2).
+			SetDefaultSpec().
+			Create(&testCtx).
+			GetObject()
 
-		By("user manually creates ServiceAccount and RoleBinding")
-		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
-		testapps.CheckedCreateK8sResource(&testCtx, sa)
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.CompDef = compDefName2
+		})()).Should(Succeed())
+		By("check serviceaccount not changed")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Annotations).ShouldNot(BeNil())
+			g.Expect(its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]).Should(Equal(newSAName))
+			g.Expect(its.Spec.Template.Spec.ServiceAccountName).Should(Equal(saName))
+		})).Should(Succeed())
 
-		testCompRBAC(compName, compDefName, saName)
+		By("mock its applies new serviceaccount")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(its *workloads.InstanceSet) {
+			its.Annotations[constant.ServiceAccountInUseAnnotationKey] = newSAName
+		})()).Should(Succeed())
 
-		By("delete the component")
-		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
-		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, true)).Should(Succeed())
-
-		By("check the serviceaccount not deleted")
-		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
+		By("check old annotation deleted")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(comp.Annotations).ShouldNot(ContainElement(constant.ComponentLastServiceAccountRuleHashAnnotationKey))
+			g.Expect(comp.Annotations).ShouldNot(ContainElement(constant.ComponentLastServiceAccountNameAnnotationKey))
+		})).Should(Succeed())
 	}
 
 	testCompSystemAccount := func(compName, compDefName string) {
@@ -1440,6 +1502,95 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
 	}
 
+	testFileTemplateProvision := func(compName, compDefName, fileTemplate string) {
+		var (
+			serverConfigName   = "server-conf"
+			serverConfigHash   = "abcdefg"
+			serverConfigAction = testapps.NewLifecycleAction(serverConfigName)
+		)
+
+		By("mock the cmpd to add a new config template")
+		compDefKey := types.NamespacedName{Name: compDefName}
+		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+			cmpd.Spec.Configs = append(cmpd.Spec.Configs, kbappsv1.ComponentFileTemplate{
+				Name:            serverConfigName,
+				VolumeName:      "server-conf",
+				ExternalManaged: ptr.To(true),
+			})
+			for i := range cmpd.Spec.Runtime.Containers {
+				cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+					append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+						Name:      "server-conf",
+						MountPath: "/var/run/app/conf/server",
+					})
+			}
+			compDefObj = cmpd.DeepCopy()
+		})()).ShouldNot(HaveOccurred())
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(serverConfigName),
+					ClusterComponentConfigSource: kbappsv1.ClusterComponentConfigSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: compDefObj.Spec.Configs[0].Template, // reuse log-conf template
+							},
+						},
+					},
+					ConfigHash:  ptr.To(serverConfigHash),
+					Restart:     ptr.To(true),
+					Reconfigure: serverConfigAction,
+				},
+			})
+		})
+
+		By("check the file template objects")
+		var defaultInitConfigHash string
+		for _, tplName := range []string{fileTemplate, serverConfigName} {
+			cmKey := types.NamespacedName{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, tplName),
+			}
+			if tplName == fileTemplate {
+				Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+					g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+					defaultInitConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+					g.Expect(defaultInitConfigHash).NotTo(BeEmpty())
+				})).Should(Succeed())
+			} else {
+				// doesn't provision it
+				Consistently(testapps.CheckObjExists(&testCtx, cmKey, &corev1.ConfigMap{}, false)).Should(Succeed())
+			}
+		}
+
+		By("check the workload")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(2))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(defaultInitConfigHash))
+			g.Expect(its.Spec.Configs[0].Restart).Should(BeNil())
+			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].Reconfigure).Should(Equal(*compDefObj.Spec.LifecycleActions.Reconfigure))
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
+			g.Expect(its.Spec.Configs[1].Name).Should(Equal(serverConfigName))
+			g.Expect(its.Spec.Configs[1].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[1].ConfigHash).Should(Equal(serverConfigHash))
+			g.Expect(its.Spec.Configs[1].Restart).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[1].Restart).Should(BeTrue())
+			g.Expect(its.Spec.Configs[1].Reconfigure).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[1].Reconfigure).Should(Equal(*serverConfigAction))
+			g.Expect(its.Spec.Configs[1].ReconfigureActionName).Should(Equal(
+				component.UDFReconfigureActionName(component.SynthesizedFileTemplate{
+					ComponentFileTemplate: kbappsv1.ComponentFileTemplate{
+						Name: serverConfigName,
+					},
+				})))
+		})).Should(Succeed())
+	}
+
 	testReconfigureAction := func(compName, compDefName, fileTemplate string) {
 		createCompObj(compName, compDefName, nil)
 
@@ -1460,6 +1611,7 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
+					ConfigHash: ptr.To("123456"),
 				},
 			}
 		})()).Should(Succeed())
@@ -1474,9 +1626,10 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
-			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
@@ -1490,7 +1643,7 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
-					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+					Reconfigure: testapps.NewLifecycleAction(fileTemplate),
 				},
 			})
 		})
@@ -1509,6 +1662,7 @@ var _ = Describe("Component Controller", func() {
 			comp.Spec.Configs[0].Variables = map[string]string{
 				"LOG_LEVEL": "warn",
 			}
+			comp.Spec.Configs[0].ConfigHash = ptr.To("123456")
 		})()).Should(Succeed())
 
 		By("check the file template object again")
@@ -1521,7 +1675,8 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
-			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
 			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-%s", fileTemplate)))
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
@@ -1560,7 +1715,9 @@ var _ = Describe("Component Controller", func() {
 		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(its.Spec.Configs).Should(BeNil())
+			g.Expect(its.Spec.Configs).Should(HaveLen(2))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[1].Name).Should(Equal("server-conf"))
 		})).Should(Succeed())
 	}
 
@@ -1604,9 +1761,66 @@ var _ = Describe("Component Controller", func() {
 		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(its.Spec.Configs).Should(BeNil())
-			g.Expect(its.Spec.Template.Annotations).ShouldNot(BeNil())
-			g.Expect(its.Spec.Template.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Restart).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].Restart).Should(BeTrue())
+		})).Should(Succeed())
+	}
+
+	testReconfigureConfigHash := func(compName, compDefName, fileTemplate string) {
+		var (
+			initConfigHash, newConfigHash string
+		)
+
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+			initConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(initConfigHash).NotTo(BeEmpty())
+		})).Should(Succeed())
+
+		By("check the init workload")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(initConfigHash))
+		})).Should(Succeed())
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+			newConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(newConfigHash).NotTo(BeEmpty())
+			g.Expect(newConfigHash).NotTo(Equal(initConfigHash))
+		})).Should(Succeed())
+
+		By("check the workload updated")
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(newConfigHash))
 		})).Should(Succeed())
 	}
 
@@ -1652,24 +1866,32 @@ var _ = Describe("Component Controller", func() {
 			testCompTLSConfig(defaultCompName, compDefObj.Name)
 		})
 
-		It("creates component RBAC resources", func() {
-			testCompWithRBAC(defaultCompName, compDefObj.Name)
+		Context("rbac", func() {
+			It("creates component RBAC resources", func() {
+				testCompWithRBAC(defaultCompName, compDefObj.Name)
+			})
+
+			It("creates component with non-exist serviceaccount", func() {
+				testCreateCompWithNonExistRBAC(defaultCompName, compDefObj.Name)
+			})
+
+			It("create component with custom RBAC which is already exist created by User", func() {
+				testCreateCompWithRBACCreateByUser(defaultCompName, compDefObj.Name)
+			})
 		})
 
-		It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
-			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefObj.Name)
-		})
+		Context("rbac, old code path", func() {
+			It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
+				testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefObj.Name)
+			})
 
-		It("adopts an orphaned rbac resource", func() {
-			testSharedRBACResourceDeletion(defaultCompName, compDefObj.Name)
-		})
+			It("adopts an orphaned rbac resource", func() {
+				testSharedRBACResourceDeletion(defaultCompName, compDefObj.Name)
+			})
 
-		It("creates component with non-exist serviceaccount", func() {
-			testCreateCompWithNonExistRBAC(defaultCompName, compDefObj.Name)
-		})
-
-		It("create component with custom RBAC which is already exist created by User", func() {
-			testCreateCompWithRBACCreateByUser(defaultCompName, compDefObj.Name)
+			It("migrates to new code path", func() {
+				testMigrateServiceAccountToNewRule(defaultCompName, compDefObj.Name)
+			})
 		})
 	})
 
@@ -2160,6 +2382,10 @@ var _ = Describe("Component Controller", func() {
 			testFileTemplateVolumes(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
+		It("config template provision", func() {
+			testFileTemplateProvision(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
 		It("reconfigure - action", func() {
 			testReconfigureAction(defaultCompName, compDefObj.Name, fileTemplate)
 		})
@@ -2174,6 +2400,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("reconfigure - restart", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - config hash", func() {
+			testReconfigureConfigHash(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

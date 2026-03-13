@@ -17,19 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configmanager
+package builder
 
 import (
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
-var (
-	logger = logr.Discard()
-)
+type ClusterRoleBuilder struct {
+	BaseBuilder[rbacv1.ClusterRole, *rbacv1.ClusterRole, ClusterRoleBuilder]
+}
 
-func SetLogger(zapLogger *zap.Logger) {
-	logger = zapr.NewLogger(zapLogger)
-	logger = logger.WithName("configmap_volume_watcher")
+func NewClusterRoleBuilder(name string) *ClusterRoleBuilder {
+	builder := &ClusterRoleBuilder{}
+	builder.init("", name, &rbacv1.ClusterRole{}, builder)
+	return builder
+}
+
+func (builder *ClusterRoleBuilder) AddPolicyRules(rules []rbacv1.PolicyRule) *ClusterRoleBuilder {
+	builder.get().Rules = append(builder.get().Rules, rules...)
+	return builder
 }

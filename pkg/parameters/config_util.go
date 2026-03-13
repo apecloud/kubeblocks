@@ -299,6 +299,9 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	if err := reader.List(ctx, configDefList); err != nil {
 		return nil, err
 	}
+	slices.SortFunc(configDefList.Items, func(a, b parametersv1alpha1.ParamConfigRenderer) int {
+		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
+	})
 
 	checkAvailable := func(configDef parametersv1alpha1.ParamConfigRenderer) error {
 		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
@@ -308,7 +311,7 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	}
 
 	for i, item := range configDefList.Items {
-		if item.Spec.ComponentDef != cmpd.Name {
+		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {

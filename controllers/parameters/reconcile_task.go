@@ -23,7 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -75,11 +77,14 @@ func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	if err := cli.List(ctx, configDefList); err != nil {
 		return nil, err
 	}
+	slices.SortFunc(configDefList.Items, func(a, b parametersv1alpha1.ParamConfigRenderer) int {
+		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
+	})
 
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 	var configRender *parametersv1alpha1.ParamConfigRenderer
 	for i, item := range configDefList.Items {
-		if item.Spec.ComponentDef != cmpd.Name {
+		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {

@@ -27,7 +27,7 @@ import (
 func GetContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
 	for i, container := range containers {
 		if container.Name == name {
-			return i, &container
+			return i, &containers[i]
 		}
 	}
 	return -1, nil

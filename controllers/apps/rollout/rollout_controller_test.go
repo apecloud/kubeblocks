@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
@@ -306,6 +307,15 @@ var _ = Describe("rollout controller", func() {
 		}
 		rolloutObj = f.Create(&testCtx).GetObject()
 		rolloutKey = client.ObjectKeyFromObject(rolloutObj)
+	}
+
+	triggerRolloutReconcile := func() {
+		Expect(testapps.GetAndChangeObj(&testCtx, rolloutKey, func(rollout *appsv1alpha1.Rollout) {
+			if rollout.Annotations == nil {
+				rollout.Annotations = map[string]string{}
+			}
+			rollout.Annotations["test.kubeblocks.io/reconcile-at"] = time.Now().Format(time.RFC3339Nano)
+		})()).Should(Succeed())
 	}
 
 	cleanEnv := func() {
@@ -1728,6 +1738,9 @@ var _ = Describe("rollout controller", func() {
 		})
 
 		It("create strategy with auto promotion", func() {
+			By("creating pods for the component")
+			pods := mockCreatePods([]int32{0, 1, 2}, "")
+
 			By("creating rollout with create strategy and auto promotion")
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
 				f.SetCompServiceVersion(serviceVersion2).
@@ -1735,8 +1748,9 @@ var _ = Describe("rollout controller", func() {
 						Create: &appsv1alpha1.RolloutStrategyCreate{
 							Canary: ptr.To(true),
 							Promotion: &appsv1alpha1.RolloutPromotion{
-								Auto:         ptr.To(true),
-								DelaySeconds: ptr.To[int32](1), // short delay for test
+								Auto:                  ptr.To(true),
+								DelaySeconds:          ptr.To[int32](1),
+								ScaleDownDelaySeconds: ptr.To[int32](0),
 							},
 						},
 					}).
@@ -1751,18 +1765,26 @@ var _ = Describe("rollout controller", func() {
 				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
 			})).Should(Succeed())
 
+			By("mocking cluster and component as running after canary spec update")
+			mockClusterNCompRunning()
+
 			By("creating canary pods to reach target replicas")
 			prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
-			_ = mockCreatePods([]int32{3, 4, 5}, prefix) // create canary pods
+			_ = mockCreatePods([]int32{3}, prefix)
+
+			By("triggering rollout reconcile after canary pods become ready")
+			triggerRolloutReconcile()
+
+			By("waiting until rollout observes the new canary pod")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Components[0].CanaryReplicas).Should(Equal(int32(1)))
+			})).Should(Succeed())
 
 			By("waiting for promotion delay and checking state transitions to succeed")
-			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
-				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.SucceedRolloutState))
-			})).WithTimeout(5 * time.Second).Should(Succeed())
-
-			By("checking canary instance template marked as non-canary after promotion")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				spec := cluster.Spec.ComponentSpecs[0]
+				g.Expect(spec.Replicas).Should(Equal(replicas))
 				for _, tpl := range spec.Instances {
 					if strings.HasPrefix(tpl.Name, prefix) {
 						g.Expect(tpl.Canary).ShouldNot(BeNil())
@@ -1770,10 +1792,34 @@ var _ = Describe("rollout controller", func() {
 						break
 					}
 				}
+			})).WithTimeout(5 * time.Second).Should(Succeed())
+
+			By("mocking cluster and component as running after promotion updates the cluster spec")
+			mockClusterNCompRunning()
+
+			By("simulating workload controller scaling down one old pod")
+			Expect(testCtx.Cli.Delete(testCtx.Ctx, pods[0])).Should(Succeed())
+			Eventually(func(g Gomega) {
+				pod := &corev1.Pod{}
+				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(pods[0]), pod)
+				g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			}).Should(Succeed())
+			triggerRolloutReconcile()
+
+			By("waiting for teardown to update the component defaults")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVersion2))
 			})).Should(Succeed())
+
+			By("mocking cluster and component as running after teardown updates the cluster spec")
+			mockClusterNCompRunning()
+			triggerRolloutReconcile()
 		})
 
 		It("create strategy with promotion delay", func() {
+			By("creating pods for the component")
+			_ = mockCreatePods([]int32{0, 1, 2}, "")
+
 			By("creating rollout with create strategy and promotion delay")
 			createRolloutObj(func(f *testapps.MockRolloutFactory) {
 				f.SetCompServiceVersion(serviceVersion2).
@@ -1781,8 +1827,9 @@ var _ = Describe("rollout controller", func() {
 						Create: &appsv1alpha1.RolloutStrategyCreate{
 							Canary: ptr.To(true),
 							Promotion: &appsv1alpha1.RolloutPromotion{
-								Auto:         ptr.To(true),
-								DelaySeconds: ptr.To[int32](30), // longer delay
+								Auto:                  ptr.To(true),
+								DelaySeconds:          ptr.To[int32](30),
+								ScaleDownDelaySeconds: ptr.To[int32](0),
 							},
 						},
 					}).
@@ -1792,9 +1839,26 @@ var _ = Describe("rollout controller", func() {
 			By("mocking cluster and component as running")
 			mockClusterNCompRunning()
 
+			By("waiting for create rollout to update the cluster spec")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].Replicas).Should(Equal(replicas + 1))
+			})).Should(Succeed())
+
+			By("mocking cluster and component as running after canary spec update")
+			mockClusterNCompRunning()
+
 			By("creating canary pods")
 			prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
-			_ = mockCreatePods([]int32{3, 4, 5}, prefix)
+			_ = mockCreatePods([]int32{3}, prefix)
+
+			By("triggering rollout reconcile after canary pods become ready")
+			triggerRolloutReconcile()
+
+			By("waiting until rollout observes the new canary pod")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Components[0].CanaryReplicas).Should(Equal(int32(1)))
+			})).Should(Succeed())
 
 			By("checking rollout stays in rolling state during promotion delay")
 			Consistently(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
@@ -1812,6 +1876,70 @@ var _ = Describe("rollout controller", func() {
 					}
 				}
 			})).Should(Succeed())
+		})
+
+		It("create strategy honors scale down delay after promotion", func() {
+			By("creating pods for the component")
+			_ = mockCreatePods([]int32{0, 1, 2}, "")
+
+			By("creating rollout with create strategy and scale down delay")
+			createRolloutObj(func(f *testapps.MockRolloutFactory) {
+				f.SetCompServiceVersion(serviceVersion2).
+					SetCompStrategy(appsv1alpha1.RolloutStrategy{
+						Create: &appsv1alpha1.RolloutStrategyCreate{
+							Canary: ptr.To(true),
+							Promotion: &appsv1alpha1.RolloutPromotion{
+								Auto:                  ptr.To(true),
+								DelaySeconds:          ptr.To[int32](0),
+								ScaleDownDelaySeconds: ptr.To[int32](30),
+							},
+						},
+					}).
+					SetCompReplicas(int32(1))
+			})
+
+			By("mocking cluster and component as running")
+			mockClusterNCompRunning()
+
+			By("waiting for create rollout to update the cluster spec")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].Replicas).Should(Equal(replicas + 1))
+			})).Should(Succeed())
+
+			By("mocking cluster and component as running after canary spec update")
+			mockClusterNCompRunning()
+
+			By("creating canary pods")
+			prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+			_ = mockCreatePods([]int32{3}, prefix)
+
+			By("triggering rollout reconcile after canary pods become ready")
+			triggerRolloutReconcile()
+
+			By("waiting until rollout observes the new canary pod")
+			Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				g.Expect(rollout.Status.Components[0].CanaryReplicas).Should(Equal(int32(1)))
+			})).Should(Succeed())
+
+			By("checking promotion happens but rollout remains rolling during scale down delay")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				spec := cluster.Spec.ComponentSpecs[0]
+				for _, tpl := range spec.Instances {
+					if strings.HasPrefix(tpl.Name, prefix) {
+						g.Expect(tpl.Canary).ShouldNot(BeNil())
+						g.Expect(*tpl.Canary).Should(BeFalse())
+						g.Expect(tpl.Replicas).ShouldNot(BeNil())
+						g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+						break
+					}
+				}
+				g.Expect(spec.Replicas).Should(Equal(replicas + 1))
+			})).WithTimeout(5 * time.Second).Should(Succeed())
+
+			Consistently(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+				g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+			})).WithTimeout(2 * time.Second).Should(Succeed())
 		})
 	})
 })

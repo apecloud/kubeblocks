@@ -117,7 +117,7 @@ func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
 func (t *rolloutCreateTransformer) rolling(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas, targetReplicas int32) error {
 	if !checkClusterNCompRunning(transCtx, comp.Name) {
-		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the component %s is not ready", comp.Name))
+		return nil
 	}
 
 	tpl, err := t.instanceTemplate(transCtx, comp, spec)
@@ -163,138 +163,90 @@ func (t *rolloutCreateTransformer) instanceTemplate(transCtx *rolloutTransformCo
 
 func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 	comp appsv1alpha1.RolloutComponent, spec *appsv1.ClusterComponentSpec, replicas, targetReplicas int32) error {
-	if comp.Strategy.Create.Promotion == nil || !ptr.Deref(comp.Strategy.Create.Promotion.Auto, false) {
-		return nil
-	}
-
-	// Find the canary instance template
-	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
-	var canaryTpl *appsv1.InstanceTemplate
-	for i := range spec.Instances {
-		if spec.Instances[i].Name == prefix {
-			canaryTpl = &spec.Instances[i]
-			break
-		}
-	}
-	if canaryTpl == nil {
-		// Canary instance template not found, nothing to promote
-		return nil
-	}
-
-	// Check if canary replicas have reached target
-	// This should be guaranteed by the caller (promote is only called when replicas+targetReplicas <= spec.Replicas)
-	// but we check anyway
-	if canaryTpl.Replicas == nil || *canaryTpl.Replicas < targetReplicas {
-		// Canary replicas not yet reached target, should still be in rolling phase
-		return nil
-	}
-
-	// Find the component status to check promotion timestamps
-	rollout := transCtx.Rollout
-	var compStatus *appsv1alpha1.RolloutComponentStatus
-	for i := range rollout.Status.Components {
-		if rollout.Status.Components[i].Name == comp.Name {
-			compStatus = &rollout.Status.Components[i]
-			break
-		}
-	}
-	if compStatus == nil {
-		// Component status not found, should not happen
-		return nil
-	}
-
-	// Check promotion delay
 	promotion := comp.Strategy.Create.Promotion
-	delaySeconds := ptr.Deref(promotion.DelaySeconds, 30)
-
-	// Use LastScaleUpTimestamp as promotion start time
-	// When canary replicas first reach target, LastScaleUpTimestamp should be set
-	if !compStatus.LastScaleUpTimestamp.IsZero() {
-		elapsed := time.Since(compStatus.LastScaleUpTimestamp.Time)
-		if elapsed < time.Duration(delaySeconds)*time.Second {
-			// Delay not yet passed, requeue
-			remaining := time.Duration(delaySeconds)*time.Second - elapsed
-			return controllerutil.NewDelayedRequeueError(remaining, fmt.Sprintf("waiting for promotion delay: %v remaining", remaining))
-		}
-	} else {
-		// First time reaching target, set the timestamp
-		compStatus.LastScaleUpTimestamp = metav1.Now()
-		return controllerutil.NewDelayedRequeueError(time.Second, "setting promotion start time")
+	if promotion == nil || !ptr.Deref(promotion.Auto, false) || !checkClusterNCompRunning(transCtx, comp.Name) {
+		return nil
 	}
 
-	// Check pre-promotion condition if specified
-	// if promotion.Condition != nil && promotion.Condition.Prev != nil {
-	//	// TODO: implement condition checking
-	//	// For now, just log that condition checking is not implemented
-	//	// return fmt.Errorf("pre-promotion condition checking not implemented yet")
-	// }
-
-	// Execute promotion: mark canary instance template as non-canary
-	canaryTpl.Canary = ptr.To(false)
-
-	// Check if we need to scale down old instances
-	scaleDownDelaySeconds := ptr.Deref(promotion.ScaleDownDelaySeconds, 30)
-	if scaleDownDelaySeconds > 0 {
-		// Check if scale down delay has passed since promotion started
-		// We use LastScaleUpTimestamp as promotion start time
-		elapsedSincePromotion := time.Since(compStatus.LastScaleUpTimestamp.Time)
-		if elapsedSincePromotion < time.Duration(scaleDownDelaySeconds)*time.Second {
-			// Scale down delay not yet passed
-			remaining := time.Duration(scaleDownDelaySeconds)*time.Second - elapsedSincePromotion
-			return controllerutil.NewDelayedRequeueError(remaining, fmt.Sprintf("waiting for scale down delay: %v remaining", remaining))
-		}
+	prefix := replaceInstanceTemplateNamePrefix(transCtx.Rollout)
+	canaryTpl := createInstanceTemplate(spec.Instances, prefix)
+	if canaryTpl == nil {
+		return nil
+	}
+	compStatus := createCompStatus(transCtx.Rollout, comp.Name)
+	if compStatus == nil || compStatus.CanaryReplicas < targetReplicas {
+		return nil
+	}
+	if promotion.Condition != nil && (promotion.Condition.Prev != nil || promotion.Condition.Post != nil) {
+		return createStrategyNotSupportedError
 	}
 
-	// Scale down old instances: reduce original replicas
-	// The original replicas are stored in 'replicas' parameter
-	// We need to find the original instance template(s) and reduce their replicas
-	// For simplicity, we assume there's a default instance template (without the prefix)
-	// or we need to identify which instances are old
+	if ptr.Deref(canaryTpl.Canary, false) {
+		if compStatus.LastScaleUpTimestamp.IsZero() {
+			return nil
+		}
+		if diff := createDelayRemaining(compStatus.LastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)); diff > 0 {
+			return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for promotion delay: %v remaining", diff))
+		}
+		canaryTpl.Canary = ptr.To(false)
+		compStatus.LastScaleDownTimestamp = metav1.Now()
+	}
 
-	// For now, we'll reduce the total replicas to match targetReplicas (canary replicas)
-	// since canary instances are now promoted to stable
-	// This assumes canary instances replace old instances one-to-one
-	// spec.Replicas should already include canary replicas, so we need to reduce it by (replicas - targetReplicas)
-	// where 'replicas' is the original stable replicas count
-	scaleDownCount := replicas - targetReplicas
-	if scaleDownCount > 0 {
-		// Reduce total replicas
-		spec.Replicas -= scaleDownCount
+	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && compStatus.LastScaleDownTimestamp.IsZero() {
+		return nil
+	}
+	if diff := createDelayRemaining(compStatus.LastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)); diff > 0 {
+		return controllerutil.NewDelayedRequeueError(diff, fmt.Sprintf("waiting for scale down delay: %v remaining", diff))
+	}
 
-		// Also need to reduce replicas in the original instance template(s)
-		// For now, we assume there's a default instance template
-		for i := range spec.Instances {
-			if spec.Instances[i].Name != prefix && spec.Instances[i].Replicas != nil && *spec.Instances[i].Replicas > 0 {
-				// Reduce replicas of this old instance template
-				oldReplicas := *spec.Instances[i].Replicas
-				reduceBy := scaleDownCount
-				if reduceBy > oldReplicas {
-					reduceBy = oldReplicas
-				}
-				spec.Instances[i].Replicas = ptr.To(oldReplicas - reduceBy)
-				scaleDownCount -= reduceBy
-
-				// Add to scale down instances in status
-				// TODO: track which specific instances are scaled down
-				if compStatus != nil {
-					// For simplicity, just mark that scaling down happened
-					compStatus.LastScaleDownTimestamp = metav1.Now()
-				}
-
-				if scaleDownCount <= 0 {
-					break
-				}
-			}
+	scaleDownCount := spec.Replicas - replicas
+	if scaleDownCount <= 0 {
+		return nil
+	}
+	spec.Replicas = replicas
+	for i := range spec.Instances {
+		if spec.Instances[i].Name == prefix || spec.Instances[i].Replicas == nil || *spec.Instances[i].Replicas == 0 {
+			continue
+		}
+		reduceBy := scaleDownCount
+		if reduceBy > *spec.Instances[i].Replicas {
+			reduceBy = *spec.Instances[i].Replicas
+		}
+		spec.Instances[i].Replicas = ptr.To(*spec.Instances[i].Replicas - reduceBy)
+		scaleDownCount -= reduceBy
+		if scaleDownCount == 0 {
+			break
 		}
 	}
 
-	// Check post-promotion condition if specified
-	// if promotion.Condition != nil && promotion.Condition.Post != nil {
-	//	// TODO: implement condition checking
-	//	// For now, just log that condition checking is not implemented
-	//	// return fmt.Errorf("post-promotion condition checking not implemented yet")
-	// }
-
-	// Promotion completed
 	return nil
+}
+
+func createInstanceTemplate(instances []appsv1.InstanceTemplate, name string) *appsv1.InstanceTemplate {
+	for i := range instances {
+		if instances[i].Name == name {
+			return &instances[i]
+		}
+	}
+	return nil
+}
+
+func createCompStatus(rollout *appsv1alpha1.Rollout, compName string) *appsv1alpha1.RolloutComponentStatus {
+	for i := range rollout.Status.Components {
+		if rollout.Status.Components[i].Name == compName {
+			return &rollout.Status.Components[i]
+		}
+	}
+	return nil
+}
+
+func createDelayRemaining(lastTimestamp metav1.Time, delaySeconds int32) time.Duration {
+	if delaySeconds <= 0 || lastTimestamp.IsZero() {
+		return 0
+	}
+	diff := time.Until(lastTimestamp.Add(time.Duration(delaySeconds) * time.Second))
+	if diff < 0 {
+		return 0
+	}
+	return diff
 }

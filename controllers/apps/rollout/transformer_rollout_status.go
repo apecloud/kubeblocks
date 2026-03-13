@@ -22,7 +22,6 @@ package rollout
 import (
 	"slices"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,10 +209,8 @@ func (t *rolloutStatusTransformer) compCreate(transCtx *rolloutTransformContext,
 	spec := t.compSpec(transCtx, comp.Name)
 	prefix := replaceInstanceTemplateNamePrefix(rollout)
 
-	// Check if the instance template exists
-	if slices.IndexFunc(spec.Instances, func(tpl appsv1.InstanceTemplate) bool {
-		return strings.HasPrefix(tpl.Name, prefix)
-	}) < 0 {
+	canaryTpl := createInstanceTemplate(spec.Instances, prefix)
+	if canaryTpl == nil {
 		return appsv1alpha1.PendingRolloutState, nil
 	}
 
@@ -227,9 +224,10 @@ func (t *rolloutStatusTransformer) compCreate(transCtx *rolloutTransformContext,
 		return "", err
 	}
 
+	allPodCnt := int32(len(pods.Items))
 	canaryPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
 		if pod.Labels != nil {
-			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
+			return pod.Labels[constant.KBAppInstanceTemplateLabelKey] == prefix
 		}
 		return false
 	}))
@@ -257,15 +255,7 @@ func (t *rolloutStatusTransformer) compCreate(transCtx *rolloutTransformContext,
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// Check if we have reached the target replicas from instance template
-	var templateTargetReplicas int32 = 0
-	for _, tpl := range spec.Instances {
-		if strings.HasPrefix(tpl.Name, prefix) && tpl.Replicas != nil {
-			templateTargetReplicas = *tpl.Replicas
-			break
-		}
-	}
-
+	templateTargetReplicas := ptr.Deref(canaryTpl.Replicas, 0)
 	if canaryPodCnt < templateTargetReplicas {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
@@ -279,16 +269,8 @@ func (t *rolloutStatusTransformer) compCreate(transCtx *rolloutTransformContext,
 
 	promotion := comp.Strategy.Create.Promotion
 
-	// Find component status
-	var compStatus *appsv1alpha1.RolloutComponentStatus
-	for i := range rollout.Status.Components {
-		if rollout.Status.Components[i].Name == comp.Name {
-			compStatus = &rollout.Status.Components[i]
-			break
-		}
-	}
+	compStatus := createCompStatus(rollout, comp.Name)
 	if compStatus == nil {
-		// Component status not found, should not happen
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
@@ -298,78 +280,36 @@ func (t *rolloutStatusTransformer) compCreate(transCtx *rolloutTransformContext,
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// Auto promotion enabled
-	// Check promotion delay
-	delaySeconds := ptr.Deref(promotion.DelaySeconds, 30)
-	if !compStatus.LastScaleUpTimestamp.IsZero() {
-		elapsed := time.Since(compStatus.LastScaleUpTimestamp.Time)
-		if elapsed < time.Duration(delaySeconds)*time.Second {
-			// Promotion delay not yet passed
-			return appsv1alpha1.RollingRolloutState, nil
-		}
-	} else {
-		// LastScaleUpTimestamp not set yet, promotion hasn't started
+	if compStatus.LastScaleUpTimestamp.IsZero() {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+	if createDelayRemaining(compStatus.LastScaleUpTimestamp, ptr.Deref(promotion.DelaySeconds, 30)) > 0 {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// Check pre-promotion condition if specified
 	if promotion.Condition != nil && promotion.Condition.Prev != nil {
-		// TODO: implement condition checking
-		// For now, assume condition is not met if specified
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// Check if canary instance template is still marked as canary
-	// Find the canary instance template
-	var canaryTpl *appsv1.InstanceTemplate
-	for i := range spec.Instances {
-		if strings.HasPrefix(spec.Instances[i].Name, prefix) {
-			canaryTpl = &spec.Instances[i]
-			break
-		}
-	}
-	if canaryTpl != nil && ptr.Deref(canaryTpl.Canary, false) {
-		// Canary instance template is still marked as canary
-		// Promotion hasn't been executed yet
+	if ptr.Deref(canaryTpl.Canary, false) {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// Check scale down delay
-	scaleDownDelaySeconds := ptr.Deref(promotion.ScaleDownDelaySeconds, 30)
-	if scaleDownDelaySeconds > 0 {
-		// Check if scale down delay has passed since promotion started
-		// We use LastScaleUpTimestamp as promotion start time
-		elapsedSincePromotion := time.Since(compStatus.LastScaleUpTimestamp.Time)
-		if elapsedSincePromotion < time.Duration(scaleDownDelaySeconds)*time.Second {
-			// Scale down delay not yet passed
-			return appsv1alpha1.RollingRolloutState, nil
-		}
+	if ptr.Deref(promotion.ScaleDownDelaySeconds, 30) > 0 && compStatus.LastScaleDownTimestamp.IsZero() {
+		return appsv1alpha1.RollingRolloutState, nil
 	}
-
-	// Check if old instances have been scaled down
-	// Count total replicas from all instance templates
-	totalReplicasFromTemplates := int32(0)
-	for _, tpl := range spec.Instances {
-		if tpl.Replicas != nil {
-			totalReplicasFromTemplates += *tpl.Replicas
-		}
-	}
-
-	// Check if total replicas match the target (canary replicas count)
-	// After promotion, total replicas should equal canaryPodCnt (promoted replicas)
-	if totalReplicasFromTemplates != canaryPodCnt {
-		// Old instances not fully scaled down yet
+	if createDelayRemaining(compStatus.LastScaleDownTimestamp, ptr.Deref(promotion.ScaleDownDelaySeconds, 30)) > 0 {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// Check post-promotion condition if specified
+	if allPodCnt != spec.Replicas {
+		return appsv1alpha1.RollingRolloutState, nil
+	}
+
 	if promotion.Condition != nil && promotion.Condition.Post != nil {
-		// TODO: implement condition checking
-		// For now, assume condition is not met if specified
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 
-	// All promotion steps completed
 	return appsv1alpha1.SucceedRolloutState, nil
 }
 

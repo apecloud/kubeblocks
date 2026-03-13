@@ -103,8 +103,18 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 
 func (t *rolloutTearDownTransformer) compCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
-	// TODO: impl
-	return createStrategyNotSupportedError
+	spec := transCtx.ClusterComps[comp.Name]
+	canaryTpl := createInstanceTemplate(spec.Instances, replaceInstanceTemplateNamePrefix(rollout))
+	if canaryTpl == nil || ptrToTrue(canaryTpl.Canary) || !checkClusterNCompRunning(transCtx, comp.Name) {
+		return nil
+	}
+	compStatus := createCompStatus(rollout, comp.Name)
+	if compStatus == nil || spec.Replicas != compStatus.Replicas {
+		return nil
+	}
+	spec.ServiceVersion = canaryTpl.ServiceVersion
+	spec.ComponentDef = canaryTpl.CompDef
+	return nil
 }
 
 func (t *rolloutTearDownTransformer) shardings(transCtx *rolloutTransformContext) error {
@@ -163,4 +173,8 @@ func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformCo
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
 	// TODO: impl
 	return createStrategyNotSupportedError
+}
+
+func ptrToTrue(v *bool) bool {
+	return v != nil && *v
 }

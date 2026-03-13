@@ -186,6 +186,10 @@ func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformCo
 	if shardingStatus == nil || spec.Template.Replicas*spec.Shards != shardingStatus.Replicas {
 		return nil
 	}
+	replicas, targetReplicas, err := createShardingReplicas(rollout, sharding, spec)
+	if err != nil || targetReplicas != replicas {
+		return err
+	}
 	spec.Template.ServiceVersion = canaryTpl.ServiceVersion
 	spec.Template.ComponentDef = canaryTpl.CompDef
 	return nil

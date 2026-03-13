@@ -1792,7 +1792,8 @@ var _ = Describe("rollout controller", func() {
 				By("creating rollout with sharding create strategy")
 				createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
 					f.SetShardingServiceVersion(serviceVersion2).
-						SetShardingStrategy(defaultCreateStrategy)
+						SetShardingStrategy(defaultCreateStrategy).
+						SetShardingReplicas(replicas)
 				})
 
 				By("checking rollout state is pending initially")
@@ -1845,7 +1846,8 @@ var _ = Describe("rollout controller", func() {
 									ScaleDownDelaySeconds: ptr.To[int32](0),
 								},
 							},
-						})
+						}).
+						SetShardingReplicas(replicas)
 				})
 
 				mockClusterNShardingRunning()
@@ -1894,6 +1896,75 @@ var _ = Describe("rollout controller", func() {
 				})).Should(Succeed())
 			})
 
+			It("sharding create strategy keeps defaults unchanged when promotion covers part of each shard", func() {
+				By("creating pods for the sharding")
+				pods := mockCreatePods4Sharding([]int32{0, 1, 2}, "")
+
+				By("creating rollout with sharding create strategy and partial auto promotion")
+				createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+					f.SetShardingServiceVersion(serviceVersion2).
+						SetShardingStrategy(appsv1alpha1.RolloutStrategy{
+							Create: &appsv1alpha1.RolloutStrategyCreate{
+								Canary: ptr.To(true),
+								Promotion: &appsv1alpha1.RolloutPromotion{
+									Auto:                  ptr.To(true),
+									DelaySeconds:          ptr.To[int32](1),
+									ScaleDownDelaySeconds: ptr.To[int32](0),
+								},
+							},
+						}).
+						SetShardingReplicas(int32(1))
+				})
+
+				mockClusterNShardingRunning()
+
+				Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+					g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+				})).Should(Succeed())
+
+				mockClusterNShardingRunning()
+
+				prefix := replaceInstanceTemplateNamePrefix(rolloutObj)
+				_ = mockCreatePods4Sharding([]int32{10}, prefix)
+				triggerRolloutReconcile()
+
+				Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+					g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.RollingRolloutState))
+					g.Expect(rollout.Status.Shardings[0].CanaryReplicas).Should(Equal(int32(1)))
+				})).Should(Succeed())
+
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.Shardings[0]
+					g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+					found := false
+					for _, tpl := range spec.Template.Instances {
+						if strings.HasPrefix(tpl.Name, prefix) {
+							found = true
+							g.Expect(tpl.Canary).ShouldNot(BeNil())
+							g.Expect(*tpl.Canary).Should(BeFalse())
+							g.Expect(tpl.Replicas).ShouldNot(BeNil())
+							g.Expect(*tpl.Replicas).Should(Equal(int32(1)))
+						}
+					}
+					g.Expect(found).Should(BeTrue())
+				})).WithTimeout(5 * time.Second).Should(Succeed())
+
+				mockClusterNShardingRunning()
+
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, pods[0])).Should(Succeed())
+				Eventually(func(g Gomega) {
+					pod := &corev1.Pod{}
+					err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(pods[0]), pod)
+					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+				}).Should(Succeed())
+				triggerRolloutReconcile()
+
+				Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					g.Expect(cluster.Spec.Shardings[0].Template.ServiceVersion).Should(Equal(serviceVersion1))
+					g.Expect(cluster.Spec.Shardings[0].Template.Instances).ShouldNot(BeEmpty())
+				})).Should(Succeed())
+			})
+
 			It("sharding create strategy with promotion delay", func() {
 				By("creating pods for the sharding")
 				_ = mockCreatePods4Sharding([]int32{0, 1, 2}, "")
@@ -1910,7 +1981,8 @@ var _ = Describe("rollout controller", func() {
 									ScaleDownDelaySeconds: ptr.To[int32](0),
 								},
 							},
-						})
+						}).
+						SetShardingReplicas(replicas)
 				})
 
 				mockClusterNShardingRunning()
@@ -1960,7 +2032,8 @@ var _ = Describe("rollout controller", func() {
 									ScaleDownDelaySeconds: ptr.To[int32](30),
 								},
 							},
-						})
+						}).
+						SetShardingReplicas(replicas)
 				})
 
 				mockClusterNShardingRunning()
@@ -2017,7 +2090,8 @@ var _ = Describe("rollout controller", func() {
 									ScaleDownDelaySeconds: ptr.To[int32](0),
 								},
 							},
-						})
+						}).
+						SetShardingReplicas(replicas)
 				})
 
 				mockClusterNShardingRunning()
@@ -2095,6 +2169,35 @@ var _ = Describe("rollout controller", func() {
 					g.Expect(spec.Template.Replicas).Should(Equal(replicas))
 				})).WithTimeout(2 * time.Second).Should(Succeed())
 
+				Consistently(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+					g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+				})).WithTimeout(2 * time.Second).Should(Succeed())
+			})
+
+			It("sharding create strategy with zero replicas is a no-op", func() {
+				By("creating rollout with sharding create strategy and zero target replicas")
+				createRolloutObj4Sharding(func(f *testapps.MockRolloutFactory) {
+					f.SetShardingServiceVersion(serviceVersion2).
+						SetShardingStrategy(defaultCreateStrategy).
+						SetShardingReplicas(int32(0))
+				})
+
+				By("checking rollout becomes pending before the sharding is running")
+				Eventually(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
+					g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
+				})).Should(Succeed())
+
+				By("mocking cluster and sharding as running")
+				mockClusterNShardingRunning()
+
+				By("checking no canary template is created")
+				Consistently(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+					spec := cluster.Spec.Shardings[0]
+					g.Expect(spec.Template.Replicas).Should(Equal(replicas))
+					g.Expect(spec.Template.Instances).Should(BeEmpty())
+				})).WithTimeout(2 * time.Second).Should(Succeed())
+
+				By("checking rollout remains pending")
 				Consistently(testapps.CheckObj(&testCtx, rolloutKey, func(g Gomega, rollout *appsv1alpha1.Rollout) {
 					g.Expect(rollout.Status.State).Should(Equal(appsv1alpha1.PendingRolloutState))
 				})).WithTimeout(2 * time.Second).Should(Succeed())

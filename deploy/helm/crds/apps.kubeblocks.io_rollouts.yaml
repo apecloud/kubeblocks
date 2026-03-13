@@ -109,7 +109,7 @@ spec:
 
 
                         For the `Create` strategy, this is the number of canary instances to create and promote, and it must be
-                        in the range [0, comp.replicas]. The rollout keeps the component stable replica count unchanged.
+                        in the range [0, original stable replicas]. The rollout keeps the component stable replica count unchanged.
                       x-kubernetes-int-or-string: true
                     serviceVersion:
                       description: Specifies the target ServiceVersion of the component.
@@ -3500,6 +3500,17 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    replicas:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: |-
+                        Specifies the number of instances to be rolled out for each shard.
+
+
+                        For the `Create` strategy, this is the number of canary instances to create and promote in each shard, and it
+                        must be in the range [0, original stable replicas]. The rollout keeps the sharding stable replica count unchanged.
+                      x-kubernetes-int-or-string: true
                     serviceVersion:
                       description: Specifies the target ServiceVersion of the sharding.
                       maxLength: 32

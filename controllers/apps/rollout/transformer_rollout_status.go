@@ -473,7 +473,7 @@ func (t *rolloutStatusTransformer) shardingCreate(transCtx *rolloutTransformCont
 	}
 
 	templateTargetReplicas := ptr.Deref(canaryTpl.Replicas, 0)
-	if canaryPodCnt < templateTargetReplicas {
+	if canaryPodCnt < templateTargetReplicas*spec.Shards {
 		return appsv1alpha1.RollingRolloutState, nil
 	}
 

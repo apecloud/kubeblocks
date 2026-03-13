@@ -96,13 +96,16 @@ func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext,
 func (t *rolloutCreateTransformer) sharding(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
 	spec := transCtx.ClusterShardings[sharding.Name]
-	replicas := createShardingReplicas(rollout, sharding, spec)
-
-	if (replicas * 2) > spec.Template.Replicas {
-		return t.shardingRolling(transCtx, sharding, spec, replicas)
+	replicas, targetReplicas, err := createShardingReplicas(rollout, sharding, spec)
+	if err != nil {
+		return err
 	}
 
-	return t.shardingPromote(transCtx, sharding, spec, replicas)
+	if (replicas + targetReplicas) > spec.Template.Replicas {
+		return t.shardingRolling(transCtx, sharding, spec, replicas, targetReplicas)
+	}
+
+	return t.shardingPromote(transCtx, sharding, spec, replicas, targetReplicas)
 }
 
 func (t *rolloutCreateTransformer) replicas(rollout *appsv1alpha1.Rollout,
@@ -249,7 +252,7 @@ func (t *rolloutCreateTransformer) promote(transCtx *rolloutTransformContext,
 }
 
 func (t *rolloutCreateTransformer) shardingRolling(transCtx *rolloutTransformContext,
-	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas int32) error {
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas, targetReplicas int32) error {
 	if !checkClusterNShardingRunning(transCtx, sharding.Name) {
 		return controllerutil.NewDelayedRequeueError(componentNotReadyRequeueDuration, fmt.Sprintf("the sharding %s is not ready", sharding.Name))
 	}
@@ -258,8 +261,8 @@ func (t *rolloutCreateTransformer) shardingRolling(transCtx *rolloutTransformCon
 	if err != nil {
 		return err
 	}
-	spec.Template.Replicas += replicas
-	tpl.Replicas = ptr.To(replicas)
+	spec.Template.Replicas += targetReplicas
+	tpl.Replicas = ptr.To(targetReplicas)
 	return nil
 }
 
@@ -296,7 +299,7 @@ func (t *rolloutCreateTransformer) shardingInstanceTemplate(transCtx *rolloutTra
 }
 
 func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformContext,
-	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas int32) error {
+	sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding, replicas, targetReplicas int32) error {
 	promotion := sharding.Strategy.Create.Promotion
 	if promotion == nil || !ptr.Deref(promotion.Auto, false) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
 		return nil
@@ -308,7 +311,8 @@ func (t *rolloutCreateTransformer) shardingPromote(transCtx *rolloutTransformCon
 		return nil
 	}
 	shardingStatus := createShardingStatus(transCtx.Rollout, sharding.Name)
-	if shardingStatus == nil || shardingStatus.CanaryReplicas < replicas {
+	desiredCanaryReplicas := targetReplicas * spec.Shards
+	if shardingStatus == nil || shardingStatus.CanaryReplicas < desiredCanaryReplicas {
 		return nil
 	}
 	if promotion.Condition != nil && (promotion.Condition.Prev != nil || promotion.Condition.Post != nil) {
@@ -383,18 +387,28 @@ func createShardingStatus(rollout *appsv1alpha1.Rollout, shardingName string) *a
 	return nil
 }
 
-func createShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) int32 {
+func createShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding, spec *appsv1.ClusterSharding) (int32, int32, error) {
 	replicas := spec.Template.Replicas
 	for _, status := range rollout.Status.Shardings {
 		if status.Name == sharding.Name {
 			if spec.Shards == 0 {
-				return 0
+				return 0, 0, nil
 			}
 			replicas = status.Replicas / spec.Shards
 			break
 		}
 	}
-	return replicas
+	if sharding.Replicas == nil {
+		return replicas, 0, nil
+	}
+	target, err := intstr.GetScaledValueFromIntOrPercent(sharding.Replicas, int(replicas), false)
+	if err != nil {
+		return 0, 0, errors.Wrapf(err, "failed to get scaled value for replicas of sharding %s", sharding.Name)
+	}
+	if target < 0 || int32(target) > replicas {
+		return 0, 0, errors.Errorf("the target replicas %d is out-of-range, sharding %s, replicas: %d", target, sharding.Name, replicas)
+	}
+	return replicas, int32(target), nil
 }
 
 func createDelayRemaining(lastTimestamp metav1.Time, delaySeconds int32) time.Duration {

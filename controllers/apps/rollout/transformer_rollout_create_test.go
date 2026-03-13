@@ -72,3 +72,70 @@ func TestRolloutSchedulingPolicyCopiesFields(t *testing.T) {
 		t.Fatalf("unexpected tolerations copy: %#v", got.Tolerations)
 	}
 }
+
+func TestCreateShardingReplicasDefaultsToNoOpWhenUnset(t *testing.T) {
+	rollout := &appsv1alpha1.Rollout{
+		Status: appsv1alpha1.RolloutStatus{
+			Shardings: []appsv1alpha1.RolloutShardingStatus{
+				{
+					Name:     "sharding",
+					Replicas: 6,
+				},
+			},
+		},
+	}
+	sharding := appsv1alpha1.RolloutSharding{
+		Name: "sharding",
+		Strategy: appsv1alpha1.RolloutStrategy{
+			Create: &appsv1alpha1.RolloutStrategyCreate{},
+		},
+	}
+	spec := &appsv1.ClusterSharding{
+		Shards: 2,
+		Template: appsv1.ClusterComponentSpec{
+			Replicas: 3,
+		},
+	}
+
+	replicas, targetReplicas, err := createShardingReplicas(rollout, sharding, spec)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if replicas != 3 {
+		t.Fatalf("unexpected original replicas: %d", replicas)
+	}
+	if targetReplicas != 0 {
+		t.Fatalf("expected zero target replicas when sharding.replicas is unset, got %d", targetReplicas)
+	}
+}
+
+func TestCreateShardingReplicasRejectsTargetGreaterThanOriginal(t *testing.T) {
+	rollout := &appsv1alpha1.Rollout{
+		Status: appsv1alpha1.RolloutStatus{
+			Shardings: []appsv1alpha1.RolloutShardingStatus{
+				{
+					Name:     "sharding",
+					Replicas: 3,
+				},
+			},
+		},
+	}
+	sharding := appsv1alpha1.RolloutSharding{
+		Name:     "sharding",
+		Replicas: ptr.To(intstr.FromInt32(4)),
+		Strategy: appsv1alpha1.RolloutStrategy{
+			Create: &appsv1alpha1.RolloutStrategyCreate{},
+		},
+	}
+	spec := &appsv1.ClusterSharding{
+		Shards: 1,
+		Template: appsv1.ClusterComponentSpec{
+			Replicas: 3,
+		},
+	}
+
+	_, _, err := createShardingReplicas(rollout, sharding, spec)
+	if err == nil {
+		t.Fatalf("expected target replicas validation error")
+	}
+}

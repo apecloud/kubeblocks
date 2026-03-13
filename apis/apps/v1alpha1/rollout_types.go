@@ -146,7 +146,7 @@ type RolloutComponent struct {
 	// Specifies the number of instances to be rolled out.
 	//
 	// For the `Create` strategy, this is the number of canary instances to create and promote, and it must be
-	// in the range [0, comp.replicas]. The rollout keeps the component stable replica count unchanged.
+	// in the range [0, original stable replicas]. The rollout keeps the component stable replica count unchanged.
 	//
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
@@ -187,6 +187,14 @@ type RolloutSharding struct {
 	//
 	// +kubebuilder:validation:Required
 	Strategy RolloutStrategy `json:"strategy"`
+
+	// Specifies the number of instances to be rolled out for each shard.
+	//
+	// For the `Create` strategy, this is the number of canary instances to create and promote in each shard, and it
+	// must be in the range [0, original stable replicas]. The rollout keeps the sharding stable replica count unchanged.
+	//
+	// +optional
+	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
 
 	// Additional meta for the instances.
 	//

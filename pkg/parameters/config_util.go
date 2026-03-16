@@ -328,6 +328,64 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 	return false
 }
 
+func legacyConfigManagerRequired(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if pd == nil {
+		return false
+	}
+	// Legacy config-manager retention is keyed off whether the parameters
+	// definition still relies on the old reload-action mechanism at all.
+	// The concrete reload execution path (for example, whether it is a
+	// ShellTrigger that can be proxied through the cluster API reconfigure
+	// action) is decided later in the reconfigure flow.
+	return pd.ReloadAction != nil
+}
+
+func LegacyConfigManagerRequiredForParamsDefs(paramsDefs []*parametersv1alpha1.ParametersDefinition) bool {
+	for _, pd := range paramsDefs {
+		if pd != nil && legacyConfigManagerRequired(&pd.Spec) {
+			return true
+		}
+	}
+	return false
+}
+
+type LegacyConfigManagerRequirementState string
+
+const (
+	LegacyConfigManagerRequirementUnknown LegacyConfigManagerRequirementState = "unknown"
+	LegacyConfigManagerRequirementKeep    LegacyConfigManagerRequirementState = "keep"
+	LegacyConfigManagerRequirementCleanup LegacyConfigManagerRequirementState = "cleanup"
+)
+
+func LegacyConfigManagerRequirementStateForCluster(cluster *appsv1.Cluster) (LegacyConfigManagerRequirementState, error) {
+	if cluster == nil || len(cluster.Annotations) == 0 {
+		return LegacyConfigManagerRequirementUnknown, nil
+	}
+	raw, ok := cluster.Annotations[constant.LegacyConfigManagerRequiredAnnotationKey]
+	if !ok || raw == "" {
+		return LegacyConfigManagerRequirementUnknown, nil
+	}
+	required, err := strconv.ParseBool(raw)
+	if err != nil {
+		return LegacyConfigManagerRequirementUnknown, fmt.Errorf("failed to parse %s: %w", constant.LegacyConfigManagerRequiredAnnotationKey, err)
+	}
+	if required {
+		return LegacyConfigManagerRequirementKeep, nil
+	}
+	return LegacyConfigManagerRequirementCleanup, nil
+}
+
+func LegacyConfigManagerRequiredForCluster(cluster *appsv1.Cluster) (bool, error) {
+	state, err := LegacyConfigManagerRequirementStateForCluster(cluster)
+	if err != nil {
+		return false, err
+	}
+	if state == LegacyConfigManagerRequirementUnknown {
+		return false, nil
+	}
+	return state == LegacyConfigManagerRequirementKeep, nil
+}
+
 // UpdateConfigPayload updates the configuration payload
 func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParamConfigRendererSpec, sharding *appsv1.ClusterSharding) error {
 	if len(configRender.Configs) == 0 {

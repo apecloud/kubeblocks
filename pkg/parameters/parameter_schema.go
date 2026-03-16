@@ -22,8 +22,6 @@ package parameters
 import (
 	"slices"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -158,15 +156,4 @@ func GetComponentConfigDescriptions(pdcr *parametersv1alpha1.ParamConfigRenderer
 		return desc.TemplateName == tpl
 	}
 	return generics.FindFunc(pdcr.Configs, match)
-}
-
-func GetPodSelector(pd *parametersv1alpha1.ParametersDefinitionSpec) *metav1.LabelSelector {
-	if pd.ReloadAction != nil {
-		return pd.ReloadAction.TargetPodSelector
-	}
-	return nil
-}
-
-func AsSidecarContainerImage(toolImage parametersv1alpha1.ToolConfig) bool {
-	return toolImage.AsContainerImage != nil && *toolImage.AsContainerImage
 }

@@ -33,6 +33,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -119,6 +120,7 @@ func startGRPCService(opts *serviceOptions, handler cfgcm.ConfigHandler) error {
 
 	server = grpc.NewServer(grpc.UnaryInterceptor(logUnaryServerInterceptor))
 	cfgproto.RegisterReconfigureServer(server, proxy)
+	reflection.Register(server)
 
 	go func() {
 		if err := server.Serve(listener); err != nil {

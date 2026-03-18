@@ -159,7 +159,7 @@ jobs:
       fail-fast: false
       matrix:
         test-type: [ apecloud-mysql|asmysql|asmysql-proxy|asmysql-orc|asmysql-orc-proxy|kafka|mongodb|mongodb-shard|postgresql|postgresql-etcd|redis|redis-cluster,
-                     clickhouse|elasticsearch|etcd|influxdb|loki|minio|milvus|nebula|qdrant|rabbitmq|rocketmq|tidb|victoria-metrics|zookeeper,
+                     clickhouse|elasticsearch|etcd|influxdb|loki|minio|milvus|nebula|pulsar|qdrant|rabbitmq|rocketmq|tidb|victoria-metrics|zookeeper,
                      greptimedb|mariadb|mogdb|oceanbase|opensearch|orioledb|orchestrator|polardbx|risingwave|starrocks|vanilla-pg|weaviate|yashandb,
                      tdengine|oracle|doris|oceanbase-ent|starrocks-ent|camellia-redis-proxy|gaussdb|damengdb|kingbase|vastbase,
                      mssql|goldendb|tdsql|greatdb|hadoop|hive|oceanbase-proxy|nacos|vault|foundationdb|selectdb ]

@@ -161,15 +161,9 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 			return pair.RoleName, nil
 		}
 
-		// compare the version of the current role snapshot with the last version recorded in the pod annotation,
-		// stale role snapshot will be ignored.
-		lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
-		if ok {
-
-			if snapshot.Version <= lastSnapshotVersion && !strings.Contains(lastSnapshotVersion, ":") {
-				reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
-				return pair.RoleName, nil
-			}
+		if checkStaleLastSnapshotVersion(snapshot.Version, pod) {
+			reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
+			return pair.RoleName, nil
 		}
 
 		var name string
@@ -189,6 +183,18 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 		}
 	}
 	return role, nil
+}
+
+// compare the version of the current role snapshot with the last version recorded in the pod annotation,
+// stale role snapshot will be ignored.
+func checkStaleLastSnapshotVersion(version string, pod *corev1.Pod) bool {
+	lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
+	if ok {
+		if version <= lastSnapshotVersion && !strings.Contains(lastSnapshotVersion, ":") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRoleSnapshot {
@@ -262,12 +268,12 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, its wo
 	}
 
 	if role.IsExclusive {
-		return removeExclusiveRoleLabels(cli, reqCtx, its, pod.Name, normalizedRoleName)
+		return removeExclusiveRoleLabels(cli, reqCtx, its, pod.Name, normalizedRoleName, version)
 	}
 	return nil
 }
 
-func removeExclusiveRoleLabels(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet, newPodName, roleName string) error {
+func removeExclusiveRoleLabels(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet, newPodName, roleName, version string) error {
 	labels := getMatchLabels(its.Name)
 	labels[RoleLabelKey] = roleName
 	var pods corev1.PodList
@@ -280,8 +286,17 @@ func removeExclusiveRoleLabels(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		if pod.Name == newPodName {
 			continue
 		}
+		if checkStaleLastSnapshotVersion(version, &pod) {
+			reqCtx.Log.Info("stale remove exclusive role label event, ignore it", "snapshot version", version, "pod", pod.Name)
+			continue
+		}
+
 		newPod := pods.Items[i].DeepCopy()
 		delete(newPod.Labels, RoleLabelKey)
+		if newPod.Annotations == nil {
+			newPod.Annotations = map[string]string{}
+		}
+		newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
 		if err := cli.Update(reqCtx.Ctx, newPod, inDataContext()); err != nil {
 			errs = append(errs, err)
 		} else {

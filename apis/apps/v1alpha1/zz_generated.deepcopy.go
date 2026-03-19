@@ -3820,6 +3820,11 @@ func (in *RolloutSharding) DeepCopyInto(out *RolloutSharding) {
 		**out = **in
 	}
 	in.Strategy.DeepCopyInto(&out.Strategy)
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	if in.InstanceMeta != nil {
 		in, out := &in.InstanceMeta, &out.InstanceMeta
 		*out = new(RolloutInstanceMeta)

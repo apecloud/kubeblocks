@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"strings"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,7 +32,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -156,3 +163,307 @@ var _ = Describe("Reconfigure Controller", func() {
 		// TODO: impl
 	})
 })
+
+func TestValidateLegacyReloadActionSupport(t *testing.T) {
+	newParamsDef := func(name string, withReload bool) *parametersv1alpha1.ParametersDefinition {
+		pd := &parametersv1alpha1.ParametersDefinition{}
+		pd.Name = name
+		if withReload {
+			pd.Spec.ReloadAction = &parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{
+					Command: []string{"bash", "-c", "reload"},
+				},
+			}
+		}
+		return pd
+	}
+	newITS := func(containers ...corev1.Container) *workloads.InstanceSet {
+		return &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: containers,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		rctx    *reconcileContext
+		patch   *parameterscore.ConfigPatchInfo
+		wantErr string
+	}{
+		{
+			name: "allow config without reload action",
+			rctx: &reconcileContext{
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql", false),
+				},
+			},
+			patch: &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+		},
+		{
+			name: "allow existing instance with legacy config manager",
+			rctx: &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+				},
+				its: newITS(corev1.Container{
+					Name: "config-manager",
+					Ports: []corev1.ContainerPort{{
+						Name:          "config-manager",
+						ContainerPort: 9901,
+					}},
+				}),
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params", true),
+				},
+			},
+			patch: &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+		},
+		{
+			name: "reject new instance with legacy reload action",
+			rctx: &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+				},
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params", true),
+				},
+			},
+			patch:   &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+			wantErr: "legacy reloadAction requires an existing instanceSet with config-manager injected",
+		},
+		{
+			name: "reject legacy config manager without port",
+			rctx: &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+				},
+				its: newITS(corev1.Container{
+					Name: "config-manager",
+				}),
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params", true),
+				},
+			},
+			patch:   &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+			wantErr: "legacy config-manager container has no reachable port",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateLegacyReloadActionSupport(tt.rctx, tt.patch)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestValidateLegacyReloadActionSupportWithClusterAnnotation(t *testing.T) {
+	newParamsDef := func(name string, withReload bool) *parametersv1alpha1.ParametersDefinition {
+		pd := &parametersv1alpha1.ParametersDefinition{}
+		pd.Name = name
+		if withReload {
+			pd.Spec.ReloadAction = &parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{
+					Command: []string{"bash", "-c", "reload"},
+				},
+			}
+		}
+		return pd
+	}
+	newITS := func(containers ...corev1.Container) *workloads.InstanceSet {
+		return &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: containers,
+					},
+				},
+			},
+		}
+	}
+	newCluster := func(annotationValue string) *appsv1.Cluster {
+		cluster := &appsv1.Cluster{}
+		if annotationValue == "" {
+			return cluster
+		}
+		cluster.Annotations = map[string]string{
+			constant.LegacyConfigManagerRequiredAnnotationKey: annotationValue,
+		}
+		return cluster
+	}
+
+	tests := []struct {
+		name    string
+		rctx    *reconcileContext
+		patch   *parameterscore.ConfigPatchInfo
+		wantErr string
+	}{
+		{
+			name: "allow config without reload action",
+			rctx: &reconcileContext{
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql", false),
+				},
+			},
+			patch: &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+		},
+		{
+			name: "allow existing instance with legacy config manager and cluster marker",
+			rctx: &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+					ClusterObj:  newCluster("true"),
+				},
+				its: newITS(corev1.Container{
+					Name: "config-manager",
+					Ports: []corev1.ContainerPort{{
+						Name:          "config-manager",
+						ContainerPort: 9901,
+					}},
+				}),
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params", true),
+				},
+			},
+			patch: &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+		},
+		{
+			name: "reject when cluster annotation is not enabled",
+			rctx: &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+					ClusterObj:  newCluster("false"),
+				},
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params", true),
+				},
+			},
+			patch:   &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+			wantErr: `cluster annotation "parameters.kubeblocks.io/legacy-config-manager-required" is not enabled`,
+		},
+		{
+			name: "reject legacy config manager without port",
+			rctx: &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+					ClusterObj:  newCluster("true"),
+				},
+				its: newITS(corev1.Container{
+					Name: "config-manager",
+				}),
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params", true),
+				},
+			},
+			patch:   &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}},
+			wantErr: "legacy config-manager container has no reachable port",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateLegacyReloadActionSupport(tt.rctx, tt.patch)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestValidateLegacyReloadActionSupportWithUnknownClusterAnnotation(t *testing.T) {
+	newParamsDef := func(name string) *parametersv1alpha1.ParametersDefinition {
+		pd := &parametersv1alpha1.ParametersDefinition{}
+		pd.Name = name
+		pd.Spec.ReloadAction = &parametersv1alpha1.ReloadAction{
+			ShellTrigger: &parametersv1alpha1.ShellTrigger{
+				Command: []string{"bash", "-c", "reload"},
+			},
+		}
+		return pd
+	}
+	newITS := func(containers ...corev1.Container) *workloads.InstanceSet {
+		return &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: containers,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		its     *workloads.InstanceSet
+		wantErr string
+	}{
+		{
+			name: "allow existing runtime during upgrade race when annotation is missing",
+			its: newITS(corev1.Container{
+				Name: "config-manager",
+				Ports: []corev1.ContainerPort{{
+					Name:          "config-manager",
+					ContainerPort: 9901,
+				}},
+			}),
+		},
+		{
+			name:    "reject when annotation is missing and runtime is absent",
+			wantErr: "legacy reloadAction requires an existing instanceSet with config-manager injected",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rctx := &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{ComponentName: "mysql"},
+					ClusterObj:  &appsv1.Cluster{},
+				},
+				its: tt.its,
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					"my.cnf": newParamsDef("mysql-params"),
+				},
+			}
+			err := validateLegacyReloadActionSupport(rctx, &parameterscore.ConfigPatchInfo{UpdateConfig: map[string][]byte{"my.cnf": []byte(`{}`)}})
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}

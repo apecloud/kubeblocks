@@ -1273,8 +1273,13 @@ type ReplicasLimit struct {
 }
 
 // ComponentAvailable defines the strategies for determining whether the component is available.
+//
+// If both `WithPhases` and `WithRole` are specified, the component will be considered
+// unavailable if any of them fail.
+// If `WithProbe` is specified, `WithPhases` and `WithRole` fields are ignored.
 type ComponentAvailable struct {
 	// Specifies the phases that the component will go through to be considered available.
+	// Multiple phases are separated by comma.
 	//
 	// This field is immutable once set.
 	//
@@ -1289,8 +1294,6 @@ type ComponentAvailable struct {
 	WithRole *string `json:"withRole,omitempty"`
 
 	// Specifies the strategies for determining whether the component is available based on the available probe.
-	//
-	// If specified, it will take precedence over the WithPhases and WithRole fields.
 	//
 	// This field is immutable once set.
 	//

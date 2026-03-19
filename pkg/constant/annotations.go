@@ -85,6 +85,7 @@ func InheritedAnnotations() []string {
 		BackupSourceTargetAnnotationKey,
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
+		LegacyConfigManagerRequiredAnnotationKey,
 		KBAppMultiClusterPlacementKey,
 	}
 }

@@ -60,8 +60,8 @@ const (
 	ProposedServiceAccountNameAnnotationKey          = "workloads.kubeblocks.io/proposed-service-account-name"
 	ServiceAccountInUseAnnotationKey                 = "workloads.kubeblocks.io/service-account-in-use"
 
-	// LegacyConfigManagerRequiredAnnotationKey tells the component controller whether an existing workload must
-	// continue to keep the legacy config-manager sidecar for parameters compatibility.
+	// LegacyConfigManagerRequiredAnnotationKey indicates whether the cluster still requires
+	// the legacy config-manager runtime for parameters compatibility.
 	LegacyConfigManagerRequiredAnnotationKey = "parameters.kubeblocks.io/legacy-config-manager-required"
 )
 

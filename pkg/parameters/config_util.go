@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
@@ -291,6 +292,9 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	if err := reader.List(ctx, configDefList); err != nil {
 		return nil, err
 	}
+	slices.SortFunc(configDefList.Items, func(a, b parametersv1alpha1.ParamConfigRenderer) int {
+		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
+	})
 
 	checkAvailable := func(configDef parametersv1alpha1.ParamConfigRenderer) error {
 		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
@@ -300,7 +304,7 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	}
 
 	for i, item := range configDefList.Items {
-		if item.Spec.ComponentDef != cmpd.Name {
+		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
@@ -322,6 +326,64 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 		return *pd.ReloadStaticParamsBeforeRestart
 	}
 	return false
+}
+
+func legacyConfigManagerRequired(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if pd == nil {
+		return false
+	}
+	// Legacy config-manager retention is keyed off whether the parameters
+	// definition still relies on the old reload-action mechanism at all.
+	// The concrete reload execution path (for example, whether it is a
+	// ShellTrigger that can be proxied through the cluster API reconfigure
+	// action) is decided later in the reconfigure flow.
+	return pd.ReloadAction != nil
+}
+
+func LegacyConfigManagerRequiredForParamsDefs(paramsDefs []*parametersv1alpha1.ParametersDefinition) bool {
+	for _, pd := range paramsDefs {
+		if pd != nil && legacyConfigManagerRequired(&pd.Spec) {
+			return true
+		}
+	}
+	return false
+}
+
+type LegacyConfigManagerRequirementState string
+
+const (
+	LegacyConfigManagerRequirementUnknown LegacyConfigManagerRequirementState = "unknown"
+	LegacyConfigManagerRequirementKeep    LegacyConfigManagerRequirementState = "keep"
+	LegacyConfigManagerRequirementCleanup LegacyConfigManagerRequirementState = "cleanup"
+)
+
+func LegacyConfigManagerRequirementStateForCluster(cluster *appsv1.Cluster) (LegacyConfigManagerRequirementState, error) {
+	if cluster == nil || len(cluster.Annotations) == 0 {
+		return LegacyConfigManagerRequirementUnknown, nil
+	}
+	raw, ok := cluster.Annotations[constant.LegacyConfigManagerRequiredAnnotationKey]
+	if !ok || raw == "" {
+		return LegacyConfigManagerRequirementUnknown, nil
+	}
+	required, err := strconv.ParseBool(raw)
+	if err != nil {
+		return LegacyConfigManagerRequirementUnknown, fmt.Errorf("failed to parse %s: %w", constant.LegacyConfigManagerRequiredAnnotationKey, err)
+	}
+	if required {
+		return LegacyConfigManagerRequirementKeep, nil
+	}
+	return LegacyConfigManagerRequirementCleanup, nil
+}
+
+func LegacyConfigManagerRequiredForCluster(cluster *appsv1.Cluster) (bool, error) {
+	state, err := LegacyConfigManagerRequirementStateForCluster(cluster)
+	if err != nil {
+		return false, err
+	}
+	if state == LegacyConfigManagerRequirementUnknown {
+		return false, nil
+	}
+	return state == LegacyConfigManagerRequirementKeep, nil
 }
 
 // UpdateConfigPayload updates the configuration payload

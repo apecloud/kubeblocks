@@ -45,9 +45,6 @@ const (
 )
 
 const (
-	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
-	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
-
 	ConfigInstanceType = "instance"
 )
 

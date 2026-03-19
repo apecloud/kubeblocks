@@ -58,8 +58,17 @@ spec:
             description: ParamConfigRendererSpec defines the desired state of ParamConfigRenderer
             properties:
               componentDef:
-                description: Specifies the ComponentDefinition custom resource (CR)
-                  that defines the Component's characteristics and behavior.
+                description: |-
+                  Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
+                  The value can represent an exact name, a name prefix, or a regular expression pattern.
+
+
+                  For example:
+
+
+                  - "clickhouse-1.0.0": Matches the exact name "clickhouse-1.0.0"
+                  - "clickhouse-1": Matches all names starting with "clickhouse-1"
+                  - "^clickhouse-1\\.\\d+\\.\\d+$": Matches all names starting with "clickhouse-1." followed by version numbers.
                 type: string
               configs:
                 description: Specifies the configuration files.

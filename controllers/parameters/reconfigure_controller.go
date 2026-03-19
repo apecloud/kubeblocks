@@ -63,6 +63,7 @@ const (
 
 	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
 	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
+	legacyReloadValidationPolicy            = "legacyReloadValidation"
 )
 
 var reconfigureRequiredLabels = []string{
@@ -224,6 +225,13 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			configPatch.DeleteConfig,
 			configPatch.UpdateConfig))
 	}
+	if err := validateLegacyReloadActionSupport(rctx, configPatch); err != nil {
+		reqCtx.Log.Error(err, "reject legacy reloadAction for unsupported instance")
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed, err.Error())
+		status := reconfigure.Status{Status: reconfigure.StatusFailed, Reason: err.Error(), ExpectedCount: core.Unconfirmed, SucceedCount: core.Unconfirmed}
+		result := reconciled(status, legacyReloadValidationPolicy, parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
+		return updateConfigPhaseWithResult(r.Client, reqCtx, configMap, result)
+	}
 
 	tasks, err := r.buildReconfigureTasks(configSpec, rctx, configPatch, forceRestart)
 	if err != nil {
@@ -273,6 +281,33 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 	}
 
 	return tasks, nil
+}
+
+func validateLegacyReloadActionSupport(rctx *reconcileContext, patch *core.ConfigPatchInfo) error {
+	if patch == nil {
+		return nil
+	}
+	for configFile := range patch.UpdateConfig {
+		pd, ok := rctx.parametersDefs[configFile]
+		if !ok || pd == nil || pd.Spec.ReloadAction == nil {
+			continue
+		}
+		requirementState, err := parameters.LegacyConfigManagerRequirementStateForCluster(rctx.ClusterObj)
+		if err != nil {
+			return err
+		}
+		// A missing cluster marker is treated as "unknown" during controller upgrade races.
+		// In that case we fall back to the live workload runtime check so existing instances
+		// keep working until the parameters controller explicitly writes "true" or "false".
+		if requirementState == parameters.LegacyConfigManagerRequirementCleanup {
+			return fmt.Errorf("unsupported legacy reloadAction for component %q config %q (ParametersDefinition %q): cluster annotation %q is not enabled; only existing instances explicitly marked for legacy config-manager compatibility are supported, new addons must use ComponentDefinition lifecycle actions",
+				rctx.ComponentName, configFile, pd.Name, constant.LegacyConfigManagerRequiredAnnotationKey)
+		}
+		if err := reconfigure.ValidateLegacyConfigManagerRuntime(rctx.its); err != nil {
+			return fmt.Errorf("unsupported legacy reloadAction for component %q config %q (ParametersDefinition %q): %w; only existing instances explicitly marked for legacy config-manager compatibility and still carrying the legacy config-manager are supported, new addons must use ComponentDefinition lifecycle actions", rctx.ComponentName, configFile, pd.Name, err)
+		}
+	}
+	return nil
 }
 
 func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.ReloadPolicy,

@@ -207,7 +207,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;clickhouse-1.0.0&rdquo;: Matches the exact name &ldquo;clickhouse-1.0.0&rdquo;</li>
+<li>&ldquo;clickhouse-1&rdquo;: Matches all names starting with &ldquo;clickhouse-1&rdquo;</li>
+<li>&rdquo;^clickhouse-1\.\d+\.\d+$&ldquo;: Matches all names starting with &ldquo;clickhouse-1.&rdquo; followed by version numbers.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1628,7 +1635,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;clickhouse-1.0.0&rdquo;: Matches the exact name &ldquo;clickhouse-1.0.0&rdquo;</li>
+<li>&ldquo;clickhouse-1&rdquo;: Matches all names starting with &ldquo;clickhouse-1&rdquo;</li>
+<li>&rdquo;^clickhouse-1\.\d+\.\d+$&ldquo;: Matches all names starting with &ldquo;clickhouse-1.&rdquo; followed by version numbers.</li>
+</ul>
 </td>
 </tr>
 <tr>

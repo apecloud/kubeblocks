@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -238,6 +239,176 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := GetUpdatedParametersReconciledPhase(tt.args.cm, tt.args.item, tt.args.status); got != tt.want {
 				t.Errorf("GetUpdatedParametersReconciledPhase() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLegacyConfigManagerRequiredForParamsDefs(t *testing.T) {
+	newParamsDef := func(reloadAction *parametersv1alpha1.ReloadAction, withDownwardAction bool) *parametersv1alpha1.ParametersDefinition {
+		pd := &parametersv1alpha1.ParametersDefinition{}
+		pd.Spec.ReloadAction = reloadAction
+		if withDownwardAction {
+			pd.Spec.DownwardAPIChangeTriggeredActions = []parametersv1alpha1.DownwardAPIChangeTriggeredAction{{
+				Name:       "role",
+				MountPoint: "/etc/downward",
+				Items:      []corev1.DownwardAPIVolumeFile{},
+			}}
+		}
+		return pd
+	}
+
+	tests := []struct {
+		name       string
+		paramsDefs []*parametersv1alpha1.ParametersDefinition
+		want       bool
+	}{
+		{
+			name: "no legacy actions",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(nil, false),
+			},
+			want: false,
+		},
+		{
+			name: "auto reload action requires legacy config manager",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(&parametersv1alpha1.ReloadAction{
+					AutoTrigger: &parametersv1alpha1.AutoTrigger{ProcessName: "mysqld"},
+				}, false),
+			},
+			want: true,
+		},
+		{
+			name: "shell reload action requires legacy config manager",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(&parametersv1alpha1.ReloadAction{
+					ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"bash", "-c", "reload"}},
+				}, false),
+			},
+			want: true,
+		},
+		{
+			name: "downward action alone does not require legacy config manager",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(nil, true),
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LegacyConfigManagerRequiredForParamsDefs(tt.paramsDefs); got != tt.want {
+				t.Fatalf("LegacyConfigManagerRequiredForParamsDefs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLegacyConfigManagerRequiredForCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        bool
+		wantErr     bool
+	}{
+		{
+			name: "missing annotation",
+			want: false,
+		},
+		{
+			name: "enabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "true",
+			},
+			want: true,
+		},
+		{
+			name: "disabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "false",
+			},
+			want: false,
+		},
+		{
+			name: "invalid value",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "invalid",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &appsv1.Cluster{}
+			cluster.Annotations = tt.annotations
+			got, err := LegacyConfigManagerRequiredForCluster(cluster)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("LegacyConfigManagerRequiredForCluster() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("LegacyConfigManagerRequiredForCluster() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLegacyConfigManagerRequirementStateForCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        LegacyConfigManagerRequirementState
+		wantErr     bool
+	}{
+		{
+			name: "missing annotation",
+			want: LegacyConfigManagerRequirementUnknown,
+		},
+		{
+			name: "enabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "true",
+			},
+			want: LegacyConfigManagerRequirementKeep,
+		},
+		{
+			name: "disabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "false",
+			},
+			want: LegacyConfigManagerRequirementCleanup,
+		},
+		{
+			name: "empty means unknown",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "",
+			},
+			want: LegacyConfigManagerRequirementUnknown,
+		},
+		{
+			name: "invalid value",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "invalid",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &appsv1.Cluster{}
+			cluster.Annotations = tt.annotations
+			got, err := LegacyConfigManagerRequirementStateForCluster(cluster)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("LegacyConfigManagerRequirementStateForCluster() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			if got != tt.want {
+				t.Fatalf("LegacyConfigManagerRequirementStateForCluster() = %v, want %v", got, tt.want)
 			}
 		})
 	}

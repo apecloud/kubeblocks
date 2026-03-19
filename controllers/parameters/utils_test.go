@@ -127,6 +127,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 		SetShardingConfig(appsv1.ClusterComponentConfig{
 			Name: ptr.To(configSpecName),
 		}).
+		AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
 		Create(&testCtx).
 		GetObject()
 
@@ -156,8 +157,14 @@ func mockCreateITSObject(namespace, name, clusterName, compName string) *workloa
 			Name:      configVolumeName,
 			MountPath: "/mnt/config",
 		}).GetObject()
+	configManagerContainer := *builder.NewContainerBuilder("config-manager").
+		AddPorts(corev1.ContainerPort{
+			Name:          "config-manager",
+			ContainerPort: 9901,
+		}).GetObject()
 	itsObj := testapps.NewInstanceSetFactory(namespace, name, clusterName, compName).
 		AddContainer(container).
+		AddContainer(configManagerContainer).
 		SetReplicas(1).
 		AddAppNameLabel(clusterName).
 		AddAppInstanceLabel(clusterName).

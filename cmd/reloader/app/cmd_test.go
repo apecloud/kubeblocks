@@ -26,12 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection/grpc_reflection_v1"
 
-	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 )
 
 type fakeConfigHandler struct{}
@@ -40,11 +41,19 @@ func (f *fakeConfigHandler) OnlineUpdate(context.Context, string, map[string]str
 	return nil
 }
 
+func (f *fakeConfigHandler) VolumeHandle(context.Context, fsnotify.Event) error {
+	return nil
+}
+
+func (f *fakeConfigHandler) MountPoint() []string {
+	return nil
+}
+
 func TestStartGRPCServiceEnablesReflection(t *testing.T) {
 	t.Helper()
 
 	logger = zap.NewNop().Sugar()
-	cfgcm.SetLogger(zap.NewNop())
+	cfgcore.SetLogger(zap.NewNop())
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -53,16 +62,19 @@ func TestStartGRPCServiceEnablesReflection(t *testing.T) {
 	port := listener.Addr().(*net.TCPAddr).Port
 	_ = listener.Close()
 
-	opts := &serviceOptions{
-		GrpcPort: port,
-		PodIP:    localhostAddress,
-	}
-	if err := startGRPCService(opts, &fakeConfigHandler{}); err != nil {
-		t.Fatalf("failed to start grpc service: %v", err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	opts := &VolumeWatcherOpts{
+		ServiceOpt: ReconfigureServiceOptions{
+			GrpcPort: port,
+			PodIP:    localhostAddress,
+		},
+		LogLevel: "info",
+	}
+	if err := startGRPCService(opts, ctx, &fakeConfigHandler{}); err != nil {
+		t.Fatalf("failed to start grpc service: %v", err)
+	}
 
 	conn, err := grpc.DialContext(ctx, net.JoinHostPort(localhostAddress, strconv.Itoa(port)), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {

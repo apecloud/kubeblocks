@@ -30,7 +30,6 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -137,11 +136,10 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyUpdatedParameters checks if the configuration is changed
-func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
+func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, componentGeneration int64) bool {
 	if configMap == nil {
 		return false
 	}
-
 	lastAppliedVersion, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
 	if !ok {
 		return false
@@ -150,17 +148,28 @@ func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alph
 	if err := json.Unmarshal([]byte(lastAppliedVersion), &lastItem); err != nil {
 		return false
 	}
-	return reflect.DeepEqual(lastItem, item)
+	if !reflect.DeepEqual(lastItem, item) {
+		return false
+	}
+	if componentGeneration == 0 {
+		return true
+	}
+	appliedGeneration, ok := configMap.Annotations[constant.ConfigAppliedComponentGenerationKey]
+	if !ok || appliedGeneration == "" {
+		return false
+	}
+	return appliedGeneration == strconv.FormatInt(componentGeneration, 10)
 }
 
 // GetUpdatedParametersReconciledPhase gets the configuration phase
 func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
-	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ParameterPhase {
+	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
+	componentGeneration int64) parametersv1alpha1.ParameterPhase {
 	if status == nil || status.Phase == "" {
 		return parametersv1alpha1.CCreatingPhase
 	}
-	if !IsApplyUpdatedParameters(configMap, item) {
+	if !IsApplyUpdatedParameters(configMap, item, componentGeneration) {
 		return parametersv1alpha1.CPendingPhase
 	}
 	if status.Phase == parametersv1alpha1.CFinishedPhase {
@@ -171,51 +180,6 @@ func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 		}
 	}
 	return status.Phase
-}
-
-func CheckAndPatchPayload(item *parametersv1alpha1.ConfigTemplateItemDetail, payloadID string, payload interface{}) (bool, error) {
-	if item == nil {
-		return false, nil
-	}
-	if item.Payload == nil {
-		item.Payload = make(map[string]json.RawMessage)
-	}
-	oldPayload, ok := item.Payload[payloadID]
-	if !ok && payload == nil {
-		return false, nil
-	}
-	if payload == nil {
-		delete(item.Payload, payloadID)
-		return true, nil
-	}
-	newPayload, err := buildPayloadAsUnstructuredObject(payload)
-	if err != nil {
-		return false, err
-	}
-	if oldPayload != nil && reflect.DeepEqual(oldPayload, newPayload) {
-		return false, nil
-	}
-	item.Payload[payloadID] = newPayload
-	return true, nil
-}
-
-func buildPayloadAsUnstructuredObject(payload interface{}) (json.RawMessage, error) {
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func ResourcesPayloadForComponent(resources corev1.ResourceRequirements) any {
-	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
-		return nil
-	}
-
-	return map[string]any{
-		"limits":   resources.Limits,
-		"requests": resources.Requests,
-	}
 }
 
 func resolveParametersDef(paramsDefs []*parametersv1alpha1.ParametersDefinition, fileName string) *parametersv1alpha1.ParametersDefinition {
@@ -366,79 +330,6 @@ func LegacyConfigManagerRequiredForCluster(cluster *appsv1.Cluster) (bool, error
 	return state == LegacyConfigManagerRequirementKeep, nil
 }
 
-// UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParamConfigRendererSpec, sharding *appsv1.ClusterSharding) error {
-	if len(configRender.Configs) == 0 {
-		return nil
-	}
-
-	for i, item := range config.ConfigItemDetails {
-		configDescs := GetComponentConfigDescriptions(configRender, item.Name)
-		configSpec := &config.ConfigItemDetails[i]
-		// check v-scale operation
-		if enableVScaleTrigger(configDescs) {
-			resourcePayload := ResourcesPayloadForComponent(component.Resources)
-			if _, err := CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload); err != nil {
-				return err
-			}
-		}
-		// check h-scale operation
-		if enableHScaleTrigger(configDescs) {
-			if _, err := CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas); err != nil {
-				return err
-			}
-		}
-		// check tls
-		if enableTLSTrigger(configDescs) {
-			if component.TLSConfig == nil {
-				continue
-			}
-			if _, err := CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig); err != nil {
-				return err
-			}
-		}
-		// check sharding h-scale operation
-		if sharding != nil && enableShardingHVScaleTrigger(configDescs) {
-			if _, err := CheckAndPatchPayload(configSpec, constant.ShardingPayload, resolveShardingResource(sharding)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {
-	for _, desc := range configDescs {
-		if slices.Contains(desc.ReRenderResourceTypes, rerenderType) {
-			return true
-		}
-	}
-	return false
-}
-
-func resolveShardingResource(sharding *appsv1.ClusterSharding) map[string]string {
-	return map[string]string{
-		"shards":   strconv.Itoa(int(sharding.Shards)),
-		"replicas": strconv.Itoa(int(sharding.Template.Replicas)),
-	}
-}
-
-func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentHScaleType)
-}
-
-func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
-}
-
-func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
-}
-
-func enableShardingHVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ShardingComponentHScaleType)
-}
-
 func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
@@ -449,34 +340,4 @@ func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 		tpls[config.Name] = cm
 	}
 	return tpls, nil
-}
-
-func ResolveShardingReference(ctx context.Context, reader client.Reader, comp *appsv1.Component) (*appsv1.ClusterSharding, error) {
-	resolveShardingName := func(comp *appsv1.Component) string {
-		if len(comp.Labels) == 0 {
-			return ""
-		}
-		return comp.Labels[constant.KBAppShardingNameLabelKey]
-	}
-
-	shardingName := resolveShardingName(comp)
-	if shardingName == "" {
-		return nil, nil
-	}
-
-	cluster := appsv1.Cluster{}
-	clusterName, _ := component.GetClusterName(comp)
-	clusterKey := types.NamespacedName{
-		Name:      clusterName,
-		Namespace: comp.Namespace,
-	}
-	if err := reader.Get(ctx, clusterKey, &cluster); err != nil {
-		return nil, err
-	}
-	for i, sharding := range cluster.Spec.Shardings {
-		if sharding.Name == shardingName {
-			return &cluster.Spec.Shardings[i], nil
-		}
-	}
-	return nil, nil
 }

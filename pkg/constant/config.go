@@ -42,6 +42,7 @@ const (
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
+	ConfigAppliedComponentGenerationKey         = "config.kubeblocks.io/component-generation"
 )
 
 const (

@@ -56,6 +56,8 @@ func init() {
 	SchemeBuilder.Register(&ComponentParameter{}, &ComponentParameterList{})
 }
 
+// Deprecated: It is retained for API compatibility with existing ComponentParameter objects.
+//
 // Payload holds the payload data. This field is optional and can contain any type of data.
 // Not included in the JSON representation of the object.
 type Payload map[string]json.RawMessage
@@ -73,11 +75,9 @@ type ConfigTemplateItemDetail struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// External controllers can trigger a configuration rerender by modifying this field.
+	// Deprecated: retained for API compatibility only.
 	//
-	// Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
-	// Modifying this field will cause a rerender, regardless of the specific content of this field.
-	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Type=object

@@ -29,7 +29,6 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -133,7 +132,7 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetUpdatedParametersReconciledPhase(tt.args.cm, tt.args.item, tt.args.status); got != tt.want {
+			if got := GetUpdatedParametersReconciledPhase(tt.args.cm, tt.args.item, tt.args.status, 0); got != tt.want {
 				t.Errorf("GetUpdatedParametersReconciledPhase() = %v, want %v", got, tt.want)
 			}
 		})
@@ -421,83 +420,6 @@ var _ = Describe("config_util", func() {
 
 })
 
-func TestCheckAndPatchPayload(t *testing.T) {
-	type args struct {
-		item      *parametersv1alpha1.ConfigTemplateItemDetail
-		payloadID string
-		payload   interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
-	}{{
-		name: "test",
-		args: args{
-			item:      &parametersv1alpha1.ConfigTemplateItemDetail{},
-			payloadID: constant.BinaryVersionPayload,
-			payload:   "md5-12912uy1232o9y2",
-		},
-		want: true,
-	}, {
-		name: "invalid-item-test",
-		args: args{
-			payloadID: constant.BinaryVersionPayload,
-			payload:   "md5-12912uy1232o9y2",
-		},
-		want: false,
-	}, {
-		name: "test-delete-payload",
-		args: args{
-			item: &parametersv1alpha1.ConfigTemplateItemDetail{
-				Payload: parametersv1alpha1.Payload{
-					constant.BinaryVersionPayload: json.RawMessage("md5-12912uy1232o9y2"),
-				},
-			},
-			payloadID: constant.BinaryVersionPayload,
-			payload:   nil,
-		},
-		want: true,
-	}, {
-		name: "test-update-payload",
-		args: args{
-			item: &parametersv1alpha1.ConfigTemplateItemDetail{
-				Payload: parametersv1alpha1.Payload{
-					constant.BinaryVersionPayload: json.RawMessage("md5-12912uy1232o9y2"),
-					constant.ComponentResourcePayload: transformPayload(map[string]any{
-						"limit": map[string]string{
-							"cpu":    "100m",
-							"memory": "100Mi",
-						},
-					}),
-				},
-			},
-			payloadID: constant.ComponentResourcePayload,
-			payload: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    resource.MustParse("200m"),
-					corev1.ResourceMemory: resource.MustParse("200m"),
-				},
-			},
-		},
-		want: true,
-	},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := CheckAndPatchPayload(tt.args.item, tt.args.payloadID, tt.args.payload)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CheckAndPatchPayload() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("CheckAndPatchPayload() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_filterImmutableParameters(t *testing.T) {
 	type args struct {
 		parameters      map[string]any
@@ -553,9 +475,4 @@ func Test_filterImmutableParameters(t *testing.T) {
 			}
 		})
 	}
-}
-
-func transformPayload(data interface{}) json.RawMessage {
-	raw, _ := buildPayloadAsUnstructuredObject(data)
-	return raw
 }

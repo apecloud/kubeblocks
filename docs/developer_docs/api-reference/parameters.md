@@ -761,14 +761,7 @@ For instance, when using the <code>ini</code> format, you can specify the sectio
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
-<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-or cluster topology. Examples:</p>
-<ul>
-<li>Redis: adjust maxmemory after v-scale operation.</li>
-<li>MySQL: increase max connections after v-scale operation.</li>
-<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
-</ul>
+<p>Deprecated: retained for API compatibility only.</p>
 </td>
 </tr>
 </tbody>
@@ -1143,9 +1136,7 @@ Payload
 </td>
 <td>
 <em>(Optional)</em>
-<p>External controllers can trigger a configuration rerender by modifying this field.</p>
-<p>Note: Currently, the <code>payload</code> field is opaque and its content is not interpreted by the system.
-Modifying this field will cause a rerender, regardless of the specific content of this field.</p>
+<p>Deprecated: retained for API compatibility only.</p>
 </td>
 </tr>
 <tr>
@@ -2356,6 +2347,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ComponentParameter objects.</p>
 <p>Payload holds the payload data. This field is optional and can contain any type of data.
 Not included in the JSON representation of the object.</p>
 </div>
@@ -2634,6 +2626,7 @@ reload.</p>
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.</p>
 <p>RerenderResourceType defines the resource requirements for a component.</p>
 </div>
 <table>

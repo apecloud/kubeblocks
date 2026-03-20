@@ -85,24 +85,6 @@ func (f *MockParamConfigRendererFactory) SetTemplateName(tpl string) *MockParamC
 	return f
 }
 
-func (f *MockParamConfigRendererFactory) HScaleEnabled() *MockParamConfigRendererFactory {
-	desc := f.safeGetConfigDescription(MysqlConfigFile)
-	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentHScaleType)
-	return f
-}
-
-func (f *MockParamConfigRendererFactory) TLSEnabled() *MockParamConfigRendererFactory {
-	desc := f.safeGetConfigDescription(MysqlConfigFile)
-	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentTLSType)
-	return f
-}
-
-func (f *MockParamConfigRendererFactory) VScaleEnabled() *MockParamConfigRendererFactory {
-	desc := f.safeGetConfigDescription(MysqlConfigFile)
-	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentVScaleType)
-	return f
-}
-
 func (f *MockParamConfigRendererFactory) getComponentConfigDescription(pdcr *parametersv1alpha1.ParamConfigRendererSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
 	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
 		return desc.Name == name

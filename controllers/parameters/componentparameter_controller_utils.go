@@ -123,11 +123,11 @@ func buildTemplateVars(ctx context.Context, cli client.Reader,
 	return nil
 }
 
-func generateReconcileTasks(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) []Task {
+func generateReconcileTasks(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter, componentGeneration int64) []Task {
 	tasks := make([]Task, 0, len(componentParameter.Spec.ConfigItemDetails))
 	for _, item := range componentParameter.Spec.ConfigItemDetails {
 		if status := fromItemStatus(reqCtx, &componentParameter.Status, item, componentParameter.GetGeneration()); status != nil {
-			tasks = append(tasks, newTask(item, status))
+			tasks = append(tasks, newTask(item, status, componentGeneration))
 		}
 	}
 	return tasks
@@ -161,7 +161,7 @@ func isReconcileStatus(phase parametersv1alpha1.ParameterPhase) bool {
 		phase != parametersv1alpha1.CDeletingPhase
 }
 
-func newTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) Task {
+func newTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parametersv1alpha1.ConfigTemplateItemDetailStatus, componentGeneration int64) Task {
 	return Task{
 		Name: item.Name,
 		Do: func(resource *Task, taskCtx *taskContext, revision string) error {
@@ -176,7 +176,7 @@ func newTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 			}
 			// Do reconcile for config template
 			configMap := resource.ConfigMapObj
-			switch parameters.GetUpdatedParametersReconciledPhase(configMap, item, status) {
+			switch parameters.GetUpdatedParametersReconciledPhase(configMap, item, status, componentGeneration) {
 			default:
 				return syncStatus(configMap, status)
 			case parametersv1alpha1.CInitPhase,
@@ -197,7 +197,7 @@ func syncImpl(taskCtx *taskContext,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
-	if parameters.IsApplyUpdatedParameters(configMap, item) {
+	if parameters.IsApplyUpdatedParameters(configMap, item, fetcher.ComponentObj.Generation) {
 		return syncStatus(configMap, status)
 	}
 
@@ -226,7 +226,7 @@ func syncImpl(taskCtx *taskContext,
 			return failStatus(err)
 		}
 	}
-	if err = mergeAndApplyConfig(fetcher.ResourceCtx, updatedConfig, configMap, fetcher.ComponentParameterObj, item, revision); err != nil {
+	if err = mergeAndApplyConfig(fetcher.ResourceCtx, updatedConfig, configMap, fetcher.ComponentParameterObj, item, fetcher.ComponentObj.Generation, revision); err != nil {
 		return failStatus(err)
 	}
 
@@ -241,14 +241,15 @@ func mergeAndApplyConfig(resourceCtx *render.ResourceCtx,
 	running *corev1.ConfigMap,
 	owner client.Object,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
+	componentGeneration int64,
 	revision string) error {
 	switch {
 	case expected == nil: // not update
-		return update(resourceCtx.Context, resourceCtx.Client, running, running, updateReconcileObject(item, owner, revision))
+		return update(resourceCtx.Context, resourceCtx.Client, running, running, updateReconcileObject(item, owner, componentGeneration, revision))
 	case running == nil: // cm been deleted
-		return create(resourceCtx.Context, resourceCtx.Client, expected, updateReconcileObject(item, owner, revision))
+		return create(resourceCtx.Context, resourceCtx.Client, expected, updateReconcileObject(item, owner, componentGeneration, revision))
 	default:
-		return update(resourceCtx.Context, resourceCtx.Client, running, running, mergedConfigmap(expected, updateReconcileObject(item, owner, revision)))
+		return update(resourceCtx.Context, resourceCtx.Client, running, running, mergedConfigmap(expected, updateReconcileObject(item, owner, componentGeneration, revision)))
 	}
 }
 
@@ -285,6 +286,7 @@ func create(ctx context.Context, cli client.Client, expected *corev1.ConfigMap, 
 
 func updateReconcileObject(item parametersv1alpha1.ConfigTemplateItemDetail,
 	owner client.Object,
+	componentGeneration int64,
 	revision string) func(*corev1.ConfigMap) error {
 	return func(cmObj *corev1.ConfigMap) error {
 		if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {
@@ -295,12 +297,13 @@ func updateReconcileObject(item parametersv1alpha1.ConfigTemplateItemDetail,
 				return err
 			}
 		}
-		return updateConfigLabels(cmObj, item, revision)
+		return updateConfigLabels(cmObj, item, componentGeneration, revision)
 	}
 }
 
 func updateConfigLabels(obj *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
+	componentGeneration int64,
 	revision string) error {
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
@@ -310,6 +313,7 @@ func updateConfigLabels(obj *corev1.ConfigMap,
 		return err
 	}
 	obj.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+	obj.Annotations[constant.ConfigAppliedComponentGenerationKey] = strconv.FormatInt(componentGeneration, 10)
 	obj.Annotations[constant.ConfigurationRevision] = revision
 
 	if obj.Labels == nil {

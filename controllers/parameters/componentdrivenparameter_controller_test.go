@@ -83,9 +83,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			SetParametersDefs(paramsDef.Name).
 			SetComponentDefinition(compDefObj.GetName()).
 			SetTemplateName(configSpecName).
-			HScaleEnabled().
-			VScaleEnabled().
-			TLSEnabled().
 			Create(&testCtx).
 			GetObject()
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParamConfigRenderer) {
@@ -157,8 +154,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
-				g.Expect(item.Payload).Should(HaveKey(constant.ReplicasPayload))
-				g.Expect(item.Payload).Should(HaveKey(constant.ComponentResourcePayload))
 				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))

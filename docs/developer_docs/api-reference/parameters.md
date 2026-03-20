@@ -431,6 +431,45 @@ ParametersDefinitionSpec
 <tbody>
 <tr>
 <td>
+<code>componentDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced componentTemplateSpec.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>fileName</code><br/>
 <em>
 string
@@ -439,6 +478,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the config file name in the config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormatConfig</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">
+FileFormatConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>, <code>hcl</code>, <code>dotenv</code>, <code>properties</code>, and <code>toml</code>.</p>
 </td>
 </tr>
 <tr>
@@ -1258,7 +1312,7 @@ ReconcileDetail
 <h3 id="parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
 </p>
 <div>
 <p>FileFormatConfig specifies the format of the configuration file and any associated parameters
@@ -1818,6 +1872,45 @@ updated by the API Server.</p>
 <tbody>
 <tr>
 <td>
+<code>componentDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced componentTemplateSpec.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>fileName</code><br/>
 <em>
 string
@@ -1826,6 +1919,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the config file name in the config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormatConfig</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">
+FileFormatConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>, <code>hcl</code>, <code>dotenv</code>, <code>properties</code>, and <code>toml</code>.</p>
 </td>
 </tr>
 <tr>

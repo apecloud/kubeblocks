@@ -211,6 +211,13 @@ func transformDefaultParameters(
 func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentFileTemplate,
 	paramDef *parametersv1alpha1.ParametersDefinition,
 	tpls map[string]*corev1.ConfigMap) *appsv1.ComponentFileTemplate {
+	if paramDef != nil && paramDef.Spec.TemplateName != "" {
+		for i, item := range templates {
+			if item.Name == paramDef.Spec.TemplateName {
+				return &templates[i]
+			}
+		}
+	}
 	for i, item := range templates {
 		tpl, ok := tpls[item.Name]
 		if !ok {

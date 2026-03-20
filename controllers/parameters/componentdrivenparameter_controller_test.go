@@ -78,15 +78,16 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
 			obj.Status.Phase = appsv1.AvailablePhase
 		})()).Should(Succeed())
-
-		pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
-			SetParametersDefs(paramsDef.Name).
-			SetComponentDefinition(compDefObj.GetName()).
-			SetTemplateName(configSpecName).
-			Create(&testCtx).
-			GetObject()
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParamConfigRenderer) {
-			obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+		By("Bind the parameters definition directly to the component template")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(paramsDef), func(obj *parametersv1alpha1.ParametersDefinition) {
+			obj.Spec.ComponentDef = compDefObj.GetName()
+			obj.Spec.TemplateName = configSpecName
+			obj.Spec.FileFormatConfig = &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{
+					IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+				},
+			}
 		})()).Should(Succeed())
 
 		By("Create init parameters")
@@ -161,11 +162,11 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		})
 	})
 
-	Context("No ParamConfigRenderer", func() {
+	Context("No matching ParametersDefinition", func() {
 		It("NPE test", func() {
 			initTestResource()
 
-			By("Create a component definition obj without ParamConfigRenderer")
+			By("Create a component definition obj without matching ParametersDefinition")
 			key := testapps.GetRandomizedKey(testCtx.DefaultNamespace, compDefName)
 			compDefObj := testapps.NewComponentDefinitionFactory(key.Name).
 				WithRandomName().
@@ -212,18 +213,18 @@ func TestResolveLegacyConfigManagerRequirement(t *testing.T) {
 				Spec:       appsv1.ComponentDefinitionSpec{ServiceVersion: "8.0"},
 				Status:     appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 			},
-			&parametersv1alpha1.ParamConfigRenderer{
-				ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
-				Spec: parametersv1alpha1.ParamConfigRendererSpec{
-					ComponentDef:   cmpdName,
-					ParametersDefs: []string{paramsDefName},
-				},
-				Status: parametersv1alpha1.ParamConfigRendererStatus{Phase: parametersv1alpha1.PDAvailablePhase},
-			},
 			&parametersv1alpha1.ParametersDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: paramsDefName},
 				Spec: parametersv1alpha1.ParametersDefinitionSpec{
-					FileName: "my.cnf",
+					ComponentDef: cmpdName,
+					FileName:     "my.cnf",
+					TemplateName: "mysql-config",
+					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+						Format: parametersv1alpha1.Ini,
+						FormatterAction: parametersv1alpha1.FormatterAction{
+							IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+						},
+					},
 				},
 				Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
 			},
@@ -239,7 +240,7 @@ func TestResolveLegacyConfigManagerRequirement(t *testing.T) {
 			},
 		}
 		if withReload {
-			objects[2].(*parametersv1alpha1.ParametersDefinition).Spec.ReloadAction = &parametersv1alpha1.ReloadAction{
+			objects[1].(*parametersv1alpha1.ParametersDefinition).Spec.ReloadAction = &parametersv1alpha1.ReloadAction{
 				ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"bash", "-c", "reload"}},
 			}
 		}
@@ -346,18 +347,18 @@ func TestSyncLegacyConfigManagerRequirement(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: cmpdName},
 			Status:     appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 		},
-		&parametersv1alpha1.ParamConfigRenderer{
-			ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
-			Spec: parametersv1alpha1.ParamConfigRendererSpec{
-				ComponentDef:   cmpdName,
-				ParametersDefs: []string{paramsDefName},
-			},
-			Status: parametersv1alpha1.ParamConfigRendererStatus{Phase: parametersv1alpha1.PDAvailablePhase},
-		},
 		&parametersv1alpha1.ParametersDefinition{
 			ObjectMeta: metav1.ObjectMeta{Name: paramsDefName},
 			Spec: parametersv1alpha1.ParametersDefinitionSpec{
-				FileName: "my.cnf",
+				ComponentDef: cmpdName,
+				FileName:     "my.cnf",
+				TemplateName: "mysql-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+					FormatterAction: parametersv1alpha1.FormatterAction{
+						IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+					},
+				},
 				ReloadAction: &parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"bash", "-c", "reload"}},
 				},

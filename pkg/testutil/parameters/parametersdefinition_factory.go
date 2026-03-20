@@ -33,8 +33,16 @@ func NewParametersDefinitionFactory(name string) *MockParametersDefinitionFactor
 	f := &MockParametersDefinitionFactory{}
 	f.Init("", name, &parametersv1alpha1.ParametersDefinition{
 		Spec: parametersv1alpha1.ParametersDefinitionSpec{
-			FileName:     MysqlConfigFile,
-			ReloadAction: WithNoneAction(),
+			FileName:         MysqlConfigFile,
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{
+					IniConfig: &parametersv1alpha1.IniConfig{
+						SectionName: "mysqld",
+					},
+				},
+			},
+			ReloadAction:     WithNoneAction(),
 		},
 	}, f)
 	return f
@@ -51,6 +59,26 @@ func (f *MockParametersDefinitionFactory) Schema(cue string) *MockParametersDefi
 
 func (f *MockParametersDefinitionFactory) SetConfigFile(name string) *MockParametersDefinitionFactory {
 	f.Get().Spec.FileName = name
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetComponentDefinition(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.ComponentDef = name
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetServiceVersion(version string) *MockParametersDefinitionFactory {
+	f.Get().Spec.ServiceVersion = version
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetTemplateName(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.TemplateName = name
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetFileFormatConfig(cfg parametersv1alpha1.FileFormatConfig) *MockParametersDefinitionFactory {
+	f.Get().Spec.FileFormatConfig = &cfg
 	return f
 }
 

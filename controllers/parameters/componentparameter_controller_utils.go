@@ -24,9 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"slices"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -73,34 +71,9 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 		return nil, err
 	}
 
-	configDefList := &parametersv1alpha1.ParamConfigRendererList{}
-	if err := cli.List(ctx, configDefList); err != nil {
+	configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, cmpd)
+	if err != nil {
 		return nil, err
-	}
-	slices.SortFunc(configDefList.Items, func(a, b parametersv1alpha1.ParamConfigRenderer) int {
-		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
-	})
-
-	var paramsDefs []*parametersv1alpha1.ParametersDefinition
-	var configRender *parametersv1alpha1.ParamConfigRenderer
-	for i, item := range configDefList.Items {
-		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
-			continue
-		}
-		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
-			configRender = &configDefList.Items[i]
-			break
-		}
-	}
-
-	if configRender != nil {
-		for _, paramsDef := range configRender.Spec.ParametersDefs {
-			var param = &parametersv1alpha1.ParametersDefinition{}
-			if err := cli.Get(ctx, client.ObjectKey{Name: paramsDef}, param); err != nil {
-				return nil, err
-			}
-			paramsDefs = append(paramsDefs, param)
-		}
 	}
 
 	return &taskContext{ctx: ctx,

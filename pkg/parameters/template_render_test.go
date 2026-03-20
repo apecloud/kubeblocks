@@ -45,7 +45,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 	var paramsDef *parametersv1alpha1.ParametersDefinition
-	var pdcr *parametersv1alpha1.ParamConfigRenderer
+	var configRender *parametersv1alpha1.ParamConfigRenderer
 
 	BeforeEach(func() {
 		mockK8sCli = testutil.NewK8sMockClient()
@@ -53,15 +53,13 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		// Add any setup steps that needs to be executed before each test
 		clusterObj, compDefObj, _ = newAllFieldsClusterObj(nil, false)
 		paramsDef = testparameters.NewParametersDefinitionFactory(paramsDefName).
+			SetComponentDefinition(compDefObj.GetName()).
+			SetTemplateName(configTemplateName).
 			SetReloadAction(testparameters.WithNoneAction()).
 			GetObject()
 		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 
-		pdcr = testparameters.NewParamConfigRendererFactory(pdcrName).
-			SetParametersDefs(paramsDef.Name).
-			SetComponentDefinition(compDefObj.GetName()).
-			SetTemplateName(configTemplateName).
-			GetObject()
+		configRender = BuildConfigRenderFromParametersDefs(compDefObj, []*parametersv1alpha1.ParametersDefinition{paramsDef})
 	})
 
 	AfterEach(func() {
@@ -100,21 +98,21 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			CustomTemplates: customTemplate,
 		}
 		pds := []*parametersv1alpha1.ParametersDefinition{paramsDef}
-		cmObj, err := RerenderParametersTemplate(rctx, item, pdcr, pds)
+		cmObj, err := RerenderParametersTemplate(rctx, item, configRender, pds)
 		Expect(err).Should(Succeed())
-		configdesc := pdcr.Spec.Configs[0]
+		configdesc := configRender.Spec.Configs[0]
 		if len(parameters) == 0 {
 			configReaders, err := cfgcore.LoadRawConfigObject(cmObj.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 			Expect(err).Should(Succeed())
 			return configReaders[configdesc.Name]
 		}
-		params, err := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl}, pdcr)
+		params, err := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl}, configRender)
 		Expect(err).Should(Succeed())
 
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())
 		item.ConfigFileParams = deRef(tplParams)
-		result, err := ApplyParameters(item, cmObj, pdcr, pds)
+		result, err := ApplyParameters(item, cmObj, configRender, pds)
 		Expect(err).Should(Succeed())
 		configReaders, err := cfgcore.LoadRawConfigObject(result.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 		Expect(err).Should(Succeed())

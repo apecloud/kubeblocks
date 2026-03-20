@@ -103,16 +103,16 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
 		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())
-
-	pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
-		SetParametersDefs(paramsDef.GetName()).
-		SetComponentDefinition(compDefObj.GetName()).
-		SetTemplateName(configSpecName).
-		Create(&testCtx).
-		GetObject()
-	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParamConfigRenderer) {
-		obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
-	})()).Should(Succeed())
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(paramsDef), func(obj *parametersv1alpha1.ParametersDefinition) {
+			obj.Spec.ComponentDef = compDefObj.GetName()
+			obj.Spec.TemplateName = configSpecName
+			obj.Spec.FileFormatConfig = &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{
+					IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+				},
+			}
+		})()).Should(Succeed())
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").

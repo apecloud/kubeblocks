@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -29,6 +30,9 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -292,6 +296,84 @@ func TestLegacyConfigManagerRequirementStateForCluster(t *testing.T) {
 				t.Fatalf("LegacyConfigManagerRequirementStateForCluster() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestResolveCmpdParametersDefs(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: "mysql-8",
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd).Build()
+	configRender, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if configRender == nil {
+		t.Fatalf("ResolveCmpdParametersDefs() configRender = nil")
+	}
+	if len(configRender.Spec.Configs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configRender.Spec.Configs))
+	}
+	if configRender.Spec.Configs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configRender.Spec.Configs[0].TemplateName, "mysql-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsRejectsDuplicateFiles(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	newPD := func(name string) *parametersv1alpha1.ParametersDefinition {
+		return &parametersv1alpha1.ParametersDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: parametersv1alpha1.ParametersDefinitionSpec{
+				ComponentDef: "mysql-8",
+				TemplateName: "mysql-config",
+				FileName:     "my.cnf",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			},
+			Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+		}
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, newPD("pd-1"), newPD("pd-2")).Build()
+	_, _, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err == nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = nil, want duplicate-file error")
 	}
 }
 

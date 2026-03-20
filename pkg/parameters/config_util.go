@@ -209,26 +209,105 @@ func filterImmutableParameters(parameters map[string]any, fileName string, param
 }
 
 func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, []*parametersv1alpha1.ParametersDefinition, error) {
-	var paramsDefs []*parametersv1alpha1.ParametersDefinition
-
-	configRender, err := ResolveComponentConfigRender(ctx, reader, cmpd)
-	if err != nil {
+	paramsDefList := &parametersv1alpha1.ParametersDefinitionList{}
+	if err := reader.List(ctx, paramsDefList); err != nil {
 		return nil, nil, err
 	}
-	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
-		return configRender, nil, nil
-	}
-	for _, defName := range configRender.Spec.ParametersDefs {
-		paramsDef := &parametersv1alpha1.ParametersDefinition{}
-		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
+
+	slices.SortFunc(paramsDefList.Items, func(a, b parametersv1alpha1.ParametersDefinition) int {
+		if cmp := strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef); cmp != 0 {
+			return cmp
+		}
+		if cmp := strings.Compare(a.Spec.TemplateName, b.Spec.TemplateName); cmp != 0 {
+			return cmp
+		}
+		if cmp := strings.Compare(a.Spec.FileName, b.Spec.FileName); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	var paramsDefs []*parametersv1alpha1.ParametersDefinition
+	seenFiles := make(map[string]string)
+	for i := range paramsDefList.Items {
+		paramsDef := &paramsDefList.Items[i]
+		matched, err := matchParametersDefinition(cmpd, paramsDef)
+		if err != nil {
 			return nil, nil, err
+		}
+		if !matched {
+			continue
 		}
 		if paramsDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
 			return nil, nil, fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", paramsDef.Name)
 		}
+		if err := validateMatchedParametersDefinition(paramsDef); err != nil {
+			return nil, nil, err
+		}
+		if existing, ok := seenFiles[paramsDef.Spec.FileName]; ok {
+			return nil, nil, fmt.Errorf("config file[%s] has been defined in other parametersdefinition[%s]", paramsDef.Spec.FileName, existing)
+		}
+		seenFiles[paramsDef.Spec.FileName] = paramsDef.Name
 		paramsDefs = append(paramsDefs, paramsDef)
 	}
-	return configRender, paramsDefs, nil
+	if len(paramsDefs) == 0 {
+		return nil, nil, nil
+	}
+	return BuildConfigRenderFromParametersDefs(cmpd, paramsDefs), paramsDefs, nil
+}
+
+func matchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {
+	if cmpd == nil || paramsDef == nil {
+		return false, nil
+	}
+	pattern := paramsDef.Spec.ComponentDef
+	if pattern == "" {
+		return false, nil
+	}
+	if err := component.ValidateDefNameRegexp(pattern); err != nil {
+		return false, fmt.Errorf("invalid parametersdefinition[%s] componentDef pattern %q: %w", paramsDef.Name, pattern, err)
+	}
+	if !component.PrefixOrRegexMatched(cmpd.Name, pattern) {
+		return false, nil
+	}
+	return paramsDef.Spec.ServiceVersion == "" || paramsDef.Spec.ServiceVersion == cmpd.Spec.ServiceVersion, nil
+}
+
+func validateMatchedParametersDefinition(paramsDef *parametersv1alpha1.ParametersDefinition) error {
+	if paramsDef.Spec.TemplateName == "" {
+		return fmt.Errorf("parametersdefinition[%s] misses templateName", paramsDef.Name)
+	}
+	if paramsDef.Spec.FileName == "" {
+		return fmt.Errorf("parametersdefinition[%s] misses fileName", paramsDef.Name)
+	}
+	if paramsDef.Spec.FileFormatConfig == nil {
+		return fmt.Errorf("parametersdefinition[%s] misses fileFormatConfig", paramsDef.Name)
+	}
+	return nil
+}
+
+func BuildConfigRenderFromParametersDefs(cmpd *appsv1.ComponentDefinition, paramsDefs []*parametersv1alpha1.ParametersDefinition) *parametersv1alpha1.ParamConfigRenderer {
+	if len(paramsDefs) == 0 {
+		return nil
+	}
+	spec := parametersv1alpha1.ParamConfigRendererSpec{}
+	if cmpd != nil {
+		spec.ComponentDef = cmpd.Name
+		spec.ServiceVersion = cmpd.Spec.ServiceVersion
+	}
+	spec.ParametersDefs = make([]string, 0, len(paramsDefs))
+	spec.Configs = make([]parametersv1alpha1.ComponentConfigDescription, 0, len(paramsDefs))
+	for _, paramsDef := range paramsDefs {
+		spec.ParametersDefs = append(spec.ParametersDefs, paramsDef.Name)
+		spec.Configs = append(spec.Configs, parametersv1alpha1.ComponentConfigDescription{
+			Name:             paramsDef.Spec.FileName,
+			TemplateName:     paramsDef.Spec.TemplateName,
+			FileFormatConfig: paramsDef.Spec.FileFormatConfig.DeepCopy(),
+		})
+	}
+	return &parametersv1alpha1.ParamConfigRenderer{
+		Spec: spec,
+	}
 }
 
 func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, error) {

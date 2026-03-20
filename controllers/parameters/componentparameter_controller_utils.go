@@ -33,7 +33,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -216,24 +215,12 @@ func syncImpl(taskCtx *taskContext,
 		PodSpec:              taskCtx.component.PodSpec,
 	}
 
-	var baseConfig = configMap
+	var baseConfig *corev1.ConfigMap
 	var updatedConfig *corev1.ConfigMap
-	if parameters.IsRerender(configMap, item) {
-		log.FromContext(taskCtx.ctx).
-			WithName("ParameterReconcileTask").
-			WithValues("cluster", taskCtx.component.ClusterName,
-				"component", taskCtx.component.Name,
-				"parameterTpl", item.Name).
-			Info("rerender parameter template",
-				"appliedConfigMeta", resolveLastConfigMeta(configMap),
-				"revision", revision,
-				"configMeta", item,
-			)
-		if baseConfig, err = parameters.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
-			return failStatus(err)
-		}
-		updatedConfig = baseConfig
+	if baseConfig, err = parameters.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+		return failStatus(err)
 	}
+	updatedConfig = baseConfig
 	if len(item.ConfigFileParams) != 0 {
 		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
@@ -247,16 +234,6 @@ func syncImpl(taskCtx *taskContext,
 	status.Phase = parametersv1alpha1.CMergedPhase
 	status.UpdateRevision = revision
 	return nil
-}
-
-func resolveLastConfigMeta(configMap *corev1.ConfigMap) any {
-	if configMap == nil || len(configMap.Annotations) == 0 {
-		return nil
-	}
-	return map[string]string{
-		"revision":   configMap.Annotations[constant.ConfigurationRevision],
-		"configMeta": configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey],
-	}
 }
 
 func mergeAndApplyConfig(resourceCtx *render.ResourceCtx,

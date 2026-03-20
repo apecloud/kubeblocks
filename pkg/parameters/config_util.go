@@ -153,26 +153,6 @@ func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alph
 	return reflect.DeepEqual(lastItem, item)
 }
 
-// IsRerender checks if the configuration template is changed
-func IsRerender(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
-	if configMap == nil {
-		return true
-	}
-	if len(item.Payload) == 0 && item.CustomTemplates == nil {
-		return false
-	}
-
-	var updatedVersion parametersv1alpha1.ConfigTemplateItemDetail
-	updatedVersionStr, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
-	if ok && updatedVersionStr != "" {
-		if err := json.Unmarshal([]byte(updatedVersionStr), &updatedVersion); err != nil {
-			return false
-		}
-	}
-	return !reflect.DeepEqual(updatedVersion.Payload, item.Payload) ||
-		!reflect.DeepEqual(updatedVersion.CustomTemplates, item.CustomTemplates)
-}
-
 // GetUpdatedParametersReconciledPhase gets the configuration phase
 func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,

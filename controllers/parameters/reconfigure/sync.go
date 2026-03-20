@@ -34,8 +34,8 @@ import (
 )
 
 func init() {
-	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicy)
-	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, syncNRestartPolicy)
+	registerPolicy(SyncDynamicReloadPolicy, syncPolicy)
+	registerPolicy(DynamicReloadAndRestartPolicy, syncNRestartPolicy)
 }
 
 var (

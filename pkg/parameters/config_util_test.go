@@ -245,16 +245,9 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 }
 
 func TestLegacyConfigManagerRequiredForParamsDefs(t *testing.T) {
-	newParamsDef := func(reloadAction *parametersv1alpha1.ReloadAction, withDownwardAction bool) *parametersv1alpha1.ParametersDefinition {
+	newParamsDef := func(reloadAction *parametersv1alpha1.ReloadAction) *parametersv1alpha1.ParametersDefinition {
 		pd := &parametersv1alpha1.ParametersDefinition{}
 		pd.Spec.ReloadAction = reloadAction
-		if withDownwardAction {
-			pd.Spec.DownwardAPIChangeTriggeredActions = []parametersv1alpha1.DownwardAPIChangeTriggeredAction{{
-				Name:       "role",
-				MountPoint: "/etc/downward",
-				Items:      []corev1.DownwardAPIVolumeFile{},
-			}}
-		}
 		return pd
 	}
 
@@ -266,7 +259,7 @@ func TestLegacyConfigManagerRequiredForParamsDefs(t *testing.T) {
 		{
 			name: "no legacy actions",
 			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
-				newParamsDef(nil, false),
+				newParamsDef(nil),
 			},
 			want: false,
 		},
@@ -275,7 +268,7 @@ func TestLegacyConfigManagerRequiredForParamsDefs(t *testing.T) {
 			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
 				newParamsDef(&parametersv1alpha1.ReloadAction{
 					AutoTrigger: &parametersv1alpha1.AutoTrigger{ProcessName: "mysqld"},
-				}, false),
+				}),
 			},
 			want: true,
 		},
@@ -284,16 +277,9 @@ func TestLegacyConfigManagerRequiredForParamsDefs(t *testing.T) {
 			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
 				newParamsDef(&parametersv1alpha1.ReloadAction{
 					ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"bash", "-c", "reload"}},
-				}, false),
+				}),
 			},
 			want: true,
-		},
-		{
-			name: "downward action alone does not require legacy config manager",
-			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
-				newParamsDef(nil, true),
-			},
-			want: false,
 		},
 	}
 

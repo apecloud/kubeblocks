@@ -16,17 +16,6 @@ limitations under the License.
 
 package v1alpha1
 
-// DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
-//
-// +enum
-// +kubebuilder:validation:Enum={all,dynamic}
-type DynamicParameterSelectedPolicy string
-
-const (
-	SelectedAllParameters     DynamicParameterSelectedPolicy = "all"
-	SelectedDynamicParameters DynamicParameterSelectedPolicy = "dynamic"
-)
-
 // CfgFileFormat defines formatter of configuration files.
 // +enum
 // +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis,props-plus,props-ultra}
@@ -44,58 +33,6 @@ const (
 	RedisCfg        CfgFileFormat = "redis"
 	PropertiesPlus  CfgFileFormat = "props-plus"
 	PropertiesUltra CfgFileFormat = "props-ultra"
-)
-
-// DynamicReloadType defines reload method.
-// +enum
-type DynamicReloadType string
-
-const (
-	UnixSignalType DynamicReloadType = "signal" // deprecated since 1.1.0
-	SQLType        DynamicReloadType = "sql"
-	ShellType      DynamicReloadType = "exec"
-	HTTPType       DynamicReloadType = "http"
-	TPLScriptType  DynamicReloadType = "tpl"
-	AutoType       DynamicReloadType = "auto"
-)
-
-// SignalType defines which signals are valid.
-// +enum
-// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
-type SignalType string
-
-const (
-	SIGHUP    SignalType = "SIGHUP"
-	SIGINT    SignalType = "SIGINT"
-	SIGQUIT   SignalType = "SIGQUIT"
-	SIGILL    SignalType = "SIGILL"
-	SIGTRAP   SignalType = "SIGTRAP"
-	SIGABRT   SignalType = "SIGABRT"
-	SIGBUS    SignalType = "SIGBUS"
-	SIGFPE    SignalType = "SIGFPE"
-	SIGKILL   SignalType = "SIGKILL"
-	SIGUSR1   SignalType = "SIGUSR1"
-	SIGSEGV   SignalType = "SIGSEGV"
-	SIGUSR2   SignalType = "SIGUSR2"
-	SIGPIPE   SignalType = "SIGPIPE"
-	SIGALRM   SignalType = "SIGALRM"
-	SIGTERM   SignalType = "SIGTERM"
-	SIGSTKFLT SignalType = "SIGSTKFLT"
-	SIGCHLD   SignalType = "SIGCHLD"
-	SIGCONT   SignalType = "SIGCONT"
-	SIGSTOP   SignalType = "SIGSTOP"
-	SIGTSTP   SignalType = "SIGTSTP"
-	SIGTTIN   SignalType = "SIGTTIN"
-	SIGTTOU   SignalType = "SIGTTOU"
-	SIGURG    SignalType = "SIGURG"
-	SIGXCPU   SignalType = "SIGXCPU"
-	SIGXFSZ   SignalType = "SIGXFSZ"
-	SIGVTALRM SignalType = "SIGVTALRM"
-	SIGPROF   SignalType = "SIGPROF"
-	SIGWINCH  SignalType = "SIGWINCH"
-	SIGIO     SignalType = "SIGIO"
-	SIGPWR    SignalType = "SIGPWR"
-	SIGSYS    SignalType = "SIGSYS"
 )
 
 // ParametersDescPhase defines the ParametersDescription CR .status.phase
@@ -164,19 +101,6 @@ type ParametersInFile struct {
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`
 }
-
-// ReloadPolicy defines the policy of reconfiguring.
-// +enum
-// +kubebuilder:validation:Enum={none,restart,asyncReload,syncReload,dynamicReloadBeginRestart}
-type ReloadPolicy string
-
-const (
-	NonePolicy                    ReloadPolicy = "none"
-	RestartPolicy                 ReloadPolicy = "restart"
-	AsyncDynamicReloadPolicy      ReloadPolicy = "asyncReload"
-	SyncDynamicReloadPolicy       ReloadPolicy = "syncReload"
-	DynamicReloadAndRestartPolicy ReloadPolicy = "dynamicReloadBeginRestart"
-)
 
 type ComponentParameters map[string]*string
 

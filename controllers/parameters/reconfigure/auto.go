@@ -19,12 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package reconfigure
 
-import (
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-)
-
 func init() {
-	registerPolicy(parametersv1alpha1.AsyncDynamicReloadPolicy, func(Context) (Status, error) {
+	registerPolicy(AsyncDynamicReloadPolicy, func(Context) (Status, error) {
 		return makeStatus(StatusNone, withReason("async dynamic reload")), nil
 	})
 }

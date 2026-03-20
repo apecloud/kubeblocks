@@ -249,8 +249,8 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 	}
 
 	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
-	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
-		return !forceRestart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
+	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy reconfigure.Policy) bool {
+		return !forceRestart || (policy == reconfigure.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
 	}
 
 	var tasks []reconfigure.Task
@@ -310,7 +310,7 @@ func validateLegacyReloadActionSupport(rctx *reconcileContext, patch *core.Confi
 	return nil
 }
 
-func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.ReloadPolicy,
+func (r *ReconfigureReconciler) buildReloadTask(policy reconfigure.Policy,
 	templateSpec *appsv1.ComponentFileTemplate, rctx *reconcileContext, pd *parametersv1alpha1.ParametersDefinition,
 	configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigure.Task {
 	reCtx := reconfigure.Context{
@@ -330,7 +330,7 @@ func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.Reload
 
 func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *reconcileContext) reconfigure.Task {
 	return reconfigure.Task{
-		Policy: parametersv1alpha1.RestartPolicy,
+		Policy: reconfigure.RestartPolicy,
 		Ctx: reconfigure.Context{
 			RequestCtx:       rctx.RequestCtx,
 			Client:           rctx.Client,
@@ -344,8 +344,8 @@ func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.Componen
 }
 
 func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, format *parametersv1alpha1.FileFormatConfig,
-	pd *parametersv1alpha1.ParametersDefinitionSpec) (parametersv1alpha1.ReloadPolicy, error) {
-	var policy = parametersv1alpha1.NonePolicy
+	pd *parametersv1alpha1.ParametersDefinitionSpec) (reconfigure.Policy, error) {
+	var policy = reconfigure.NonePolicy
 	dynamicUpdate, err := core.CheckUpdateDynamicParameters(format, pd, jsonPatch)
 	if err != nil {
 		return policy, err
@@ -354,15 +354,15 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 	// make decision
 	switch {
 	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
-		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
+		policy = reconfigure.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
-		policy = parametersv1alpha1.RestartPolicy
+		policy = reconfigure.RestartPolicy
 	case isAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
-		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+		policy = reconfigure.AsyncDynamicReloadPolicy
 	case r.enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
-		policy = parametersv1alpha1.SyncDynamicReloadPolicy
+		policy = reconfigure.SyncDynamicReloadPolicy
 	default: // config-manager auto trigger to hot update
-		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+		policy = reconfigure.AsyncDynamicReloadPolicy
 	}
 	return policy, nil
 }

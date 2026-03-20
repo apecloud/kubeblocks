@@ -478,36 +478,6 @@ can also trigger a reload.</li>
 </ol>
 <p>If <code>reloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
 dynamic reloading will not be triggered.</p>
-<p>Example:</p>
-<pre><code class="language-yaml">dynamicReloadAction:
- tplScriptTrigger:
-   namespace: kb-system
-   scriptConfigMapRef: mysql-reload-script
-   sync: true
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardAPIChangeTriggeredActions</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">
-[]DownwardAPIChangeTriggeredAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of actions to execute specified commands based on Pod labels.</p>
-<p>It utilizes the K8s Downward API to mount label information as a volume into the pod.
-The &lsquo;config-manager&rsquo; sidecar container watches for changes in the role label and dynamically invoke
-registered commands (usually execute some SQL statements) when a change is detected.</p>
-<p>It is designed for scenarios where:</p>
-<ul>
-<li>Replicas with different roles have different configurations, such as Redis primary &amp; secondary replicas.</li>
-<li>After a role switch (e.g., from secondary to primary), some changes in configuration are needed
-to reflect the new role.</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -1285,134 +1255,6 @@ ReconcileDetail
 </tr>
 </tbody>
 </table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
-</p>
-<div>
-<p>DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
-For example, a command might be executed when the &lsquo;role&rsquo; label of the Pod is updated.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the field. It must be a string of maximum length 63.
-The name should match the regex pattern <code>^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the mount point of the Downward API volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>items</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#downwardapivolumefile-v1-core">
-[]Kubernetes core/v1.DownwardAPIVolumeFile
-</a>
-</em>
-</td>
-<td>
-<p>Represents a list of files under the Downward API volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the command to be triggered when changes are detected in Downward API volume files.
-It relies on the inotify mechanism in the config-manager sidecar to monitor file changes.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfig</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.ScriptConfig">
-ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
-The scripts are mounted as volumes and can be referenced and executed by the DownwardAction to perform specific tasks or configurations.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
-(<code>string</code> alias)</h3>
-<div>
-<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;all&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;dynamic&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.DynamicReloadType">DynamicReloadType
-(<code>string</code> alias)</h3>
-<div>
-<p>DynamicReloadType defines reload method.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;auto&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;http&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;sql&#34;</p></td>
-<td><p>deprecated since 1.1.0</p>
-</td>
-</tr><tr><td><p>&#34;exec&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;tpl&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;signal&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig
 </h3>
 <p>
@@ -2023,36 +1865,6 @@ can also trigger a reload.</li>
 </ol>
 <p>If <code>reloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
 dynamic reloading will not be triggered.</p>
-<p>Example:</p>
-<pre><code class="language-yaml">dynamicReloadAction:
- tplScriptTrigger:
-   namespace: kb-system
-   scriptConfigMapRef: mysql-reload-script
-   sync: true
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardAPIChangeTriggeredActions</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">
-[]DownwardAPIChangeTriggeredAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of actions to execute specified commands based on Pod labels.</p>
-<p>It utilizes the K8s Downward API to mount label information as a volume into the pod.
-The &lsquo;config-manager&rsquo; sidecar container watches for changes in the role label and dynamically invoke
-registered commands (usually execute some SQL statements) when a change is detected.</p>
-<p>It is designed for scenarios where:</p>
-<ul>
-<li>Replicas with different roles have different configurations, such as Redis primary &amp; secondary replicas.</li>
-<li>After a role switch (e.g., from secondary to primary), some changes in configuration are needed
-to reflect the new role.</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -2522,20 +2334,6 @@ This allows users to customize the configuration template according to their spe
 <tbody>
 <tr>
 <td>
-<code>unixSignalTrigger</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.UnixSignalTrigger">
-UnixSignalTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to trigger a reload by sending a specific Unix signal to the process.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>shellTrigger</code><br/>
 <em>
 <a href="#parameters.kubeblocks.io/v1alpha1.ShellTrigger">
@@ -2546,20 +2344,6 @@ ShellTrigger
 <td>
 <em>(Optional)</em>
 <p>Allows to execute a custom shell script to reload the process.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tplScriptTrigger</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.TPLScriptTrigger">
-TPLScriptTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Enables reloading process using a Go template script.</p>
 </td>
 </tr>
 <tr>
@@ -2596,30 +2380,6 @@ reload.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.ReloadPolicy">ReloadPolicy
-(<code>string</code> alias)</h3>
-<div>
-<p>ReloadPolicy defines the policy of reconfiguring.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;asyncReload&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;dynamicReloadBeginRestart&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;none&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;restart&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;syncReload&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.RerenderResourceType">RerenderResourceType
 (<code>string</code> alias)</h3>
 <p>
@@ -2649,7 +2409,7 @@ reload.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ScriptConfig">ScriptConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ShellTrigger">ShellTrigger</a>, <a href="#parameters.kubeblocks.io/v1alpha1.TPLScriptTrigger">TPLScriptTrigger</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ShellTrigger">ShellTrigger</a>)
 </p>
 <div>
 </div>
@@ -2732,54 +2492,6 @@ bool
 </tr>
 <tr>
 <td>
-<code>batchReload</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Controls whether parameter updates are processed individually or collectively in a batch:</p>
-<ul>
-<li>&lsquo;True&rsquo;: Processes all changes in one batch reload.</li>
-<li>&lsquo;False&rsquo;: Processes each change individually.</li>
-</ul>
-<p>Defaults to &lsquo;False&rsquo; if unspecified.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>batchParamsFormatterTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a Go template string for formatting batch input data.
-It&rsquo;s used when <code>batchReload</code> is &lsquo;True&rsquo; to format data passed into STDIN of the script.
-The template accesses key-value pairs of updated parameters via the &lsquo;$&rsquo; variable.
-This allows for custom formatting of the input data.</p>
-<p>Example template:</p>
-<pre><code class="language-yaml">batchParamsFormatterTemplate: |-
-&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
-&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
-&#123;&#123;- end &#125;&#125;
-</code></pre>
-<p>This example generates batch input data in a key:value format, sorted by keys.</p>
-<pre><code>key1:value1
-key2:value2
-key3:value3
-</code></pre>
-<p>If not specified, the default format is key=value, sorted by keys, for each updated parameter.</p>
-<pre><code>key1=value1
-key2=value2
-key3=value3
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
 <code>toolsSetup</code><br/>
 <em>
 <a href="#parameters.kubeblocks.io/v1alpha1.ToolsSetup">
@@ -2810,138 +2522,6 @@ ScriptConfig
 <em>(Optional)</em>
 <p>ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
 The scripts are mounted as volumes and can be referenced and executed by the dynamic reload.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.SignalType">SignalType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.UnixSignalTrigger">UnixSignalTrigger</a>)
-</p>
-<div>
-<p>SignalType defines which signals are valid.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;SIGABRT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGALRM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGBUS&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGCHLD&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGCONT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGFPE&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGHUP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGILL&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGINT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGIO&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGKILL&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPIPE&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPROF&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPWR&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGQUIT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSEGV&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSTKFLT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSTOP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSYS&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTERM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTRAP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTSTP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTTIN&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTTOU&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGURG&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGUSR1&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGUSR2&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGVTALRM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGWINCH&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGXCPU&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGXFSZ&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.TPLScriptTrigger">TPLScriptTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ReloadAction">ReloadAction</a>)
-</p>
-<div>
-<p>TPLScriptTrigger Enables reloading process using a Go template script.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ScriptConfig</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.ScriptConfig">
-ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ScriptConfig</code> are embedded into this type.)
-</p>
-<p>Specifies the ConfigMap that contains the script to be executed for reload.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>sync</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines whether parameter updates should be synchronized with the &ldquo;config-manager&rdquo;.
-Specifies the controller&rsquo;s reload strategy:</p>
-<ul>
-<li>If set to &lsquo;True&rsquo;, the controller executes the reload action in synchronous mode,
-pausing execution until the reload completes.</li>
-<li>If set to &lsquo;False&rsquo;, the controller executes the reload action in asynchronous mode,
-updating the ConfigMap without waiting for the reload process to finish.</li>
-</ul>
 </td>
 </tr>
 </tbody>
@@ -3117,48 +2697,6 @@ This field is typically used with an emptyDir volume to ensure a temporary, empt
 <td>
 <em>(Optional)</em>
 <p>Specifies a list of settings of init containers that prepare tools for dynamic reload.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.UnixSignalTrigger">UnixSignalTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ReloadAction">ReloadAction</a>)
-</p>
-<div>
-<p>UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>signal</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.SignalType">
-SignalType
-</a>
-</em>
-</td>
-<td>
-<p>Specifies a valid Unix signal to be sent.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>processName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Identifies the name of the process to which the Unix signal will be sent.</p>
 </td>
 </tr>
 </tbody>

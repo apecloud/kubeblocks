@@ -90,6 +90,7 @@ type ParametersDefinitionSpec struct {
 	//    sync: true
 	// ```
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +optional
 	ReloadAction *ReloadAction `json:"reloadAction,omitempty"`
 
@@ -123,6 +124,7 @@ type ParametersDefinitionSpec struct {
 	// This flag allows for more efficient handling of configuration changes by potentially eliminating
 	// an unnecessary reload step.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +optional
 	MergeReloadAndRestart *bool `json:"mergeReloadAndRestart,omitempty"`
 
@@ -136,6 +138,7 @@ type ParametersDefinitionSpec struct {
 	//   The "all" option is for certain engines that require static parameters to be set
 	//   via SQL statements before they can take effect on restart.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +optional
 	ReloadStaticParamsBeforeRestart *bool `json:"reloadStaticParamsBeforeRestart,omitempty"`
 

@@ -440,6 +440,211 @@ func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
 	}
 }
 
+func TestResolveCmpdParametersDefsMergesNewParametersDefinitionsWithLegacyParamConfigRenderer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{
+				{Name: "mysql-config", Template: "mysql-config"},
+				{Name: "log-config", Template: "log-config"},
+			},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	newPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: "mysql-8",
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	legacyPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-log-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "log.conf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{legacyPD.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "log.conf",
+				TemplateName: "log-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Properties,
+				},
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, newPD, legacyPD, pcr).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 2 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 2", len(paramsDefs))
+	}
+	if len(configDescs) != 2 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 2", len(configDescs))
+	}
+	gotTemplates := map[string]string{}
+	for _, configDesc := range configDescs {
+		gotTemplates[configDesc.Name] = configDesc.TemplateName
+	}
+	if gotTemplates["my.cnf"] != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName for my.cnf = %q, want %q", gotTemplates["my.cnf"], "mysql-config")
+	}
+	if gotTemplates["log.conf"] != "log-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName for log.conf = %q, want %q", gotTemplates["log.conf"], "log-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsIgnoresMalformedUnrelatedLegacyParamConfigRenderer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	validPCR := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{pd.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "mysql-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			}},
+		},
+	}
+	invalidPCR := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "broken-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef: "[broken",
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd, validPCR, invalidPCR).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsPrefersNewParametersDefinitionOverLegacyParamConfigRendererForSameFile(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{
+				{Name: "mysql-config", Template: "mysql-config"},
+				{Name: "legacy-config", Template: "legacy-config"},
+			},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	newPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: "mysql-8",
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	legacyPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-legacy-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{legacyPD.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "legacy-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Properties,
+				},
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, newPD, legacyPD, pcr).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if paramsDefs[0].Name != newPD.Name {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDef = %q, want %q", paramsDefs[0].Name, newPD.Name)
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
 var _ = Describe("config_util", func() {
 
 	var k8sMockClient *testutil.K8sClientMockHelper

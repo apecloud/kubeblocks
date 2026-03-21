@@ -228,7 +228,9 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 	})
 
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
+	configDescs := make([]parametersv1alpha1.ComponentConfigDescription, 0, len(paramsDefList.Items))
 	seenFiles := make(map[string]string)
+	seenConfigFiles := make(map[string]struct{})
 	for i := range paramsDefList.Items {
 		paramsDef := &paramsDefList.Items[i]
 		matched, err := matchParametersDefinition(cmpd, paramsDef)
@@ -249,11 +251,39 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		}
 		seenFiles[paramsDef.Spec.FileName] = paramsDef.Name
 		paramsDefs = append(paramsDefs, paramsDef)
+		configDescs = append(configDescs, parametersv1alpha1.ComponentConfigDescription{
+			Name:             paramsDef.Spec.FileName,
+			TemplateName:     paramsDef.Spec.TemplateName,
+			FileFormatConfig: paramsDef.Spec.FileFormatConfig.DeepCopy(),
+		})
+		seenConfigFiles[paramsDef.Spec.FileName] = struct{}{}
+	}
+
+	legacyConfigDescs, legacyParamsDefs, err := resolveCmpdParametersDefsByConfigRender(ctx, reader, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, legacyParamsDef := range legacyParamsDefs {
+		if _, ok := seenFiles[legacyParamsDef.Spec.FileName]; ok {
+			continue
+		}
+		seenFiles[legacyParamsDef.Spec.FileName] = legacyParamsDef.Name
+		paramsDefs = append(paramsDefs, legacyParamsDef)
+	}
+	for _, legacyConfigDesc := range legacyConfigDescs {
+		if _, ok := seenFiles[legacyConfigDesc.Name]; !ok {
+			continue
+		}
+		if _, ok := seenConfigFiles[legacyConfigDesc.Name]; ok {
+			continue
+		}
+		configDescs = append(configDescs, legacyConfigDesc)
+		seenConfigFiles[legacyConfigDesc.Name] = struct{}{}
 	}
 	if len(paramsDefs) == 0 {
-		return resolveCmpdParametersDefsByConfigRender(ctx, reader, cmpd)
+		return nil, nil, nil
 	}
-	return BuildConfigDescriptionsFromParametersDefs(paramsDefs), paramsDefs, nil
+	return configDescs, paramsDefs, nil
 }
 
 func resolveCmpdParametersDefsByConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) ([]parametersv1alpha1.ComponentConfigDescription, []*parametersv1alpha1.ParametersDefinition, error) {
@@ -286,9 +316,6 @@ func matchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *para
 	pattern := paramsDef.Spec.ComponentDef
 	if pattern == "" {
 		return false, nil
-	}
-	if err := component.ValidateDefNameRegexp(pattern); err != nil {
-		return false, fmt.Errorf("invalid parametersdefinition[%s] componentDef pattern %q: %w", paramsDef.Name, pattern, err)
 	}
 	if !component.PrefixOrRegexMatched(cmpd.Name, pattern) {
 		return false, nil
@@ -334,9 +361,6 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 	})
 
 	for i, item := range configDefList.Items {
-		if err := component.ValidateDefNameRegexp(item.Spec.ComponentDef); err != nil {
-			return nil, fmt.Errorf("invalid ParamConfigRenderer[%s] componentDef pattern %q: %w", item.Name, item.Spec.ComponentDef, err)
-		}
 		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}

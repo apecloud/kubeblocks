@@ -227,6 +227,7 @@ func cleanEnv() {
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
 	testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)

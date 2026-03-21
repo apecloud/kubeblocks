@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -130,6 +131,67 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
 				g.Expect(cfg.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("server-id=2"))
 				g.Expect(cfg.Annotations[constant.ConfigAppliedComponentGenerationKey]).ShouldNot(BeEmpty())
+			})).Should(Succeed())
+		})
+
+		It("should render both new PD and legacy PCR files in mixed mode", func() {
+			templateObj, _, compObj, _, _ := mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			By("add a legacy-only file to the component template")
+			const legacyFile = "log.conf"
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(templateObj), func(tpl *corev1.ConfigMap) {
+				tpl.Data[legacyFile] = "slow_query_log=1\n"
+			})).Should(Succeed())
+
+			By("create a legacy-only ParametersDefinition and ParamConfigRenderer binding")
+			legacyPD := testparameters.NewParametersDefinitionFactory("legacy-log-params").
+				SetConfigFile(legacyFile).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(legacyPD), func(obj *parametersv1alpha1.ParametersDefinition) {
+				obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})()).Should(Succeed())
+
+			pcr := &parametersv1alpha1.ParamConfigRenderer{
+				ObjectMeta: metav1.ObjectMeta{Name: pdcrName + "-mixed"},
+				Spec: parametersv1alpha1.ParamConfigRendererSpec{
+					ComponentDef:   compObj.Spec.CompDef,
+					ServiceVersion: "8.0.30",
+					ParametersDefs: []string{legacyPD.Name},
+					Configs: []parametersv1alpha1.ComponentConfigDescription{{
+						Name:         legacyFile,
+						TemplateName: configSpecName,
+						FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+							Format: parametersv1alpha1.Properties,
+						},
+					}},
+				},
+			}
+			Expect(testCtx.Cli.Create(testCtx.Ctx, pcr)).Should(Succeed())
+
+			By("touch the component to regenerate ComponentParameter from mixed sources")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
+				if comp.Annotations == nil {
+					comp.Annotations = map[string]string{}
+				}
+				comp.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = "true"
+			})).Should(Succeed())
+
+			configKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
+				g.Expect(cfg.Data).Should(HaveKey(testparameters.MysqlConfigFile))
+				g.Expect(cfg.Data).Should(HaveKeyWithValue(legacyFile, "slow_query_log=1\n"))
 			})).Should(Succeed())
 		})
 	})

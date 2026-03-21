@@ -27,15 +27,22 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("ParamConfigRenderer Controller", func() {
 
-	BeforeEach(cleanEnv)
+	cleanPDCRTestEnv := func() {
+		cleanEnv()
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
+	}
 
-	AfterEach(cleanEnv)
+	BeforeEach(cleanPDCRTestEnv)
+
+	AfterEach(cleanPDCRTestEnv)
 
 	initPDCRTest := func() {
 		By("Create a config template obj")

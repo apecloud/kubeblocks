@@ -291,7 +291,8 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(json.Unmarshal([]byte(config.Reconfigure.GRPC.Request["params"]), &params)).Should(Succeed())
 			Expect(params).Should(HaveKeyWithValue("a", "c b e f"))
 			Expect(config.Reconfigure.GRPC.Response.Status).Should(Equal("errMessage"))
-			Expect(config.Restart).Should(BeNil())
+			Expect(config.Restart).ShouldNot(BeNil())
+			Expect(*config.Restart).Should(BeFalse())
 		})
 
 		ginkgo.It("use config manager port from workload template", func() {
@@ -529,6 +530,189 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain set")
+		}
+	})
+}
+
+func TestApplyChangesToClusterTemplateReconfigure(t *testing.T) {
+	configHash := "test-config-hash"
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name: "my.cnf",
+			Reconfigure: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+			},
+		},
+		ConfigHash: &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{
+			Replicas: 1,
+			Configs: []appsv1.ClusterComponentConfig{{
+				Name: ptr.To("my.cnf"),
+			}},
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{
+			Name: "my.cnf",
+		},
+		ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{
+			DynamicParameters: []string{"binlog_expire_logs_seconds"},
+		},
+		Patch: &core.ConfigPatchInfo{
+			IsModify: true,
+			UpdateConfig: map[string][]byte{
+				"my.cnf": []byte(`{"binlog_expire_logs_seconds":"432000"}`),
+			},
+		},
+	}
+
+	status, err := syncPolicy(ctx)
+	if err != nil {
+		t.Fatalf("syncPolicy returned error: %v", err)
+	}
+	if status.Status != StatusRetry {
+		t.Fatalf("expected status %q, got %q", StatusRetry, status.Status)
+	}
+	config := ctx.ClusterComponent.Configs[0]
+	if config.Restart == nil || *config.Restart {
+		t.Fatalf("expected restart to be false, got %v", config.Restart)
+	}
+	if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
+		t.Fatalf("expected template reconfigure action to be propagated")
+	}
+	if got := config.Reconfigure.Exec.Command; len(got) != 3 || got[2] != "reload" {
+		t.Fatalf("unexpected reconfigure exec command: %v", got)
+	}
+}
+
+func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
+	configHash := "test-config-hash"
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name: "my.cnf",
+			Reconfigure: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+			},
+		},
+		ConfigHash: &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{
+			Replicas: 1,
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{
+			Name: "my.cnf",
+		},
+		ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{
+			DynamicParameters: []string{"binlog_expire_logs_seconds"},
+		},
+		Patch: &core.ConfigPatchInfo{
+			IsModify: true,
+			UpdateConfig: map[string][]byte{
+				"my.cnf": []byte(`{"binlog_expire_logs_seconds":"259200"}`),
+			},
+		},
+	}
+
+	config := &appsv1.ClusterComponentConfig{
+		Name:    ptr.To("my.cnf"),
+		Restart: ptr.To(true),
+	}
+
+	applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "259200"}, false)
+
+	if config.Restart == nil || *config.Restart {
+		t.Fatalf("expected restart to be cleared to false, got %v", config.Restart)
+	}
+	if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
+		t.Fatalf("expected reconfigure action to stay set")
+	}
+}
+
+func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing.T) {
+	baseContext := func() Context {
+		configHash := "test-config-hash"
+		return Context{
+			ConfigTemplate: appsv1.ComponentFileTemplate{
+				Name: "my.cnf",
+				Reconfigure: &appsv1.Action{
+					Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+				},
+			},
+			ConfigHash: &configHash,
+			ClusterComponent: &appsv1.ClusterComponentSpec{
+				Replicas: 1,
+				Configs: []appsv1.ClusterComponentConfig{{
+					Name: ptr.To("my.cnf"),
+				}},
+			},
+			ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{
+				Name: "my.cnf",
+			},
+		}
+	}
+
+	t.Run("restart-only with template action does not propagate reconfigure", func(t *testing.T) {
+		ctx := baseContext()
+		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{}
+		config := &ctx.ClusterComponent.Configs[0]
+
+		applyChangesToCluster(ctx, config, nil, true)
+
+		if config.Reconfigure != nil {
+			t.Fatalf("expected reconfigure to be nil for restart-only path")
+		}
+		if config.Restart == nil || !*config.Restart {
+			t.Fatalf("expected restart to remain true")
+		}
+	})
+
+	t.Run("static reload-before-restart propagates template action", func(t *testing.T) {
+		ctx := baseContext()
+		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
+			ReloadStaticParamsBeforeRestart: ptr.To(true),
+		}
+		config := &ctx.ClusterComponent.Configs[0]
+
+		applyChangesToCluster(ctx, config, map[string]string{"performance_schema": "ON"}, true)
+
+		if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
+			t.Fatalf("expected template reconfigure to be kept for reload-before-restart")
+		}
+		if config.Restart == nil || !*config.Restart {
+			t.Fatalf("expected restart to remain true")
+		}
+	})
+
+	t.Run("mixed split update propagates template action", func(t *testing.T) {
+		ctx := baseContext()
+		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
+			DynamicParameters:     []string{"binlog_expire_logs_seconds"},
+			MergeReloadAndRestart: ptr.To(false),
+		}
+		config := &ctx.ClusterComponent.Configs[0]
+
+		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
+
+		if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
+			t.Fatalf("expected template reconfigure to be kept for split mixed update")
+		}
+		if config.Restart == nil || !*config.Restart {
+			t.Fatalf("expected restart to remain true")
+		}
+	})
+
+	t.Run("mixed merged update clears template action", func(t *testing.T) {
+		ctx := baseContext()
+		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
+			DynamicParameters:     []string{"binlog_expire_logs_seconds"},
+			MergeReloadAndRestart: ptr.To(true),
+		}
+		config := &ctx.ClusterComponent.Configs[0]
+
+		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
+
+		if config.Reconfigure != nil {
+			t.Fatalf("expected reconfigure to be nil when restart absorbs mixed update")
+		}
+		if config.Restart == nil || !*config.Restart {
+			t.Fatalf("expected restart to remain true")
 		}
 	})
 }

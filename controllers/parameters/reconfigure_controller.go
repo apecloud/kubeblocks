@@ -207,7 +207,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.configRender, rctx.parametersDefs)
+	configPatch, forceRestart, err := createConfigPatch(configMap, configSpec, rctx.configRender, rctx.parametersDefs)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -256,16 +256,18 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 	var tasks []reconfigure.Task
 	for key, jsonPatch := range patch.UpdateConfig {
 		pd, ok := rctx.parametersDefs[key]
-		// If the ParametersDefinition or its ReloadAction is nil, continue to the next iteration.
-		if !ok || pd.Spec.ReloadAction == nil {
+		if !ok {
 			continue
 		}
 		configFormat := parameters.GetComponentConfigDescription(&rctx.configRender.Spec, key)
 		if configFormat == nil || configFormat.FileFormatConfig == nil {
 			continue
 		}
+		if !supportsReloadAction(pd, templateSpec) {
+			continue
+		}
 		// Determine the appropriate ReloadPolicy.
-		policy, err := r.resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
+		policy, err := r.resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec, templateSpec)
 		if err != nil {
 			return nil, err
 		}
@@ -344,16 +346,25 @@ func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.Componen
 }
 
 func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, format *parametersv1alpha1.FileFormatConfig,
-	pd *parametersv1alpha1.ParametersDefinitionSpec) (reconfigure.Policy, error) {
+	pd *parametersv1alpha1.ParametersDefinitionSpec, templateSpec *appsv1.ComponentFileTemplate) (reconfigure.Policy, error) {
 	var policy = reconfigure.NonePolicy
 	dynamicUpdate, err := core.CheckUpdateDynamicParameters(format, pd, jsonPatch)
 	if err != nil {
 		return policy, err
 	}
+	if pd.ReloadAction == nil && templateSpec != nil && templateSpec.Reconfigure != nil {
+		if dynamicUpdate {
+			return reconfigure.SyncDynamicReloadPolicy, nil
+		}
+		if parameters.ReloadStaticParameters(pd) || parameters.NeedDynamicReloadAction(pd) {
+			return reconfigure.DynamicReloadAndRestartPolicy, nil
+		}
+		return reconfigure.RestartPolicy, nil
+	}
 
 	// make decision
 	switch {
-	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
+	case !dynamicUpdate && (parameters.NeedDynamicReloadAction(pd) || parameters.ReloadStaticParameters(pd)): // static parameters update and need to do hot update
 		policy = reconfigure.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = reconfigure.RestartPolicy
@@ -463,7 +474,7 @@ func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]str
 	return &hash
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
 	if configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil, true, nil
 	}
@@ -477,7 +488,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.P
 		return nil, false, err
 	}
 	if !restart {
-		restart = needRestart(paramsDefs, patch)
+		restart = needRestart(paramsDefs, patch, configSpec)
 	}
 	return patch, restart, nil
 }
@@ -496,16 +507,23 @@ func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	return data, nil
 }
 
-func needRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo) bool {
+func needRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo, configSpec *appsv1.ComponentFileTemplate) bool {
 	if patch == nil {
 		return false
 	}
 	for key := range patch.UpdateConfig {
-		if paramsDef, ok := paramsDefs[key]; !ok || !isSupportReload(paramsDef.Spec.ReloadAction) {
+		if paramsDef, ok := paramsDefs[key]; !ok || !supportsReloadAction(paramsDef, configSpec) {
 			return true
 		}
 	}
 	return false
+}
+
+func supportsReloadAction(paramsDef *parametersv1alpha1.ParametersDefinition, configSpec *appsv1.ComponentFileTemplate) bool {
+	if paramsDef != nil && isSupportReload(paramsDef.Spec.ReloadAction) {
+		return true
+	}
+	return configSpec != nil && configSpec.Reconfigure != nil
 }
 
 func isSupportReload(reload *parametersv1alpha1.ReloadAction) bool {

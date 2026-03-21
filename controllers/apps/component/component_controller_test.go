@@ -1765,6 +1765,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
 			g.Expect(its.Spec.Configs[0].Restart).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].Restart).Should(BeTrue())
+			g.Expect(its.Spec.Configs[0].Reconfigure).Should(BeNil())
 		})).Should(Succeed())
 	}
 

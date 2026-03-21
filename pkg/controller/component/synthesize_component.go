@@ -493,6 +493,12 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 
 		if utpl.Reconfigure != nil {
 			stpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+		} else if ptr.Deref(utpl.Restart, false) {
+			// When a restart is explicitly requested on the cluster spec without a paired
+			// reconfigure action, do not fall back to the template-level default action.
+			// This allows higher-level controllers (for example parameters reconfigure)
+			// to distinguish "restart only" from "reconfigure + restart".
+			stpl.Reconfigure = nil
 		}
 
 		// if externalManaged is not specified as required, use the user specified value

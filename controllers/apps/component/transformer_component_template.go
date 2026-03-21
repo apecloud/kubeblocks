@@ -339,6 +339,9 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			if tpl.Reconfigure != nil {
 				return tpl.Reconfigure
 			}
+			if ptr.Deref(tpl.RestartOnFileChange, false) {
+				return nil
+			}
 			if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 				return synthesizedComp.LifecycleActions.ComponentLifecycleActions.Reconfigure
 			}
@@ -347,6 +350,9 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 		actionName = func(tpl component.SynthesizedFileTemplate) string {
 			if tpl.Reconfigure != nil {
 				return component.UDFReconfigureActionName(tpl)
+			}
+			if ptr.Deref(tpl.RestartOnFileChange, false) {
+				return ""
 			}
 			return "" // default reconfigure action or empty
 		}

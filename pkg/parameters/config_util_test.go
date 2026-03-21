@@ -377,6 +377,58 @@ func TestResolveCmpdParametersDefsRejectsDuplicateFiles(t *testing.T) {
 	}
 }
 
+func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{pd.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "mysql-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			}},
+		},
+		Status: parametersv1alpha1.ParamConfigRendererStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd, pcr).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
 var _ = Describe("config_util", func() {
 
 	var k8sMockClient *testutil.K8sClientMockHelper

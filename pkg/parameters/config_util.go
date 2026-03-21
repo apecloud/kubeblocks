@@ -251,9 +251,32 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		paramsDefs = append(paramsDefs, paramsDef)
 	}
 	if len(paramsDefs) == 0 {
-		return nil, nil, nil
+		return resolveCmpdParametersDefsByConfigRender(ctx, reader, cmpd)
 	}
 	return BuildConfigDescriptionsFromParametersDefs(paramsDefs), paramsDefs, nil
+}
+
+func resolveCmpdParametersDefsByConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) ([]parametersv1alpha1.ComponentConfigDescription, []*parametersv1alpha1.ParametersDefinition, error) {
+	configRender, err := ResolveComponentConfigRender(ctx, reader, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
+		return nil, nil, nil
+	}
+
+	paramsDefs := make([]*parametersv1alpha1.ParametersDefinition, 0, len(configRender.Spec.ParametersDefs))
+	for _, defName := range configRender.Spec.ParametersDefs {
+		paramsDef := &parametersv1alpha1.ParametersDefinition{}
+		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
+			return nil, nil, err
+		}
+		if paramsDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return nil, nil, fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", paramsDef.Name)
+		}
+		paramsDefs = append(paramsDefs, paramsDef)
+	}
+	return slices.Clone(configRender.Spec.Configs), paramsDefs, nil
 }
 
 func matchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {

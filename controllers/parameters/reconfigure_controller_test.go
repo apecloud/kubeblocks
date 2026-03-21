@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -472,7 +471,7 @@ func TestValidateLegacyReloadActionSupportWithUnknownClusterAnnotation(t *testin
 }
 
 func TestNeedRestartAllowsTemplateReconfigure(t *testing.T) {
-	patch := &core.ConfigPatchInfo{
+	patch := &parameterscore.ConfigPatchInfo{
 		UpdateConfig: map[string][]byte{
 			"my.cnf": []byte(`{"mysqld":{"binlog_expire_logs_seconds":432000}}`),
 		},

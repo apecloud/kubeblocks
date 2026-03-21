@@ -116,11 +116,12 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	config.ConfigHash = ctx.getTargetConfigHash()
 	// Keep restart explicit so an old persisted `restart: true` is actively cleared.
 	config.Restart = ptr.To(restart)
-	if shouldBuildLegacyReconfigureAction(ctx, params, restart) {
+	switch {
+	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
 		config.Reconfigure = reloadActionToReconfigureAction(ctx, params)
-	} else if shouldUseTemplateReconfigureAction(ctx, params, restart) {
+	case shouldUseTemplateReconfigureAction(ctx, params, restart):
 		config.Reconfigure = ctx.ConfigTemplate.Reconfigure.DeepCopy()
-	} else {
+	default:
 		config.Reconfigure = nil
 	}
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))

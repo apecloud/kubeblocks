@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -52,7 +53,6 @@ const (
 	cmName           = "mysql-tree-node-template-8.0"
 	paramsDefName    = "mysql-params-def"
 	pdcrName         = "config-test-pdcr"
-	envTestFileKey   = "env_test"
 )
 
 func mockSchemaData() string {
@@ -73,13 +73,11 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		).
 		AddAnnotations(constant.ConfigurationRevision, "1").
-		AddConfigFile(envTestFileKey, "abcde=1234").
 		Create(&testCtx).
 		GetObject()
 
 	By("Create a parameters definition obj")
 	paramsdef := testparameters.NewParametersDefinitionFactory(paramsDefName).
-		SetReloadAction(testparameters.WithNoneAction()).
 		Schema(mockSchemaData()).
 		Create(&testCtx).
 		GetObject()
@@ -174,12 +172,6 @@ func mockCreateITSObject(namespace, name, clusterName, compName string) *workloa
 	return itsObj
 }
 
-const (
-	configHash1 = "6c5b4466f"  // innodb_buffer_pool_size=1024M && max_connections=100
-	configHash2 = "5b46b78c8d" // max_connections=2000 && gtid_mode=OFF
-	configHash3 = "8665bf6888" // max_connections=1000 && gtid_mode=ON
-)
-
 func mockReconfigureDone(namespace, itsName, configName, configHash string) {
 	itsKey := client.ObjectKey{
 		Namespace: namespace,
@@ -199,6 +191,25 @@ func mockReconfigureDone(namespace, itsName, configName, configHash string) {
 			},
 		}
 	})()).Should(Succeed())
+}
+
+func waitRenderedConfigHash(namespace, clusterName, componentName, configName string, substrings ...string) string {
+	cfgKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      parameterscore.GetComponentCfgName(clusterName, componentName, configName),
+	}
+	var configHash string
+	Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *corev1.ConfigMap) {
+		content := cfg.Data[testparameters.MysqlConfigFile]
+		for _, substring := range substrings {
+			g.Expect(content).Should(ContainSubstring(substring))
+		}
+		hash := computeTargetConfigHash(nil, cfg.Data)
+		g.Expect(hash).ShouldNot(BeNil())
+		g.Expect(*hash).ShouldNot(BeEmpty())
+		configHash = *hash
+	})).Should(Succeed())
+	return configHash
 }
 
 func cleanEnv() {

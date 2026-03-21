@@ -42,23 +42,8 @@ func NewParametersDefinitionFactory(name string) *MockParametersDefinitionFactor
 					},
 				},
 			},
-			ReloadAction: WithNoneAction(),
 		},
 	}, f)
-	return f
-}
-
-func (f *MockParametersDefinitionFactory) Schema(cue string) *MockParametersDefinitionFactory {
-	openAPISchema, _ := openapi.GenerateOpenAPISchema(cue, "")
-	f.Get().Spec.ParametersSchema = &parametersv1alpha1.ParametersSchema{
-		CUE:          cue,
-		SchemaInJSON: openAPISchema,
-	}
-	return f
-}
-
-func (f *MockParametersDefinitionFactory) SetConfigFile(name string) *MockParametersDefinitionFactory {
-	f.Get().Spec.FileName = name
 	return f
 }
 
@@ -77,8 +62,22 @@ func (f *MockParametersDefinitionFactory) SetTemplateName(name string) *MockPara
 	return f
 }
 
+func (f *MockParametersDefinitionFactory) SetConfigFile(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.FileName = name
+	return f
+}
+
 func (f *MockParametersDefinitionFactory) SetFileFormatConfig(cfg parametersv1alpha1.FileFormatConfig) *MockParametersDefinitionFactory {
 	f.Get().Spec.FileFormatConfig = &cfg
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) Schema(cue string) *MockParametersDefinitionFactory {
+	openAPISchema, _ := openapi.GenerateOpenAPISchema(cue, "")
+	f.Get().Spec.ParametersSchema = &parametersv1alpha1.ParametersSchema{
+		CUE:          cue,
+		SchemaInJSON: openAPISchema,
+	}
 	return f
 }
 
@@ -95,17 +94,4 @@ func (f *MockParametersDefinitionFactory) DynamicParameters(params []string) *Mo
 func (f *MockParametersDefinitionFactory) ImmutableParameters(params []string) *MockParametersDefinitionFactory {
 	f.Get().Spec.ImmutableParameters = params
 	return f
-}
-
-func (f *MockParametersDefinitionFactory) SetReloadAction(action *parametersv1alpha1.ReloadAction) *MockParametersDefinitionFactory {
-	f.Get().Spec.ReloadAction = action
-	return f
-}
-
-func WithNoneAction() *parametersv1alpha1.ReloadAction {
-	return &parametersv1alpha1.ReloadAction{
-		AutoTrigger: &parametersv1alpha1.AutoTrigger{
-			ProcessName: "",
-		},
-	}
 }

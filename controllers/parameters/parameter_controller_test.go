@@ -81,7 +81,11 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("mock the reconfigure done")
-			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash1)
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName,
+				waitRenderedConfigHash(
+					testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
+					"innodb_buffer_pool_size=1024M", "max_connections=100",
+				))
 
 			By("check component parameter status")
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
@@ -111,7 +115,11 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("mock the reconfigure done")
-			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash2)
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName,
+				waitRenderedConfigHash(
+					testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
+					"max_connections=2000", "gtid_mode=OFF",
+				))
 
 			By("check parameter status")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
@@ -278,7 +286,15 @@ var _ = Describe("Parameter Controller", func() {
 
 			for _, spec := range shardingCompSpecList {
 				By("mock the reconfigure done: " + spec.Name)
-				mockReconfigureDone(synthesizedComp.Namespace, constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name), configSpecName, configHash1)
+				mockReconfigureDone(
+					synthesizedComp.Namespace,
+					constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name),
+					configSpecName,
+					waitRenderedConfigHash(
+						testCtx.DefaultNamespace, synthesizedComp.ClusterName, spec.Name, configSpecName,
+						"innodb_buffer_pool_size=1024M", "max_connections=100",
+					),
+				)
 
 				By("check component parameter status: " + spec.Name)
 				cpkey := types.NamespacedName{

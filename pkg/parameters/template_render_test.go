@@ -55,7 +55,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		paramsDef = testparameters.NewParametersDefinitionFactory(paramsDefName).
 			SetComponentDefinition(compDefObj.GetName()).
 			SetTemplateName(configTemplateName).
-			SetReloadAction(testparameters.WithNoneAction()).
 			GetObject()
 		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 

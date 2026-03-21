@@ -80,7 +80,11 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 
 			By("mock the reconfigure done")
-			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash3)
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName,
+				waitRenderedConfigHash(
+					testCtx.DefaultNamespace, clusterName, defaultCompName, configSpecName,
+					"max_connections=1000", "gtid_mode=ON",
+				))
 
 			By("check component parameter status is updated to Finished")
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {

@@ -61,7 +61,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 
 		By("Create a parameters definition obj")
 		paramsDef := testparameters.NewParametersDefinitionFactory(paramsDefName).
-			SetReloadAction(testparameters.WithNoneAction()).
 			Create(&testCtx).
 			GetObject()
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(paramsDef), func(obj *parametersv1alpha1.ParametersDefinition) {

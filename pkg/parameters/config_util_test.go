@@ -308,6 +308,10 @@ func TestResolveCmpdParametersDefs(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
 		Spec: appsv1.ComponentDefinitionSpec{
 			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name: "mysql-config",
+				Template: "mysql-config",
+			}},
 		},
 		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 	}
@@ -352,6 +356,10 @@ func TestResolveCmpdParametersDefsRejectsDuplicateFiles(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
 		Spec: appsv1.ComponentDefinitionSpec{
 			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
 		},
 		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 	}
@@ -386,6 +394,10 @@ func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
 		Spec: appsv1.ComponentDefinitionSpec{
 			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
 		},
 		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 	}
@@ -410,7 +422,6 @@ func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
 				},
 			}},
 		},
-		Status: parametersv1alpha1.ParamConfigRendererStatus{Phase: parametersv1alpha1.PDAvailablePhase},
 	}
 
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd, pcr).Build()

@@ -333,22 +333,92 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
 	})
 
-	checkAvailable := func(configDef parametersv1alpha1.ParamConfigRenderer) error {
-		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
-			return fmt.Errorf("the referenced ParamConfigRenderer is unavailable: %s", configDef.Name)
-		}
-		return nil
-	}
-
 	for i, item := range configDefList.Items {
+		if err := component.ValidateDefNameRegexp(item.Spec.ComponentDef); err != nil {
+			return nil, fmt.Errorf("invalid ParamConfigRenderer[%s] componentDef pattern %q: %w", item.Name, item.Spec.ComponentDef, err)
+		}
 		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
-			return &configDefList.Items[i], checkAvailable(item)
+			resolved := configDefList.Items[i].DeepCopy()
+			if err := hydrateLegacyConfigRender(ctx, reader, resolved, cmpd); err != nil {
+				return nil, err
+			}
+			return resolved, nil
 		}
 	}
 	return nil, nil
+}
+
+func hydrateLegacyConfigRender(ctx context.Context, reader client.Reader, configRender *parametersv1alpha1.ParamConfigRenderer, cmpd *appsv1.ComponentDefinition) error {
+	if configRender == nil {
+		return nil
+	}
+	if err := fillLegacyConfigTemplateNames(ctx, reader, &configRender.Spec, cmpd); err != nil {
+		return err
+	}
+	if err := validateLegacyParametersDefs(ctx, reader, configRender.Spec.ParametersDefs); err != nil {
+		return err
+	}
+	return validateLegacyParametersConfigs(configRender.Spec.Configs, cmpd.Spec.Configs)
+}
+
+func fillLegacyConfigTemplateNames(ctx context.Context, reader client.Reader, template *parametersv1alpha1.ParamConfigRendererSpec, cmpd *appsv1.ComponentDefinition) error {
+	match := func(spec parametersv1alpha1.ComponentConfigDescription) bool {
+		return spec.TemplateName == ""
+	}
+	if generics.CountFunc(template.Configs, match) == 0 {
+		return nil
+	}
+	tpls, err := ResolveComponentTemplate(ctx, reader, cmpd)
+	if err != nil {
+		return err
+	}
+	resolveConfigTemplate := func(config string) string {
+		for name, configTemplate := range tpls {
+			if _, ok := configTemplate.Data[config]; ok {
+				return name
+			}
+		}
+		return ""
+	}
+	for i, config := range template.Configs {
+		if tplName := resolveConfigTemplate(config.Name); tplName != "" {
+			template.Configs[i].TemplateName = tplName
+		}
+	}
+	return nil
+}
+
+func validateLegacyParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescription, templates []appsv1.ComponentFileTemplate) error {
+	for _, config := range configs {
+		match := func(spec appsv1.ComponentFileTemplate) bool {
+			return config.TemplateName == spec.Name
+		}
+		if len(generics.FindFunc(templates, match)) == 0 {
+			return fmt.Errorf("config template[%s] not found in component definition", config.TemplateName)
+		}
+	}
+	return nil
+}
+
+func validateLegacyParametersDefs(ctx context.Context, reader client.Reader, paramsDefs []string) error {
+	paramsDefObjs := make(map[string]*parametersv1alpha1.ParametersDefinition, len(paramsDefs))
+	for _, paramsDef := range paramsDefs {
+		obj := &parametersv1alpha1.ParametersDefinition{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: paramsDef}, obj); err != nil {
+			return err
+		}
+		if obj.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", obj.Name)
+		}
+		if def, ok := paramsDefObjs[obj.Spec.FileName]; ok {
+			return fmt.Errorf("config file[%s] has been defined in other parametersdefinition[%s]", obj.Spec.FileName, def.Name)
+		}
+		paramsDefObjs[obj.Spec.FileName] = obj
+	}
+	return nil
 }
 
 func NeedDynamicReloadAction(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {

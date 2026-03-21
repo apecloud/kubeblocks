@@ -60,10 +60,6 @@ func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefi
 	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }
 
-func ParametersDrivenConfigRenderTerminalPhases(status parametersv1alpha1.ParamConfigRendererStatus, generation int64) bool {
-	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
-}
-
 func ParametersTerminalPhases(status parametersv1alpha1.ParameterStatus, generation int64) bool {
 	return status.ObservedGeneration == generation && IsParameterFinished(status.Phase)
 }

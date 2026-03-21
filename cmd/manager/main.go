@@ -676,14 +676,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-driven-config-render-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ParamConfigRenderer")
-			os.Exit(1)
-		}
 		if err = (&parameterscontrollers.ParameterTemplateExtensionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

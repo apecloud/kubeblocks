@@ -309,7 +309,7 @@ func TestResolveCmpdParametersDefs(t *testing.T) {
 		Spec: appsv1.ComponentDefinitionSpec{
 			ServiceVersion: "8.0.30",
 			Configs: []appsv1.ComponentFileTemplate{{
-				Name: "mysql-config",
+				Name:     "mysql-config",
 				Template: "mysql-config",
 			}},
 		},

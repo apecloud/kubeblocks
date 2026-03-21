@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -111,6 +112,17 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 			},
 		}
 	})()).Should(Succeed())
+	By("wait until the current cache can resolve parameter bindings for the component definition")
+	Eventually(func(g Gomega) {
+		cmpd := &appsv1.ComponentDefinition{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(compDefObj), cmpd)).Should(Succeed())
+		configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(testCtx.Ctx, testCtx.Cli, cmpd)
+		g.Expect(err).ShouldNot(HaveOccurred())
+		g.Expect(configDescs).Should(HaveLen(1))
+		g.Expect(paramsDefs).Should(HaveLen(1))
+		g.Expect(configDescs[0].TemplateName).Should(BeEquivalentTo(configSpecName))
+		g.Expect(paramsDefs[0].Name).Should(BeEquivalentTo(paramsDef.Name))
+	}).Should(Succeed())
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -227,7 +239,7 @@ func cleanEnv() {
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
-	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature)
 	testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)

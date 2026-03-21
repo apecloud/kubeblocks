@@ -175,7 +175,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 					}},
 				},
 			}
-			Expect(testCtx.Cli.Create(testCtx.Ctx, pcr)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, pcr)).Should(Succeed())
 
 			By("touch the component to regenerate ComponentParameter from mixed sources")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {

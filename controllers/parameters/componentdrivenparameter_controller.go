@@ -266,7 +266,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, nil
 	}
 
-	configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
+	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configRender)
+	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configDescs)
 	if err != nil {
 		return nil, err
 	}
@@ -301,14 +301,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
 	}
-	sharding, err := parameters.ResolveShardingReference(reqCtx.Ctx, reader, comp)
-	if err != nil {
-		return nil, err
-	}
-	if configRender != nil {
-		err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
-	}
-	return parameterObj, err
+	return parameterObj, nil
 }
 
 // resolveLegacyConfigManagerRequirement reports whether this component still depends on the
@@ -471,7 +464,6 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 		if expected.CustomTemplates != nil {
 			dest.CustomTemplates = expected.CustomTemplates
 		}
-		dest.Payload = expected.Payload
 		dest.ConfigSpec = expected.ConfigSpec
 	})
 }

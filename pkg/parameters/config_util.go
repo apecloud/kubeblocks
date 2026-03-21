@@ -30,7 +30,6 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -137,11 +136,10 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyUpdatedParameters checks if the configuration is changed
-func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
+func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, componentGeneration int64) bool {
 	if configMap == nil {
 		return false
 	}
-
 	lastAppliedVersion, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
 	if !ok {
 		return false
@@ -150,37 +148,28 @@ func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alph
 	if err := json.Unmarshal([]byte(lastAppliedVersion), &lastItem); err != nil {
 		return false
 	}
-	return reflect.DeepEqual(lastItem, item)
-}
-
-// IsRerender checks if the configuration template is changed
-func IsRerender(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
-	if configMap == nil {
-		return true
-	}
-	if len(item.Payload) == 0 && item.CustomTemplates == nil {
+	if !reflect.DeepEqual(lastItem, item) {
 		return false
 	}
-
-	var updatedVersion parametersv1alpha1.ConfigTemplateItemDetail
-	updatedVersionStr, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
-	if ok && updatedVersionStr != "" {
-		if err := json.Unmarshal([]byte(updatedVersionStr), &updatedVersion); err != nil {
-			return false
-		}
+	if componentGeneration == 0 {
+		return true
 	}
-	return !reflect.DeepEqual(updatedVersion.Payload, item.Payload) ||
-		!reflect.DeepEqual(updatedVersion.CustomTemplates, item.CustomTemplates)
+	appliedGeneration, ok := configMap.Annotations[constant.ConfigAppliedComponentGenerationKey]
+	if !ok || appliedGeneration == "" {
+		return false
+	}
+	return appliedGeneration == strconv.FormatInt(componentGeneration, 10)
 }
 
 // GetUpdatedParametersReconciledPhase gets the configuration phase
 func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
-	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ParameterPhase {
+	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
+	componentGeneration int64) parametersv1alpha1.ParameterPhase {
 	if status == nil || status.Phase == "" {
 		return parametersv1alpha1.CCreatingPhase
 	}
-	if !IsApplyUpdatedParameters(configMap, item) {
+	if !IsApplyUpdatedParameters(configMap, item, componentGeneration) {
 		return parametersv1alpha1.CPendingPhase
 	}
 	if status.Phase == parametersv1alpha1.CFinishedPhase {
@@ -191,51 +180,6 @@ func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 		}
 	}
 	return status.Phase
-}
-
-func CheckAndPatchPayload(item *parametersv1alpha1.ConfigTemplateItemDetail, payloadID string, payload interface{}) (bool, error) {
-	if item == nil {
-		return false, nil
-	}
-	if item.Payload == nil {
-		item.Payload = make(map[string]json.RawMessage)
-	}
-	oldPayload, ok := item.Payload[payloadID]
-	if !ok && payload == nil {
-		return false, nil
-	}
-	if payload == nil {
-		delete(item.Payload, payloadID)
-		return true, nil
-	}
-	newPayload, err := buildPayloadAsUnstructuredObject(payload)
-	if err != nil {
-		return false, err
-	}
-	if oldPayload != nil && reflect.DeepEqual(oldPayload, newPayload) {
-		return false, nil
-	}
-	item.Payload[payloadID] = newPayload
-	return true, nil
-}
-
-func buildPayloadAsUnstructuredObject(payload interface{}) (json.RawMessage, error) {
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func ResourcesPayloadForComponent(resources corev1.ResourceRequirements) any {
-	if len(resources.Requests) == 0 && len(resources.Limits) == 0 {
-		return nil
-	}
-
-	return map[string]any{
-		"limits":   resources.Limits,
-		"requests": resources.Requests,
-	}
 }
 
 func resolveParametersDef(paramsDefs []*parametersv1alpha1.ParametersDefinition, fileName string) *parametersv1alpha1.ParametersDefinition {
@@ -264,16 +208,94 @@ func filterImmutableParameters(parameters map[string]any, fileName string, param
 	return validParameters
 }
 
-func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, []*parametersv1alpha1.ParametersDefinition, error) {
-	var paramsDefs []*parametersv1alpha1.ParametersDefinition
+func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) ([]parametersv1alpha1.ComponentConfigDescription, []*parametersv1alpha1.ParametersDefinition, error) {
+	paramsDefList := &parametersv1alpha1.ParametersDefinitionList{}
+	if err := reader.List(ctx, paramsDefList); err != nil {
+		return nil, nil, err
+	}
 
+	slices.SortFunc(paramsDefList.Items, func(a, b parametersv1alpha1.ParametersDefinition) int {
+		if cmp := strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef); cmp != 0 {
+			return cmp
+		}
+		if cmp := strings.Compare(a.Spec.TemplateName, b.Spec.TemplateName); cmp != 0 {
+			return cmp
+		}
+		if cmp := strings.Compare(a.Spec.FileName, b.Spec.FileName); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	var paramsDefs []*parametersv1alpha1.ParametersDefinition
+	configDescs := make([]parametersv1alpha1.ComponentConfigDescription, 0, len(paramsDefList.Items))
+	seenFiles := make(map[string]string)
+	seenConfigFiles := make(map[string]struct{})
+	for i := range paramsDefList.Items {
+		paramsDef := &paramsDefList.Items[i]
+		matched, err := matchParametersDefinition(cmpd, paramsDef)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !matched {
+			continue
+		}
+		if paramsDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return nil, nil, fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", paramsDef.Name)
+		}
+		if err := validateMatchedParametersDefinition(paramsDef); err != nil {
+			return nil, nil, err
+		}
+		if existing, ok := seenFiles[paramsDef.Spec.FileName]; ok {
+			return nil, nil, fmt.Errorf("config file[%s] has been defined in other parametersdefinition[%s]", paramsDef.Spec.FileName, existing)
+		}
+		seenFiles[paramsDef.Spec.FileName] = paramsDef.Name
+		paramsDefs = append(paramsDefs, paramsDef)
+		configDescs = append(configDescs, parametersv1alpha1.ComponentConfigDescription{
+			Name:             paramsDef.Spec.FileName,
+			TemplateName:     paramsDef.Spec.TemplateName,
+			FileFormatConfig: paramsDef.Spec.FileFormatConfig.DeepCopy(),
+		})
+		seenConfigFiles[paramsDef.Spec.FileName] = struct{}{}
+	}
+
+	legacyConfigDescs, legacyParamsDefs, err := resolveCmpdParametersDefsByConfigRender(ctx, reader, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, legacyParamsDef := range legacyParamsDefs {
+		if _, ok := seenFiles[legacyParamsDef.Spec.FileName]; ok {
+			continue
+		}
+		seenFiles[legacyParamsDef.Spec.FileName] = legacyParamsDef.Name
+		paramsDefs = append(paramsDefs, legacyParamsDef)
+	}
+	for _, legacyConfigDesc := range legacyConfigDescs {
+		if _, ok := seenFiles[legacyConfigDesc.Name]; !ok {
+			continue
+		}
+		if _, ok := seenConfigFiles[legacyConfigDesc.Name]; ok {
+			continue
+		}
+		configDescs = append(configDescs, legacyConfigDesc)
+		seenConfigFiles[legacyConfigDesc.Name] = struct{}{}
+	}
+	if len(paramsDefs) == 0 {
+		return nil, nil, nil
+	}
+	return configDescs, paramsDefs, nil
+}
+
+func resolveCmpdParametersDefsByConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) ([]parametersv1alpha1.ComponentConfigDescription, []*parametersv1alpha1.ParametersDefinition, error) {
 	configRender, err := ResolveComponentConfigRender(ctx, reader, cmpd)
 	if err != nil {
 		return nil, nil, err
 	}
 	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
-		return configRender, nil, nil
+		return nil, nil, nil
 	}
+
+	paramsDefs := make([]*parametersv1alpha1.ParametersDefinition, 0, len(configRender.Spec.ParametersDefs))
 	for _, defName := range configRender.Spec.ParametersDefs {
 		paramsDef := &parametersv1alpha1.ParametersDefinition{}
 		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
@@ -284,7 +306,49 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		}
 		paramsDefs = append(paramsDefs, paramsDef)
 	}
-	return configRender, paramsDefs, nil
+	return slices.Clone(configRender.Spec.Configs), paramsDefs, nil
+}
+
+func matchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {
+	if cmpd == nil || paramsDef == nil {
+		return false, nil
+	}
+	pattern := paramsDef.Spec.ComponentDef
+	if pattern == "" {
+		return false, nil
+	}
+	if !component.PrefixOrRegexMatched(cmpd.Name, pattern) {
+		return false, nil
+	}
+	return paramsDef.Spec.ServiceVersion == "" || paramsDef.Spec.ServiceVersion == cmpd.Spec.ServiceVersion, nil
+}
+
+func validateMatchedParametersDefinition(paramsDef *parametersv1alpha1.ParametersDefinition) error {
+	if paramsDef.Spec.TemplateName == "" {
+		return fmt.Errorf("parametersdefinition[%s] misses templateName", paramsDef.Name)
+	}
+	if paramsDef.Spec.FileName == "" {
+		return fmt.Errorf("parametersdefinition[%s] misses fileName", paramsDef.Name)
+	}
+	if paramsDef.Spec.FileFormatConfig == nil {
+		return fmt.Errorf("parametersdefinition[%s] misses fileFormatConfig", paramsDef.Name)
+	}
+	return nil
+}
+
+func BuildConfigDescriptionsFromParametersDefs(paramsDefs []*parametersv1alpha1.ParametersDefinition) []parametersv1alpha1.ComponentConfigDescription {
+	if len(paramsDefs) == 0 {
+		return nil
+	}
+	configs := make([]parametersv1alpha1.ComponentConfigDescription, 0, len(paramsDefs))
+	for _, paramsDef := range paramsDefs {
+		configs = append(configs, parametersv1alpha1.ComponentConfigDescription{
+			Name:             paramsDef.Spec.FileName,
+			TemplateName:     paramsDef.Spec.TemplateName,
+			FileFormatConfig: paramsDef.Spec.FileFormatConfig.DeepCopy(),
+		})
+	}
+	return configs
 }
 
 func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, error) {
@@ -296,22 +360,89 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 		return strings.Compare(b.Spec.ComponentDef, a.Spec.ComponentDef)
 	})
 
-	checkAvailable := func(configDef parametersv1alpha1.ParamConfigRenderer) error {
-		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
-			return fmt.Errorf("the referenced ParamConfigRenderer is unavailable: %s", configDef.Name)
-		}
-		return nil
-	}
-
 	for i, item := range configDefList.Items {
 		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
-			return &configDefList.Items[i], checkAvailable(item)
+			resolved := configDefList.Items[i].DeepCopy()
+			if err := hydrateLegacyConfigRender(ctx, reader, resolved, cmpd); err != nil {
+				return nil, err
+			}
+			return resolved, nil
 		}
 	}
 	return nil, nil
+}
+
+func hydrateLegacyConfigRender(ctx context.Context, reader client.Reader, configRender *parametersv1alpha1.ParamConfigRenderer, cmpd *appsv1.ComponentDefinition) error {
+	if configRender == nil {
+		return nil
+	}
+	if err := fillLegacyConfigTemplateNames(ctx, reader, &configRender.Spec, cmpd); err != nil {
+		return err
+	}
+	if err := validateLegacyParametersDefs(ctx, reader, configRender.Spec.ParametersDefs); err != nil {
+		return err
+	}
+	return validateLegacyParametersConfigs(configRender.Spec.Configs, cmpd.Spec.Configs)
+}
+
+func fillLegacyConfigTemplateNames(ctx context.Context, reader client.Reader, template *parametersv1alpha1.ParamConfigRendererSpec, cmpd *appsv1.ComponentDefinition) error {
+	match := func(spec parametersv1alpha1.ComponentConfigDescription) bool {
+		return spec.TemplateName == ""
+	}
+	if generics.CountFunc(template.Configs, match) == 0 {
+		return nil
+	}
+	tpls, err := ResolveComponentTemplate(ctx, reader, cmpd)
+	if err != nil {
+		return err
+	}
+	resolveConfigTemplate := func(config string) string {
+		for name, configTemplate := range tpls {
+			if _, ok := configTemplate.Data[config]; ok {
+				return name
+			}
+		}
+		return ""
+	}
+	for i, config := range template.Configs {
+		if tplName := resolveConfigTemplate(config.Name); tplName != "" {
+			template.Configs[i].TemplateName = tplName
+		}
+	}
+	return nil
+}
+
+func validateLegacyParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescription, templates []appsv1.ComponentFileTemplate) error {
+	for _, config := range configs {
+		match := func(spec appsv1.ComponentFileTemplate) bool {
+			return config.TemplateName == spec.Name
+		}
+		if len(generics.FindFunc(templates, match)) == 0 {
+			return fmt.Errorf("config template[%s] not found in component definition", config.TemplateName)
+		}
+	}
+	return nil
+}
+
+func validateLegacyParametersDefs(ctx context.Context, reader client.Reader, paramsDefs []string) error {
+	paramsDefObjs := make(map[string]*parametersv1alpha1.ParametersDefinition, len(paramsDefs))
+	for _, paramsDef := range paramsDefs {
+		obj := &parametersv1alpha1.ParametersDefinition{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: paramsDef}, obj); err != nil {
+			return err
+		}
+		if obj.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", obj.Name)
+		}
+		if def, ok := paramsDefObjs[obj.Spec.FileName]; ok {
+			return fmt.Errorf("config file[%s] has been defined in other parametersdefinition[%s]", obj.Spec.FileName, def.Name)
+		}
+		paramsDefObjs[obj.Spec.FileName] = obj
+	}
+	return nil
 }
 
 func NeedDynamicReloadAction(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
@@ -386,79 +517,6 @@ func LegacyConfigManagerRequiredForCluster(cluster *appsv1.Cluster) (bool, error
 	return state == LegacyConfigManagerRequirementKeep, nil
 }
 
-// UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParamConfigRendererSpec, sharding *appsv1.ClusterSharding) error {
-	if len(configRender.Configs) == 0 {
-		return nil
-	}
-
-	for i, item := range config.ConfigItemDetails {
-		configDescs := GetComponentConfigDescriptions(configRender, item.Name)
-		configSpec := &config.ConfigItemDetails[i]
-		// check v-scale operation
-		if enableVScaleTrigger(configDescs) {
-			resourcePayload := ResourcesPayloadForComponent(component.Resources)
-			if _, err := CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload); err != nil {
-				return err
-			}
-		}
-		// check h-scale operation
-		if enableHScaleTrigger(configDescs) {
-			if _, err := CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas); err != nil {
-				return err
-			}
-		}
-		// check tls
-		if enableTLSTrigger(configDescs) {
-			if component.TLSConfig == nil {
-				continue
-			}
-			if _, err := CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig); err != nil {
-				return err
-			}
-		}
-		// check sharding h-scale operation
-		if sharding != nil && enableShardingHVScaleTrigger(configDescs) {
-			if _, err := CheckAndPatchPayload(configSpec, constant.ShardingPayload, resolveShardingResource(sharding)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {
-	for _, desc := range configDescs {
-		if slices.Contains(desc.ReRenderResourceTypes, rerenderType) {
-			return true
-		}
-	}
-	return false
-}
-
-func resolveShardingResource(sharding *appsv1.ClusterSharding) map[string]string {
-	return map[string]string{
-		"shards":   strconv.Itoa(int(sharding.Shards)),
-		"replicas": strconv.Itoa(int(sharding.Template.Replicas)),
-	}
-}
-
-func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentHScaleType)
-}
-
-func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
-}
-
-func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
-}
-
-func enableShardingHVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ShardingComponentHScaleType)
-}
-
 func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
@@ -469,34 +527,4 @@ func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 		tpls[config.Name] = cm
 	}
 	return tpls, nil
-}
-
-func ResolveShardingReference(ctx context.Context, reader client.Reader, comp *appsv1.Component) (*appsv1.ClusterSharding, error) {
-	resolveShardingName := func(comp *appsv1.Component) string {
-		if len(comp.Labels) == 0 {
-			return ""
-		}
-		return comp.Labels[constant.KBAppShardingNameLabelKey]
-	}
-
-	shardingName := resolveShardingName(comp)
-	if shardingName == "" {
-		return nil, nil
-	}
-
-	cluster := appsv1.Cluster{}
-	clusterName, _ := component.GetClusterName(comp)
-	clusterKey := types.NamespacedName{
-		Name:      clusterName,
-		Namespace: comp.Namespace,
-	}
-	if err := reader.Get(ctx, clusterKey, &cluster); err != nil {
-		return nil, err
-	}
-	for i, sharding := range cluster.Spec.Shardings {
-		if sharding.Name == shardingName {
-			return &cluster.Spec.Shardings[i], nil
-		}
-	}
-	return nil, nil
 }

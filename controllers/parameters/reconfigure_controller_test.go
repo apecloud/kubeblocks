@@ -106,6 +106,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
+			expectedHash := waitRenderedConfigHash(
+				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
+				"innodb_buffer_pool_size=1024M", "max_connections=100",
+			)
+
 			By("verify changes submit to cluster")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				for _, comp := range cluster.Spec.ComponentSpecs {
@@ -114,7 +119,7 @@ var _ = Describe("Reconfigure Controller", func() {
 						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
 						g.Expect(config.Variables).Should(BeNil())
 						g.Expect(config.ConfigHash).ShouldNot(BeNil())
-						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
+						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
 						g.Expect(config.Restart).ShouldNot(BeNil())
 						g.Expect(*config.Restart).Should(BeTrue())
 						g.Expect(config.Reconfigure).Should(BeNil())
@@ -141,6 +146,11 @@ var _ = Describe("Reconfigure Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
+			expectedHash := waitRenderedConfigHash(
+				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
+				"innodb_buffer_pool_size=1024M", "max_connections=100",
+			)
+
 			By("verify changes submit to cluster")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				for _, comp := range cluster.Spec.ComponentSpecs {
@@ -149,7 +159,7 @@ var _ = Describe("Reconfigure Controller", func() {
 						// g.Expect(config.Variables).Should(HaveKeyWithValue("max_connections", "100"))
 						g.Expect(config.Variables).Should(BeNil())
 						g.Expect(config.ConfigHash).ShouldNot(BeNil())
-						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
+						g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
 						g.Expect(config.Restart).ShouldNot(BeNil())
 						g.Expect(*config.Restart).Should(BeTrue())
 						g.Expect(config.Reconfigure).Should(BeNil())

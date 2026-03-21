@@ -38,7 +38,7 @@ type reconcileContext struct {
 
 	configMap      *corev1.ConfigMap
 	its            *workloads.InstanceSet
-	configRender   *parametersv1alpha1.ParamConfigRenderer
+	configDescs    []parametersv1alpha1.ComponentConfigDescription
 	parametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
@@ -79,7 +79,7 @@ func (c *reconcileContext) workload() *reconcileContext {
 
 func (c *reconcileContext) parametersDefinitions() *reconcileContext {
 	return c.Wrap(func() (err error) {
-		configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
+		configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func (c *reconcileContext) parametersDefinitions() *reconcileContext {
 		for _, paramsDef := range paramsDefs {
 			paramsDefMap[paramsDef.Spec.FileName] = paramsDef
 		}
-		c.configRender = configRender
+		c.configDescs = configDescs
 		c.parametersDefs = paramsDefMap
 		return nil
 	})

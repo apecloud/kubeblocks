@@ -60,10 +60,6 @@ func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefi
 	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }
 
-func ParametersDrivenConfigRenderTerminalPhases(status parametersv1alpha1.ParamConfigRendererStatus, generation int64) bool {
-	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
-}
-
 func ParametersTerminalPhases(status parametersv1alpha1.ParameterStatus, generation int64) bool {
 	return status.ObservedGeneration == generation && IsParameterFinished(status.Phase)
 }
@@ -138,22 +134,4 @@ func GetConfigTemplateItem(parameterSpec *parametersv1alpha1.ComponentParameterS
 		return &parameterSpec.ConfigItemDetails[index]
 	}
 	return nil
-}
-
-func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParamConfigRendererSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
-	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
-		return desc.Name == name
-	}
-
-	if index := generics.FindFirstFunc(pdcr.Configs, match); index >= 0 {
-		return &pdcr.Configs[index]
-	}
-	return nil
-}
-
-func GetComponentConfigDescriptions(pdcr *parametersv1alpha1.ParamConfigRendererSpec, tpl string) []parametersv1alpha1.ComponentConfigDescription {
-	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
-		return desc.TemplateName == tpl
-	}
-	return generics.FindFunc(pdcr.Configs, match)
 }

@@ -56,10 +56,34 @@ func init() {
 
 // ParametersDefinitionSpec defines the desired state of ParametersDefinition
 type ParametersDefinitionSpec struct {
+	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
+	// The value can represent an exact name, a name prefix, or a regular expression pattern.
+	//
+	// +optional
+	ComponentDef string `json:"componentDef,omitempty"`
+
+	// ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	// If no version is specified, the latest available version will be used.
+	//
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// Specifies the name of the referenced config template.
+	//
+	// +optional
+	TemplateName string `json:"templateName,omitempty"`
+
 	// Specifies the config file name in the config template.
 	//
 	// +optional
 	FileName string `json:"fileName,omitempty"`
+
+	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
+	//
+	// +optional
+	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig,omitempty"`
 
 	// Defines a list of parameters including their names, default values, descriptions,
 	// types, and constraints (permissible values or the range of valid values).
@@ -86,6 +110,7 @@ type ParametersDefinitionSpec struct {
 
 	// Specifies the policy when parameter be removed.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +optional
 	ParameterDeletedPolicy *ParameterDeletedPolicy `json:"deletedPolicy,omitempty"`
 
@@ -137,6 +162,7 @@ type ParametersDefinitionSpec struct {
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 }
 
+// Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.
 type ParameterDeletedPolicy struct {
 
 	// Specifies the method to handle the deletion of a parameter.
@@ -179,6 +205,8 @@ type ParametersDefinitionStatus struct {
 }
 
 // ReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.
+//
+// Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.
 //
 // Only one of the mechanisms can be specified at a time.
 type ReloadAction struct {

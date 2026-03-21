@@ -45,7 +45,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 	var paramsDef *parametersv1alpha1.ParametersDefinition
-	var configRender *parametersv1alpha1.ParamConfigRenderer
+	var configDescs []parametersv1alpha1.ComponentConfigDescription
 
 	BeforeEach(func() {
 		mockK8sCli = testutil.NewK8sMockClient()
@@ -59,7 +59,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			GetObject()
 		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 
-		configRender = BuildConfigRenderFromParametersDefs(compDefObj, []*parametersv1alpha1.ParametersDefinition{paramsDef})
+		configDescs = BuildConfigDescriptionsFromParametersDefs([]*parametersv1alpha1.ParametersDefinition{paramsDef})
 	})
 
 	AfterEach(func() {
@@ -98,21 +98,21 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			CustomTemplates: customTemplate,
 		}
 		pds := []*parametersv1alpha1.ParametersDefinition{paramsDef}
-		cmObj, err := RerenderParametersTemplate(rctx, item, configRender, pds)
+		cmObj, err := RerenderParametersTemplate(rctx, item, configDescs, pds)
 		Expect(err).Should(Succeed())
-		configdesc := configRender.Spec.Configs[0]
+		configdesc := configDescs[0]
 		if len(parameters) == 0 {
 			configReaders, err := cfgcore.LoadRawConfigObject(cmObj.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 			Expect(err).Should(Succeed())
 			return configReaders[configdesc.Name]
 		}
-		params, err := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl}, configRender)
+		params, err := ClassifyComponentParameters(parameters, pds, []appsv1.ComponentFileTemplate{*item.ConfigSpec}, map[string]*corev1.ConfigMap{configTemplateName: tpl}, configDescs)
 		Expect(err).Should(Succeed())
 
 		tplParams, ok := params[configTemplateName]
 		Expect(ok).Should(BeTrue())
 		item.ConfigFileParams = deRef(tplParams)
-		result, err := ApplyParameters(item, cmObj, configRender, pds)
+		result, err := ApplyParameters(item, cmObj, configDescs, pds)
 		Expect(err).Should(Succeed())
 		configReaders, err := cfgcore.LoadRawConfigObject(result.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
 		Expect(err).Should(Succeed())

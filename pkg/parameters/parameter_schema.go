@@ -139,21 +139,3 @@ func GetConfigTemplateItem(parameterSpec *parametersv1alpha1.ComponentParameterS
 	}
 	return nil
 }
-
-func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParamConfigRendererSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
-	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
-		return desc.Name == name
-	}
-
-	if index := generics.FindFirstFunc(pdcr.Configs, match); index >= 0 {
-		return &pdcr.Configs[index]
-	}
-	return nil
-}
-
-func GetComponentConfigDescriptions(pdcr *parametersv1alpha1.ParamConfigRendererSpec, tpl string) []parametersv1alpha1.ComponentConfigDescription {
-	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
-		return desc.TemplateName == tpl
-	}
-	return generics.FindFunc(pdcr.Configs, match)
-}

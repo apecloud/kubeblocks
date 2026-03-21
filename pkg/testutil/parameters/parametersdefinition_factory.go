@@ -33,7 +33,7 @@ func NewParametersDefinitionFactory(name string) *MockParametersDefinitionFactor
 	f := &MockParametersDefinitionFactory{}
 	f.Init("", name, &parametersv1alpha1.ParametersDefinition{
 		Spec: parametersv1alpha1.ParametersDefinitionSpec{
-			FileName:         MysqlConfigFile,
+			FileName: MysqlConfigFile,
 			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
 				Format: parametersv1alpha1.Ini,
 				FormatterAction: parametersv1alpha1.FormatterAction{
@@ -42,7 +42,7 @@ func NewParametersDefinitionFactory(name string) *MockParametersDefinitionFactor
 					},
 				},
 			},
-			ReloadAction:     WithNoneAction(),
+			ReloadAction: WithNoneAction(),
 		},
 	}, f)
 	return f

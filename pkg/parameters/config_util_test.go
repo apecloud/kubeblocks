@@ -325,21 +325,21 @@ func TestResolveCmpdParametersDefs(t *testing.T) {
 	}
 
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd).Build()
-	configRender, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
 	if err != nil {
 		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
 	}
 	if len(paramsDefs) != 1 {
 		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
 	}
-	if configRender == nil {
-		t.Fatalf("ResolveCmpdParametersDefs() configRender = nil")
+	if configDescs == nil {
+		t.Fatalf("ResolveCmpdParametersDefs() configDescs = nil")
 	}
-	if len(configRender.Spec.Configs) != 1 {
-		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configRender.Spec.Configs))
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
 	}
-	if configRender.Spec.Configs[0].TemplateName != "mysql-config" {
-		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configRender.Spec.Configs[0].TemplateName, "mysql-config")
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
 	}
 }
 

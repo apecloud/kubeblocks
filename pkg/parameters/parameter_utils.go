@@ -37,26 +37,26 @@ func ClassifyParamsFromConfigTemplate(params parametersv1alpha1.ComponentParamet
 	cmpd *appsv1.ComponentDefinition,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	tpls map[string]*corev1.ConfigMap,
-	pcr *parametersv1alpha1.ParamConfigRenderer) ([]parametersv1alpha1.ConfigTemplateItemDetail, error) {
+	configs []parametersv1alpha1.ComponentConfigDescription) ([]parametersv1alpha1.ConfigTemplateItemDetail, error) {
 	var itemDetails []parametersv1alpha1.ConfigTemplateItemDetail
 
-	classifyParams, err := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls, pcr)
+	classifyParams, err := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls, configs)
 	if err != nil {
 		return nil, err
 	}
-	if !HasValidParameterTemplate(pcr) {
+	if !HasValidParameterTemplate(configs) {
 		return nil, nil
 	}
-	for _, template := range ResolveParameterTemplate(cmpd.Spec, pcr.Spec) {
+	for _, template := range ResolveParameterTemplate(cmpd.Spec, configs) {
 		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
 	}
 	return itemDetails, nil
 }
 
-func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, pcr parametersv1alpha1.ParamConfigRendererSpec) []appsv1.ComponentFileTemplate {
+func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, configs []parametersv1alpha1.ComponentConfigDescription) []appsv1.ComponentFileTemplate {
 	var templates []appsv1.ComponentFileTemplate
 
-	tpls := generics.Map(pcr.Configs, func(e parametersv1alpha1.ComponentConfigDescription) string {
+	tpls := generics.Map(configs, func(e parametersv1alpha1.ComponentConfigDescription) string {
 		return e.TemplateName
 	})
 
@@ -70,10 +70,6 @@ func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, pcr parameter
 		}
 	}
 	return templates
-}
-
-func HasValidParameterTemplate(pcr *parametersv1alpha1.ParamConfigRenderer) bool {
-	return pcr != nil && len(pcr.Spec.Configs) != 0
 }
 
 func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1alpha1.ParametersInFile, template appsv1.ComponentFileTemplate) parametersv1alpha1.ConfigTemplateItemDetail {
@@ -92,12 +88,12 @@ func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParamete
 	parametersDefs []*parametersv1alpha1.ParametersDefinition,
 	templates []appsv1.ComponentFileTemplate,
 	tpls map[string]*corev1.ConfigMap,
-	pcr *parametersv1alpha1.ParamConfigRenderer) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
-	if len(parameters) == 0 || !HasValidParameterTemplate(pcr) {
+	configs []parametersv1alpha1.ComponentConfigDescription) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
+	if len(parameters) == 0 || !HasValidParameterTemplate(configs) {
 		return nil, nil
 	}
 	if !hasValidParametersDefinition(parametersDefs) {
-		return transformDefaultParameters(parameters, pcr)
+		return transformDefaultParameters(parameters, configs)
 	}
 
 	classifyParams := make(map[string]map[string]*parametersv1alpha1.ParametersInFile, len(templates))
@@ -190,16 +186,16 @@ func hasValidParametersDefinition(defs []*parametersv1alpha1.ParametersDefinitio
 
 func transformDefaultParameters(
 	parameters parametersv1alpha1.ComponentParameters,
-	pcr *parametersv1alpha1.ParamConfigRenderer) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
+	configs []parametersv1alpha1.ComponentConfigDescription) (map[string]map[string]*parametersv1alpha1.ParametersInFile, error) {
 
 	match := func(config parametersv1alpha1.ComponentConfigDescription) bool {
 		return config.TemplateName != "" && config.FileFormatConfig != nil
 	}
-	configs := generics.FindFunc(pcr.Spec.Configs, match)
-	if len(configs) == 0 {
+	filteredConfigs := generics.FindFunc(configs, match)
+	if len(filteredConfigs) == 0 {
 		return nil, fmt.Errorf("the component does not support parameters reconfigure")
 	}
-	config := configs[0]
+	config := filteredConfigs[0]
 	return map[string]map[string]*parametersv1alpha1.ParametersInFile{
 		config.TemplateName: {
 			config.Name: &parametersv1alpha1.ParametersInFile{

@@ -54,7 +54,7 @@ type Task struct {
 
 type taskContext struct {
 	componentParameter *parametersv1alpha1.ComponentParameter
-	configRender       *parametersv1alpha1.ParamConfigRenderer
+	configDescs        []parametersv1alpha1.ComponentConfigDescription
 	ctx                context.Context
 	component          *component.SynthesizedComponent
 	paramsDefs         []*parametersv1alpha1.ParametersDefinition
@@ -71,14 +71,14 @@ func newTaskContext(ctx context.Context, cli client.Client, componentParameter *
 		return nil, err
 	}
 
-	configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, cmpd)
+	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, cmpd)
 	if err != nil {
 		return nil, err
 	}
 
 	return &taskContext{ctx: ctx,
 		componentParameter: componentParameter,
-		configRender:       configRender,
+		configDescs:        configDescs,
 		component:          synthesizedComp,
 		paramsDefs:         paramsDefs,
 	}, nil
@@ -190,12 +190,12 @@ func syncImpl(taskCtx *taskContext,
 
 	var baseConfig *corev1.ConfigMap
 	var updatedConfig *corev1.ConfigMap
-	if baseConfig, err = parameters.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+	if baseConfig, err = parameters.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configDescs, taskCtx.paramsDefs); err != nil {
 		return failStatus(err)
 	}
 	updatedConfig = baseConfig
 	if len(item.ConfigFileParams) != 0 {
-		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+		if updatedConfig, err = parameters.ApplyParameters(item, baseConfig, taskCtx.configDescs, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
 	}

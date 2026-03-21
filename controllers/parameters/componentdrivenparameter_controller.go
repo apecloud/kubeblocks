@@ -266,7 +266,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, nil
 	}
 
-	configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
+	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configRender)
+	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configDescs)
 	if err != nil {
 		return nil, err
 	}

@@ -32,6 +32,8 @@ import (
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ParamConfigRenderer is the Schema for the paramconfigrenderers API
+//
+// +kubebuilder:deprecatedversion:warning="This CRD has been deprecated since 1.2.0"
 type ParamConfigRenderer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

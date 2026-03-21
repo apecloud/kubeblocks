@@ -31,6 +31,8 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
+    deprecated: true
+    deprecationWarning: This CRD has been deprecated since 1.2.0
     name: v1alpha1
     schema:
       openAPIV3Schema:

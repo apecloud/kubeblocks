@@ -465,7 +465,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the referenced componentTemplateSpec.</p>
+<p>Specifies the name of the referenced config template.</p>
 </td>
 </tr>
 <tr>
@@ -1637,6 +1637,7 @@ When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefin
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterDeletedPolicy">ParameterDeletedPolicy</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 <p>ParameterDeletedMethod defines how to handle parameter remove</p>
 </div>
 <table>
@@ -1658,6 +1659,7 @@ When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefin
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 </div>
 <table>
 <thead>
@@ -1906,7 +1908,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the referenced componentTemplateSpec.</p>
+<p>Specifies the name of the referenced config template.</p>
 </td>
 </tr>
 <tr>
@@ -2430,6 +2432,7 @@ This allows users to customize the configuration template according to their spe
 </p>
 <div>
 <p>ReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.</p>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 <p>Only one of the mechanisms can be specified at a time.</p>
 </div>
 <table>

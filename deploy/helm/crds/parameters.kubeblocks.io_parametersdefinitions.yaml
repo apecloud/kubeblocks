@@ -426,7 +426,7 @@ spec:
                 type: array
                 x-kubernetes-list-type: set
               templateName:
-                description: Specifies the name of the referenced componentTemplateSpec.
+                description: Specifies the name of the referenced config template.
                 type: string
             type: object
           status:

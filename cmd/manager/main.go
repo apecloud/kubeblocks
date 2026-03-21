@@ -660,6 +660,14 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
 			os.Exit(1)
 		}
+		if err = (&parameterscontrollers.LegacyParamConfigRendererReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("legacy-param-config-renderer-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "LegacyParamConfigRenderer")
+			os.Exit(1)
+		}
 		if err = (&parameterscontrollers.ComponentParameterReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

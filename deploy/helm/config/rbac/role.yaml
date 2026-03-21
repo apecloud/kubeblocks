@@ -853,6 +853,22 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
+  - paramconfigrenderers
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - paramconfigrenderers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
   - parameters
   verbs:
   - create

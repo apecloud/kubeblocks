@@ -119,7 +119,9 @@ var _ = Describe("Reconfigure Controller", func() {
 						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
 						g.Expect(config.Restart).ShouldNot(BeNil())
 						g.Expect(*config.Restart).Should(BeTrue())
-						g.Expect(config.Reconfigure).Should(BeNil())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
 					}
 				}
 			})).Should(Succeed())
@@ -154,7 +156,9 @@ var _ = Describe("Reconfigure Controller", func() {
 						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
 						g.Expect(config.Restart).ShouldNot(BeNil())
 						g.Expect(*config.Restart).Should(BeTrue())
-						g.Expect(config.Reconfigure).Should(BeNil())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
 					}
 				}
 			})).Should(Succeed())

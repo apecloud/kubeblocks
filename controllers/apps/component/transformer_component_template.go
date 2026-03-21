@@ -336,11 +336,11 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			return &val
 		}
 		action = func(tpl component.SynthesizedFileTemplate) *kbappsv1.Action {
+			if tpl.ReconfigureRequired != nil && !*tpl.ReconfigureRequired {
+				return nil
+			}
 			if tpl.Reconfigure != nil {
 				return tpl.Reconfigure
-			}
-			if ptr.Deref(tpl.RestartOnFileChange, false) {
-				return nil
 			}
 			if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
 				return synthesizedComp.LifecycleActions.ComponentLifecycleActions.Reconfigure
@@ -348,11 +348,11 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			return nil
 		}
 		actionName = func(tpl component.SynthesizedFileTemplate) string {
+			if tpl.ReconfigureRequired != nil && !*tpl.ReconfigureRequired {
+				return ""
+			}
 			if tpl.Reconfigure != nil {
 				return component.UDFReconfigureActionName(tpl)
-			}
-			if ptr.Deref(tpl.RestartOnFileChange, false) {
-				return ""
 			}
 			return "" // default reconfigure action or empty
 		}

@@ -280,17 +280,19 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
 			Expect(config.Reconfigure).ShouldNot(BeNil())
-			Expect(config.Reconfigure.GRPC).ShouldNot(BeNil())
-			Expect(config.Reconfigure.GRPC.Port).Should(Equal("9901"))
-			Expect(config.Reconfigure.GRPC.Service).Should(Equal("proto.Reconfigure"))
-			Expect(config.Reconfigure.GRPC.Method).Should(Equal("OnlineUpgradeParams"))
-			Expect(config.Reconfigure.GRPC.Request).Should(HaveKeyWithValue("configSpec", cfgName))
-			Expect(config.Reconfigure.GRPC.Request).Should(HaveKeyWithValue("configFile", cfgName))
-			Expect(config.Reconfigure.GRPC.Request).Should(HaveKey("params"))
+			Expect(*config.Reconfigure).Should(BeTrue())
+			Expect(config.ReconfigureAction).ShouldNot(BeNil())
+			Expect(config.ReconfigureAction.GRPC).ShouldNot(BeNil())
+			Expect(config.ReconfigureAction.GRPC.Port).Should(Equal("9901"))
+			Expect(config.ReconfigureAction.GRPC.Service).Should(Equal("proto.Reconfigure"))
+			Expect(config.ReconfigureAction.GRPC.Method).Should(Equal("OnlineUpgradeParams"))
+			Expect(config.ReconfigureAction.GRPC.Request).Should(HaveKeyWithValue("configSpec", cfgName))
+			Expect(config.ReconfigureAction.GRPC.Request).Should(HaveKeyWithValue("configFile", cfgName))
+			Expect(config.ReconfigureAction.GRPC.Request).Should(HaveKey("params"))
 			params := map[string]string{}
-			Expect(json.Unmarshal([]byte(config.Reconfigure.GRPC.Request["params"]), &params)).Should(Succeed())
+			Expect(json.Unmarshal([]byte(config.ReconfigureAction.GRPC.Request["params"]), &params)).Should(Succeed())
 			Expect(params).Should(HaveKeyWithValue("a", "c b e f"))
-			Expect(config.Reconfigure.GRPC.Response.Status).Should(Equal("errMessage"))
+			Expect(config.ReconfigureAction.GRPC.Response.Status).Should(Equal("errMessage"))
 			Expect(config.Restart).ShouldNot(BeNil())
 			Expect(*config.Restart).Should(BeFalse())
 		})
@@ -307,8 +309,10 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
 			Expect(config.Reconfigure).ShouldNot(BeNil())
-			Expect(config.Reconfigure.GRPC).ShouldNot(BeNil())
-			Expect(config.Reconfigure.GRPC.Port).Should(Equal("19901"))
+			Expect(*config.Reconfigure).Should(BeTrue())
+			Expect(config.ReconfigureAction).ShouldNot(BeNil())
+			Expect(config.ReconfigureAction.GRPC).ShouldNot(BeNil())
+			Expect(config.ReconfigureAction.GRPC.Port).Should(Equal("19901"))
 		})
 
 		ginkgo.It("fail when legacy config manager is not injected", func() {
@@ -336,7 +340,9 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			_, err := syncPolicy(rctx)
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
-			Expect(config.Reconfigure).Should(BeNil())
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeFalse())
+			Expect(config.ReconfigureAction).Should(BeNil())
 		})
 
 		ginkgo.It("skip reconfigure when no reload action", func() {
@@ -344,7 +350,9 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			_, err := syncPolicy(rctx)
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
-			Expect(config.Reconfigure).Should(BeNil())
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeFalse())
+			Expect(config.ReconfigureAction).Should(BeNil())
 		})
 
 		ginkgo.It("skip reconfigure when restart merged", func() {
@@ -352,7 +360,9 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			_, err := syncNRestartPolicy(rctx)
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
-			Expect(config.Reconfigure).Should(BeNil())
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeFalse())
+			Expect(config.ReconfigureAction).Should(BeNil())
 			Expect(config.Restart).ShouldNot(BeNil())
 			Expect(*config.Restart).Should(BeTrue())
 		})
@@ -363,6 +373,8 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
 			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeTrue())
+			Expect(config.ReconfigureAction).Should(BeNil())
 			Expect(config.Restart).ShouldNot(BeNil())
 			Expect(*config.Restart).Should(BeTrue())
 		})
@@ -373,7 +385,9 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			_, err := syncNRestartPolicy(rctx)
 			Expect(err).Should(Succeed())
 			config := rctx.ClusterComponent.Configs[0]
-			Expect(config.Reconfigure).Should(BeNil())
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeFalse())
+			Expect(config.ReconfigureAction).Should(BeNil())
 			Expect(config.Restart).ShouldNot(BeNil())
 			Expect(*config.Restart).Should(BeTrue())
 		})
@@ -505,14 +519,17 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 		}}
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
 		applyChangesToCluster(ctx, config, map[string]string{"a": "b"}, false)
-		if config.Reconfigure == nil || config.Reconfigure.GRPC == nil {
+		if config.Reconfigure == nil || !*config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be true")
+		}
+		if config.ReconfigureAction == nil || config.ReconfigureAction.GRPC == nil {
 			t.Fatalf("expected grpc reconfigure action to be set")
 		}
-		if config.Reconfigure.GRPC.Port != "19901" {
-			t.Fatalf("expected grpc port 19901, got %s", config.Reconfigure.GRPC.Port)
+		if config.ReconfigureAction.GRPC.Port != "19901" {
+			t.Fatalf("expected grpc port 19901, got %s", config.ReconfigureAction.GRPC.Port)
 		}
 		params := map[string]string{}
-		if err := json.Unmarshal([]byte(config.Reconfigure.GRPC.Request["params"]), &params); err != nil {
+		if err := json.Unmarshal([]byte(config.ReconfigureAction.GRPC.Request["params"]), &params); err != nil {
 			t.Fatalf("unmarshal params: %v", err)
 		}
 		if params["a"] != "b" {
@@ -525,7 +542,10 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 		ctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
 		applyChangesToCluster(ctx, config, map[string]string{"a": "b"}, true)
-		if config.Reconfigure != nil {
+		if config.Reconfigure == nil || *config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be false")
+		}
+		if config.ReconfigureAction != nil {
 			t.Fatalf("expected grpc reconfigure action to be nil")
 		}
 		if config.Restart == nil || !*config.Restart {
@@ -575,10 +595,16 @@ func TestApplyChangesToClusterTemplateReconfigure(t *testing.T) {
 	if config.Restart == nil || *config.Restart {
 		t.Fatalf("expected restart to be false, got %v", config.Restart)
 	}
-	if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
+	if config.Reconfigure == nil || !*config.Reconfigure {
+		t.Fatalf("expected reconfigure intent to be true")
+	}
+	if config.ReconfigureAction != nil {
+		t.Fatalf("expected template reconfigure to use default action instead of override")
+	}
+	if ctx.ConfigTemplate.Reconfigure == nil || ctx.ConfigTemplate.Reconfigure.Exec == nil {
 		t.Fatalf("expected template reconfigure action to be propagated")
 	}
-	if got := config.Reconfigure.Exec.Command; len(got) != 3 || got[2] != "reload" {
+	if got := ctx.ConfigTemplate.Reconfigure.Exec.Command; len(got) != 3 || got[2] != "reload" {
 		t.Fatalf("unexpected reconfigure exec command: %v", got)
 	}
 }
@@ -620,8 +646,11 @@ func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
 	if config.Restart == nil || *config.Restart {
 		t.Fatalf("expected restart to be cleared to false, got %v", config.Restart)
 	}
-	if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
-		t.Fatalf("expected reconfigure action to stay set")
+	if config.Reconfigure == nil || !*config.Reconfigure {
+		t.Fatalf("expected reconfigure intent to stay true")
+	}
+	if config.ReconfigureAction != nil {
+		t.Fatalf("expected no override action for template-level reconfigure")
 	}
 }
 
@@ -655,8 +684,11 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 
 		applyChangesToCluster(ctx, config, nil, true)
 
-		if config.Reconfigure != nil {
-			t.Fatalf("expected reconfigure to be nil for restart-only path")
+		if config.Reconfigure == nil || *config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be false for restart-only path")
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected reconfigure action to be nil for restart-only path")
 		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")
@@ -672,8 +704,11 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 
 		applyChangesToCluster(ctx, config, map[string]string{"performance_schema": "ON"}, true)
 
-		if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
-			t.Fatalf("expected template reconfigure to be kept for reload-before-restart")
+		if config.Reconfigure == nil || !*config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be true for reload-before-restart")
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected template reconfigure to use default action")
 		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")
@@ -690,8 +725,11 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 
 		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
 
-		if config.Reconfigure == nil || config.Reconfigure.Exec == nil {
-			t.Fatalf("expected template reconfigure to be kept for split mixed update")
+		if config.Reconfigure == nil || !*config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be true for split mixed update")
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected template reconfigure to use default action")
 		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")
@@ -708,8 +746,11 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 
 		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
 
-		if config.Reconfigure != nil {
-			t.Fatalf("expected reconfigure to be nil when restart absorbs mixed update")
+		if config.Reconfigure == nil || *config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be false when restart absorbs mixed update")
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected reconfigure action to be nil when restart absorbs mixed update")
 		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")

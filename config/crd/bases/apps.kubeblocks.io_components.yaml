@@ -178,7 +178,15 @@ spec:
                       type: string
                     reconfigure:
                       description: |-
-                        The custom reconfigure action to reload the updated configuration.
+                        Specifies whether to execute a reconfigure action for the updated configuration.
+
+
+                        When set to true and `reconfigureAction` is empty, the controller uses the default
+                        reconfigure action defined by the corresponding configuration template or component lifecycle.
+                      type: boolean
+                    reconfigureAction:
+                      description: |-
+                        The custom reconfigure action to apply the updated configuration.
 
 
                         The container executing this action has access to following variables:

@@ -1538,9 +1538,10 @@ var _ = Describe("Component Controller", func() {
 							},
 						},
 					},
-					ConfigHash:  ptr.To(serverConfigHash),
-					Restart:     ptr.To(true),
-					Reconfigure: serverConfigAction,
+					ConfigHash:        ptr.To(serverConfigHash),
+					Restart:           ptr.To(true),
+					Reconfigure:       ptr.To(true),
+					ReconfigureAction: serverConfigAction,
 				},
 			})
 		})
@@ -1643,7 +1644,8 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
-					Reconfigure: testapps.NewLifecycleAction(fileTemplate),
+					Reconfigure:       ptr.To(true),
+					ReconfigureAction: testapps.NewLifecycleAction(fileTemplate),
 				},
 			})
 		})

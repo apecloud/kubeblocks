@@ -90,9 +90,10 @@ type SynthesizedComponent struct {
 
 type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
-	Config     bool
-	Variables  map[string]string
-	ConfigHash *string
+	Config              bool
+	Variables           map[string]string
+	ConfigHash          *string
+	ReconfigureRequired *bool
 }
 
 type SynthesizedLifecycleActions struct {

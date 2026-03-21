@@ -119,7 +119,8 @@ var _ = Describe("synthesized component", func() {
 						},
 					},
 				},
-				Reconfigure: &appsv1.Action{
+				Reconfigure: ptr.To(true),
+				ReconfigureAction: &appsv1.Action{
 					Exec: &appsv1.ExecAction{
 						Command: []string{"echo", "external", "reconfigure"},
 					},
@@ -139,9 +140,10 @@ var _ = Describe("synthesized component", func() {
 					Template:    comp.Spec.Configs[0].ConfigMap.Name,
 					Namespace:   comp.Namespace,
 					VolumeName:  compDef.Spec.Configs[1].VolumeName,
-					Reconfigure: comp.Spec.Configs[0].Reconfigure,
+					Reconfigure: comp.Spec.Configs[0].ReconfigureAction,
 				},
-				Config: true,
+				Config:              true,
+				ReconfigureRequired: ptr.To(true),
 			}))
 		})
 
@@ -155,7 +157,8 @@ var _ = Describe("synthesized component", func() {
 						},
 					},
 				},
-				Reconfigure: &appsv1.Action{
+				Reconfigure: ptr.To(true),
+				ReconfigureAction: &appsv1.Action{
 					Exec: &appsv1.ExecAction{
 						Command: []string{"echo", "external", "reconfigure"},
 					},
@@ -176,10 +179,11 @@ var _ = Describe("synthesized component", func() {
 					Template:        comp.Spec.Configs[0].ConfigMap.Name,
 					Namespace:       comp.Namespace,
 					VolumeName:      compDef.Spec.Configs[1].VolumeName,
-					Reconfigure:     comp.Spec.Configs[0].Reconfigure,
+					Reconfigure:     comp.Spec.Configs[0].ReconfigureAction,
 					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
-				Config: true,
+				Config:              true,
+				ReconfigureRequired: ptr.To(true),
 			}))
 		})
 
@@ -202,7 +206,7 @@ var _ = Describe("synthesized component", func() {
 					Template:        "",
 					Namespace:       "",
 					VolumeName:      compDef.Spec.Configs[1].VolumeName,
-					Reconfigure:     comp.Spec.Configs[0].Reconfigure,
+					Reconfigure:     comp.Spec.Configs[0].ReconfigureAction,
 					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
 				Config: true,

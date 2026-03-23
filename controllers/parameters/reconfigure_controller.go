@@ -352,11 +352,15 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 	if err != nil {
 		return policy, err
 	}
+	hasDynamicUpdate, err := core.HasDynamicParameterUpdate(format, pd, jsonPatch)
+	if err != nil {
+		return policy, err
+	}
 	if pd.ReloadAction == nil && templateSpec != nil && templateSpec.Reconfigure != nil {
 		if dynamicUpdate {
 			return reconfigure.SyncDynamicReloadPolicy, nil
 		}
-		if parameters.ReloadStaticParameters(pd) || parameters.NeedDynamicReloadAction(pd) {
+		if parameters.ReloadStaticParameters(pd) || (hasDynamicUpdate && parameters.NeedDynamicReloadAction(pd)) {
 			return reconfigure.DynamicReloadAndRestartPolicy, nil
 		}
 		return reconfigure.RestartPolicy, nil
@@ -364,7 +368,7 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 
 	// make decision
 	switch {
-	case !dynamicUpdate && (parameters.NeedDynamicReloadAction(pd) || parameters.ReloadStaticParameters(pd)): // static parameters update and need to do hot update
+	case !dynamicUpdate && (parameters.ReloadStaticParameters(pd) || (hasDynamicUpdate && parameters.NeedDynamicReloadAction(pd))): // static parameters update and need to do hot update
 		policy = reconfigure.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
 		policy = reconfigure.RestartPolicy

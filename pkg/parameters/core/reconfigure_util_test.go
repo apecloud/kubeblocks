@@ -196,3 +196,51 @@ func TestIsDynamicParameter(t *testing.T) {
 		})
 	}
 }
+
+func TestHasDynamicParameterUpdate(t *testing.T) {
+	config := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{
+				SectionName: "mysqld",
+			},
+		},
+	}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters: []string{"binlog_expire_logs_seconds"},
+	}
+
+	tests := []struct {
+		name  string
+		patch string
+		want  bool
+	}{
+		{
+			name:  "static only",
+			patch: `{"mysqld":{"table_open_cache_instances":"8"}}`,
+			want:  false,
+		},
+		{
+			name:  "dynamic only",
+			patch: `{"mysqld":{"binlog_expire_logs_seconds":"432000"}}`,
+			want:  true,
+		},
+		{
+			name:  "mixed",
+			patch: `{"mysqld":{"binlog_expire_logs_seconds":"432000","table_open_cache_instances":"8"}}`,
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := HasDynamicParameterUpdate(config, pd, tt.patch)
+			if err != nil {
+				t.Fatalf("HasDynamicParameterUpdate() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("HasDynamicParameterUpdate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

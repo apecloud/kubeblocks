@@ -596,3 +596,37 @@ func TestResolveReconfigurePolicyUsesTemplateReconfigureForSplitMixedUpdate(t *t
 		t.Fatalf("expected %q, got %q", reconfigure.DynamicReloadAndRestartPolicy, policy)
 	}
 }
+
+func TestResolveReconfigurePolicyKeepsStaticOnlyUpdateAsRestartWhenMergeIsDisabled(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters:     []string{"binlog_expire_logs_seconds"},
+		MergeReloadAndRestart: ptr.To(false),
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "mysql-replication-config",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"mysqld":{"table_open_cache_instances":"8"}}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				},
+			},
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.RestartPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.RestartPolicy, policy)
+	}
+}

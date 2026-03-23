@@ -182,6 +182,24 @@ func CheckUpdateDynamicParameters(config *parametersv1alpha1.FileFormatConfig, p
 	return false, nil
 }
 
+// HasDynamicParameterUpdate returns true when at least one updated parameter is dynamic.
+func HasDynamicParameterUpdate(config *parametersv1alpha1.FileFormatConfig, paramsDef *parametersv1alpha1.ParametersDefinitionSpec, patch string) (bool, error) {
+	if patch == "" {
+		return false, nil
+	}
+
+	updatedParams, err := resolveUpdateParameter([]byte(patch), NestedPrefixField(config))
+	if err != nil {
+		return false, err
+	}
+	for _, param := range updatedParams {
+		if IsDynamicParameter(param, paramsDef) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // IsDynamicParameter checks if the parameter supports hot update
 func IsDynamicParameter(paramName string, paramsDef *parametersv1alpha1.ParametersDefinitionSpec) bool {
 	if len(paramsDef.DynamicParameters) != 0 {

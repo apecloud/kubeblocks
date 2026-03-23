@@ -35,6 +35,7 @@ const (
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
 	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgAddonJobTimeout       = "ADDON_JOB_TIMEOUT"
 
 	// addon charts config keys
 	CfgAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"

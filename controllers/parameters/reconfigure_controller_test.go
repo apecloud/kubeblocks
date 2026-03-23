@@ -28,11 +28,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/controllers/parameters/reconfigure"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
@@ -117,7 +119,9 @@ var _ = Describe("Reconfigure Controller", func() {
 						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
 						g.Expect(config.Restart).ShouldNot(BeNil())
 						g.Expect(*config.Restart).Should(BeTrue())
-						g.Expect(config.Reconfigure).Should(BeNil())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
 					}
 				}
 			})).Should(Succeed())
@@ -152,7 +156,9 @@ var _ = Describe("Reconfigure Controller", func() {
 						g.Expect(*config.ConfigHash).Should(Equal(configHash1))
 						g.Expect(config.Restart).ShouldNot(BeNil())
 						g.Expect(*config.Restart).Should(BeTrue())
-						g.Expect(config.Reconfigure).Should(BeNil())
+						g.Expect(config.Reconfigure).ShouldNot(BeNil())
+						g.Expect(*config.Reconfigure).Should(BeFalse())
+						g.Expect(config.ReconfigureAction).Should(BeNil())
 					}
 				}
 			})).Should(Succeed())
@@ -465,5 +471,162 @@ func TestValidateLegacyReloadActionSupportWithUnknownClusterAnnotation(t *testin
 				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
 			}
 		})
+	}
+}
+
+func TestNeedRestartAllowsTemplateReconfigure(t *testing.T) {
+	patch := &parameterscore.ConfigPatchInfo{
+		UpdateConfig: map[string][]byte{
+			"my.cnf": []byte(`{"mysqld":{"binlog_expire_logs_seconds":432000}}`),
+		},
+	}
+	paramsDefs := map[string]*parametersv1alpha1.ParametersDefinition{
+		"my.cnf": {
+			Spec: parametersv1alpha1.ParametersDefinitionSpec{},
+		},
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "mysql-replication-config",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	if got := needRestart(paramsDefs, patch, configSpec); got {
+		t.Fatalf("expected template reconfigure action to avoid forced restart")
+	}
+}
+
+func TestResolveReconfigurePolicyUsesTemplateReconfigureForDynamicUpdate(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters: []string{"binlog_expire_logs_seconds"},
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "mysql-replication-config",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"mysqld":{"binlog_expire_logs_seconds":432000}}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				},
+			},
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.SyncDynamicReloadPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.SyncDynamicReloadPolicy, policy)
+	}
+}
+
+func TestResolveReconfigurePolicyUsesTemplateReconfigureForStaticReloadBeforeRestart(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		ReloadStaticParamsBeforeRestart: ptr.To(true),
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "mysql-replication-config",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"mysqld":{"performance_schema":"ON"}}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				},
+			},
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.DynamicReloadAndRestartPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.DynamicReloadAndRestartPolicy, policy)
+	}
+}
+
+func TestResolveReconfigurePolicyUsesTemplateReconfigureForSplitMixedUpdate(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters:     []string{"binlog_expire_logs_seconds"},
+		MergeReloadAndRestart: ptr.To(false),
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "mysql-replication-config",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"mysqld":{"binlog_expire_logs_seconds":"432000","performance_schema":"ON"}}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				},
+			},
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.DynamicReloadAndRestartPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.DynamicReloadAndRestartPolicy, policy)
+	}
+}
+
+func TestResolveReconfigurePolicyKeepsStaticOnlyUpdateAsRestartWhenMergeIsDisabled(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters:     []string{"binlog_expire_logs_seconds"},
+		MergeReloadAndRestart: ptr.To(false),
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "mysql-replication-config",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"mysqld":{"table_open_cache_instances":"8"}}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				},
+			},
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.RestartPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.RestartPolicy, policy)
 	}
 }

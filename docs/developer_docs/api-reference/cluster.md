@@ -2888,6 +2888,20 @@ bool
 <td>
 <code>reconfigure</code><br/>
 <em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to execute a reconfigure action for the updated configuration.</p>
+<p>When set to true and <code>reconfigureAction</code> is empty, the controller uses the default
+reconfigure action defined by the corresponding configuration template or component lifecycle.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureAction</code><br/>
+<em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
 </a>
@@ -2895,7 +2909,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>The custom reconfigure action to reload the updated configuration.</p>
+<p>The custom reconfigure action to apply the updated configuration.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>

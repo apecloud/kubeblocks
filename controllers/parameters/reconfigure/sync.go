@@ -114,15 +114,18 @@ func submit(ctx Context, parameters map[string]string, restart bool) (Status, er
 func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
 	config.Variables = params
 	config.ConfigHash = ctx.getTargetConfigHash()
-	if restart {
-		config.Restart = ptr.To(true)
-	} else {
-		config.Restart = nil
-	}
-	if shouldBuildLegacyReconfigureAction(ctx, params, restart) {
-		config.Reconfigure = reloadActionToReconfigureAction(ctx, params)
-	} else {
-		config.Reconfigure = nil
+	// Keep restart explicit so an old persisted `restart: true` is actively cleared.
+	config.Restart = ptr.To(restart)
+	config.Reconfigure = ptr.To(false)
+	switch {
+	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
+		config.Reconfigure = ptr.To(true)
+		config.ReconfigureAction = reloadActionToReconfigureAction(ctx, params)
+	case shouldUseTemplateReconfigureAction(ctx, params, restart):
+		config.Reconfigure = ptr.To(true)
+		config.ReconfigureAction = nil
+	default:
+		config.ReconfigureAction = nil
 	}
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
@@ -151,6 +154,19 @@ func shouldBuildLegacyReconfigureAction(ctx Context, params map[string]string, r
 		return false
 	}
 	return true
+}
+
+func shouldUseTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
+	if len(params) == 0 || ctx.ConfigTemplate.Reconfigure == nil {
+		return false
+	}
+	if !restart {
+		return true
+	}
+	if ctx.ParametersDef == nil {
+		return false
+	}
+	return parameters.ReloadStaticParameters(ctx.ParametersDef) || parameters.NeedDynamicReloadAction(ctx.ParametersDef)
 }
 
 func reloadActionToReconfigureAction(ctx Context, params map[string]string) *appsv1.Action {

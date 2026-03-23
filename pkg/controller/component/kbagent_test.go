@@ -391,6 +391,11 @@ var _ = Describe("kb-agent", func() {
 							},
 						},
 					},
+					ReconfigureAction: &appsv1.Action{
+						Exec: &appsv1.ExecAction{
+							Command: []string{"echo", "user-reconfigure"},
+						},
+					},
 				},
 				{
 					ComponentFileTemplate: appsv1.ComponentFileTemplate{
@@ -434,13 +439,19 @@ var _ = Describe("kb-agent", func() {
 				},
 			}))
 			Expect(actions).Should(ContainElement(proto.Action{
-				Name: "udf-reconfigure-log.conf",
+				Name: "udf-reconfigure-cmpd-log.conf",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "reconfigure"},
 				},
 			}))
 			Expect(actions).Should(ContainElement(proto.Action{
-				Name: "udf-reconfigure-server.conf",
+				Name: "udf-reconfigure-user-log.conf",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "user-reconfigure"},
+				},
+			}))
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "udf-reconfigure-cmpd-server.conf",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "reconfigure"},
 				},

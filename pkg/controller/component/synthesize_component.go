@@ -492,8 +492,12 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 		}
 
 		if utpl.Reconfigure != nil {
-			stpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+			stpl.ReconfigureRequired = utpl.Reconfigure
+			if !*utpl.Reconfigure {
+				stpl.Reconfigure = nil
+			}
 		}
+		stpl.ReconfigureAction = utpl.ReconfigureAction
 
 		// if externalManaged is not specified as required, use the user specified value
 		if !ptr.Deref(stpl.ExternalManaged, false) {

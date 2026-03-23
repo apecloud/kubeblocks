@@ -177,8 +177,12 @@ func getHostNetworkPort(synthesizedComp *SynthesizedComponent, clusterName, comp
 	return pm.GetPort(key)
 }
 
-func UDFReconfigureActionName(tpl SynthesizedFileTemplate) string {
-	return fmt.Sprintf("reconfigure-%s", tpl.Name)
+func CMPDReconfigureActionName(tpl SynthesizedFileTemplate) string {
+	return fmt.Sprintf("reconfigure-cmpd-%s", tpl.Name)
+}
+
+func UserReconfigureActionName(tpl SynthesizedFileTemplate) string {
+	return fmt.Sprintf("reconfigure-user-%s", tpl.Name)
 }
 
 func AddInstanceAssistantObject(synthesizedComp *SynthesizedComponent, object client.Object) {

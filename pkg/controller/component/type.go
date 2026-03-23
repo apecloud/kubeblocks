@@ -94,6 +94,7 @@ type SynthesizedFileTemplate struct {
 	Variables           map[string]string
 	ConfigHash          *string
 	ReconfigureRequired *bool
+	ReconfigureAction   *kbappsv1.Action
 }
 
 type SynthesizedLifecycleActions struct {

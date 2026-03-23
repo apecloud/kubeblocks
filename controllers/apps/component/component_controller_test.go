@@ -1584,7 +1584,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[1].Reconfigure).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[1].Reconfigure).Should(Equal(*serverConfigAction))
 			g.Expect(its.Spec.Configs[1].ReconfigureActionName).Should(Equal(
-				component.UDFReconfigureActionName(component.SynthesizedFileTemplate{
+				component.UserReconfigureActionName(component.SynthesizedFileTemplate{
 					ComponentFileTemplate: kbappsv1.ComponentFileTemplate{
 						Name: serverConfigName,
 					},
@@ -1680,7 +1680,7 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-%s", fileTemplate)))
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-user-%s", fileTemplate)))
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
@@ -1767,7 +1767,8 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
 			g.Expect(its.Spec.Configs[0].Restart).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].Restart).Should(BeTrue())
-			g.Expect(its.Spec.Configs[0].Reconfigure).Should(BeNil())
+			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
 		})).Should(Succeed())
 	}
 

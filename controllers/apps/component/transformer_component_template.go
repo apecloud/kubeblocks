@@ -339,6 +339,9 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			if tpl.ReconfigureRequired != nil && !*tpl.ReconfigureRequired {
 				return nil
 			}
+			if tpl.ReconfigureRequired != nil && *tpl.ReconfigureRequired && tpl.ReconfigureAction != nil {
+				return tpl.ReconfigureAction
+			}
 			if tpl.Reconfigure != nil {
 				return tpl.Reconfigure
 			}
@@ -351,10 +354,13 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			if tpl.ReconfigureRequired != nil && !*tpl.ReconfigureRequired {
 				return ""
 			}
-			if tpl.Reconfigure != nil {
-				return component.UDFReconfigureActionName(tpl)
+			if tpl.ReconfigureRequired != nil && *tpl.ReconfigureRequired && tpl.ReconfigureAction != nil {
+				return component.UserReconfigureActionName(tpl)
 			}
-			return "" // default reconfigure action or empty
+			if tpl.Reconfigure != nil {
+				return component.CMPDReconfigureActionName(tpl)
+			}
+			return "" // lifecycle default reconfigure action or empty
 		}
 		templateChanges = t.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
 		parameters      = func(tpl component.SynthesizedFileTemplate) map[string]string {

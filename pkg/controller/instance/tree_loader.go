@@ -57,6 +57,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	}
 
 	tree.Context = ctx
+	tree.Reader = reader
 	tree.EventRecorder = recorder
 	tree.Logger = logger
 

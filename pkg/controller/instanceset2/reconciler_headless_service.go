@@ -106,6 +106,11 @@ func (r *headlessServiceReconciler) addHeadlessService(its *workloads.InstanceSe
 			its.Spec.InstanceAssistantObjects = make([]corev1.ObjectReference, 0)
 		}
 		gvk, _ := model.GetGVKName(svc)
+		for _, objRef := range its.Spec.InstanceAssistantObjects {
+			if objRef.Kind == gvk.Kind && objRef.Namespace == gvk.Namespace && objRef.Name == gvk.Name {
+				return
+			}
+		}
 		its.Spec.InstanceAssistantObjects = append(its.Spec.InstanceAssistantObjects,
 			corev1.ObjectReference{
 				Kind:      gvk.Kind,

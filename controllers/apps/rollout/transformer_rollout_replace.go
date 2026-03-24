@@ -295,10 +295,11 @@ func (t *rolloutReplaceTransformer) sharding(transCtx *rolloutTransformContext,
 		tpl = tpls[instTpl.Name]
 	}
 
+	totalReplicas := newReplicas * spec.Shards
 	if spec.Template.Replicas == replicas {
-		return t.shardingUp(rollout, sharding, spec, newReplicas, tpl)
+		return t.shardingUp(rollout, sharding, spec, totalReplicas, tpl)
 	} else {
-		return t.shardingDown(rollout, sharding, spec, newReplicas, instance, instTpl)
+		return t.shardingDown(rollout, sharding, spec, totalReplicas, instance, instTpl)
 	}
 }
 
@@ -471,7 +472,11 @@ func replaceShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha
 	replicas := spec.Template.Replicas
 	for _, status := range rollout.Status.Shardings {
 		if status.Name == sharding.Name {
-			replicas = status.Replicas
+			if spec.Shards == 0 {
+				replicas = 0
+			} else {
+				replicas = status.Replicas / spec.Shards
+			}
 			break
 		}
 	}

@@ -166,39 +166,50 @@ type ShardingLifecycleActions struct {
 	//
 	// With `ComponentReady` being the default.
 	//
-	// The PostProvision Action is intended to run only once.
+	// The PostProvision action is intended to run only once.
 	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PostProvision *Action `json:"postProvision,omitempty"`
+	PostProvision *ShardingAction `json:"postProvision,omitempty"`
 
 	// Specifies the hook to be executed prior to terminating a sharding.
 	//
-	// The PreTerminate Action is intended to run only once.
+	// The PreTerminate action is intended to run only once.
 	//
 	// This action is executed immediately when a terminate operation for the sharding is initiated.
 	// The actual termination and cleanup of the sharding and its associated resources will not proceed
 	// until the PreTerminate action has completed successfully.
 	//
+	// If a PostProvision action is defined, this action will only execute if PostProvision reaches
+	// the 'Succeeded' phase. If the defined PostProvision fails, this action will be skipped.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PreTerminate *Action `json:"preTerminate,omitempty"`
+	PreTerminate *ShardingAction `json:"preTerminate,omitempty"`
 
 	// Specifies the hook to be executed after a shard added.
 	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_ADD_SHARD_NAME: The name of the shard being added.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	ShardAdd *Action `json:"shardAdd,omitempty"`
+	ShardAdd *ShardingAction `json:"shardAdd,omitempty"`
 
 	// Specifies the hook to be executed prior to remove a shard.
 	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_REMOVE_SHARD_NAME: The name of the shard being removed.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	ShardRemove *Action `json:"shardRemove,omitempty"`
+	ShardRemove *ShardingAction `json:"shardRemove,omitempty"`
 }
 
 type ShardingSystemAccount struct {
@@ -221,3 +232,31 @@ type ShardingTLS struct {
 	// +optional
 	Shared *bool `json:"shared,omitempty"`
 }
+
+type ShardingAction struct {
+	Action `json:",inline"`
+
+	// Defines the criteria used to select the target shard(s) for executing the Action.
+	// It provides precise control over which shard(s) should be targeted.
+	//
+	// The default selection logic (when this field is omitted) is context-dependent:
+	// 1. Contextual Default: If the Action is triggered by or originates from a specific shard,
+	//    that shard is selected as the default target.
+	// 2. Global Default: In other cases (where no specific shard context exists),
+	//    one shard is selected randomly by default.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	TargetShardSelector TargetShardSelector `json:"targetShardSelector,omitempty"`
+}
+
+// TargetShardSelector defines how to select shard(s) to execute an Action.
+// +enum
+// +kubebuilder:validation:Enum={Any,All}
+type TargetShardSelector string
+
+const (
+	AnyShard  TargetShardSelector = "Any"
+	AllShards TargetShardSelector = "All"
+)

@@ -125,7 +125,7 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 		return nil, err
 	}
 	if req.NonBlocking == nil || !*req.NonBlocking {
-		return blockingCallAction(ctx, action, req.Parameters, req.TimeoutSeconds)
+		return blockingCallAction(ctx, action, req.Parameters, &action.TimeoutSeconds)
 	}
 	return s.handleRequestNonBlocking(ctx, req, action)
 }
@@ -136,7 +136,7 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 
 	running, ok := s.runningActions[req.Action]
 	if !ok {
-		resultChan, err := nonBlockingCallAction(ctx, action, req.Parameters, req.TimeoutSeconds)
+		resultChan, err := nonBlockingCallAction(ctx, action, req.Parameters, &action.TimeoutSeconds)
 		if err != nil {
 			return nil, err
 		}

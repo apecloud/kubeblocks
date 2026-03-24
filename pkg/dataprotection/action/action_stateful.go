@@ -65,7 +65,7 @@ func (s *StatefulSetAction) Type() dpv1alpha1.ActionType {
 func (s *StatefulSetAction) Execute(ctx ActionContext) (actionStatus *dpv1alpha1.ActionStatus, err error) {
 	defer func() {
 		if err != nil {
-			err = intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, err.Error())
+			err = intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "%s", err.Error())
 		}
 	}()
 	sts := &appsv1.StatefulSet{}

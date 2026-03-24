@@ -21,7 +21,7 @@ package parameters
 
 import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
+	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 

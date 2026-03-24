@@ -1106,16 +1106,33 @@ type ComponentFileTemplate struct {
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 
-	// ExternalManaged indicates whether the configuration is managed by an external system.
-	// When set to true, the controller will ignore the management of this configuration.
-	//
-	// +optional
-	ExternalManaged *bool `json:"externalManaged,omitempty"`
-
-	// Specifies whether to restart the pod when the file changes.
+	// Specifies whether to restart the workload when the file changes.
 	//
 	// +optional
 	RestartOnFileChange *bool `json:"restartOnFileChange,omitempty"`
+
+	// Defines the procedure that reloads the file when it's content changes.
+	//
+	// If specified, this action overrides the global reconfigure action defined in lifecycle actions
+	// for this specific file template.
+	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_CONFIG_FILES_CREATED: file1,file2...
+	// - KB_CONFIG_FILES_REMOVED: file1,file2...
+	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	Reconfigure *Action `json:"reconfigure,omitempty"`
+
+	// ExternalManaged specifies whether the file management is delegated to an external system or manual user control.
+	//
+	// When set to true, the controller will ignore the management of this file.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
 type LogConfig struct {
@@ -1437,6 +1454,18 @@ type ReplicaRole struct {
 	// +kubebuilder:default=false
 	// +optional
 	ParticipatesInQuorum bool `json:"participatesInQuorum"`
+
+	// IsExclusive specifies if this role can be assigned to only one Pod at a time
+	// within a Component. If true, the controller ensures that when a new Pod
+	// claims this role, any existing Pods with the same role label will have
+	// their labels removed immediately.
+	// This helps prevent "Split-Brain" scenarios during network partitions or node failures.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	IsExclusive bool `json:"isExclusive"`
 }
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
@@ -1535,6 +1564,9 @@ type ComponentLifecycleActions struct {
 	// This approach aims to minimize downtime and maintain availability
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 	// In a typical consensus system, this action is used to transfer leader role to another replica.
+	//
+	// When a pod is about to be updated, a switchover action will be triggered for it. So addon implementation must determine
+	// if the pod's current role needs to be transferred.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -1690,8 +1722,6 @@ type ComponentLifecycleActions struct {
 	//
 	// Note: This field is immutable once it has been set.
 	//
-	// This Action is reserved for future versions.
-	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
 
@@ -1716,6 +1746,9 @@ type ComponentLifecycleActions struct {
 // Action defines a customizable hook or procedure tailored for different database engines,
 // designed to be invoked at predetermined points within the lifecycle of a Component instance.
 // It provides a modular and extensible way to customize a Component's behavior through the execution of defined actions.
+//
+// Action should be idempotent if possible. In some circumstances (for example, an UPDATE to an k8s object fails due to concurrent updates),
+// the action may be retried even after a success.
 //
 // Available Action triggers include:
 //
@@ -1805,7 +1838,10 @@ type Action struct {
 
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//
-	// If the Action does not complete within this time frame, it will be terminated.
+	// Behavior based on the value:
+	// - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+	// - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+	// - Negative (< 0): No timeout is applied; the action runs until the command completes.
 	//
 	// This field cannot be updated.
 	//

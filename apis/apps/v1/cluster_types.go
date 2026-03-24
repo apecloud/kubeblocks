@@ -226,7 +226,7 @@ type ClusterStatus struct {
 	// Records the current status information of all shardings within the Cluster.
 	//
 	// +optional
-	Shardings map[string]ClusterComponentStatus `json:"shardings,omitempty"`
+	Shardings map[string]ClusterShardingStatus `json:"shardings,omitempty"`
 
 	// Represents a list of detailed status of the Cluster object.
 	// Each condition in the list provides real-time information about certain aspect of the Cluster object.
@@ -264,7 +264,7 @@ type ClusterComponentSpec struct {
 	// but required otherwise.
 	//
 	// +kubebuilder:validation:MaxLength=22
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^$|^[a-z]([a-z0-9-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -355,9 +355,20 @@ type ClusterComponentSpec struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
-	// Each template specifies the desired characteristics of a persistent volume, such as storage class,
-	// size, and access modes.
-	// These templates are used to dynamically provision persistent volumes for the Component.
+	//
+	// Each template defines the desired characteristics of a persistent volume, such as storage class,
+	// size, and access modes, used for dynamic provisioning.
+	//
+	// PVC Adoption Mechanism:
+	// KubeBlocks supports adopting existing PVCs (static provisioning) if they meet the following criteria
+	// before the Cluster is created:
+	// 1. Naming: The PVC name must follow the KubeBlocks naming convention:
+	//    $(vct-name)-$(pod-name) (e.g., "data-mycluster-mysql-0").
+	// 2. Labeling: The PVC must carry the label "app.kubernetes.io/managed-by=kubeblocks".
+	// 3. Ownership: The PVC must not have any existing controller reference.
+	//
+	// If these conditions are met, KubeBlocks will automatically take over the PVCs and
+	// set the Component (or its controlled resources) as the owner/controller reference.
 	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -423,11 +434,14 @@ type ClusterComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
-	// "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+	// "kb-{clusterName}-{compName}", bound to a cluster role with rules defined in ComponentDefinition's
 	// `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
-	// it will also be bound to a default role named
+	// it will also be bound to a default cluster role named
 	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
-	// If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
+	//
+	// Before KubeBlocks 1.1, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
+	// To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+	// when a workload has been restarted.
 	//
 	// If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 	// create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
@@ -493,6 +507,13 @@ type ClusterComponentSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies the desired Ordinals.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+	//
+	// +optional
+	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
 	// globally uniquely ordinal scheme, regardless of the instance template.
@@ -623,16 +644,16 @@ type ClusterSharding struct {
 	// between the desired and actual number of shards.
 	// KubeBlocks provides lifecycle management for sharding, including:
 	//
-	// - Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+	// - Executing the shardAdd Action defined in the ShardingDefinition when the number of shards increases.
 	//   This allows for custom actions to be performed after a new shard is provisioned.
-	// - Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+	// - Executing the shardRemove Action defined in the ShardingDefinition when the number of shards decreases.
 	//   This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 	//   Resources and data associated with the corresponding Component will also be deleted.
 	//
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
 	// +kubebuilder:validation:Required
-	Shards int32 `json:"shards,omitempty"`
+	Shards int32 `json:"shards"`
 
 	// The default template for generating Components for shards, where each shard consists of one Component.
 	//
@@ -745,6 +766,11 @@ type ShardTemplate struct {
 	//
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty"`
+
+	// Specifies an override for the desired Ordinals of the shard.
+	//
+	// +optional
+	Ordinals *Ordinals `json:"ordinals,omitempty"`
 
 	// Specifies an override for the instance naming of the shard.
 	//
@@ -901,3 +927,95 @@ type ClusterComponentStatus struct {
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 }
+
+// ClusterShardingStatus records a sharding status.
+type ClusterShardingStatus struct {
+	// Specifies the current state of the sharding.
+	//
+	// +optional
+	Phase ComponentPhase `json:"phase,omitempty"`
+
+	// Records detailed information about the sharding in its current phase.
+	//
+	// +optional
+	Message map[string]string `json:"message,omitempty"`
+
+	// Indicates the most recent generation of the sharding state observed.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Indicates whether the sharding state observed is up-to-date with the desired state.
+	//
+	// +optional
+	UpToDate bool `json:"upToDate,omitempty"`
+
+	// Records the name of the sharding definition used.
+	//
+	// +optional
+	ShardingDef string `json:"shardingDef,omitempty"`
+
+	// PostProvision records the status of the sharding post-provision action.
+	//
+	// +optional
+	PostProvision *LifecycleActionStatus `json:"postProvision,omitempty"`
+
+	// PreTerminate records the status of the sharding pre-terminate action.
+	//
+	// +optional
+	PreTerminate *LifecycleActionStatus `json:"preTerminate,omitempty"`
+}
+
+// LifecycleActionStatus records the observed state of a lifecycle-related action.
+type LifecycleActionStatus struct {
+	// Phase is the current phase of the lifecycle action.
+	//
+	// +optional
+	Phase LifecycleActionPhase `json:"phase,omitempty"`
+
+	// Reason is a programmatic identifier indicating the reason for the current phase.
+	// e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
+	//
+	// +optional
+	// Reason string `json:"reason,omitempty"`
+
+	// Message is a human-readable message providing details about the current phase.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// StartTime records the time when the action started execution.
+	//
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// CompletionTime records the time when the action reached a terminal state (Succeeded, Failed, or Skipped).
+	//
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+}
+
+// LifecycleActionPhase describes the current phase of a lifecycle-related action.
+//
+// +enum
+// +kubebuilder:validation:Enum={Pending,Running,Succeeded,Failed,Skipped}
+type LifecycleActionPhase string
+
+const (
+	// LifecycleActionPending indicates the action is registered and waiting to be triggered or
+	// waiting for its dynamic preconditions to be met.
+	LifecycleActionPending LifecycleActionPhase = "Pending"
+
+	// LifecycleActionRunning indicates the preconditions are met and the action is currently being executed.
+	LifecycleActionRunning LifecycleActionPhase = "Running"
+
+	// LifecycleActionSucceeded indicates the action has completed successfully.
+	LifecycleActionSucceeded LifecycleActionPhase = "Succeeded"
+
+	// LifecycleActionFailed indicates the action has failed during execution or timed out.
+	LifecycleActionFailed LifecycleActionPhase = "Failed"
+
+	// LifecycleActionSkipped indicates the action was intentionally bypassed.
+	// Usually occurs if a prerequisite action failed or a permanent condition was not met.
+	LifecycleActionSkipped LifecycleActionPhase = "Skipped"
+)

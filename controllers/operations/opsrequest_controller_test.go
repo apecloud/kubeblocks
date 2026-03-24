@@ -292,6 +292,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
 
+			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1.RunningComponentPhase))
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningComponentPhase))
 		}
 

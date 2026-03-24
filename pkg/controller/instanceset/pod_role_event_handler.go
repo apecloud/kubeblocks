@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -159,15 +160,9 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 			return pair.RoleName, nil
 		}
 
-		// compare the version of the current role snapshot with the last version recorded in the pod annotation,
-		// stale role snapshot will be ignored.
-		lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
-		if ok {
-
-			if snapshot.Version <= lastSnapshotVersion && !strings.Contains(lastSnapshotVersion, ":") {
-				reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
-				return pair.RoleName, nil
-			}
+		if checkStaleLastSnapshotVersion(snapshot.Version, pod) {
+			reqCtx.Log.Info("stale role snapshot received, ignore it", "snapshot", snapshot)
+			return pair.RoleName, nil
 		}
 
 		var name string
@@ -187,6 +182,18 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 		}
 	}
 	return role, nil
+}
+
+// compare the version of the current role snapshot with the last version recorded in the pod annotation,
+// stale role snapshot will be ignored.
+func checkStaleLastSnapshotVersion(version string, pod *corev1.Pod) bool {
+	lastSnapshotVersion, ok := pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]
+	if ok {
+		if version <= lastSnapshotVersion && !strings.Contains(lastSnapshotVersion, ":") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRoleSnapshot {
@@ -236,27 +243,64 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 	return nil
 }
 
-// updatePodRoleLabel updates pod role label when internal container role changed
-func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
-	its workloads.InstanceSet, pod *corev1.Pod, roleName string, version string) error {
-	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(its)
-	// role not defined in CR, ignore it
-	roleName = strings.ToLower(roleName)
-
+func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet,
+	pod *corev1.Pod, roleName string, version string) error {
+	var (
+		ctx                = reqCtx.Ctx
+		roleMap            = composeRoleMap(its)
+		normalizedRoleName = strings.ToLower(roleName)
+		role, defined      = roleMap[normalizedRoleName]
+	)
 	// update pod role label
 	newPod := pod.DeepCopy()
-	role, ok := roleMap[roleName]
-	switch ok {
-	case true:
-		newPod.Labels[RoleLabelKey] = role.Name
-	case false:
+	if defined {
+		newPod.Labels[RoleLabelKey] = normalizedRoleName
+	} else {
 		delete(newPod.Labels, RoleLabelKey)
 	}
-
 	if newPod.Annotations == nil {
 		newPod.Annotations = map[string]string{}
 	}
 	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Update(ctx, newPod)
+	if err := cli.Update(ctx, newPod); err != nil {
+		return err
+	}
+
+	if role.IsExclusive {
+		return removeExclusiveRoleLabels(cli, reqCtx, its, pod.Name, normalizedRoleName, version)
+	}
+	return nil
+}
+
+func removeExclusiveRoleLabels(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet, newPodName, roleName, version string) error {
+	labels := getMatchLabels(its.Name)
+	labels[RoleLabelKey] = roleName
+	var pods corev1.PodList
+	if err := cli.List(reqCtx.Ctx, &pods, client.InNamespace(its.Namespace), client.MatchingLabels(labels)); err != nil {
+		return err
+	}
+
+	var errs []error
+	for i, pod := range pods.Items {
+		if pod.Name == newPodName {
+			continue
+		}
+		if checkStaleLastSnapshotVersion(version, &pod) {
+			reqCtx.Log.Info("stale remove exclusive role label event, ignore it", "snapshot version", version, "pod", pod.Name)
+			continue
+		}
+
+		newPod := pods.Items[i].DeepCopy()
+		delete(newPod.Labels, RoleLabelKey)
+		if newPod.Annotations == nil {
+			newPod.Annotations = map[string]string{}
+		}
+		newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
+		if err := cli.Update(reqCtx.Ctx, newPod); err != nil {
+			errs = append(errs, err)
+		} else {
+			reqCtx.Log.Info("remove exclusive role label", "pod", newPod.Name, "role", roleName)
+		}
+	}
+	return errors.Join(errs...)
 }

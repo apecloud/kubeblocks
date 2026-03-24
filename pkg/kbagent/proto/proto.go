@@ -74,8 +74,8 @@ type ActionRequest struct {
 	Action         string            `json:"action"`
 	Parameters     map[string]string `json:"parameters,omitempty"`
 	NonBlocking    *bool             `json:"nonBlocking,omitempty"`
-	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
-	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
+	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"` // TODO: not implemented
+	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`    // TODO: not implemented
 }
 
 type ActionResponse struct {
@@ -135,7 +135,7 @@ type TaskEvent struct {
 type NewReplicaTask struct {
 	Remote         string            `json:"remote"` // the remote address of the data source
 	Port           int32             `json:"port"`
-	Replicas       string            `json:"replicas"`             // replicas to load the data
-	Parameters     map[string]string `json:"parameters,omitempty"` // parameters for data dump and load
-	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
+	Replicas       string            `json:"replicas"`                 // replicas to load the data
+	Parameters     map[string]string `json:"parameters,omitempty"`     // parameters for data dump and load
+	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"` // TODO: not implemented
 }

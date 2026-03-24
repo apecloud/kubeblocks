@@ -75,7 +75,7 @@ jobs:
           fi
           make bump-chart-ver VERSION="${BUMP_VERSION}"
           touch ${{ matrix.yaml }}
-          helm template kubeblocks deploy/helm --dependency-update > ${{ matrix.yaml }}
+          helm template kubeblocks deploy/helm --namespace kb-system --dependency-update > ${{ matrix.yaml }}
 
       - name: merge KubeBlocks crds
         if: ${{ matrix.yaml == 'kubeblocks_crds.yaml' }}

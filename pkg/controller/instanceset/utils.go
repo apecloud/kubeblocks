@@ -30,11 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/integer"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -205,7 +206,7 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 	return updateStrategy
 }
 
-func newLifecycleAction(its *workloads.InstanceSet, objects []client.Object, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+func newLifecycleAction(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = its.Labels[constant.AppInstanceLabelKey]
 		compName         = its.Labels[constant.KBAppComponentLabelKey]
@@ -220,6 +221,7 @@ func newLifecycleAction(its *workloads.InstanceSet, objects []client.Object, pod
 		}
 		replicas []lifecycle.Replica
 	)
+	objects := tree.List(&corev1.Pod{})
 	for i := range objects {
 		replicas = append(replicas, &lifecycleReplica{
 			Pod: *(objects[i].(*corev1.Pod)),
@@ -252,4 +254,8 @@ func (r *lifecycleReplica) Endpoint() (string, int32, error) {
 
 func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
 	return "", 0, fmt.Errorf("NotSupported")
+}
+
+func isStopRequested(its *workloads.InstanceSet) bool {
+	return ptr.Deref(its.Spec.Stop, false)
 }

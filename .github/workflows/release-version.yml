@@ -12,7 +12,7 @@ run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_ver
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.24"
 
 jobs:
   release-message:
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib
@@ -47,7 +47,7 @@ jobs:
       - name: Install golangci-lint
         if: matrix.ops == 'lint'
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.8.0
 
       - name: make ${{ matrix.ops }}
         run: |
@@ -143,6 +143,17 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"
+      VERSION: "${{ inputs.release_version }}"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
+      WORKFLOW_ID: "release-version.yml"
+      APECD_REF: "v0.1.38"
+    secrets: inherit
+
+  release-storage-providers-version:
+    needs: release-branch
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.38
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks-storage-providers"
       VERSION: "${{ inputs.release_version }}"
       BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
       WORKFLOW_ID: "release-version.yml"

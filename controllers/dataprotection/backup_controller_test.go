@@ -681,6 +681,13 @@ var _ = Describe("Backup Controller test", func() {
 					Phase:               dpv1alpha1.BackupPhaseCompleted,
 					CompletionTimestamp: &metav1.Time{Time: time.Now().Add(-time.Hour * 24)},
 					BackupRepoName:      testdp.BackupRepoName,
+					Target: &dpv1alpha1.BackupStatusTarget{
+						BackupTarget: dpv1alpha1.BackupTarget{
+							PodSelector: &dpv1alpha1.PodSelector{
+								Strategy: dpv1alpha1.PodSelectionStrategyAny,
+							},
+						},
+					},
 					EncryptionConfig: &dpv1alpha1.EncryptionConfig{
 						Algorithm: "AES-256-CFB",
 						PassPhraseSecretKeyRef: &corev1.SecretKeySelector{
@@ -915,6 +922,13 @@ var _ = Describe("Backup Controller test", func() {
 					BackupRepoName:   repoName,
 					ParentBackupName: parentBackup,
 					BaseBackupName:   baseBackup,
+					Target: &dpv1alpha1.BackupStatusTarget{
+						BackupTarget: dpv1alpha1.BackupTarget{
+							PodSelector: &dpv1alpha1.PodSelector{
+								Strategy: dpv1alpha1.PodSelectionStrategyAny,
+							},
+						},
+					},
 					TimeRange: &dpv1alpha1.BackupTimeRange{
 						Start: step(),
 						End:   step(),

@@ -119,7 +119,7 @@ func newLifecycleAction(action string, synthesizedComp *component.SynthesizedCom
 		})
 	}
 	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, replicas...)
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, nil, replicas...)
 }
 
 type lifecycleReplica struct {

@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -119,7 +118,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 
 func (t *componentAccountTransformer) createAccount(transCtx *componentTransformContext,
 	dag *graph.DAG, graphCli model.GraphClient, account synthesizedSystemAccount) error {
-	secret, err := t.buildAccountSecret(transCtx, transCtx.SynthesizeComponent, account)
+	secret, err := t.buildAccountSecret(transCtx, account)
 	if err != nil {
 		return err
 	}
@@ -137,7 +136,7 @@ func (t *componentAccountTransformer) deleteAccount(transCtx *componentTransform
 
 func (t *componentAccountTransformer) updateAccount(transCtx *componentTransformContext,
 	dag *graph.DAG, graphCli model.GraphClient, account synthesizedSystemAccount, running *corev1.Secret) error {
-	secret, err := t.buildAccountSecret(transCtx, transCtx.SynthesizeComponent, account)
+	secret, err := t.buildAccountSecret(transCtx, account)
 	if err != nil {
 		return err
 	}
@@ -175,17 +174,16 @@ func (t *componentAccountTransformer) buildAccountHash(account synthesizedSystem
 	return signatureSystemAccountPassword(secret)
 }
 
-func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
-	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount) (*corev1.Secret, error) {
+func (t *componentAccountTransformer) buildAccountSecret(transCtx *componentTransformContext, account synthesizedSystemAccount) (*corev1.Secret, error) {
 	var password []byte
 	var err error
 	switch {
 	case account.SecretRef != nil:
-		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
+		if password, err = t.getPasswordFromSecret(transCtx, account); err != nil {
 			return nil, err
 		}
 	default:
-		password, err = t.buildPassword(ctx, account)
+		password, err = t.buildPassword(transCtx, account)
 		if err != nil {
 			return nil, err
 		}
@@ -193,16 +191,19 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 	if len(password) > maximumPasswordLength {
 		return nil, errPasswordTooLong
 	}
-	return t.buildAccountSecretWithPassword(ctx, synthesizeComp, account, password)
+	return t.buildAccountSecretWithPassword(transCtx, account, password)
 }
 
-func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account synthesizedSystemAccount) ([]byte, error) {
+func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
 	secretKey := types.NamespacedName{
 		Namespace: account.SecretRef.Namespace,
 		Name:      account.SecretRef.Name,
 	}
+	if len(secretKey.Namespace) == 0 {
+		secretKey.Namespace = transCtx.SynthesizeComponent.Namespace
+	}
 	secret := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
+	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
 		return nil, err
 	}
 
@@ -210,23 +211,24 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	if len(account.SecretRef.Password) > 0 {
 		passwordKey = account.SecretRef.Password
 	}
-	if len(secret.Data) == 0 || len(secret.Data[passwordKey]) == 0 {
+	if _, ok := secret.Data[passwordKey]; !ok {
 		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
 	}
 	return secret.Data[passwordKey], nil
 }
 
-func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
+func (t *componentAccountTransformer) buildPassword(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
+	synthesizedComp := transCtx.SynthesizeComponent
 	// get restore password if exists during recovery.
-	password, err := appsutil.GetRestoreSystemAccountPassword(ctx.Context, ctx.Client,
-		ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
+	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client,
+		synthesizedComp.Annotations, synthesizedComp.Name, account.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation, err: %w", account.Name, ctx.SynthesizeComponent.Name, err)
+		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation, err: %w", account.Name, synthesizedComp.Name, err)
 	}
 	if account.InitAccount && len(password) == 0 {
-		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account).
+		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(synthesizedComp, account).
 		// This is compatibility processing.
-		password = []byte(factory.GetRestorePassword(ctx.SynthesizeComponent))
+		password = []byte(appsutil.GetRestorePassword(synthesizedComp.Annotations, synthesizedComp.Name))
 	}
 	if len(password) == 0 {
 		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
@@ -236,16 +238,17 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 }
 
 func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext,
-	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount, password []byte) (*corev1.Secret, error) {
-	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
-	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
+	account synthesizedSystemAccount, password []byte) (*corev1.Secret, error) {
+	synthesizedComp := ctx.SynthesizeComponent
+	secretName := constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, account.Name)
+	secret := builder.NewSecretBuilder(synthesizedComp.Namespace, secretName).
 		// Priority: static < dynamic < built-in
-		AddLabelsInMap(synthesizeComp.StaticLabels).
-		AddLabelsInMap(synthesizeComp.DynamicLabels).
-		AddLabelsInMap(constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddLabels(systemAccountLabel, account.Name).
-		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
-		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		// SetImmutable(true).

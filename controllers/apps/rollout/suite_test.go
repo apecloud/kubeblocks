@@ -124,7 +124,7 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault("HOST_PORT_CM_NAME", "kubeblocks-host-ports")
 	viper.SetDefault(constant.EnableRBACManager, true)
 
-	err = intctrlutil.InitHostPortManager(k8sClient)
+	err = intctrlutil.InitDefaultHostPortManager(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&RolloutReconciler{

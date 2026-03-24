@@ -197,11 +197,14 @@ type ComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
-	// "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+	// "kb-{clusterName}-{compName}", bound to a cluster role with rules defined in ComponentDefinition's
 	// `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
-	// it will also be bound to a default role named
+	// it will also be bound to a default cluster role named
 	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
-	// If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
+	//
+	// Before KubeBlocks 1.1, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
+	// To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+	// when a workload has been restarted.
 	//
 	// If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 	// create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
@@ -279,6 +282,13 @@ type ComponentSpec struct {
 	// +optional
 	Instances []InstanceTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// Specifies the desired Ordinals.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+	// If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+	//
+	// +optional
+	Ordinals Ordinals `json:"ordinals,omitempty"`
+
 	// flatInstanceOrdinal controls whether the naming of instances(pods) under this component uses a flattened,
 	// globally uniquely ordinal scheme, regardless of the instance template.
 	//
@@ -338,6 +348,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
+
+	// Specifies custom actions that can be performed on the Component.
+	//
+	// +optional
+	CustomActions []CustomAction `json:"customActions,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.
@@ -398,6 +413,20 @@ type Sidecar struct {
 	//
 	// +kubebuilder:validation:Required
 	SidecarDef string `json:"sidecarDef"`
+}
+
+type CustomAction struct {
+	// Name specifies the unique name of the custom action.
+	//
+	// The name will be used as the action name when invoking the action.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the action to be performed.
+	//
+	// +kubebuilder:validation:Required
+	Action *Action `json:"action"`
 }
 
 // ComponentPhase defines the phase of the Component within the .status.phase field.

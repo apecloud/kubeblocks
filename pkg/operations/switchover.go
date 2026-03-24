@@ -116,7 +116,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 			return err
 		}
 		compName := switchover.GetComponentName()
-		if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
+		if synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, compName))
 		}
 
@@ -392,7 +392,7 @@ func newLifecycleAction(synthesizedComp *component.SynthesizedComponent, pods []
 		replicas = append(replicas, &lifecycleReplica{Pod: *pods[i]})
 	}
 	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, replica, replicas...)
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, replica, replicas...)
 }
 
 type lifecycleReplica struct {

@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var _ = Describe("configuration builder", func() {

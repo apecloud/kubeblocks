@@ -34,11 +34,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
-	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	cfgcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
+	"github.com/apecloud/kubeblocks/pkg/parameters/validate"
 )
 
 // ParametersDefinitionReconciler reconciles a ParametersDefinition object
@@ -88,7 +89,7 @@ func (r *ParametersDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) erro
 
 func (r *ParametersDefinitionReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parametersDef *parametersv1alpha1.ParametersDefinition) (ctrl.Result, error) {
 
-	if intctrlutil.ParametersDefinitionTerminalPhases(parametersDef.Status, parametersDef.Generation) {
+	if parameters.ParametersDefinitionTerminalPhases(parametersDef.Status, parametersDef.Generation) {
 		return intctrlutil.Reconciled()
 	}
 

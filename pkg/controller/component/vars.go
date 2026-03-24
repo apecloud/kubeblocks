@@ -239,7 +239,7 @@ func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]core
 func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []corev1.EnvVar, vars *[]corev1.EnvVar) error {
 	var (
 		isValues = make(map[string]bool)
-		values   = make(map[string]string)
+		values   = make(map[string]any)
 	)
 	normalize := func(name string) string {
 		return strings.ReplaceAll(name, "-", "_")
@@ -458,7 +458,8 @@ func resolveHostNetworkPortRef(ctx context.Context, cli client.Reader, synthesiz
 	defineKey string, selector appsv1.HostNetworkVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePort := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		compName := obj.(string)
-		port, _ := getHostNetworkPort(ctx, cli, synthesizedComp.ClusterName, compName, selector.Container.Name, selector.Container.Port.Name)
+		port, _ := getHostNetworkPort(synthesizedComp,
+			synthesizedComp.ClusterName, compName, selector.Container.Name, selector.Container.Port.Name)
 		if port > 0 {
 			return &corev1.EnvVar{
 				Name:  defineKey,
@@ -1255,7 +1256,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 	// if err == nil {
 	//	names, err = GeneratePodNamesByITS(its)
 	// } else {
-	names, err := GeneratePodNamesByComp(comp)
+	names, err := generatePodNamesByComp(comp)
 	// }
 	if err != nil {
 		return "", err

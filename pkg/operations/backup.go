@@ -92,9 +92,10 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	}
 	// check backup status
 	phase := backups.Items[0].Status.Phase
-	if phase == dpv1alpha1.BackupPhaseCompleted {
+	switch phase {
+	case dpv1alpha1.BackupPhaseCompleted:
 		return opsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if phase == dpv1alpha1.BackupPhaseFailed {
+	case dpv1alpha1.BackupPhaseFailed:
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("backup failed")
 	}
 	return opsv1alpha1.OpsRunningPhase, 0, nil

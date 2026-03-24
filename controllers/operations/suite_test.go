@@ -21,7 +21,6 @@ package operations
 
 import (
 	"context"
-	"fmt"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -65,11 +64,6 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-const (
-	testDataPlaneNodeAffinityKey = "testDataPlaneNodeAffinityKey"
-	testDataPlaneTolerationKey   = "testDataPlaneTolerationKey"
-)
-
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -100,10 +94,6 @@ var _ = BeforeSuite(func() {
 	}
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 10)
-	viper.Set(constant.CfgKeyDataPlaneTolerations,
-		fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", testDataPlaneTolerationKey))
-	viper.Set(constant.CfgKeyDataPlaneAffinity,
-		fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", testDataPlaneNodeAffinityKey))
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()
@@ -179,7 +169,7 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault("HOST_PORT_CM_NAME", "kubeblocks-host-ports")
 	viper.SetDefault(constant.EnableRBACManager, true)
 
-	err = intctrlutil.InitHostPortManager(k8sClient)
+	err = intctrlutil.InitDefaultHostPortManager(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 
 	clusterRecorder = k8sManager.GetEventRecorderFor("cluster-controller")
@@ -250,7 +240,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-parameter"),
-	}).SetupWithManager(k8sManager, nil)
+	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	/*	err = (&apps.ServiceDescriptorReconciler{

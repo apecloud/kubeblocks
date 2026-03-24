@@ -193,4 +193,206 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(parseProbeEventMessage(reqCtx, event)).Should(BeNil())
 		})
 	})
+
+	Context("exclusive role", func() {
+		var (
+			cli     client.Client
+			reqCtx  intctrlutil.RequestCtx
+			pod     *corev1.Pod
+			handler *PodRoleEventHandler
+		)
+
+		BeforeEach(func() {
+			cli = k8sMock
+			reqCtx = intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: logger,
+			}
+			pod = builder.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
+			pod.ResourceVersion = "1"
+			handler = &PodRoleEventHandler{}
+		})
+
+		It("should remove exclusive role labels from other pods when a new pod claims exclusive role", func() {
+			// Create an exclusive role
+			exclusiveRole := workloads.ReplicaRole{
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
+				IsExclusive:          true, // Exclusive role
+			}
+
+			// Create an event for the new pod claiming the exclusive role
+			objectRef := corev1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  pod.Namespace,
+				Name:       pod.Name,
+				UID:        pod.UID,
+				FieldPath:  lorryEventFieldPath,
+			}
+			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", exclusiveRole.Name)
+			event := builder.NewEventBuilder(namespace, "foo").
+				SetInvolvedObject(objectRef).
+				SetReason(checkRoleOperation).
+				SetMessage(message).
+				GetObject()
+
+			// Mock other pods with the same exclusive role label
+			otherPod1 := builder.NewPodBuilder(namespace, getPodName(name, 1)).
+				SetUID("uid-other-1").
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+				AddLabels(WorkloadsInstanceLabelKey, name).
+				AddLabels(RoleLabelKey, exclusiveRole.Name).
+				GetObject()
+			otherPod2 := builder.NewPodBuilder(namespace, getPodName(name, 2)).
+				SetUID("uid-other-2").
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+				AddLabels(WorkloadsInstanceLabelKey, name).
+				AddLabels(RoleLabelKey, exclusiveRole.Name).
+				GetObject()
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
+					p.Namespace = objKey.Namespace
+					p.Name = objKey.Name
+					p.UID = pod.UID
+					p.Labels = map[string]string{
+						constant.AppManagedByLabelKey: constant.AppName,
+						WorkloadsManagedByLabelKey:    workloads.InstanceSetKind,
+						WorkloadsInstanceLabelKey:     name,
+					}
+					return nil
+				}).Times(1)
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, its *workloads.InstanceSet, _ ...client.GetOption) error {
+					its.Namespace = objKey.Namespace
+					its.Name = objKey.Name
+					its.Spec.Roles = []workloads.ReplicaRole{exclusiveRole}
+					return nil
+				}).Times(1)
+
+			// Expect update for the main pod (adding role label)
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
+					Expect(pd).ShouldNot(BeNil())
+					Expect(pd.Labels).ShouldNot(BeNil())
+					Expect(pd.Labels[RoleLabelKey]).Should(Equal(exclusiveRole.Name))
+					return nil
+				}).Times(1)
+
+			// Expect list call to find other pods with the same exclusive role
+			k8sMock.EXPECT().
+				List(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, podList *corev1.PodList, opts ...client.ListOption) error {
+					podList.Items = []corev1.Pod{*otherPod1, *otherPod2}
+					return nil
+				}).Times(1)
+
+			// Expect updates to remove role labels from other pods
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
+					Expect(pd).ShouldNot(BeNil())
+					// Should be one of the other pods (not the main pod)
+					Expect(pd.Name).ShouldNot(Equal(pod.Name))
+					// Role label should be removed
+					Expect(pd.Labels).ShouldNot(HaveKey(RoleLabelKey))
+					return nil
+				}).Times(2) // Two other pods
+
+			// Expect event patch
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, evt *corev1.Event, patch client.Patch, _ ...client.PatchOption) error {
+					Expect(evt).ShouldNot(BeNil())
+					Expect(evt.Annotations).ShouldNot(BeNil())
+					Expect(evt.Annotations[roleChangedAnnotKey]).Should(Equal(fmt.Sprintf("count-%d", evt.Count)))
+					return nil
+				}).Times(1)
+
+			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+
+		It("should not remove role labels when role is not exclusive", func() {
+			// Create a non-exclusive role
+			nonExclusiveRole := workloads.ReplicaRole{
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       3,
+				IsExclusive:          false, // Not exclusive
+			}
+
+			// Create an event for the new pod claiming the non-exclusive role
+			objectRef := corev1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  pod.Namespace,
+				Name:       pod.Name,
+				UID:        pod.UID,
+				FieldPath:  lorryEventFieldPath,
+			}
+			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", nonExclusiveRole.Name)
+			event := builder.NewEventBuilder(namespace, "foo").
+				SetInvolvedObject(objectRef).
+				SetReason(checkRoleOperation).
+				SetMessage(message).
+				GetObject()
+
+			// Expectations
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
+					p.Namespace = objKey.Namespace
+					p.Name = objKey.Name
+					p.UID = pod.UID
+					p.Labels = map[string]string{
+						constant.AppManagedByLabelKey: constant.AppName,
+						WorkloadsManagedByLabelKey:    workloads.InstanceSetKind,
+						WorkloadsInstanceLabelKey:     name,
+					}
+					return nil
+				}).Times(1)
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, its *workloads.InstanceSet, _ ...client.GetOption) error {
+					its.Namespace = objKey.Namespace
+					its.Name = objKey.Name
+					its.Spec.Roles = []workloads.ReplicaRole{nonExclusiveRole}
+					return nil
+				}).Times(1)
+
+			// Expect update for the main pod only (no list or updates for other pods)
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
+					Expect(pd).ShouldNot(BeNil())
+					Expect(pd.Labels).ShouldNot(BeNil())
+					Expect(pd.Labels[RoleLabelKey]).Should(Equal(nonExclusiveRole.Name))
+					return nil
+				}).Times(1)
+
+			// Should NOT call List (since role is not exclusive)
+			// Should NOT call Update for other pods
+
+			// Expect event patch
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, evt *corev1.Event, patch client.Patch, _ ...client.PatchOption) error {
+					Expect(evt).ShouldNot(BeNil())
+					Expect(evt.Annotations).ShouldNot(BeNil())
+					Expect(evt.Annotations[roleChangedAnnotKey]).Should(Equal(fmt.Sprintf("count-%d", evt.Count)))
+					return nil
+				}).Times(1)
+
+			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+	})
 })

@@ -206,7 +206,7 @@ var _ = Describe("rollout controller", func() {
 		})()).Should(Succeed())
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
 			cluster.Status.ObservedGeneration = cluster.Generation
-			cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+			cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
 				shardingName: {
 					Phase: appsv1.RunningComponentPhase,
 				},

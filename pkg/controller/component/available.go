@@ -201,7 +201,7 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 	}
 	events = append(events, event)
 
-	podNames, err := GeneratePodNamesByITS(its)
+	podNames, err := GetCurrentPodNamesByITS(its)
 	if err != nil {
 		return nil, err
 	}

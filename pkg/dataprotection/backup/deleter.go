@@ -326,6 +326,9 @@ func (d *Deleter) doPreDeleteAction(
 	if d.actionSet != nil {
 		envVars = append(envVars, d.actionSet.Spec.Env...)
 	}
+	if backup.Status.BackupMethod != nil {
+		envVars = append(envVars, backup.Status.BackupMethod.Env...)
+	}
 	image := common.Expand(preDeleteAction.Image, common.MappingFuncFor(utils.CovertEnvToMap(envVars)))
 	container := corev1.Container{
 		Name:            deleteContainerName,

@@ -25,6 +25,7 @@ import (
 	"math/rand"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -141,7 +142,12 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	if !spec.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
-	if err := a.precondition(ctx, cli, spec); err != nil {
+	if err := a.precondition(ctx, cli, spec, func() client.MatchingLabels {
+		if opts == nil || opts.PreConditionObjectSelector == nil {
+			return nil
+		}
+		return opts.PreConditionObjectSelector
+	}()); err != nil {
 		return nil, err
 	}
 	// TODO: exactly once
@@ -155,7 +161,7 @@ func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec 
 	return a.checkedCallAction(ctx, cli, &spec.Action, lfa, opts)
 }
 
-func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action) error {
+func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action, labels client.MatchingLabels) error {
 	if spec.PreCondition == nil {
 		return nil
 	}
@@ -163,53 +169,83 @@ func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *app
 	case appsv1.ImmediatelyPreConditionType:
 		return nil
 	case appsv1.RuntimeReadyPreConditionType:
-		return a.runtimeReadyCheck(ctx, cli)
+		return a.runtimeReadyCheck(ctx, cli, labels)
 	case appsv1.ComponentReadyPreConditionType:
-		return a.compReadyCheck(ctx, cli)
+		return a.compReadyCheck(ctx, cli, labels)
 	case appsv1.ClusterReadyPreConditionType:
-		return a.clusterReadyCheck(ctx, cli)
+		return a.clusterReadyCheck(ctx, cli, labels)
 	default:
 		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
 	}
 }
 
-func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) error {
+func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
 	ready := func(object client.Object) bool {
 		cluster := object.(*appsv1.Cluster)
 		return cluster.Status.Phase == appsv1.RunningClusterPhase
 	}
-	return a.readyCheck(ctx, cli, a.clusterName, "cluster", &appsv1.Cluster{}, ready)
+	return a.readyCheck(ctx, cli, a.clusterName, "cluster", &appsv1.Cluster{}, &appsv1.ClusterList{}, ready, labels)
 }
 
-func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
+func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
 	ready := func(object client.Object) bool {
 		comp := object.(*appsv1.Component)
 		return comp.Status.Phase == appsv1.RunningComponentPhase
 	}
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
-	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, ready)
+	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, &appsv1.ComponentList{}, ready, labels)
 }
 
-func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader) error {
+func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader, labels client.MatchingLabels) error {
 	name := constant.GenerateWorkloadNamePattern(a.clusterName, a.compName)
 	ready := func(object client.Object) bool {
 		its := object.(*workloads.InstanceSet)
 		return its.IsInstancesReady()
 	}
-	return a.readyCheck(ctx, cli, name, "runtime", &workloads.InstanceSet{}, ready)
+	return a.readyCheck(ctx, cli, name, "runtime", &workloads.InstanceSet{}, &workloads.InstanceSetList{}, ready, labels)
 }
 
-func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string, obj client.Object, ready func(object client.Object) bool) error {
-	key := types.NamespacedName{
-		Namespace: a.namespace,
-		Name:      name,
+func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string,
+	obj client.Object, objList client.ObjectList, ready func(object client.Object) bool, labels client.MatchingLabels) error {
+	objs := make([]client.Object, 0)
+	if len(labels) == 0 {
+		key := types.NamespacedName{
+			Namespace: a.namespace,
+			Name:      name,
+		}
+		if err := cli.Get(ctx, key, obj); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+		}
+		objs = append(objs, obj)
+	} else {
+		listObjs := func() error {
+			if err := cli.List(ctx, objList, client.InNamespace(a.namespace), labels); err != nil {
+				return err
+			}
+			items, err := meta.ExtractList(objList)
+			if err != nil {
+				return err
+			}
+			for _, item := range items {
+				objs = append(objs, item.(client.Object))
+			}
+			return nil
+		}
+
+		if err := listObjs(); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+		}
 	}
-	if err := cli.Get(ctx, key, obj); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+	if len(objs) == 0 {
+		return fmt.Errorf("%w: no %s found", ErrPreconditionFailed, kind)
 	}
-	if !ready(obj) {
-		return fmt.Errorf("%w: %s is not ready", ErrPreconditionFailed, kind)
+
+	for _, o := range objs {
+		if !ready(o) {
+			return fmt.Errorf("%w: %s is not ready", ErrPreconditionFailed, kind)
+		}
 	}
+
 	return nil
 }
 
@@ -318,7 +354,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), replica.Name())
 		}
 		if len(rsp.Error) > 0 {
-			return nil, a.formatError(lfa, rsp)
+			return nil, a.formatError(lfa, rsp, replica.Name())
 		}
 		// take first non-nil output
 		if output == nil && rsp.Output != nil {
@@ -344,9 +380,9 @@ func (a *kbagent) serverEndpoint(replica Replica) (string, int32, error) {
 	return host, port, nil
 }
 
-func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) error {
+func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, podName string) error {
 	wrapError := func(err error) error {
-		return errors.Wrapf(err, "action: %s, error: %s", lfa.name(), rsp.Message)
+		return errors.Wrapf(err, "action: %s, executed on pod: %s, error: %s", lfa.name(), podName, rsp.Message)
 	}
 	err := proto.Type2Error(rsp.Error)
 	switch {

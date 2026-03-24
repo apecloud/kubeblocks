@@ -140,6 +140,9 @@ func buildShardTemplates(clusterName string, sharding *appsv1.ClusterSharding, s
 		if tpl.Instances != nil {
 			spec.Instances = tpl.Instances
 		}
+		if tpl.Ordinals != nil {
+			spec.Ordinals = *tpl.Ordinals
+		}
 		if tpl.FlatInstanceOrdinal != nil {
 			spec.FlatInstanceOrdinal = *tpl.FlatInstanceOrdinal
 		}

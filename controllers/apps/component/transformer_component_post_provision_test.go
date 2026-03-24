@@ -138,7 +138,7 @@ var _ = Describe("post-provision transformer test", func() {
 					}).AnyTimes()
 				})
 
-				transCtx.RunningWorkload.(*workloads.InstanceSet).Status.InstanceStatus = []workloads.InstanceStatus{
+				transCtx.RunningWorkload.Status.InstanceStatus = []workloads.InstanceStatus{
 					{
 						PodName: fmt.Sprintf("%s-0", constant.GenerateWorkloadNamePattern(clusterName, compName)),
 					},

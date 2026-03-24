@@ -22,7 +22,6 @@ package instanceset
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -72,7 +71,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	replicas := int32(0)
-	ordinals := make([]int32, 0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
@@ -95,23 +93,17 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, pod := range podList {
-		_, ordinal := parseParentNameAndOrdinal(pod.Name)
 		templateName := pod.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
-				Name:     templateName,
-				Ordinals: make([]int32, 0),
+				Name: templateName,
 			}
 		}
 		currentRevisions[pod.Name] = getPodRevision(pod)
 		if isCreated(pod) {
 			notReadyNames.Insert(pod.Name)
 			replicas++
-			if len(templateName) == 0 {
-				ordinals = append(ordinals, int32(ordinal))
-			}
 			template2TemplatesStatus[templateName].Replicas++
-			template2TemplatesStatus[templateName].Ordinals = append(template2TemplatesStatus[templateName].Ordinals, int32(ordinal))
 		}
 		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
 			readyReplicas++
@@ -125,12 +117,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if isCreated(pod) && !isTerminating(pod) {
-			isPodUpdated, err := IsPodUpdated(its, pod)
-			if err != nil {
-				return kubebuilderx.Continue, err
+			updated, err1 := isPodUpdated(its, pod)
+			if err1 != nil {
+				return kubebuilderx.Continue, err1
 			}
 			switch _, ok := updateRevisions[pod.Name]; {
-			case !ok, !isPodUpdated:
+			case !ok, !updated:
 				currentReplicas++
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			default:
@@ -151,8 +143,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	its.Status.ReadyInitReplicas = r.buildReadyInitReplicas(its, readyReplicas)
 	its.Status.Replicas = replicas
-	its.Status.Ordinals = ordinals
-	slices.Sort(its.Status.Ordinals)
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
@@ -204,6 +194,28 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
+
+	// serviceaccount name migration process
+	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	updateDone := true
+	for podName, revision := range proposedRevisions {
+		if currentRevisions[podName] != revision {
+			updateDone = false
+			break
+		}
+	}
+	if updateDone {
+		_, ok1 := its.Annotations[constant.ServiceAccountInUseAnnotationKey]
+		proposedSA, ok2 := its.Annotations[constant.ProposedServiceAccountNameAnnotationKey]
+		if !ok1 && ok2 {
+			its.Annotations[constant.ServiceAccountInUseAnnotationKey] = proposedSA
+		}
+	}
+
 	return kubebuilderx.Continue, nil
 }
 
@@ -224,7 +236,6 @@ func (r *statusReconciler) buildTemplatesStatus(template2TemplatesStatus map[str
 		if len(templateName) == 0 {
 			continue
 		}
-		slices.Sort(templateStatus.Ordinals)
 		templatesStatus = append(templatesStatus, *templateStatus)
 	}
 	sort.Slice(templatesStatus, func(i, j int) bool {

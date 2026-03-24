@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -56,23 +55,19 @@ var _ graph.Transformer = &componentServiceTransformer{}
 
 func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	protoITS, err := factory.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
-	if err != nil {
-		return err
-	}
-	// if there exists an instanceset, use its status field to replace protoITS', so that podNameBuilder can work correctly
-	if transCtx.RunningWorkload != nil {
-		runningITS := transCtx.RunningWorkload.(*workloadsv1.InstanceSet)
-		if runningITS != nil {
-			protoITS.Status = runningITS.Status
-		}
-	}
+
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
 	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
 		transCtx.V(1).Info("Component is in compact mode, no need to create service related objects", "component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
+	}
+
+	runningITS := transCtx.RunningWorkload
+	protoITS, err := component.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
+	if err != nil {
+		return err
 	}
 
 	synthesizeComp := transCtx.SynthesizeComponent
@@ -87,7 +82,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, protoITS)
+		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, runningITS, protoITS)
 		if err != nil {
 			return err
 		}
@@ -125,13 +120,13 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 }
 
 func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(comp, synthesizeComp, service, protoITS)
+		return t.buildPodService(comp, synthesizeComp, service, runningITS, protoITS)
 	}
 	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
@@ -141,8 +136,8 @@ func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentServ
 }
 
 func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
-	pods, err := t.podsNameNSuffix(synthesizeComp, protoITS)
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
+	pods, err := t.podsNameNSuffix(synthesizeComp, runningITS, protoITS)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +160,8 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 	return t.buildServices(comp, synthesizeComp, services)
 }
 
-func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, protoITS *workloadsv1.InstanceSet) (map[string]string, error) {
-	podNames, err := component.GeneratePodNamesByITS(protoITS)
+func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloadsv1.InstanceSet) (map[string]string, error) {
+	podNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
 	if err != nil {
 		return nil, err
 	}

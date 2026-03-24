@@ -23,16 +23,14 @@ import (
 	"errors"
 	"slices"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 )
 
 func NewMembershipReconciler() kubebuilderx.Reconciler {
@@ -83,7 +81,7 @@ func (r *membershipReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 
 	for _, pod := range pods {
 		if newNameSet.Has(pod.GetName()) {
-			if err = lifecycleCreateInstance(tree, its, pods, pod.(*corev1.Pod)); err != nil {
+			if err = lifecycleCreateInstance(tree, its, pod.(*corev1.Pod)); err != nil {
 				return kubebuilderx.Continue, err
 			}
 		}
@@ -97,7 +95,7 @@ func (r *membershipReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebui
 	return kubebuilderx.Continue, nil
 }
 
-func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
 	idx := slices.IndexFunc(its.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
 		return inst.PodName == pod.Name
 	})
@@ -121,7 +119,7 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	if inst.MemberJoined == nil || *inst.MemberJoined {
 		return nil // not defined or joined
 	}
-	if err := lifecycleJoinMember(tree, its, pods, pod); err != nil {
+	if err := lifecycleJoinMember(tree, its, pod); err != nil {
 		tree.Logger.Info("failed to join member", "pod", pod.Name, "error", err.Error())
 	} else {
 		its.Status.InstanceStatus[idx].MemberJoined = ptr.To(true)
@@ -129,8 +127,8 @@ func lifecycleCreateInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	return nil
 }
 
-func lifecycleJoinMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
-	lfa, err := newLifecycleAction(its, pods, pod)
+func lifecycleJoinMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
+	lfa, err := newLifecycleAction(its, tree, pod)
 	if err != nil {
 		return err
 	}
@@ -143,7 +141,7 @@ func lifecycleJoinMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceS
 	return nil
 }
 
-func lifecycleDeleteInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+func lifecycleDeleteInstance(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
 	idx := slices.IndexFunc(its.Status.InstanceStatus, func(inst workloads.InstanceStatus) bool {
 		return inst.PodName == pod.Name
 	})
@@ -152,7 +150,7 @@ func lifecycleDeleteInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	}
 	inst := its.Status.InstanceStatus[idx]
 	if ptr.Deref(inst.MemberJoined, false) {
-		if err := lifecycleLeaveMember(tree, its, pods, pod); err != nil {
+		if err := lifecycleLeaveMember(tree, its, pod); err != nil {
 			return err
 		}
 	}
@@ -160,7 +158,7 @@ func lifecycleDeleteInstance(tree *kubebuilderx.ObjectTree, its *workloads.Insta
 	return nil
 }
 
-func lifecycleLeaveMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) error {
+func lifecycleLeaveMember(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
 	switchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		if its.Spec.LifecycleActions.Switchover == nil {
 			return nil
@@ -188,7 +186,7 @@ func lifecycleLeaveMember(tree *kubebuilderx.ObjectTree, its *workloads.Instance
 		return nil
 	}
 
-	lfa, err := newLifecycleAction(its, pods, pod)
+	lfa, err := newLifecycleAction(its, tree, pod)
 	if err != nil {
 		return err
 

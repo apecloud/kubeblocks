@@ -90,6 +90,14 @@ spec:
                   description: ClusterComponentConfig represents a configuration for
                     a component.
                   properties:
+                    configHash:
+                      description: |-
+                        Represents a checksum or hash of the configuration content.
+
+
+                        The controller uses this value to detect changes and determine if a reconfiguration or restart
+                        is necessary to apply updates.
+                      type: string
                     configMap:
                       description: ConfigMap source for the config.
                       properties:
@@ -155,9 +163,13 @@ spec:
                       x-kubernetes-map-type: atomic
                     externalManaged:
                       description: |-
-                        ExternalManaged indicates whether the configuration is managed by an external system.
-                        When set to true, the controller will use the user-provided template and reconfigure action,
-                        ignoring the default template and update behavior.
+                        ExternalManaged specifies whether the configuration management is delegated to an external system
+                        or manual user control.
+
+
+                        When set to true, the controller will exclusively utilize the user-provided configuration source
+                        and the 'reconfigure' action defined in this config, bypassing the default templates and
+                        update behaviors specified in the ComponentDefinition.
                       type: boolean
                     name:
                       description: The name of the config.
@@ -166,7 +178,7 @@ spec:
                       type: string
                     reconfigure:
                       description: |-
-                        The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+                        The custom reconfigure action to reload the updated configuration.
 
 
                         The container executing this action has access to following variables:
@@ -175,9 +187,6 @@ spec:
                         - KB_CONFIG_FILES_CREATED: file1,file2...
                         - KB_CONFIG_FILES_REMOVED: file1,file2...
                         - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
-
-                        Note: This field is immutable once it has been set.
                       properties:
                         exec:
                           description: |-
@@ -600,19 +609,477 @@ spec:
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
 
-                            If the Action does not complete within this time frame, it will be terminated.
+                            Behavior based on the value:
+                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                            - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                            - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
 
                             This field cannot be updated.
                           format: int32
                           type: integer
                       type: object
+                    restart:
+                      description: Specifies whether to restart the component to reload
+                        the updated configuration.
+                      type: boolean
                     variables:
                       additionalProperties:
                         type: string
                       description: Variables are key-value pairs for dynamic configuration
                         values that can be provided by the user.
                       type: object
+                  type: object
+                type: array
+              customActions:
+                description: Specifies custom actions that can be performed on the
+                  Component.
+                items:
+                  properties:
+                    action:
+                      description: Specifies the action to be performed.
+                      properties:
+                        exec:
+                          description: |-
+                            Defines the command to run.
+
+
+                            This field cannot be updated.
+                          properties:
+                            args:
+                              description: Args represents the arguments that are
+                                passed to the `command` for execution.
+                              items:
+                                type: string
+                              type: array
+                            command:
+                              description: |-
+                                Specifies the command to be executed inside the container.
+                                The working directory for this command is the container's root directory('/').
+                                Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
+                                If the shell is required, it must be explicitly invoked in the command.
+
+
+                                A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
+                              items:
+                                type: string
+                              type: array
+                            container:
+                              description: |-
+                                Specifies the name of the container within the same pod whose resources will be shared with the action.
+                                This allows the action to utilize the specified container's resources without executing within it.
+
+
+                                The name must match one of the containers defined in `componentDefinition.spec.runtime`.
+
+
+                                The resources that can be shared are included:
+
+
+                                - volume mounts
+
+
+                                This field cannot be updated.
+                              type: string
+                            env:
+                              description: |-
+                                Represents a list of environment variables that will be injected into the container.
+                                These variables enable the container to adapt its behavior based on the environment it's running in.
+
+
+                                This field cannot be updated.
+                              items:
+                                description: EnvVar represents an environment variable
+                                  present in a Container.
+                                properties:
+                                  name:
+                                    description: Name of the environment variable.
+                                      Must be a C_IDENTIFIER.
+                                    type: string
+                                  value:
+                                    description: |-
+                                      Variable references $(VAR_NAME) are expanded
+                                      using the previously defined environment variables in the container and
+                                      any service environment variables. If a variable cannot be resolved,
+                                      the reference in the input string will be unchanged. Double $$ are reduced
+                                      to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                                      "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                                      Escaped references will never be expanded, regardless of whether the variable
+                                      exists or not.
+                                      Defaults to "".
+                                    type: string
+                                  valueFrom:
+                                    description: Source for the environment variable's
+                                      value. Cannot be used if value is not empty.
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Selects a key of a ConfigMap.
+                                        properties:
+                                          key:
+                                            description: The key to select.
+                                            type: string
+                                          name:
+                                            description: |-
+                                              Name of the referent.
+                                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                              TODO: Add other useful fields. apiVersion, kind, uid?
+                                            type: string
+                                          optional:
+                                            description: Specify whether the ConfigMap
+                                              or its key must be defined
+                                            type: boolean
+                                        required:
+                                        - key
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      fieldRef:
+                                        description: |-
+                                          Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                          spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                        properties:
+                                          apiVersion:
+                                            description: Version of the schema the
+                                              FieldPath is written in terms of, defaults
+                                              to "v1".
+                                            type: string
+                                          fieldPath:
+                                            description: Path of the field to select
+                                              in the specified API version.
+                                            type: string
+                                        required:
+                                        - fieldPath
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      resourceFieldRef:
+                                        description: |-
+                                          Selects a resource of the container: only resources limits and requests
+                                          (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                        properties:
+                                          containerName:
+                                            description: 'Container name: required
+                                              for volumes, optional for env vars'
+                                            type: string
+                                          divisor:
+                                            anyOf:
+                                            - type: integer
+                                            - type: string
+                                            description: Specifies the output format
+                                              of the exposed resources, defaults to
+                                              "1"
+                                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                            x-kubernetes-int-or-string: true
+                                          resource:
+                                            description: 'Required: resource to select'
+                                            type: string
+                                        required:
+                                        - resource
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      secretKeyRef:
+                                        description: Selects a key of a secret in
+                                          the pod's namespace
+                                        properties:
+                                          key:
+                                            description: The key of the secret to
+                                              select from.  Must be a valid secret
+                                              key.
+                                            type: string
+                                          name:
+                                            description: |-
+                                              Name of the referent.
+                                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                              TODO: Add other useful fields. apiVersion, kind, uid?
+                                            type: string
+                                          optional:
+                                            description: Specify whether the Secret
+                                              or its key must be defined
+                                            type: boolean
+                                        required:
+                                        - key
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                    type: object
+                                required:
+                                - name
+                                type: object
+                              type: array
+                            image:
+                              description: |-
+                                Specifies the container image to be used for running the Action.
+
+
+                                When specified, a dedicated container will be created using this image to execute the Action.
+                                All actions with same image will share the same container.
+
+
+                                This field cannot be updated.
+                              type: string
+                            matchingKey:
+                              description: |-
+                                Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                                The impact of this field depends on the `targetPodSelector` value:
+
+
+                                - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                                - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                                  will be selected for the Action.
+
+
+                                This field cannot be updated.
+                              type: string
+                            targetPodSelector:
+                              description: |-
+                                Defines the criteria used to select the target Pod(s) for executing the Action.
+                                This is useful when there is no default target replica identified.
+                                It allows for precise control over which Pod(s) the Action should run in.
+
+
+                                If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                                to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                                post-provision or pre-terminate of the component.
+
+
+                                This field cannot be updated.
+                              enum:
+                              - Any
+                              - All
+                              - Role
+                              - Ordinal
+                              type: string
+                          type: object
+                        grpc:
+                          description: |-
+                            Defines the gRPC call to issue.
+
+
+                            This field cannot be updated.
+                          properties:
+                            host:
+                              description: |-
+                                The target host to connect to.
+                                Defaults to "127.0.0.1" if not specified.
+                              type: string
+                            method:
+                              description: Name of the method to invoke on the gRPC
+                                service.
+                              type: string
+                            port:
+                              description: |-
+                                The port to access on the host.
+                                It may be a numeric string (e.g., "50051") or a named port defined in the container spec.
+                              type: string
+                            request:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Request payload for the gRPC method.
+
+
+                                Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
+                                Templates are rendered with predefined action variables before the request is sent.
+                              type: object
+                            response:
+                              description: Required response schema for the gRPC method.
+                              properties:
+                                message:
+                                  description: |-
+                                    Name of the field in the response whose value should be output.
+                                    Printed to stdout on success, or stderr on failure.
+                                  type: string
+                                status:
+                                  description: |-
+                                    Name of the string field in the response that carries status information.
+                                    If non-empty, the action fails.
+                                  type: string
+                              type: object
+                            service:
+                              description: Fully-qualified name of the gRPC service
+                                to call.
+                              type: string
+                          required:
+                          - method
+                          - port
+                          - service
+                          type: object
+                        http:
+                          description: |-
+                            Defines the HTTP request to perform.
+
+
+                            This field cannot be updated.
+                          properties:
+                            body:
+                              description: |-
+                                Optional HTTP request body.
+
+
+                                Supports Go text/template syntax; rendered with predefined variables before sending.
+                              type: string
+                            headers:
+                              description: |-
+                                Custom headers to set in the request.
+                                Header values may use Go text/template syntax, rendered with predefined variables.
+                              items:
+                                description: HTTPHeader represents a single HTTP header
+                                  key/value pair.
+                                properties:
+                                  name:
+                                    description: Name of the header field.
+                                    type: string
+                                  value:
+                                    description: Value of the header field.
+                                    type: string
+                                required:
+                                - name
+                                - value
+                                type: object
+                              type: array
+                            host:
+                              description: |-
+                                The target host to connect to.
+                                Defaults to "127.0.0.1" if not specified.
+                              type: string
+                            method:
+                              default: GET
+                              description: |-
+                                The HTTP method to use.
+                                Defaults to "GET".
+                              enum:
+                              - GET
+                              - POST
+                              - PUT
+                              - DELETE
+                              - HEAD
+                              - PATCH
+                              type: string
+                            path:
+                              default: /
+                              description: |-
+                                The path to request on the HTTP server.
+                                Defaults to "/" if not specified.
+                              pattern: ^/.*
+                              type: string
+                            port:
+                              description: |-
+                                The port to access on the host.
+                                It may be a numeric string (e.g., "8080") or a named port defined in the container spec.
+                              type: string
+                            scheme:
+                              default: HTTP
+                              description: |-
+                                The scheme to use for connecting to the host.
+                                Defaults to "HTTP".
+                              enum:
+                              - HTTP
+                              - HTTPS
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        matchingKey:
+                          description: |-
+                            Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
+                            The impact of this field depends on the `targetPodSelector` value:
+
+
+                            - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
+                            - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
+                              will be selected for the Action.
+
+
+                            This field cannot be updated.
+                          type: string
+                        preCondition:
+                          description: |-
+                            Specifies the state that the cluster must reach before the Action is executed.
+                            Currently, this is only applicable to the `postProvision` action.
+
+
+                            The conditions are as follows:
+
+
+                            - `Immediately`: Executed right after the Component object is created.
+                              The readiness of the Component and its resources is not guaranteed at this stage.
+                            - `RuntimeReady`: The Action is triggered after the Component object has been created and all associated
+                              runtime resources (e.g. Pods) are in a ready state.
+                            - `ComponentReady`: The Action is triggered after the Component itself is in a ready state.
+                              This process does not affect the readiness state of the Component or the Cluster.
+                            - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
+                              This execution does not alter the Component or the Cluster's state of readiness.
+
+
+                            This field cannot be updated.
+                          type: string
+                        retryPolicy:
+                          description: |-
+                            Defines the strategy to be taken when retrying the Action after a failure.
+
+
+                            It specifies the conditions under which the Action should be retried and the limits to apply,
+                            such as the maximum number of retries and backoff strategy.
+
+
+                            This field cannot be updated.
+                          properties:
+                            maxRetries:
+                              default: 0
+                              description: |-
+                                Defines the maximum number of retry attempts that should be made for a given Action.
+                                This value is set to 0 by default, indicating that no retries will be made.
+                              type: integer
+                            retryInterval:
+                              default: 0
+                              description: |-
+                                Indicates the duration of time to wait between each retry attempt.
+                                This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                              format: int64
+                              type: integer
+                          type: object
+                        targetPodSelector:
+                          description: |-
+                            Defines the criteria used to select the target Pod(s) for executing the Action.
+                            This is useful when there is no default target replica identified.
+                            It allows for precise control over which Pod(s) the Action should run in.
+
+
+                            If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
+                            to be removed or added; or a random pod if the Action is triggered at the component level, such as
+                            post-provision or pre-terminate of the component.
+
+
+                            This field cannot be updated.
+                          enum:
+                          - Any
+                          - All
+                          - Role
+                          - Ordinal
+                          type: string
+                        timeoutSeconds:
+                          default: 0
+                          description: |-
+                            Specifies the maximum duration in seconds that the Action is allowed to run.
+
+
+                            Behavior based on the value:
+                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                            - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+                            - Negative (< 0): No timeout is applied; the action runs until the command completes.
+
+
+                            This field cannot be updated.
+                          format: int32
+                          type: integer
+                      type: object
+                    name:
+                      description: |-
+                        Name specifies the unique name of the custom action.
+
+
+                        The name will be used as the action name when invoking the action.
+                      type: string
+                  required:
+                  - action
+                  - name
                   type: object
                 type: array
               disableExporter:
@@ -2488,7 +2955,7 @@ spec:
                 description: Defines the network configuration for the Component.
                 properties:
                   dnsConfig:
-                    description: Specifies the DNS parameters of a pod.
+                    description: Specifies the DNS parameters of the pod.
                     properties:
                       nameservers:
                         description: |-
@@ -2553,6 +3020,40 @@ spec:
                     description: Host networking requested for this pod. Use the host's
                       network namespace.
                     type: boolean
+                  hostPorts:
+                    description: |-
+                      HostPorts specifies the mapping of container ports to host ports.
+                      The behavior varies based on the HostNetwork setting:
+
+
+                      1. When HostNetwork is enabled:
+                         - If this field is empty: All ports are automatically allocated by the host-port manager.
+                         - If this field is specified:
+                           a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
+                           b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+                              You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+
+
+                      2. When HostNetwork is disabled:
+                         It allows optional mapping for container ports to host ports.
+                         - Mappings are restricted to ports defined in `cmpd.spec.runtime.containers.ports`.
+                         - Any specified container ports not present in the runtime definition will be ignored.
+                    items:
+                      properties:
+                        name:
+                          description: The name of the container port.
+                          type: string
+                        port:
+                          description: The port number of the host port.
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                      required:
+                      - name
+                      - port
+                      type: object
+                    type: array
                 type: object
               offlineInstances:
                 description: |-
@@ -2575,6 +3076,35 @@ spec:
                 items:
                   type: string
                 type: array
+              ordinals:
+                description: |-
+                  Specifies the desired Ordinals.
+                  The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+                  If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
+                properties:
+                  discrete:
+                    items:
+                      format: int32
+                      type: integer
+                    type: array
+                  ranges:
+                    items:
+                      description: |-
+                        Range represents a range with a start and an end value. Both start and end are included.
+                        It is used to define a continuous segment.
+                      properties:
+                        end:
+                          format: int32
+                          type: integer
+                        start:
+                          format: int32
+                          type: integer
+                      required:
+                      - end
+                      - start
+                      type: object
+                    type: array
+                type: object
               parallelPodManagementConcurrency:
                 anyOf:
                 - type: integer
@@ -3865,11 +4395,15 @@ spec:
 
 
                   If not specified, KubeBlocks automatically creates a default ServiceAccount named
-                  "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+                  "kb-{clusterName}-{compName}", bound to a cluster role with rules defined in ComponentDefinition's
                   `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
-                  it will also be bound to a default role named
+                  it will also be bound to a default cluster role named
                   "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
-                  If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
+
+
+                  Before KubeBlocks 1.1, the automatically created serviceaccount is named "kb-{componentdefinition.name}".
+                  To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+                  when a workload has been restarted.
 
 
                   If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
@@ -4582,7 +5116,11 @@ spec:
                           description: The unique identifier of the secret.
                           type: string
                         namespace:
-                          description: The namespace where the secret is located.
+                          description: |-
+                            The namespace where the secret is located.
+
+
+                            If not specified, the secret is assumed to be in the same namespace as the cluster.
                           type: string
                         password:
                           default: password
@@ -4591,7 +5129,6 @@ spec:
                           type: string
                       required:
                       - name
-                      - namespace
                       type: object
                   required:
                   - name

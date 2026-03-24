@@ -25,13 +25,17 @@ import (
 	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 func FullName(clusterName, compName string) string {
@@ -56,10 +60,6 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
 func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
-	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
-	if err != nil {
-		return nil, err
-	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
@@ -72,7 +72,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
 		SetEnv(compSpec.Env).
-		SetSchedulingPolicy(schedulingPolicy).
+		SetSchedulingPolicy(scheduling.BuildSchedulingPolicy(cluster, compSpec)).
 		SetDisableExporter(compSpec.DisableExporter).
 		SetReplicas(compSpec.Replicas).
 		SetResources(compSpec.Resources).
@@ -90,6 +90,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetServiceRefs(compSpec.ServiceRefs).
 		SetTLSConfig(compSpec.TLS, compSpec.Issuer).
 		SetInstances(compSpec.Instances).
+		SetOrdinals(compSpec.Ordinals).
 		SetFlatInstanceOrdinal(compSpec.FlatInstanceOrdinal).
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
@@ -166,4 +167,56 @@ func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
 		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}
 	return nil
+}
+
+func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
+	synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	if err != nil {
+		return nil, err
+	}
+	synthesizedComp.TemplateVars, _, err = ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+	if err != nil {
+		return nil, err
+	}
+
+	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("has no pods to running the action")
+	}
+
+	replicas := make([]lifecycle.Replica, 0)
+	for i := range pods {
+		replicas = append(replicas, &lifecycleReplica{
+			Pod: *pods[i],
+		})
+	}
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, nil, synthesizedComp.TemplateVars, nil, replicas...)
+}
+
+type lifecycleReplica struct {
+	corev1.Pod
+}
+
+func (r *lifecycleReplica) Namespace() string {
+	return r.ObjectMeta.Namespace
+}
+
+func (r *lifecycleReplica) Name() string {
+	return r.ObjectMeta.Name
+}
+
+func (r *lifecycleReplica) Role() string {
+	return r.ObjectMeta.Labels[constant.RoleLabelKey]
+}
+
+func (r *lifecycleReplica) Endpoint() (string, int32, error) {
+	port, err := intctrlutil.GetPortByName(r.Pod, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+	return r.Status.PodIP, port, err
+}
+
+func (r *lifecycleReplica) StreamingEndpoint() (string, int32, error) {
+	return "", 0, fmt.Errorf("NotSupported")
 }

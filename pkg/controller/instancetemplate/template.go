@@ -80,7 +80,7 @@ func buildInstanceTemplates(its *workloads.InstanceSet, instancesCompressed *cor
 	totalReplicas := *its.Spec.Replicas
 	if replicasInTemplates < totalReplicas {
 		replicas := totalReplicas - replicasInTemplates
-		instance := &workloads.InstanceTemplate{Replicas: &replicas, Ordinals: its.Spec.DefaultTemplateOrdinals}
+		instance := &workloads.InstanceTemplate{Replicas: &replicas, Ordinals: its.Spec.Ordinals}
 		instanceTemplateList = append(instanceTemplateList, instance)
 	}
 

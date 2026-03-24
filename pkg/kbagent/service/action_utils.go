@@ -22,9 +22,9 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -45,6 +45,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"k8s.io/utils/ptr"
 
 	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
@@ -115,10 +116,10 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
-			return nil, errors.Wrapf(kbaproto.ErrFailed, errMsg)
+			return nil, errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg)
 		}
 		if errMsg := result.stderr.String(); len(errMsg) > 0 {
-			return nil, errors.Wrapf(err, errMsg)
+			return nil, errors.Wrapf(err, "%s", errMsg)
 		}
 		return nil, err
 	}
@@ -151,11 +152,7 @@ func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, paramet
 func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
 	var cancel context.CancelFunc
-	if timeout == nil {
-		ctx, cancel = context.WithTimeout(ctx, defaultActionCallTimeout)
-	} else if *timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
-	}
+	ctx, cancel = actionCallTimeoutContext(ctx, timeout)
 
 	var err error
 	errChan := make(chan error, 1)
@@ -174,6 +171,17 @@ func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parame
 		return nil, err
 	}
 	return errChan, nil
+}
+
+func actionCallTimeoutContext(ctx context.Context, timeout *int32) (context.Context, context.CancelFunc) {
+	switch {
+	case ptr.Deref(timeout, 0) == 0:
+		return context.WithTimeout(ctx, defaultActionCallTimeout)
+	case *timeout > 0:
+		return context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
+	default:
+		return ctx, func() {}
+	}
 }
 
 func execActionCallX(ctx context.Context, cancel context.CancelFunc,
@@ -369,7 +377,6 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 			return err
 		}
 	}
-
 	go func() {
 		defer cancel()
 		defer close(errChan)
@@ -526,6 +533,21 @@ func setGRPCMessageField(msg *dynamicpb.Message, fieldName, value string) error 
 		return fmt.Errorf("field %s not found", fieldName)
 	}
 
+	if field.IsMap() {
+		if field.MapKey().Kind() != protoreflect.StringKind || field.MapValue().Kind() != protoreflect.StringKind {
+			return fmt.Errorf("unsupported map field type: %s", field.Kind())
+		}
+		items := map[string]string{}
+		if err := json.Unmarshal([]byte(value), &items); err != nil {
+			return err
+		}
+		mapField := msg.Mutable(field).Map()
+		for k, v := range items {
+			mapField.Set(protoreflect.ValueOfString(k).MapKey(), protoreflect.ValueOfString(v))
+		}
+		return nil
+	}
+
 	var val protoreflect.Value
 	switch field.Kind() {
 	case protoreflect.StringKind:
@@ -601,9 +623,11 @@ func renderTemplateData(action string, parameters map[string]string, data string
 	return buf.String(), nil
 }
 
-func mergeEnvWith(parameters map[string]string) map[string]string {
-	result := make(map[string]string)
-	maps.Copy(result, parameters)
+func mergeEnvWith(parameters map[string]string) map[string]any {
+	result := make(map[string]any)
+	for k, v := range parameters {
+		result[k] = v
+	}
 	for _, e := range os.Environ() {
 		kv := strings.Split(e, "=")
 		if _, ok := result[kv[0]]; !ok {

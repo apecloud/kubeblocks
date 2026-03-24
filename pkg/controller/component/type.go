@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type SynthesizedComponent struct {
@@ -47,9 +48,9 @@ type SynthesizedComponent struct {
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	PVCRetentionPolicy               kbappsv1.PersistentVolumeClaimRetentionPolicy
 	FileTemplates                    []SynthesizedFileTemplate
+	Configs                          []workloads.ConfigTemplate
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
-	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
 	Labels                           map[string]string                      `json:"labels,omitempty"`
 	StaticLabels                     map[string]string                      // labels defined by the component definition
@@ -57,10 +58,12 @@ type SynthesizedComponent struct {
 	Annotations                      map[string]string                      `json:"annotations,omitempty"`
 	StaticAnnotations                map[string]string                      // annotations defined by the component definition
 	DynamicAnnotations               map[string]string                      // annotations defined by the cluster and component API
+	AnnotationsInjectedToWorkload    map[string]string                      // annotations created by component controller which will be added to workload CR
 	TemplateVars                     map[string]string                      `json:"templateVars,omitempty"`
 	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
 	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
+	Ordinals                         kbappsv1.Ordinals
 	FlatInstanceOrdinal              bool
 	InstanceImages                   map[string]map[string]string    `json:"instanceImages,omitempty"`
 	OfflineInstances                 []string                        `json:"offlineInstances,omitempty"`
@@ -69,16 +72,17 @@ type SynthesizedComponent struct {
 	ParallelPodManagementConcurrency *intstr.IntOrString             `json:"parallelPodManagementConcurrency,omitempty"`
 	PodUpdatePolicy                  kbappsv1.PodUpdatePolicyType    `json:"podUpdatePolicy,omitempty"`
 	PodUpgradePolicy                 kbappsv1.PodUpdatePolicyType
-	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
-	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy    `json:"instanceUpdateStrategy,omitempty"`
-	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
-	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
-	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
-	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
-	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
-	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
+	UpdateStrategy                   *kbappsv1.UpdateStrategy         `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+	PolicyRules                      []rbacv1.PolicyRule              `json:"policyRules,omitempty"`
+	LifecycleActions                 SynthesizedLifecycleActions      `json:"lifecycleActions,omitempty"`
+	SystemAccounts                   []kbappsv1.SystemAccount         `json:"systemAccounts,omitempty"`
+	Volumes                          []kbappsv1.ComponentVolume       `json:"volumes,omitempty"`
+	Network                          *kbappsv1.ComponentNetwork
+	HostNetwork                      *kbappsv1.HostNetwork       `json:"hostNetwork,omitempty"`
+	ComponentServices                []kbappsv1.ComponentService `json:"componentServices,omitempty"`
+	MinReadySeconds                  int32                       `json:"minReadySeconds,omitempty"`
+	DisableExporter                  *bool                       `json:"disableExporter,omitempty"`
 	Stop                             *bool
 	EnableInstanceAPI                *bool
 	InstanceAssistantObjects         []corev1.ObjectReference
@@ -86,7 +90,12 @@ type SynthesizedComponent struct {
 
 type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
-	Config      bool
-	Variables   map[string]string
-	Reconfigure *kbappsv1.Action
+	Config     bool
+	Variables  map[string]string
+	ConfigHash *string
+}
+
+type SynthesizedLifecycleActions struct {
+	*kbappsv1.ComponentLifecycleActions
+	CustomActions []kbappsv1.CustomAction
 }

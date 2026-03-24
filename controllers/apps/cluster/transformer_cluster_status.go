@@ -68,7 +68,7 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster
 		statusList = append(statusList, maps.Values(cluster.Status.Components)...)
 	}
 	if cluster.Status.Shardings != nil {
-		statusList = append(statusList, maps.Values(cluster.Status.Shardings)...)
+		statusList = append(statusList, maps.Values(t.shardingToCompStatus(cluster.Status.Shardings))...)
 	}
 	newPhase := composeClusterPhase(statusList)
 
@@ -98,7 +98,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 	kindNames := map[string][]string{}
 	for kind, statusMap := range map[string]map[string]appsv1.ClusterComponentStatus{
 		"component": cluster.Status.Components,
-		"sharding":  cluster.Status.Shardings,
+		"sharding":  t.shardingToCompStatus(cluster.Status.Shardings),
 	} {
 		for name, status := range statusMap {
 			if status.Phase == appsv1.FailedComponentPhase {
@@ -112,6 +112,19 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 	if len(kindNames) > 0 {
 		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterNotReadyCondition(cluster.Name, kindNames))
 	}
+}
+
+func (t *clusterStatusTransformer) shardingToCompStatus(shardingStatus map[string]appsv1.ClusterShardingStatus) map[string]appsv1.ClusterComponentStatus {
+	result := make(map[string]appsv1.ClusterComponentStatus)
+	for name, status := range shardingStatus {
+		result[name] = appsv1.ClusterComponentStatus{
+			Phase:              status.Phase,
+			Message:            status.Message,
+			ObservedGeneration: status.ObservedGeneration,
+			UpToDate:           status.UpToDate,
+		}
+	}
+	return result
 }
 
 func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.ClusterPhase {

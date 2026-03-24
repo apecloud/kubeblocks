@@ -108,7 +108,6 @@ type BackupTarget struct {
 
 	// Specifies the service account to run the backup workload.
 	//
-	// +kubebuilder:validation:Required
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Specifies the container port in the target pod.

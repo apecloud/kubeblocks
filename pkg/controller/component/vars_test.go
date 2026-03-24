@@ -331,16 +331,13 @@ var _ = Describe("vars", func() {
 			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
 
 			By("has no host-network port")
-			synthesizedComp.Annotations = map[string]string{
-				constant.HostNetworkAnnotationKey: synthesizedComp.Name,
-			}
+			synthesizedComp.Network = &appsv1.ComponentNetwork{HostNetwork: true}
 			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
 			By("ok")
-			ctx := mockHostNetworkPort(testCtx.Ctx, testCtx.Cli,
-				synthesizedComp.ClusterName, synthesizedComp.Name, "default", "default", 30001)
+			synthesizedComp.Network.HostPorts = []appsv1.HostPort{{Name: "default", Port: 30001}}
 			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
@@ -375,7 +372,7 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
 
 			By("w/ default value - back-off to default value")
-			synthesizedComp.Annotations = nil // disable the host-network
+			synthesizedComp.Network = nil // disable the host-network
 			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "3306"))

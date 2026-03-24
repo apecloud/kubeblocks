@@ -27,7 +27,6 @@ const (
 )
 
 const (
-	EventReasonInvalidSpec   = "InvalidSpec"
 	EventReasonStrictInPlace = "StrictInPlace"
 )
 

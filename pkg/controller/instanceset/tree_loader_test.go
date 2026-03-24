@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,11 +81,6 @@ var _ = Describe("tree loader test", func() {
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PersistentVolumeClaimList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PersistentVolumeClaimList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &batchv1.JobList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *batchv1.JobList, _ ...client.ListOption) error {
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

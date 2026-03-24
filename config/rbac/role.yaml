@@ -489,12 +489,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts/status
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
   - services
   verbs:
   - create
@@ -937,6 +931,24 @@ rules:
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
+  - clusterroles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
   - rolebindings
   verbs:
   - create
@@ -955,12 +967,6 @@ rules:
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
-  - rolebindings/status
-  verbs:
-  - get
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - roles
   verbs:
   - create
@@ -976,12 +982,6 @@ rules:
   - roles/finalizers
   verbs:
   - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles/status
-  verbs:
-  - get
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:

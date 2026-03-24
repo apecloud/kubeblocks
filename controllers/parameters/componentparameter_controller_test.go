@@ -26,36 +26,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("ComponentParameter Controller", func() {
-
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
-	Context("When updating configuration", func() {
-		It("Should reconcile success", func() {
-			mockReconcileResource()
+	Context("reconcile", func() {
+		It("should reconcile success", func() {
+			_, _, _, _, itsObj := mockReconcileResource()
 
+			By("wait for component parameter to be ready")
 			cfgKey := client.ObjectKey{
-				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
-
-			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, componentParameter *parametersv1alpha1.ComponentParameter) {
-				g.Expect(componentParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-				itemStatus := intctrlutil.GetItemStatus(&componentParameter.Status, configSpecName)
-				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
+				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 
-			By("reconfiguring parameters.")
+			By("update parameters")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
 				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
@@ -66,13 +65,24 @@ var _ = Describe("ComponentParameter Controller", func() {
 				}
 			})).Should(Succeed())
 
+			By("check component parameter status is updated to Upgrading")
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
-				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
-				g.Expect(itemStatus).ShouldNot(BeNil())
-				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
-				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
+				g.Expect(status).ShouldNot(BeNil())
+				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CUpgradingPhase))
+			})).Should(Succeed())
+
+			By("mock the reconfigure done")
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash3)
+
+			By("check component parameter status is updated to Finished")
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
+				g.Expect(status).ShouldNot(BeNil())
+				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 		})
-
 	})
 })

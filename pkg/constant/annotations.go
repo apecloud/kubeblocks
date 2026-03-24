@@ -33,6 +33,7 @@ const (
 	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
 
 	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
@@ -52,6 +53,18 @@ const (
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 
 	LifeCycleDataLoadedAnnotationKey = "apps.kubeblocks.io/lifecycle-data-loaded"
+
+	// These annoations serve in a transition period when existing clusters can adopt
+	// new serviceaccount naming rules.
+	// They will be removed in the future.
+	ComponentLastServiceAccountNameAnnotationKey     = "component.kubeblocks.io/last-service-account-name"
+	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
+	ProposedServiceAccountNameAnnotationKey          = "workloads.kubeblocks.io/proposed-service-account-name"
+	ServiceAccountInUseAnnotationKey                 = "workloads.kubeblocks.io/service-account-in-use"
+
+	// LegacyConfigManagerRequiredAnnotationKey indicates whether the cluster still requires
+	// the legacy config-manager runtime for parameters compatibility.
+	LegacyConfigManagerRequiredAnnotationKey = "parameters.kubeblocks.io/legacy-config-manager-required"
 )
 
 const (
@@ -74,6 +87,7 @@ func InheritedAnnotations() []string {
 		BackupSourceTargetAnnotationKey,
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
+		LegacyConfigManagerRequiredAnnotationKey,
 		KBAppMultiClusterPlacementKey,
 	}
 }

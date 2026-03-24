@@ -146,11 +146,9 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
-	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
-	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
+	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
@@ -272,17 +270,11 @@ func validateRequiredToParseConfigs() error {
 	if err := validateAffinity(viper.GetString(constant.CfgKeyCtrlrMgrAffinity)); err != nil {
 		return err
 	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		nodeSelector := map[string]string{}
-		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
+	if nodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); nodeSelector != "" {
+		__ := map[string]string{}
+		if err := json.Unmarshal([]byte(nodeSelector), &__); err != nil {
 			return err
 		}
-	}
-	if err := validateTolerations(viper.GetString(constant.CfgKeyDataPlaneTolerations)); err != nil {
-		return err
-	}
-	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
-		return err
 	}
 
 	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
@@ -417,7 +409,7 @@ func main() {
 		client = multiClusterMgr.GetClient()
 	}
 
-	if err := intctrlutil.InitHostPortManager(mgr.GetClient()); err != nil {
+	if err := intctrlutil.InitDefaultHostPortManager(mgr.GetClient()); err != nil {
 		setupLog.Error(err, "unable to init port manager")
 		os.Exit(1)
 	}
@@ -669,18 +661,18 @@ func main() {
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ComponentParameterReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ReconfigureReconciler{
-			Client:   client,
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}

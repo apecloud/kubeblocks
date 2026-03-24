@@ -45,7 +45,8 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil ||
+		synthesizedComp.LifecycleActions.PostProvision == nil {
 		return nil
 	}
 
@@ -57,6 +58,8 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 		err = lifecycle.IgnoreNotDefined(err)
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
 			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
+		} else {
+			err = fmt.Errorf("%w: %w", intctrlutil.NewRequeueError(time.Second*5, "post-provision action failed"), err)
 		}
 		return err
 	}
@@ -91,7 +94,8 @@ func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTra
 
 func checkPostProvisionDone(transCtx *componentTransformContext) bool {
 	synthesizedComp := transCtx.SynthesizeComponent
-	if synthesizedComp == nil || synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.PostProvision == nil {
+	if synthesizedComp == nil || synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil ||
+		synthesizedComp.LifecycleActions.PostProvision == nil {
 		return true
 	}
 

@@ -40,28 +40,19 @@ func (r *Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 
-func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.Spec.ComponentSpecs {
-		if v.Name == componentName {
-			return &v
-		}
-	}
-	return nil
-}
-
-func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.ComponentSpecs {
-		if v.Name == componentName {
-			return &v
+func (r *ClusterSpec) GetComponentByName(compName string) *ClusterComponentSpec {
+	for i, v := range r.ComponentSpecs {
+		if v.Name == compName {
+			return &r.ComponentSpecs[i]
 		}
 	}
 	return nil
 }
 
 func (r *ClusterSpec) GetShardingByName(shardingName string) *ClusterSharding {
-	for _, v := range r.Shardings {
+	for i, v := range r.Shardings {
 		if v.Name == shardingName {
-			return &v
+			return &r.Shardings[i]
 		}
 	}
 	return nil

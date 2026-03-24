@@ -147,7 +147,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	}
 
 	// release the allocated host-network ports for the component
-	pm := intctrlutil.GetPortManager()
+	pm := intctrlutil.GetPortManager(comp.Spec.Network)
 	if err = pm.ReleaseByPrefix(comp.Name); err != nil {
 		return intctrlutil.NewRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
 	}
@@ -158,6 +158,14 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 
 func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformContext, comp *appsv1.Component,
 	graphCli model.GraphClient, dag *graph.DAG, matchLabels map[string]string) (err error) {
+	// for new rule
+	// rolebinding and serviceaccount have the same name
+	newName := constant.GenerateDefaultServiceAccountNameNew(comp.Name)
+	if obj.GetName() == newName {
+		graphCli.Delete(dag, obj)
+		return
+	}
+
 	// orphan a rbac resource so that it can be adopted by another component
 	// this means these resources won't get automatically deleted
 	if err := controllerutil.RemoveControllerReference(comp, obj, model.GetScheme()); err != nil {

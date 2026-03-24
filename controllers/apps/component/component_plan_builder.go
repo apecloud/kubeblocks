@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -48,8 +49,8 @@ type componentTransformContext struct {
 	Component           *appsv1.Component
 	ComponentOrig       *appsv1.Component
 	SynthesizeComponent *component.SynthesizedComponent
-	RunningWorkload     client.Object
-	ProtoWorkload       client.Object
+	RunningWorkload     *workloads.InstanceSet
+	ProtoWorkload       *workloads.InstanceSet
 }
 
 func (c *componentTransformContext) GetContext() context.Context {

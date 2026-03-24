@@ -286,7 +286,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if expectCount != completedCount {
 			opsIsCompleted = false
 		} else if !pgResource.noWaitComponentCompleted &&
-			(!slices.Contains(componentTerminalPhases(), componentPhase) || completedCount == 0) {
+			(!slices.Contains(componentTerminalPhases(), componentPhase) || noAnyProgressCompleted(pgResource.clusterComponent.Replicas, completedCount)) {
 			opsIsCompleted = false
 		}
 		opsCompStatus.Phase = componentPhase
@@ -306,6 +306,10 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		return opsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func noAnyProgressCompleted(replicas, completedCount int32) bool {
+	return replicas > 0 && completedCount == 0
 }
 
 func hasIntersectionCompOpsList[T ComponentOpsInterface, S ComponentOpsInterface](currCompOpsMap map[string]T, list []S) bool {

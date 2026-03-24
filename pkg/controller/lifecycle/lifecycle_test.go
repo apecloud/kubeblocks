@@ -121,6 +121,7 @@ var _ = Describe("lifecycle", func() {
 		compName         string
 		lifecycleActions *appsv1.ComponentLifecycleActions
 		pods             []Replica
+		customAction     *appsv1.Action
 	)
 
 	cleanEnv := func() {
@@ -162,6 +163,16 @@ var _ = Describe("lifecycle", func() {
 			},
 		}
 		pods = []Replica{&lifecycleReplica{}}
+		customAction = &appsv1.Action{
+			Exec: &appsv1.ExecAction{
+				Command: []string{"/bin/bash", "-c", "echo -n custom-action"},
+			},
+			TimeoutSeconds: 5,
+			RetryPolicy: &appsv1.RetryPolicy{
+				MaxRetries:    5,
+				RetryInterval: 10,
+			},
+		}
 	})
 
 	AfterEach(func() {
@@ -172,14 +183,14 @@ var _ = Describe("lifecycle", func() {
 
 	Context("new", func() {
 		It("nil pod", func() {
-			_, err := New("", "", "", nil, nil, nil)
+			_, err := New("", "", "", nil, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("either pod or pods must be provided to call lifecycle actions"))
+			Expect(err.Error()).Should(ContainSubstring("pods must be provided to call lifecycle actions"))
 		})
 
 		It("pod", func() {
 			pod := pods[0]
-			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, pod)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, pod, pods...)
 			Expect(err).Should(BeNil())
 
 			Expect(lifecycle).ShouldNot(BeNil())
@@ -499,6 +510,99 @@ var _ = Describe("lifecycle", func() {
 			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
 		})
 
+		It("precondition - object selector", func() {
+			componentReady := appsv1.ComponentReadyPreConditionType
+			labels := map[string]string{
+				"test": "test",
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, nil, nil, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-1",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.RunningComponentPhase,
+						},
+					},
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-2",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.RunningComponentPhase,
+						},
+					},
+				},
+			}
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			customAction.PreCondition = &componentReady
+			err = lifecycle.UserDefined(ctx, reader, &Options{
+				PreConditionObjectSelector: labels,
+			}, "custom-action", customAction, nil)
+			Expect(err).Should(BeNil())
+		})
+
+		It("precondition - object selector fail", func() {
+			componentReady := appsv1.ComponentReadyPreConditionType
+			labels := map[string]string{
+				"test": "test",
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, nil, nil, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			reader := &mockReader{
+				cli: k8sClient,
+				objs: []client.Object{
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-1",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.RunningComponentPhase,
+						},
+					},
+					&appsv1.Component{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "comp-2",
+							Labels:    labels,
+						},
+						Status: appsv1.ComponentStatus{
+							Phase: appsv1.FailedComponentPhase,
+						},
+					},
+				},
+			}
+
+			customAction.PreCondition = &componentReady
+			err = lifecycle.UserDefined(ctx, reader, &Options{
+				PreConditionObjectSelector: labels,
+			}, "custom-action", customAction, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
+		})
+
 		It("pod selector - any", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AnyReplica
 			pods = []Replica{
@@ -554,7 +658,38 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - all", func() {
-			// TODO: impl
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []Replica{
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-0",
+						},
+					},
+				},
+				&lifecycleReplica{
+					Pod: corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      "pod-1",
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{}, nil
+				}).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
 		})
 
 		It("pod selector - role", func() {

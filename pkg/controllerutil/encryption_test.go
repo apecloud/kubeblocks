@@ -41,3 +41,50 @@ func TestEncryptor(t *testing.T) {
 		}
 	}
 }
+
+func TestComputeHash(t *testing.T) {
+	type args struct {
+		object interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{{
+		"test1",
+		args{
+			map[string]string{
+				"abdc": "bcde",
+			},
+		},
+		"58c7f7c8b5",
+		false,
+	}, {
+		"empty_test",
+		args{
+			map[string]string{},
+		},
+		"5894b84845",
+		false,
+	}, {
+		"nil_test",
+		args{
+			nil,
+		},
+		"cd856cb98",
+		false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ComputeHash(tt.args.object)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ComputeHash() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ComputeHash() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

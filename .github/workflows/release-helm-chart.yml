@@ -44,7 +44,7 @@ jobs:
       CHART_DIR: "deploy/helm"
       APECD_REF: "v0.1.96"
       MAKE_OPS_POST: "install"
-      GO_VERSION: "1.23"
+      GO_VERSION: "1.24"
     secrets: inherit
 
   release-addons-chart:
@@ -75,7 +75,7 @@ jobs:
       MAKE_OPS_PRE: "helm-package VERSION=${{ needs.release-version.outputs.release-version-bump }}"
       IMG: "apecloud/kubeblocks-charts"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
-      GO_VERSION: "1.23"
+      GO_VERSION: "1.24"
       APECD_REF: "v0.1.86"
       DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit

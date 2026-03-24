@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 // ParameterReconciler reconciles a Parameter object
@@ -90,7 +91,7 @@ func (r *ParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ParameterReconciler) handleComponent(rctx *ReconcileContext, updatedParameters parametersv1alpha1.ComponentParameters, parameter *parametersv1alpha1.Parameter) error {
+func (r *ParameterReconciler) handleComponent(rctx *reconcileContext, updatedParameters parametersv1alpha1.ComponentParameters, parameter *parametersv1alpha1.Parameter) error {
 	configmaps, err := resolveComponentRefConfigMap(rctx)
 	if err != nil {
 		return err
@@ -131,7 +132,7 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if intctrlutil.ParametersTerminalPhases(parameter.Status, parameter.Generation) {
+	if parameters.ParametersTerminalPhases(parameter.Status, parameter.Generation) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -156,8 +157,8 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 func (r *ParameterReconciler) generateParameterTaskContext(
 	reqCtx intctrlutil.RequestCtx,
 	parameter *parametersv1alpha1.Parameter,
-	cluster *appsv1.Cluster) ([]*ReconcileContext, []parametersv1alpha1.ComponentParameters, error) {
-	var rctxs []*ReconcileContext
+	cluster *appsv1.Cluster) ([]*reconcileContext, []parametersv1alpha1.ComponentParameters, error) {
+	var rctxs []*reconcileContext
 	var params []parametersv1alpha1.ComponentParameters
 	for _, compParameter := range parameter.Spec.ComponentParameters {
 		comps, err := resolveComponents(reqCtx.Ctx, r.Client, cluster, compParameter.ComponentName)
@@ -166,14 +167,14 @@ func (r *ParameterReconciler) generateParameterTaskContext(
 		}
 		for _, compName := range comps {
 			params = append(params, compParameter.Parameters)
-			rctxs = append(rctxs, newParameterReconcileContext(reqCtx,
+			rctxs = append(rctxs, newReconcileContext(reqCtx,
 				&render.ResourceCtx{
 					Context:       reqCtx.Ctx,
 					Client:        r.Client,
 					Namespace:     parameter.Namespace,
 					ClusterName:   parameter.Spec.ClusterName,
 					ComponentName: compName,
-				}, nil, cluster, "", nil))
+				}, nil, cluster))
 		}
 	}
 	return rctxs, params, nil
@@ -258,14 +259,14 @@ func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, par
 	if finished {
 		return intctrlutil.Reconciled()
 	}
-	return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "")
+	return intctrlutil.RequeueAfter(configReconcileInterval, reqCtx.Log, "")
 }
 
 func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bool {
 	var finished = true
 
 	defer func() {
-		if finished && !intctrlutil.IsFailedPhase(parameterStatus.Phase) {
+		if finished && !parameters.IsFailedPhase(parameterStatus.Phase) {
 			parameterStatus.Phase = parametersv1alpha1.CFinishedPhase
 		}
 	}()

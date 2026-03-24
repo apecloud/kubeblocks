@@ -7,74 +7,109 @@ metadata:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - serviceaccounts
+    - serviceaccounts
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
+    - create
+    - delete
+    - get
+    - list
+    - watch
+    - patch
+    - update
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - serviceaccounts/finalizers
+    - serviceaccounts/finalizers
   verbs:
-  - update
+    - update
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - serviceaccounts/status
+    - serviceaccounts/status
   verbs:
-  - get
-  - patch
-  - update
+    - get
+    - patch
+    - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+    - rbac.authorization.k8s.io
   resources:
-  - rolebindings
+    - roles
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
+    - create
+    - delete
+    - get
+    - list
+    - watch
+    - patch
+    - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+    - rbac.authorization.k8s.io
   resources:
-  - roles
+    - roles/finalizers
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
+    - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+    - rbac.authorization.k8s.io
   resources:
-  - roles/status
+    - roles/status
   verbs:
-  - get
-  - patch
-  - update
+    - get
+    - patch
+    - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+    - rbac.authorization.k8s.io
   resources:
-  - rolebindings/finalizers
+    - rolebindings
   verbs:
-  - update
+    - create
+    - delete
+    - get
+    - list
+    - watch
+    - patch
+    - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+    - rbac.authorization.k8s.io
   resources:
-  - rolebindings/status
+    - rolebindings/finalizers
   verbs:
-  - get
-  - patch
-  - update
+    - update
+- apiGroups:
+    - rbac.authorization.k8s.io
+  resources:
+    - rolebindings/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
+    - rbac.authorization.k8s.io
+  resources:
+    - clusterroles
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - watch
+    - patch
+    - update
+- apiGroups:
+    - rbac.authorization.k8s.io
+  resources:
+    - clusterroles/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - rbac.authorization.k8s.io
+  resources:
+    - clusterroles/status
+  verbs:
+    - get
+    - patch
+    - update
 - apiGroups:
     - rbac.authorization.k8s.io
   resources:
@@ -84,6 +119,7 @@ rules:
     - delete
     - get
     - list
+    - watch
     - patch
     - update
 - apiGroups:

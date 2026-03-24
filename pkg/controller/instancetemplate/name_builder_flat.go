@@ -149,6 +149,7 @@ func (c *flatNameBuilder) Validate() error {
 //
 // template ordinals are assumed to be valid at this time
 func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Set[int32], error) {
+	its := itsExt.InstanceSet
 	// globalUsedOrdinalSet won't decrease, so that one ordinal couldn't suddenly change its template
 	globalUsedOrdinalSet := sets.New[int32]()
 	defaultTemplateUnavailableOrdinalSet := sets.New[int32]()
@@ -158,12 +159,13 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		instanceTemplatesList = append(instanceTemplatesList, instanceTemplate)
 		template2OrdinalSetMap[instanceTemplate.Name] = sets.New[int32]()
 	}
+	template2OrdinalSetMap[DefaultTemplateName] = sets.New[int32]() // always add the default instance template
 	slices.SortFunc(instanceTemplatesList, func(a, b *workloads.InstanceTemplate) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 
 	offlineOrdinalSet := sets.New[int32]()
-	for _, instance := range itsExt.InstanceSet.Spec.OfflineInstances {
+	for _, instance := range its.Spec.OfflineInstances {
 		ordinal, err := getOrdinal(instance)
 		if err != nil {
 			return nil, err
@@ -177,20 +179,15 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		defaultTemplateUnavailableOrdinalSet = defaultTemplateUnavailableOrdinalSet.Union(availableOrdinalSet)
 	}
 
-	if _, ok := template2OrdinalSetMap[""]; ok {
-		template2OrdinalSetMap[""].Insert(itsExt.InstanceSet.Status.Ordinals...)
-	}
-	globalUsedOrdinalSet.Insert(itsExt.InstanceSet.Status.Ordinals...)
-	for _, status := range itsExt.InstanceSet.Status.TemplatesStatus {
-		if _, ok := template2OrdinalSetMap[status.Name]; ok {
-			template2OrdinalSetMap[status.Name].Insert(status.Ordinals...)
+	for tplName, ordinals := range its.Status.AssignedOrdinals {
+		if _, ok := template2OrdinalSetMap[tplName]; !ok {
+			template2OrdinalSetMap[tplName] = sets.New[int32]()
 		}
-		globalUsedOrdinalSet.Insert(status.Ordinals...)
+		template2OrdinalSetMap[tplName].Insert(ordinals.Discrete...)
+		globalUsedOrdinalSet.Insert(ordinals.Discrete...)
 	}
 
-	generateWithOrdinalsDefined := func(
-		current, available sets.Set[int32], instanceTemplate *workloads.InstanceTemplate,
-	) (sets.Set[int32], error) {
+	generateWithOrdinalsDefined := func(current, available sets.Set[int32], instanceTemplate *workloads.InstanceTemplate) (sets.Set[int32], error) {
 		// delete any ordinal that doesn't in the available
 		current = current.Intersection(available)
 
@@ -208,6 +205,24 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 			return current, nil
 		}
 
+		// move from the default instance template to a named instance template
+		isTakeOver := func(ordinal int32) bool {
+			return instanceTemplate.Name != DefaultTemplateName &&
+				template2OrdinalSetMap[DefaultTemplateName].Has(ordinal)
+		}
+
+		// move from a named instance template to the default instance template
+		isTakeBack := func(ordinal int32) bool {
+			if instanceTemplate.Name == DefaultTemplateName {
+				for name, ordinals := range template2OrdinalSetMap {
+					if name != DefaultTemplateName && ordinals.Has(ordinal) {
+						return true
+					}
+				}
+			}
+			return false
+		}
+
 		// if current is too little, add some
 		availableWithoutCurrent := available.Difference(current)
 		availableList := convertOrdinalSetToSortedList(availableWithoutCurrent)
@@ -218,7 +233,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 					return current, ErrOrdinalsNotEnough
 				}
 				ordinal := availableList[cur]
-				if !globalUsedOrdinalSet.Has(ordinal) || (!current.Has(ordinal) && template2OrdinalSetMap[""].Has(ordinal)) {
+				if !globalUsedOrdinalSet.Has(ordinal) || (!current.Has(ordinal) && (isTakeOver(ordinal) || isTakeBack(ordinal))) {
 					globalUsedOrdinalSet.Insert(ordinal)
 					current.Insert(ordinal)
 					break
@@ -229,9 +244,7 @@ func generateTemplateName2OrdinalMap(itsExt *InstanceSetExt) (map[string]sets.Se
 		return current, nil
 	}
 
-	generateWithoutOrdinalsDefined := func(
-		current sets.Set[int32], instanceTemplate *workloads.InstanceTemplate,
-	) (sets.Set[int32], error) {
+	generateWithoutOrdinalsDefined := func(current sets.Set[int32], instanceTemplate *workloads.InstanceTemplate) (sets.Set[int32], error) {
 		// delete any ordinal that is taken by an template with ordinals defined
 		current = current.Difference(defaultTemplateUnavailableOrdinalSet)
 		// delete any offline ordinals

@@ -165,21 +165,24 @@ func withClusterTopology(cluster *appsv1.Cluster) bool {
 }
 
 func withClusterUserDefined(cluster *appsv1.Cluster) bool {
-	hasCompDefSet := func(spec appsv1.ClusterComponentSpec) bool {
-		return len(spec.ComponentDef) > 0
+	hasDefSet := func(comp appsv1.ClusterComponentSpec, sharding appsv1.ClusterSharding) bool {
+		return len(comp.ComponentDef) > 0 || len(sharding.ShardingDef) > 0
 	}
 	return len(cluster.Spec.ClusterDef) == 0 && len(cluster.Spec.Topology) == 0 &&
-		clusterCompCnt(cluster) == clusterCompCntWithFunc(cluster, hasCompDefSet)
+		clusterCompCnt(cluster) == clusterCompCntWithFunc(cluster, hasDefSet)
 }
 
 func clusterCompCnt(cluster *appsv1.Cluster) int {
-	return clusterCompCntWithFunc(cluster, func(spec appsv1.ClusterComponentSpec) bool { return true })
+	return clusterCompCntWithFunc(cluster, func(appsv1.ClusterComponentSpec, appsv1.ClusterSharding) bool { return true })
 }
 
-func clusterCompCntWithFunc(cluster *appsv1.Cluster, match func(spec appsv1.ClusterComponentSpec) bool) int {
-	cnt := generics.CountFunc(cluster.Spec.ComponentSpecs, match)
+func clusterCompCntWithFunc(cluster *appsv1.Cluster, match func(comp appsv1.ClusterComponentSpec, sharding appsv1.ClusterSharding) bool) int {
+	cnt := generics.CountFunc(cluster.Spec.ComponentSpecs,
+		func(spec appsv1.ClusterComponentSpec) bool {
+			return match(spec, appsv1.ClusterSharding{})
+		})
 	for _, sharding := range cluster.Spec.Shardings {
-		if match(sharding.Template) {
+		if match(sharding.Template, sharding) {
 			cnt += int(sharding.Shards)
 		}
 	}

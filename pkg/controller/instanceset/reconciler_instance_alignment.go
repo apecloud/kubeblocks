@@ -76,8 +76,10 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// 2. find the create and delete set
 	newNameSet := sets.New[string]()
-	for name := range nameToTemplateMap {
-		newNameSet.Insert(name)
+	if !isStopRequested(its) {
+		for name := range nameToTemplateMap {
+			newNameSet.Insert(name)
+		}
 	}
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
@@ -141,7 +143,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.AddWithOption(newPod, r.createInstance(tree, its, oldInstanceList, newPod)); err != nil {
+		if err := tree.AddWithOption(newPod, r.createInstance(tree, its)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 		currentAlignedNameList = append(currentAlignedNameList, name)
@@ -169,6 +171,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			default:
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
+					if err := tryTakeOverExternalPVC(its, pvcObj.(*corev1.PersistentVolumeClaim)); err != nil {
+						return kubebuilderx.Continue, err
+					}
 					if err = tree.Update(pvcObj); err != nil {
 						return kubebuilderx.Continue, err
 					}
@@ -194,18 +199,20 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
-		if err := tree.DeleteWithOption(pod, r.deleteInstance(tree, its, oldInstanceList, pod)); err != nil {
+		if err := tree.DeleteWithOption(pod, r.deleteInstance(tree, its, pod)); err != nil {
 			return kubebuilderx.Continue, err
 		}
 
-		retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
-		// the default policy is `Delete`
-		if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
-			for _, obj := range oldPVCList {
-				pvc := obj.(*corev1.PersistentVolumeClaim)
-				if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {
-					if err := tree.Delete(pvc); err != nil {
-						return kubebuilderx.Continue, err
+		if !isStopRequested(its) {
+			retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+			// the default policy is `Delete`
+			if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+				for _, obj := range oldPVCList {
+					pvc := obj.(*corev1.PersistentVolumeClaim)
+					if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {
+						if err := tree.Delete(pvc); err != nil {
+							return kubebuilderx.Continue, err
+						}
 					}
 				}
 			}
@@ -221,15 +228,15 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 }
 
 func (r *instanceAlignmentReconciler) createInstance(tree *kubebuilderx.ObjectTree,
-	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithPostHook {
+	its *workloads.InstanceSet) kubebuilderx.WithPostHook {
 	return func(obj client.Object) error {
-		return lifecycleCreateInstance(tree, its, pods, obj.(*corev1.Pod))
+		return lifecycleCreateInstance(tree, its, obj.(*corev1.Pod))
 	}
 }
 
 func (r *instanceAlignmentReconciler) deleteInstance(tree *kubebuilderx.ObjectTree,
-	its *workloads.InstanceSet, pods []client.Object, pod *corev1.Pod) kubebuilderx.WithPrevHook {
+	its *workloads.InstanceSet, pod *corev1.Pod) kubebuilderx.WithPrevHook {
 	return func(obj client.Object) error {
-		return lifecycleDeleteInstance(tree, its, pods, pod)
+		return lifecycleDeleteInstance(tree, its, pod)
 	}
 }

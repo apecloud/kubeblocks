@@ -252,10 +252,42 @@ type ComponentNetwork struct {
 	// +optional
 	DNSPolicy *corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 
-	// Specifies the DNS parameters of a pod.
+	// Specifies the DNS parameters of the pod.
 	//
 	// +optional
 	DNSConfig *corev1.PodDNSConfig `json:"dnsConfig,omitempty"`
+
+	// HostPorts specifies the mapping of container ports to host ports.
+	// The behavior varies based on the HostNetwork setting:
+	//
+	// 1. When HostNetwork is enabled:
+	//    - If this field is empty: All ports are automatically allocated by the host-port manager.
+	//    - If this field is specified:
+	//      a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
+	//      b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+	//         You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+	//
+	// 2. When HostNetwork is disabled:
+	//    It allows optional mapping for container ports to host ports.
+	//    - Mappings are restricted to ports defined in `cmpd.spec.runtime.containers.ports`.
+	//    - Any specified container ports not present in the runtime definition will be ignored.
+	//
+	// +optional
+	HostPorts []HostPort `json:"hostPorts,omitempty"`
+}
+
+type HostPort struct {
+	// The name of the container port.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The port number of the host port.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Required
+	Port int32 `json:"port"`
 }
 
 type Service struct {
@@ -468,8 +500,10 @@ type ProvisionSecretRef struct {
 
 	// The namespace where the secret is located.
 	//
-	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace"`
+	// If not specified, the secret is assumed to be in the same namespace as the cluster.
+	//
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// The key in the secret data that contains the password.
 	//
@@ -495,7 +529,30 @@ type ClusterComponentConfig struct {
 	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
 
-	// The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+	// ExternalManaged specifies whether the configuration management is delegated to an external system
+	// or manual user control.
+	//
+	// When set to true, the controller will exclusively utilize the user-provided configuration source
+	// and the 'reconfigure' action defined in this config, bypassing the default templates and
+	// update behaviors specified in the ComponentDefinition.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
+
+	// Represents a checksum or hash of the configuration content.
+	//
+	// The controller uses this value to detect changes and determine if a reconfiguration or restart
+	// is necessary to apply updates.
+	//
+	// +optional
+	ConfigHash *string `json:"configHash,omitempty"`
+
+	// Specifies whether to restart the component to reload the updated configuration.
+	//
+	// +optional
+	Restart *bool `json:"restart,omitempty"`
+
+	// The custom reconfigure action to reload the updated configuration.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -503,17 +560,8 @@ type ClusterComponentConfig struct {
 	// - KB_CONFIG_FILES_REMOVED: file1,file2...
 	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
 	//
-	// Note: This field is immutable once it has been set.
-	//
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
-
-	// ExternalManaged indicates whether the configuration is managed by an external system.
-	// When set to true, the controller will use the user-provided template and reconfigure action,
-	// ignoring the default template and update behavior.
-	//
-	// +optional
-	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

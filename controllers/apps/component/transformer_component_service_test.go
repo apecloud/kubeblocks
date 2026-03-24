@@ -195,7 +195,7 @@ var _ = Describe("component service transformer test", func() {
 			// scale-in
 			replicas := transCtx.SynthesizeComponent.Replicas
 			transCtx.SynthesizeComponent.Replicas = 1
-			transCtx.RunningWorkload.(*workloadsv1.InstanceSet).Spec.Replicas = ptr.To[int32](1)
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](1)
 			transformer := &componentServiceTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())

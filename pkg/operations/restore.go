@@ -230,6 +230,8 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	cluster.Spec.Services = services
 	for i := range cluster.Spec.ComponentSpecs {
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
+		cluster.Spec.ComponentSpecs[i].TLS = false
+		cluster.Spec.ComponentSpecs[i].Issuer = nil
 	}
 	r.rebuildShardAccountSecrets(cluster)
 	r.normalizeSchedulePolicy(cluster, cluster.Spec.SchedulingPolicy)

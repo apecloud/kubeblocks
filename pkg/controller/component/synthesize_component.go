@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -37,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -95,20 +95,21 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Annotations:                      comp.Annotations,
 		StaticAnnotations:                compDef.Spec.Annotations,
 		DynamicAnnotations:               comp.Spec.Annotations,
+		AnnotationsInjectedToWorkload:    make(map[string]string),
 		PodSpec:                          &compDef.Spec.Runtime,
+		Network:                          comp.Spec.Network,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
 		LogConfigs:                       compDefObj.Spec.LogConfigs,
 		Roles:                            compDefObj.Spec.Roles,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
-		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
 		SystemAccounts:                   compDefObj.Spec.SystemAccounts,
 		Replicas:                         comp.Spec.Replicas,
 		Resources:                        comp.Spec.Resources,
 		TLSConfig:                        comp.Spec.TLSConfig,
-		ServiceAccountName:               comp.Spec.ServiceAccountName,
 		Instances:                        comp.Spec.Instances,
+		Ordinals:                         comp.Spec.Ordinals,
 		FlatInstanceOrdinal:              comp.Spec.FlatInstanceOrdinal,
 		InstanceImages:                   make(map[string]map[string]string),
 		OfflineInstances:                 comp.Spec.OfflineInstances,
@@ -121,6 +122,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
 		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 		EnableInstanceAPI:                comp.Spec.EnableInstanceAPI,
+		LifecycleActions: SynthesizedLifecycleActions{
+			ComponentLifecycleActions: compDefObj.Spec.LifecycleActions,
+			CustomActions:             comp.Spec.CustomActions,
+		},
 	}
 
 	// build scheduling policy for workload
@@ -146,9 +151,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
-
-	// build serviceAccountName
-	buildServiceAccountName(synthesizeComp)
 
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
@@ -475,25 +477,36 @@ func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.C
 }
 
 func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
-	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
-		tpl.Variables = utpl.Variables
+	merge := func(stpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
 		if utpl.ConfigMap != nil {
-			tpl.Namespace = comp.Namespace
-			tpl.Template = utpl.ConfigMap.Name
-		}
-		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
-		if utpl.ExternalManaged != nil {
-			tpl.ExternalManaged = utpl.ExternalManaged
+			stpl.Namespace = comp.Namespace
+			stpl.Template = utpl.ConfigMap.Name
 		}
 
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+		stpl.Variables = utpl.Variables
+		stpl.ConfigHash = utpl.ConfigHash
+
+		// if restartOnFileChange is not specified as required, use the user specified value
+		if !ptr.Deref(stpl.RestartOnFileChange, false) {
+			stpl.RestartOnFileChange = utpl.Restart
+		}
+
+		if utpl.Reconfigure != nil {
+			stpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+		}
+
+		// if externalManaged is not specified as required, use the user specified value
+		if !ptr.Deref(stpl.ExternalManaged, false) {
+			stpl.ExternalManaged = utpl.ExternalManaged
+		}
+		if ptr.Deref(stpl.ExternalManaged, false) {
 			if utpl.ConfigMap == nil {
 				// reset the template and wait the external system to provision it.
-				tpl.Namespace = ""
-				tpl.Template = ""
+				stpl.Namespace = ""
+				stpl.Template = ""
 			}
 		}
-		return tpl
+		return stpl
 	}
 
 	stpl := SynthesizedFileTemplate{
@@ -501,27 +514,15 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 		Config:                config,
 	}
 	if config {
-		for _, utpl := range comp.Spec.Configs {
-			if utpl.Name != nil && *utpl.Name == tpl.Name {
-				return merge(stpl, utpl)
-			}
+		i := slices.IndexFunc(comp.Spec.Configs, func(c appsv1.ClusterComponentConfig) bool {
+			return ptr.Deref(c.Name, "") == tpl.Name
+		})
+		if i >= 0 {
+			return merge(stpl, comp.Spec.Configs[i])
 		}
 		return merge(stpl, appsv1.ClusterComponentConfig{})
 	}
-	return stpl
-}
-
-// buildServiceAccountName builds serviceAccountName for component and podSpec.
-func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
-	if synthesizeComp.ServiceAccountName != "" {
-		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
-		return
-	}
-	if !viper.GetBool(constant.EnableRBACManager) {
-		return
-	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
-	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
+	return stpl // script
 }
 
 func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {

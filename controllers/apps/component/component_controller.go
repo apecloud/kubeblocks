@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -91,14 +92,14 @@ type ComponentReconciler struct {
 // read only + watch access
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles/status,verbs=get
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -121,7 +122,9 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(intctrlutil.RequeueError); ok {
+		if intctrlutil.IsRequeueError(err) {
+			var re intctrlutil.RequeueError
+			_ = errors.As(err, &re)
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
 		if apierrors.IsConflict(err) {
@@ -148,6 +151,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentMonitorContainerTransformer{},
 			// allocate ports for host-network component
 			&componentHostNetworkTransformer{},
+			// map for container ports to host ports
+			&componentHostPortTransformer{},
 			// handle component services
 			&componentServiceTransformer{},
 			// handle component system accounts
@@ -160,14 +165,13 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountProvisionTransformer{},
 			// render config/script templates
 			&componentFileTemplateTransformer{},
-			// HACK: the legacy reload sidecar
-			&componentReloadSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
+			// handle RBAC for component workloads
+			// it should be put before workload transformer, because we modify podSpec's serviceaccount in it
+			&componentRBACTransformer{},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
-			// handle RBAC for component workloads
-			&componentRBACTransformer{},
 			// handle component postProvision lifecycle action
 			&componentPostProvisionTransformer{},
 			// update component status

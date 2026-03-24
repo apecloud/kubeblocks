@@ -1,7 +1,7 @@
 # Based on https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/go/.devcontainer/base.Dockerfile
 
 # [Choice] Go version: 1, 1.19, 1.18, etc
-ARG GOVERSION=1.23
+ARG GOVERSION=1.24
 FROM golang:${GOVERSION}-bullseye
 
 # Copy library scripts to execute
@@ -14,7 +14,7 @@ ARG INSTALL_ZSH="true"
 ARG KUBECTL_VERSION="latest"
 ARG HELM_VERSION="latest"
 ARG MINIKUBE_VERSION="latest"
-ARG GOLANGCI_LINT_VERSION="1.64.5"
+ARG GOLANGCI_LINT_VERSION="2.8.0"
 
 ARG USERNAME=kubeblocks
 ARG USER_UID=1000

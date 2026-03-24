@@ -84,7 +84,7 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 		}
 		var targetPodName string
 		if targetPod != nil {
-			targetPodName = ""
+			targetPodName = targetPod.Name
 		}
 		return w.createWorkload(actionCtx, podSpec, targetPodName, index)
 	}
@@ -187,11 +187,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		podSpec.RestartPolicy = corev1.RestartPolicyNever
 	}
 	if len(podSpec.Tolerations) == 0 {
-		toleration, err := getTolerations(w.Cluster, w.Comp)
-		if err != nil {
-			return nil, err
-		}
-		podSpec.Tolerations = toleration
+		podSpec.Tolerations = getTolerations(w.Cluster, w.Comp)
 	}
 	switch {
 	case w.OpsRequest.Spec.CustomOps.ServiceAccountName != nil:

@@ -22,6 +22,8 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,9 +35,10 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 // ParameterDrivenConfigRenderReconciler reconciles a ParamConfigRenderer object
@@ -84,11 +87,11 @@ func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manage
 }
 
 func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParamConfigRenderer) (ctrl.Result, error) {
-	if intctrlutil.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
+	if parameters.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
-	cmpd := &appsv1.ComponentDefinition{}
-	if err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: parameterTemplate.Spec.ComponentDef}, cmpd); err != nil {
+	cmpd, err := r.resolveComponentDefinition(reqCtx, parameterTemplate)
+	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 	if err := fillParameterTemplate(reqCtx, r.Client, parameterTemplate, cmpd); err != nil {
@@ -106,6 +109,36 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 
 	intctrlutil.RecordCreatedEvent(r.Recorder, parameterTemplate)
 	return intctrlutil.Reconciled()
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) resolveComponentDefinition(reqCtx intctrlutil.RequestCtx, pcr *parametersv1alpha1.ParamConfigRenderer) (*appsv1.ComponentDefinition, error) {
+	componentDefPattern := pcr.Spec.ComponentDef
+	if err := component.ValidateDefNameRegexp(componentDefPattern); err != nil {
+		return nil, fmt.Errorf("invalid componentDef pattern %q: %w", componentDefPattern, err)
+	}
+
+	cmpd := &appsv1.ComponentDefinition{}
+	if err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: componentDefPattern}, cmpd); err == nil {
+		return cmpd, nil
+	}
+
+	compDefList := &appsv1.ComponentDefinitionList{}
+	if err := r.List(reqCtx.Ctx, compDefList); err != nil {
+		return nil, err
+	}
+	slices.SortFunc(compDefList.Items, func(a, b appsv1.ComponentDefinition) int {
+		return strings.Compare(b.Name, a.Name)
+	})
+
+	for i, item := range compDefList.Items {
+		if !component.PrefixOrRegexMatched(item.Name, componentDefPattern) {
+			continue
+		}
+		if pcr.Spec.ServiceVersion == "" || pcr.Spec.ServiceVersion == item.Spec.ServiceVersion {
+			return &compDefList.Items[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no ComponentDefinition found matching pattern %q", componentDefPattern)
 }
 
 func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.RequestCtx, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRendererSpec, cmpd *appsv1.ComponentDefinition) error {
@@ -155,7 +188,7 @@ func fillParameterTemplate(reqCtx intctrlutil.RequestCtx, cli client.Client, tem
 	if generics.CountFunc(template.Spec.Configs, match) == 0 {
 		return nil
 	}
-	if tpls, err = configctrl.ResolveComponentTemplate(reqCtx.Ctx, cli, cmpd); err != nil {
+	if tpls, err = parameters.ResolveComponentTemplate(reqCtx.Ctx, cli, cmpd); err != nil {
 		return err
 	}
 	deepCopy := template.DeepCopy()

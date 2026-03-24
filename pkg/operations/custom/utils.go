@@ -430,15 +430,12 @@ func getNameFromObjectKey(objectKey string) string {
 	return objectKey
 }
 
-func getTolerations(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) ([]corev1.Toleration, error) {
-	schedulePolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
-	if err != nil {
-		return nil, err
-	}
+func getTolerations(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) []corev1.Toleration {
+	schedulePolicy := scheduling.BuildSchedulingPolicy(cluster, compSpec)
 	if schedulePolicy == nil {
-		return nil, nil
+		return nil
 	}
-	return schedulePolicy.Tolerations, nil
+	return schedulePolicy.Tolerations
 }
 
 func listCompPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,

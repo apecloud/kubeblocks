@@ -196,7 +196,7 @@ func (t *rolloutSetupTransformer) initShardingStatus(transCtx *rolloutTransformC
 		ShardingDef:    spec.ShardingDef,
 		ServiceVersion: spec.Template.ServiceVersion,
 		CompDef:        spec.Template.ComponentDef,
-		Replicas:       spec.Template.Replicas,
+		Replicas:       spec.Template.Replicas * spec.Shards,
 	})
 	return nil
 }

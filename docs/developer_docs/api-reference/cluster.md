@@ -716,11 +716,13 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
-&ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
+&ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
-it will also be bound to a default role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+it will also be bound to a default cluster role named
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.</p>
 </td>
@@ -855,6 +857,22 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -958,6 +976,20 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -2339,7 +2371,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.CustomAction">CustomAction</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1alpha1.RolloutPromoteCondition">RolloutPromoteCondition</a>, <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate</a>, <a href="#workloads.kubeblocks.io/v1.LifecycleActions">LifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -2447,7 +2479,10 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
-<p>If the Action does not complete within this time frame, it will be terminated.</p>
+<p>Behavior based on the value:
+- Positive (&gt; 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+- Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
+- Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -2809,6 +2844,48 @@ ClusterComponentConfigSource
 </tr>
 <tr>
 <td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged specifies whether the configuration management is delegated to an external system
+or manual user control.</p>
+<p>When set to true, the controller will exclusively utilize the user-provided configuration source
+and the &lsquo;reconfigure&rsquo; action defined in this config, bypassing the default templates and
+update behaviors specified in the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents a checksum or hash of the configuration content.</p>
+<p>The controller uses this value to detect changes and determine if a reconfiguration or restart
+is necessary to apply updates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restart</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart the component to reload the updated configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>reconfigure</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -2818,28 +2895,13 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>The custom reconfigure action to reload the service configuration whenever changes to this config are detected.</p>
+<p>The custom reconfigure action to reload the updated configuration.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
 </ul>
-<p>Note: This field is immutable once it has been set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>externalManaged</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ExternalManaged indicates whether the configuration is managed by an external system.
-When set to true, the controller will use the user-provided template and reconfigure action,
-ignoring the default template and update behavior.</p>
 </td>
 </tr>
 </tbody>
@@ -3144,10 +3206,18 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
-Each template specifies the desired characteristics of a persistent volume, such as storage class,
-size, and access modes.
-These templates are used to dynamically provision persistent volumes for the Component.</p>
+<p>Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.</p>
+<p>Each template defines the desired characteristics of a persistent volume, such as storage class,
+size, and access modes, used for dynamic provisioning.</p>
+<p>PVC Adoption Mechanism:
+KubeBlocks supports adopting existing PVCs (static provisioning) if they meet the following criteria
+before the Cluster is created:
+1. Naming: The PVC name must follow the KubeBlocks naming convention:
+   $(vct-name)-$(pod-name) (e.g., &ldquo;data-mycluster-mysql-0&rdquo;).
+2. Labeling: The PVC must carry the label &ldquo;app.kubernetes.io/managed-by=kubeblocks&rdquo;.
+3. Ownership: The PVC must not have any existing controller reference.</p>
+<p>If these conditions are met, KubeBlocks will automatically take over the PVCs and
+set the Component (or its controlled resources) as the owner/controller reference.</p>
 </td>
 </tr>
 <tr>
@@ -3287,11 +3357,13 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
-&ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
+&ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
-it will also be bound to a default role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+it will also be bound to a default cluster role named
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.</p>
 </td>
@@ -3388,6 +3460,22 @@ starting with an ordinal of 0.
 It is crucial to maintain unique names for each InstanceTemplate to avoid conflicts.</p>
 <p>The sum of replicas across all InstanceTemplates should not exceed the total number of replicas specified for the Component.
 Any remaining replicas will be generated using the default template and will follow the default naming rules.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
 </td>
 </tr>
 <tr>
@@ -3873,9 +3961,9 @@ KubeBlocks dynamically creates and deletes Components based on the difference
 between the desired and actual number of shards.
 KubeBlocks provides lifecycle management for sharding, including:</p>
 <ul>
-<li>Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+<li>Executing the shardAdd Action defined in the ShardingDefinition when the number of shards increases.
 This allows for custom actions to be performed after a new shard is provisioned.</li>
-<li>Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+<li>Executing the shardRemove Action defined in the ShardingDefinition when the number of shards decreases.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
@@ -3926,6 +4014,114 @@ to be created with distinct configurations.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the names of shards (components) to be transitioned to offline status.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus</a>)
+</p>
+<div>
+<p>ClusterShardingStatus records a sharding status.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentPhase">
+ComponentPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the current state of the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records detailed information about the sharding in its current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the most recent generation of the sharding state observed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the sharding state observed is up-to-date with the desired state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the name of the sharding definition used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>postProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PostProvision records the status of the sharding post-provision action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PreTerminate records the status of the sharding pre-terminate action.</p>
 </td>
 </tr>
 </tbody>
@@ -4181,8 +4377,8 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
 <td>
 <code>shardings</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
+<a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterShardingStatus
 </a>
 </em>
 </td>
@@ -5730,19 +5926,6 @@ Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more informatio
 </tr>
 <tr>
 <td>
-<code>externalManaged</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ExternalManaged indicates whether the configuration is managed by an external system.
-When set to true, the controller will ignore the management of this configuration.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>restartOnFileChange</code><br/>
 <em>
 bool
@@ -5750,7 +5933,43 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to restart the pod when the file changes.</p>
+<p>Specifies whether to restart the workload when the file changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure that reloads the file when it&rsquo;s content changes.</p>
+<p>If specified, this action overrides the global reconfigure action defined in lifecycle actions
+for this specific file template.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
+</ul>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged specifies whether the file management is delegated to an external system or manual user control.</p>
+<p>When set to true, the controller will ignore the management of this file.</p>
 </td>
 </tr>
 </tbody>
@@ -5867,6 +6086,8 @@ Action
 This approach aims to minimize downtime and maintain availability
 during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
 In a typical consensus system, this action is used to transfer leader role to another replica.</p>
+<p>When a pod is about to be updated, a switchover action will be triggered for it. So addon implementation must determine
+if the pod&rsquo;s current role needs to be transferred.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>
@@ -6054,7 +6275,6 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure that update a replica with new configuration.</p>
 <p>Note: This field is immutable once it has been set.</p>
-<p>This Action is reserved for future versions.</p>
 </td>
 </tr>
 <tr>
@@ -6151,7 +6371,38 @@ Kubernetes core/v1.PodDNSConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the DNS parameters of a pod.</p>
+<p>Specifies the DNS parameters of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hostPorts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.HostPort">
+[]HostPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>HostPorts specifies the mapping of container ports to host ports.
+The behavior varies based on the HostNetwork setting:</p>
+<ol>
+<li><p>When HostNetwork is enabled:</p>
+<ul>
+<li>If this field is empty: All ports are automatically allocated by the host-port manager.</li>
+<li>If this field is specified:
+a) Mappings for all ports defined in <code>cmpd.spec.hostNetwork</code> are MANDATORY.
+b) Mappings for kbagent ports (&ldquo;http&rdquo;, &ldquo;streaming&rdquo;) are OPTIONAL.
+You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.</li>
+</ul></li>
+<li><p>When HostNetwork is disabled:
+It allows optional mapping for container ports to host ports.</p>
+<ul>
+<li>Mappings are restricted to ports defined in <code>cmpd.spec.runtime.containers.ports</code>.</li>
+<li>Any specified container ports not present in the runtime definition will be ignored.</li>
+</ul></li>
+</ol>
 </td>
 </tr>
 </tbody>
@@ -6159,7 +6410,7 @@ Kubernetes core/v1.PodDNSConfig
 <h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
 </p>
 <div>
 <p>ComponentPhase defines the phase of the Component within the .status.phase field.</p>
@@ -6555,11 +6806,13 @@ string
 This ServiceAccount is used to grant necessary permissions for the Component&rsquo;s Pods to interact
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
-&ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
+&ldquo;kb-&#123;clusterName&#125;-&#123;compName&#125;&rdquo;, bound to a cluster role with rules defined in ComponentDefinition&rsquo;s
 <code>policyRules</code> field. If needed (currently this means if any lifecycleAction is enabled),
-it will also be bound to a default role named
-&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.
-If multiple components use the same ComponentDefinition, they will share one ServiceAccount.</p>
+it will also be bound to a default cluster role named
+&ldquo;kubeblocks-cluster-pod-role&rdquo;, which is installed together with KubeBlocks.</p>
+<p>Before KubeBlocks 1.1, the automatically created serviceaccount is named &ldquo;kb-&#123;componentdefinition.name&#125;&rdquo;.
+To reduce unintended pod restart, old pods still use old serviceaccount. New serviceaccount will be used
+when a workload has been restarted.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
 create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.</p>
 </td>
@@ -6694,6 +6947,22 @@ Any remaining replicas will be generated using the default template and will fol
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this component.
+If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -6797,6 +7066,20 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether to enable the new Instance API.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>customActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.CustomAction">
+[]CustomAction
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies custom actions that can be performed on the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -7670,6 +7953,48 @@ VarOption
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.CustomAction">CustomAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the custom action.</p>
+<p>The name will be used as the action name when invoking the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the action to be performed.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.EnvVar">EnvVar
 </h3>
 <p>
@@ -8428,6 +8753,45 @@ ContainerVars
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.HostPort">HostPort
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentNetwork">ComponentNetwork</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the container port.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>port</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The port number of the host port.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
@@ -8793,6 +9157,112 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.LifecycleActionPhase">LifecycleActionPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus</a>)
+</p>
+<div>
+<p>LifecycleActionPhase describes the current phase of a lifecycle-related action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>LifecycleActionFailed indicates the action has failed during execution or timed out.</p>
+</td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td><p>LifecycleActionPending indicates the action is registered and waiting to be triggered or
+waiting for its dynamic preconditions to be met.</p>
+</td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td><p>LifecycleActionRunning indicates the preconditions are met and the action is currently being executed.</p>
+</td>
+</tr><tr><td><p>&#34;Skipped&#34;</p></td>
+<td><p>LifecycleActionSkipped indicates the action was intentionally bypassed.
+Usually occurs if a prerequisite action failed or a permanent condition was not met.</p>
+</td>
+</tr><tr><td><p>&#34;Succeeded&#34;</p></td>
+<td><p>LifecycleActionSucceeded indicates the action has completed successfully.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+</p>
+<div>
+<p>LifecycleActionStatus records the observed state of a lifecycle-related action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionPhase">
+LifecycleActionPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase is the current phase of the lifecycle action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message is a human-readable message providing details about the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>startTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>StartTime records the time when the action started execution.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>completionTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CompletionTime records the time when the action reached a terminal state (Succeeded, Failed, or Skipped).</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.LogConfig">LogConfig
 </h3>
 <p>
@@ -9088,7 +9558,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.Ordinals">Ordinals
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#apps.kubeblocks.io/v1.ShardTemplate">ShardTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
 <p>Ordinals represents a combination of continuous segments and individual values.</p>
@@ -9769,7 +10239,9 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>The namespace where the secret is located.</p>
+<p>If not specified, the secret is assumed to be in the same namespace as the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -9897,6 +10369,23 @@ The default value is false.</p>
 - 1 leader pod (participatesInQuorum=true)
 The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
 of 2 learners and 1 follower while maintaining quorum.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>isExclusive</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>IsExclusive specifies if this role can be assigned to only one Pod at a time
+within a Component. If true, the controller ensures that when a new Pod
+claims this role, any existing Pods with the same role label will have
+their labels removed immediately.
+This helps prevent &ldquo;Split-Brain&rdquo; scenarios during network partitions or node failures.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11861,6 +12350,20 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an override for the desired Ordinals of the shard.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>flatInstanceOrdinal</code><br/>
 <em>
 bool
@@ -11869,6 +12372,59 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies an override for the instance naming of the shard.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingAction">ShardingAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>Action</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetShardSelector</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TargetShardSelector">
+TargetShardSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the criteria used to select the target shard(s) for executing the Action.
+It provides precise control over which shard(s) should be targeted.</p>
+<p>The default selection logic (when this field is omitted) is context-dependent:
+1. Contextual Default: If the Action is triggered by or originates from a specific shard,
+   that shard is selected as the default target.
+2. Global Default: In other cases (where no specific shard context exists),
+one shard is selected randomly by default.</p>
+<p>This field cannot be updated.</p>
 </td>
 </tr>
 </tbody>
@@ -12071,8 +12627,8 @@ string
 <td>
 <code>postProvision</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
@@ -12083,7 +12639,7 @@ Action
 the action should trigger, available conditions for sharding include: <code>Immediately</code>, <code>ComponentReady</code>,
 and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> condition means all components of the sharding are ready.</p>
 <p>With <code>ComponentReady</code> being the default.</p>
-<p>The PostProvision Action is intended to run only once.</p>
+<p>The PostProvision action is intended to run only once.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12091,18 +12647,20 @@ and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> con
 <td>
 <code>preTerminate</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed prior to terminating a sharding.</p>
-<p>The PreTerminate Action is intended to run only once.</p>
+<p>The PreTerminate action is intended to run only once.</p>
 <p>This action is executed immediately when a terminate operation for the sharding is initiated.
 The actual termination and cleanup of the sharding and its associated resources will not proceed
 until the PreTerminate action has completed successfully.</p>
+<p>If a PostProvision action is defined, this action will only execute if PostProvision reaches
+the &lsquo;Succeeded&rsquo; phase. If the defined PostProvision fails, this action will be skipped.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12110,14 +12668,18 @@ until the PreTerminate action has completed successfully.</p>
 <td>
 <code>shardAdd</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed after a shard added.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_ADD_SHARD_NAME: The name of the shard being added.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12125,14 +12687,18 @@ Action
 <td>
 <code>shardRemove</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.Action">
-Action
+<a href="#apps.kubeblocks.io/v1.ShardingAction">
+ShardingAction
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed prior to remove a shard.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -12982,6 +13548,27 @@ VarOption
 </tr><tr><td><p>&#34;Ordinal&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Role&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TargetShardSelector">TargetShardSelector
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>)
+</p>
+<div>
+<p>TargetShardSelector defines how to select shard(s) to execute an Action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;All&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Any&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>
@@ -24487,8 +25074,8 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
 </p>
 <div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
+<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.</p>
+<p>Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
 </div>
 <table>
 <thead>
@@ -31422,8 +32009,7 @@ SignalType
 </em>
 </td>
 <td>
-<p>Specifies a valid Unix signal to be sent.
-For a comprehensive list of all Unix signals, see: ../../pkg/configuration/configmap/handler.go:allUnixSignals</p>
+<p>Specifies a valid Unix signal to be sent.</p>
 </td>
 </tr>
 <tr>
@@ -31794,7 +32380,7 @@ Defaults to 1 if unspecified.</p>
 </tr>
 <tr>
 <td>
-<code>defaultTemplateOrdinals</code><br/>
+<code>ordinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
 Ordinals
@@ -31802,12 +32388,10 @@ Ordinals
 </em>
 </td>
 <td>
-<p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.
 If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
-<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
-then the instance names generated under the default template would be
-$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
 </td>
 </tr>
 <tr>
@@ -32089,6 +32673,19 @@ bool
 </tr>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the InstanceSet.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
@@ -32238,13 +32835,26 @@ string
 </tr>
 <tr>
 <td>
-<code>generation</code><br/>
+<code>configHash</code><br/>
 <em>
-int64
+string
 </em>
 </td>
 <td>
-<p>The generation of the config.</p>
+<em>(Optional)</em>
+<p>Represents a checksum or hash of the config content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restart</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart instances.</p>
 </td>
 </tr>
 <tr>
@@ -32405,13 +33015,14 @@ string
 </tr>
 <tr>
 <td>
-<code>generation</code><br/>
+<code>configHash</code><br/>
 <em>
-int64
+string
 </em>
 </td>
 <td>
-<p>The generation of the config.</p>
+<em>(Optional)</em>
+<p>Represents a checksum or hash of the config content.</p>
 </td>
 </tr>
 </tbody>
@@ -32448,7 +33059,7 @@ Defaults to 1 if unspecified.</p>
 </tr>
 <tr>
 <td>
-<code>defaultTemplateOrdinals</code><br/>
+<code>ordinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
 Ordinals
@@ -32456,12 +33067,10 @@ Ordinals
 </em>
 </td>
 <td>
-<p>Specifies the desired Ordinals of the default template.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
+<em>(Optional)</em>
+<p>Specifies the desired Ordinals.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.
 If Ordinals are defined, their number must be equal to or more than the corresponding replicas.</p>
-<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
-then the instance names generated under the default template would be
-$(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7</p>
 </td>
 </tr>
 <tr>
@@ -32743,6 +33352,19 @@ bool
 </tr>
 <tr>
 <td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop the InstanceSet.
+If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
@@ -32856,18 +33478,6 @@ int32
 </td>
 <td>
 <p>replicas is the number of instances created by the InstanceSet controller.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ordinals</code><br/>
-<em>
-[]int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Ordinals is the ordinals used by the instances of the InstanceSet except the template instances.</p>
 </td>
 </tr>
 <tr>
@@ -33025,6 +33635,20 @@ key is the pod name, value is the revision.</p>
 </tr>
 <tr>
 <td>
+<code>deferredUpdatedRevisions</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>revisions of desired pod template. But the update process is deferred until another pod update process is triggered.
+i.e. a running pod may still use a revision in <code>updateRevisions</code>.
+key is the pod name, value is the revision.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>templatesStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceTemplateStatus">
@@ -33034,7 +33658,25 @@ key is the pod name, value is the revision.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>TemplatesStatus represents status of each instance generated by InstanceTemplates</p>
+<p>TemplatesStatus represents status of each instance generated by InstanceTemplates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>assignedOrdinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AssignedOrdinals is the ordinals assigned to the workload instances.</p>
+<p>This field represents the authoritative set of ordinal identifiers currently in use by the workload.
+It enables support for non-contiguous ordinals, allowing any instance to be terminated without affecting others.</p>
+<p>The controller uses this to maintain identity consistency and to decide which specific ordinal
+to allocate next during scaling up, or which identity is preserved during a restart.</p>
 </td>
 </tr>
 </tbody>
@@ -33577,6 +34219,7 @@ Ordinals
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the desired Ordinals of this InstanceTemplate.
 The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
 <p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
@@ -33724,18 +34367,6 @@ int32
 </tr>
 <tr>
 <td>
-<code>ordinals</code><br/>
-<em>
-[]int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Ordinals is the ordinals used by the instances of the InstanceTemplate.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>readyReplicas</code><br/>
 <em>
 int32
@@ -33879,7 +34510,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the procedure that update a replica with new configuration.</p>
+<p>Defines the procedure that update replicas with new configuration.</p>
 </td>
 </tr>
 </tbody>
@@ -35905,8 +36536,8 @@ RoleUpdateMechanism
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
-<p>SchedulingPolicy the scheduling policy.
-Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
+<p>SchedulingPolicy the scheduling policy.</p>
+<p>Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
 </div>
 <table>
 <thead>

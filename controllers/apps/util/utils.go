@@ -128,13 +128,8 @@ func IsOwnedByInstanceSet(obj client.Object) bool {
 	return false
 }
 
-func GetRestoreSystemAccountPassword(
-	ctx context.Context,
-	cli client.Reader,
-	annotations map[string]string,
-	componentName,
-	accountName string,
-) ([]byte, error) {
+func GetRestoreSystemAccountPassword(ctx context.Context, cli client.Reader,
+	annotations map[string]string, componentName, accountName string) ([]byte, error) {
 	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return nil, nil
@@ -186,4 +181,27 @@ func GetRestoreSystemAccountPassword(
 	}
 	password, err := e.Decrypt([]byte(encryptedPwd))
 	return []byte(password), err
+}
+
+func GetRestorePassword(annotations map[string]string, compName string) string {
+	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return ""
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return ""
+	}
+	backupSource, ok := backupMap[compName]
+	if !ok {
+		return ""
+	}
+	password, ok := backupSource[constant.ConnectionPassword]
+	if !ok {
+		return ""
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	password, _ = e.Decrypt([]byte(password))
+	return password
 }

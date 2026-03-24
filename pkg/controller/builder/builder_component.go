@@ -179,6 +179,12 @@ func (builder *ComponentBuilder) SetInstances(instances []appsv1.InstanceTemplat
 	builder.get().Spec.Instances = instances
 	return builder
 }
+
+func (builder *ComponentBuilder) SetOrdinals(ordinals appsv1.Ordinals) *ComponentBuilder {
+	builder.get().Spec.Ordinals = ordinals
+	return builder
+}
+
 func (builder *ComponentBuilder) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *ComponentBuilder {
 	builder.get().Spec.FlatInstanceOrdinal = flatInstanceOrdinal
 	return builder

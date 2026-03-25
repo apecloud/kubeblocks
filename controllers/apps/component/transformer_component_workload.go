@@ -644,19 +644,3 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 		rollback(1, &itsProto.Spec.Template.Spec.Containers[i])
 	}
 }
-
-func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycleActions) (bool, bool) {
-	if lifecycleActions == nil {
-		return false, false
-	}
-	hasActionDefined := func(actions []*appsv1.Action) bool {
-		for _, action := range actions {
-			if !action.Defined() {
-				return false
-			}
-		}
-		return true
-	}
-	return hasActionDefined([]*appsv1.Action{lifecycleActions.MemberJoin}),
-		hasActionDefined([]*appsv1.Action{lifecycleActions.DataDump, lifecycleActions.DataLoad})
-}

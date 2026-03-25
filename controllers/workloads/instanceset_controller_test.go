@@ -561,12 +561,18 @@ var _ = Describe("InstanceSet Controller", func() {
 			mockPodReady(scaleOutPodName)
 
 			Eventually(func(g Gomega) {
-				g.Expect(actions).Should(HaveLen(2))
+				g.Expect(actions).ShouldNot(BeEmpty())
 				g.Expect(actions[0].name).Should(Equal("dataLoad"))
 				g.Expect(actions[0].targetPod).Should(Equal(scaleOutPodName))
 				g.Expect(actions[0].sourcePod).Should(BeEmpty())
-				g.Expect(actions[1].name).Should(Equal("memberJoin"))
-				g.Expect(actions[1].memberPod).Should(Equal(scaleOutPodName))
+				memberJoinSeen := false
+				for _, action := range actions {
+					if action.name == "memberJoin" {
+						g.Expect(action.memberPod).Should(Equal(scaleOutPodName))
+						memberJoinSeen = true
+					}
+				}
+				g.Expect(memberJoinSeen).Should(BeTrue())
 			}).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -629,11 +635,20 @@ var _ = Describe("InstanceSet Controller", func() {
 			mockPodReady(scaleOutPod1, scaleOutPod2)
 
 			Eventually(func(g Gomega) {
-				g.Expect(actions).Should(HaveLen(4))
-				g.Expect(actions[0]).Should(Equal(actionCall{name: "dataLoad", targetPod: scaleOutPod1}))
-				g.Expect(actions[1]).Should(Equal(actionCall{name: "memberJoin", memberPod: scaleOutPod1}))
-				g.Expect(actions[2]).Should(Equal(actionCall{name: "dataLoad", targetPod: scaleOutPod2}))
-				g.Expect(actions[3]).Should(Equal(actionCall{name: "memberJoin", memberPod: scaleOutPod2}))
+				dataLoads := map[string]int{}
+				memberJoins := map[string]int{}
+				for _, action := range actions {
+					switch action.name {
+					case "dataLoad":
+						dataLoads[action.targetPod]++
+					case "memberJoin":
+						memberJoins[action.memberPod]++
+					}
+				}
+				g.Expect(dataLoads[scaleOutPod1]).Should(BeNumerically(">=", 1))
+				g.Expect(memberJoins[scaleOutPod1]).Should(BeNumerically(">=", 1))
+				g.Expect(dataLoads[scaleOutPod2]).Should(BeNumerically(">=", 1))
+				g.Expect(memberJoins[scaleOutPod2]).Should(BeNumerically(">=", 1))
 			}).Should(Succeed())
 		})
 

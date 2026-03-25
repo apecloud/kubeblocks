@@ -79,52 +79,52 @@ func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streaming []s
 	return append(util.DefaultEnvVars(), envVars...), nil
 }
 
-func BuildEnv4Worker(tasks []proto.Task) (*corev1.EnvVar, error) {
-	dt, err := serializeTask(tasks)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.EnvVar{
-		Name:  taskEnvName,
-		Value: dt,
-	}, nil
-}
-
-func UpdateEnv4Worker(envVars map[string]string, f func(proto.Task) *proto.Task) (*corev1.EnvVar, error) {
-	if envVars == nil {
-		return nil, nil
-	}
-	dt, ok := envVars[taskEnvName]
-	if !ok || len(dt) == 0 {
-		return nil, nil // has no task
-	}
-
-	tasks, err := deserializeTask(dt)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := 0; i < len(tasks); i++ {
-		if f != nil {
-			task := f(tasks[i])
-			if task != nil {
-				tasks[i] = *task
-			} else {
-				tasks = append(tasks[:i], tasks[i+1:]...)
-				i--
-			}
-		}
-	}
-
-	dt, err = serializeTask(tasks)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.EnvVar{
-		Name:  taskEnvName,
-		Value: dt,
-	}, nil
-}
+// func BuildEnv4Worker(tasks []proto.Task) (*corev1.EnvVar, error) {
+//	dt, err := serializeTask(tasks)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return &corev1.EnvVar{
+//		Name:  taskEnvName,
+//		Value: dt,
+//	}, nil
+// }
+//
+// func UpdateEnv4Worker(envVars map[string]string, f func(proto.Task) *proto.Task) (*corev1.EnvVar, error) {
+//	if envVars == nil {
+//		return nil, nil
+//	}
+//	dt, ok := envVars[taskEnvName]
+//	if !ok || len(dt) == 0 {
+//		return nil, nil // has no task
+//	}
+//
+//	tasks, err := deserializeTask(dt)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for i := 0; i < len(tasks); i++ {
+//		if f != nil {
+//			task := f(tasks[i])
+//			if task != nil {
+//				tasks[i] = *task
+//			} else {
+//				tasks = append(tasks[:i], tasks[i+1:]...)
+//				i--
+//			}
+//		}
+//	}
+//
+//	dt, err = serializeTask(tasks)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return &corev1.EnvVar{
+//		Name:  taskEnvName,
+//		Value: dt,
+//	}, nil
+// }
 
 func Launch(logger logr.Logger, config server.Config) (bool, error) {
 	envVars := util.EnvL2M(os.Environ())
@@ -267,13 +267,13 @@ func streamingService(services []service.Service) service.Service {
 	return nil
 }
 
-func serializeTask(tasks []proto.Task) (string, error) {
-	dt, err := json.Marshal(tasks)
-	if err != nil {
-		return "", nil
-	}
-	return string(dt), nil
-}
+// func serializeTask(tasks []proto.Task) (string, error) {
+//	dt, err := json.Marshal(tasks)
+//	if err != nil {
+//		return "", nil
+//	}
+//	return string(dt), nil
+// }
 
 func deserializeTask(dt string) ([]proto.Task, error) {
 	tasks := make([]proto.Task, 0)

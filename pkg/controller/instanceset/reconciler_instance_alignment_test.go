@@ -331,6 +331,56 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))
 		})
 
+		It("retries scale-in when member leave fails without deleting the pod", func() {
+			attempts := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action != "memberLeave" {
+						return kbagentproto.ActionResponse{}, nil
+					}
+					attempts++
+					if attempts == 1 {
+						return kbagentproto.ActionResponse{}, fmt.Errorf("temporary leave failure")
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			replicas := int32(1)
+			its.Spec.Replicas = &replicas
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberLeave: testapps.NewLifecycleAction("member-leave"),
+			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: its.Name + "-0", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-1", Provisioned: true, MemberJoined: boolPtr(true)},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for i := 0; i < 2; i++ {
+				pod := builder.NewPodBuilder(namespace, fmt.Sprintf("%s-%d", its.Name, i)).GetObject()
+				makePodAvailable(pod)
+				Expect(tree.Add(pod)).Should(Succeed())
+			}
+
+			reconciler = NewReplicasAlignmentReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))
+			Expect(*findInstanceStatus(its, its.Name+"-1").MemberJoined).Should(BeTrue())
+
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(attempts).Should(Equal(2))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
+			Expect(*findInstanceStatus(its, its.Name+"-1").MemberJoined).Should(BeFalse())
+		})
+
 		It("best-effort parallel lifecycle advances all pending scale-out replicas in one reconcile", func() {
 			var actions []kbagentproto.ActionRequest
 			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
@@ -421,6 +471,12 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(leaveNames).Should(ConsistOf(its.Name+"-1", its.Name+"-2", its.Name+"-3", its.Name+"-4", its.Name+"-6"))
 			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))
+
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(leaveNames).Should(HaveLen(6))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
 		})
 	})
 })

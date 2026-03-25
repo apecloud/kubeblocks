@@ -229,8 +229,7 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 	configDescs := make([]parametersv1alpha1.ComponentConfigDescription, 0, len(paramsDefList.Items))
-	seenFiles := make(map[string]string)
-	seenConfigFiles := make(map[string]struct{})
+	coveredFiles := make(map[string]string)
 	for i := range paramsDefList.Items {
 		paramsDef := &paramsDefList.Items[i]
 		matched, err := matchParametersDefinition(cmpd, paramsDef)
@@ -246,39 +245,35 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		if err := validateMatchedParametersDefinition(paramsDef); err != nil {
 			return nil, nil, err
 		}
-		if existing, ok := seenFiles[paramsDef.Spec.FileName]; ok {
+		if existing, ok := coveredFiles[paramsDef.Spec.FileName]; ok {
 			return nil, nil, fmt.Errorf("config file[%s] has been defined in other parametersdefinition[%s]", paramsDef.Spec.FileName, existing)
 		}
-		seenFiles[paramsDef.Spec.FileName] = paramsDef.Name
+		coveredFiles[paramsDef.Spec.FileName] = paramsDef.Name
 		paramsDefs = append(paramsDefs, paramsDef)
 		configDescs = append(configDescs, parametersv1alpha1.ComponentConfigDescription{
 			Name:             paramsDef.Spec.FileName,
 			TemplateName:     paramsDef.Spec.TemplateName,
 			FileFormatConfig: paramsDef.Spec.FileFormatConfig.DeepCopy(),
 		})
-		seenConfigFiles[paramsDef.Spec.FileName] = struct{}{}
 	}
 
 	legacyConfigDescs, legacyParamsDefs, err := resolveCmpdParametersDefsByConfigRender(ctx, reader, cmpd)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, legacyParamsDef := range legacyParamsDefs {
-		if _, ok := seenFiles[legacyParamsDef.Spec.FileName]; ok {
-			continue
-		}
-		seenFiles[legacyParamsDef.Spec.FileName] = legacyParamsDef.Name
-		paramsDefs = append(paramsDefs, legacyParamsDef)
-	}
+	legacyConfigFiles := make(map[string]struct{}, len(legacyConfigDescs))
 	for _, legacyConfigDesc := range legacyConfigDescs {
-		if _, ok := seenFiles[legacyConfigDesc.Name]; !ok {
-			continue
-		}
-		if _, ok := seenConfigFiles[legacyConfigDesc.Name]; ok {
+		if _, ok := coveredFiles[legacyConfigDesc.Name]; ok {
 			continue
 		}
 		configDescs = append(configDescs, legacyConfigDesc)
-		seenConfigFiles[legacyConfigDesc.Name] = struct{}{}
+		legacyConfigFiles[legacyConfigDesc.Name] = struct{}{}
+	}
+	for _, legacyParamsDef := range legacyParamsDefs {
+		if _, ok := legacyConfigFiles[legacyParamsDef.Spec.FileName]; !ok {
+			continue
+		}
+		paramsDefs = append(paramsDefs, legacyParamsDef)
 	}
 	if len(paramsDefs) == 0 {
 		return nil, nil, nil

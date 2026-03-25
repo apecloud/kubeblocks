@@ -27,7 +27,6 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -102,10 +101,6 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 
 	t.buildInstanceSetPlacementAnnotation(comp, protoITS)
 
-	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -119,43 +114,6 @@ func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp 
 			its.Annotations[constant.KBAppMultiClusterPlacementKey] = placement
 		}
 	}
-}
-
-func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Context, cli client.Reader,
-	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	var (
-		namespace   = synthesizedComp.Namespace
-		clusterName = synthesizedComp.ClusterName
-		compName    = synthesizedComp.Name
-	)
-
-	// HACK: sync replicas status from runningITS to protoITS
-	component.BuildReplicasStatus(runningITS, protoITS)
-
-	replicas, err := func() ([]string, error) {
-		pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName)
-		if err != nil {
-			return nil, err
-		}
-		podNameSet := sets.New[string]()
-		for _, pod := range pods {
-			podNameSet.Insert(pod.Name)
-		}
-
-		desiredPodNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
-		if err != nil {
-			return nil, err
-		}
-		desiredPodNameSet := sets.New(desiredPodNames...)
-
-		return desiredPodNameSet.Intersection(podNameSet).UnsortedList(), nil
-	}()
-	if err != nil {
-		return err
-	}
-
-	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions)
-	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransformContext, cli model.GraphClient, dag *graph.DAG,
@@ -206,13 +164,13 @@ func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
 	return ptr.Deref(synthesizedComp.Stop, false)
 }
 
-func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentTransformContext, dag *graph.DAG,
-	synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(transCtx, t.Client, synthesizeComp, comp, obj, its, dag)
+func (t *componentWorkloadTransformer) handleWorkloadUpdate(_ *componentTransformContext, _ *graph.DAG,
+	synthesizeComp *component.SynthesizedComponent, _ *appsv1.Component, obj, its *workloads.InstanceSet) error {
+	cwo, err := newComponentWorkloadOps(synthesizeComp, obj, its)
 	if err != nil {
 		return err
 	}
-	if err := cwo.horizontalScale(); err != nil {
+	if err := cwo.validateHorizontalScale(); err != nil {
 		return err
 	}
 	return nil

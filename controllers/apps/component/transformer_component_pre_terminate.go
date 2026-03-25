@@ -107,13 +107,12 @@ func (t *componentPreTerminateTransformer) provisioned(transCtx *componentTransf
 		return false, client.IgnoreNotFound(err)
 	}
 
-	provisioned, err := component.GetReplicasStatusFunc(its, func(s component.ReplicaStatus) bool {
-		return s.Provisioned
-	})
-	if err != nil {
-		return false, err
+	for _, status := range its.Status.InstanceStatus {
+		if status.Provisioned {
+			return true, nil
+		}
 	}
-	return len(provisioned) > 0, nil
+	return false, nil
 }
 
 func (t *componentPreTerminateTransformer) checkPreTerminateDone(transCtx *componentTransformContext, dag *graph.DAG) bool {

@@ -33950,6 +33950,42 @@ string
 </tr>
 <tr>
 <td>
+<code>provisioned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance is provisioned.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoaded</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance data is loaded.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoined</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the instance has joined the cluster membership.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeExpansion</code><br/>
 <em>
 bool
@@ -34383,6 +34419,50 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Defines the procedure for a controlled transition of a role to a new replica.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberJoin</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to add a new replica into membership.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberLeave</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure to remove a replica from membership.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dataLoad</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure for importing data into a replica.
+InstanceSet only orchestrates the target replica side of this action.
+Any source selection, dump, or streaming protocol remains the responsibility of the action implementation itself.</p>
 </td>
 </tr>
 <tr>

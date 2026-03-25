@@ -20,20 +20,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
 	"fmt"
 	"slices"
+	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("replicas alignment reconciler test", func() {
@@ -47,6 +55,17 @@ var _ = Describe("replicas alignment reconciler test", func() {
 	})
 
 	Context("PreCondition & Reconcile", func() {
+		makePodAvailable := func(pod *corev1.Pod) {
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = []corev1.PodCondition{
+				{
+					Type:               corev1.PodReady,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Second)),
+				},
+			}
+		}
+
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1
@@ -180,6 +199,228 @@ var _ = Describe("replicas alignment reconciler test", func() {
 					}))
 				}
 			}
+		})
+
+		It("serially advances scale-out lifecycle one step per reconcile", func() {
+			var actions []kbagentproto.ActionRequest
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actions = append(actions, req)
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberJoin: testapps.NewLifecycleAction("member-join"),
+				DataLoad:   testapps.NewLifecycleAction("data-load"),
+			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: its.Name + "-0", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-1", Provisioned: true, DataLoaded: boolPtr(false), MemberJoined: boolPtr(false)},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			pod0 := builder.NewPodBuilder(namespace, its.Name+"-0").GetObject()
+			pod1 := builder.NewPodBuilder(namespace, its.Name+"-1").GetObject()
+			makePodAvailable(pod0)
+			makePodAvailable(pod1)
+			Expect(tree.Add(pod0, pod1)).Should(Succeed())
+
+			r := &instanceAlignmentReconciler{}
+			retry, err := r.reconcileScaleOutLifecycle(tree, its)
+			Expect(err).Should(BeNil())
+			Expect(retry).Should(BeTrue())
+			Expect(actions).Should(HaveLen(1))
+			Expect(actions[0].Action).Should(Equal("dataLoad"))
+			Expect(actions[0].Parameters["KB_TARGET_POD_NAME"]).Should(Equal(pod1.Name))
+			Expect(*findInstanceStatus(its, pod1.Name).DataLoaded).Should(BeTrue())
+			Expect(*findInstanceStatus(its, pod1.Name).MemberJoined).Should(BeFalse())
+
+			retry, err = r.reconcileScaleOutLifecycle(tree, its)
+			Expect(err).Should(BeNil())
+			Expect(retry).Should(BeTrue())
+			Expect(actions).Should(HaveLen(2))
+			Expect(actions[1].Action).Should(Equal("memberJoin"))
+			Expect(actions[1].Parameters["KB_JOIN_MEMBER_POD_NAME"]).Should(Equal(pod1.Name))
+			Expect(*findInstanceStatus(its, pod1.Name).MemberJoined).Should(BeTrue())
+		})
+
+		It("parallel lifecycle advances all pending scale-out replicas in one reconcile", func() {
+			var actions []kbagentproto.ActionRequest
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actions = append(actions, req)
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberJoin: testapps.NewLifecycleAction("member-join"),
+				DataLoad:   testapps.NewLifecycleAction("data-load"),
+			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.ParallelUpdateStrategy)
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: its.Name + "-0", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-1", Provisioned: true, DataLoaded: boolPtr(false), MemberJoined: boolPtr(false)},
+				{PodName: its.Name + "-2", Provisioned: true, DataLoaded: boolPtr(false), MemberJoined: boolPtr(false)},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for i := 0; i < 3; i++ {
+				pod := builder.NewPodBuilder(namespace, fmt.Sprintf("%s-%d", its.Name, i)).GetObject()
+				makePodAvailable(pod)
+				Expect(tree.Add(pod)).Should(Succeed())
+			}
+
+			r := &instanceAlignmentReconciler{}
+			retry, err := r.reconcileScaleOutLifecycle(tree, its)
+			Expect(err).Should(BeNil())
+			Expect(retry).Should(BeFalse())
+			Expect(actions).Should(HaveLen(4))
+			Expect(actions[0].Action).Should(Equal("dataLoad"))
+			Expect(actions[1].Action).Should(Equal("memberJoin"))
+			Expect(actions[2].Action).Should(Equal("dataLoad"))
+			Expect(actions[3].Action).Should(Equal("memberJoin"))
+			for _, podName := range []string{its.Name + "-1", its.Name + "-2"} {
+				status := findInstanceStatus(its, podName)
+				Expect(*status.DataLoaded).Should(BeTrue())
+				Expect(*status.MemberJoined).Should(BeTrue())
+			}
+		})
+
+		It("serially scales in one joined replica per reconcile", func() {
+			var leaveNames []string
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "memberLeave" {
+						leaveNames = append(leaveNames, req.Parameters["KB_LEAVE_MEMBER_POD_NAME"])
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			replicas := int32(1)
+			its.Spec.Replicas = &replicas
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberLeave: testapps.NewLifecycleAction("member-leave"),
+			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: its.Name + "-0", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-1", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-2", Provisioned: true, MemberJoined: boolPtr(true)},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for i := 0; i < 3; i++ {
+				pod := builder.NewPodBuilder(namespace, fmt.Sprintf("%s-%d", its.Name, i)).GetObject()
+				makePodAvailable(pod)
+				Expect(tree.Add(pod)).Should(Succeed())
+			}
+
+			reconciler = NewReplicasAlignmentReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(leaveNames).Should(HaveLen(1))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))
+		})
+
+		It("best-effort parallel lifecycle advances all pending scale-out replicas in one reconcile", func() {
+			var actions []kbagentproto.ActionRequest
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actions = append(actions, req)
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberJoin: testapps.NewLifecycleAction("member-join"),
+				DataLoad:   testapps.NewLifecycleAction("data-load"),
+			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: its.Name + "-0", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-1", Provisioned: true, DataLoaded: boolPtr(false), MemberJoined: boolPtr(false)},
+				{PodName: its.Name + "-2", Provisioned: true, DataLoaded: boolPtr(false), MemberJoined: boolPtr(false)},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for i := 0; i < 3; i++ {
+				pod := builder.NewPodBuilder(namespace, fmt.Sprintf("%s-%d", its.Name, i)).GetObject()
+				makePodAvailable(pod)
+				Expect(tree.Add(pod)).Should(Succeed())
+			}
+
+			r := &instanceAlignmentReconciler{}
+			retry, err := r.reconcileScaleOutLifecycle(tree, its)
+			Expect(err).Should(BeNil())
+			Expect(retry).Should(BeFalse())
+			Expect(actions).Should(HaveLen(4))
+			Expect(actions[0].Action).Should(Equal("dataLoad"))
+			Expect(actions[1].Action).Should(Equal("memberJoin"))
+			Expect(actions[2].Action).Should(Equal("dataLoad"))
+			Expect(actions[3].Action).Should(Equal("memberJoin"))
+			for _, podName := range []string{its.Name + "-1", its.Name + "-2"} {
+				status := findInstanceStatus(its, podName)
+				Expect(*status.DataLoaded).Should(BeTrue())
+				Expect(*status.MemberJoined).Should(BeTrue())
+			}
+		})
+
+		It("best-effort parallel scale-in processes the first role-safe batch in one reconcile", func() {
+			var leaveNames []string
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "memberLeave" {
+						leaveNames = append(leaveNames, req.Parameters["KB_LEAVE_MEMBER_POD_NAME"])
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			replicas := int32(1)
+			its.Spec.Replicas = &replicas
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberLeave: testapps.NewLifecycleAction("member-leave"),
+			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			roleNames := []string{"follower", "logger", "", "learner", "candidate", "leader", "learner"}
+			for i, roleName := range roleNames {
+				pod := builder.NewPodBuilder(namespace, fmt.Sprintf("%s-%d", its.Name, i)).GetObject()
+				if len(roleName) > 0 {
+					pod.Labels = map[string]string{RoleLabelKey: roleName}
+				}
+				makePodAvailable(pod)
+				Expect(tree.Add(pod)).Should(Succeed())
+			}
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: its.Name + "-0", Provisioned: true, MemberJoined: boolPtr(true), Role: "follower"},
+				{PodName: its.Name + "-1", Provisioned: true, MemberJoined: boolPtr(true), Role: "logger"},
+				{PodName: its.Name + "-2", Provisioned: true, MemberJoined: boolPtr(true)},
+				{PodName: its.Name + "-3", Provisioned: true, MemberJoined: boolPtr(true), Role: "learner"},
+				{PodName: its.Name + "-4", Provisioned: true, MemberJoined: boolPtr(true), Role: "candidate"},
+				{PodName: its.Name + "-5", Provisioned: true, MemberJoined: boolPtr(true), Role: "leader"},
+				{PodName: its.Name + "-6", Provisioned: true, MemberJoined: boolPtr(true), Role: "learner"},
+			}
+
+			reconciler = NewReplicasAlignmentReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(leaveNames).Should(ConsistOf(its.Name+"-1", its.Name+"-2", its.Name+"-3", its.Name+"-4", its.Name+"-6"))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(2))
 		})
 	})
 })

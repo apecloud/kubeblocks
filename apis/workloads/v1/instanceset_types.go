@@ -524,6 +524,23 @@ type LifecycleActions struct {
 	// +optional
 	Switchover *Action `json:"switchover,omitempty"`
 
+	// Defines the procedure to add a new replica into membership.
+	//
+	// +optional
+	MemberJoin *Action `json:"memberJoin,omitempty"`
+
+	// Defines the procedure to remove a replica from membership.
+	//
+	// +optional
+	MemberLeave *Action `json:"memberLeave,omitempty"`
+
+	// Defines the procedure for importing data into a replica.
+	// InstanceSet only orchestrates the target replica side of this action.
+	// Any source selection, dump, or streaming protocol remains the responsibility of the action implementation itself.
+	//
+	// +optional
+	DataLoad *Action `json:"dataLoad,omitempty"`
+
 	// Defines the procedure that update replicas with new configuration.
 	//
 	// +optional
@@ -578,6 +595,21 @@ type InstanceStatus struct {
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+
+	// Represents whether the instance is provisioned.
+	//
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// Represents whether the instance data is loaded.
+	//
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
+	// Represents whether the instance has joined the cluster membership.
+	//
+	// +optional
+	MemberJoined *bool `json:"memberJoined,omitempty"`
 
 	// Represents whether the instance is in volume expansion.
 	//
@@ -703,7 +735,7 @@ func (r *InstanceSet) IsInstanceSetReady() bool {
 	if !instancesReady {
 		return false
 	}
-	return r.IsRoleProbeDone()
+	return r.IsRoleProbeDone() && r.IsLifecycleReady()
 }
 
 func (r *InstanceSet) IsRoleProbeDone() bool {
@@ -718,4 +750,16 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 		}
 	}
 	return cnt == replicas
+}
+
+func (r *InstanceSet) IsLifecycleReady() bool {
+	for _, inst := range r.Status.InstanceStatus {
+		if inst.DataLoaded != nil && !*inst.DataLoaded {
+			return false
+		}
+		if inst.MemberJoined != nil && !*inst.MemberJoined {
+			return false
+		}
+	}
+	return true
 }

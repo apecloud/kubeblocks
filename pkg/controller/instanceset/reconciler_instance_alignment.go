@@ -20,15 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"errors"
+	"slices"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -182,12 +188,29 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 	}
 
+	if retryAfter, err := r.reconcileScaleOutLifecycle(tree, its); err != nil {
+		return kubebuilderx.Continue, err
+	} else if retryAfter {
+		return kubebuilderx.RetryAfter(0), nil
+	}
+
 	// delete useless instances
 	priorities := make(map[string]int)
 	sortObjects(oldInstanceList, priorities, false)
+	serialLifecycle := getMemberUpdateStrategy(its) == workloads.SerialUpdateStrategy
+	scaleInBatchNames, err := r.selectScaleInBatchNames(its, oldInstanceList, deleteNameSet)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if len(scaleInBatchNames) > 0 && concurrency < len(scaleInBatchNames) {
+		concurrency = len(scaleInBatchNames)
+	}
 	for _, object := range oldInstanceList {
 		pod, _ := object.(*corev1.Pod)
 		if _, ok := deleteNameSet[pod.Name]; !ok {
+			continue
+		}
+		if len(scaleInBatchNames) > 0 && !scaleInBatchNames.Has(pod.Name) {
 			continue
 		}
 		if !isOrderedReady && concurrency <= 0 {
@@ -199,6 +222,13 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
+		if retryAfter, err := r.reconcileScaleInLifecycle(tree, its, pod); err != nil {
+			return kubebuilderx.Continue, err
+		} else if retryAfter {
+			return kubebuilderx.RetryAfter(0), nil
+		}
+		status := findInstanceStatus(its, pod.Name)
+		joined := status != nil && status.MemberJoined != nil && *status.MemberJoined
 		if err := tree.Delete(pod); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -221,10 +251,177 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if isOrderedReady {
 			break
 		}
+		if serialLifecycle && joined {
+			break
+		}
 		concurrency--
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+func (r *instanceAlignmentReconciler) reconcileScaleOutLifecycle(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (bool, error) {
+	if its.Spec.LifecycleActions == nil {
+		return false, nil
+	}
+	pods := sortedPods(tree.List(&corev1.Pod{}))
+	serialLifecycle := getMemberUpdateStrategy(its) == workloads.SerialUpdateStrategy
+	for _, pod := range pods {
+		status := findInstanceStatus(its, pod.Name)
+		if status == nil || !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
+			continue
+		}
+		if status.DataLoaded != nil && !*status.DataLoaded {
+			done, err := r.runDataLoad(tree, its, pod, status)
+			if err != nil {
+				return false, err
+			}
+			if serialLifecycle || !done {
+				return true, nil
+			}
+		}
+		if status.MemberJoined != nil && !*status.MemberJoined {
+			done, err := r.runMemberJoin(tree, its, pod, status)
+			if err != nil {
+				return false, err
+			}
+			if serialLifecycle || !done {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func (r *instanceAlignmentReconciler) runDataLoad(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, status *workloads.InstanceStatus) (bool, error) {
+	// InstanceSet only orchestrates target-side initialization here.
+	// Source-side data export/streaming remains an implementation detail of the lifecycle action itself.
+	lfa, err := newLifecycleAction(its, tree, pod)
+	if err != nil {
+		return false, err
+	}
+	if err = lfa.DataLoad(tree.Context, tree.Reader, nil); err != nil {
+		if errors.Is(err, lifecycle.ErrActionNotDefined) {
+			done := true
+			status.DataLoaded = &done
+			return true, nil
+		}
+		return false, err
+	}
+	done := true
+	status.DataLoaded = &done
+	return true, nil
+}
+
+func (r *instanceAlignmentReconciler) runMemberJoin(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, status *workloads.InstanceStatus) (bool, error) {
+	lfa, err := newLifecycleAction(its, tree, pod)
+	if err != nil {
+		return false, err
+	}
+	if err = lfa.MemberJoin(tree.Context, tree.Reader, nil); err != nil {
+		if errors.Is(err, lifecycle.ErrActionNotDefined) {
+			done := true
+			status.MemberJoined = &done
+			return true, nil
+		}
+		return false, err
+	}
+	done := true
+	status.MemberJoined = &done
+	return true, nil
+}
+
+func (r *instanceAlignmentReconciler) reconcileScaleInLifecycle(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+	status := findInstanceStatus(its, pod.Name)
+	if status == nil || status.MemberJoined == nil || !*status.MemberJoined {
+		return false, nil
+	}
+	lfa, err := newLifecycleAction(its, tree, pod)
+	if err != nil {
+		return false, err
+	}
+	if err = lfa.MemberLeave(tree.Context, tree.Reader, nil); err != nil {
+		if errors.Is(err, lifecycle.ErrActionNotDefined) {
+			done := false
+			status.MemberJoined = &done
+			return false, nil
+		}
+		return false, err
+	}
+	done := false
+	status.MemberJoined = &done
+	return false, nil
+}
+
+func (r *instanceAlignmentReconciler) selectScaleInBatchNames(its *workloads.InstanceSet, oldInstanceList []client.Object, deleteNameSet sets.Set[string]) (sets.Set[string], error) {
+	if its.Spec.LifecycleActions == nil || its.Spec.LifecycleActions.MemberLeave == nil || deleteNameSet.Len() == 0 {
+		return nil, nil
+	}
+	pods := make([]corev1.Pod, 0, deleteNameSet.Len())
+	for _, object := range oldInstanceList {
+		pod := object.(*corev1.Pod)
+		if deleteNameSet.Has(pod.Name) {
+			pods = append(pods, *pod)
+		}
+	}
+	if len(pods) == 0 {
+		return nil, nil
+	}
+	plan := &realUpdatePlan{
+		its:  *its,
+		pods: pods,
+		dag:  graph.NewDAG(),
+		isPodUpdated: func(_ *workloads.InstanceSet, _ *corev1.Pod) (bool, error) {
+			return false, nil
+		},
+	}
+	selected, err := plan.Execute()
+	if err != nil {
+		return nil, err
+	}
+	if len(selected) == 0 {
+		return nil, nil
+	}
+	names := sets.New[string]()
+	for _, pod := range selected {
+		names.Insert(pod.Name)
+	}
+	return names, nil
+}
+
+func findInstanceStatus(its *workloads.InstanceSet, podName string) *workloads.InstanceStatus {
+	for i := range its.Status.InstanceStatus {
+		if its.Status.InstanceStatus[i].PodName == podName {
+			return &its.Status.InstanceStatus[i]
+		}
+	}
+	return nil
+}
+
+func sortedPods(objects []client.Object) []*corev1.Pod {
+	pods := make([]*corev1.Pod, 0, len(objects))
+	for _, obj := range objects {
+		pods = append(pods, obj.(*corev1.Pod))
+	}
+	slices.SortFunc(pods, func(a, b *corev1.Pod) int {
+		aParent, aOrdinal := parseParentNameAndOrdinal(a.Name)
+		bParent, bOrdinal := parseParentNameAndOrdinal(b.Name)
+		if aParent != bParent {
+			if aParent < bParent {
+				return -1
+			}
+			return 1
+		}
+		switch {
+		case aOrdinal < bOrdinal:
+			return -1
+		case aOrdinal > bOrdinal:
+			return 1
+		default:
+			return 0
+		}
+	})
+	return pods
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

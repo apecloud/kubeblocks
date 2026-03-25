@@ -141,6 +141,21 @@ var _ = Describe("InstanceSet Controller", func() {
 		return pods
 	}
 
+	mockPodRoleReady := func(podName, role string) {
+		By("mock pod role and ready")
+		podKey := types.NamespacedName{
+			Namespace: itsObj.Namespace,
+			Name:      podName,
+		}
+		Expect(testapps.GetAndChangeObj(&testCtx, podKey, func(pod *corev1.Pod) {
+			if pod.Labels == nil {
+				pod.Labels = map[string]string{}
+			}
+			pod.Labels[constant.RoleLabelKey] = role
+		})()).Should(Succeed())
+		mockPodReady(podName)
+	}
+
 	Context("reconciliation", func() {
 		It("should reconcile well", func() {
 			name := "test-instance-set"
@@ -471,7 +486,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -484,6 +500,271 @@ var _ = Describe("InstanceSet Controller", func() {
 					},
 				}))
 			})).Should(Succeed())
+		})
+
+		It("instance status - lifecycle", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.Get().Spec.LifecycleActions = &workloads.LifecycleActions{
+					MemberJoin: testapps.NewLifecycleAction("member-join"),
+					DataLoad:   testapps.NewLifecycleAction("data-load"),
+				}
+			})
+
+			By("check lifecycle status defaults for an available pod")
+			podName := fmt.Sprintf("%s-0", itsObj.Name)
+			mockPodReady(podName)
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0].PodName).Should(Equal(podName))
+				g.Expect(its.Status.InstanceStatus[0].Provisioned).Should(BeTrue())
+				g.Expect(its.Status.InstanceStatus[0].DataLoaded).Should(BeNil())
+				g.Expect(its.Status.InstanceStatus[0].MemberJoined).ShouldNot(BeNil())
+				g.Expect(*its.Status.InstanceStatus[0].MemberJoined).Should(BeTrue())
+			})).Should(Succeed())
+		})
+
+		It("scale-out lifecycle actions", func() {
+			type actionCall struct {
+				name      string
+				targetPod string
+				memberPod string
+				sourcePod string
+			}
+			var actions []actionCall
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					actions = append(actions, actionCall{
+						name:      req.Action,
+						targetPod: req.Parameters["KB_TARGET_POD_NAME"],
+						memberPod: req.Parameters["KB_JOIN_MEMBER_POD_NAME"],
+						sourcePod: req.Parameters["KB_SOURCE_POD_NAME"],
+					})
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.Get().Spec.LifecycleActions = &workloads.LifecycleActions{
+					MemberJoin: testapps.NewLifecycleAction("member-join"),
+					DataLoad:   testapps.NewLifecycleAction("data-load"),
+				}
+			})
+
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](2)
+			})()).Should(Succeed())
+
+			scaleOutPodName := fmt.Sprintf("%s-1", itsObj.Name)
+			scaleOutPodKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: scaleOutPodName}
+			Eventually(testapps.CheckObjExists(&testCtx, scaleOutPodKey, &corev1.Pod{}, true)).Should(Succeed())
+			mockPodReady(scaleOutPodName)
+
+			Eventually(func(g Gomega) {
+				g.Expect(actions).Should(HaveLen(2))
+				g.Expect(actions[0].name).Should(Equal("dataLoad"))
+				g.Expect(actions[0].targetPod).Should(Equal(scaleOutPodName))
+				g.Expect(actions[0].sourcePod).Should(BeEmpty())
+				g.Expect(actions[1].name).Should(Equal("memberJoin"))
+				g.Expect(actions[1].memberPod).Should(Equal(scaleOutPodName))
+			}).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(2))
+				for _, status := range its.Status.InstanceStatus {
+					switch status.PodName {
+					case fmt.Sprintf("%s-0", itsObj.Name):
+						g.Expect(status.DataLoaded).Should(BeNil())
+						g.Expect(status.MemberJoined).ShouldNot(BeNil())
+						g.Expect(*status.MemberJoined).Should(BeTrue())
+					case scaleOutPodName:
+						g.Expect(status.Provisioned).Should(BeTrue())
+						g.Expect(status.DataLoaded).ShouldNot(BeNil())
+						g.Expect(*status.DataLoaded).Should(BeTrue())
+						g.Expect(status.MemberJoined).ShouldNot(BeNil())
+						g.Expect(*status.MemberJoined).Should(BeTrue())
+					}
+				}
+			})).Should(Succeed())
+		})
+
+		It("best-effort parallel scale-out lifecycle actions", func() {
+			type actionCall struct {
+				name      string
+				targetPod string
+				memberPod string
+				sourcePod string
+			}
+			var actions []actionCall
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					actions = append(actions, actionCall{
+						name:      req.Action,
+						targetPod: req.Parameters["KB_TARGET_POD_NAME"],
+						memberPod: req.Parameters["KB_JOIN_MEMBER_POD_NAME"],
+						sourcePod: req.Parameters["KB_SOURCE_POD_NAME"],
+					})
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.Get().Spec.LifecycleActions = &workloads.LifecycleActions{
+					MemberJoin: testapps.NewLifecycleAction("member-join"),
+					DataLoad:   testapps.NewLifecycleAction("data-load"),
+				}
+				f.Get().Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
+				f.Get().Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			})
+
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](3)
+			})()).Should(Succeed())
+
+			scaleOutPod1 := fmt.Sprintf("%s-1", itsObj.Name)
+			scaleOutPod2 := fmt.Sprintf("%s-2", itsObj.Name)
+			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Namespace: itsObj.Namespace, Name: scaleOutPod1}, &corev1.Pod{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Namespace: itsObj.Namespace, Name: scaleOutPod2}, &corev1.Pod{}, true)).Should(Succeed())
+			mockPodReady(scaleOutPod1, scaleOutPod2)
+
+			Eventually(func(g Gomega) {
+				g.Expect(actions).Should(HaveLen(4))
+				g.Expect(actions[0]).Should(Equal(actionCall{name: "dataLoad", targetPod: scaleOutPod1}))
+				g.Expect(actions[1]).Should(Equal(actionCall{name: "memberJoin", memberPod: scaleOutPod1}))
+				g.Expect(actions[2]).Should(Equal(actionCall{name: "dataLoad", targetPod: scaleOutPod2}))
+				g.Expect(actions[3]).Should(Equal(actionCall{name: "memberJoin", memberPod: scaleOutPod2}))
+			}).Should(Succeed())
+		})
+
+		It("scale-in lifecycle actions", func() {
+			var (
+				actions          []string
+				leaveMemberNames []string
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					actions = append(actions, req.Action)
+					if req.Action == "memberLeave" {
+						leaveMemberNames = append(leaveMemberNames, req.Parameters["KB_LEAVE_MEMBER_POD_NAME"])
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.Get().Spec.LifecycleActions = &workloads.LifecycleActions{
+					MemberJoin:  testapps.NewLifecycleAction("member-join"),
+					MemberLeave: testapps.NewLifecycleAction("member-leave"),
+					DataLoad:    testapps.NewLifecycleAction("data-load"),
+				}
+			})
+
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](2)
+			})()).Should(Succeed())
+
+			scaleOutPodName := fmt.Sprintf("%s-1", itsObj.Name)
+			scaleOutPodKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: scaleOutPodName}
+			Eventually(testapps.CheckObjExists(&testCtx, scaleOutPodKey, &corev1.Pod{}, true)).Should(Succeed())
+			mockPodReady(scaleOutPodName)
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(2))
+				for _, status := range its.Status.InstanceStatus {
+					if status.PodName == scaleOutPodName {
+						g.Expect(status.MemberJoined).ShouldNot(BeNil())
+						g.Expect(*status.MemberJoined).Should(BeTrue())
+					}
+				}
+			})).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](1)
+			})()).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(actions).Should(ContainElement("memberLeave"))
+				g.Expect(leaveMemberNames).Should(ContainElement(scaleOutPodName))
+			}).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, scaleOutPodKey, &corev1.Pod{}, false)).Should(Succeed())
+		})
+
+		It("scale-in bootstrap lifecycle actions", func() {
+			var leaveMemberNames []string
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action == "memberLeave" {
+						leaveMemberNames = append(leaveMemberNames, req.Parameters["KB_LEAVE_MEMBER_POD_NAME"])
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.Get().Spec.LifecycleActions = &workloads.LifecycleActions{
+					MemberLeave: testapps.NewLifecycleAction("member-leave"),
+				}
+			})
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				for _, status := range its.Status.InstanceStatus {
+					if status.PodName == fmt.Sprintf("%s-0", itsObj.Name) {
+						g.Expect(status.MemberJoined).ShouldNot(BeNil())
+						g.Expect(*status.MemberJoined).Should(BeTrue())
+					}
+				}
+			})).Should(Succeed())
+			mockPodReady(fmt.Sprintf("%s-0", itsObj.Name))
+
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](0)
+			})()).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(leaveMemberNames).Should(ContainElement(fmt.Sprintf("%s-0", itsObj.Name)))
+			}).Should(Succeed())
+		})
+
+		It("best-effort parallel scale-in lifecycle actions", func() {
+			var leaveMemberNames []string
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbaproto.ActionRequest) (kbaproto.ActionResponse, error) {
+					if req.Action == "memberLeave" {
+						leaveMemberNames = append(leaveMemberNames, req.Parameters["KB_LEAVE_MEMBER_POD_NAME"])
+					}
+					return kbaproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetReplicas(3).SetRoles([]workloads.ReplicaRole{
+					{Name: "leader", ParticipatesInQuorum: true, UpdatePriority: 5},
+					{Name: "follower", ParticipatesInQuorum: true, UpdatePriority: 4},
+					{Name: "learner", ParticipatesInQuorum: false, UpdatePriority: 2},
+				})
+				f.Get().Spec.LifecycleActions = &workloads.LifecycleActions{
+					MemberLeave: testapps.NewLifecycleAction("member-leave"),
+				}
+				f.Get().Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
+				f.Get().Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			})
+
+			mockPodRoleReady(fmt.Sprintf("%s-0", itsObj.Name), "leader")
+			mockPodRoleReady(fmt.Sprintf("%s-1", itsObj.Name), "follower")
+			mockPodRoleReady(fmt.Sprintf("%s-2", itsObj.Name), "learner")
+
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Replicas = ptr.To[int32](1)
+			})()).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(leaveMemberNames).Should(HaveLen(2))
+				g.Expect(leaveMemberNames[0]).Should(Equal(fmt.Sprintf("%s-2", itsObj.Name)))
+				g.Expect(leaveMemberNames[1]).Should(Equal(fmt.Sprintf("%s-1", itsObj.Name)))
+			}).Should(Succeed())
 		})
 
 		It("reconfigure", func() {
@@ -529,7 +810,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -562,7 +844,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -620,7 +903,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -653,7 +937,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -691,7 +976,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -721,7 +1007,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -783,7 +1070,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -825,7 +1113,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -894,7 +1183,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "client",
@@ -947,7 +1237,8 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName: fmt.Sprintf("%s-0", itsObj.Name),
+					PodName:     fmt.Sprintf("%s-0", itsObj.Name),
+					Provisioned: true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "client",

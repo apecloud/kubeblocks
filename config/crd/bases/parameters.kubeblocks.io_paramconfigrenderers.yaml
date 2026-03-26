@@ -31,11 +31,16 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
+    deprecated: true
+    deprecationWarning: This CRD has been deprecated since 1.2.0
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ParamConfigRenderer is the Schema for the paramconfigrenderers
-          API
+        description: |-
+          Deprecated: retained for API compatibility only.
+
+
+          # ParamConfigRenderer is the Schema for the paramconfigrenderers API
         properties:
           apiVersion:
             description: |-
@@ -147,8 +152,11 @@ spec:
                         - MySQL: increase max connections after v-scale operation.
                         - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
                       items:
-                        description: RerenderResourceType defines the resource requirements
-                          for a component.
+                        description: |-
+                          Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.
+
+
+                          RerenderResourceType defines the resource requirements for a component.
                         enum:
                         - vscale
                         - hscale

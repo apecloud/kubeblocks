@@ -69,7 +69,6 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			parametersDef := testparameters.NewParametersDefinitionFactory("mysql-parameters-8.0").
 				StaticParameters([]string{"automatic_sp_privileges"}).
 				DynamicParameters([]string{"innodb_autoinc_lock_mode"}).
-				SetReloadAction(testparameters.WithNoneAction()).
 				Schema(`
 #MysqlParameter: {
   // [OFF|ON] default ON

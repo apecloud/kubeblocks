@@ -37,6 +37,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -52,7 +54,6 @@ const (
 	cmName           = "mysql-tree-node-template-8.0"
 	paramsDefName    = "mysql-params-def"
 	pdcrName         = "config-test-pdcr"
-	envTestFileKey   = "env_test"
 )
 
 func mockSchemaData() string {
@@ -73,13 +74,11 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 		).
 		AddAnnotations(constant.ConfigurationRevision, "1").
-		AddConfigFile(envTestFileKey, "abcde=1234").
 		Create(&testCtx).
 		GetObject()
 
 	By("Create a parameters definition obj")
 	paramsdef := testparameters.NewParametersDefinitionFactory(paramsDefName).
-		SetReloadAction(testparameters.WithNoneAction()).
 		Schema(mockSchemaData()).
 		Create(&testCtx).
 		GetObject()
@@ -103,16 +102,27 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
 		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())
-
-	pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
-		SetParametersDefs(paramsDef.GetName()).
-		SetComponentDefinition(compDefObj.GetName()).
-		SetTemplateName(configSpecName).
-		Create(&testCtx).
-		GetObject()
-	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParamConfigRenderer) {
-		obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+	Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(paramsDef), func(obj *parametersv1alpha1.ParametersDefinition) {
+		obj.Spec.ComponentDef = compDefObj.GetName()
+		obj.Spec.TemplateName = configSpecName
+		obj.Spec.FileFormatConfig = &parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+			},
+		}
 	})()).Should(Succeed())
+	By("wait until the current cache can resolve parameter bindings for the component definition")
+	Eventually(func(g Gomega) {
+		cmpd := &appsv1.ComponentDefinition{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(compDefObj), cmpd)).Should(Succeed())
+		configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(testCtx.Ctx, testCtx.Cli, cmpd)
+		g.Expect(err).ShouldNot(HaveOccurred())
+		g.Expect(configDescs).Should(HaveLen(1))
+		g.Expect(paramsDefs).Should(HaveLen(1))
+		g.Expect(configDescs[0].TemplateName).Should(BeEquivalentTo(configSpecName))
+		g.Expect(paramsDefs[0].Name).Should(BeEquivalentTo(paramsDef.Name))
+	}).Should(Succeed())
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -174,12 +184,6 @@ func mockCreateITSObject(namespace, name, clusterName, compName string) *workloa
 	return itsObj
 }
 
-const (
-	configHash1 = "6c5b4466f"  // innodb_buffer_pool_size=1024M && max_connections=100
-	configHash2 = "5b46b78c8d" // max_connections=2000 && gtid_mode=OFF
-	configHash3 = "8665bf6888" // max_connections=1000 && gtid_mode=ON
-)
-
 func mockReconfigureDone(namespace, itsName, configName, configHash string) {
 	itsKey := client.ObjectKey{
 		Namespace: namespace,
@@ -201,6 +205,25 @@ func mockReconfigureDone(namespace, itsName, configName, configHash string) {
 	})()).Should(Succeed())
 }
 
+func waitRenderedConfigHash(namespace, clusterName, componentName, configName string, substrings ...string) string {
+	cfgKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      parameterscore.GetComponentCfgName(clusterName, componentName, configName),
+	}
+	var configHash string
+	Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *corev1.ConfigMap) {
+		content := cfg.Data[testparameters.MysqlConfigFile]
+		for _, substring := range substrings {
+			g.Expect(content).Should(ContainSubstring(substring))
+		}
+		hash := computeTargetConfigHash(nil, cfg.Data)
+		g.Expect(hash).ShouldNot(BeNil())
+		g.Expect(*hash).ShouldNot(BeEmpty())
+		configHash = *hash
+	})).Should(Succeed())
+	return configHash
+}
+
 func cleanEnv() {
 	// must wait till resources deleted and no longer existed before the testcases start,
 	// otherwise if later it needs to create some new resource objects with the same name,
@@ -216,7 +239,7 @@ func cleanEnv() {
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
-	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature)
 	testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)

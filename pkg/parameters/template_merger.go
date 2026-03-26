@@ -40,10 +40,10 @@ type TemplateMerger interface {
 type mergeContext struct {
 	render.TemplateRender
 
-	template     parametersv1alpha1.ConfigTemplateExtension
-	configSpec   appsv1.ComponentFileTemplate
-	paramsDefs   []*parametersv1alpha1.ParametersDefinition
-	configRender *parametersv1alpha1.ParamConfigRenderer
+	template   parametersv1alpha1.ConfigTemplateExtension
+	configSpec appsv1.ComponentFileTemplate
+	paramsDefs []*parametersv1alpha1.ParametersDefinition
+	configs    []parametersv1alpha1.ComponentConfigDescription
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
@@ -56,7 +56,7 @@ func (m *mergeContext) renderTemplate() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := validateRenderedData(configs, m.paramsDefs, m.configRender); err != nil {
+	if err := validateRenderedData(configs, m.paramsDefs, m.configs); err != nil {
 		return nil, err
 	}
 	return configs, nil
@@ -83,10 +83,10 @@ type configOnlyAddMerger struct {
 }
 
 func (c *configPatcher) merge(baseData map[string]string, updatedData map[string]string, manager *valueManager) (map[string]string, error) {
-	if c.configRender == nil || len(c.configRender.Spec.Configs) == 0 {
+	if len(c.configs) == 0 {
 		return nil, fmt.Errorf("not support patch merge policy")
 	}
-	configPatch, err := core.TransformConfigPatchFromData(updatedData, c.configRender.Spec)
+	configPatch, err := core.TransformConfigPatchFromData(updatedData, c.configs)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (c *configPatcher) merge(baseData map[string]string, updatedData map[string
 		return baseData, nil
 	}
 
-	params := core.GenerateVisualizedParamsList(configPatch, c.configRender.Spec.Configs)
+	params := core.GenerateVisualizedParamsList(configPatch, c.configs)
 	mergedData := copyMap(baseData)
 	for key, patch := range splitParameters(params) {
 		v, ok := baseData[key]
@@ -102,7 +102,7 @@ func (c *configPatcher) merge(baseData map[string]string, updatedData map[string
 			mergedData[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec.Configs, key), manager.BuildValueTransformer(key))
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configs, key), manager.BuildValueTransformer(key))
 		if err != nil {
 			return nil, err
 		}
@@ -129,14 +129,14 @@ func NewTemplateMerger(template parametersv1alpha1.ConfigTemplateExtension,
 	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentFileTemplate,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	configRender *parametersv1alpha1.ParamConfigRenderer,
+	configs []parametersv1alpha1.ComponentConfigDescription,
 ) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec:     configSpec,
 		template:       template,
 		TemplateRender: templateRender,
 		paramsDefs:     paramsDefs,
-		configRender:   configRender,
+		configs:        configs,
 	}
 
 	var merger TemplateMerger
@@ -160,8 +160,8 @@ func mergerConfigTemplate(template parametersv1alpha1.ConfigTemplateExtension,
 	configSpec appsv1.ComponentFileTemplate,
 	baseData map[string]string,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
-	configRender *parametersv1alpha1.ParamConfigRenderer) (map[string]string, error) {
-	templateMerger, err := NewTemplateMerger(template, templateRender, configSpec, paramsDefs, configRender)
+	configs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
+	templateMerger, err := NewTemplateMerger(template, templateRender, configSpec, paramsDefs, configs)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func mergerConfigTemplate(template parametersv1alpha1.ConfigTemplateExtension,
 	if len(data) == 0 {
 		return nil, nil
 	}
-	return templateMerger.merge(baseData, data, NewValueManager(paramsDefs, configRender.Spec.Configs))
+	return templateMerger.merge(baseData, data, NewValueManager(paramsDefs, configs))
 }
 
 func splitParameters(params []core.VisualizedParam) map[string]map[string]*string {

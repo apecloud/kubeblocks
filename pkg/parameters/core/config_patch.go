@@ -90,7 +90,7 @@ func difference(base *cfgWrapper, target *cfgWrapper) (*ConfigPatchInfo, error) 
 	return reconfigureInfo, nil
 }
 
-func TransformConfigPatchFromData(data map[string]string, configRender parametersv1alpha1.ParamConfigRendererSpec) (*ConfigPatchInfo, error) {
+func TransformConfigPatchFromData(data map[string]string, configs []parametersv1alpha1.ComponentConfigDescription) (*ConfigPatchInfo, error) {
 	emptyData := func(m map[string]string) map[string]string {
 		r := make(map[string]string, len(m))
 		for key := range m {
@@ -98,6 +98,6 @@ func TransformConfigPatchFromData(data map[string]string, configRender parameter
 		}
 		return r
 	}
-	patch, _, err := CreateConfigPatch(emptyData(data), data, configRender, false)
+	patch, _, err := CreateConfigPatch(emptyData(data), data, configs, false)
 	return patch, err
 }

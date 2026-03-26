@@ -46,6 +46,8 @@ const (
 	PDDeletingPhase    ParametersDescPhase = "Deleting"
 )
 
+// Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.
+//
 // ParameterDeletedMethod defines how to handle parameter remove
 // +enum
 // +kubebuilder:validation:Enum={RestoreToDefault, Reset}
@@ -56,6 +58,8 @@ const (
 	PDPReset   ParameterDeletedMethod = "Reset"
 )
 
+// Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.
+//
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
 // +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale}

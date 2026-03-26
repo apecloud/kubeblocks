@@ -86,13 +86,13 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 	return updatedParams, nil
 }
 
-// ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, configRender parametersv1alpha1.ParamConfigRendererSpec) error {
+// ValidateConfigPatch verifies if the changed parameters have been removed.
+func ValidateConfigPatch(patch *ConfigPatchInfo, configs []parametersv1alpha1.ComponentConfigDescription) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}
 
-	vParams := GenerateVisualizedParamsList(patch, configRender.Configs)
+	vParams := GenerateVisualizedParamsList(patch, configs)
 	for _, param := range vParams {
 		for _, p := range param.Parameters {
 			if p.Value == nil {

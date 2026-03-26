@@ -27,15 +27,18 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -90,16 +93,24 @@ func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
 		}).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.enqueueByComponent)).
 		Complete(r)
 }
 
-func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
-	tasks := generateReconcileTasks(reqCtx, componentParameter)
-	if len(tasks) == 0 {
-		reqCtx.Log.Info("nothing to reconcile")
-		return intctrlutil.Reconciled()
+func (r *ComponentParameterReconciler) enqueueByComponent(_ context.Context, object client.Object) []reconcile.Request {
+	comp, ok := object.(*appsv1.Component)
+	if !ok {
+		return nil
 	}
+	return []reconcile.Request{{
+		NamespacedName: types.NamespacedName{
+			Namespace: comp.Namespace,
+			Name:      comp.Name,
+		},
+	}}
+}
 
+func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
 	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, componentParameter)
 	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to get related object").Error())
@@ -110,6 +121,11 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	}
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(componentParameter, reqCtx)
+	}
+	tasks := generateReconcileTasks(reqCtx, componentParameter, fetcherTask.ComponentObj.Generation)
+	if len(tasks) == 0 {
+		reqCtx.Log.Info("nothing to reconcile")
+		return intctrlutil.Reconciled()
 	}
 
 	taskCtx, err := newTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)

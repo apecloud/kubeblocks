@@ -72,7 +72,7 @@ func syncReconfiguringPhase(rctx *reconcileContext, status *parametersv1alpha1.C
 			rctx.Log.Info("component status or spec not found", "component", parameterStatus.Name, "template", parameterStatus.Name)
 			continue
 		}
-		parameterStatus.Phase = parameters.GetUpdatedParametersReconciledPhase(cm, *compSpec, compStatus)
+		parameterStatus.Phase = parameters.GetUpdatedParametersReconciledPhase(cm, *compSpec, compStatus, 0)
 		if finished {
 			finished = parameters.IsParameterFinished(parameterStatus.Phase)
 		}
@@ -154,22 +154,22 @@ func updateCustomTemplates(rctx *reconcileContext, parameter *parametersv1alpha1
 
 func classifyParameters(updatedParameters parametersv1alpha1.ComponentParameters, configmaps map[string]*corev1.ConfigMap) func(*reconcileContext, *parametersv1alpha1.Parameter) error {
 	return func(rctx *reconcileContext, parameter *parametersv1alpha1.Parameter) error {
-		if !parameters.HasValidParameterTemplate(rctx.configRender) {
+		if !parameters.HasValidParameterTemplate(rctx.configDescs) {
 			return intctrlutil.NewFatalError(fmt.Sprintf("component[%s] does not support reconfigure", rctx.ComponentName))
 		}
 		classParameters, err := parameters.ClassifyComponentParameters(updatedParameters,
 			flatten(rctx.parametersDefs),
 			rctx.ComponentDefObj.Spec.Configs,
 			configmaps,
-			rctx.configRender,
+			rctx.configDescs,
 		)
 		if err != nil {
 			return intctrlutil.NewFatalError(err.Error())
 		}
 		for tpl, m := range classParameters {
-			configDescs := parameters.GetComponentConfigDescriptions(&rctx.configRender.Spec, tpl)
+			configDescs := parameters.GetComponentConfigDescriptions(rctx.configDescs, tpl)
 			if len(configDescs) == 0 {
-				return intctrlutil.NewFatalError(fmt.Sprintf("not found config description from pdcr: %s", tpl))
+				return intctrlutil.NewFatalError(fmt.Sprintf("not found config description for template: %s", tpl))
 			}
 			if err := validateComponentParameter(toArray(rctx.parametersDefs), configDescs, m); err != nil {
 				return intctrlutil.NewFatalError(err.Error())

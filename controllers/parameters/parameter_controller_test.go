@@ -20,11 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,7 +81,11 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("mock the reconfigure done")
-			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash1)
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName,
+				waitRenderedConfigHash(
+					testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
+					"innodb_buffer_pool_size=1024M", "max_connections=100",
+				))
 
 			By("check component parameter status")
 			Eventually(testapps.CheckObj(&testCtx, compParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
@@ -109,7 +115,11 @@ var _ = Describe("Parameter Controller", func() {
 				GetObject()
 
 			By("mock the reconfigure done")
-			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName, configHash2)
+			mockReconfigureDone(itsObj.Namespace, itsObj.Name, configSpecName,
+				waitRenderedConfigHash(
+					testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
+					"max_connections=2000", "gtid_mode=OFF",
+				))
 
 			By("check parameter status")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
@@ -139,6 +149,53 @@ var _ = Describe("Parameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
 				g.Expect(parameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CMergeFailedPhase))
 			})).Should(Succeed())
+		})
+
+		It("rerenders the base template before applying parameter updates", func() {
+			prepareTestEnv()
+
+			By("update the template to depend on the current component replicas")
+			templateKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: configSpecName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, templateKey, func(tpl *corev1.ConfigMap) {
+				tpl.Data[testparameters.MysqlConfigFile] = strings.ReplaceAll(
+					tpl.Data[testparameters.MysqlConfigFile],
+					"server-id=1",
+					"server-id={{ $.component.replicas }}",
+				)
+			})).Should(Succeed())
+
+			By("change the component replicas without touching rerender payload fields")
+			componentKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: synthesizedComp.FullCompName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, componentKey, func(comp *appsv1.Component) {
+				comp.Spec.Replicas = 2
+			})).Should(Succeed())
+
+			clusterKey := client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: synthesizedComp.ClusterName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].Replicas = 2
+			})).Should(Succeed())
+
+			By("submit a parameter update to enter the apply flow")
+			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
+			parameterObj := testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
+				AddParameters("gtid_mode", "ON").
+				Create(&testCtx).
+				GetObject()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      configcore.GetComponentCfgName(synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *corev1.ConfigMap) {
+				config := cfg.Data[testparameters.MysqlConfigFile]
+				g.Expect(config).Should(ContainSubstring("server-id=2"))
+				g.Expect(config).Should(ContainSubstring("gtid_mode=ON"))
+			}), time.Second*10).Should(Succeed())
+
+			By("check parameter status eventually finishes")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameterObj), func(g Gomega, parameter *parametersv1alpha1.Parameter) {
+				g.Expect(parameter.Status.Phase).ShouldNot(BeEquivalentTo(parametersv1alpha1.CMergeFailedPhase))
+			}), time.Second*10).Should(Succeed())
 		})
 	})
 
@@ -229,7 +286,15 @@ var _ = Describe("Parameter Controller", func() {
 
 			for _, spec := range shardingCompSpecList {
 				By("mock the reconfigure done: " + spec.Name)
-				mockReconfigureDone(synthesizedComp.Namespace, constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name), configSpecName, configHash1)
+				mockReconfigureDone(
+					synthesizedComp.Namespace,
+					constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, spec.Name),
+					configSpecName,
+					waitRenderedConfigHash(
+						testCtx.DefaultNamespace, synthesizedComp.ClusterName, spec.Name, configSpecName,
+						"innodb_buffer_pool_size=1024M", "max_connections=100",
+					),
+				)
 
 				By("check component parameter status: " + spec.Name)
 				cpkey := types.NamespacedName{

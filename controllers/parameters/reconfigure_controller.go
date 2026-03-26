@@ -207,7 +207,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	configPatch, forceRestart, err := createConfigPatch(configMap, configSpec, rctx.configRender, rctx.parametersDefs)
+	configPatch, forceRestart, err := createConfigPatch(configMap, configSpec, rctx.configDescs, rctx.parametersDefs)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -244,7 +244,7 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 	rctx *reconcileContext, patch *core.ConfigPatchInfo, forceRestart bool) ([]reconfigure.Task, error) {
 
 	// If the patch or ConfigRender is nil, return a single restart task.
-	if patch == nil || rctx.configRender == nil {
+	if patch == nil || len(rctx.configDescs) == 0 {
 		return []reconfigure.Task{r.buildRestartTask(templateSpec, rctx)}, nil
 	}
 
@@ -259,7 +259,7 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 		if !ok {
 			continue
 		}
-		configFormat := parameters.GetComponentConfigDescription(&rctx.configRender.Spec, key)
+		configFormat := parameters.GetComponentConfigDescription(rctx.configDescs, key)
 		if configFormat == nil || configFormat.FileFormatConfig == nil {
 			continue
 		}
@@ -478,8 +478,9 @@ func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]str
 	return &hash
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
-	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+func createConfigPatch(cfg *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate,
+	configDescs []parametersv1alpha1.ComponentConfigDescription, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
+	if len(configDescs) == 0 {
 		return nil, true, nil
 	}
 	lastConfig, err := getLastVersionConfig(cfg)
@@ -487,7 +488,7 @@ func createConfigPatch(cfg *corev1.ConfigMap, configSpec *appsv1.ComponentFileTe
 		return nil, false, core.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	patch, restart, err := core.CreateConfigPatch(lastConfig, cfg.Data, configRender.Spec, true)
+	patch, restart, err := core.CreateConfigPatch(lastConfig, cfg.Data, configDescs, true)
 	if err != nil {
 		return nil, false, err
 	}

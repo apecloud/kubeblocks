@@ -146,7 +146,8 @@ ComponentParameterStatus
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParamConfigRenderer">ParamConfigRenderer
 </h3>
 <div>
-<p>ParamConfigRenderer is the Schema for the paramconfigrenderers API</p>
+<p>Deprecated: retained for API compatibility only.</p>
+<h1>ParamConfigRenderer is the Schema for the paramconfigrenderers API</h1>
 </div>
 <table>
 <thead>
@@ -431,6 +432,45 @@ ParametersDefinitionSpec
 <tbody>
 <tr>
 <td>
+<code>componentDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced config template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>fileName</code><br/>
 <em>
 string
@@ -439,6 +479,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the config file name in the config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormatConfig</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">
+FileFormatConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>, <code>hcl</code>, <code>dotenv</code>, <code>properties</code>, and <code>toml</code>.</p>
 </td>
 </tr>
 <tr>
@@ -1113,9 +1168,7 @@ Payload
 </td>
 <td>
 <em>(Optional)</em>
-<p>External controllers can trigger a configuration rerender by modifying this field.</p>
-<p>Note: Currently, the <code>payload</code> field is opaque and its content is not interpreted by the system.
-Modifying this field will cause a rerender, regardless of the specific content of this field.</p>
+<p>Deprecated: retained for API compatibility only.</p>
 </td>
 </tr>
 <tr>
@@ -1267,7 +1320,7 @@ ReconcileDetail
 <h3 id="parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
 </p>
 <div>
 <p>FileFormatConfig specifies the format of the configuration file and any associated parameters
@@ -1592,6 +1645,7 @@ When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefin
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterDeletedPolicy">ParameterDeletedPolicy</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 <p>ParameterDeletedMethod defines how to handle parameter remove</p>
 </div>
 <table>
@@ -1613,6 +1667,7 @@ When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefin
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 </div>
 <table>
 <thead>
@@ -1827,6 +1882,45 @@ updated by the API Server.</p>
 <tbody>
 <tr>
 <td>
+<code>componentDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced config template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>fileName</code><br/>
 <em>
 string
@@ -1835,6 +1929,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the config file name in the config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormatConfig</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">
+FileFormatConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>, <code>hcl</code>, <code>dotenv</code>, <code>properties</code>, and <code>toml</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2168,6 +2277,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ComponentParameter objects.</p>
 <p>Payload holds the payload data. This field is optional and can contain any type of data.
 Not included in the JSON representation of the object.</p>
 </div>
@@ -2330,6 +2440,7 @@ This allows users to customize the configuration template according to their spe
 </p>
 <div>
 <p>ReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.</p>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 <p>Only one of the mechanisms can be specified at a time.</p>
 </div>
 <table>
@@ -2394,6 +2505,7 @@ reload.</p>
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.</p>
 <p>RerenderResourceType defines the resource requirements for a component.</p>
 </div>
 <table>

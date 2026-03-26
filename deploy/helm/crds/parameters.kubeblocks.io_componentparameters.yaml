@@ -652,12 +652,7 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     payload:
-                      description: |-
-                        External controllers can trigger a configuration rerender by modifying this field.
-
-
-                        Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
-                        Modifying this field will cause a rerender, regardless of the specific content of this field.
+                      description: 'Deprecated: retained for API compatibility only.'
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     userConfigTemplates:

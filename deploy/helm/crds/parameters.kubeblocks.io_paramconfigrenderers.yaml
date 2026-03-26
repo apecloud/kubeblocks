@@ -36,8 +36,11 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ParamConfigRenderer is the Schema for the paramconfigrenderers
-          API
+        description: |-
+          Deprecated: retained for API compatibility only.
+
+
+          # ParamConfigRenderer is the Schema for the paramconfigrenderers API
         properties:
           apiVersion:
             description: |-
@@ -137,7 +140,17 @@ spec:
                       description: Specifies the config file name in the config template.
                       type: string
                     reRenderResourceTypes:
-                      description: 'Deprecated: retained for API compatibility only.'
+                      description: |-
+                        Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
+
+
+                        In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+                        or cluster topology. Examples:
+
+
+                        - Redis: adjust maxmemory after v-scale operation.
+                        - MySQL: increase max connections after v-scale operation.
+                        - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
                       items:
                         description: |-
                           Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.

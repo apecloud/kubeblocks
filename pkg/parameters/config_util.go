@@ -136,7 +136,7 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyUpdatedParameters checks if the configuration is changed
-func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, componentGeneration int64) bool {
+func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, compGeneration int64) bool {
 	if configMap == nil {
 		return false
 	}
@@ -151,25 +151,25 @@ func IsApplyUpdatedParameters(configMap *corev1.ConfigMap, item parametersv1alph
 	if !reflect.DeepEqual(lastItem, item) {
 		return false
 	}
-	if componentGeneration == 0 {
+	if compGeneration == 0 {
 		return true
 	}
-	appliedGeneration, ok := configMap.Annotations[constant.ConfigAppliedComponentGenerationKey]
+	appliedGeneration, ok := configMap.Annotations[constant.ParametersAppliedComponentGenerationKey]
 	if !ok || appliedGeneration == "" {
 		return false
 	}
-	return appliedGeneration == strconv.FormatInt(componentGeneration, 10)
+	return appliedGeneration == strconv.FormatInt(compGeneration, 10)
 }
 
 // GetUpdatedParametersReconciledPhase gets the configuration phase
 func GetUpdatedParametersReconciledPhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
-	componentGeneration int64) parametersv1alpha1.ParameterPhase {
+	compGeneration int64) parametersv1alpha1.ParameterPhase {
 	if status == nil || status.Phase == "" {
 		return parametersv1alpha1.CCreatingPhase
 	}
-	if !IsApplyUpdatedParameters(configMap, item, componentGeneration) {
+	if !IsApplyUpdatedParameters(configMap, item, compGeneration) {
 		return parametersv1alpha1.CPendingPhase
 	}
 	if status.Phase == parametersv1alpha1.CFinishedPhase {

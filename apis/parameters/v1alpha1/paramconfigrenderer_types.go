@@ -31,7 +31,9 @@ import (
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ParamConfigRenderer is the Schema for the paramconfigrenderers API
+// Deprecated: retained for API compatibility only.
+//
+// # ParamConfigRenderer is the Schema for the paramconfigrenderers API
 //
 // +kubebuilder:deprecatedversion:warning="This CRD has been deprecated since 1.2.0"
 type ParamConfigRenderer struct {
@@ -119,9 +121,15 @@ type ComponentConfigDescription struct {
 	// +optional
 	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig,omitempty"`
 
-	// Deprecated: retained for API compatibility only.
+	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
+	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+	// or cluster topology. Examples:
+	//
+	// - Redis: adjust maxmemory after v-scale operation.
+	// - MySQL: increase max connections after v-scale operation.
+	// - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
+	//
 	// +listType=set
 	// +optional
 	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`

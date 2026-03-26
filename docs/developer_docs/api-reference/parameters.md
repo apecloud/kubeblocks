@@ -146,7 +146,8 @@ ComponentParameterStatus
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParamConfigRenderer">ParamConfigRenderer
 </h3>
 <div>
-<p>ParamConfigRenderer is the Schema for the paramconfigrenderers API</p>
+<p>Deprecated: retained for API compatibility only.</p>
+<h1>ParamConfigRenderer is the Schema for the paramconfigrenderers API</h1>
 </div>
 <table>
 <thead>
@@ -785,7 +786,14 @@ For instance, when using the <code>ini</code> format, you can specify the sectio
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: retained for API compatibility only.</p>
+<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
+<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+or cluster topology. Examples:</p>
+<ul>
+<li>Redis: adjust maxmemory after v-scale operation.</li>
+<li>MySQL: increase max connections after v-scale operation.</li>
+<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
+</ul>
 </td>
 </tr>
 </tbody>

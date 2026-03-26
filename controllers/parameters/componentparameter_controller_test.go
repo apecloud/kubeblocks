@@ -130,7 +130,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			}
 			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
 				g.Expect(cfg.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("server-id=2"))
-				g.Expect(cfg.Annotations[constant.ConfigAppliedComponentGenerationKey]).ShouldNot(BeEmpty())
+				g.Expect(cfg.Annotations[constant.ParametersAppliedComponentGenerationKey]).ShouldNot(BeEmpty())
 			})).Should(Succeed())
 		})
 

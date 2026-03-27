@@ -279,7 +279,8 @@ ParamConfigRendererStatus
 <h3 id="parameters.kubeblocks.io/v1alpha1.Parameter">Parameter
 </h3>
 <div>
-<p>Parameter is the Schema for the parameters API</p>
+<p>Deprecated: retained for API compatibility only.</p>
+<h1>Parameter is the Schema for the parameters API</h1>
 </div>
 <table>
 <thead>

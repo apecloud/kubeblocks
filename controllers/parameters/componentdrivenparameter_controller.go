@@ -50,7 +50,7 @@ import (
 	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-// ComponentDrivenParameterReconciler reconciles a Parameter object
+// ComponentDrivenParameterReconciler reconciles a Component object into the corresponding ComponentParameter.
 type ComponentDrivenParameterReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -81,8 +81,8 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 		Req:      req,
 		Recorder: r.Recorder,
 		Log: log.FromContext(ctx).
-			WithName("ComponentParameterReconciler").
-			WithValues("Namespace", req.Namespace, "Parameter", req.Name),
+			WithName("ComponentDrivenParameterReconciler").
+			WithValues("Namespace", req.Namespace, "Component", req.Name),
 	}
 
 	comp := &appsv1.Component{}

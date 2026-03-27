@@ -644,12 +644,12 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParameterReconciler{
+		if err = (&parameterscontrollers.DeprecatedParameterReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
+			Recorder: mgr.GetEventRecorderFor("deprecated-parameter-controller"),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Parameter")
+			setupLog.Error(err, "unable to create controller", "controller", "DeprecatedParameter")
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ComponentDrivenParameterReconciler{

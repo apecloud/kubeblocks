@@ -65,6 +65,9 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.InstanceSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentParameterSignature, inNS)
 	}
 
 	BeforeEach(cleanEnv)
@@ -121,14 +124,14 @@ parameter: {
 				}).
 				GetObject()
 			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, componentParameter, func() {
-				componentParameter.Status.ObservedGeneration = componentParameter.Generation
-				componentParameter.Status.Phase = parametersv1alpha1.CFinishedPhase
-				componentParameter.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
 					Name:  "mysql-config",
 					Phase: parametersv1alpha1.CFinishedPhase,
 				}}
-			})).Should(Succeed())
+			})()).Should(Succeed())
 
 			configMap := &corev1.ConfigMap{}
 			configMap.Name = parameterscore.GetComponentCfgName(clusterName, defaultCompName, "mysql-config")
@@ -182,6 +185,7 @@ parameter: {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
 				item := parameters.GetConfigTemplateItem(&cp.Spec, "mysql-config")
@@ -192,6 +196,71 @@ parameter: {
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
 			})).Should(Succeed())
 
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CFinishedPhase,
+				}}
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+
+			Expect(err).Should(BeNil())
+
+		})
+
+		It("supports reconfigure with only user config templates", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			By("prepare configuration metadata and component parameter")
+			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
+			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-" + randomStr + "-tpl-only").
+				SetComponentDefinition(compDefName).
+				SetTemplateName("mysql-config").
+				Schema(`
+parameter: {
+  max_connections?: string
+}`).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
+				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ServiceVersion = "8.0.30"
+				compDef.Spec.Configs = []appsv1.ComponentFileTemplate{
+					{
+						Name:            "mysql-config",
+						Template:        template.Name,
+						Namespace:       template.Namespace,
+						VolumeName:      "mysql-config",
+						ExternalManaged: pointer.Bool(true),
+					},
+				}
+			})()).Should(Succeed())
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				ClusterRef(clusterName).
+				Component(defaultCompName).
+				AddConfigurationItem(appsv1.ComponentFileTemplate{
+					Name:            "mysql-config",
+					Template:        template.Name,
+					Namespace:       template.Namespace,
+					VolumeName:      "mysql-config",
+					ExternalManaged: pointer.Bool(true),
+				}).
+				GetObject()
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, componentParameter, func() {
 				componentParameter.Status.ObservedGeneration = componentParameter.Generation
 				componentParameter.Status.Phase = parametersv1alpha1.CFinishedPhase
@@ -201,11 +270,44 @@ parameter: {
 				}}
 			})).Should(Succeed())
 
+			customTemplate := testparameters.NewComponentTemplateFactory("custom-mysql-config-"+randomStr, testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "max_connections=300\n").
+				Create(&testCtx).
+				GetObject()
+
+			By("create Start opsRequest")
+			ops := testops.NewOpsRequestObj("reconfigure-template-only-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					UserConfigTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+						"mysql-config": {
+							TemplateRef: customTemplate.Name,
+							Namespace:   customTemplate.Namespace,
+							Policy:      parametersv1alpha1.ReplacePolicy,
+						},
+					},
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			By("run the ops request")
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(err).ShouldNot(HaveOccurred())
 
-			Expect(err).Should(BeNil())
-
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cp.Spec, "mysql-config")
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(customTemplate.Name))
+			})).Should(Succeed())
 		})
 	})
 })

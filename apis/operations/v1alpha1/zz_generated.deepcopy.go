@@ -1210,7 +1210,7 @@ func (in *Reconfigure) DeepCopyInto(out *Reconfigure) {
 		in, out := &in.UserConfigTemplates, &out.UserConfigTemplates
 		*out = make(map[string]parametersv1alpha1.ConfigTemplateExtension, len(*in))
 		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+			(*out)[key] = val
 		}
 	}
 }

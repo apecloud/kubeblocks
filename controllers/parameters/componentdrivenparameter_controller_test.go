@@ -160,6 +160,22 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		})
 	})
 
+	Context("Resolve init parameters from cluster annotation", func() {
+		It("returns error for invalid annotation payload", func() {
+			cluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.ParametersInitAnnotationKey: "{invalid-json",
+					},
+				},
+			}
+
+			_, err := resolveInitParametersFromCluster(cluster, defaultCompName)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("failed to unmarshal init parameters annotation"))
+		})
+	})
+
 	Context("No matching ParametersDefinition", func() {
 		It("NPE test", func() {
 			initTestResource()

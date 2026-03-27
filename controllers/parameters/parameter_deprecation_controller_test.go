@@ -22,7 +22,7 @@ package parameters
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -58,13 +58,12 @@ var _ = Describe("Deprecated Parameter Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(parameter), func(obj *parametersv1alpha1.Parameter) {
-			now := metav1.Now()
-			obj.DeletionTimestamp = &now
-		})()).Should(Succeed())
+		Expect(testCtx.Cli.Delete(testCtx.Ctx, parameter)).Should(Succeed())
 
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(parameter), func(g Gomega, obj *parametersv1alpha1.Parameter) {
-			g.Expect(obj.Finalizers).ShouldNot(ContainElement(constant.ConfigFinalizerName))
-		})).Should(Succeed())
+		Eventually(func(g Gomega) {
+			obj := &parametersv1alpha1.Parameter{}
+			err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(parameter), obj)
+			g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+		}).Should(Succeed())
 	})
 })

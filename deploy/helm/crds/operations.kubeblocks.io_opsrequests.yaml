@@ -2766,6 +2766,36 @@ spec:
                         - key
                         type: object
                       type: array
+                    userConfigTemplates:
+                      additionalProperties:
+                        properties:
+                          namespace:
+                            default: default
+                            description: |-
+                              Specifies the namespace of the referenced configuration template ConfigMap object.
+                              An empty namespace is equivalent to the "default" namespace.
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                          policy:
+                            default: none
+                            description: Defines the strategy for merging externally
+                              imported templates into component templates.
+                            enum:
+                            - patch
+                            - replace
+                            - none
+                            type: string
+                          templateRef:
+                            description: Specifies the name of the referenced configuration
+                              template ConfigMap object.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - templateRef
+                        type: object
+                      description: Specifies user-provided configuration templates
+                        keyed by config template name.
+                      type: object
                   required:
                   - componentName
                   type: object

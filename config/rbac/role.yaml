@@ -871,12 +871,8 @@ rules:
   resources:
   - parameters
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - parameters.kubeblocks.io

@@ -28,6 +28,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -443,6 +444,21 @@ func handleInitParameterTemplates(ctx context.Context, reader client.Reader, cus
 			return fmt.Errorf("init template[%s] not found in component definition", tplName)
 		}
 		specs[index].CustomTemplates = tpl.DeepCopy()
+	}
+	return nil
+}
+
+func validateCustomTemplate(ctx context.Context, cli client.Reader, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
+	for configSpec, custom := range templates {
+		cm := &corev1.ConfigMap{}
+		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s/%s] for custom template: %s",
+					custom.Namespace, custom.TemplateRef, configSpec)
+			}
+			return err
+		}
 	}
 	return nil
 }

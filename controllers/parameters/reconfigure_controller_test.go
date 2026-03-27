@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -98,13 +99,18 @@ var _ = Describe("Reconfigure Controller", func() {
 		})
 
 		It("submit changes to cluster", func() {
-			By("submit a parameter update request")
-			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
-			testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
-				AddParameters("innodb_buffer_pool_size", "1024M").
-				AddParameters("max_connections", "100").
-				Create(&testCtx).
-				GetObject()
+			By("submit changes through component parameter")
+			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
+					testparameters.MysqlConfigFile: {
+						Parameters: map[string]*string{
+							"innodb_buffer_pool_size": pointer.String("1024M"),
+							"max_connections":         pointer.String("100"),
+						},
+					},
+				}
+			})).Should(Succeed())
 
 			expectedHash := waitRenderedConfigHash(
 				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
@@ -138,13 +144,18 @@ var _ = Describe("Reconfigure Controller", func() {
 				pd.Spec.ReloadAction = nil // restart
 			})()).Should(Succeed())
 
-			By("submit a parameter update request")
-			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
-			testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
-				AddParameters("innodb_buffer_pool_size", "1024M").
-				AddParameters("max_connections", "100").
-				Create(&testCtx).
-				GetObject()
+			By("submit changes through component parameter")
+			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
+					testparameters.MysqlConfigFile: {
+						Parameters: map[string]*string{
+							"innodb_buffer_pool_size": pointer.String("1024M"),
+							"max_connections":         pointer.String("100"),
+						},
+					},
+				}
+			})).Should(Succeed())
 
 			expectedHash := waitRenderedConfigHash(
 				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,

@@ -113,20 +113,6 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: troubleshoot.sh
-  kind: HostPreflight
-  path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
-  version: v1beta2
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: troubleshoot.sh
-  kind: Preflight
-  path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
-  version: v1beta2
-- api:
-    crdVersion: v1
-    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: workloads

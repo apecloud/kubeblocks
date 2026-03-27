@@ -34,6 +34,7 @@ const (
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 
 	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
+	ParametersInitAnnotationKey          = "config.kubeblocks.io/init-parameters"
 	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
 )
 

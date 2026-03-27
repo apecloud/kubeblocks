@@ -89,15 +89,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			}
 		})()).Should(Succeed())
 
-		By("Create init parameters")
-		key := testapps.GetRandomizedKey(testCtx.DefaultNamespace, defaultCompName)
-		testparameters.NewParameterFactory(key.Name, key.Namespace, clusterName, defaultCompName).
-			AddParameters("innodb_buffer_pool_size", "1024M").
-			AddParameters("max_connections", "100").
-			AddLabels(constant.AppInstanceLabelKey, clusterName).
-			AddLabels(constant.ParametersInitLabelKey, "true").
-			Create(&testCtx)
-
 		By("Create a custom template cm")
 		tplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "custom-tpl")
 		tpl := testparameters.NewComponentTemplateFactory(tplKey.Name, testCtx.DefaultNamespace).
@@ -110,13 +101,22 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			Namespace:   tpl.Namespace,
 			Policy:      parametersv1alpha1.ReplacePolicy,
 		}
-		annotationValue, _ := json.Marshal(map[string]parametersv1alpha1.ConfigTemplateExtension{
-			configSpecName: customTemplate,
+		annotationValue, _ := json.Marshal(map[string]map[string]interface{}{
+			defaultCompName: {
+				"parameters": map[string]string{
+					"innodb_buffer_pool_size": "1024M",
+					"max_connections":         "100",
+				},
+				"userConfigTemplates": map[string]parametersv1alpha1.ConfigTemplateExtension{
+					configSpecName: customTemplate,
+				},
+			},
 		})
 
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddComponent(defaultCompName, compDefObj.GetName()).
 			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
+			AddAnnotations(constant.ParametersInitAnnotationKey, string(annotationValue)).
 			Create(&testCtx)
 
 		By("Create a component obj")
@@ -127,7 +127,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).
-			SetAnnotations(map[string]string{constant.CustomParameterTemplateAnnotationKey: string(annotationValue)}).
 			Create(&testCtx).
 			GetObject()
 

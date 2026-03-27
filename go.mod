@@ -34,7 +34,6 @@ require (
 	github.com/onsi/gomega v1.36.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
-	github.com/replicatedhq/troubleshoot v0.57.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cast v1.5.1
 	github.com/spf13/pflag v1.0.5

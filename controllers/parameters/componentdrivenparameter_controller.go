@@ -123,7 +123,8 @@ func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.Reques
 	if err = r.syncLegacyConfigManagerRequirement(reqCtx, component, required); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to sync legacy config-manager compatibility annotation").Error())
 	}
-	if expectedObject, err = buildComponentParameter(reqCtx, r.Client, component); err != nil {
+	includeInitOverlay := existingObject == nil
+	if expectedObject, err = buildComponentParameter(reqCtx, r.Client, component, includeInitOverlay); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -259,7 +260,7 @@ func getCompDefinition(ctx context.Context, cli client.Reader, cmpdName string) 
 	return cmpd, nil
 }
 
-func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ComponentParameter, error) {
+func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component, includeInitOverlay bool) (*parametersv1alpha1.ComponentParameter, error) {
 	var err error
 	var cmpd *appsv1.ComponentDefinition
 
@@ -278,19 +279,28 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	initSpec, err := resolveInitParameters(reqCtx, reader, comp)
-	if err != nil {
-		return nil, err
-	}
-	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initSpec.Parameters, cmpd, paramsDefs, tpls, configDescs)
+	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(nil, cmpd, paramsDefs, tpls, configDescs)
 	if err != nil {
 		return nil, err
 	}
 	if len(parameterSpecs) == 0 {
 		return nil, nil
 	}
-	if err = handleInitParameterTemplates(reqCtx.Ctx, reader, initSpec.CustomTemplates, parameterSpecs); err != nil {
-		return nil, err
+	if includeInitOverlay {
+		initSpec, err := resolveInitParameters(reqCtx, reader, comp)
+		if err != nil {
+			return nil, err
+		}
+		if len(initSpec.Parameters) != 0 {
+			initParameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initSpec.Parameters, cmpd, paramsDefs, tpls, configDescs)
+			if err != nil {
+				return nil, err
+			}
+			parameterSpecs = mergeInitParameterSpecs(parameterSpecs, initParameterSpecs)
+		}
+		if err = handleInitParameterTemplates(reqCtx.Ctx, reader, initSpec.CustomTemplates, parameterSpecs); err != nil {
+			return nil, err
+		}
 	}
 	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
 		return nil, err
@@ -309,6 +319,26 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, err
 	}
 	return parameterObj, nil
+}
+
+func mergeInitParameterSpecs(base, init []parametersv1alpha1.ConfigTemplateItemDetail) []parametersv1alpha1.ConfigTemplateItemDetail {
+	for i := range base {
+		initItem := findConfigTemplateItem(init, base[i].Name)
+		if initItem == nil || len(initItem.ConfigFileParams) == 0 {
+			continue
+		}
+		base[i].ConfigFileParams = initItem.ConfigFileParams
+	}
+	return base
+}
+
+func findConfigTemplateItem(items []parametersv1alpha1.ConfigTemplateItemDetail, name string) *parametersv1alpha1.ConfigTemplateItemDetail {
+	for i := range items {
+		if items[i].Name == name {
+			return &items[i]
+		}
+	}
+	return nil
 }
 
 // resolveLegacyConfigManagerRequirement reports whether this component still depends on the

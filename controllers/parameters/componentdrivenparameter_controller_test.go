@@ -158,6 +158,53 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
 			})).Should(Succeed())
 		})
+
+		It("does not reapply init template after runtime updates", func() {
+			component := initTestResource()
+			parameterKey := types.NamespacedName{
+				Namespace: component.Namespace,
+				Name:      configcore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+
+			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+			})).Should(Succeed())
+
+			By("update the ComponentParameter with a runtime custom template")
+			runtimeTplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "runtime-tpl")
+			runtimeTpl := testparameters.NewComponentTemplateFactory(runtimeTplKey.Name, testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "runtime=1").
+				Create(&testCtx).
+				GetObject()
+
+			Expect(testapps.GetAndChangeObj(&testCtx, parameterKey, func(parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				Expect(item).ShouldNot(BeNil())
+				item.CustomTemplates = &parametersv1alpha1.ConfigTemplateExtension{
+					TemplateRef: runtimeTpl.Name,
+					Namespace:   runtimeTpl.Namespace,
+					Policy:      parametersv1alpha1.ReplacePolicy,
+				}
+			})()).Should(Succeed())
+
+			By("touch the component to trigger ComponentDrivenParameter reconciliation")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(component), func(comp *appsv1.Component) {
+				if comp.Annotations == nil {
+					comp.Annotations = map[string]string{}
+				}
+				comp.Annotations["parameters.kubeblocks.io/runtime-template-test"] = "true"
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(runtimeTpl.Name))
+				g.Expect(item.CustomTemplates.Namespace).Should(Equal(runtimeTpl.Namespace))
+			})).Should(Succeed())
+		})
 	})
 
 	Context("Resolve init parameters from cluster annotation", func() {

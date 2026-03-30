@@ -302,10 +302,6 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 			return nil, err
 		}
 	}
-	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
-		return nil, err
-	}
-
 	clusterName, _ := component.GetClusterName(comp)
 	componentName, _ := component.ShortName(clusterName, comp.Name)
 	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
@@ -382,36 +378,6 @@ func resolveLegacyConfigManagerWorkload(ctx context.Context, reader client.Reade
 		return nil, err
 	}
 	return its, nil
-}
-
-func handleCustomParameterTemplate(ctx context.Context, reader client.Reader, annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
-	if len(annotations) == 0 {
-		return nil
-	}
-	customParamsTpl := annotations[constant.CustomParameterTemplateAnnotationKey]
-	if customParamsTpl == "" {
-		return nil
-	}
-
-	var customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension
-	if err := json.Unmarshal([]byte(customParamsTpl), &customTemplates); err != nil {
-		return errors.Wrap(err, "failed to unmarshal custom parameter template")
-	}
-	if err := validateCustomTemplate(ctx, reader, customTemplates); err != nil {
-		return errors.Wrap(err, "failed to validate custom parameter template")
-	}
-
-	for tplName, tpl := range customTemplates {
-		match := func(spec parametersv1alpha1.ConfigTemplateItemDetail) bool {
-			return spec.Name == tplName
-		}
-		index := generics.FindFirstFunc(specs, match)
-		if index < 0 {
-			return fmt.Errorf("custom template[%s] not found in component definition", tplName)
-		}
-		specs[index].CustomTemplates = tpl.DeepCopy()
-	}
-	return nil
 }
 
 func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*initParameterSpec, error) {

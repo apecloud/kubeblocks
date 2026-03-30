@@ -33,10 +33,7 @@ const (
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 
-	// Deprecated: retained for compatibility with existing references to the old init Parameter label key.
-	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
-	ParametersInitAnnotationKey          = "config.kubeblocks.io/init-parameters"
-	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
+	ParametersInitAnnotationKey = "config.kubeblocks.io/init-parameters"
 )
 
 const (

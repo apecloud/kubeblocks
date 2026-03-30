@@ -3778,7 +3778,7 @@ This field is used to override or set the values of parameters without modifying
 </tr>
 <tr>
 <td>
-<code>userConfigTemplates</code><br/>
+<code>customTemplates</code><br/>
 <em>
 map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ConfigTemplateExtension
 </em>

@@ -573,7 +573,7 @@ type Reconfigure struct {
 	// Specifies user-provided configuration templates keyed by config template name.
 	//
 	// +optional
-	UserConfigTemplates map[string]parametersv1alpha1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates map[string]parametersv1alpha1.ConfigTemplateExtension `json:"customTemplates,omitempty"`
 }
 
 type CustomOps struct {

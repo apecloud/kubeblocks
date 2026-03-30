@@ -160,7 +160,7 @@ parameter: {
 							Value: pointer.String("200"),
 						},
 					},
-					UserConfigTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+					CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
 						"mysql-config": {
 							TemplateRef: customTemplate.Name,
 							Namespace:   customTemplate.Namespace,
@@ -281,7 +281,7 @@ parameter: {
 			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
 				{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					UserConfigTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+					CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
 						"mysql-config": {
 							TemplateRef: customTemplate.Name,
 							Namespace:   customTemplate.Namespace,

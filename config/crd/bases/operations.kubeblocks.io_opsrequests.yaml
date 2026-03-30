@@ -2746,27 +2746,7 @@ spec:
                       description: Specifies the name of the Component as defined
                         in the cluster.spec
                       type: string
-                    parameters:
-                      description: |-
-                        Specifies a list of key-value pairs representing parameters and their corresponding values
-                        within a single configuration file.
-                        This field is used to override or set the values of parameters without modifying the entire configuration file.
-                      items:
-                        properties:
-                          key:
-                            description: Represents the name of the parameter that
-                              is to be updated.
-                            type: string
-                          value:
-                            description: |-
-                              Represents the parameter values that are to be updated.
-                              If set to nil, the parameter defined by the Key field will be removed from the configuration file.
-                            type: string
-                        required:
-                        - key
-                        type: object
-                      type: array
-                    userConfigTemplates:
+                    customTemplates:
                       additionalProperties:
                         properties:
                           namespace:
@@ -2796,6 +2776,26 @@ spec:
                       description: Specifies user-provided configuration templates
                         keyed by config template name.
                       type: object
+                    parameters:
+                      description: |-
+                        Specifies a list of key-value pairs representing parameters and their corresponding values
+                        within a single configuration file.
+                        This field is used to override or set the values of parameters without modifying the entire configuration file.
+                      items:
+                        properties:
+                          key:
+                            description: Represents the name of the parameter that
+                              is to be updated.
+                            type: string
+                          value:
+                            description: |-
+                              Represents the parameter values that are to be updated.
+                              If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+                            type: string
+                        required:
+                        - key
+                        type: object
+                      type: array
                   required:
                   - componentName
                   type: object

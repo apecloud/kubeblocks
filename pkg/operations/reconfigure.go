@@ -98,8 +98,8 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
 	}
 	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
-		if len(reconfigure.Parameters) == 0 && len(reconfigure.UserConfigTemplates) == 0 {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters or userConfigTemplates", reconfigure.ComponentName)
+		if len(reconfigure.Parameters) == 0 && len(reconfigure.CustomTemplates) == 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters or customTemplates", reconfigure.ComponentName)
 		}
 		componentNames, err := resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
@@ -184,7 +184,7 @@ func applyReconfigureToComponentParameter(reqCtx intctrlutil.RequestCtx, cli cli
 	if err != nil {
 		return err
 	}
-	if err := validateCustomTemplates(reqCtx.Ctx, cli, reconfigure.UserConfigTemplates); err != nil {
+	if err := validateCustomTemplates(reqCtx.Ctx, cli, reconfigure.CustomTemplates); err != nil {
 		return err
 	}
 	patch := client.MergeFrom(componentParameter.DeepCopy())
@@ -216,7 +216,7 @@ func applyReconfigureToComponentParameter(reqCtx intctrlutil.RequestCtx, cli cli
 			}
 		}
 	}
-	for templateName, templateExtension := range reconfigure.UserConfigTemplates {
+	for templateName, templateExtension := range reconfigure.CustomTemplates {
 		item := parameters.GetConfigTemplateItem(&componentParameter.Spec, templateName)
 		if item == nil {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
@@ -231,7 +231,7 @@ func applyReconfigureToComponentParameter(reqCtx intctrlutil.RequestCtx, cli cli
 
 func resolveReconfigureTargetTemplates(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, componentName string, reconfigure opsv1alpha1.Reconfigure) ([]string, error) {
 	templateSet := map[string]struct{}{}
-	for templateName := range reconfigure.UserConfigTemplates {
+	for templateName := range reconfigure.CustomTemplates {
 		templateSet[templateName] = struct{}{}
 	}
 	if len(reconfigure.Parameters) != 0 {

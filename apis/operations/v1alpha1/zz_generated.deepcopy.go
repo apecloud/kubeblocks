@@ -1206,8 +1206,8 @@ func (in *Reconfigure) DeepCopyInto(out *Reconfigure) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.UserConfigTemplates != nil {
-		in, out := &in.UserConfigTemplates, &out.UserConfigTemplates
+	if in.CustomTemplates != nil {
+		in, out := &in.CustomTemplates, &out.CustomTemplates
 		*out = make(map[string]parametersv1alpha1.ConfigTemplateExtension, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

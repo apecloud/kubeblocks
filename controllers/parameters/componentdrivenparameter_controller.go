@@ -21,7 +21,6 @@ package parameters
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -380,48 +379,40 @@ func resolveLegacyConfigManagerWorkload(ctx context.Context, reader client.Reade
 	return its, nil
 }
 
-func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*initParameterSpec, error) {
-	resolveShardingName := func(comp *appsv1.Component) string {
-		if len(comp.Labels) == 0 {
-			return ""
+func resolveInitParameters(_ intctrlutil.RequestCtx, _ client.Reader, comp *appsv1.Component) (*initParameterSpec, error) {
+	if comp == nil || len(comp.Spec.Configs) == 0 {
+		return &initParameterSpec{}, nil
+	}
+
+	spec := &initParameterSpec{
+		Parameters:      parametersv1alpha1.ComponentParameters{},
+		CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{},
+	}
+	for _, config := range comp.Spec.Configs {
+		for key, value := range config.Variables {
+			v := value
+			spec.Parameters[key] = &v
 		}
-		return comp.Labels[constant.KBAppShardingNameLabelKey]
+		if config.ConfigMap == nil || config.ConfigMap.Name == "" {
+			continue
+		}
+		if config.Name == nil || *config.Name == "" {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal,
+				"config name is required when using component configs.configMap as an init template source")
+		}
+		spec.CustomTemplates[*config.Name] = parametersv1alpha1.ConfigTemplateExtension{
+			TemplateRef: config.ConfigMap.Name,
+			Namespace:   comp.Namespace,
+			Policy:      parametersv1alpha1.ReplacePolicy,
+		}
 	}
-	clusterName, _ := component.GetClusterName(comp)
-	cluster := &appsv1.Cluster{}
-	clusterKey := types.NamespacedName{
-		Namespace: comp.Namespace,
-		Name:      clusterName,
+	if len(spec.Parameters) == 0 {
+		spec.Parameters = nil
 	}
-	if err := reader.Get(reqCtx.Ctx, clusterKey, cluster); err != nil {
-		return nil, errors.Wrapf(err, "failed to get cluster for init parameters: %v", client.ObjectKeyFromObject(comp))
+	if len(spec.CustomTemplates) == 0 {
+		spec.CustomTemplates = nil
 	}
-
-	compRealName, _ := component.ShortName(clusterName, comp.Name)
-	if shardingName := resolveShardingName(comp); shardingName != "" {
-		compRealName = shardingName
-	}
-	return resolveInitParametersFromCluster(cluster, compRealName)
-}
-
-func resolveInitParametersFromCluster(cluster *appsv1.Cluster, compName string) (*initParameterSpec, error) {
-	if cluster == nil || len(cluster.Annotations) == 0 {
-		return &initParameterSpec{}, nil
-	}
-	raw := cluster.Annotations[constant.ParametersInitAnnotationKey]
-	if raw == "" {
-		return &initParameterSpec{}, nil
-	}
-
-	var byComponent map[string]initParameterSpec
-	if err := json.Unmarshal([]byte(raw), &byComponent); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal init parameters annotation")
-	}
-	spec, ok := byComponent[compName]
-	if !ok {
-		return &initParameterSpec{}, nil
-	}
-	return &spec, nil
+	return spec, nil
 }
 
 func handleInitParameterTemplates(ctx context.Context, reader client.Reader, customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {

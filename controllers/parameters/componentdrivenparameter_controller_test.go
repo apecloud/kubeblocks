@@ -96,27 +96,9 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		customTemplate := parametersv1alpha1.ConfigTemplateExtension{
-			TemplateRef: tpl.Name,
-			Namespace:   tpl.Namespace,
-			Policy:      parametersv1alpha1.ReplacePolicy,
-		}
-		annotationValue, _ := json.Marshal(map[string]map[string]interface{}{
-			defaultCompName: {
-				"parameters": map[string]string{
-					"innodb_buffer_pool_size": "1024M",
-					"max_connections":         "100",
-				},
-				"userConfigTemplates": map[string]parametersv1alpha1.ConfigTemplateExtension{
-					configSpecName: customTemplate,
-				},
-			},
-		})
-
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddComponent(defaultCompName, compDefObj.GetName()).
 			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
-			AddAnnotations(constant.ParametersInitAnnotationKey, string(annotationValue)).
 			Create(&testCtx)
 
 		By("Create a component obj")
@@ -124,6 +106,20 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
+			SetConfigs([]appsv1.ClusterComponentConfig{
+				{
+					Name: pointer.String(configSpecName),
+					Variables: map[string]string{
+						"innodb_buffer_pool_size": "1024M",
+						"max_connections":         "100",
+					},
+					ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: tpl.Name},
+						},
+					},
+				},
+			}).
 			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).
@@ -244,19 +240,29 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		})
 	})
 
-	Context("Resolve init parameters from cluster annotation", func() {
-		It("returns error for invalid annotation payload", func() {
-			cluster := &appsv1.Cluster{
+	Context("Resolve init parameters from component configs", func() {
+		It("returns error when configMap source is missing config name", func() {
+			comp := &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						constant.ParametersInitAnnotationKey: "{invalid-json",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-component",
+				},
+				Spec: appsv1.ComponentSpec{
+					Configs: []appsv1.ClusterComponentConfig{
+						{
+							ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "custom-template"},
+								},
+							},
+						},
 					},
 				},
 			}
 
-			_, err := resolveInitParametersFromCluster(cluster, defaultCompName)
+			_, err := resolveInitParameters(intctrlutil.RequestCtx{}, nil, comp)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("failed to unmarshal init parameters annotation"))
+			Expect(err.Error()).Should(ContainSubstring("config name is required"))
 		})
 	})
 

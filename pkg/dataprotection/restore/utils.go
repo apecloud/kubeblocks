@@ -311,7 +311,7 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 }
 
 func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
-	return !t.Before(start) && !t.After(end)
+	return t.Before(start) || t.After(end)
 }
 
 func GetRestoreFromBackupAnnotation(

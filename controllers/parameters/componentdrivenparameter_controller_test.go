@@ -96,9 +96,27 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
+		initAnnotation, err := parametersv1alpha1.EncodeInitParameters(parametersv1alpha1.InitParameters{
+			defaultCompName: {
+				Parameters: parametersv1alpha1.ComponentParameters{
+					"innodb_buffer_pool_size": pointer.String("1024M"),
+					"max_connections":         pointer.String("100"),
+				},
+				CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+					configSpecName: {
+						TemplateRef: tpl.Name,
+						Namespace:   tpl.Namespace,
+						Policy:      parametersv1alpha1.ReplacePolicy,
+					},
+				},
+			},
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddComponent(defaultCompName, compDefObj.GetName()).
 			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
+			AddAnnotations("config.kubeblocks.io/init-parameters", initAnnotation).
 			Create(&testCtx)
 
 		By("Create a component obj")
@@ -106,20 +124,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
-			SetConfigs([]appsv1.ClusterComponentConfig{
-				{
-					Name: pointer.String(configSpecName),
-					Variables: map[string]string{
-						"innodb_buffer_pool_size": "1024M",
-						"max_connections":         "100",
-					},
-					ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{Name: tpl.Name},
-						},
-					},
-				},
-			}).
 			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).
@@ -240,29 +244,29 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		})
 	})
 
-	Context("Resolve init parameters from component configs", func() {
-		It("returns error when configMap source is missing config name", func() {
+	Context("Resolve init parameters from cluster annotation", func() {
+		It("returns error when cluster annotation payload is invalid", func() {
+			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddComponent(defaultCompName, compDefName).
+				AddAnnotations("config.kubeblocks.io/init-parameters", "{invalid-json").
+				Create(&testCtx).
+				GetObject()
 			comp := &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: testCtx.DefaultNamespace,
-					Name:      "test-component",
-				},
-				Spec: appsv1.ComponentSpec{
-					Configs: []appsv1.ClusterComponentConfig{
-						{
-							ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: "custom-template"},
-								},
-							},
-						},
+					Name:      constant.GenerateClusterComponentName(cluster.Name, defaultCompName),
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: cluster.Name,
 					},
 				},
 			}
 
-			_, err := resolveInitParameters(intctrlutil.RequestCtx{}, nil, comp)
+			scheme := runtime.NewScheme()
+			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+			fakeReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+			_, err := resolveInitParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, fakeReader, comp)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("config name is required"))
+			Expect(err.Error()).Should(ContainSubstring("invalid cluster initialization payload"))
 		})
 	})
 

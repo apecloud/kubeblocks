@@ -953,7 +953,7 @@ updated by the API Server.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ComponentParameters">ComponentParameters
 (<code>map[string]*string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.InitParameter">InitParameter</a>)
 </p>
 <div>
 </div>
@@ -1076,7 +1076,7 @@ ParameterPhase
 <h3 id="parameters.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#parameters.kubeblocks.io/v1alpha1.InitParameter">InitParameter</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus</a>)
 </p>
 <div>
 </div>
@@ -1482,6 +1482,51 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.InitParameter">InitParameter
+</h3>
+<div>
+<p>InitParameter describes the initialization overlay for one cluster sub-resource.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameters">
+ComponentParameters
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>customTemplates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
+map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ConfigTemplateExtension
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.InitParameters">InitParameters
+(<code>map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.InitParameter</code> alias)</h3>
+<div>
+<p>InitParameters describes the initialization overlays keyed by cluster sub-resource name,
+such as a component or sharding item name.</p>
+</div>
 <h3 id="parameters.kubeblocks.io/v1alpha1.MergedPolicy">MergedPolicy
 (<code>string</code> alias)</h3>
 <p>

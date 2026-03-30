@@ -56,11 +56,6 @@ type ComponentDrivenParameterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-type initParameterSpec struct {
-	Parameters      parametersv1alpha1.ComponentParameters                `json:"parameters,omitempty"`
-	CustomTemplates map[string]parametersv1alpha1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
-}
-
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
@@ -286,18 +281,18 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, nil
 	}
 	if includeInitOverlay {
-		initSpec, err := resolveInitParameters(reqCtx, reader, comp)
+		init, err := resolveInitParameters(reqCtx, reader, comp)
 		if err != nil {
 			return nil, err
 		}
-		if len(initSpec.Parameters) != 0 {
-			initParameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initSpec.Parameters, cmpd, paramsDefs, tpls, configDescs)
+		if len(init.Parameters) != 0 {
+			items, err := parameters.ClassifyParamsFromConfigTemplate(init.Parameters, cmpd, paramsDefs, tpls, configDescs)
 			if err != nil {
 				return nil, err
 			}
-			parameterSpecs = mergeInitParameterSpecs(parameterSpecs, initParameterSpecs)
+			parameterSpecs = mergeInitParameterSpecs(parameterSpecs, items)
 		}
-		if err = handleInitParameterTemplates(reqCtx.Ctx, reader, initSpec.CustomTemplates, parameterSpecs); err != nil {
+		if err = handleInitParameterTemplates(reqCtx.Ctx, reader, init.CustomTemplates, parameterSpecs); err != nil {
 			return nil, err
 		}
 	}
@@ -379,38 +374,33 @@ func resolveLegacyConfigManagerWorkload(ctx context.Context, reader client.Reade
 	return its, nil
 }
 
-func resolveInitParameters(_ intctrlutil.RequestCtx, _ client.Reader, comp *appsv1.Component) (*initParameterSpec, error) {
-	if comp == nil || len(comp.Spec.Configs) == 0 {
-		return &initParameterSpec{}, nil
+func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.InitParameter, error) {
+	if comp == nil {
+		return &parametersv1alpha1.InitParameter{}, nil
 	}
-
-	spec := &initParameterSpec{
-		Parameters:      parametersv1alpha1.ComponentParameters{},
-		CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{},
+	clusterName, err := component.GetClusterName(comp)
+	if err != nil {
+		return nil, err
 	}
-	for _, config := range comp.Spec.Configs {
-		for key, value := range config.Variables {
-			v := value
-			spec.Parameters[key] = &v
-		}
-		if config.ConfigMap == nil || config.ConfigMap.Name == "" {
-			continue
-		}
-		if config.Name == nil || *config.Name == "" {
-			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal,
-				"config name is required when using component configs.configMap as an init template source")
-		}
-		spec.CustomTemplates[*config.Name] = parametersv1alpha1.ConfigTemplateExtension{
-			TemplateRef: config.ConfigMap.Name,
-			Namespace:   comp.Namespace,
-			Policy:      parametersv1alpha1.ReplacePolicy,
-		}
+	compName, err := component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return nil, err
 	}
-	if len(spec.Parameters) == 0 {
-		spec.Parameters = nil
+	cluster := &appsv1.Cluster{}
+	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{Namespace: comp.Namespace, Name: clusterName}, cluster); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+		return &parametersv1alpha1.InitParameter{}, nil
 	}
-	if len(spec.CustomTemplates) == 0 {
-		spec.CustomTemplates = nil
+	initParams, err := parametersv1alpha1.ParseInitParameters(cluster)
+	if err != nil {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal,
+			"invalid cluster initialization payload: %v", err)
+	}
+	spec := initParams.Get(compName)
+	if spec == nil {
+		return &parametersv1alpha1.InitParameter{}, nil
 	}
 	return spec, nil
 }

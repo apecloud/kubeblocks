@@ -34,7 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const parameterDeprecatedMessage = "Parameter is deprecated; use OpsRequest type Reconfiguring for runtime updates and Cluster annotation config.kubeblocks.io/init-parameters for initialization"
+const parameterDeprecatedMessage = "Parameter is deprecated; use OpsRequest type Reconfiguring for runtime updates and cluster init parameters for initialization"
 
 // DeprecatedParameterReconciler marks Parameter requests as unsupported.
 type DeprecatedParameterReconciler struct {

@@ -31,6 +31,7 @@ type ParametersV1alpha1Interface interface {
 	ComponentParametersGetter
 	ParamConfigRenderersGetter
 	ParametersGetter
+	ParameterViewsGetter
 	ParametersDefinitionsGetter
 }
 
@@ -49,6 +50,10 @@ func (c *ParametersV1alpha1Client) ParamConfigRenderers() ParamConfigRendererInt
 
 func (c *ParametersV1alpha1Client) Parameters(namespace string) ParameterInterface {
 	return newParameters(c, namespace)
+}
+
+func (c *ParametersV1alpha1Client) ParameterViews(namespace string) ParameterViewInterface {
+	return newParameterViews(c, namespace)
 }
 
 func (c *ParametersV1alpha1Client) ParametersDefinitions() ParametersDefinitionInterface {

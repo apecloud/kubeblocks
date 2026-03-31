@@ -692,6 +692,14 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ParameterTemplateExtension")
 			os.Exit(1)
 		}
+		if err = (&parameterscontrollers.ParameterViewReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameter-view-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParameterView")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

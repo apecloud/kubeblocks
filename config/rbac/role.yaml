@@ -915,6 +915,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterviews
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterviews/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterviews/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterroles

@@ -507,7 +507,8 @@ CfgFileFormat
 </td>
 <td>
 <em>(Optional)</em>
-<p>FileFormat identifies the file format used by the selected config file.</p>
+<p>FileFormat identifies the file format used by the selected config file.
+When omitted, the controller resolves it from the referenced template metadata.</p>
 </td>
 </tr>
 <tr>
@@ -534,7 +535,8 @@ int64
 <td>
 <em>(Optional)</em>
 <p>SourceGeneration captures the ComponentParameter generation used to build the current view.
-Controllers should reject stale writes when this value no longer matches the source object.</p>
+Controllers should reject stale writes when this value no longer matches the source object.
+It is typically populated and refreshed by the controller.</p>
 </td>
 </tr>
 <tr>
@@ -546,7 +548,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ContentHash optionally captures the effective source content used to build the current view.</p>
+<p>ContentHash optionally captures the effective source content used to build the current view.
+It is typically populated and refreshed by the controller.</p>
 </td>
 </tr>
 <tr>
@@ -2211,7 +2214,12 @@ patches.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewContentMarker">ParameterViewContentMarker
 (<code>string</code> alias)</h3>
 <div>
-<p>ParameterViewContentMarker indicates how the segment should be interpreted in marker-based content.</p>
+<p>ParameterViewContentMarker indicates how a marker line should be interpreted.</p>
+<p>D means a dynamic parameter managed by ParametersDefinition.
+S means a static parameter managed by ParametersDefinition.
+I means an immutable parameter that is rendered but not editable.
+U means unmanaged content such as comments, section headers, blank lines, or
+file fragments that are not defined by the current ParametersDefinition.</p>
 </div>
 <table>
 <thead>
@@ -2361,7 +2369,8 @@ CfgFileFormat
 </td>
 <td>
 <em>(Optional)</em>
-<p>FileFormat identifies the file format used by the selected config file.</p>
+<p>FileFormat identifies the file format used by the selected config file.
+When omitted, the controller resolves it from the referenced template metadata.</p>
 </td>
 </tr>
 <tr>
@@ -2388,7 +2397,8 @@ int64
 <td>
 <em>(Optional)</em>
 <p>SourceGeneration captures the ComponentParameter generation used to build the current view.
-Controllers should reject stale writes when this value no longer matches the source object.</p>
+Controllers should reject stale writes when this value no longer matches the source object.
+It is typically populated and refreshed by the controller.</p>
 </td>
 </tr>
 <tr>
@@ -2400,7 +2410,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ContentHash optionally captures the effective source content used to build the current view.</p>
+<p>ContentHash optionally captures the effective source content used to build the current view.
+It is typically populated and refreshed by the controller.</p>
 </td>
 </tr>
 <tr>

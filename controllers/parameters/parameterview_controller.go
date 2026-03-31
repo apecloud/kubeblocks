@@ -437,7 +437,7 @@ func (r *ParameterViewReconciler) resolveConfigContext(ctx context.Context,
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("file format not found for %s/%s", view.Spec.TemplateName, view.Spec.FileName)
+	return nil, fmt.Errorf("file not found for %s/%s", view.Spec.TemplateName, view.Spec.FileName)
 }
 
 func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Context,

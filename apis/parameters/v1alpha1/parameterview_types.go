@@ -76,6 +76,7 @@ type ParameterViewSpec struct {
 	FileName string `json:"fileName"`
 
 	// FileFormat identifies the file format used by the selected config file.
+	// When omitted, the controller resolves it from the referenced template metadata.
 	//
 	// +optional
 	FileFormat CfgFileFormat `json:"fileFormat,omitempty"`
@@ -88,11 +89,13 @@ type ParameterViewSpec struct {
 
 	// SourceGeneration captures the ComponentParameter generation used to build the current view.
 	// Controllers should reject stale writes when this value no longer matches the source object.
+	// It is typically populated and refreshed by the controller.
 	//
 	// +optional
 	SourceGeneration int64 `json:"sourceGeneration,omitempty"`
 
 	// ContentHash optionally captures the effective source content used to build the current view.
+	// It is typically populated and refreshed by the controller.
 	//
 	// +optional
 	ContentHash string `json:"contentHash,omitempty"`
@@ -179,7 +182,13 @@ const (
 	MarkerLineParameterViewContentType ParameterViewContentType = "MarkerLine"
 )
 
-// ParameterViewContentMarker indicates how the segment should be interpreted in marker-based content.
+// ParameterViewContentMarker indicates how a marker line should be interpreted.
+//
+// D means a dynamic parameter managed by ParametersDefinition.
+// S means a static parameter managed by ParametersDefinition.
+// I means an immutable parameter that is rendered but not editable.
+// U means unmanaged content such as comments, section headers, blank lines, or
+// file fragments that are not defined by the current ParametersDefinition.
 // +enum
 // +kubebuilder:validation:Enum={D,S,I,U}
 type ParameterViewContentMarker string

@@ -13,11 +13,9 @@ spec:
     name: componentparameter-sample
   templateName: mysql-config
   fileName: my.cnf
-  fileFormat: ini
   mode: ReadWrite
-  sourceGeneration: 1
   content:
-    type: PlainText
+    type: MarkerLine
     text: |
-      [mysqld]
-      max_connections=200
+      [U] [mysqld]
+      [D] max_connections=200

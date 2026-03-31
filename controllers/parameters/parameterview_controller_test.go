@@ -186,6 +186,146 @@ func TestParameterViewReconcileMarksInvalidWhenReferenceMissing(t *testing.T) {
 	assertParameterViewConditionReason(t, view, parameterViewReasonReferenceNotFound)
 }
 
+func TestParameterViewReconcileMarksInvalidWhenTemplateMissing(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1000\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 1,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: "missing-template",
+				FileName:     fileName,
+			},
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonTemplateNotFound)
+}
+
+func TestParameterViewReconcileMarksInvalidWhenFileMissing(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1000\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 1,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     "missing.cnf",
+			},
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonFileNotFound)
+}
+
+func TestParameterViewReconcileRejectsUnsupportedContentType(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1000\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 1,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.ParameterViewContentType("Chunked"),
+				},
+			},
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonUnsupportedContentType)
+}
+
+func TestParameterViewReconcileRejectsFileFormatMismatch(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1000\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 1,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				FileFormat:   parametersv1alpha1.JSON,
+			},
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonFileFormatMismatch)
+}
+
 func TestParameterViewReconcileMarksConflictOnSourceDrift(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
 		"max_connections=2000\n",

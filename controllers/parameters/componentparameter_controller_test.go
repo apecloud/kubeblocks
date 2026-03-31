@@ -76,7 +76,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CUpgradingPhase))
 			})).Should(Succeed())
 
@@ -91,7 +91,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 		})

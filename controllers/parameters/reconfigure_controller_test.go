@@ -72,7 +72,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}
 			Eventually(testapps.CheckObj(&testCtx, compParameterKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 				g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-				g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
+				g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
 			})).Should(Succeed())
 		})
 

@@ -122,6 +122,13 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(componentParameter, reqCtx)
 	}
+	skeletonUpdated, err := r.reconcileConfigItemDetails(reqCtx, componentParameter, fetcherTask)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to reconcile config item details").Error())
+	}
+	if skeletonUpdated {
+		return intctrlutil.Reconciled()
+	}
 	specUpdated, handled, err := r.reconcileParameterValues(reqCtx, componentParameter, fetcherTask)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to reconcile parameter values").Error())
@@ -144,6 +151,10 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 			errors.Wrap(err, "failed to run parameters reconcile task").Error())
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentParameterReconciler) reconcileConfigItemDetails(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
+	return reconcileConfigItemDetailsIntoSpec(reqCtx.Ctx, r.Client, componentParameter, fetchTask)
 }
 
 func (r *ComponentParameterReconciler) reconcileParameterValues(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, bool, error) {

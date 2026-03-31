@@ -43,6 +43,41 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
+func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
+	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, fetchTask.ComponentDefObj)
+	if err != nil {
+		return false, err
+	}
+	if !parameters.HasValidParameterTemplate(configDescs) {
+		return false, nil
+	}
+	templates, err := resolveComponentTemplate(ctx, cli, fetchTask.ComponentDefObj)
+	if err != nil {
+		return false, err
+	}
+	configItemDetails, err := parameters.ClassifyParamsFromConfigTemplate(nil, fetchTask.ComponentDefObj, paramsDefs, templates, configDescs)
+	if err != nil {
+		return false, err
+	}
+	expected := componentParameter.DeepCopy()
+	expected.Spec.ConfigItemDetails = configItemDetails
+	merged := parameters.MergeComponentParameter(expected, componentParameter, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
+		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
+			dest.ConfigFileParams = expected.ConfigFileParams
+		}
+		if dest.CustomTemplates == nil && expected.CustomTemplates != nil {
+			dest.CustomTemplates = expected.CustomTemplates
+		}
+		dest.ConfigSpec = expected.ConfigSpec
+	})
+	if reflect.DeepEqual(componentParameter.Spec.ConfigItemDetails, merged.Spec.ConfigItemDetails) {
+		return false, nil
+	}
+	patch := client.MergeFrom(componentParameter.DeepCopy())
+	componentParameter.Spec.ConfigItemDetails = merged.Spec.ConfigItemDetails
+	return true, cli.Patch(ctx, componentParameter, patch)
+}
+
 func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
 	specCopy := componentParameter.Spec.DeepCopy()
 	configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)

@@ -42,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
@@ -145,7 +145,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			component := initTestResource()
 			parameterKey := types.NamespacedName{
 				Namespace: component.Namespace,
-				Name:      configcore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+				Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
@@ -165,7 +165,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			component := initTestResource()
 			parameterKey := types.NamespacedName{
 				Namespace: component.Namespace,
-				Name:      configcore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+				Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
@@ -205,6 +205,9 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
 				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(runtimeTpl.Name))
 				g.Expect(item.CustomTemplates.Namespace).Should(Equal(runtimeTpl.Namespace))
+				g.Expect(parameter.Spec.Init).ShouldNot(BeNil())
+				g.Expect(parameter.Spec.Init.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				g.Expect(parameter.Spec.Init.Templates).Should(HaveKey(configSpecName))
 			})).Should(Succeed())
 		})
 
@@ -212,7 +215,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			component := initTestResource()
 			parameterKey := types.NamespacedName{
 				Namespace: component.Namespace,
-				Name:      configcore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+				Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 
 			legacyTplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "legacy-custom-tpl")

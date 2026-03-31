@@ -112,22 +112,28 @@ parameter: {
 
 			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
 				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
-				ClusterRef(clusterName).
-				Component(defaultCompName).
-				AddConfigurationItem(appsv1.ComponentFileTemplate{
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			// The ops suite does not run the ComponentParameter controller, so it uses a
+			// prepared normalized config item skeleton as the starting point.
+			componentParameter.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{
+				Name: "mysql-config",
+				ConfigSpec: &appsv1.ComponentFileTemplate{
 					Name:            "mysql-config",
 					Template:        template.Name,
 					Namespace:       template.Namespace,
 					VolumeName:      "mysql-config",
 					ExternalManaged: pointer.Bool(true),
-				}).
-				GetObject()
+				},
+			}}
 			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
 				cp.Status.ObservedGeneration = cp.Generation
 				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
 				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
-					Name:  "mysql-config",
+					Name:  cp.Spec.ConfigItemDetails[0].Name,
 					Phase: parametersv1alpha1.CFinishedPhase,
 				}}
 			})()).Should(Succeed())
@@ -183,7 +189,7 @@ parameter: {
 				cp.Status.ObservedGeneration = cp.Generation
 				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
 				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
-					Name:  "mysql-config",
+					Name:  cp.Spec.ConfigItemDetails[0].Name,
 					Phase: parametersv1alpha1.CFinishedPhase,
 				}}
 			})()).Should(Succeed())

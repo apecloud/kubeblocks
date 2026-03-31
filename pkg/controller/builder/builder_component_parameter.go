@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
@@ -34,26 +33,17 @@ func NewComponentParameterBuilder(namespace, name string) *ComponentParameterBui
 	return builder
 }
 
-func (c *ComponentParameterBuilder) ClusterRef(clusterName string) *ComponentParameterBuilder {
+func (c *ComponentParameterBuilder) SetClusterName(clusterName string) *ComponentParameterBuilder {
 	c.get().Spec.ClusterName = clusterName
 	return c
 }
 
-func (c *ComponentParameterBuilder) Component(component string) *ComponentParameterBuilder {
-	c.get().Spec.ComponentName = component
+func (c *ComponentParameterBuilder) SetCompName(compName string) *ComponentParameterBuilder {
+	c.get().Spec.ComponentName = compName
 	return c
 }
 
-func (c *ComponentParameterBuilder) AddConfigurationItem(configSpec appsv1.ComponentFileTemplate) *ComponentParameterBuilder {
-	c.get().Spec.ConfigItemDetails = append(c.get().Spec.ConfigItemDetails,
-		parametersv1alpha1.ConfigTemplateItemDetail{
-			Name:       configSpec.Name,
-			ConfigSpec: configSpec.DeepCopy(),
-		})
-	return c
-}
-
-func (c *ComponentParameterBuilder) SetConfigurationItem(items []parametersv1alpha1.ConfigTemplateItemDetail) *ComponentParameterBuilder {
-	c.get().Spec.ConfigItemDetails = items
+func (c *ComponentParameterBuilder) SetInit(init *parametersv1alpha1.ParameterValues) *ComponentParameterBuilder {
+	c.get().Spec.Init = init
 	return c
 }

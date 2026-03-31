@@ -30,7 +30,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -139,14 +138,6 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 	return opsv1alpha1.OpsSucceedPhase, "", nil
 }
 
-func transformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
-	ret := make(parametersv1alpha1.ComponentParameters, len(params))
-	for _, param := range params {
-		ret[param.Key] = param.Value
-	}
-	return ret
-}
-
 func applyReconfigureToComponentParameter(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, componentName string, reconfigure opsv1alpha1.Reconfigure) error {
 	componentParameter, err := getRunningComponentParameter(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
 	if err != nil {
@@ -211,22 +202,4 @@ func getRunningComponentParameter(ctx context.Context, cli client.Client, namesp
 		return nil, err
 	}
 	return componentParameter, nil
-}
-
-func getComponentByShortName(ctx context.Context, cli client.Client, namespace, clusterName, shortName string) (*appsv1.Component, error) {
-	componentList := &appsv1.ComponentList{}
-	if err := cli.List(ctx, componentList, client.InNamespace(namespace), client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}); err != nil {
-		return nil, err
-	}
-	for i := range componentList.Items {
-		componentObj := &componentList.Items[i]
-		name, err := component.ShortName(clusterName, componentObj.Name)
-		if err != nil {
-			return nil, err
-		}
-		if name == shortName {
-			return componentObj, nil
-		}
-	}
-	return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", shortName)
 }

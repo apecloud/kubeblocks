@@ -96,13 +96,17 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		initAnnotation, err := parametersv1alpha1.EncodeInitParameters(parametersv1alpha1.InitParameters{
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+			AddComponent(defaultCompName, compDefObj.GetName()).
+			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
+			GetObject()
+		Expect(parametersv1alpha1.SetInitParameters(cluster, parametersv1alpha1.InitParameters{
 			defaultCompName: {
-				Parameters: parametersv1alpha1.ComponentParameters{
+				Parameters: parametersv1alpha1.ParameterValueMap{
 					"innodb_buffer_pool_size": pointer.String("1024M"),
 					"max_connections":         pointer.String("100"),
 				},
-				CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+				Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
 					configSpecName: {
 						TemplateRef: tpl.Name,
 						Namespace:   tpl.Namespace,
@@ -110,14 +114,8 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 					},
 				},
 			},
-		})
-		Expect(err).ShouldNot(HaveOccurred())
-
-		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			AddComponent(defaultCompName, compDefObj.GetName()).
-			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
-			AddAnnotations("config.kubeblocks.io/init-parameters", initAnnotation).
-			Create(&testCtx)
+		})).Should(Succeed())
+		Expect(testCtx.CreateObj(testCtx.Ctx, cluster)).Should(Succeed())
 
 		By("Create a component obj")
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
@@ -151,6 +149,10 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				g.Expect(parameter.Spec.Init).ShouldNot(BeNil())
+				g.Expect(parameter.Spec.Init.Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
+				g.Expect(parameter.Spec.Init.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				g.Expect(parameter.Spec.Init.Templates).Should(HaveKey(configSpecName))
 				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))

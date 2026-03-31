@@ -25,10 +25,10 @@ import (
 func TestInitParametersRoundTrip(t *testing.T) {
 	value := InitParameters{
 		"mysql": {
-			Parameters: ComponentParameters{
+			Parameters: ParameterValueMap{
 				"max_connections": strPtr("200"),
 			},
-			CustomTemplates: map[string]ConfigTemplateExtension{
+			Templates: map[string]ConfigTemplateExtension{
 				"mysql-config": {
 					TemplateRef: "custom-template",
 					Namespace:   "default",
@@ -53,7 +53,7 @@ func TestInitParametersRoundTrip(t *testing.T) {
 	if spec.Parameters["max_connections"] == nil || *spec.Parameters["max_connections"] != "200" {
 		t.Fatalf("unexpected parameter value: %#v", spec.Parameters["max_connections"])
 	}
-	tpl := spec.CustomTemplates["mysql-config"]
+	tpl := spec.Templates["mysql-config"]
 	if tpl.TemplateRef != "custom-template" || tpl.Namespace != "default" || tpl.Policy != ReplacePolicy {
 		t.Fatalf("unexpected template extension: %#v", tpl)
 	}
@@ -63,7 +63,7 @@ func TestParseInitParameters(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	if err := SetInitParameters(cluster, InitParameters{
 		"mysql": {
-			Parameters: ComponentParameters{
+			Parameters: ParameterValueMap{
 				"max_connections": strPtr("200"),
 			},
 		},
@@ -84,7 +84,7 @@ func TestSetInitParameters(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	params := InitParameters{
 		"mysql": {
-			Parameters: ComponentParameters{
+			Parameters: ParameterValueMap{
 				"max_connections": strPtr("200"),
 			},
 		},

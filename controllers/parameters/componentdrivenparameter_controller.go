@@ -44,7 +44,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
@@ -280,20 +279,17 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if len(parameterSpecs) == 0 {
 		return nil, nil
 	}
+	var initValues *parametersv1alpha1.ParameterValues
 	if includeInitOverlay {
 		init, err := resolveInitParameters(reqCtx, reader, comp)
 		if err != nil {
 			return nil, err
 		}
-		if len(init.Parameters) != 0 {
-			items, err := parameters.ClassifyParamsFromConfigTemplate(init.Parameters, cmpd, paramsDefs, tpls, configDescs)
-			if err != nil {
-				return nil, err
-			}
-			parameterSpecs = mergeInitParameterSpecs(parameterSpecs, items)
-		}
-		if err = handleInitParameterTemplates(reqCtx.Ctx, reader, init.CustomTemplates, parameterSpecs); err != nil {
+		if err = validateCustomTemplate(reqCtx.Ctx, reader, init.Templates); err != nil {
 			return nil, err
+		}
+		if len(init.Parameters) != 0 || len(init.Templates) != 0 {
+			initValues = init.DeepCopy()
 		}
 	}
 	clusterName, _ := component.GetClusterName(comp)
@@ -305,30 +301,11 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		Component(componentName).
 		SetConfigurationItem(parameterSpecs).
 		GetObject()
+	parameterObj.Spec.Init = initValues
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
 	}
 	return parameterObj, nil
-}
-
-func mergeInitParameterSpecs(base, init []parametersv1alpha1.ConfigTemplateItemDetail) []parametersv1alpha1.ConfigTemplateItemDetail {
-	for i := range base {
-		initItem := findConfigTemplateItem(init, base[i].Name)
-		if initItem == nil || len(initItem.ConfigFileParams) == 0 {
-			continue
-		}
-		base[i].ConfigFileParams = initItem.ConfigFileParams
-	}
-	return base
-}
-
-func findConfigTemplateItem(items []parametersv1alpha1.ConfigTemplateItemDetail, name string) *parametersv1alpha1.ConfigTemplateItemDetail {
-	for i := range items {
-		if items[i].Name == name {
-			return &items[i]
-		}
-	}
-	return nil
 }
 
 // resolveLegacyConfigManagerRequirement reports whether this component still depends on the
@@ -374,9 +351,9 @@ func resolveLegacyConfigManagerWorkload(ctx context.Context, reader client.Reade
 	return its, nil
 }
 
-func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.InitParameter, error) {
+func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ParameterValues, error) {
 	if comp == nil {
-		return &parametersv1alpha1.InitParameter{}, nil
+		return &parametersv1alpha1.ParameterValues{}, nil
 	}
 	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
@@ -391,7 +368,7 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 		if client.IgnoreNotFound(err) != nil {
 			return nil, err
 		}
-		return &parametersv1alpha1.InitParameter{}, nil
+		return &parametersv1alpha1.ParameterValues{}, nil
 	}
 	initParams, err := parametersv1alpha1.ParseInitParameters(cluster)
 	if err != nil {
@@ -400,29 +377,9 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 	}
 	spec := initParams.Get(compName)
 	if spec == nil {
-		return &parametersv1alpha1.InitParameter{}, nil
+		return &parametersv1alpha1.ParameterValues{}, nil
 	}
 	return spec, nil
-}
-
-func handleInitParameterTemplates(ctx context.Context, reader client.Reader, customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
-	if len(customTemplates) == 0 {
-		return nil
-	}
-	if err := validateCustomTemplate(ctx, reader, customTemplates); err != nil {
-		return errors.Wrap(err, "failed to validate init parameter template")
-	}
-	for tplName, tpl := range customTemplates {
-		match := func(spec parametersv1alpha1.ConfigTemplateItemDetail) bool {
-			return spec.Name == tplName
-		}
-		index := generics.FindFirstFunc(specs, match)
-		if index < 0 {
-			return fmt.Errorf("init template[%s] not found in component definition", tplName)
-		}
-		specs[index].CustomTemplates = tpl.DeepCopy()
-	}
-	return nil
 }
 
 func validateCustomTemplate(ctx context.Context, cli client.Reader, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {

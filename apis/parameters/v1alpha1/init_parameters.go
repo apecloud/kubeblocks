@@ -32,13 +32,7 @@ const (
 
 // InitParameters describes the initialization overlays keyed by cluster sub-resource name,
 // such as a component or sharding item name.
-type InitParameters map[string]InitParameter
-
-// InitParameter describes the initialization overlay for one cluster sub-resource.
-type InitParameter struct {
-	Parameters      ComponentParameters                `json:"parameters,omitempty"`
-	CustomTemplates map[string]ConfigTemplateExtension `json:"customTemplates,omitempty"`
-}
+type InitParameters map[string]ParameterValues
 
 // EncodeInitParameters serializes the initialization payload.
 func EncodeInitParameters(v InitParameters) (string, error) {
@@ -101,7 +95,7 @@ func SetInitParameters(cluster *appsv1.Cluster, params InitParameters) error {
 }
 
 // Get returns the initialization overlay for the given sub-resource name.
-func (v InitParameters) Get(name string) *InitParameter {
+func (v InitParameters) Get(name string) *ParameterValues {
 	if len(v) == 0 {
 		return nil
 	}

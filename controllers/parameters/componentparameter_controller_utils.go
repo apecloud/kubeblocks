@@ -43,14 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-func reconcileDesiredIntoSpec(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
-	desired := componentParameter.Spec.Desired
-	if desired == nil {
-		return false, nil
-	}
-	if err := validateCustomTemplate(ctx, cli, desired.Templates); err != nil {
-		return false, err
-	}
+func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
 	specCopy := componentParameter.Spec.DeepCopy()
 	configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
 	if err != nil {
@@ -60,38 +53,11 @@ func reconcileDesiredIntoSpec(ctx context.Context, cli client.Client, componentP
 	if err != nil {
 		return false, err
 	}
-	if len(desired.Parameters) != 0 {
-		classifiedParameters, err := parameters.ClassifyComponentParameters(
-			parametersv1alpha1.ComponentParameters(desired.Parameters),
-			paramsDefs,
-			fetchTask.ComponentDefObj.Spec.Configs,
-			configmaps,
-			configDescs,
-		)
-		if err != nil {
-			return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-		}
-		for templateName, paramsInFile := range classifiedParameters {
-			configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
-			if len(configDescriptions) == 0 {
-				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for template: %s", templateName)
-			}
-			if _, err := parameters.DoMerge(resolveBaseData(paramsInFile), parameters.DerefMapValues(paramsInFile), paramsDefs, configDescriptions); err != nil {
-				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-			}
-			item := parameters.GetConfigTemplateItem(specCopy, templateName)
-			if item == nil {
-				return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
-			}
-			mergeWithOverride(item, parameters.DerefMapValues(paramsInFile))
-		}
+	if err := applyParameterValues(specCopy, componentParameter.Spec.Init, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
+		return false, err
 	}
-	for templateName, templateExtension := range desired.Templates {
-		item := parameters.GetConfigTemplateItem(specCopy, templateName)
-		if item == nil {
-			return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
-		}
-		item.CustomTemplates = templateExtension.DeepCopy()
+	if err := applyParameterValues(specCopy, componentParameter.Spec.Desired, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
+		return false, err
 	}
 	if reflect.DeepEqual(componentParameter.Spec, *specCopy) {
 		return false, nil
@@ -99,6 +65,56 @@ func reconcileDesiredIntoSpec(ctx context.Context, cli client.Client, componentP
 	patch := client.MergeFrom(componentParameter.DeepCopy())
 	componentParameter.Spec = *specCopy
 	return true, cli.Patch(ctx, componentParameter, patch)
+}
+
+func applyParameterValues(spec *parametersv1alpha1.ComponentParameterSpec,
+	values *parametersv1alpha1.ParameterValues, override bool,
+	ctx context.Context, cli client.Client, fetchTask *Task,
+	configmaps map[string]*corev1.ConfigMap,
+	configDescs []parametersv1alpha1.ComponentConfigDescription,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
+	if values == nil {
+		return nil
+	}
+	if err := validateCustomTemplate(ctx, cli, values.Templates); err != nil {
+		return err
+	}
+	if len(values.Parameters) != 0 {
+		classifiedParameters, err := parameters.ClassifyComponentParameters(
+			parametersv1alpha1.ComponentParameters(values.Parameters),
+			paramsDefs,
+			fetchTask.ComponentDefObj.Spec.Configs,
+			configmaps,
+			configDescs,
+		)
+		if err != nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+		}
+		for templateName, paramsInFile := range classifiedParameters {
+			configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
+			if len(configDescriptions) == 0 {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for template: %s", templateName)
+			}
+			if _, err := parameters.DoMerge(resolveBaseData(paramsInFile), parameters.DerefMapValues(paramsInFile), paramsDefs, configDescriptions); err != nil {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+			}
+			item := parameters.GetConfigTemplateItem(spec, templateName)
+			if item == nil {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
+			}
+			mergeItemParameters(item, parameters.DerefMapValues(paramsInFile), override)
+		}
+	}
+	for templateName, templateExtension := range values.Templates {
+		item := parameters.GetConfigTemplateItem(spec, templateName)
+		if item == nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
+		}
+		if override || item.CustomTemplates == nil {
+			item.CustomTemplates = templateExtension.DeepCopy()
+		}
+	}
+	return nil
 }
 
 func resolveComponentRefConfigMap(ctx context.Context, cli client.Client, namespace, clusterName, componentName string) (map[string]*corev1.ConfigMap, error) {
@@ -124,9 +140,12 @@ func resolveComponentRefConfigMap(ctx context.Context, cli client.Client, namesp
 	return configmaps, nil
 }
 
-func mergeWithOverride(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile) {
+func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile, override bool) {
 	if item.ConfigFileParams == nil {
 		item.ConfigFileParams = updatedParameters
+		return
+	}
+	if !override && len(item.ConfigFileParams) != 0 {
 		return
 	}
 	for key, parametersInFile := range updatedParameters {

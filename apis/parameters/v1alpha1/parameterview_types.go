@@ -75,32 +75,36 @@ type ParameterViewSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	FileName string `json:"fileName"`
 
-	// FileFormat identifies the file format used by the selected config file.
-	// When omitted, the controller resolves it from the referenced template metadata.
-	//
-	// +optional
-	FileFormat CfgFileFormat `json:"fileFormat,omitempty"`
-
 	// Mode controls whether edits are allowed to be translated back into ComponentParameter patches.
 	//
 	// +kubebuilder:default="ReadWrite"
 	// +optional
 	Mode ParameterViewMode `json:"mode,omitempty"`
 
-	// SourceGeneration captures the ComponentParameter generation used to build the current view.
-	// Controllers should reject stale writes when this value no longer matches the source object.
-	// It is typically populated and refreshed by the controller.
+	// ResetToLatest requests the controller to discard the current draft in spec.content
+	// and rebuild it from the latest observed effective content.
+	//
+	// This is a reset-style action rather than a git-style rebase:
+	// 1. the current draft is dropped;
+	// 2. spec.content is reconstructed from status.latest;
+	// 3. status.base is advanced to the rebuilt content revision.
 	//
 	// +optional
-	SourceGeneration int64 `json:"sourceGeneration,omitempty"`
+	ResetToLatest bool `json:"resetToLatest,omitempty"`
 
-	// ContentHash optionally captures the effective source content used to build the current view.
-	// It is typically populated and refreshed by the controller.
+	// Content is the current user-facing document for the selected file.
 	//
-	// +optional
-	ContentHash string `json:"contentHash,omitempty"`
-
-	// Content is the document for the selected file.
+	// Controllers treat Content as the user's current draft:
+	// 1. on initialization, Content is populated from the effective content and
+	//    status.base and status.latest point to the same revision;
+	// 2. while status.base and status.latest remain equal, Content is based on the
+	//    latest observed effective content;
+	// 3. when status.latest advances and Content is still only a projection of
+	//    status.base, the controller may auto-refresh Content and move status.base
+	//    forward to status.latest;
+	// 4. when Content has diverged into a real user draft, the controller preserves
+	//    it and uses status.base as the draft base when replaying the draft onto
+	//    status.latest or surfacing a conflict.
 	//
 	// +optional
 	Content ParameterViewContent `json:"content,omitempty"`
@@ -127,6 +131,67 @@ type ParameterViewStatus struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// FileFormat identifies the file format used by the selected config file.
+	// It is resolved and refreshed by the controller from template metadata.
+	//
+	// +optional
+	FileFormat CfgFileFormat `json:"fileFormat,omitempty"`
+
+	// Base records the effective content revision that spec.content is currently based on.
+	// It is the draft base used to decide whether spec.content is still only a
+	// projection of the source, or whether it has diverged into a real user draft.
+	//
+	// +optional
+	Base ParameterViewRevision `json:"base,omitempty"`
+
+	// Latest records the latest effective content revision observed by the controller.
+	// When Base and Latest are equal, spec.content is based on the current latest
+	// effective revision. When they differ, spec.content is either waiting to
+	// auto-refresh because no real draft exists, or waiting for the controller to
+	// replay or reject a preserved user draft against the newer latest revision.
+	//
+	// +optional
+	Latest ParameterViewRevision `json:"latest,omitempty"`
+
+	// Submissions records recent desired parameter submissions derived from this view.
+	// Newer entries appear first. The controller may compact older entries, but it
+	// keeps enough history for users to understand which changes were recently submitted.
+	//
+	// +optional
+	Submissions []ParameterViewSubmission `json:"submissions,omitempty"`
+}
+
+// ParameterViewRevision identifies an effective content revision for a view.
+type ParameterViewRevision struct {
+	// Revision records the effective content revision associated with this view state.
+	// The controller resolves it from the generated ConfigMap revision metadata when available.
+	//
+	// +optional
+	Revision string `json:"revision,omitempty"`
+
+	// ContentHash records the hash of the effective file content for this revision.
+	//
+	// +optional
+	ContentHash string `json:"contentHash,omitempty"`
+}
+
+// ParameterViewSubmission records the most recent submission derived from a view draft.
+type ParameterViewSubmission struct {
+	// Revision records the effective content revision that the submission was based on.
+	//
+	// +optional
+	Revision ParameterViewRevision `json:"revision,omitempty"`
+
+	// SubmittedAt records when the submission entry was created or last refreshed.
+	//
+	// +optional
+	SubmittedAt *metav1.Time `json:"submittedAt,omitempty"`
+
+	// Parameters contains the desired parameter updates submitted from the view.
+	//
+	// +optional
+	Parameters ParameterValueMap `json:"parameters,omitempty"`
 }
 
 // ParameterViewMode defines whether a ParameterView can be edited.
@@ -141,12 +206,12 @@ const (
 
 // ParameterViewPhase defines the lifecycle state of a ParameterView.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Ready,Conflict,Invalid,Applying}
+// +kubebuilder:validation:Enum={Pending,Synced,Conflict,Invalid,Applying}
 type ParameterViewPhase string
 
 const (
 	ParameterViewPendingPhase  ParameterViewPhase = "Pending"
-	ParameterViewReadyPhase    ParameterViewPhase = "Ready"
+	ParameterViewSyncedPhase   ParameterViewPhase = "Synced"
 	ParameterViewConflictPhase ParameterViewPhase = "Conflict"
 	ParameterViewInvalidPhase  ParameterViewPhase = "Invalid"
 	ParameterViewApplyingPhase ParameterViewPhase = "Applying"

@@ -498,21 +498,6 @@ string
 </tr>
 <tr>
 <td>
-<code>fileFormat</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.CfgFileFormat">
-CfgFileFormat
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>FileFormat identifies the file format used by the selected config file.
-When omitted, the controller resolves it from the referenced template metadata.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>mode</code><br/>
 <em>
 <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewMode">
@@ -527,29 +512,19 @@ ParameterViewMode
 </tr>
 <tr>
 <td>
-<code>sourceGeneration</code><br/>
+<code>resetToLatest</code><br/>
 <em>
-int64
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>SourceGeneration captures the ComponentParameter generation used to build the current view.
-Controllers should reject stale writes when this value no longer matches the source object.
-It is typically populated and refreshed by the controller.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>contentHash</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ContentHash optionally captures the effective source content used to build the current view.
-It is typically populated and refreshed by the controller.</p>
+<p>ResetToLatest requests the controller to discard the current draft in spec.content
+and rebuild it from the latest observed effective content.</p>
+<p>This is a reset-style action rather than a git-style rebase:
+1. the current draft is dropped;
+2. spec.content is reconstructed from status.latest;
+3. status.base is advanced to the rebuilt content revision.</p>
 </td>
 </tr>
 <tr>
@@ -563,7 +538,18 @@ ParameterViewContent
 </td>
 <td>
 <em>(Optional)</em>
-<p>Content is the document for the selected file.</p>
+<p>Content is the current user-facing document for the selected file.</p>
+<p>Controllers treat Content as the user&rsquo;s current draft:
+1. on initialization, Content is populated from the effective content and
+   status.base and status.latest point to the same revision;
+2. while status.base and status.latest remain equal, Content is based on the
+   latest observed effective content;
+3. when status.latest advances and Content is still only a projection of
+   status.base, the controller may auto-refresh Content and move status.base
+   forward to status.latest;
+4. when Content has diverged into a real user draft, the controller preserves
+   it and uses status.base as the draft base when replaying the draft onto
+status.latest or surfacing a conflict.</p>
 </td>
 </tr>
 </tbody>
@@ -888,7 +874,7 @@ string
 <h3 id="parameters.kubeblocks.io/v1alpha1.CfgFileFormat">CfgFileFormat
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSpec">ParameterViewSpec</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>)
 </p>
 <div>
 <p>CfgFileFormat defines formatter of configuration files.</p>
@@ -2111,7 +2097,7 @@ updated by the API Server.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterValueMap">ParameterValueMap
 (<code>map[string]*string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">ParameterValues</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">ParameterValues</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>)
 </p>
 <div>
 <p>ParameterValueMap is a flat parameter key/value map.</p>
@@ -2303,9 +2289,52 @@ file fragments that are not defined by the current ParametersDefinition.</p>
 <td></td>
 </tr><tr><td><p>&#34;Pending&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;Ready&#34;</p></td>
+</tr><tr><td><p>&#34;Synced&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">ParameterViewRevision
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>)
+</p>
+<div>
+<p>ParameterViewRevision identifies an effective content revision for a view.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>revision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Revision records the effective content revision associated with this view state.
+The controller resolves it from the generated ConfigMap revision metadata when available.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>contentHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ContentHash records the hash of the effective file content for this revision.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSpec">ParameterViewSpec
 </h3>
@@ -2360,21 +2389,6 @@ string
 </tr>
 <tr>
 <td>
-<code>fileFormat</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.CfgFileFormat">
-CfgFileFormat
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>FileFormat identifies the file format used by the selected config file.
-When omitted, the controller resolves it from the referenced template metadata.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>mode</code><br/>
 <em>
 <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewMode">
@@ -2389,29 +2403,19 @@ ParameterViewMode
 </tr>
 <tr>
 <td>
-<code>sourceGeneration</code><br/>
+<code>resetToLatest</code><br/>
 <em>
-int64
+bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>SourceGeneration captures the ComponentParameter generation used to build the current view.
-Controllers should reject stale writes when this value no longer matches the source object.
-It is typically populated and refreshed by the controller.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>contentHash</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ContentHash optionally captures the effective source content used to build the current view.
-It is typically populated and refreshed by the controller.</p>
+<p>ResetToLatest requests the controller to discard the current draft in spec.content
+and rebuild it from the latest observed effective content.</p>
+<p>This is a reset-style action rather than a git-style rebase:
+1. the current draft is dropped;
+2. spec.content is reconstructed from status.latest;
+3. status.base is advanced to the rebuilt content revision.</p>
 </td>
 </tr>
 <tr>
@@ -2425,7 +2429,18 @@ ParameterViewContent
 </td>
 <td>
 <em>(Optional)</em>
-<p>Content is the document for the selected file.</p>
+<p>Content is the current user-facing document for the selected file.</p>
+<p>Controllers treat Content as the user&rsquo;s current draft:
+1. on initialization, Content is populated from the effective content and
+   status.base and status.latest point to the same revision;
+2. while status.base and status.latest remain equal, Content is based on the
+   latest observed effective content;
+3. when status.latest advances and Content is still only a projection of
+   status.base, the controller may auto-refresh Content and move status.base
+   forward to status.latest;
+4. when Content has diverged into a real user draft, the controller preserves
+   it and uses status.base as the draft base when replaying the draft onto
+status.latest or surfacing a conflict.</p>
 </td>
 </tr>
 </tbody>
@@ -2496,6 +2511,131 @@ string
 <td>
 <em>(Optional)</em>
 <p>Conditions captures detailed reconciliation and validation status.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormat</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.CfgFileFormat">
+CfgFileFormat
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FileFormat identifies the file format used by the selected config file.
+It is resolved and refreshed by the controller from template metadata.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>base</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">
+ParameterViewRevision
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Base records the effective content revision that spec.content is currently based on.
+It is the draft base used to decide whether spec.content is still only a
+projection of the source, or whether it has diverged into a real user draft.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>latest</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">
+ParameterViewRevision
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Latest records the latest effective content revision observed by the controller.
+When Base and Latest are equal, spec.content is based on the current latest
+effective revision. When they differ, spec.content is either waiting to
+auto-refresh because no real draft exists, or waiting for the controller to
+replay or reject a preserved user draft against the newer latest revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>submissions</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">
+[]ParameterViewSubmission
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Submissions records recent desired parameter submissions derived from this view.
+Newer entries appear first. The controller may compact older entries, but it
+keeps enough history for users to understand which changes were recently submitted.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>)
+</p>
+<div>
+<p>ParameterViewSubmission records the most recent submission derived from a view draft.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>revision</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">
+ParameterViewRevision
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Revision records the effective content revision that the submission was based on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>submittedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SubmittedAt records when the submission entry was created or last refreshed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterValueMap">
+ParameterValueMap
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Parameters contains the desired parameter updates submitted from the view.</p>
 </td>
 </tr>
 </tbody>

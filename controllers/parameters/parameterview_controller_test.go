@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -80,17 +81,23 @@ func TestParameterViewReconcileInitializesPlainTextContent(t *testing.T) {
 	if view.Spec.Content.Text != "max_connections=1000\n" {
 		t.Fatalf("expected content to be backfilled from generated configmap, got %q", view.Spec.Content.Text)
 	}
-	if view.Spec.FileFormat != parametersv1alpha1.Ini {
-		t.Fatalf("expected fileFormat %q, got %q", parametersv1alpha1.Ini, view.Spec.FileFormat)
+	if view.Status.FileFormat != parametersv1alpha1.Ini {
+		t.Fatalf("expected fileFormat %q, got %q", parametersv1alpha1.Ini, view.Status.FileFormat)
 	}
-	if view.Spec.SourceGeneration != componentParameterGeneration {
-		t.Fatalf("expected sourceGeneration %d, got %d", componentParameterGeneration, view.Spec.SourceGeneration)
+	if view.Status.Base.Revision != fmt.Sprint(componentParameterGeneration) {
+		t.Fatalf("expected base revision %q, got %q", fmt.Sprint(componentParameterGeneration), view.Status.Base.Revision)
 	}
-	if view.Spec.ContentHash != hashContent("max_connections=1000\n") {
-		t.Fatalf("unexpected contentHash: %q", view.Spec.ContentHash)
+	if view.Status.Base.ContentHash != hashContent("max_connections=1000\n") {
+		t.Fatalf("unexpected base content hash: %q", view.Status.Base.ContentHash)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
+	if view.Status.Latest.Revision != fmt.Sprint(componentParameterGeneration) {
+		t.Fatalf("expected latest revision %q, got %q", fmt.Sprint(componentParameterGeneration), view.Status.Latest.Revision)
+	}
+	if view.Status.Latest.ContentHash != hashContent("max_connections=1000\n") {
+		t.Fatalf("unexpected latest content hash: %q", view.Status.Latest.ContentHash)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewSyncedPhase, view.Status.Phase)
 	}
 	if view.Status.ObservedGeneration != view.Generation {
 		t.Fatalf("expected observedGeneration %d, got %d", view.Generation, view.Status.ObservedGeneration)
@@ -147,8 +154,8 @@ func TestParameterViewReconcileInitializesMarkerLineContent(t *testing.T) {
 	if view.Spec.Content.Text != expected {
 		t.Fatalf("expected rendered marker content %q, got %q", expected, view.Spec.Content.Text)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
+	if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewSyncedPhase, view.Status.Phase)
 	}
 }
 
@@ -291,42 +298,7 @@ func TestParameterViewReconcileRejectsUnsupportedContentType(t *testing.T) {
 	assertParameterViewConditionReason(t, view, parameterViewReasonUnsupportedContentType)
 }
 
-func TestParameterViewReconcileRejectsFileFormatMismatch(t *testing.T) {
-	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
-		"max_connections=1000\n",
-		&parametersv1alpha1.ParameterView{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       parameterViewName,
-				Namespace:  parameterViewNamespace,
-				Generation: 1,
-			},
-			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName: templateName,
-				FileName:     fileName,
-				FileFormat:   parametersv1alpha1.JSON,
-			},
-		},
-	)...)
-
-	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
-	})
-	if err != nil {
-		t.Fatalf("reconcile failed: %v", err)
-	}
-
-	view := &parametersv1alpha1.ParameterView{}
-	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
-		t.Fatalf("get view failed: %v", err)
-	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
-	}
-	assertParameterViewConditionReason(t, view, parameterViewReasonFileFormatMismatch)
-}
-
-func TestParameterViewReconcileMarksConflictOnSourceDrift(t *testing.T) {
+func TestParameterViewReconcileReappliesDraftWhenSourceDriftIsExpressible(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
 		"max_connections=2000\n",
 		&parametersv1alpha1.ParameterView{
@@ -336,57 +308,21 @@ func TestParameterViewReconcileMarksConflictOnSourceDrift(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: 1,
-				ContentHash:      hashContent("max_connections=1000\n"),
-				Content:          parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
 			},
-		},
-	)...)
-
-	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
-	})
-	if err != nil {
-		t.Fatalf("reconcile failed: %v", err)
-	}
-
-	view := &parametersv1alpha1.ParameterView{}
-	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
-		t.Fatalf("get view failed: %v", err)
-	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewConflictPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewConflictPhase, view.Status.Phase)
-	}
-	if view.Status.Message == "" {
-		t.Fatalf("expected conflict message to be set")
-	}
-	assertParameterViewConditionReason(t, view, parameterViewReasonSourceChanged)
-	if view.Spec.Content.Text != "max_connections=1500\n" {
-		t.Fatalf("expected user content to be preserved on conflict, got %q", view.Spec.Content.Text)
-	}
-}
-
-func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T) {
-	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
-		"max_connections=1000\n",
-		&parametersv1alpha1.ParameterView{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       parameterViewName,
-				Namespace:  parameterViewNamespace,
-				Generation: 2,
-			},
-			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("max_connections=1000\n"),
-				Content:          parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    "1",
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    "1",
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
 			},
 		},
 	)...)
@@ -406,6 +342,66 @@ func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T)
 		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
 	}
 	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", parametersv1alpha1.ParameterValueMap{
+		"default.max_connections": ptr.To("1500"),
+	})
+
+	compParam := &parametersv1alpha1.ComponentParameter{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
+		t.Fatalf("get component parameter failed: %v", err)
+	}
+	if got := compParam.Spec.Desired.Parameters["default.max_connections"]; got == nil || *got != "1500" {
+		t.Fatalf("expected desired default.max_connections=1500, got %#v", got)
+	}
+}
+
+func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1000\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+			},
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", parametersv1alpha1.ParameterValueMap{
+		"default.max_connections": ptr.To("1500"),
+	})
 
 	compParam := &parametersv1alpha1.ComponentParameter{}
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
@@ -441,15 +437,23 @@ func TestParameterViewReconcileWritesMarkerLineToComponentParameter(t *testing.T
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\nserver_id=1\ncustom_local=on\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
 					Text: "[U] [mysqld]\n[D] max_connections=1500\n[S] sync_binlog=1\n[I] server_id=1\n[U] custom_local=on\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\nserver_id=1\ncustom_local=on\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\nserver_id=1\ncustom_local=on\n"),
 				},
 			},
 		},
@@ -490,14 +494,22 @@ func TestParameterViewReconcileRejectsWriteInReadOnlyMode(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				Mode:             parametersv1alpha1.ParameterViewReadOnlyMode,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("max_connections=1000\n"),
-				Content:          parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Mode:         parametersv1alpha1.ParameterViewReadOnlyMode,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
 			},
 		},
 	)...)
@@ -546,15 +558,23 @@ func TestParameterViewReconcileWritesMarkerLineStaticEdits(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
 					Text: "[U] [mysqld]\n[D] max_connections=1000\n[S] sync_binlog=2\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
 				},
 			},
 		},
@@ -604,15 +624,23 @@ func TestParameterViewReconcileRejectsMarkerLineUnmanagedEdits(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
 					Text: "[U] [mysqld changed]\n[D] max_connections=1000\n[S] sync_binlog=1\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
 				},
 			},
 		},
@@ -651,15 +679,23 @@ func TestParameterViewReconcileRejectsInvalidMarkerSyntax(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
 					Text: "[S] [mysqld]\nmax_connections=1500\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\n"),
 				},
 			},
 		},
@@ -692,13 +728,21 @@ func TestParameterViewReconcileKeepsApplyingWhenDesiredAlreadySubmitted(t *testi
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("max_connections=1000\n"),
-				Content:          parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
 			},
 		},
 		func(cp *parametersv1alpha1.ComponentParameter) {
@@ -737,13 +781,21 @@ func TestParameterViewReconcileReturnsReadyAfterRuntimeCatchesUp(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("max_connections=1000\n"),
-				Content:          parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
 			},
 		},
 		func(cp *parametersv1alpha1.ComponentParameter) {
@@ -792,8 +844,8 @@ func TestParameterViewReconcileReturnsReadyAfterRuntimeCatchesUp(t *testing.T) {
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
 		t.Fatalf("get view failed: %v", err)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
+	if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewSyncedPhase, view.Status.Phase)
 	}
 	if view.Spec.Content.Text != "# normalized\nmax_connections=1500\n" {
 		t.Fatalf("expected content to refresh from runtime source, got %q", view.Spec.Content.Text)
@@ -811,12 +863,9 @@ func TestParameterViewReconcileRefreshesLegacyConflictWhenRuntimeSemanticsMatch(
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("max_connections=1000\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.PlainTextParameterViewContentType,
 					Text: "[mysqld]\nmax_connections=1500\n",
@@ -825,7 +874,16 @@ func TestParameterViewReconcileRefreshesLegacyConflictWhenRuntimeSemanticsMatch(
 			Status: parametersv1alpha1.ParameterViewStatus{
 				Phase:              parametersv1alpha1.ParameterViewConflictPhase,
 				ObservedGeneration: 2,
-				Message:            "source content changed for mysql-replication-config/my.cnf",
+				Message:            "draft is based on an outdated revision for mysql-config/my.cnf; continue editing to retry replay or set resetToLatest=true to discard the draft",
+				FileFormat:         parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
 			},
 		},
 	)...)
@@ -857,19 +915,94 @@ func TestParameterViewReconcileRefreshesLegacyConflictWhenRuntimeSemanticsMatch(
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
 		t.Fatalf("get view failed: %v", err)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
+	if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewSyncedPhase, view.Status.Phase)
 	}
-	if view.Spec.SourceGeneration != componentParameterGeneration {
-		t.Fatalf("expected source generation %d, got %d", componentParameterGeneration, view.Spec.SourceGeneration)
+	if view.Status.Base.Revision != fmt.Sprint(componentParameterGeneration) {
+		t.Fatalf("expected base revision %q, got %q", fmt.Sprint(componentParameterGeneration), view.Status.Base.Revision)
 	}
-	if view.Spec.ContentHash != hashContent("[mysqld]\nmax_connections=1500\n") {
-		t.Fatalf("expected content hash to refresh from runtime source, got %q", view.Spec.ContentHash)
+	if view.Status.Base.ContentHash != hashContent("[mysqld]\nmax_connections=1500\n") {
+		t.Fatalf("expected base content hash to refresh from runtime source, got %q", view.Status.Base.ContentHash)
+	}
+	if view.Status.Latest.ContentHash != hashContent("[mysqld]\nmax_connections=1500\n") {
+		t.Fatalf("expected latest content hash to refresh from runtime source, got %q", view.Status.Latest.ContentHash)
 	}
 	if view.Spec.Content.Text != "[mysqld]\nmax_connections=1500\n" {
 		t.Fatalf("expected content to refresh from runtime source, got %q", view.Spec.Content.Text)
 	}
 	assertParameterViewConditionReason(t, view, parameterViewReasonResolved)
+}
+
+func TestParameterViewReconcileRetriesDraftReplayWhileInConflict(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1100\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 3,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.PlainTextParameterViewContentType,
+					Text: "max_connections=1200\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				Phase:              parametersv1alpha1.ParameterViewConflictPhase,
+				ObservedGeneration: 2,
+				Message:            "draft is based on an outdated revision for mysql-config/my.cnf; continue editing to retry replay or set resetToLatest=true to discard the draft",
+				FileFormat:         parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration - 1),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1100\n"),
+				},
+			},
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
+		t.Fatalf("expected phase %q, got %q with message %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase, view.Status.Message)
+	}
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1200\n", parametersv1alpha1.ParameterValueMap{
+		"default.max_connections": ptr.To("1200"),
+	})
+	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
+	if view.Status.Base.Revision != fmt.Sprint(componentParameterGeneration) {
+		t.Fatalf("expected base revision %q, got %q", fmt.Sprint(componentParameterGeneration), view.Status.Base.Revision)
+	}
+	if view.Status.Base.ContentHash != hashContent("max_connections=1100\n") {
+		t.Fatalf("expected base content hash %q, got %q", hashContent("max_connections=1100\n"), view.Status.Base.ContentHash)
+	}
+
+	compParam := &parametersv1alpha1.ComponentParameter{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
+		t.Fatalf("get component parameter failed: %v", err)
+	}
+	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Parameters == nil {
+		t.Fatalf("expected desired parameters to be written")
+	}
+	if got := compParam.Spec.Desired.Parameters["default.max_connections"]; got == nil || *got != "1200" {
+		t.Fatalf("expected desired default.max_connections=1200, got %#v", got)
+	}
 }
 
 func TestParameterViewReconcileReturnsReadyAfterMarkerLineRuntimeCatchesUp(t *testing.T) {
@@ -891,15 +1024,23 @@ func TestParameterViewReconcileReturnsReadyAfterMarkerLineRuntimeCatchesUp(t *te
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
 					Text: "[U] [mysqld]\n[D] max_connections=1500\n[S] sync_binlog=1\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
 				},
 			},
 		},
@@ -951,8 +1092,8 @@ func TestParameterViewReconcileReturnsReadyAfterMarkerLineRuntimeCatchesUp(t *te
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
 		t.Fatalf("get view failed: %v", err)
 	}
-	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
-		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
+	if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewSyncedPhase, view.Status.Phase)
 	}
 	expected := "[U] [mysqld]\n[D] max_connections=1500\n[S] sync_binlog=1\n"
 	if view.Spec.Content.Text != expected {
@@ -971,15 +1112,23 @@ func TestParameterViewReconcileRejectsUnsupportedPlainTextEdits(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         fileName,
-				FileFormat:       parametersv1alpha1.Ini,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("max_connections=1000\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.PlainTextParameterViewContentType,
 					Text: "# edited comment\nmax_connections=1000\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
 				},
 			},
 		},
@@ -1015,15 +1164,23 @@ func TestParameterViewReconcileWritesYAMLPlainTextToDesiredParameters(t *testing
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         "config.yaml",
-				FileFormat:       parametersv1alpha1.YAML,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("maxConnections: \"1000\"\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     "config.yaml",
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.PlainTextParameterViewContentType,
 					Text: "maxConnections: \"1500\"\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.YAML,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("maxConnections: \"1000\"\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("maxConnections: \"1000\"\n"),
 				},
 			},
 		},
@@ -1043,6 +1200,9 @@ func TestParameterViewReconcileWritesYAMLPlainTextToDesiredParameters(t *testing
 	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
 		t.Fatalf("expected phase %q, got %q with message %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase, view.Status.Message)
 	}
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "maxConnections: \"1500\"\n", parametersv1alpha1.ParameterValueMap{
+		"maxConnections": ptr.To("1500"),
+	})
 
 	compParam := &parametersv1alpha1.ComponentParameter{}
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
@@ -1069,15 +1229,23 @@ func TestParameterViewReconcileWritesJSONPlainTextToDesiredParameters(t *testing
 				Generation: 2,
 			},
 			Spec: parametersv1alpha1.ParameterViewSpec{
-				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
-				TemplateName:     templateName,
-				FileName:         "config.json",
-				FileFormat:       parametersv1alpha1.JSON,
-				SourceGeneration: componentParameterGeneration,
-				ContentHash:      hashContent("{\n  \"maxConnections\": \"1000\"\n}\n"),
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     "config.json",
 				Content: parametersv1alpha1.ParameterViewContent{
 					Type: parametersv1alpha1.PlainTextParameterViewContentType,
 					Text: "{\n  \"maxConnections\": \"1500\"\n}\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.JSON,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("{\n  \"maxConnections\": \"1000\"\n}\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("{\n  \"maxConnections\": \"1000\"\n}\n"),
 				},
 			},
 		},
@@ -1107,6 +1275,53 @@ func TestParameterViewReconcileWritesJSONPlainTextToDesiredParameters(t *testing
 	}
 	if got := compParam.Spec.Desired.Parameters["maxconnections"]; got == nil || *got != "1500" {
 		t.Fatalf("expected desired maxconnections=1500, got %#v", got)
+	}
+}
+
+func assertParameterViewLastSubmission(t *testing.T, view *parametersv1alpha1.ParameterView, revision, content string, parameters parametersv1alpha1.ParameterValueMap) {
+	t.Helper()
+
+	if len(view.Status.Submissions) == 0 {
+		t.Fatalf("expected at least one submission entry")
+	}
+	got := view.Status.Submissions[0]
+	if got.Revision.Revision != revision {
+		t.Fatalf("expected latest submission revision %q, got %q", revision, got.Revision.Revision)
+	}
+	if got.Revision.ContentHash != hashContent(content) {
+		t.Fatalf("expected latest submission content hash %q, got %q", hashContent(content), got.Revision.ContentHash)
+	}
+	if got.SubmittedAt == nil || got.SubmittedAt.IsZero() {
+		t.Fatalf("expected latest submission submittedAt to be set")
+	}
+	if !equalParameterValueMap(got.Parameters, parameters) {
+		t.Fatalf("expected latest submission parameters %#v, got %#v", parameters, got.Parameters)
+	}
+}
+
+func TestCompactSubmissionsKeepsNewestEntriesWithinCap(t *testing.T) {
+	submissions := make([]parametersv1alpha1.ParameterViewSubmission, 0, parameterViewSubmissionLimit+2)
+	for i := 0; i < parameterViewSubmissionLimit+2; i++ {
+		submissions = append(submissions, parametersv1alpha1.ParameterViewSubmission{
+			Revision: parametersv1alpha1.ParameterViewRevision{
+				Revision:    fmt.Sprintf("%d", i),
+				ContentHash: fmt.Sprintf("h-%d", i),
+			},
+			Parameters: parametersv1alpha1.ParameterValueMap{
+				fmt.Sprintf("p-%d", i): ptr.To(fmt.Sprintf("v-%d", i)),
+			},
+		})
+	}
+
+	compacted := compactSubmissions(submissions)
+	if len(compacted) != parameterViewSubmissionLimit {
+		t.Fatalf("expected compacted submissions to keep %d entries, got %d", parameterViewSubmissionLimit, len(compacted))
+	}
+	if compacted[0].Revision.Revision != "0" {
+		t.Fatalf("expected newest submission revision %q, got %q", "0", compacted[0].Revision.Revision)
+	}
+	if compacted[len(compacted)-1].Revision.Revision != fmt.Sprintf("%d", parameterViewSubmissionLimit-1) {
+		t.Fatalf("expected oldest retained submission revision %q, got %q", fmt.Sprintf("%d", parameterViewSubmissionLimit-1), compacted[len(compacted)-1].Revision.Revision)
 	}
 }
 
@@ -1304,7 +1519,7 @@ func newParameterViewTestObjectsWithOptions(opts parameterViewTestOptions) []run
 func assertParameterViewConditionReason(t *testing.T, view *parametersv1alpha1.ParameterView, reason string) {
 	t.Helper()
 	for _, condition := range view.Status.Conditions {
-		if condition.Type == parameterViewReadyCondition {
+		if condition.Type == parameterViewSyncedCondition {
 			if condition.Reason != reason {
 				t.Fatalf("expected condition reason %q, got %q", reason, condition.Reason)
 			}
@@ -1348,7 +1563,7 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
 			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=OFF"))
 			g.Expect(obj.Labels).Should(HaveKeyWithValue(parameterViewParameterRefLabelKey, cfgKey.Name))
 			g.Expect(obj.Labels).Should(HaveKeyWithValue(parameterViewTemplateLabelKey, configSpecName))
@@ -1401,7 +1616,7 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
 		})).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
@@ -1450,7 +1665,7 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
 		})).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
@@ -1472,7 +1687,7 @@ var _ = Describe("ParameterView Controller", func() {
 		})).Should(Succeed())
 	})
 
-	It("refreshes to Ready when runtime config catches up", func() {
+	It("refreshes to Synced when runtime config catches up", func() {
 		_, _, _, _, _ = mockReconcileResource()
 
 		cfgKey := client.ObjectKey{
@@ -1486,6 +1701,17 @@ var _ = Describe("ParameterView Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 			g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, runtimeKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("gtid_mode=OFF"))
+		})).Should(Succeed())
+		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
+			if cm.Labels == nil {
+				cm.Labels = map[string]string{}
+			}
+			cm.Labels[constant.AppInstanceLabelKey] = clusterName
+			cm.Labels[constant.KBAppComponentLabelKey] = defaultCompName
+			cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = configSpecName
+		})()).Should(Succeed())
 
 		viewKey := client.ObjectKey{
 			Namespace: testCtx.DefaultNamespace,
@@ -1506,9 +1732,22 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
 			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=OFF"))
 		})).Should(Succeed())
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
+			contentHash := hashContent(obj.Spec.Content.Text)
+			revision := obj.Status.Latest.Revision
+			obj.Status.FileFormat = parametersv1alpha1.Ini
+			obj.Status.Base = parametersv1alpha1.ParameterViewRevision{
+				Revision:    revision,
+				ContentHash: contentHash,
+			}
+			obj.Status.Latest = parametersv1alpha1.ParameterViewRevision{
+				Revision:    revision,
+				ContentHash: contentHash,
+			}
+		})()).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
 			obj.Spec.Content.Text = strings.Replace(obj.Spec.Content.Text, "gtid_mode=OFF", "gtid_mode=ON", 1)
@@ -1521,14 +1760,20 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
 			cm.Data[testparameters.MysqlConfigFile] = strings.Replace(cm.Data[testparameters.MysqlConfigFile], "gtid_mode=OFF", "gtid_mode=ON", 1)
 		})()).Should(Succeed())
+		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
+			if obj.Annotations == nil {
+				obj.Annotations = map[string]string{}
+			}
+			obj.Annotations["parameters.kubeblocks.io/test-refresh"] = "1"
+		})()).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
 			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=ON"))
 		})).Should(Succeed())
 	})
 
-	It("marks Conflict when runtime config drifts from the current view", func() {
+	It("refreshes to Synced when runtime config drifts without a draft", func() {
 		_, _, _, _, _ = mockReconcileResource()
 
 		cfgKey := client.ObjectKey{
@@ -1542,6 +1787,17 @@ var _ = Describe("ParameterView Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 			g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, runtimeKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("gtid_mode=OFF"))
+		})).Should(Succeed())
+		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
+			if cm.Labels == nil {
+				cm.Labels = map[string]string{}
+			}
+			cm.Labels[constant.AppInstanceLabelKey] = clusterName
+			cm.Labels[constant.KBAppComponentLabelKey] = defaultCompName
+			cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = configSpecName
+		})()).Should(Succeed())
 
 		viewKey := client.ObjectKey{
 			Namespace: testCtx.DefaultNamespace,
@@ -1562,24 +1818,30 @@ var _ = Describe("ParameterView Controller", func() {
 		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
 			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=OFF"))
 		})).Should(Succeed())
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
+			contentHash := hashContent(obj.Spec.Content.Text)
+			revision := obj.Status.Latest.Revision
+			obj.Status.FileFormat = parametersv1alpha1.Ini
+			obj.Status.Base = parametersv1alpha1.ParameterViewRevision{
+				Revision:    revision,
+				ContentHash: contentHash,
+			}
+			obj.Status.Latest = parametersv1alpha1.ParameterViewRevision{
+				Revision:    revision,
+				ContentHash: contentHash,
+			}
+		})()).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
 			cm.Data[testparameters.MysqlConfigFile] = strings.Replace(cm.Data[testparameters.MysqlConfigFile], "gtid_mode=OFF", "gtid_mode=ON", 1)
 		})()).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
-			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewConflictPhase))
-			var reason string
-			for _, condition := range obj.Status.Conditions {
-				if condition.Type == parameterViewReadyCondition {
-					reason = condition.Reason
-					break
-				}
-			}
-			g.Expect(reason).Should(BeEquivalentTo(parameterViewReasonSourceChanged))
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewSyncedPhase))
+			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=ON"))
 		})).Should(Succeed())
 	})
 })

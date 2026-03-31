@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +46,8 @@ import (
 )
 
 const (
-	parameterViewReadyCondition = "Ready"
+	parameterViewSyncedCondition = "Synced"
+	parameterViewSubmissionLimit = 10
 
 	parameterViewReasonResolved                  = "Resolved"
 	parameterViewReasonReferenceNotFound         = "ReferenceNotFound"
@@ -55,6 +57,7 @@ const (
 	parameterViewReasonUnsupportedContentType    = "UnsupportedContentType"
 	parameterViewReasonReadOnly                  = "ReadOnly"
 	parameterViewReasonSourceChanged             = "SourceChanged"
+	parameterViewReasonDraftOutdated             = "DraftOutdated"
 	parameterViewReasonDiffFailed                = "DiffFailed"
 	parameterViewReasonInvalidMarkerSyntax       = "InvalidMarkerSyntax"
 	parameterViewReasonUnsupportedContentChanges = "UnsupportedContentChanges"
@@ -99,7 +102,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Name:      view.Spec.ParameterRef.Name,
 	}, compParam); err != nil {
 		return r.markInvalid(reqCtx, view, parameterViewReasonReferenceNotFound,
-			fmt.Sprintf("referenced ComponentParameter not found: %s", view.Spec.ParameterRef.Name))
+			fmt.Sprintf("referenced ComponentParameter not found: %s", view.Spec.ParameterRef.Name), nil)
 	}
 
 	source, err := r.resolveSource(reqCtx.Ctx, compParam, view)
@@ -111,11 +114,13 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		view.Spec.Content.Type != parametersv1alpha1.PlainTextParameterViewContentType &&
 		view.Spec.Content.Type != parametersv1alpha1.MarkerLineParameterViewContentType {
 		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentType,
-			fmt.Sprintf("content type %q is not supported", view.Spec.Content.Type))
+			fmt.Sprintf("content type %q is not supported", view.Spec.Content.Type), nil)
 	}
 
 	specChanged := false
 	specPatch := client.MergeFrom(view.DeepCopy())
+	statusPatch := client.MergeFrom(view.DeepCopy())
+	statusChanged := false
 	if setParameterViewLabels(view, compParam) {
 		specChanged = true
 	}
@@ -123,16 +128,27 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		view.Spec.Content.Type = parametersv1alpha1.PlainTextParameterViewContentType
 		specChanged = true
 	}
-	if view.Spec.FileFormat == "" {
-		view.Spec.FileFormat = source.fileFormat
-		specChanged = true
-	} else if view.Spec.FileFormat != source.fileFormat {
-		return r.markInvalid(reqCtx, view, parameterViewReasonFileFormatMismatch,
-			fmt.Sprintf("fileFormat %q does not match source file format %q", view.Spec.FileFormat, source.fileFormat))
+	if syncLatestStatus(view, source) {
+		statusChanged = true
 	}
 	sourceViewContent, err := r.renderContent(reqCtx.Ctx, compParam, view, source.content)
 	if err != nil {
 		return r.markInvalidForViewContentError(reqCtx, view, err)
+	}
+
+	hadDraftContent := view.Spec.Content.Text != ""
+
+	if view.Spec.ResetToLatest {
+		view.Spec.Content.Text = sourceViewContent
+		view.Spec.ResetToLatest = false
+		specChanged = true
+		if syncBaseRevision(view, source) {
+			statusChanged = true
+		}
+		if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to refresh parameter view")
+		}
+		return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
 	}
 
 	currentContent := view.Spec.Content.Text
@@ -143,104 +159,141 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	if view.Spec.SourceGeneration == 0 || view.Spec.Content.Text == "" {
-		if view.Spec.SourceGeneration != source.generation {
-			view.Spec.SourceGeneration = source.generation
-			specChanged = true
+	if view.Status.Base.Revision == "" || view.Status.Base.ContentHash == "" {
+		if syncBaseRevision(view, source) {
+			statusChanged = true
 		}
-		if view.Spec.ContentHash != source.hash {
-			view.Spec.ContentHash = source.hash
-			specChanged = true
-		}
-		if view.Spec.Content.Text != sourceViewContent {
+		if view.Spec.Content.Text == "" && view.Spec.Content.Text != sourceViewContent {
 			view.Spec.Content.Text = sourceViewContent
 			specChanged = true
 		}
-	} else {
+	}
+
+	if !hadDraftContent {
+		if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+		}
+		return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+	}
+
+	if view.Status.Base.Revision != "" && view.Status.Base.ContentHash != "" {
 		switch {
 		case currentContent == source.content:
-			if view.Spec.SourceGeneration != source.generation {
-				view.Spec.SourceGeneration = source.generation
-				specChanged = true
-			}
-			if view.Spec.ContentHash != source.hash {
-				view.Spec.ContentHash = source.hash
-				specChanged = true
-			}
 			if view.Spec.Content.Text != sourceViewContent {
 				view.Spec.Content.Text = sourceViewContent
 				specChanged = true
 			}
+			if syncBaseRevision(view, source) {
+				statusChanged = true
+			}
 		case view.Spec.Mode == parametersv1alpha1.ParameterViewReadOnlyMode:
-			if specChanged {
-				if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
-					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
-				}
+			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 			}
-			return r.markInvalid(reqCtx, view, parameterViewReasonReadOnly, "content updates are not allowed in ReadOnly mode")
-		case view.Spec.ContentHash != "" && view.Spec.ContentHash != source.hash:
-			equivalent, err := r.equalConfigSemantics(reqCtx.Ctx, compParam, view, currentContent, source.content)
-			if err != nil {
-				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error())
-			}
-			if equivalent {
-				if view.Spec.SourceGeneration != source.generation {
-					view.Spec.SourceGeneration = source.generation
-					specChanged = true
-				}
-				if view.Spec.ContentHash != source.hash {
-					view.Spec.ContentHash = source.hash
-					specChanged = true
-				}
+			return r.markInvalid(reqCtx, view, parameterViewReasonReadOnly, "content updates are not allowed in ReadOnly mode", updateLatestStatus(source))
+		case view.Status.Base.ContentHash != source.hash:
+			if hashContent(currentContent) == view.Status.Base.ContentHash {
 				if view.Spec.Content.Text != sourceViewContent {
 					view.Spec.Content.Text = sourceViewContent
 					specChanged = true
 				}
-				if specChanged {
-					if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
+				if syncBaseRevision(view, source) {
+					statusChanged = true
+				}
+				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+				}
+				return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+			}
+			equivalent, err := r.equalConfigSemantics(reqCtx.Ctx, compParam, view, currentContent, source.content)
+			if err != nil {
+				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), nil)
+			}
+			if equivalent {
+				if view.Spec.Content.Text != sourceViewContent {
+					view.Spec.Content.Text = sourceViewContent
+					specChanged = true
+				}
+				if syncBaseRevision(view, source) {
+					statusChanged = true
+				}
+				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+				}
+				return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+			}
+			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
+			if err == nil {
+				if syncBaseRevision(view, source) {
+					statusChanged = true
+				}
+				if desiredParametersContain(compParam.Spec.Desired, desiredPatch) {
+					if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 					}
+					return r.markApplying(reqCtx, view, "parameter view update is pending apply", composeStatusUpdates(
+						updateBaseAndLatestStatus(source),
+						updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+					))
 				}
-				return r.markReady(reqCtx, view)
-			}
-			if specChanged {
-				if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
-					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
+				if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
+					return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), updateLatestStatus(source))
 				}
+				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+				}
+				return r.markApplying(reqCtx, view, "parameter view update has been submitted", composeStatusUpdates(
+					updateBaseAndLatestStatus(source),
+					updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+				))
 			}
-			return r.markConflict(reqCtx, view, fmt.Sprintf("source content changed for %s/%s", view.Spec.TemplateName, view.Spec.FileName))
+			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+			}
+			return r.markConflict(reqCtx, view,
+				fmt.Sprintf("draft is based on an outdated revision for %s/%s; continue editing to retry replay or set resetToLatest=true to discard the draft",
+					view.Spec.TemplateName, view.Spec.FileName),
+				updateLatestStatus(source))
+		case view.Spec.Mode == parametersv1alpha1.ParameterViewReadOnlyMode:
+			panic("unreachable")
 		default:
 			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
 			if err != nil {
-				return r.markInvalidForDesiredPatchError(reqCtx, view, err)
+				return r.markInvalidForDesiredPatchError(reqCtx, view, err, nil)
 			}
 			if desiredParametersContain(compParam.Spec.Desired, desiredPatch) {
-				if specChanged {
-					if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
-					}
+				if syncBaseRevision(view, source) {
+					statusChanged = true
 				}
-				return r.markApplying(reqCtx, view, "parameter view update is pending apply")
+				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+				}
+				return r.markApplying(reqCtx, view, "parameter view update is pending apply", composeStatusUpdates(
+					updateBaseAndLatestStatus(source),
+					updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+				))
 			}
 			if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
-				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error())
+				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), updateLatestStatus(source))
 			}
-			if specChanged {
-				if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
-					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
-				}
+			if syncBaseRevision(view, source) {
+				statusChanged = true
 			}
-			return r.markApplying(reqCtx, view, "parameter view update has been submitted")
+			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
+			}
+			return r.markApplying(reqCtx, view, "parameter view update has been submitted", composeStatusUpdates(
+				updateBaseAndLatestStatus(source),
+				updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+			))
 		}
 	}
 
-	if specChanged {
-		if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
-		}
+	if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 	}
 
-	return r.markReady(reqCtx, view)
+	return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -320,11 +373,162 @@ func setParameterViewLabels(view *parametersv1alpha1.ParameterView, compParam *p
 	return changed
 }
 
+func syncLatestStatus(view *parametersv1alpha1.ParameterView, source *parameterViewSource) bool {
+	changed := false
+	if view.Status.FileFormat != source.fileFormat {
+		view.Status.FileFormat = source.fileFormat
+		changed = true
+	}
+	if view.Status.Latest.Revision != source.revision {
+		view.Status.Latest.Revision = source.revision
+		changed = true
+	}
+	if view.Status.Latest.ContentHash != source.hash {
+		view.Status.Latest.ContentHash = source.hash
+		changed = true
+	}
+	return changed
+}
+
+func syncBaseRevision(view *parametersv1alpha1.ParameterView, source *parameterViewSource) bool {
+	changed := false
+	if view.Status.Base.Revision != source.revision {
+		view.Status.Base.Revision = source.revision
+		changed = true
+	}
+	if view.Status.Base.ContentHash != source.hash {
+		view.Status.Base.ContentHash = source.hash
+		changed = true
+	}
+	return changed
+}
+
+func cloneParameterValueMap(src parametersv1alpha1.ParameterValueMap) parametersv1alpha1.ParameterValueMap {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(parametersv1alpha1.ParameterValueMap, len(src))
+	for key, value := range src {
+		if value == nil {
+			dst[key] = nil
+			continue
+		}
+		copied := *value
+		dst[key] = &copied
+	}
+	return dst
+}
+
+func equalParameterValueMap(a, b parametersv1alpha1.ParameterValueMap) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, av := range a {
+		bv, ok := b[key]
+		if !ok {
+			return false
+		}
+		switch {
+		case av == nil && bv == nil:
+			continue
+		case av == nil || bv == nil:
+			return false
+		case *av != *bv:
+			return false
+		}
+	}
+	return true
+}
+
+func updateLatestStatus(source *parameterViewSource) func(*parametersv1alpha1.ParameterViewStatus) {
+	return func(status *parametersv1alpha1.ParameterViewStatus) {
+		status.FileFormat = source.fileFormat
+		status.Latest.Revision = source.revision
+		status.Latest.ContentHash = source.hash
+	}
+}
+
+func updateBaseAndLatestStatus(source *parameterViewSource) func(*parametersv1alpha1.ParameterViewStatus) {
+	return func(status *parametersv1alpha1.ParameterViewStatus) {
+		updateLatestStatus(source)(status)
+		status.Base.Revision = source.revision
+		status.Base.ContentHash = source.hash
+	}
+}
+
+func updateSubmissionStatus(revision, content string, parameters parametersv1alpha1.ParameterValueMap) func(*parametersv1alpha1.ParameterViewStatus) {
+	return func(status *parametersv1alpha1.ParameterViewStatus) {
+		now := metav1.Now()
+		submission := parametersv1alpha1.ParameterViewSubmission{
+			Revision: parametersv1alpha1.ParameterViewRevision{
+				Revision:    revision,
+				ContentHash: hashContent(content),
+			},
+			SubmittedAt: &now,
+			Parameters:  cloneParameterValueMap(parameters),
+		}
+		status.Submissions = compactSubmissions(prependSubmission(status.Submissions, submission))
+	}
+}
+
+func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, submission parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {
+	result := make([]parametersv1alpha1.ParameterViewSubmission, 0, len(existing)+1)
+	result = append(result, submission)
+	for _, item := range existing {
+		if item.Revision.Revision == submission.Revision.Revision &&
+			item.Revision.ContentHash == submission.Revision.ContentHash &&
+			equalParameterValueMap(item.Parameters, submission.Parameters) {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func compactSubmissions(submissions []parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {
+	if len(submissions) == 0 {
+		return nil
+	}
+	compacted := make([]parametersv1alpha1.ParameterViewSubmission, 0, min(len(submissions), parameterViewSubmissionLimit))
+	for _, item := range submissions {
+		compacted = append(compacted, item)
+		if len(compacted) == parameterViewSubmissionLimit {
+			break
+		}
+	}
+	return compacted
+}
+
+func composeStatusUpdates(updates ...func(*parametersv1alpha1.ParameterViewStatus)) func(*parametersv1alpha1.ParameterViewStatus) {
+	return func(status *parametersv1alpha1.ParameterViewStatus) {
+		for _, update := range updates {
+			if update != nil {
+				update(status)
+			}
+		}
+	}
+}
+
+func (r *ParameterViewReconciler) patchView(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView,
+	specPatch, statusPatch client.Patch, specChanged, statusChanged bool) error {
+	if specChanged {
+		if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
+			return err
+		}
+	}
+	if statusChanged {
+		if err := r.patchObservedStatus(reqCtx, view, statusPatch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type parameterViewSource struct {
 	content    string
 	hash       string
 	fileFormat parametersv1alpha1.CfgFileFormat
-	generation int64
+	revision   string
 }
 
 func (r *ParameterViewReconciler) resolveSource(ctx context.Context,
@@ -348,8 +552,23 @@ func (r *ParameterViewReconciler) resolveSource(ctx context.Context,
 		content:    content,
 		hash:       hashContent(content),
 		fileFormat: fileFormat,
-		generation: compParam.Generation,
+		revision:   r.resolveSourceRevision(ctx, compParam, item),
 	}, nil
+}
+
+func (r *ParameterViewReconciler) resolveSourceRevision(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, item *parametersv1alpha1.ConfigTemplateItemDetail) string {
+	running := &corev1.ConfigMap{}
+	runningKey := client.ObjectKey{
+		Namespace: compParam.Namespace,
+		Name:      parameterscore.GetComponentCfgName(compParam.Spec.ClusterName, compParam.Spec.ComponentName, item.Name),
+	}
+	if err := r.Client.Get(ctx, runningKey, running); err == nil && running.Annotations != nil {
+		if revision := running.Annotations[constant.ConfigurationRevision]; revision != "" {
+			return revision
+		}
+	}
+	return strconv.FormatInt(compParam.Generation, 10)
 }
 
 func (r *ParameterViewReconciler) resolveFileFormat(ctx context.Context,
@@ -531,7 +750,7 @@ func (r *ParameterViewReconciler) extractRawContent(ctx context.Context,
 		if err != nil {
 			return "", err
 		}
-		if view.Spec.ContentHash == "" || view.Spec.ContentHash == hashContent(sourceContent) {
+		if view.Status.Base.ContentHash == "" || view.Status.Base.ContentHash == hashContent(sourceContent) {
 			if err := validateMarkerLineContent(view.Spec.Content.Text, sourceViewContent); err != nil {
 				return "", err
 			}
@@ -635,44 +854,49 @@ type parameterViewConfigContext struct {
 	fileConfig   parametersv1alpha1.ComponentConfigDescription
 }
 
-func (r *ParameterViewReconciler) markReady(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView) (ctrl.Result, error) {
-	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewReadyPhase, "", metav1.ConditionTrue, parameterViewReasonResolved, "parameter view is ready")
+func (r *ParameterViewReconciler) markReady(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView,
+	updateStatus func(*parametersv1alpha1.ParameterViewStatus)) (ctrl.Result, error) {
+	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewSyncedPhase, "", metav1.ConditionTrue, parameterViewReasonResolved, "parameter view is synced", updateStatus)
 }
 
-func (r *ParameterViewReconciler) markConflict(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, msg string) (ctrl.Result, error) {
-	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewConflictPhase, msg, metav1.ConditionFalse, "SourceChanged", msg)
+func (r *ParameterViewReconciler) markConflict(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView,
+	msg string, updateStatus func(*parametersv1alpha1.ParameterViewStatus)) (ctrl.Result, error) {
+	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewConflictPhase, msg, metav1.ConditionFalse, parameterViewReasonDraftOutdated, msg, updateStatus)
 }
 
-func (r *ParameterViewReconciler) markApplying(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, msg string) (ctrl.Result, error) {
-	if _, err := r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewApplyingPhase, msg, metav1.ConditionFalse, parameterViewReasonApplying, msg); err != nil {
+func (r *ParameterViewReconciler) markApplying(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView,
+	msg string, updateStatus func(*parametersv1alpha1.ParameterViewStatus)) (ctrl.Result, error) {
+	if _, err := r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewApplyingPhase, msg, metav1.ConditionFalse, parameterViewReasonApplying, msg, updateStatus); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *ParameterViewReconciler) markInvalid(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, reason, msg string) (ctrl.Result, error) {
-	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewInvalidPhase, msg, metav1.ConditionFalse, reason, msg)
+func (r *ParameterViewReconciler) markInvalid(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView,
+	reason, msg string, updateStatus func(*parametersv1alpha1.ParameterViewStatus)) (ctrl.Result, error) {
+	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewInvalidPhase, msg, metav1.ConditionFalse, reason, msg, updateStatus)
 }
 
 func (r *ParameterViewReconciler) markInvalidForSourceError(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, err error) (ctrl.Result, error) {
 	msg := err.Error()
 	switch {
 	case containsPhrase(msg, "template not found"):
-		return r.markInvalid(reqCtx, view, parameterViewReasonTemplateNotFound, msg)
+		return r.markInvalid(reqCtx, view, parameterViewReasonTemplateNotFound, msg, nil)
 	case containsPhrase(msg, "file not found"):
-		return r.markInvalid(reqCtx, view, parameterViewReasonFileNotFound, msg)
+		return r.markInvalid(reqCtx, view, parameterViewReasonFileNotFound, msg, nil)
 	default:
-		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, msg)
+		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, msg, nil)
 	}
 }
 
-func (r *ParameterViewReconciler) markInvalidForDesiredPatchError(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, err error) (ctrl.Result, error) {
+func (r *ParameterViewReconciler) markInvalidForDesiredPatchError(reqCtx intctrlutil.RequestCtx,
+	view *parametersv1alpha1.ParameterView, err error, updateStatus func(*parametersv1alpha1.ParameterViewStatus)) (ctrl.Result, error) {
 	msg := err.Error()
 	switch {
 	case containsPhrase(msg, parameterViewReasonDiffFailed):
-		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, trimReasonPrefix(msg, parameterViewReasonDiffFailed))
+		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, trimReasonPrefix(msg, parameterViewReasonDiffFailed), updateStatus)
 	default:
-		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, trimReasonPrefix(msg, parameterViewReasonUnsupportedContentChanges))
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, trimReasonPrefix(msg, parameterViewReasonUnsupportedContentChanges), updateStatus)
 	}
 }
 
@@ -680,23 +904,27 @@ func (r *ParameterViewReconciler) markInvalidForViewContentError(reqCtx intctrlu
 	msg := err.Error()
 	switch {
 	case containsPhrase(msg, "cannot be modified"):
-		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, msg)
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, msg, nil)
 	case containsPhrase(msg, "marker"):
-		return r.markInvalid(reqCtx, view, parameterViewReasonInvalidMarkerSyntax, msg)
+		return r.markInvalid(reqCtx, view, parameterViewReasonInvalidMarkerSyntax, msg, nil)
 	default:
-		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, msg)
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, msg, nil)
 	}
 }
 
 func (r *ParameterViewReconciler) patchStatus(reqCtx intctrlutil.RequestCtx,
 	view *parametersv1alpha1.ParameterView, phase parametersv1alpha1.ParameterViewPhase,
-	message string, conditionStatus metav1.ConditionStatus, reason, conditionMessage string) (ctrl.Result, error) {
+	message string, conditionStatus metav1.ConditionStatus, reason, conditionMessage string,
+	updateStatus func(*parametersv1alpha1.ParameterViewStatus)) (ctrl.Result, error) {
 	patch := client.MergeFrom(view.DeepCopy())
+	if updateStatus != nil {
+		updateStatus(&view.Status)
+	}
 	view.Status.ObservedGeneration = view.Generation
 	view.Status.Phase = phase
 	view.Status.Message = message
 	meta.SetStatusCondition(&view.Status.Conditions, metav1.Condition{
-		Type:               parameterViewReadyCondition,
+		Type:               parameterViewSyncedCondition,
 		Status:             conditionStatus,
 		Reason:             reason,
 		Message:            conditionMessage,
@@ -707,4 +935,12 @@ func (r *ParameterViewReconciler) patchStatus(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view status")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *ParameterViewReconciler) patchObservedStatus(reqCtx intctrlutil.RequestCtx,
+	view *parametersv1alpha1.ParameterView, patch client.Patch) error {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, view, patch); err != nil {
+		return err
+	}
+	return nil
 }

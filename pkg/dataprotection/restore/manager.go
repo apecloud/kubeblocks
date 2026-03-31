@@ -158,7 +158,7 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		if startTime.IsZero() || stopTime.IsZero() {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`startTimeStamp or completeTimeStamp of backup "%s" is empty`, continuousBackup.Name))
 		}
-		if restoreTime.Before(startTime.Time) || restoreTime.After(stopTime.Time) {
+		if !isTimeInRange(restoreTime, startTime.Time, stopTime.Time) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`restore time out of the range for backup "%s"`, continuousBackup.Name))
 		}
 		return nil

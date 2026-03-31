@@ -168,7 +168,7 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
 		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(restoreSpec.RestorePointInTime, backup)
 		if err != nil {
-			return nil, err
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		opsRequest.Spec.GetRestore().RestorePointInTime = restoreTimeStr
 	}

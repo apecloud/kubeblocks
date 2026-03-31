@@ -43,7 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
+func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
 	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, fetchTask.ComponentDefObj)
 	if err != nil {
 		return false, err
@@ -59,9 +59,9 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	if err != nil {
 		return false, err
 	}
-	expected := componentParameter.DeepCopy()
+	expected := compParam.DeepCopy()
 	expected.Spec.ConfigItemDetails = configItemDetails
-	merged := parameters.MergeComponentParameter(expected, componentParameter, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
+	merged := parameters.MergeComponentParameter(expected, compParam, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
 		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
 		}
@@ -70,17 +70,17 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 		}
 		dest.ConfigSpec = expected.ConfigSpec
 	})
-	if reflect.DeepEqual(componentParameter.Spec.ConfigItemDetails, merged.Spec.ConfigItemDetails) {
+	if reflect.DeepEqual(compParam.Spec.ConfigItemDetails, merged.Spec.ConfigItemDetails) {
 		return false, nil
 	}
-	patch := client.MergeFrom(componentParameter.DeepCopy())
-	componentParameter.Spec.ConfigItemDetails = merged.Spec.ConfigItemDetails
-	return true, cli.Patch(ctx, componentParameter, patch)
+	patch := client.MergeFrom(compParam.DeepCopy())
+	compParam.Spec.ConfigItemDetails = merged.Spec.ConfigItemDetails
+	return true, cli.Patch(ctx, compParam, patch)
 }
 
-func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
-	specCopy := componentParameter.Spec.DeepCopy()
-	configmaps, err := resolveComponentRefConfigMap(ctx, cli, componentParameter.Namespace, componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)
+func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
+	specCopy := compParam.Spec.DeepCopy()
+	configmaps, err := resolveComponentRefConfigMap(ctx, cli, compParam.Namespace, compParam.Spec.ClusterName, compParam.Spec.ComponentName)
 	if err != nil {
 		return false, err
 	}
@@ -88,18 +88,18 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if err != nil {
 		return false, err
 	}
-	if err := applyParameterValues(specCopy, componentParameter.Spec.Init, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
+	if err := applyParameterValues(specCopy, compParam.Spec.Init, false, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
-	if err := applyParameterValues(specCopy, componentParameter.Spec.Desired, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
+	if err := applyParameterValues(specCopy, compParam.Spec.Desired, true, ctx, cli, fetchTask, configmaps, configDescs, paramsDefs); err != nil {
 		return false, err
 	}
-	if reflect.DeepEqual(componentParameter.Spec, *specCopy) {
+	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
 	}
-	patch := client.MergeFrom(componentParameter.DeepCopy())
-	componentParameter.Spec = *specCopy
-	return true, cli.Patch(ctx, componentParameter, patch)
+	patch := client.MergeFrom(compParam.DeepCopy())
+	compParam.Spec = *specCopy
+	return true, cli.Patch(ctx, compParam, patch)
 }
 
 func applyParameterValues(spec *parametersv1alpha1.ComponentParameterSpec,

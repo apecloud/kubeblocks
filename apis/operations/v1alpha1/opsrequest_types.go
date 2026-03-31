@@ -24,7 +24,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -569,11 +568,6 @@ type Reconfigure struct {
 	//
 	// +optional
 	Parameters []ParameterPair `json:"parameters,omitempty"`
-
-	// Specifies user-provided configuration templates keyed by config template name.
-	//
-	// +optional
-	CustomTemplates map[string]parametersv1alpha1.ConfigTemplateExtension `json:"customTemplates,omitempty"`
 }
 
 type CustomOps struct {

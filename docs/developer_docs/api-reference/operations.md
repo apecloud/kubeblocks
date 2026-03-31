@@ -3776,18 +3776,6 @@ within a single configuration file.
 This field is used to override or set the values of parameters without modifying the entire configuration file.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>customTemplates</code><br/>
-<em>
-map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ConfigTemplateExtension
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies user-provided configuration templates keyed by config template name.</p>
-</td>
-</tr>
 </tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.ReplicaChanger">ReplicaChanger

@@ -142,11 +142,6 @@ parameter: {
 			configMap.Data = map[string]string{testparameters.MysqlConfigFile: template.Data[testparameters.MysqlConfigFile]}
 			Expect(testCtx.CreateObj(ctx, configMap)).Should(Succeed())
 
-			customTemplate := testparameters.NewComponentTemplateFactory("custom-mysql-config", testCtx.DefaultNamespace).
-				AddConfigFile(testparameters.MysqlConfigFile, "max_connections=300\ngtid_mode=ON\n").
-				Create(&testCtx).
-				GetObject()
-
 			By("create Start opsRequest")
 			ops := testops.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.ReconfiguringType)
@@ -157,13 +152,6 @@ parameter: {
 						{
 							Key:   "max_connections",
 							Value: pointer.String("200"),
-						},
-					},
-					CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
-						"mysql-config": {
-							TemplateRef: customTemplate.Name,
-							Namespace:   customTemplate.Namespace,
-							Policy:      parametersv1alpha1.ReplacePolicy,
 						},
 					},
 				},
@@ -189,8 +177,6 @@ parameter: {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
 				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
 				g.Expect(cp.Spec.Desired.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
-				g.Expect(cp.Spec.Desired.Templates).Should(HaveKey("mysql-config"))
-				g.Expect(cp.Spec.Desired.Templates["mysql-config"].TemplateRef).Should(Equal(customTemplate.Name))
 			})).Should(Succeed())
 
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
@@ -208,102 +194,6 @@ parameter: {
 
 			Expect(err).Should(BeNil())
 
-		})
-
-		It("supports reconfigure with only user config templates", func() {
-			By("init operations resources ")
-			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
-
-			By("prepare configuration metadata and component parameter")
-			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
-				Create(&testCtx).
-				GetObject()
-			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-" + randomStr + "-tpl-only").
-				SetComponentDefinition(compDefName).
-				SetTemplateName("mysql-config").
-				Schema(`
-parameter: {
-  max_connections?: string
-}`).
-				Create(&testCtx).
-				GetObject()
-			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
-				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
-			})).Should(Succeed())
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(compDef *appsv1.ComponentDefinition) {
-				compDef.Spec.ServiceVersion = "8.0.30"
-				compDef.Spec.Configs = []appsv1.ComponentFileTemplate{
-					{
-						Name:            "mysql-config",
-						Template:        template.Name,
-						Namespace:       template.Namespace,
-						VolumeName:      "mysql-config",
-						ExternalManaged: pointer.Bool(true),
-					},
-				}
-			})()).Should(Succeed())
-
-			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
-				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
-				ClusterRef(clusterName).
-				Component(defaultCompName).
-				AddConfigurationItem(appsv1.ComponentFileTemplate{
-					Name:            "mysql-config",
-					Template:        template.Name,
-					Namespace:       template.Namespace,
-					VolumeName:      "mysql-config",
-					ExternalManaged: pointer.Bool(true),
-				}).
-				GetObject()
-			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, componentParameter, func() {
-				componentParameter.Status.ObservedGeneration = componentParameter.Generation
-				componentParameter.Status.Phase = parametersv1alpha1.CFinishedPhase
-				componentParameter.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
-					Name:  "mysql-config",
-					Phase: parametersv1alpha1.CFinishedPhase,
-				}}
-			})).Should(Succeed())
-
-			customTemplate := testparameters.NewComponentTemplateFactory("custom-mysql-config-"+randomStr, testCtx.DefaultNamespace).
-				AddConfigFile(testparameters.MysqlConfigFile, "max_connections=300\n").
-				Create(&testCtx).
-				GetObject()
-
-			By("create Start opsRequest")
-			ops := testops.NewOpsRequestObj("reconfigure-template-only-"+randomStr, testCtx.DefaultNamespace,
-				clusterName, opsv1alpha1.ReconfiguringType)
-			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
-				{
-					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					CustomTemplates: map[string]parametersv1alpha1.ConfigTemplateExtension{
-						"mysql-config": {
-							TemplateRef: customTemplate.Name,
-							Namespace:   customTemplate.Namespace,
-							Policy:      parametersv1alpha1.ReplacePolicy,
-						},
-					},
-				},
-			}
-			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
-
-			By("run the ops request")
-			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
-			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
-				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
-				g.Expect(cp.Spec.Desired.Templates).Should(HaveKey("mysql-config"))
-				g.Expect(cp.Spec.Desired.Templates["mysql-config"].TemplateRef).Should(Equal(customTemplate.Name))
-			})).Should(Succeed())
 		})
 	})
 })

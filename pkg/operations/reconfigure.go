@@ -33,7 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 type reconfigureAction struct {
@@ -71,19 +71,12 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 		return "", noRequeueAfter, err
 	}
 	if phase == opsv1alpha1.OpsRunningPhase {
-		return syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsRunningPhase)
+		return r.syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsRunningPhase)
 	}
 	if phase == opsv1alpha1.OpsSucceedPhase {
-		return syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsSucceedPhase)
+		return r.syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsSucceedPhase)
 	}
-	return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(fmt.Sprintf("reconfigure component parameter failed: %s", msg))
-}
-
-func syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource, opsDeepCopy *opsv1alpha1.OpsRequest, phase opsv1alpha1.OpsPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, resource, opsDeepCopy, phase); err != nil {
-		return "", noRequeueAfter, err
-	}
-	return phase, noRequeueAfter, nil
+	return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(fmt.Sprintf("reconfigure failed: %s", msg))
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (err error) {
@@ -95,15 +88,15 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
 	}
 	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
-		if len(reconfigure.Parameters) == 0 && len(reconfigure.CustomTemplates) == 0 {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters or customTemplates", reconfigure.ComponentName)
+		if len(reconfigure.Parameters) == 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters", reconfigure.ComponentName)
 		}
-		componentNames, err := resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
+		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
 			return err
 		}
-		for _, componentName := range componentNames {
-			if err := applyReconfigureToComponentParameter(reqCtx, cli, resource.Cluster, componentName, reconfigure); err != nil {
+		for _, compName := range compNames {
+			if err := r.applyReconfigureToParameters(reqCtx, cli, resource.Cluster, compName, reconfigure); err != nil {
 				return err
 			}
 		}
@@ -111,23 +104,30 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	return nil
 }
 
+func (r *reconfigureAction) syncReconfigureForOps(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource, opsDeepCopy *opsv1alpha1.OpsRequest, phase opsv1alpha1.OpsPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if err := PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, resource, opsDeepCopy, phase); err != nil {
+		return "", noRequeueAfter, err
+	}
+	return phase, noRequeueAfter, nil
+}
+
 func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (opsv1alpha1.OpsPhase, string, error) {
 	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
-		componentNames, err := resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
+		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
 			return "", "", err
 		}
-		for _, componentName := range componentNames {
-			componentParameter, err := getRunningComponentParameter(reqCtx.Ctx, cli, resource.Cluster.Namespace, resource.Cluster.Name, componentName)
+		for _, compName := range compNames {
+			compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, resource.Cluster.Namespace, resource.Cluster.Name, compName)
 			if err != nil {
 				return "", "", err
 			}
-			if componentParameter.Generation != componentParameter.Status.ObservedGeneration {
+			if compParam.Generation != compParam.Status.ObservedGeneration {
 				return opsv1alpha1.OpsRunningPhase, "", nil
 			}
-			switch componentParameter.Status.Phase {
+			switch compParam.Status.Phase {
 			case parametersv1alpha1.CMergeFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
-				return opsv1alpha1.OpsFailedPhase, componentParameter.Status.Message, nil
+				return opsv1alpha1.OpsFailedPhase, compParam.Status.Message, nil
 			case parametersv1alpha1.CFinishedPhase:
 				continue
 			default:
@@ -138,68 +138,61 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 	return opsv1alpha1.OpsSucceedPhase, "", nil
 }
 
-func applyReconfigureToComponentParameter(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, componentName string, reconfigure opsv1alpha1.Reconfigure) error {
-	componentParameter, err := getRunningComponentParameter(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
+func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	cluster *appsv1.Cluster, compName string, reconfigure opsv1alpha1.Reconfigure) error {
+	compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, compName)
 	if err != nil {
 		return err
 	}
-	patch := client.MergeFrom(componentParameter.DeepCopy())
-	if componentParameter.Spec.Desired == nil {
-		componentParameter.Spec.Desired = &parametersv1alpha1.ParameterValues{}
+	patch := client.MergeFrom(compParam.DeepCopy())
+	if compParam.Spec.Desired == nil {
+		compParam.Spec.Desired = &parametersv1alpha1.ParameterValues{}
 	}
 	if len(reconfigure.Parameters) != 0 {
-		if componentParameter.Spec.Desired.Parameters == nil {
-			componentParameter.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
+		if compParam.Spec.Desired.Parameters == nil {
+			compParam.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
 		}
 		for _, param := range reconfigure.Parameters {
-			componentParameter.Spec.Desired.Parameters[param.Key] = param.Value
+			compParam.Spec.Desired.Parameters[param.Key] = param.Value
 		}
 	}
-	if len(reconfigure.CustomTemplates) != 0 {
-		if componentParameter.Spec.Desired.Templates == nil {
-			componentParameter.Spec.Desired.Templates = map[string]parametersv1alpha1.ConfigTemplateExtension{}
-		}
-		for templateName, templateExtension := range reconfigure.CustomTemplates {
-			componentParameter.Spec.Desired.Templates[templateName] = *templateExtension.DeepCopy()
-		}
-	}
-	if err := cli.Patch(reqCtx.Ctx, componentParameter, patch); err != nil {
+	if err := cli.Patch(reqCtx.Ctx, compParam, patch); err != nil {
 		return err
 	}
 	return nil
 }
 
-func resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, componentName string) ([]string, error) {
-	if compSpec := cluster.Spec.GetComponentByName(componentName); compSpec != nil {
+func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {
+	if compSpec := cluster.Spec.GetComponentByName(compName); compSpec != nil {
 		return []string{compSpec.Name}, nil
 	}
-	shardingComp := cluster.Spec.GetShardingByName(componentName)
+	shardingComp := cluster.Spec.GetShardingByName(compName)
 	if shardingComp == nil {
-		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", componentName)
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", compName)
 	}
-	components, err := sharding.ListShardingComponents(ctx, reader, cluster, componentName)
+	comps, err := sharding.ListShardingComponents(ctx, reader, cluster, compName)
 	if err != nil {
 		return nil, err
 	}
-	componentNames := make([]string, 0, len(components))
-	for _, comp := range components {
+	compNames := make([]string, 0, len(comps))
+	for _, comp := range comps {
 		shortName, err := component.ShortName(cluster.Name, comp.Name)
 		if err != nil {
 			return nil, err
 		}
-		componentNames = append(componentNames, shortName)
+		compNames = append(compNames, shortName)
 	}
-	return componentNames, nil
+	return compNames, nil
 }
 
-func getRunningComponentParameter(ctx context.Context, cli client.Client, namespace, clusterName, componentName string) (*parametersv1alpha1.ComponentParameter, error) {
-	componentParameter := &parametersv1alpha1.ComponentParameter{}
+func (r *reconfigureAction) getRunningComponentParameter(ctx context.Context, cli client.Client, namespace, clusterName, compName string) (*parametersv1alpha1.ComponentParameter, error) {
+	compParam := &parametersv1alpha1.ComponentParameter{}
 	key := client.ObjectKey{
 		Namespace: namespace,
-		Name:      configcore.GenerateComponentConfigurationName(clusterName, componentName),
+		Name:      parameterscore.GenerateComponentConfigurationName(clusterName, compName),
 	}
-	if err := cli.Get(ctx, key, componentParameter); err != nil {
+	if err := cli.Get(ctx, key, compParam); err != nil {
 		return nil, err
 	}
-	return componentParameter, nil
+	return compParam, nil
 }

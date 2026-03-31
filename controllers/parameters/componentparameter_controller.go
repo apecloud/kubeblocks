@@ -122,6 +122,13 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(componentParameter, reqCtx)
 	}
+	specUpdated, handled, err := r.reconcileDesired(reqCtx, componentParameter, fetcherTask)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to reconcile desired parameter state").Error())
+	}
+	if handled || specUpdated {
+		return intctrlutil.Reconciled()
+	}
 	tasks := generateReconcileTasks(reqCtx, componentParameter, fetcherTask.ComponentObj.Generation)
 	if len(tasks) == 0 {
 		reqCtx.Log.Info("nothing to reconcile")
@@ -139,6 +146,20 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	return intctrlutil.Reconciled()
 }
 
+func (r *ComponentParameterReconciler) reconcileDesired(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, bool, error) {
+	if componentParameter.Spec.Desired == nil {
+		return false, false, nil
+	}
+	patched, err := reconcileDesiredIntoSpec(reqCtx.Ctx, r.Client, componentParameter, fetchTask)
+	if err == nil {
+		return patched, patched, nil
+	}
+	if statusErr := r.failWithDesired(componentParameter, reqCtx, err); statusErr != nil {
+		return false, false, statusErr
+	}
+	return false, true, nil
+}
+
 func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *parametersv1alpha1.ComponentParameter, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
 	msg := fmt.Sprintf("not found cluster component: [%s]", componentParam.Spec.ComponentName)
 
@@ -150,6 +171,20 @@ func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *
 			errors.Wrap(err, "failed to update componentParameter status").Error())
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentParameterReconciler) failWithDesired(componentParam *parametersv1alpha1.ComponentParameter, reqCtx intctrlutil.RequestCtx, cause error) error {
+	msg := cause.Error()
+	if componentParam.Status.ObservedGeneration == componentParam.Generation &&
+		componentParam.Status.Phase == parametersv1alpha1.CMergeFailedPhase &&
+		componentParam.Status.Message == msg {
+		return nil
+	}
+	patch := client.MergeFrom(componentParam.DeepCopy())
+	componentParam.Status.ObservedGeneration = componentParam.Generation
+	componentParam.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+	componentParam.Status.Message = msg
+	return r.Client.Status().Patch(reqCtx.Ctx, componentParam, patch)
 }
 
 func (r *ComponentParameterReconciler) runTasks(taskCtx *taskContext, tasks []Task, resource *Task) error {

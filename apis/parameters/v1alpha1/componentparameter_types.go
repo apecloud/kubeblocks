@@ -56,6 +56,53 @@ func init() {
 	SchemeBuilder.Register(&ComponentParameter{}, &ComponentParameterList{})
 }
 
+// ComponentParameterSpec defines the desired state of ComponentConfiguration
+type ComponentParameterSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	// Specifies the name of the Cluster that this configuration is associated with.
+	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Represents the name of the Component that this configuration pertains to.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	ComponentName string `json:"componentName"`
+
+	// ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
+	//
+	// Each ConfigTemplateItemDetail corresponds to a configuration template,
+	// which is a ConfigMap that contains multiple configuration files.
+	// Each configuration file is stored as a key-value pair within the ConfigMap.
+	//
+	// The ConfigTemplateItemDetail includes information such as:
+	//
+	// - The configuration template (a ConfigMap)
+	// - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
+	// - Volume mounts (for mounting the configuration files)
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ConfigItemDetails []ConfigTemplateItemDetail `json:"configItemDetails,omitempty"`
+
+	// Init provides the initial parameter state used when the managed runtime configuration is created.
+	//
+	// +optional
+	Init *ParameterValues `json:"init,omitempty"`
+
+	// Desired is the current desired parameter state.
+	//
+	// +optional
+	Desired *ParameterValues `json:"desired,omitempty"`
+}
+
 // Deprecated: It is retained for API compatibility with existing ComponentParameter objects.
 //
 // Payload holds the payload data. This field is optional and can contain any type of data.
@@ -113,75 +160,59 @@ type ConfigTemplateItemDetail struct {
 	ConfigFileParams map[string]ParametersInFile `json:"configFileParams,omitempty"`
 }
 
-// ComponentParameterSpec defines the desired state of ComponentConfiguration
-type ComponentParameterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+// ParameterValueMap is a flat parameter key/value map.
+type ParameterValueMap map[string]*string
+
+// ParameterValues describes user-provided parameter values and template overrides.
+type ParameterValues struct {
+	// Parameters are flat parameter key/value pairs.
+	//
+	// +optional
+	Parameters ParameterValueMap `json:"parameters,omitempty"`
+
+	// Templates are user-provided template overrides keyed by config template name.
+	//
+	// +optional
+	Templates map[string]ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+}
+
+// ComponentParameterStatus defines the observed state of ComponentConfiguration
+type ComponentParameterStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Specifies the name of the Cluster that this configuration is associated with.
-	//
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	// Provides a description of any abnormal status.
 	// +optional
-	ClusterName string `json:"clusterName,omitempty"`
+	Message string `json:"message,omitempty"`
 
-	// Represents the name of the Component that this configuration pertains to.
+	// Indicates the current status of the configuration item.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
-	ComponentName string `json:"componentName"`
-
-	// ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
-	//
-	// Each ConfigTemplateItemDetail corresponds to a configuration template,
-	// which is a ConfigMap that contains multiple configuration files.
-	// Each configuration file is stored as a key-value pair within the ConfigMap.
-	//
-	// The ConfigTemplateItemDetail includes information such as:
-	//
-	// - The configuration template (a ConfigMap)
-	// - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
-	// - Volume mounts (for mounting the configuration files)
+	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
 	//
 	// +optional
+	Phase ParameterPhase `json:"phase,omitempty"`
+
+	// Represents the latest generation observed for this
+	// ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is
+	// updated by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Provides detailed status information for opsRequest.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// Provides the status of each component undergoing reconfiguration.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigItemDetails []ConfigTemplateItemDetail `json:"configItemDetails,omitempty"`
-}
-
-type ReconcileDetail struct {
-	// Represents the policy applied during the most recent execution.
-	//
-	// +optional
-	Policy string `json:"policy"`
-
-	// Represents the outcome of the most recent execution.
-	//
-	// +optional
-	ExecResult string `json:"execResult"`
-
-	// Represents the current revision of the configuration item.
-	//
-	// +optional
-	CurrentRevision string `json:"currentRevision,omitempty"`
-
-	// Represents the number of pods where configuration changes were successfully applied.
-	//
-	// +kubebuilder:default=-1
-	// +optional
-	SucceedCount int32 `json:"succeedCount,omitempty"`
-
-	// Represents the total number of pods that require execution of configuration changes.
-	//
-	// +kubebuilder:default=-1
-	// +optional
-	ExpectedCount int32 `json:"expectedCount,omitempty"`
-
-	// Represents the error message generated when the execution of configuration changes fails.
-	//
-	// +optional
-	ErrMessage string `json:"errMessage,omitempty"`
+	ConfigurationItemStatus []ConfigTemplateItemDetailStatus `json:"configurationStatus"`
 }
 
 type ConfigTemplateItemDetailStatus struct {
@@ -227,41 +258,36 @@ type ConfigTemplateItemDetailStatus struct {
 	ReconcileDetail *ReconcileDetail `json:"reconcileDetail,omitempty"`
 }
 
-// ComponentParameterStatus defines the observed state of ComponentConfiguration
-type ComponentParameterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Provides a description of any abnormal status.
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// Indicates the current status of the configuration item.
-	//
-	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
+type ReconcileDetail struct {
+	// Represents the policy applied during the most recent execution.
 	//
 	// +optional
-	Phase ParameterPhase `json:"phase,omitempty"`
+	Policy string `json:"policy"`
 
-	// Represents the latest generation observed for this
-	// ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is
-	// updated by the API Server.
+	// Represents the outcome of the most recent execution.
+	//
 	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ExecResult string `json:"execResult"`
 
-	// Provides detailed status information for opsRequest.
+	// Represents the current revision of the configuration item.
+	//
 	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// Provides the status of each component undergoing reconfiguration.
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigurationItemStatus []ConfigTemplateItemDetailStatus `json:"configurationStatus"`
+	// Represents the number of pods where configuration changes were successfully applied.
+	//
+	// +kubebuilder:default=-1
+	// +optional
+	SucceedCount int32 `json:"succeedCount,omitempty"`
+
+	// Represents the total number of pods that require execution of configuration changes.
+	//
+	// +kubebuilder:default=-1
+	// +optional
+	ExpectedCount int32 `json:"expectedCount,omitempty"`
+
+	// Represents the error message generated when the execution of configuration changes fails.
+	//
+	// +optional
+	ErrMessage string `json:"errMessage,omitempty"`
 }

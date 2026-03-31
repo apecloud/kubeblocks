@@ -134,6 +134,48 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
+		It("should project desired parameters into config item details", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			customTemplate := testparameters.NewComponentTemplateFactory("desired-template", testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "max_connections=2000\n").
+				Create(&testCtx).
+				GetObject()
+
+			By("update desired state instead of config item details directly")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterValues{
+					Parameters: parametersv1alpha1.ParameterValueMap{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+						configSpecName: {
+							TemplateRef: customTemplate.Name,
+							Namespace:   customTemplate.Namespace,
+							Policy:      parametersv1alpha1.ReplacePolicy,
+						},
+					},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(customTemplate.Name))
+				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
+				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+		})
+
 		It("should render both new PD and legacy PCR files in mixed mode", func() {
 			templateObj, _, compObj, _, _ := mockReconcileResource()
 

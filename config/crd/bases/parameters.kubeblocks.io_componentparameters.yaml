@@ -695,6 +695,85 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              desired:
+                description: Desired is the current desired parameter state.
+                properties:
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: Parameters are flat parameter key/value pairs.
+                    type: object
+                  userConfigTemplates:
+                    additionalProperties:
+                      properties:
+                        namespace:
+                          default: default
+                          description: |-
+                            Specifies the namespace of the referenced configuration template ConfigMap object.
+                            An empty namespace is equivalent to the "default" namespace.
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specifies the name of the referenced configuration
+                            template ConfigMap object.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                    description: Templates are user-provided template overrides keyed
+                      by config template name.
+                    type: object
+                type: object
+              init:
+                description: Init provides the initial parameter state used when the
+                  managed runtime configuration is created.
+                properties:
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: Parameters are flat parameter key/value pairs.
+                    type: object
+                  userConfigTemplates:
+                    additionalProperties:
+                      properties:
+                        namespace:
+                          default: default
+                          description: |-
+                            Specifies the namespace of the referenced configuration template ConfigMap object.
+                            An empty namespace is equivalent to the "default" namespace.
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specifies the name of the referenced configuration
+                            template ConfigMap object.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                    description: Templates are user-provided template overrides keyed
+                      by config template name.
+                    type: object
+                type: object
             required:
             - componentName
             type: object

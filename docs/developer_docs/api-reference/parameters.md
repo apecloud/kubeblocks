@@ -125,6 +125,34 @@ Each configuration file is stored as a key-value pair within the ConfigMap.</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>init</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">
+ParameterValues
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Init provides the initial parameter state used when the managed runtime configuration is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desired</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">
+ParameterValues
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Desired is the current desired parameter state.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -861,6 +889,34 @@ Each configuration file is stored as a key-value pair within the ConfigMap.</p>
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>init</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">
+ParameterValues
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Init provides the initial parameter state used when the managed runtime configuration is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desired</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">
+ParameterValues
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Desired is the current desired parameter state.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ComponentParameterStatus">ComponentParameterStatus
@@ -1076,7 +1132,7 @@ ParameterPhase
 <h3 id="parameters.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#parameters.kubeblocks.io/v1alpha1.InitParameter">InitParameter</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#parameters.kubeblocks.io/v1alpha1.InitParameter">InitParameter</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">ParameterValues</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus</a>)
 </p>
 <div>
 </div>
@@ -1906,6 +1962,60 @@ updated by the API Server.</p>
 <td>
 <em>(Optional)</em>
 <p>Records the status of a reconfiguring operation if <code>opsRequest.spec.type</code> equals to &ldquo;Reconfiguring&rdquo;.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterValueMap">ParameterValueMap
+(<code>map[string]*string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterValues">ParameterValues</a>)
+</p>
+<div>
+<p>ParameterValueMap is a flat parameter key/value map.</p>
+</div>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterValues">ParameterValues
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameterSpec">ComponentParameterSpec</a>)
+</p>
+<div>
+<p>ParameterValues describes user-provided parameter values and template overrides.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterValueMap">
+ParameterValueMap
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Parameters are flat parameter key/value pairs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>userConfigTemplates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
+map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ConfigTemplateExtension
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Templates are user-provided template overrides keyed by config template name.</p>
 </td>
 </tr>
 </tbody>

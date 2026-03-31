@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/parameters"
 	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -121,10 +119,6 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 			return "", "", err
 		}
 		for _, componentName := range componentNames {
-			targetTemplates, err := resolveReconfigureTargetTemplates(reqCtx, cli, resource.Cluster, componentName, reconfigure)
-			if err != nil {
-				return "", "", err
-			}
 			componentParameter, err := getRunningComponentParameter(reqCtx.Ctx, cli, resource.Cluster.Namespace, resource.Cluster.Name, componentName)
 			if err != nil {
 				return "", "", err
@@ -132,19 +126,13 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 			if componentParameter.Generation != componentParameter.Status.ObservedGeneration {
 				return opsv1alpha1.OpsRunningPhase, "", nil
 			}
-			for _, templateName := range targetTemplates {
-				itemStatus := parameters.GetItemStatus(&componentParameter.Status, templateName)
-				if itemStatus == nil {
-					return opsv1alpha1.OpsRunningPhase, "", nil
-				}
-				switch itemStatus.Phase {
-				case parametersv1alpha1.CMergeFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
-					return opsv1alpha1.OpsFailedPhase, itemStatusMessage(itemStatus), nil
-				case parametersv1alpha1.CFinishedPhase:
-					continue
-				default:
-					return opsv1alpha1.OpsRunningPhase, "", nil
-				}
+			switch componentParameter.Status.Phase {
+			case parametersv1alpha1.CMergeFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
+				return opsv1alpha1.OpsFailedPhase, componentParameter.Status.Message, nil
+			case parametersv1alpha1.CFinishedPhase:
+				continue
+			default:
+				return opsv1alpha1.OpsRunningPhase, "", nil
 			}
 		}
 	}
@@ -164,120 +152,30 @@ func applyReconfigureToComponentParameter(reqCtx intctrlutil.RequestCtx, cli cli
 	if err != nil {
 		return err
 	}
-	componentDefObj := &appsv1.ComponentDefinition{}
-	componentDefName := componentParameter.Labels[constant.AppComponentLabelKey]
-	if componentDefName == "" {
-		componentObj, err := getComponentByShortName(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
-		if err != nil {
-			return err
-		}
-		componentDefName = componentObj.Spec.CompDef
-	}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentDefName}, componentDefObj); err != nil {
-		return err
-	}
-	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, cli, componentDefObj)
-	if err != nil {
-		return err
-	}
-	configmaps, err := resolveComponentRefConfigMapForOps(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
-	if err != nil {
-		return err
-	}
-	if err := validateCustomTemplates(reqCtx.Ctx, cli, reconfigure.CustomTemplates); err != nil {
-		return err
-	}
 	patch := client.MergeFrom(componentParameter.DeepCopy())
+	if componentParameter.Spec.Desired == nil {
+		componentParameter.Spec.Desired = &parametersv1alpha1.ParameterValues{}
+	}
 	if len(reconfigure.Parameters) != 0 {
-		classifiedParameters, err := parameters.ClassifyComponentParameters(
-			transformComponentParameters(reconfigure.Parameters),
-			paramsDefs,
-			componentDefObj.Spec.Configs,
-			configmaps,
-			configDescs,
-		)
-		if err != nil {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+		if componentParameter.Spec.Desired.Parameters == nil {
+			componentParameter.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
 		}
-		for templateName, paramsInFile := range classifiedParameters {
-			configDescriptions := parameters.GetComponentConfigDescriptions(configDescs, templateName)
-			if len(configDescriptions) == 0 {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for template: %s", templateName)
-			}
-			if _, err := parameters.DoMerge(resolveBaseDataForOps(paramsInFile), parameters.DerefMapValues(paramsInFile), paramsDefs, configDescriptions); err != nil {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-			}
-			item := parameters.GetConfigTemplateItem(&componentParameter.Spec, templateName)
-			if item == nil {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
-			}
-			if err := mergeWithOverrideForOps(item, parameters.DerefMapValues(paramsInFile)); err != nil {
-				return err
-			}
+		for _, param := range reconfigure.Parameters {
+			componentParameter.Spec.Desired.Parameters[param.Key] = param.Value
 		}
 	}
-	for templateName, templateExtension := range reconfigure.CustomTemplates {
-		item := parameters.GetConfigTemplateItem(&componentParameter.Spec, templateName)
-		if item == nil {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", templateName)
+	if len(reconfigure.CustomTemplates) != 0 {
+		if componentParameter.Spec.Desired.Templates == nil {
+			componentParameter.Spec.Desired.Templates = map[string]parametersv1alpha1.ConfigTemplateExtension{}
 		}
-		item.CustomTemplates = templateExtension.DeepCopy()
+		for templateName, templateExtension := range reconfigure.CustomTemplates {
+			componentParameter.Spec.Desired.Templates[templateName] = *templateExtension.DeepCopy()
+		}
 	}
 	if err := cli.Patch(reqCtx.Ctx, componentParameter, patch); err != nil {
 		return err
 	}
 	return nil
-}
-
-func resolveReconfigureTargetTemplates(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, componentName string, reconfigure opsv1alpha1.Reconfigure) ([]string, error) {
-	templateSet := map[string]struct{}{}
-	for templateName := range reconfigure.CustomTemplates {
-		templateSet[templateName] = struct{}{}
-	}
-	if len(reconfigure.Parameters) != 0 {
-		componentParameter, err := getRunningComponentParameter(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
-		if err != nil {
-			return nil, err
-		}
-		componentDefObj := &appsv1.ComponentDefinition{}
-		componentDefName := componentParameter.Labels[constant.AppComponentLabelKey]
-		if componentDefName == "" {
-			componentObj, err := getComponentByShortName(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
-			if err != nil {
-				return nil, err
-			}
-			componentDefName = componentObj.Spec.CompDef
-		}
-		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: componentDefName}, componentDefObj); err != nil {
-			return nil, err
-		}
-		configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, cli, componentDefObj)
-		if err != nil {
-			return nil, err
-		}
-		configmaps, err := resolveComponentRefConfigMapForOps(reqCtx.Ctx, cli, cluster.Namespace, cluster.Name, componentName)
-		if err != nil {
-			return nil, err
-		}
-		classifiedParameters, err := parameters.ClassifyComponentParameters(
-			transformComponentParameters(reconfigure.Parameters),
-			paramsDefs,
-			componentDefObj.Spec.Configs,
-			configmaps,
-			configDescs,
-		)
-		if err != nil {
-			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
-		}
-		for templateName := range classifiedParameters {
-			templateSet[templateName] = struct{}{}
-		}
-	}
-	templates := make([]string, 0, len(templateSet))
-	for templateName := range templateSet {
-		templates = append(templates, templateName)
-	}
-	return templates, nil
 }
 
 func resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, componentName string) ([]string, error) {
@@ -331,77 +229,4 @@ func getComponentByShortName(ctx context.Context, cli client.Client, namespace, 
 		}
 	}
 	return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", shortName)
-}
-
-func resolveComponentRefConfigMapForOps(ctx context.Context, cli client.Client, namespace, clusterName, componentName string) (map[string]*corev1.ConfigMap, error) {
-	configMapList := &corev1.ConfigMapList{}
-	if err := cli.List(ctx, configMapList,
-		client.InNamespace(namespace),
-		client.MatchingLabels(constant.GetCompLabels(clusterName, componentName)),
-		client.HasLabels([]string{
-			constant.AppInstanceLabelKey,
-			constant.KBAppComponentLabelKey,
-			constant.CMConfigurationTemplateNameLabelKey,
-			constant.CMConfigurationTypeLabelKey,
-			constant.CMConfigurationSpecProviderLabelKey,
-		}),
-	); err != nil {
-		return nil, err
-	}
-	configmaps := make(map[string]*corev1.ConfigMap, len(configMapList.Items))
-	for i := range configMapList.Items {
-		item := &configMapList.Items[i]
-		configmaps[item.Labels[constant.CMConfigurationSpecProviderLabelKey]] = item
-	}
-	return configmaps, nil
-}
-
-func validateCustomTemplates(ctx context.Context, cli client.Reader, customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
-	for _, tpl := range customTemplates {
-		configMap := &corev1.ConfigMap{}
-		namespace := tpl.Namespace
-		if namespace == "" {
-			namespace = "default"
-		}
-		if err := cli.Get(ctx, client.ObjectKey{Name: tpl.TemplateRef, Namespace: namespace}, configMap); err != nil {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s/%s] for custom template", namespace, tpl.TemplateRef)
-		}
-	}
-	return nil
-}
-
-func mergeWithOverrideForOps(item *parametersv1alpha1.ConfigTemplateItemDetail, updatedParameters map[string]parametersv1alpha1.ParametersInFile) error {
-	if item.ConfigFileParams == nil {
-		item.ConfigFileParams = updatedParameters
-		return nil
-	}
-	for key, parametersInFile := range updatedParameters {
-		merged := item.ConfigFileParams[key]
-		if parametersInFile.Content != nil {
-			merged.Content = parametersInFile.Content
-		}
-		if merged.Parameters == nil && len(parametersInFile.Parameters) > 0 {
-			merged.Parameters = map[string]*string{}
-		}
-		for paramKey, paramValue := range parametersInFile.Parameters {
-			merged.Parameters[paramKey] = paramValue
-		}
-		item.ConfigFileParams[key] = merged
-	}
-	return nil
-}
-
-func resolveBaseDataForOps(updatedParameters map[string]*parametersv1alpha1.ParametersInFile) map[string]string {
-	baseData := make(map[string]string, len(updatedParameters))
-	for key := range updatedParameters {
-		baseData[key] = ""
-	}
-	return baseData
-}
-
-func itemStatusMessage(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) string {
-	if status == nil || status.Message == nil {
-		return ""
-	}
-	return *status.Message
 }

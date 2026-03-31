@@ -35,7 +35,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
-	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
@@ -188,12 +187,10 @@ parameter: {
 			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&cp.Spec, "mysql-config")
-				g.Expect(item).ShouldNot(BeNil())
-				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
-				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(customTemplate.Name))
-				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
-				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+				g.Expect(cp.Spec.Desired.Templates).Should(HaveKey("mysql-config"))
+				g.Expect(cp.Spec.Desired.Templates["mysql-config"].TemplateRef).Should(Equal(customTemplate.Name))
 			})).Should(Succeed())
 
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
@@ -303,10 +300,9 @@ parameter: {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
-				item := parameters.GetConfigTemplateItem(&cp.Spec, "mysql-config")
-				g.Expect(item).ShouldNot(BeNil())
-				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
-				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(customTemplate.Name))
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Templates).Should(HaveKey("mysql-config"))
+				g.Expect(cp.Spec.Desired.Templates["mysql-config"].TemplateRef).Should(Equal(customTemplate.Name))
 			})).Should(Succeed())
 		})
 	})

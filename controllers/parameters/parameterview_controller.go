@@ -24,8 +24,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
 
-	apiMeta "k8s.io/apimachinery/pkg/api/meta"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -33,13 +36,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 const (
 	parameterViewReadyCondition = "Ready"
+
+	parameterViewReasonResolved                  = "Resolved"
+	parameterViewReasonReferenceNotFound         = "ReferenceNotFound"
+	parameterViewReasonTemplateNotFound          = "TemplateNotFound"
+	parameterViewReasonFileNotFound              = "FileNotFound"
+	parameterViewReasonFileFormatMismatch        = "FileFormatMismatch"
+	parameterViewReasonUnsupportedContentType    = "UnsupportedContentType"
+	parameterViewReasonReadOnly                  = "ReadOnly"
+	parameterViewReasonSourceChanged             = "SourceChanged"
+	parameterViewReasonDiffFailed                = "DiffFailed"
+	parameterViewReasonUnsupportedContentChanges = "UnsupportedContentChanges"
+	parameterViewReasonApplying                  = "Applying"
+
+	parameterViewApplyingRequeueAfter = 2 * time.Second
 )
 
 // ParameterViewReconciler reconciles a ParameterView object.
@@ -74,16 +93,18 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Namespace: view.Namespace,
 		Name:      view.Spec.ParameterRef.Name,
 	}, compParam); err != nil {
-		return r.markInvalid(reqCtx, view, fmt.Sprintf("referenced ComponentParameter not found: %s", view.Spec.ParameterRef.Name))
+		return r.markInvalid(reqCtx, view, parameterViewReasonReferenceNotFound,
+			fmt.Sprintf("referenced ComponentParameter not found: %s", view.Spec.ParameterRef.Name))
 	}
 
 	source, err := r.resolveSource(reqCtx.Ctx, compParam, view)
 	if err != nil {
-		return r.markInvalid(reqCtx, view, err.Error())
+		return r.markInvalidForSourceError(reqCtx, view, err)
 	}
 
 	if view.Spec.Content.Type != "" && view.Spec.Content.Type != parametersv1alpha1.PlainTextParameterViewContentType {
-		return r.markInvalid(reqCtx, view, fmt.Sprintf("content type %q is not supported in phase 1", view.Spec.Content.Type))
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentType,
+			fmt.Sprintf("content type %q is not supported", view.Spec.Content.Type))
 	}
 
 	specChanged := false
@@ -96,7 +117,8 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		view.Spec.FileFormat = source.fileFormat
 		specChanged = true
 	} else if view.Spec.FileFormat != source.fileFormat {
-		return r.markInvalid(reqCtx, view, fmt.Sprintf("fileFormat %q does not match source file format %q", view.Spec.FileFormat, source.fileFormat))
+		return r.markInvalid(reqCtx, view, parameterViewReasonFileFormatMismatch,
+			fmt.Sprintf("fileFormat %q does not match source file format %q", view.Spec.FileFormat, source.fileFormat))
 	}
 
 	if view.Spec.SourceGeneration == 0 || view.Spec.Content.Text == "" {
@@ -112,18 +134,78 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			view.Spec.Content.Text = source.content
 			specChanged = true
 		}
-	} else if view.Spec.ContentHash != "" && view.Spec.ContentHash != source.hash {
-		if view.Spec.Content.Text != source.content {
+	} else if view.Spec.Content.Type == parametersv1alpha1.PlainTextParameterViewContentType {
+		switch {
+		case view.Spec.Content.Text == source.content:
+			if view.Spec.SourceGeneration != source.generation {
+				view.Spec.SourceGeneration = source.generation
+				specChanged = true
+			}
+			if view.Spec.ContentHash != source.hash {
+				view.Spec.ContentHash = source.hash
+				specChanged = true
+			}
+		case view.Spec.Mode == parametersv1alpha1.ParameterViewReadOnlyMode:
+			if specChanged {
+				if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
+				}
+			}
+			return r.markInvalid(reqCtx, view, parameterViewReasonReadOnly, "content updates are not allowed in ReadOnly mode")
+		case view.Spec.ContentHash != "" && view.Spec.ContentHash != source.hash:
+			equivalent, err := r.equalConfigSemantics(reqCtx.Ctx, compParam, view, view.Spec.Content.Text, source.content)
+			if err != nil {
+				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error())
+			}
+			if equivalent {
+				if view.Spec.SourceGeneration != source.generation {
+					view.Spec.SourceGeneration = source.generation
+					specChanged = true
+				}
+				if view.Spec.ContentHash != source.hash {
+					view.Spec.ContentHash = source.hash
+					specChanged = true
+				}
+				if view.Spec.Content.Text != source.content {
+					view.Spec.Content.Text = source.content
+					specChanged = true
+				}
+				if specChanged {
+					if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
+						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
+					}
+				}
+				return r.markReady(reqCtx, view)
+			}
 			if specChanged {
 				if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
 					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
 				}
 			}
 			return r.markConflict(reqCtx, view, fmt.Sprintf("source content changed for %s/%s", view.Spec.TemplateName, view.Spec.FileName))
+		default:
+			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content)
+			if err != nil {
+				return r.markInvalidForDesiredPatchError(reqCtx, view, err)
+			}
+			if desiredParametersContain(compParam.Spec.Desired, desiredPatch) {
+				if specChanged {
+					if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
+						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
+					}
+				}
+				return r.markApplying(reqCtx, view, "parameter view update is pending apply")
+			}
+			if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
+				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error())
+			}
+			if specChanged {
+				if err := r.Client.Patch(reqCtx.Ctx, view, specPatch); err != nil {
+					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view spec")
+				}
+			}
+			return r.markApplying(reqCtx, view, "parameter view update has been submitted")
 		}
-		view.Spec.SourceGeneration = source.generation
-		view.Spec.ContentHash = source.hash
-		specChanged = true
 	}
 
 	if specChanged {
@@ -149,7 +231,8 @@ type parameterViewSource struct {
 	generation int64
 }
 
-func (r *ParameterViewReconciler) resolveSource(ctx context.Context, compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView) (*parameterViewSource, error) {
+func (r *ParameterViewReconciler) resolveSource(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView) (*parameterViewSource, error) {
 	item := parameters.GetConfigTemplateItem(&compParam.Spec, view.Spec.TemplateName)
 	if item == nil {
 		return nil, fmt.Errorf("template not found in ComponentParameter: %s", view.Spec.TemplateName)
@@ -173,34 +256,28 @@ func (r *ParameterViewReconciler) resolveSource(ctx context.Context, compParam *
 	}, nil
 }
 
-func (r *ParameterViewReconciler) resolveFileFormat(ctx context.Context, compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView) (parametersv1alpha1.CfgFileFormat, error) {
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(compParam)},
-	}
-	fetchTask, err := prepareReconcileTask(reqCtx, r.Client, compParam)
+func (r *ParameterViewReconciler) resolveFileFormat(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView) (parametersv1alpha1.CfgFileFormat, error) {
+	cfgCtx, err := r.resolveConfigContext(ctx, compParam, view)
 	if err != nil {
 		return "", err
 	}
-	configDescs, _, err := parameters.ResolveCmpdParametersDefs(ctx, r.Client, fetchTask.ComponentDefObj)
-	if err != nil {
-		return "", err
+	if cfgCtx.fileConfig.FileFormatConfig == nil {
+		return "", fmt.Errorf("file format not found for %s/%s", view.Spec.TemplateName, view.Spec.FileName)
 	}
-	for _, desc := range configDescs {
-		if desc.TemplateName == view.Spec.TemplateName && desc.Name == view.Spec.FileName && desc.FileFormatConfig != nil {
-			return desc.FileFormatConfig.Format, nil
-		}
-	}
-	return "", fmt.Errorf("file format not found for %s/%s", view.Spec.TemplateName, view.Spec.FileName)
+	return cfgCtx.fileConfig.FileFormatConfig.Format, nil
 }
 
-func (r *ParameterViewReconciler) resolveContent(ctx context.Context, compParam *parametersv1alpha1.ComponentParameter, item *parametersv1alpha1.ConfigTemplateItemDetail, fileName string) (string, error) {
-	configMaps, err := resolveComponentRefConfigMap(ctx, r.Client, compParam.Namespace, compParam.Spec.ClusterName, compParam.Spec.ComponentName)
-	if err == nil {
-		if cm, ok := configMaps[item.Name]; ok && cm != nil {
-			if content, ok := cm.Data[fileName]; ok {
-				return content, nil
-			}
+func (r *ParameterViewReconciler) resolveContent(ctx context.Context, compParam *parametersv1alpha1.ComponentParameter,
+	item *parametersv1alpha1.ConfigTemplateItemDetail, fileName string) (string, error) {
+	running := &corev1.ConfigMap{}
+	runningKey := client.ObjectKey{
+		Namespace: compParam.Namespace,
+		Name:      parameterscore.GetComponentCfgName(compParam.Spec.ClusterName, compParam.Spec.ComponentName, item.Name),
+	}
+	if err := r.Client.Get(ctx, runningKey, running); err == nil {
+		if content, ok := running.Data[fileName]; ok {
+			return content, nil
 		}
 	}
 
@@ -233,37 +310,240 @@ func (r *ParameterViewReconciler) resolveContent(ctx context.Context, compParam 
 	return content, nil
 }
 
+func (r *ParameterViewReconciler) resolveConfigContext(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView) (*parameterViewConfigContext, error) {
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: ctx,
+		Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(compParam)},
+	}
+	fetchTask, err := prepareReconcileTask(reqCtx, r.Client, compParam)
+	if err != nil {
+		return nil, err
+	}
+	configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, r.Client, fetchTask.ComponentDefObj)
+	if err != nil {
+		return nil, err
+	}
+	templates, err := resolveComponentTemplate(ctx, r.Client, fetchTask.ComponentDefObj)
+	if err != nil {
+		return nil, err
+	}
+	for _, desc := range configDescs {
+		if desc.TemplateName == view.Spec.TemplateName && desc.Name == view.Spec.FileName {
+			return &parameterViewConfigContext{
+				componentDef: fetchTask.ComponentDefObj,
+				configDescs:  configDescs,
+				paramsDefs:   paramsDefs,
+				templates:    templates,
+				fileConfig:   desc,
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("file format not found for %s/%s", view.Spec.TemplateName, view.Spec.FileName)
+}
+
+func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView, sourceContent string) (parametersv1alpha1.ParameterValueMap, error) {
+	cfgCtx, err := r.resolveConfigContext(ctx, compParam, view)
+	if err != nil {
+		return nil, err
+	}
+	descs := []parametersv1alpha1.ComponentConfigDescription{cfgCtx.fileConfig}
+	baseData := map[string]string{view.Spec.FileName: sourceContent}
+	updatedData := map[string]string{view.Spec.FileName: view.Spec.Content.Text}
+	patch, _, err := parameterscore.CreateConfigPatch(baseData, updatedData, descs, false)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonDiffFailed, err)
+	}
+	if !patch.IsModify {
+		return nil, fmt.Errorf("%s: edited content cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
+	}
+	if err := parameterscore.ValidateConfigPatch(patch, descs); err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+	}
+
+	desiredPatch := make(parametersv1alpha1.ParameterValueMap)
+	for _, filePatch := range parameterscore.GenerateVisualizedParamsList(patch, descs) {
+		if filePatch.Key != view.Spec.FileName {
+			continue
+		}
+		for _, param := range filePatch.Parameters {
+			desiredPatch[param.Key] = param.Value
+		}
+	}
+	if len(desiredPatch) == 0 {
+		return nil, fmt.Errorf("%s: edited content does not contain any supported parameter updates", parameterViewReasonUnsupportedContentChanges)
+	}
+	if _, err := parameters.ClassifyComponentParameters(
+		parametersv1alpha1.ComponentParameters(desiredPatch),
+		cfgCtx.paramsDefs,
+		cfgCtx.componentDef.Spec.Configs,
+		cfgCtx.templates,
+		cfgCtx.configDescs,
+	); err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+	}
+
+	valueManager := parameters.NewValueManager(cfgCtx.paramsDefs, descs)
+	updatedParams, err := parameterscore.FromStringMap(desiredPatch, valueManager.BuildValueTransformer(view.Spec.FileName))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+	}
+	mergedData, err := parameters.MergeAndValidateConfigs(baseData, []parameterscore.ParamPairs{{
+		Key:           view.Spec.FileName,
+		UpdatedParams: updatedParams,
+	}}, cfgCtx.paramsDefs, descs)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+	}
+	semanticPatch, _, err := parameterscore.CreateConfigPatch(mergedData, updatedData, descs, false)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+	}
+	if semanticPatch.IsModify {
+		return nil, fmt.Errorf("%s: edited content contains changes that cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
+	}
+	return desiredPatch, nil
+}
+
+func (r *ParameterViewReconciler) equalConfigSemantics(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView, leftContent, rightContent string) (bool, error) {
+	cfgCtx, err := r.resolveConfigContext(ctx, compParam, view)
+	if err != nil {
+		return false, err
+	}
+	descs := []parametersv1alpha1.ComponentConfigDescription{cfgCtx.fileConfig}
+	leftValues, err := parameterscore.TransformConfigFileToKeyValueMap(view.Spec.FileName, descs, []byte(leftContent))
+	if err != nil {
+		return false, err
+	}
+	rightValues, err := parameterscore.TransformConfigFileToKeyValueMap(view.Spec.FileName, descs, []byte(rightContent))
+	if err != nil {
+		return false, err
+	}
+	if len(leftValues) != len(rightValues) {
+		return false, nil
+	}
+	for key, leftValue := range leftValues {
+		rightValue, ok := rightValues[key]
+		if !ok || rightValue != leftValue {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func hashContent(content string) string {
 	sum := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(sum[:])
 }
 
+func containsPhrase(message, phrase string) bool {
+	return strings.Contains(strings.ToLower(message), strings.ToLower(phrase))
+}
+
+func trimReasonPrefix(message, reason string) string {
+	prefix := reason + ": "
+	if strings.HasPrefix(message, prefix) {
+		return strings.TrimPrefix(message, prefix)
+	}
+	return message
+}
+
+func desiredParametersContain(values *parametersv1alpha1.ParameterValues, patch parametersv1alpha1.ParameterValueMap) bool {
+	if values == nil || len(values.Parameters) == 0 || len(patch) == 0 {
+		return false
+	}
+	for key, expected := range patch {
+		actual, ok := values.Parameters[key]
+		if !ok {
+			return false
+		}
+		switch {
+		case expected == nil && actual == nil:
+		case expected != nil && actual != nil && *expected == *actual:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func (r *ParameterViewReconciler) patchComponentParameterDesired(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, patchValues parametersv1alpha1.ParameterValueMap) error {
+	if len(patchValues) == 0 {
+		return nil
+	}
+	patch := client.MergeFrom(compParam.DeepCopy())
+	if compParam.Spec.Desired == nil {
+		compParam.Spec.Desired = &parametersv1alpha1.ParameterValues{}
+	}
+	if compParam.Spec.Desired.Parameters == nil {
+		compParam.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
+	}
+	for key, value := range patchValues {
+		compParam.Spec.Desired.Parameters[key] = value
+	}
+	return r.Client.Patch(ctx, compParam, patch)
+}
+
+type parameterViewConfigContext struct {
+	componentDef *appsv1.ComponentDefinition
+	configDescs  []parametersv1alpha1.ComponentConfigDescription
+	paramsDefs   []*parametersv1alpha1.ParametersDefinition
+	templates    map[string]*corev1.ConfigMap
+	fileConfig   parametersv1alpha1.ComponentConfigDescription
+}
+
 func (r *ParameterViewReconciler) markReady(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView) (ctrl.Result, error) {
-	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewReadyPhase, "", metav1.ConditionTrue, "Resolved", "parameter view is ready")
+	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewReadyPhase, "", metav1.ConditionTrue, parameterViewReasonResolved, "parameter view is ready")
 }
 
 func (r *ParameterViewReconciler) markConflict(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, msg string) (ctrl.Result, error) {
 	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewConflictPhase, msg, metav1.ConditionFalse, "SourceChanged", msg)
 }
 
-func (r *ParameterViewReconciler) markInvalid(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, msg string) (ctrl.Result, error) {
-	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewInvalidPhase, msg, metav1.ConditionFalse, "InvalidSpec", msg)
+func (r *ParameterViewReconciler) markApplying(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, msg string) (ctrl.Result, error) {
+	if _, err := r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewApplyingPhase, msg, metav1.ConditionFalse, parameterViewReasonApplying, msg); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: parameterViewApplyingRequeueAfter}, nil
 }
 
-func (r *ParameterViewReconciler) patchStatus(
-	reqCtx intctrlutil.RequestCtx,
-	view *parametersv1alpha1.ParameterView,
-	phase parametersv1alpha1.ParameterViewPhase,
-	message string,
-	conditionStatus metav1.ConditionStatus,
-	reason string,
-	conditionMessage string,
-) (ctrl.Result, error) {
+func (r *ParameterViewReconciler) markInvalid(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, reason, msg string) (ctrl.Result, error) {
+	return r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewInvalidPhase, msg, metav1.ConditionFalse, reason, msg)
+}
+
+func (r *ParameterViewReconciler) markInvalidForSourceError(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, err error) (ctrl.Result, error) {
+	msg := err.Error()
+	switch {
+	case containsPhrase(msg, "template not found"):
+		return r.markInvalid(reqCtx, view, parameterViewReasonTemplateNotFound, msg)
+	case containsPhrase(msg, "file not found"):
+		return r.markInvalid(reqCtx, view, parameterViewReasonFileNotFound, msg)
+	default:
+		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, msg)
+	}
+}
+
+func (r *ParameterViewReconciler) markInvalidForDesiredPatchError(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, err error) (ctrl.Result, error) {
+	msg := err.Error()
+	switch {
+	case containsPhrase(msg, parameterViewReasonDiffFailed):
+		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, trimReasonPrefix(msg, parameterViewReasonDiffFailed))
+	default:
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, trimReasonPrefix(msg, parameterViewReasonUnsupportedContentChanges))
+	}
+}
+
+func (r *ParameterViewReconciler) patchStatus(reqCtx intctrlutil.RequestCtx,
+	view *parametersv1alpha1.ParameterView, phase parametersv1alpha1.ParameterViewPhase,
+	message string, conditionStatus metav1.ConditionStatus, reason, conditionMessage string) (ctrl.Result, error) {
 	patch := client.MergeFrom(view.DeepCopy())
 	view.Status.ObservedGeneration = view.Generation
 	view.Status.Phase = phase
 	view.Status.Message = message
-	apiMeta.SetStatusCondition(&view.Status.Conditions, metav1.Condition{
+	meta.SetStatusCondition(&view.Status.Conditions, metav1.Condition{
 		Type:               parameterViewReadyCondition,
 		Status:             conditionStatus,
 		Reason:             reason,

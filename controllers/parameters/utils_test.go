@@ -56,6 +56,9 @@ const (
 	pdcrName         = "config-test-pdcr"
 )
 
+var parameterViewSignature = func(_ parametersv1alpha1.ParameterView, _ *parametersv1alpha1.ParameterView, _ parametersv1alpha1.ParameterViewList, _ *parametersv1alpha1.ParameterViewList) {
+}
+
 func mockSchemaData() string {
 	cue, _ := testdata.GetTestDataFileContent("cue_testdata/wesql.cue")
 	return string(cue)
@@ -247,5 +250,6 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, parameterViewSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterSignature, true, inNS, ml)
 }

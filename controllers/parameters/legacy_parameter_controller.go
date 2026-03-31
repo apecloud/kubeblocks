@@ -34,10 +34,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const parameterDeprecatedMessage = "Parameter is deprecated; use OpsRequest type Reconfiguring for runtime updates and cluster init parameters for initialization"
+const (
+	parameterDeprecatedMessage = "Parameter is deprecated; use OpsRequest type Reconfiguring for runtime updates and cluster init parameters for initialization"
+)
 
-// DeprecatedParameterReconciler marks Parameter requests as unsupported.
-type DeprecatedParameterReconciler struct {
+// LegacyParameterReconciler marks Parameter requests as unsupported.
+type LegacyParameterReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
@@ -47,13 +49,13 @@ type DeprecatedParameterReconciler struct {
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameters/finalizers,verbs=update
 
-func (r *DeprecatedParameterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *LegacyParameterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
 		Recorder: r.Recorder,
 		Log: log.FromContext(ctx).
-			WithName("DeprecatedParameterReconciler").
+			WithName("LegacyParameterReconciler").
 			WithValues("Namespace", req.Namespace, "Parameter", req.Name),
 	}
 
@@ -61,6 +63,7 @@ func (r *DeprecatedParameterReconciler) Reconcile(ctx context.Context, req ctrl.
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, parameter); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	if !parameter.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(parameter, constant.ConfigFinalizerName) {
 			return intctrlutil.Reconciled()
@@ -72,6 +75,7 @@ func (r *DeprecatedParameterReconciler) Reconcile(ctx context.Context, req ctrl.
 		}
 		return intctrlutil.Reconciled()
 	}
+
 	if parameter.Status.ObservedGeneration == parameter.Generation &&
 		parameter.Status.Phase == parametersv1alpha1.CMergeFailedPhase &&
 		parameter.Status.Message == parameterDeprecatedMessage {
@@ -88,7 +92,7 @@ func (r *DeprecatedParameterReconciler) Reconcile(ctx context.Context, req ctrl.
 	return intctrlutil.Reconciled()
 }
 
-func (r *DeprecatedParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *LegacyParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&parametersv1alpha1.Parameter{}).
 		Complete(r)

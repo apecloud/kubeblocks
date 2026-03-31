@@ -124,10 +124,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&DeprecatedParameterReconciler{
+	err = (&LegacyParameterReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("deprecated-parameter-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("parameter-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

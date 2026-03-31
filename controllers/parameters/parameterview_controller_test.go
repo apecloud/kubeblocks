@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -93,6 +94,61 @@ func TestParameterViewReconcileInitializesPlainTextContent(t *testing.T) {
 	}
 	if view.Status.ObservedGeneration != view.Generation {
 		t.Fatalf("expected observedGeneration %d, got %d", view.Generation, view.Status.ObservedGeneration)
+	}
+}
+
+func TestParameterViewReconcileInitializesMarkerLineContent(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nmax_connections=1000\nsync_binlog=1\nserver_id=1\ncustom_local=on\n# trailing comment\n",
+		templateContent: "template-value=1\n",
+		dynamicParameters: []string{
+			"default.max_connections",
+		},
+		staticParameters: []string{
+			"default.sync_binlog",
+		},
+		immutableParameters: []string{
+			"default.server_id",
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 1,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
+				},
+			},
+		},
+	})...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	expected := "[U] [mysqld]\n[D] max_connections=1000\n[S] sync_binlog=1\n[I] server_id=1\n[U] custom_local=on\n[U] # trailing comment\n"
+	if view.Spec.Content.Type != parametersv1alpha1.MarkerLineParameterViewContentType {
+		t.Fatalf("expected content type %q, got %q", parametersv1alpha1.MarkerLineParameterViewContentType, view.Spec.Content.Type)
+	}
+	if view.Spec.Content.Text != expected {
+		t.Fatalf("expected rendered marker content %q, got %q", expected, view.Spec.Content.Text)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
 	}
 }
 
@@ -223,6 +279,67 @@ func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T)
 	}
 }
 
+func TestParameterViewReconcileWritesMarkerLineToComponentParameter(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nmax_connections=1000\nsync_binlog=1\nserver_id=1\ncustom_local=on\n",
+		templateContent: "template-value=1\n",
+		dynamicParameters: []string{
+			"default.max_connections",
+		},
+		staticParameters: []string{
+			"default.sync_binlog",
+		},
+		immutableParameters: []string{
+			"default.server_id",
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName:     templateName,
+				FileName:         fileName,
+				FileFormat:       parametersv1alpha1.Ini,
+				SourceGeneration: componentParameterGeneration,
+				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\nserver_id=1\ncustom_local=on\n"),
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
+					Text: "[U] [mysqld]\n[D] max_connections=1500\n[S] sync_binlog=1\n[I] server_id=1\n[U] custom_local=on\n",
+				},
+			},
+		},
+	})...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
+
+	compParam := &parametersv1alpha1.ComponentParameter{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
+		t.Fatalf("get component parameter failed: %v", err)
+	}
+	if got := compParam.Spec.Desired.Parameters["mysqld.max_connections"]; got == nil || *got != "1500" {
+		t.Fatalf("expected desired mysqld.max_connections=1500, got %#v", got)
+	}
+}
+
 func TestParameterViewReconcileRejectsWriteInReadOnlyMode(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
 		"max_connections=1000\n",
@@ -268,6 +385,161 @@ func TestParameterViewReconcileRejectsWriteInReadOnlyMode(t *testing.T) {
 	if compParam.Spec.Desired != nil && len(compParam.Spec.Desired.Parameters) != 0 {
 		t.Fatalf("expected desired parameters to remain unchanged, got %#v", compParam.Spec.Desired.Parameters)
 	}
+}
+
+func TestParameterViewReconcileRejectsMarkerLineStaticEdits(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nmax_connections=1000\nsync_binlog=1\n",
+		templateContent: "template-value=1\n",
+		dynamicParameters: []string{
+			"default.max_connections",
+		},
+		staticParameters: []string{
+			"default.sync_binlog",
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName:     templateName,
+				FileName:         fileName,
+				FileFormat:       parametersv1alpha1.Ini,
+				SourceGeneration: componentParameterGeneration,
+				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
+					Text: "[U] [mysqld]\n[D] max_connections=1000\n[S] sync_binlog=2\n",
+				},
+			},
+		},
+	})...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
+
+	compParam := &parametersv1alpha1.ComponentParameter{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
+		t.Fatalf("get component parameter failed: %v", err)
+	}
+	if got := compParam.Spec.Desired.Parameters["mysqld.sync_binlog"]; got == nil || *got != "2" {
+		t.Fatalf("expected desired mysqld.sync_binlog=2, got %#v", got)
+	}
+}
+
+func TestParameterViewReconcileRejectsMarkerLineUnmanagedEdits(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nmax_connections=1000\nsync_binlog=1\n",
+		templateContent: "template-value=1\n",
+		dynamicParameters: []string{
+			"default.max_connections",
+		},
+		staticParameters: []string{
+			"default.sync_binlog",
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName:     templateName,
+				FileName:         fileName,
+				FileFormat:       parametersv1alpha1.Ini,
+				SourceGeneration: componentParameterGeneration,
+				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
+					Text: "[U] [mysqld changed]\n[D] max_connections=1000\n[S] sync_binlog=1\n",
+				},
+			},
+		},
+	})...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonUnsupportedContentChanges)
+}
+
+func TestParameterViewReconcileRejectsInvalidMarkerSyntax(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nmax_connections=1000\n",
+		templateContent: "template-value=1\n",
+		dynamicParameters: []string{
+			"default.max_connections",
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName:     templateName,
+				FileName:         fileName,
+				FileFormat:       parametersv1alpha1.Ini,
+				SourceGeneration: componentParameterGeneration,
+				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\n"),
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
+					Text: "[S] [mysqld]\nmax_connections=1500\n",
+				},
+			},
+		},
+	})...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonInvalidMarkerSyntax)
 }
 
 func TestParameterViewReconcileKeepsApplyingWhenDesiredAlreadySubmitted(t *testing.T) {
@@ -455,6 +727,95 @@ func TestParameterViewReconcileRefreshesLegacyConflictWhenRuntimeSemanticsMatch(
 		t.Fatalf("expected content hash to refresh from runtime source, got %q", view.Spec.ContentHash)
 	}
 	if view.Spec.Content.Text != "[mysqld]\nmax_connections=1500\n" {
+		t.Fatalf("expected content to refresh from runtime source, got %q", view.Spec.Content.Text)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonResolved)
+}
+
+func TestParameterViewReconcileReturnsReadyAfterMarkerLineRuntimeCatchesUp(t *testing.T) {
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nmax_connections=1000\nsync_binlog=1\n",
+		templateContent: "template-value=1\n",
+		dynamicParameters: []string{
+			"mysqld.max_connections",
+		},
+		staticParameters: []string{
+			"mysqld.sync_binlog",
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef:     corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName:     templateName,
+				FileName:         fileName,
+				FileFormat:       parametersv1alpha1.Ini,
+				SourceGeneration: componentParameterGeneration,
+				ContentHash:      hashContent("[mysqld]\nmax_connections=1000\nsync_binlog=1\n"),
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.MarkerLineParameterViewContentType,
+					Text: "[U] [mysqld]\n[D] max_connections=1500\n[S] sync_binlog=1\n",
+				},
+			},
+		},
+		mutate: []func(*parametersv1alpha1.ComponentParameter){
+			func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
+					Parameters: parametersv1alpha1.ParameterValueMap{
+						"mysqld.max_connections": ptr.To("1500"),
+					},
+				}
+			},
+		},
+	})...)
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if result.RequeueAfter != parameterViewApplyingRequeueAfter {
+		t.Fatalf("expected requeueAfter %s, got %s", parameterViewApplyingRequeueAfter, result.RequeueAfter)
+	}
+
+	rendered := &corev1.ConfigMap{}
+	renderedKey := types.NamespacedName{
+		Namespace: parameterViewNamespace,
+		Name:      parameterscore.GetComponentCfgName(pvClusterName, pvComponentName, templateName),
+	}
+	if err := cli.Get(context.Background(), renderedKey, rendered); err != nil {
+		t.Fatalf("get rendered configmap failed: %v", err)
+	}
+	rendered.Data[fileName] = "[mysqld]\nmax_connections=1500\nsync_binlog=1\n"
+	if err := cli.Update(context.Background(), rendered); err != nil {
+		t.Fatalf("update rendered configmap failed: %v", err)
+	}
+
+	result, err = reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("second reconcile failed: %v", err)
+	}
+	if result.RequeueAfter != 0 {
+		t.Fatalf("expected no further requeue, got %s", result.RequeueAfter)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewReadyPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewReadyPhase, view.Status.Phase)
+	}
+	expected := "[U] [mysqld]\n[D] max_connections=1500\n[S] sync_binlog=1\n"
+	if view.Spec.Content.Text != expected {
 		t.Fatalf("expected content to refresh from runtime source, got %q", view.Spec.Content.Text)
 	}
 	assertParameterViewConditionReason(t, view, parameterViewReasonResolved)
@@ -657,12 +1018,15 @@ func newParameterViewTestObjects(runtimeContent string, view *parametersv1alpha1
 }
 
 type parameterViewTestOptions struct {
-	fileName        string
-	fileFormat      parametersv1alpha1.CfgFileFormat
-	runtimeContent  string
-	templateContent string
-	view            *parametersv1alpha1.ParameterView
-	mutate          []func(*parametersv1alpha1.ComponentParameter)
+	fileName            string
+	fileFormat          parametersv1alpha1.CfgFileFormat
+	runtimeContent      string
+	templateContent     string
+	dynamicParameters   []string
+	staticParameters    []string
+	immutableParameters []string
+	view                *parametersv1alpha1.ParameterView
+	mutate              []func(*parametersv1alpha1.ComponentParameter)
 }
 
 func newParameterViewTestObjectsWithOptions(opts parameterViewTestOptions) []runtime.Object {
@@ -751,6 +1115,9 @@ func newParameterViewTestObjectsWithOptions(opts parameterViewTestOptions) []run
 			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
 				Format: opts.fileFormat,
 			},
+			DynamicParameters:   opts.dynamicParameters,
+			StaticParameters:    opts.staticParameters,
+			ImmutableParameters: opts.immutableParameters,
 		},
 		Status: parametersv1alpha1.ParametersDefinitionStatus{
 			Phase: parametersv1alpha1.PDAvailablePhase,
@@ -846,7 +1213,7 @@ var _ = Describe("ParameterView Controller", func() {
 		})).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
-			obj.Spec.Content.Text = "[mysqld]\ngtid_mode=ON\n"
+			obj.Spec.Content.Text = strings.Replace(obj.Spec.Content.Text, "gtid_mode=OFF", "gtid_mode=ON", 1)
 		})()).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
@@ -855,7 +1222,7 @@ var _ = Describe("ParameterView Controller", func() {
 
 		Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 			g.Expect(cfg.Spec.Desired).ShouldNot(BeNil())
-			g.Expect(cfg.Spec.Desired.Parameters).Should(HaveKeyWithValue("mysqld.gtid_mode", ptr.To("ON")))
+			g.Expect(cfg.Spec.Desired.Parameters).Should(HaveKeyWithValue("gtid_mode", ptr.To("ON")))
 		})).Should(Succeed())
 	})
 
@@ -894,7 +1261,7 @@ var _ = Describe("ParameterView Controller", func() {
 		})).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
-			obj.Spec.Content.Text = "[mysqld]\ngtid_mode=ON\n"
+			obj.Spec.Content.Text = strings.Replace(obj.Spec.Content.Text, "gtid_mode=OFF", "gtid_mode=ON", 1)
 		})()).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
@@ -949,11 +1316,11 @@ var _ = Describe("ParameterView Controller", func() {
 			if cfg.Spec.Desired.Parameters == nil {
 				cfg.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
 			}
-			cfg.Spec.Desired.Parameters["mysqld.max_connections"] = ptr.To("2000")
+			cfg.Spec.Desired.Parameters["gtid_mode"] = ptr.To("ON")
 		})()).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
-			obj.Spec.Content.Text = "[mysqld]\nmax_connections=2000\n"
+			obj.Spec.Content.Text = strings.Replace(obj.Spec.Content.Text, "gtid_mode=OFF", "gtid_mode=ON", 1)
 		})()).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {

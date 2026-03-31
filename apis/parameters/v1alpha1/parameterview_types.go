@@ -78,7 +78,7 @@ type ParameterViewSpec struct {
 	// FileFormat identifies the file format used by the selected config file.
 	//
 	// +optional
-	FileFormat CfgFileFormat `json:"fileFormat"`
+	FileFormat CfgFileFormat `json:"fileFormat,omitempty"`
 
 	// Mode controls whether edits are allowed to be translated back into ComponentParameter patches.
 	//

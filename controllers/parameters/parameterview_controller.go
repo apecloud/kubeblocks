@@ -55,6 +55,7 @@ const (
 	parameterViewReasonReadOnly                  = "ReadOnly"
 	parameterViewReasonSourceChanged             = "SourceChanged"
 	parameterViewReasonDiffFailed                = "DiffFailed"
+	parameterViewReasonInvalidMarkerSyntax       = "InvalidMarkerSyntax"
 	parameterViewReasonUnsupportedContentChanges = "UnsupportedContentChanges"
 	parameterViewReasonApplying                  = "Applying"
 
@@ -102,7 +103,9 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return r.markInvalidForSourceError(reqCtx, view, err)
 	}
 
-	if view.Spec.Content.Type != "" && view.Spec.Content.Type != parametersv1alpha1.PlainTextParameterViewContentType {
+	if view.Spec.Content.Type != "" &&
+		view.Spec.Content.Type != parametersv1alpha1.PlainTextParameterViewContentType &&
+		view.Spec.Content.Type != parametersv1alpha1.MarkerLineParameterViewContentType {
 		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentType,
 			fmt.Sprintf("content type %q is not supported", view.Spec.Content.Type))
 	}
@@ -120,6 +123,18 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return r.markInvalid(reqCtx, view, parameterViewReasonFileFormatMismatch,
 			fmt.Sprintf("fileFormat %q does not match source file format %q", view.Spec.FileFormat, source.fileFormat))
 	}
+	sourceViewContent, err := r.renderContent(reqCtx.Ctx, compParam, view, source.content)
+	if err != nil {
+		return r.markInvalidForViewContentError(reqCtx, view, err)
+	}
+
+	currentContent := view.Spec.Content.Text
+	if view.Spec.Content.Text != "" {
+		currentContent, err = r.extractRawContent(reqCtx.Ctx, compParam, view, source.content)
+		if err != nil {
+			return r.markInvalidForViewContentError(reqCtx, view, err)
+		}
+	}
 
 	if view.Spec.SourceGeneration == 0 || view.Spec.Content.Text == "" {
 		if view.Spec.SourceGeneration != source.generation {
@@ -130,19 +145,23 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			view.Spec.ContentHash = source.hash
 			specChanged = true
 		}
-		if view.Spec.Content.Text != source.content {
-			view.Spec.Content.Text = source.content
+		if view.Spec.Content.Text != sourceViewContent {
+			view.Spec.Content.Text = sourceViewContent
 			specChanged = true
 		}
-	} else if view.Spec.Content.Type == parametersv1alpha1.PlainTextParameterViewContentType {
+	} else {
 		switch {
-		case view.Spec.Content.Text == source.content:
+		case currentContent == source.content:
 			if view.Spec.SourceGeneration != source.generation {
 				view.Spec.SourceGeneration = source.generation
 				specChanged = true
 			}
 			if view.Spec.ContentHash != source.hash {
 				view.Spec.ContentHash = source.hash
+				specChanged = true
+			}
+			if view.Spec.Content.Text != sourceViewContent {
+				view.Spec.Content.Text = sourceViewContent
 				specChanged = true
 			}
 		case view.Spec.Mode == parametersv1alpha1.ParameterViewReadOnlyMode:
@@ -153,7 +172,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 			return r.markInvalid(reqCtx, view, parameterViewReasonReadOnly, "content updates are not allowed in ReadOnly mode")
 		case view.Spec.ContentHash != "" && view.Spec.ContentHash != source.hash:
-			equivalent, err := r.equalConfigSemantics(reqCtx.Ctx, compParam, view, view.Spec.Content.Text, source.content)
+			equivalent, err := r.equalConfigSemantics(reqCtx.Ctx, compParam, view, currentContent, source.content)
 			if err != nil {
 				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error())
 			}
@@ -166,8 +185,8 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					view.Spec.ContentHash = source.hash
 					specChanged = true
 				}
-				if view.Spec.Content.Text != source.content {
-					view.Spec.Content.Text = source.content
+				if view.Spec.Content.Text != sourceViewContent {
+					view.Spec.Content.Text = sourceViewContent
 					specChanged = true
 				}
 				if specChanged {
@@ -184,7 +203,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 			return r.markConflict(reqCtx, view, fmt.Sprintf("source content changed for %s/%s", view.Spec.TemplateName, view.Spec.FileName))
 		default:
-			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content)
+			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
 			if err != nil {
 				return r.markInvalidForDesiredPatchError(reqCtx, view, err)
 			}
@@ -343,14 +362,15 @@ func (r *ParameterViewReconciler) resolveConfigContext(ctx context.Context,
 }
 
 func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Context,
-	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView, sourceContent string) (parametersv1alpha1.ParameterValueMap, error) {
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView,
+	sourceContent, updatedContent string) (parametersv1alpha1.ParameterValueMap, error) {
 	cfgCtx, err := r.resolveConfigContext(ctx, compParam, view)
 	if err != nil {
 		return nil, err
 	}
 	descs := []parametersv1alpha1.ComponentConfigDescription{cfgCtx.fileConfig}
 	baseData := map[string]string{view.Spec.FileName: sourceContent}
-	updatedData := map[string]string{view.Spec.FileName: view.Spec.Content.Text}
+	updatedData := map[string]string{view.Spec.FileName: updatedContent}
 	patch, _, err := parameterscore.CreateConfigPatch(baseData, updatedData, descs, false)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", parameterViewReasonDiffFailed, err)
@@ -404,6 +424,44 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 		return nil, fmt.Errorf("%s: edited content contains changes that cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
 	return desiredPatch, nil
+}
+
+func (r *ParameterViewReconciler) renderContent(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView, rawContent string) (string, error) {
+	switch view.Spec.Content.Type {
+	case "", parametersv1alpha1.PlainTextParameterViewContentType:
+		return rawContent, nil
+	case parametersv1alpha1.MarkerLineParameterViewContentType:
+		cfgCtx, err := r.resolveConfigContext(ctx, compParam, view)
+		if err != nil {
+			return "", err
+		}
+		return r.renderMarkerLineContent(cfgCtx, view, rawContent)
+	default:
+		return "", fmt.Errorf("content type %q is not supported", view.Spec.Content.Type)
+	}
+}
+
+func (r *ParameterViewReconciler) extractRawContent(ctx context.Context,
+	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView, sourceContent string) (string, error) {
+	switch view.Spec.Content.Type {
+	case "", parametersv1alpha1.PlainTextParameterViewContentType:
+		return view.Spec.Content.Text, nil
+	case parametersv1alpha1.MarkerLineParameterViewContentType:
+		sourceViewContent, err := r.renderContent(ctx, compParam, view, sourceContent)
+		if err != nil {
+			return "", err
+		}
+		if view.Spec.ContentHash == "" || view.Spec.ContentHash == hashContent(sourceContent) {
+			if err := validateMarkerLineContent(view.Spec.Content.Text, sourceViewContent); err != nil {
+				return "", err
+			}
+		}
+		_, _, rawContent, err := parseMarkerLineContent(view.Spec.Content.Text)
+		return rawContent, err
+	default:
+		return "", fmt.Errorf("content type %q is not supported", view.Spec.Content.Type)
+	}
 }
 
 func (r *ParameterViewReconciler) equalConfigSemantics(ctx context.Context,
@@ -533,6 +591,18 @@ func (r *ParameterViewReconciler) markInvalidForDesiredPatchError(reqCtx intctrl
 		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, trimReasonPrefix(msg, parameterViewReasonDiffFailed))
 	default:
 		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, trimReasonPrefix(msg, parameterViewReasonUnsupportedContentChanges))
+	}
+}
+
+func (r *ParameterViewReconciler) markInvalidForViewContentError(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, err error) (ctrl.Result, error) {
+	msg := err.Error()
+	switch {
+	case containsPhrase(msg, "cannot be modified"):
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, msg)
+	case containsPhrase(msg, "marker"):
+		return r.markInvalid(reqCtx, view, parameterViewReasonInvalidMarkerSyntax, msg)
+	default:
+		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, msg)
 	}
 }
 

@@ -417,27 +417,35 @@ var _ = Describe("RestoreManager Test", func() {
 		})
 
 		Context("BuildContinuousRestoreManager", func() {
-			It("respects UnifyFullAndContinuousRestore annotation", func() {
-				By("create a continuous backup")
+			const (
+				continuousBackupStartTime = "2023-01-01T09:00:00Z"
+				continuousBackupEndTime   = "2023-01-01T12:00:00Z"
+			)
+
+			createContinuousBackupAndRestore := func(restoreTime string) (*dpv1alpha1.Backup, *dpv1alpha1.Restore) {
 				continuousBackup := mockBackupForRestore(
 					&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeContinuous,
-					"2023-01-01T09:00:00Z", "2023-01-01T12:00:00Z", "test-backup-continuous",
+					continuousBackupStartTime, continuousBackupEndTime, "test-backup-continuous",
 				)
-
-				By("create a completed backup")
-				_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
 
 				schedulingSpec := dpv1alpha1.SchedulingSpec{
 					NodeName: nodeName,
 				}
 
-				By("create restore")
 				restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
 					SetBackup(continuousBackup.Name, testCtx.DefaultNamespace).
 					SetSchedulingSpec(schedulingSpec).
 					Create(&testCtx).
-					SetRestoreTime("2023-01-01T11:30:00Z").
+					SetRestoreTime(restoreTime).
 					Get()
+				return continuousBackup, restore
+			}
+
+			It("respects UnifyFullAndContinuousRestore annotation", func() {
+				By("create a completed backup")
+				_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
+
+				continuousBackup, restore := createContinuousBackupAndRestore("2023-01-01T11:30:00Z")
 
 				By("create restore manager")
 				reqCtx := getReqCtx()
@@ -464,6 +472,60 @@ var _ = Describe("RestoreManager Test", func() {
 				Expect(restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)).Should(Succeed())
 				Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(1))
 
+			})
+
+			When("restoreTime is at boundary values", func() {
+				It("should fail when restoreTime equals backup start time", func() {
+					_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T09:00:00Z", "")
+					continuousBackup, restore := createContinuousBackupAndRestore(continuousBackupStartTime)
+
+					reqCtx := getReqCtx()
+					restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+					backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					_ = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+					Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(2))
+				})
+
+				It("should fail when restoreTime equals backup end time", func() {
+					_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
+					continuousBackup, restore := createContinuousBackupAndRestore(continuousBackupEndTime)
+
+					reqCtx := getReqCtx()
+					restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+					backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					_ = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+					Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(2))
+				})
+
+				It("should failed when restoreTime is before backup start time", func() {
+					_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
+					continuousBackup, restore := createContinuousBackupAndRestore("2023-01-01T08:00:00Z")
+
+					reqCtx := getReqCtx()
+					restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+					backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					err = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+					Expect(err).Should(HaveOccurred())
+				})
+
+				It("should failed when restoreTime is after backup end time", func() {
+					_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")
+					continuousBackup, restore := createContinuousBackupAndRestore("2023-01-01T13:00:00Z")
+
+					reqCtx := getReqCtx()
+					restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+					backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					err = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+					Expect(err).Should(HaveOccurred())
+				})
 			})
 		})
 	})

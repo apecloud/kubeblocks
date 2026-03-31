@@ -387,7 +387,7 @@ func TestParameterViewReconcileRejectsWriteInReadOnlyMode(t *testing.T) {
 	}
 }
 
-func TestParameterViewReconcileRejectsMarkerLineStaticEdits(t *testing.T) {
+func TestParameterViewReconcileWritesMarkerLineStaticEdits(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
 		fileName:        fileName,
 		fileFormat:      parametersv1alpha1.Ini,
@@ -621,8 +621,8 @@ func TestParameterViewReconcileReturnsReadyAfterRuntimeCatchesUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reconcile failed: %v", err)
 	}
-	if result.RequeueAfter != parameterViewApplyingRequeueAfter {
-		t.Fatalf("expected requeueAfter %s, got %s", parameterViewApplyingRequeueAfter, result.RequeueAfter)
+	if result.RequeueAfter != 0 {
+		t.Fatalf("expected no requeue, got %s", result.RequeueAfter)
 	}
 
 	rendered := &corev1.ConfigMap{}
@@ -780,8 +780,8 @@ func TestParameterViewReconcileReturnsReadyAfterMarkerLineRuntimeCatchesUp(t *te
 	if err != nil {
 		t.Fatalf("reconcile failed: %v", err)
 	}
-	if result.RequeueAfter != parameterViewApplyingRequeueAfter {
-		t.Fatalf("expected requeueAfter %s, got %s", parameterViewApplyingRequeueAfter, result.RequeueAfter)
+	if result.RequeueAfter != 0 {
+		t.Fatalf("expected no requeue, got %s", result.RequeueAfter)
 	}
 
 	rendered := &corev1.ConfigMap{}
@@ -1210,6 +1210,10 @@ var _ = Describe("ParameterView Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
 			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
 			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=OFF"))
+			g.Expect(obj.Labels).Should(HaveKeyWithValue(parameterViewParameterRefLabelKey, cfgKey.Name))
+			g.Expect(obj.Labels).Should(HaveKeyWithValue(parameterViewTemplateLabelKey, configSpecName))
+			g.Expect(obj.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterName))
+			g.Expect(obj.Labels).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, defaultCompName))
 		})).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
@@ -1325,6 +1329,117 @@ var _ = Describe("ParameterView Controller", func() {
 
 		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
 			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewApplyingPhase))
+		})).Should(Succeed())
+	})
+
+	It("refreshes to Ready when runtime config catches up", func() {
+		_, _, _, _, _ = mockReconcileResource()
+
+		cfgKey := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+		}
+		runtimeKey := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      parameterscore.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+			g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+		})).Should(Succeed())
+
+		viewKey := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      "parameterview-phase4-runtime-ready",
+		}
+		view := &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: viewKey.Namespace,
+				Name:      viewKey.Name,
+				Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: cfgKey.Name},
+				TemplateName: configSpecName,
+				FileName:     testparameters.MysqlConfigFile,
+			},
+		}
+		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
+
+		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=OFF"))
+		})).Should(Succeed())
+
+		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {
+			obj.Spec.Content.Text = strings.Replace(obj.Spec.Content.Text, "gtid_mode=OFF", "gtid_mode=ON", 1)
+		})()).Should(Succeed())
+
+		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewApplyingPhase))
+		})).Should(Succeed())
+
+		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
+			cm.Data[testparameters.MysqlConfigFile] = strings.Replace(cm.Data[testparameters.MysqlConfigFile], "gtid_mode=OFF", "gtid_mode=ON", 1)
+		})()).Should(Succeed())
+
+		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=ON"))
+		})).Should(Succeed())
+	})
+
+	It("marks Conflict when runtime config drifts from the current view", func() {
+		_, _, _, _, _ = mockReconcileResource()
+
+		cfgKey := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+		}
+		runtimeKey := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      parameterscore.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+			g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+		})).Should(Succeed())
+
+		viewKey := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      "parameterview-phase4-runtime-conflict",
+		}
+		view := &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: viewKey.Namespace,
+				Name:      viewKey.Name,
+				Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: cfgKey.Name},
+				TemplateName: configSpecName,
+				FileName:     testparameters.MysqlConfigFile,
+			},
+		}
+		Expect(k8sClient.Create(testCtx.Ctx, view)).Should(Succeed())
+
+		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewReadyPhase))
+			g.Expect(obj.Spec.Content.Text).Should(ContainSubstring("gtid_mode=OFF"))
+		})).Should(Succeed())
+
+		Expect(testapps.GetAndChangeObj(&testCtx, runtimeKey, func(cm *corev1.ConfigMap) {
+			cm.Data[testparameters.MysqlConfigFile] = strings.Replace(cm.Data[testparameters.MysqlConfigFile], "gtid_mode=OFF", "gtid_mode=ON", 1)
+		})()).Should(Succeed())
+
+		Eventually(testapps.CheckObj(&testCtx, viewKey, func(g Gomega, obj *parametersv1alpha1.ParameterView) {
+			g.Expect(obj.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.ParameterViewConflictPhase))
+			var reason string
+			for _, condition := range obj.Status.Conditions {
+				if condition.Type == parameterViewReadyCondition {
+					reason = condition.Reason
+					break
+				}
+			}
+			g.Expect(reason).Should(BeEquivalentTo(parameterViewReasonSourceChanged))
 		})).Should(Succeed())
 	})
 })

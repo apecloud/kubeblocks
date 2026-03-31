@@ -21,23 +21,24 @@ package parameters
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -59,7 +60,8 @@ const (
 	parameterViewReasonUnsupportedContentChanges = "UnsupportedContentChanges"
 	parameterViewReasonApplying                  = "Applying"
 
-	parameterViewApplyingRequeueAfter = 2 * time.Second
+	parameterViewParameterRefLabelKey = "parameters.kubeblocks.io/parameter-ref"
+	parameterViewTemplateLabelKey     = "parameters.kubeblocks.io/template-name"
 )
 
 // ParameterViewReconciler reconciles a ParameterView object.
@@ -72,6 +74,8 @@ type ParameterViewReconciler struct {
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterviews,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterviews/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterviews/finalizers,verbs=update
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=componentparameters,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop.
 func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -112,6 +116,9 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	specChanged := false
 	specPatch := client.MergeFrom(view.DeepCopy())
+	if setParameterViewLabels(view, compParam) {
+		specChanged = true
+	}
 	if view.Spec.Content.Type == "" {
 		view.Spec.Content.Type = parametersv1alpha1.PlainTextParameterViewContentType
 		specChanged = true
@@ -240,7 +247,77 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func (r *ParameterViewReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&parametersv1alpha1.ParameterView{}).
+		Watches(&parametersv1alpha1.ComponentParameter{}, handler.EnqueueRequestsFromMapFunc(r.enqueueByComponentParameter)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.enqueueByConfigMap)).
 		Complete(r)
+}
+
+func (r *ParameterViewReconciler) enqueueByComponentParameter(_ context.Context, object client.Object) []reconcile.Request {
+	compParam, ok := object.(*parametersv1alpha1.ComponentParameter)
+	if !ok {
+		return nil
+	}
+	return r.listParameterViewRequests(context.Background(), compParam.Namespace, client.MatchingLabels(
+		buildParameterViewLabels(compParam.Spec.ClusterName, compParam.Spec.ComponentName, compParam.Name, ""),
+	))
+}
+
+func (r *ParameterViewReconciler) enqueueByConfigMap(ctx context.Context, object client.Object) []reconcile.Request {
+	configMap, ok := object.(*corev1.ConfigMap)
+	if !ok {
+		return nil
+	}
+	clusterName := configMap.Labels[constant.AppInstanceLabelKey]
+	componentName := configMap.Labels[constant.KBAppComponentLabelKey]
+	templateName := configMap.Labels[constant.CMConfigurationSpecProviderLabelKey]
+	if clusterName == "" || componentName == "" || templateName == "" {
+		return nil
+	}
+	return r.listParameterViewRequests(ctx, configMap.Namespace, client.MatchingLabels(
+		buildParameterViewLabels(clusterName, componentName, "", templateName),
+	))
+}
+
+func (r *ParameterViewReconciler) listParameterViewRequests(ctx context.Context, namespace string, opts ...client.ListOption) []reconcile.Request {
+	viewList := &parametersv1alpha1.ParameterViewList{}
+	listOpts := append([]client.ListOption{client.InNamespace(namespace)}, opts...)
+	if err := r.Client.List(ctx, viewList, listOpts...); err != nil {
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(viewList.Items))
+	for i := range viewList.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&viewList.Items[i]),
+		})
+	}
+	return requests
+}
+
+func buildParameterViewLabels(clusterName, componentName, parameterRefName, templateName string) map[string]string {
+	labels := constant.GetCompLabels(clusterName, componentName)
+	if parameterRefName != "" {
+		labels[parameterViewParameterRefLabelKey] = parameterRefName
+	}
+	if templateName != "" {
+		labels[parameterViewTemplateLabelKey] = templateName
+	}
+	return labels
+}
+
+func setParameterViewLabels(view *parametersv1alpha1.ParameterView, compParam *parametersv1alpha1.ComponentParameter) bool {
+	expected := buildParameterViewLabels(compParam.Spec.ClusterName, compParam.Spec.ComponentName, compParam.Name, view.Spec.TemplateName)
+	if view.Labels == nil {
+		view.Labels = map[string]string{}
+	}
+	changed := false
+	for key, value := range expected {
+		if view.Labels[key] == value {
+			continue
+		}
+		view.Labels[key] = value
+		changed = true
+	}
+	return changed
 }
 
 type parameterViewSource struct {
@@ -298,6 +375,8 @@ func (r *ParameterViewReconciler) resolveContent(ctx context.Context, compParam 
 		if content, ok := running.Data[fileName]; ok {
 			return content, nil
 		}
+	} else if !errors.IsNotFound(err) {
+		return "", err
 	}
 
 	if item.ConfigFileParams != nil {
@@ -492,8 +571,11 @@ func (r *ParameterViewReconciler) equalConfigSemantics(ctx context.Context,
 }
 
 func hashContent(content string) string {
-	sum := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(sum[:])
+	hash, err := intctrlutil.ComputeHash(content)
+	if err != nil {
+		panic(err)
+	}
+	return hash
 }
 
 func containsPhrase(message, phrase string) bool {
@@ -565,7 +647,7 @@ func (r *ParameterViewReconciler) markApplying(reqCtx intctrlutil.RequestCtx, vi
 	if _, err := r.patchStatus(reqCtx, view, parametersv1alpha1.ParameterViewApplyingPhase, msg, metav1.ConditionFalse, parameterViewReasonApplying, msg); err != nil {
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{RequeueAfter: parameterViewApplyingRequeueAfter}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *ParameterViewReconciler) markInvalid(reqCtx intctrlutil.RequestCtx, view *parametersv1alpha1.ParameterView, reason, msg string) (ctrl.Result, error) {

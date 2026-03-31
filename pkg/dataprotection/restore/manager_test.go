@@ -484,7 +484,7 @@ var _ = Describe("RestoreManager Test", func() {
 					backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					err = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+					_ = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
 					Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(2))
 				})
 
@@ -497,7 +497,7 @@ var _ = Describe("RestoreManager Test", func() {
 					backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					err = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+					_ = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
 					Expect(restoreMGR.PostReadyBackupSets).Should(HaveLen(2))
 				})
 

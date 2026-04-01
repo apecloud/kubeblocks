@@ -58,6 +58,7 @@ const (
 	parameterViewReasonReadOnly                  = "ReadOnly"
 	parameterViewReasonDraftOutdated             = "DraftOutdated"
 	parameterViewReasonDiffFailed                = "DiffFailed"
+	parameterViewReasonSchemaValidationFailed    = "SchemaValidationFailed"
 	parameterViewReasonInvalidMarkerSyntax       = "InvalidMarkerSyntax"
 	parameterViewReasonUnsupportedContentChanges = "UnsupportedContentChanges"
 	parameterViewReasonApplying                  = "Applying"
@@ -264,8 +265,6 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				fmt.Sprintf("draft is based on an outdated revision for %s/%s; continue editing to retry replay or set resetToLatest=true to discard the draft",
 					view.Spec.TemplateName, view.Spec.FileName),
 				composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
-		case view.Spec.Mode == parametersv1alpha1.ParameterViewReadOnlyMode:
-			panic("unreachable")
 		default:
 			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
 			if err != nil {
@@ -830,7 +829,7 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 		return nil, fmt.Errorf("%s: edited content cannot be represented as desired parameter updates", parameterViewReasonUnsupportedContentChanges)
 	}
 	if err := parameterscore.ValidateConfigPatch(patch, descs); err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
 
 	desiredPatch := make(parametersv1alpha1.ParameterValueMap)
@@ -852,20 +851,20 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 		cfgCtx.templates,
 		cfgCtx.configDescs,
 	); err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
 
 	valueManager := parameters.NewValueManager(cfgCtx.paramsDefs, descs)
 	updatedParams, err := parameterscore.FromStringMap(desiredPatch, valueManager.BuildValueTransformer(view.Spec.FileName))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
 	mergedData, err := parameters.MergeAndValidateConfigs(baseData, []parameterscore.ParamPairs{{
 		Key:           view.Spec.FileName,
 		UpdatedParams: updatedParams,
 	}}, cfgCtx.paramsDefs, descs)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", parameterViewReasonUnsupportedContentChanges, err)
+		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
 	semanticPatch, _, err := parameterscore.CreateConfigPatch(mergedData, updatedData, descs, false)
 	if err != nil {
@@ -1048,6 +1047,8 @@ func (r *ParameterViewReconciler) markInvalidForDesiredPatchError(reqCtx intctrl
 	switch {
 	case containsPhrase(msg, parameterViewReasonDiffFailed):
 		return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, trimReasonPrefix(msg, parameterViewReasonDiffFailed), updateStatus)
+	case containsPhrase(msg, parameterViewReasonSchemaValidationFailed):
+		return r.markInvalid(reqCtx, view, parameterViewReasonSchemaValidationFailed, trimReasonPrefix(msg, parameterViewReasonSchemaValidationFailed), updateStatus)
 	default:
 		return r.markInvalid(reqCtx, view, parameterViewReasonUnsupportedContentChanges, trimReasonPrefix(msg, parameterViewReasonUnsupportedContentChanges), updateStatus)
 	}

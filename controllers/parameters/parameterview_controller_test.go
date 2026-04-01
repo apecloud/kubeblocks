@@ -44,6 +44,7 @@ import (
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestParameterViewReconcileInitializesPlainTextContent(t *testing.T) {
@@ -1310,6 +1311,68 @@ func TestParameterViewReconcileRejectsUnsupportedPlainTextEdits(t *testing.T) {
 	assertParameterViewConditionReason(t, view, parameterViewReasonUnsupportedContentChanges)
 }
 
+func TestParameterViewReconcileRejectsSchemaInvalidParameterValue(t *testing.T) {
+	mysqlCue, err := testdata.GetTestDataFileContent("cue_testdata/mysql.cue")
+	if err != nil {
+		t.Fatalf("load mysql cue failed: %v", err)
+	}
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
+		fileName:        fileName,
+		fileFormat:      parametersv1alpha1.Ini,
+		runtimeContent:  "[mysqld]\nbinlog_format=MIXED\n",
+		templateContent: "[mysqld]\nbinlog_format=MIXED\n",
+		dynamicParameters: []string{
+			"default.binlog_format",
+		},
+		parametersSchema: &parametersv1alpha1.ParametersSchema{
+			CUE: string(mysqlCue),
+		},
+		view: &parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content: parametersv1alpha1.ParameterViewContent{
+					Type: parametersv1alpha1.PlainTextParameterViewContentType,
+					Text: "[mysqld]\nbinlog_format=BAD\n",
+				},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nbinlog_format=MIXED\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("[mysqld]\nbinlog_format=MIXED\n"),
+				},
+			},
+		},
+	})...)
+
+	_, err = reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewInvalidPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewInvalidPhase, view.Status.Phase)
+	}
+	assertParameterViewConditionReason(t, view, parameterViewReasonSchemaValidationFailed)
+}
+
 func TestParameterViewReconcileWritesYAMLPlainTextToDesiredParameters(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjectsWithOptions(parameterViewTestOptions{
 		fileName:        "config.yaml",
@@ -1555,6 +1618,7 @@ type parameterViewTestOptions struct {
 	fileFormat          parametersv1alpha1.CfgFileFormat
 	runtimeContent      string
 	templateContent     string
+	parametersSchema    *parametersv1alpha1.ParametersSchema
 	dynamicParameters   []string
 	staticParameters    []string
 	immutableParameters []string
@@ -1648,6 +1712,7 @@ func newParameterViewTestObjectsWithOptions(opts parameterViewTestOptions) []run
 			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
 				Format: opts.fileFormat,
 			},
+			ParametersSchema:    opts.parametersSchema,
 			DynamicParameters:   opts.dynamicParameters,
 			StaticParameters:    opts.staticParameters,
 			ImmutableParameters: opts.immutableParameters,

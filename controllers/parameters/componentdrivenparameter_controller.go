@@ -152,7 +152,7 @@ func (r *ComponentDrivenParameterReconciler) delete(reqCtx intctrlutil.RequestCt
 }
 
 func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCtx, expected, existing *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
-	// By design, init values are seeded only when the ComponentParameter is first created.
+	// By design, initial inputs are seeded only when the ComponentParameter is first created.
 	// Subsequent Component-driven updates only synchronize metadata and preserve the existing init payload.
 	mergedObject := r.mergeComponentParameter(expected, existing)
 	if reflect.DeepEqual(mergedObject, existing) {
@@ -269,17 +269,17 @@ func (r *ComponentDrivenParameterReconciler) buildComponentParameter(reqCtx intc
 		return nil, nil
 	}
 
-	var initValues *parametersv1alpha1.ParameterValues
+	var initialInputs *parametersv1alpha1.ParameterInputs
 	if includeInitOverlay {
-		init, err := resolveInitParameters(reqCtx, reader, comp)
+		initial, err := resolveInitParameters(reqCtx, reader, comp)
 		if err != nil {
 			return nil, err
 		}
-		if err = validateCustomTemplate(reqCtx.Ctx, reader, init.Templates); err != nil {
+		if err = validateCustomTemplate(reqCtx.Ctx, reader, initial.Templates); err != nil {
 			return nil, err
 		}
-		if len(init.Parameters) != 0 || len(init.Templates) != 0 {
-			initValues = init.DeepCopy()
+		if len(initial.Assignments) != 0 || len(initial.Updates) != 0 || len(initial.UnmanagedUpdates) != 0 || len(initial.Templates) != 0 {
+			initialInputs = initial.DeepCopy()
 		}
 	}
 
@@ -290,7 +290,7 @@ func (r *ComponentDrivenParameterReconciler) buildComponentParameter(reqCtx intc
 		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, compName, cmpd.Name)).
 		SetClusterName(clusterName).
 		SetCompName(compName).
-		SetInit(initValues).
+		SetInitial(initialInputs).
 		GetObject()
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
@@ -298,9 +298,9 @@ func (r *ComponentDrivenParameterReconciler) buildComponentParameter(reqCtx intc
 	return parameterObj, nil
 }
 
-func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ParameterValues, error) {
+func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ParameterInputs, error) {
 	if comp == nil {
-		return &parametersv1alpha1.ParameterValues{}, nil
+		return &parametersv1alpha1.ParameterInputs{}, nil
 	}
 	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
@@ -315,7 +315,7 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 		if client.IgnoreNotFound(err) != nil {
 			return nil, err
 		}
-		return &parametersv1alpha1.ParameterValues{}, nil
+		return &parametersv1alpha1.ParameterInputs{}, nil
 	}
 	initParams, err := parametersv1alpha1.ParseInitParameters(cluster)
 	if err != nil {
@@ -324,7 +324,7 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 	}
 	spec := initParams.Get(compName)
 	if spec == nil {
-		return &parametersv1alpha1.ParameterValues{}, nil
+		return &parametersv1alpha1.ParameterInputs{}, nil
 	}
 	return spec, nil
 }

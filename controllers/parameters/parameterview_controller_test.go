@@ -343,7 +343,7 @@ func TestParameterViewReconcileReappliesDraftWhenSourceDriftIsExpressible(t *tes
 		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
 	}
 	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
-	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", parametersv1alpha1.ParameterValueMap{
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", map[string]*string{
 		"default.max_connections": ptr.To("1500"),
 	})
 
@@ -351,7 +351,7 @@ func TestParameterViewReconcileReappliesDraftWhenSourceDriftIsExpressible(t *tes
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if got := compParam.Spec.Desired.Parameters["default.max_connections"]; got == nil || *got != "1500" {
+	if got := compParam.Spec.Desired.Assignments["default.max_connections"]; got == nil || *got != "1500" {
 		t.Fatalf("expected desired default.max_connections=1500, got %#v", got)
 	}
 }
@@ -400,7 +400,7 @@ func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T)
 		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
 	}
 	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
-	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", parametersv1alpha1.ParameterValueMap{
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1500\n", map[string]*string{
 		"default.max_connections": ptr.To("1500"),
 	})
 
@@ -408,10 +408,10 @@ func TestParameterViewReconcileWritesPlainTextToComponentParameter(t *testing.T)
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Parameters == nil {
+	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Assignments == nil {
 		t.Fatalf("expected desired parameters to be written")
 	}
-	if got := compParam.Spec.Desired.Parameters["default.max_connections"]; got == nil || *got != "1500" {
+	if got := compParam.Spec.Desired.Assignments["default.max_connections"]; got == nil || *got != "1500" {
 		t.Fatalf("expected desired default.max_connections=1500, got %#v", got)
 	}
 }
@@ -480,7 +480,7 @@ func TestParameterViewReconcileWritesMarkerLineToComponentParameter(t *testing.T
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if got := compParam.Spec.Desired.Parameters["mysqld.max_connections"]; got == nil || *got != "1500" {
+	if got := compParam.Spec.Desired.Assignments["mysqld.max_connections"]; got == nil || *got != "1500" {
 		t.Fatalf("expected desired mysqld.max_connections=1500, got %#v", got)
 	}
 }
@@ -535,8 +535,8 @@ func TestParameterViewReconcileRejectsWriteInReadOnlyMode(t *testing.T) {
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if compParam.Spec.Desired != nil && len(compParam.Spec.Desired.Parameters) != 0 {
-		t.Fatalf("expected desired parameters to remain unchanged, got %#v", compParam.Spec.Desired.Parameters)
+	if compParam.Spec.Desired != nil && len(compParam.Spec.Desired.Assignments) != 0 {
+		t.Fatalf("expected desired parameters to remain unchanged, got %#v", compParam.Spec.Desired.Assignments)
 	}
 }
 
@@ -601,7 +601,7 @@ func TestParameterViewReconcileWritesMarkerLineStaticEdits(t *testing.T) {
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if got := compParam.Spec.Desired.Parameters["mysqld.sync_binlog"]; got == nil || *got != "2" {
+	if got := compParam.Spec.Desired.Assignments["mysqld.sync_binlog"]; got == nil || *got != "2" {
 		t.Fatalf("expected desired mysqld.sync_binlog=2, got %#v", got)
 	}
 }
@@ -747,8 +747,8 @@ func TestParameterViewReconcileKeepsApplyingWhenDesiredAlreadySubmitted(t *testi
 			},
 		},
 		func(cp *parametersv1alpha1.ComponentParameter) {
-			cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
-				Parameters: parametersv1alpha1.ParameterValueMap{
+			cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
 					"default.max_connections": ptr.To("1500"),
 				},
 			}
@@ -804,7 +804,7 @@ func TestParameterViewReconcileMarksLatestSubmissionMergeFailed(t *testing.T) {
 						ContentHash: hashContent("max_connections=1500\n"),
 					},
 					SubmittedAt: &now,
-					Parameters: parametersv1alpha1.ParameterValueMap{
+					Assignments: map[string]*string{
 						"default.max_connections": ptr.To("1500"),
 					},
 					Result: parametersv1alpha1.ParameterViewSubmissionResult{
@@ -817,8 +817,8 @@ func TestParameterViewReconcileMarksLatestSubmissionMergeFailed(t *testing.T) {
 			},
 		},
 		func(cp *parametersv1alpha1.ComponentParameter) {
-			cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
-				Parameters: parametersv1alpha1.ParameterValueMap{
+			cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
 					"default.max_connections": ptr.To("1500"),
 				},
 			}
@@ -879,7 +879,7 @@ func TestParameterViewReconcileMarksLatestSubmissionReconfigureFailed(t *testing
 						ContentHash: hashContent("max_connections=1500\n"),
 					},
 					SubmittedAt: &now,
-					Parameters: parametersv1alpha1.ParameterValueMap{
+					Assignments: map[string]*string{
 						"default.max_connections": ptr.To("1500"),
 					},
 					Result: parametersv1alpha1.ParameterViewSubmissionResult{
@@ -893,8 +893,8 @@ func TestParameterViewReconcileMarksLatestSubmissionReconfigureFailed(t *testing
 		},
 		func(cp *parametersv1alpha1.ComponentParameter) {
 			msg := "rolling restart failed on pod test-0"
-			cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
-				Parameters: parametersv1alpha1.ParameterValueMap{
+			cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
 					"default.max_connections": ptr.To("1500"),
 				},
 			}
@@ -959,8 +959,8 @@ func TestParameterViewReconcileReturnsReadyAfterRuntimeCatchesUp(t *testing.T) {
 			},
 		},
 		func(cp *parametersv1alpha1.ComponentParameter) {
-			cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
-				Parameters: parametersv1alpha1.ParameterValueMap{
+			cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
 					"default.max_connections": ptr.To("1500"),
 				},
 			}
@@ -1142,7 +1142,7 @@ func TestParameterViewReconcileRetriesDraftReplayWhileInConflict(t *testing.T) {
 	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
 		t.Fatalf("expected phase %q, got %q with message %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase, view.Status.Message)
 	}
-	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1200\n", parametersv1alpha1.ParameterValueMap{
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "max_connections=1200\n", map[string]*string{
 		"default.max_connections": ptr.To("1200"),
 	})
 	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
@@ -1157,10 +1157,10 @@ func TestParameterViewReconcileRetriesDraftReplayWhileInConflict(t *testing.T) {
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Parameters == nil {
+	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Assignments == nil {
 		t.Fatalf("expected desired parameters to be written")
 	}
-	if got := compParam.Spec.Desired.Parameters["default.max_connections"]; got == nil || *got != "1200" {
+	if got := compParam.Spec.Desired.Assignments["default.max_connections"]; got == nil || *got != "1200" {
 		t.Fatalf("expected desired default.max_connections=1200, got %#v", got)
 	}
 }
@@ -1206,8 +1206,8 @@ func TestParameterViewReconcileReturnsReadyAfterMarkerLineRuntimeCatchesUp(t *te
 		},
 		mutate: []func(*parametersv1alpha1.ComponentParameter){
 			func(cp *parametersv1alpha1.ComponentParameter) {
-				cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
-					Parameters: parametersv1alpha1.ParameterValueMap{
+				cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
 						"mysqld.max_connections": ptr.To("1500"),
 					},
 				}
@@ -1422,7 +1422,7 @@ func TestParameterViewReconcileWritesYAMLPlainTextToDesiredParameters(t *testing
 	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
 		t.Fatalf("expected phase %q, got %q with message %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase, view.Status.Message)
 	}
-	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "maxConnections: \"1500\"\n", parametersv1alpha1.ParameterValueMap{
+	assertParameterViewLastSubmission(t, view, fmt.Sprint(componentParameterGeneration), "maxConnections: \"1500\"\n", map[string]*string{
 		"maxConnections": ptr.To("1500"),
 	})
 
@@ -1430,10 +1430,10 @@ func TestParameterViewReconcileWritesYAMLPlainTextToDesiredParameters(t *testing
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Parameters == nil {
+	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Assignments == nil {
 		t.Fatalf("expected desired parameters to be written")
 	}
-	if got := compParam.Spec.Desired.Parameters["maxConnections"]; got == nil || *got != "1500" {
+	if got := compParam.Spec.Desired.Assignments["maxConnections"]; got == nil || *got != "1500" {
 		t.Fatalf("expected desired maxConnections=1500, got %#v", got)
 	}
 }
@@ -1492,15 +1492,15 @@ func TestParameterViewReconcileWritesJSONPlainTextToDesiredParameters(t *testing
 	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: componentParameterName}, compParam); err != nil {
 		t.Fatalf("get component parameter failed: %v", err)
 	}
-	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Parameters == nil {
+	if compParam.Spec.Desired == nil || compParam.Spec.Desired.Assignments == nil {
 		t.Fatalf("expected desired parameters to be written")
 	}
-	if got := compParam.Spec.Desired.Parameters["maxconnections"]; got == nil || *got != "1500" {
+	if got := compParam.Spec.Desired.Assignments["maxconnections"]; got == nil || *got != "1500" {
 		t.Fatalf("expected desired maxconnections=1500, got %#v", got)
 	}
 }
 
-func assertParameterViewLastSubmission(t *testing.T, view *parametersv1alpha1.ParameterView, revision, content string, parameters parametersv1alpha1.ParameterValueMap) {
+func assertParameterViewLastSubmission(t *testing.T, view *parametersv1alpha1.ParameterView, revision, content string, parameters map[string]*string) {
 	t.Helper()
 
 	if len(view.Status.Submissions) == 0 {
@@ -1516,8 +1516,8 @@ func assertParameterViewLastSubmission(t *testing.T, view *parametersv1alpha1.Pa
 	if got.SubmittedAt == nil || got.SubmittedAt.IsZero() {
 		t.Fatalf("expected latest submission submittedAt to be set")
 	}
-	if !equalParameterValueMap(got.Parameters, parameters) {
-		t.Fatalf("expected latest submission parameters %#v, got %#v", parameters, got.Parameters)
+	if !equalParameterValueMap(got.Assignments, parameters) {
+		t.Fatalf("expected latest submission parameters %#v, got %#v", parameters, got.Assignments)
 	}
 	assertParameterViewSubmissionResult(t, got, parametersv1alpha1.ParameterViewSubmissionProcessingPhase, parameterViewSubmissionReasonProcessing, "submission is being processed by ComponentParameter")
 }
@@ -1548,7 +1548,7 @@ func TestCompactSubmissionsKeepsNewestEntriesWithinCap(t *testing.T) {
 				Revision:    fmt.Sprintf("%d", i),
 				ContentHash: fmt.Sprintf("h-%d", i),
 			},
-			Parameters: parametersv1alpha1.ParameterValueMap{
+			Assignments: map[string]*string{
 				fmt.Sprintf("p-%d", i): ptr.To(fmt.Sprintf("v-%d", i)),
 			},
 		})
@@ -1824,7 +1824,7 @@ var _ = Describe("ParameterView Controller", func() {
 
 		Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 			g.Expect(cfg.Spec.Desired).ShouldNot(BeNil())
-			g.Expect(cfg.Spec.Desired.Parameters).Should(HaveKeyWithValue("gtid_mode", ptr.To("ON")))
+			g.Expect(cfg.Spec.Desired.Assignments).Should(HaveKeyWithValue("gtid_mode", ptr.To("ON")))
 		})).Should(Succeed())
 	})
 
@@ -1871,10 +1871,10 @@ var _ = Describe("ParameterView Controller", func() {
 		})).Should(Succeed())
 
 		Consistently(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
-			if cfg.Spec.Desired == nil || cfg.Spec.Desired.Parameters == nil {
+			if cfg.Spec.Desired == nil || cfg.Spec.Desired.Assignments == nil {
 				return
 			}
-			g.Expect(cfg.Spec.Desired.Parameters).ShouldNot(HaveKey("mysqld.gtid_mode"))
+			g.Expect(cfg.Spec.Desired.Assignments).ShouldNot(HaveKey("mysqld.gtid_mode"))
 		})).Should(Succeed())
 	})
 
@@ -1913,12 +1913,12 @@ var _ = Describe("ParameterView Controller", func() {
 
 		Expect(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
 			if cfg.Spec.Desired == nil {
-				cfg.Spec.Desired = &parametersv1alpha1.ParameterValues{}
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
 			}
-			if cfg.Spec.Desired.Parameters == nil {
-				cfg.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
+			if cfg.Spec.Desired.Assignments == nil {
+				cfg.Spec.Desired.Assignments = map[string]*string{}
 			}
-			cfg.Spec.Desired.Parameters["gtid_mode"] = ptr.To("ON")
+			cfg.Spec.Desired.Assignments["gtid_mode"] = ptr.To("ON")
 		})()).Should(Succeed())
 
 		Expect(testapps.GetAndChangeObj(&testCtx, viewKey, func(obj *parametersv1alpha1.ParameterView) {

@@ -166,7 +166,7 @@ func (r *ComponentParameterReconciler) reconcileConfigItemDetails(reqCtx intctrl
 }
 
 func (r *ComponentParameterReconciler) reconcileParameterValues(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, bool, error) {
-	if compParam.Spec.Init == nil && compParam.Spec.Desired == nil {
+	if compParam.Spec.Initial == nil && compParam.Spec.Desired == nil {
 		return false, false, nil
 	}
 	patched, err := reconcileParameterValuesIntoSpec(reqCtx.Ctx, r.Client, compParam, fetchTask)

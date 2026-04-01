@@ -102,7 +102,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			GetObject()
 		Expect(parametersv1alpha1.SetInitParameters(cluster, parametersv1alpha1.InitParameters{
 			defaultCompName: {
-				Parameters: parametersv1alpha1.ParameterValueMap{
+				Assignments: map[string]*string{
 					"innodb_buffer_pool_size": pointer.String("1024M"),
 					"max_connections":         pointer.String("100"),
 				},
@@ -149,10 +149,10 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
-				g.Expect(parameter.Spec.Init).ShouldNot(BeNil())
-				g.Expect(parameter.Spec.Init.Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
-				g.Expect(parameter.Spec.Init.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
-				g.Expect(parameter.Spec.Init.Templates).Should(HaveKey(configSpecName))
+				g.Expect(parameter.Spec.Initial).ShouldNot(BeNil())
+				g.Expect(parameter.Spec.Initial.Assignments).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
+				g.Expect(parameter.Spec.Initial.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				g.Expect(parameter.Spec.Initial.Templates).Should(HaveKey(configSpecName))
 				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
@@ -205,9 +205,9 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
 				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(runtimeTpl.Name))
 				g.Expect(item.CustomTemplates.Namespace).Should(Equal(runtimeTpl.Namespace))
-				g.Expect(parameter.Spec.Init).ShouldNot(BeNil())
-				g.Expect(parameter.Spec.Init.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
-				g.Expect(parameter.Spec.Init.Templates).Should(HaveKey(configSpecName))
+				g.Expect(parameter.Spec.Initial).ShouldNot(BeNil())
+				g.Expect(parameter.Spec.Initial.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				g.Expect(parameter.Spec.Initial.Templates).Should(HaveKey(configSpecName))
 			})).Should(Succeed())
 		})
 

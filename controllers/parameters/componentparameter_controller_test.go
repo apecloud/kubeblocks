@@ -152,8 +152,8 @@ var _ = Describe("ComponentParameter Controller", func() {
 
 			By("update desired state instead of config item details directly")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				cfg.Spec.Desired = &parametersv1alpha1.ParameterValues{
-					Parameters: parametersv1alpha1.ParameterValueMap{
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
 					},
 					Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
@@ -184,13 +184,13 @@ var _ = Describe("ComponentParameter Controller", func() {
 				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				cfg.Spec.Init = &parametersv1alpha1.ParameterValues{
-					Parameters: parametersv1alpha1.ParameterValueMap{
+				cfg.Spec.Initial = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("1000"),
 					},
 				}
-				cfg.Spec.Desired = &parametersv1alpha1.ParameterValues{
-					Parameters: parametersv1alpha1.ParameterValueMap{
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
 					},
 				}
@@ -201,6 +201,34 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
 				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+		})
+
+		It("should let explicit desired remove override assignments", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					Updates: []parametersv1alpha1.ParameterUpdate{{
+						Type: parametersv1alpha1.ParameterUpdateRemove,
+						Key:  "max_connections",
+					}},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
+				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKey("max_connections"))
+				g.Expect(item.ConfigFileParams["my.cnf"].Parameters["max_connections"]).Should(BeNil())
 			})).Should(Succeed())
 		})
 

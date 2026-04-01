@@ -414,11 +414,11 @@ func syncBaseRevision(view *parametersv1alpha1.ParameterView, source *parameterV
 	return changed
 }
 
-func cloneParameterValueMap(src parametersv1alpha1.ParameterValueMap) parametersv1alpha1.ParameterValueMap {
+func cloneParameterValueMap(src map[string]*string) map[string]*string {
 	if len(src) == 0 {
 		return nil
 	}
-	dst := make(parametersv1alpha1.ParameterValueMap, len(src))
+	dst := make(map[string]*string, len(src))
 	for key, value := range src {
 		if value == nil {
 			dst[key] = nil
@@ -430,7 +430,7 @@ func cloneParameterValueMap(src parametersv1alpha1.ParameterValueMap) parameters
 	return dst
 }
 
-func equalParameterValueMap(a, b parametersv1alpha1.ParameterValueMap) bool {
+func equalParameterValueMap(a, b map[string]*string) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -467,7 +467,7 @@ func updateBaseAndLatestStatus(source *parameterViewSource) func(*parametersv1al
 	}
 }
 
-func updateSubmissionStatus(revision, content string, parameters parametersv1alpha1.ParameterValueMap) func(*parametersv1alpha1.ParameterViewStatus) {
+func updateSubmissionStatus(revision, content string, parameters map[string]*string) func(*parametersv1alpha1.ParameterViewStatus) {
 	return func(status *parametersv1alpha1.ParameterViewStatus) {
 		now := metav1.Now()
 		submission := parametersv1alpha1.ParameterViewSubmission{
@@ -476,7 +476,7 @@ func updateSubmissionStatus(revision, content string, parameters parametersv1alp
 				ContentHash: hashContent(content),
 			},
 			SubmittedAt: &now,
-			Parameters:  cloneParameterValueMap(parameters),
+			Assignments: cloneParameterValueMap(parameters),
 			Result: parametersv1alpha1.ParameterViewSubmissionResult{
 				Phase:     parametersv1alpha1.ParameterViewSubmissionProcessingPhase,
 				Reason:    parameterViewSubmissionReasonProcessing,
@@ -489,7 +489,7 @@ func updateSubmissionStatus(revision, content string, parameters parametersv1alp
 }
 
 func updateSubmissionAndResultStatus(compParam *parametersv1alpha1.ComponentParameter, templateName string,
-	source *parameterViewSource, content string, parameters parametersv1alpha1.ParameterValueMap) func(*parametersv1alpha1.ParameterViewStatus) {
+	source *parameterViewSource, content string, parameters map[string]*string) func(*parametersv1alpha1.ParameterViewStatus) {
 	return func(status *parametersv1alpha1.ParameterViewStatus) {
 		updateSubmissionStatus(source.revision, content, parameters)(status)
 		syncSubmissionResultsStatus(status, compParam, source, templateName)
@@ -513,7 +513,7 @@ func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, su
 	for _, item := range existing {
 		if item.Revision.Revision == submission.Revision.Revision &&
 			item.Revision.ContentHash == submission.Revision.ContentHash &&
-			equalParameterValueMap(item.Parameters, submission.Parameters) {
+			equalParameterValueMap(item.Assignments, submission.Assignments) {
 			continue
 		}
 		result = append(result, item)
@@ -526,7 +526,7 @@ func findSubmission(existing []parametersv1alpha1.ParameterViewSubmission, targe
 		item := &existing[i]
 		if item.Revision.Revision == target.Revision.Revision &&
 			item.Revision.ContentHash == target.Revision.ContentHash &&
-			equalParameterValueMap(item.Parameters, target.Parameters) {
+			equalParameterValueMap(item.Assignments, target.Assignments) {
 			return item
 		}
 	}
@@ -813,7 +813,7 @@ func (r *ParameterViewReconciler) resolveConfigContext(ctx context.Context,
 
 func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Context,
 	compParam *parametersv1alpha1.ComponentParameter, view *parametersv1alpha1.ParameterView,
-	sourceContent, updatedContent string) (parametersv1alpha1.ParameterValueMap, error) {
+	sourceContent, updatedContent string) (map[string]*string, error) {
 	cfgCtx, err := r.resolveConfigContext(ctx, compParam, view)
 	if err != nil {
 		return nil, err
@@ -832,7 +832,7 @@ func (r *ParameterViewReconciler) resolveDesiredParameterPatch(ctx context.Conte
 		return nil, fmt.Errorf("%s: %w", parameterViewReasonSchemaValidationFailed, err)
 	}
 
-	desiredPatch := make(parametersv1alpha1.ParameterValueMap)
+	desiredPatch := make(map[string]*string)
 	for _, filePatch := range parameterscore.GenerateVisualizedParamsList(patch, descs) {
 		if filePatch.Key != view.Spec.FileName {
 			continue
@@ -961,12 +961,12 @@ func trimReasonPrefix(message, reason string) string {
 	return message
 }
 
-func desiredParametersContain(values *parametersv1alpha1.ParameterValues, patch parametersv1alpha1.ParameterValueMap) bool {
-	if values == nil || len(values.Parameters) == 0 || len(patch) == 0 {
+func desiredParametersContain(inputs *parametersv1alpha1.ParameterInputs, patch map[string]*string) bool {
+	if inputs == nil || len(inputs.Assignments) == 0 || len(patch) == 0 {
 		return false
 	}
 	for key, expected := range patch {
-		actual, ok := values.Parameters[key]
+		actual, ok := inputs.Assignments[key]
 		if !ok {
 			return false
 		}
@@ -981,19 +981,19 @@ func desiredParametersContain(values *parametersv1alpha1.ParameterValues, patch 
 }
 
 func (r *ParameterViewReconciler) patchComponentParameterDesired(ctx context.Context,
-	compParam *parametersv1alpha1.ComponentParameter, patchValues parametersv1alpha1.ParameterValueMap) error {
+	compParam *parametersv1alpha1.ComponentParameter, patchValues map[string]*string) error {
 	if len(patchValues) == 0 {
 		return nil
 	}
 	patch := client.MergeFrom(compParam.DeepCopy())
 	if compParam.Spec.Desired == nil {
-		compParam.Spec.Desired = &parametersv1alpha1.ParameterValues{}
+		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
 	}
-	if compParam.Spec.Desired.Parameters == nil {
-		compParam.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
+	if compParam.Spec.Desired.Assignments == nil {
+		compParam.Spec.Desired.Assignments = map[string]*string{}
 	}
 	for key, value := range patchValues {
-		compParam.Spec.Desired.Parameters[key] = value
+		compParam.Spec.Desired.Assignments[key] = value
 	}
 	return r.Client.Patch(ctx, compParam, patch)
 }

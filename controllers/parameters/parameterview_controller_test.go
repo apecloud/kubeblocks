@@ -771,6 +771,165 @@ func TestParameterViewReconcileKeepsApplyingWhenDesiredAlreadySubmitted(t *testi
 	assertParameterViewConditionReason(t, view, parameterViewReasonApplying)
 }
 
+func TestParameterViewReconcileMarksLatestSubmissionMergeFailed(t *testing.T) {
+	now := metav1.Now()
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1000\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1000\n"),
+				},
+				Submissions: []parametersv1alpha1.ParameterViewSubmission{{
+					Revision: parametersv1alpha1.ParameterViewRevision{
+						Revision:    fmt.Sprint(componentParameterGeneration),
+						ContentHash: hashContent("max_connections=1500\n"),
+					},
+					SubmittedAt: &now,
+					Parameters: parametersv1alpha1.ParameterValueMap{
+						"default.max_connections": ptr.To("1500"),
+					},
+					Result: parametersv1alpha1.ParameterViewSubmissionResult{
+						Phase:     parametersv1alpha1.ParameterViewSubmissionProcessingPhase,
+						Reason:    parameterViewSubmissionReasonProcessing,
+						Message:   "submission is being processed by ComponentParameter",
+						UpdatedAt: &now,
+					},
+				}},
+			},
+		},
+		func(cp *parametersv1alpha1.ComponentParameter) {
+			cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
+				Parameters: parametersv1alpha1.ParameterValueMap{
+					"default.max_connections": ptr.To("1500"),
+				},
+			}
+			cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+			cp.Status.Message = "schema validation failed: max_connections exceeds upper bound"
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewApplyingPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewApplyingPhase, view.Status.Phase)
+	}
+	if len(view.Status.Submissions) == 0 {
+		t.Fatalf("expected submission history to be preserved")
+	}
+	assertParameterViewSubmissionResult(t, view.Status.Submissions[0], parametersv1alpha1.ParameterViewSubmissionFailedPhase, parameterViewSubmissionReasonMergeFailed, "schema validation failed: max_connections exceeds upper bound")
+}
+
+func TestParameterViewReconcileMarksLatestSubmissionReconfigureFailed(t *testing.T) {
+	now := metav1.Now()
+	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
+		"max_connections=1500\n",
+		&parametersv1alpha1.ParameterView{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       parameterViewName,
+				Namespace:  parameterViewNamespace,
+				Generation: 2,
+			},
+			Spec: parametersv1alpha1.ParameterViewSpec{
+				ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+				TemplateName: templateName,
+				FileName:     fileName,
+				Content:      parametersv1alpha1.ParameterViewContent{Type: parametersv1alpha1.PlainTextParameterViewContentType, Text: "max_connections=1500\n"},
+			},
+			Status: parametersv1alpha1.ParameterViewStatus{
+				FileFormat: parametersv1alpha1.Ini,
+				Base: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1500\n"),
+				},
+				Latest: parametersv1alpha1.ParameterViewRevision{
+					Revision:    fmt.Sprint(componentParameterGeneration),
+					ContentHash: hashContent("max_connections=1500\n"),
+				},
+				Submissions: []parametersv1alpha1.ParameterViewSubmission{{
+					Revision: parametersv1alpha1.ParameterViewRevision{
+						Revision:    fmt.Sprint(componentParameterGeneration),
+						ContentHash: hashContent("max_connections=1500\n"),
+					},
+					SubmittedAt: &now,
+					Parameters: parametersv1alpha1.ParameterValueMap{
+						"default.max_connections": ptr.To("1500"),
+					},
+					Result: parametersv1alpha1.ParameterViewSubmissionResult{
+						Phase:     parametersv1alpha1.ParameterViewSubmissionProcessingPhase,
+						Reason:    parameterViewSubmissionReasonProcessing,
+						Message:   "submission is being processed by ComponentParameter",
+						UpdatedAt: &now,
+					},
+				}},
+			},
+		},
+		func(cp *parametersv1alpha1.ComponentParameter) {
+			msg := "rolling restart failed on pod test-0"
+			cp.Spec.Desired = &parametersv1alpha1.ParameterValues{
+				Parameters: parametersv1alpha1.ParameterValueMap{
+					"default.max_connections": ptr.To("1500"),
+				},
+			}
+			cp.Status.Phase = parametersv1alpha1.CFailedAndPausePhase
+			cp.Status.Message = msg
+			cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+				Name:    templateName,
+				Phase:   parametersv1alpha1.CFailedAndPausePhase,
+				Message: &msg,
+				ReconcileDetail: &parametersv1alpha1.ReconcileDetail{
+					ErrMessage: msg,
+				},
+			}}
+		},
+	)...)
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName},
+	})
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	view := &parametersv1alpha1.ParameterView{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: parameterViewNamespace, Name: parameterViewName}, view); err != nil {
+		t.Fatalf("get view failed: %v", err)
+	}
+	if view.Status.Phase != parametersv1alpha1.ParameterViewSyncedPhase {
+		t.Fatalf("expected phase %q, got %q", parametersv1alpha1.ParameterViewSyncedPhase, view.Status.Phase)
+	}
+	if len(view.Status.Submissions) == 0 {
+		t.Fatalf("expected submission history to be preserved")
+	}
+	assertParameterViewSubmissionResult(t, view.Status.Submissions[0], parametersv1alpha1.ParameterViewSubmissionFailedPhase, parameterViewSubmissionReasonReconfigureFailed, "rolling restart failed on pod test-0")
+}
+
 func TestParameterViewReconcileReturnsReadyAfterRuntimeCatchesUp(t *testing.T) {
 	reconciler, cli := newParameterViewTestReconciler(t, newParameterViewTestObjects(
 		"max_connections=1000\n",
@@ -1296,6 +1455,25 @@ func assertParameterViewLastSubmission(t *testing.T, view *parametersv1alpha1.Pa
 	}
 	if !equalParameterValueMap(got.Parameters, parameters) {
 		t.Fatalf("expected latest submission parameters %#v, got %#v", parameters, got.Parameters)
+	}
+	assertParameterViewSubmissionResult(t, got, parametersv1alpha1.ParameterViewSubmissionProcessingPhase, parameterViewSubmissionReasonProcessing, "submission is being processed by ComponentParameter")
+}
+
+func assertParameterViewSubmissionResult(t *testing.T, submission parametersv1alpha1.ParameterViewSubmission,
+	phase parametersv1alpha1.ParameterViewSubmissionPhase, reason, message string) {
+	t.Helper()
+
+	if submission.Result.Phase != phase {
+		t.Fatalf("expected submission result phase %q, got %q", phase, submission.Result.Phase)
+	}
+	if submission.Result.Reason != reason {
+		t.Fatalf("expected submission result reason %q, got %q", reason, submission.Result.Reason)
+	}
+	if submission.Result.Message != message {
+		t.Fatalf("expected submission result message %q, got %q", message, submission.Result.Message)
+	}
+	if submission.Result.UpdatedAt == nil || submission.Result.UpdatedAt.IsZero() {
+		t.Fatalf("expected submission result updatedAt to be set")
 	}
 }
 

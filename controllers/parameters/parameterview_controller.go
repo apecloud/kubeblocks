@@ -47,21 +47,25 @@ import (
 
 const (
 	parameterViewSyncedCondition = "Synced"
+
 	parameterViewSubmissionLimit = 10
 
 	parameterViewReasonResolved                  = "Resolved"
 	parameterViewReasonReferenceNotFound         = "ReferenceNotFound"
 	parameterViewReasonTemplateNotFound          = "TemplateNotFound"
 	parameterViewReasonFileNotFound              = "FileNotFound"
-	parameterViewReasonFileFormatMismatch        = "FileFormatMismatch"
 	parameterViewReasonUnsupportedContentType    = "UnsupportedContentType"
 	parameterViewReasonReadOnly                  = "ReadOnly"
-	parameterViewReasonSourceChanged             = "SourceChanged"
 	parameterViewReasonDraftOutdated             = "DraftOutdated"
 	parameterViewReasonDiffFailed                = "DiffFailed"
 	parameterViewReasonInvalidMarkerSyntax       = "InvalidMarkerSyntax"
 	parameterViewReasonUnsupportedContentChanges = "UnsupportedContentChanges"
 	parameterViewReasonApplying                  = "Applying"
+
+	parameterViewSubmissionReasonProcessing        = "Processing"
+	parameterViewSubmissionReasonMergeFailed       = "MergeFailed"
+	parameterViewSubmissionReasonReconfigureFailed = "ReconfigureFailed"
+	parameterViewSubmissionReasonSucceeded         = "Succeeded"
 
 	parameterViewParameterRefLabelKey = "parameters.kubeblocks.io/parameter-ref"
 	parameterViewTemplateLabelKey     = "parameters.kubeblocks.io/template-name"
@@ -131,6 +135,10 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if syncLatestStatus(view, source) {
 		statusChanged = true
 	}
+	if syncSubmissionResults(view, compParam, source, view.Spec.TemplateName) {
+		statusChanged = true
+	}
+	submissionResultUpdate := updateSubmissionResultStatus(compParam, view.Spec.TemplateName, source)
 	sourceViewContent, err := r.renderContent(reqCtx.Ctx, compParam, view, source.content)
 	if err != nil {
 		return r.markInvalidForViewContentError(reqCtx, view, err)
@@ -148,7 +156,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to refresh parameter view")
 		}
-		return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+		return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 	}
 
 	currentContent := view.Spec.Content.Text
@@ -173,7 +181,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 		}
-		return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+		return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 	}
 
 	if view.Status.Base.Revision != "" && view.Status.Base.ContentHash != "" {
@@ -190,7 +198,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 			}
-			return r.markInvalid(reqCtx, view, parameterViewReasonReadOnly, "content updates are not allowed in ReadOnly mode", updateLatestStatus(source))
+			return r.markInvalid(reqCtx, view, parameterViewReasonReadOnly, "content updates are not allowed in ReadOnly mode", composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 		case view.Status.Base.ContentHash != source.hash:
 			if hashContent(currentContent) == view.Status.Base.ContentHash {
 				if view.Spec.Content.Text != sourceViewContent {
@@ -203,7 +211,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 				}
-				return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+				return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 			}
 			equivalent, err := r.equalConfigSemantics(reqCtx.Ctx, compParam, view, currentContent, source.content)
 			if err != nil {
@@ -220,7 +228,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 				}
-				return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+				return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 			}
 			desiredPatch, err := r.resolveDesiredParameterPatch(reqCtx.Ctx, compParam, view, source.content, currentContent)
 			if err == nil {
@@ -233,18 +241,20 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					}
 					return r.markApplying(reqCtx, view, "parameter view update is pending apply", composeStatusUpdates(
 						updateBaseAndLatestStatus(source),
-						updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+						updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
+						submissionResultUpdate,
 					))
 				}
 				if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
-					return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), updateLatestStatus(source))
+					return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 				}
 				if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
 					return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 				}
 				return r.markApplying(reqCtx, view, "parameter view update has been submitted", composeStatusUpdates(
 					updateBaseAndLatestStatus(source),
-					updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+					updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
+					submissionResultUpdate,
 				))
 			}
 			if err := r.patchView(reqCtx, view, specPatch, statusPatch, specChanged, statusChanged); err != nil {
@@ -253,7 +263,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return r.markConflict(reqCtx, view,
 				fmt.Sprintf("draft is based on an outdated revision for %s/%s; continue editing to retry replay or set resetToLatest=true to discard the draft",
 					view.Spec.TemplateName, view.Spec.FileName),
-				updateLatestStatus(source))
+				composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 		case view.Spec.Mode == parametersv1alpha1.ParameterViewReadOnlyMode:
 			panic("unreachable")
 		default:
@@ -270,11 +280,12 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				}
 				return r.markApplying(reqCtx, view, "parameter view update is pending apply", composeStatusUpdates(
 					updateBaseAndLatestStatus(source),
-					updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+					updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
+					submissionResultUpdate,
 				))
 			}
 			if err := r.patchComponentParameterDesired(reqCtx.Ctx, compParam, desiredPatch); err != nil {
-				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), updateLatestStatus(source))
+				return r.markInvalid(reqCtx, view, parameterViewReasonDiffFailed, err.Error(), composeStatusUpdates(updateLatestStatus(source), submissionResultUpdate))
 			}
 			if syncBaseRevision(view, source) {
 				statusChanged = true
@@ -284,7 +295,8 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 			return r.markApplying(reqCtx, view, "parameter view update has been submitted", composeStatusUpdates(
 				updateBaseAndLatestStatus(source),
-				updateSubmissionStatus(source.revision, currentContent, desiredPatch),
+				updateSubmissionAndResultStatus(compParam, view.Spec.TemplateName, source, currentContent, desiredPatch),
+				submissionResultUpdate,
 			))
 		}
 	}
@@ -293,7 +305,7 @@ func (r *ParameterViewReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update parameter view")
 	}
 
-	return r.markReady(reqCtx, view, updateBaseAndLatestStatus(source))
+	return r.markReady(reqCtx, view, composeStatusUpdates(updateBaseAndLatestStatus(source), submissionResultUpdate))
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -466,13 +478,38 @@ func updateSubmissionStatus(revision, content string, parameters parametersv1alp
 			},
 			SubmittedAt: &now,
 			Parameters:  cloneParameterValueMap(parameters),
+			Result: parametersv1alpha1.ParameterViewSubmissionResult{
+				Phase:     parametersv1alpha1.ParameterViewSubmissionProcessingPhase,
+				Reason:    parameterViewSubmissionReasonProcessing,
+				Message:   "submission is being processed by ComponentParameter",
+				UpdatedAt: &now,
+			},
 		}
 		status.Submissions = compactSubmissions(prependSubmission(status.Submissions, submission))
 	}
 }
 
+func updateSubmissionAndResultStatus(compParam *parametersv1alpha1.ComponentParameter, templateName string,
+	source *parameterViewSource, content string, parameters parametersv1alpha1.ParameterValueMap) func(*parametersv1alpha1.ParameterViewStatus) {
+	return func(status *parametersv1alpha1.ParameterViewStatus) {
+		updateSubmissionStatus(source.revision, content, parameters)(status)
+		syncSubmissionResultsStatus(status, compParam, source, templateName)
+	}
+}
+
+func updateSubmissionResultStatus(compParam *parametersv1alpha1.ComponentParameter, templateName string,
+	source *parameterViewSource) func(*parametersv1alpha1.ParameterViewStatus) {
+	return func(status *parametersv1alpha1.ParameterViewStatus) {
+		syncSubmissionResultsStatus(status, compParam, source, templateName)
+	}
+}
+
 func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, submission parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {
 	result := make([]parametersv1alpha1.ParameterViewSubmission, 0, len(existing)+1)
+	if duplicated := findSubmission(existing, submission); duplicated != nil {
+		submission.SubmittedAt = duplicated.SubmittedAt
+		submission.Result = duplicated.Result
+	}
 	result = append(result, submission)
 	for _, item := range existing {
 		if item.Revision.Revision == submission.Revision.Revision &&
@@ -483,6 +520,18 @@ func prependSubmission(existing []parametersv1alpha1.ParameterViewSubmission, su
 		result = append(result, item)
 	}
 	return result
+}
+
+func findSubmission(existing []parametersv1alpha1.ParameterViewSubmission, target parametersv1alpha1.ParameterViewSubmission) *parametersv1alpha1.ParameterViewSubmission {
+	for i := range existing {
+		item := &existing[i]
+		if item.Revision.Revision == target.Revision.Revision &&
+			item.Revision.ContentHash == target.Revision.ContentHash &&
+			equalParameterValueMap(item.Parameters, target.Parameters) {
+			return item
+		}
+	}
+	return nil
 }
 
 func compactSubmissions(submissions []parametersv1alpha1.ParameterViewSubmission) []parametersv1alpha1.ParameterViewSubmission {
@@ -497,6 +546,110 @@ func compactSubmissions(submissions []parametersv1alpha1.ParameterViewSubmission
 		}
 	}
 	return compacted
+}
+
+func syncSubmissionResults(view *parametersv1alpha1.ParameterView, compParam *parametersv1alpha1.ComponentParameter,
+	source *parameterViewSource, templateName string) bool {
+	return syncSubmissionResultsStatus(&view.Status, compParam, source, templateName)
+}
+
+func syncSubmissionResultsStatus(status *parametersv1alpha1.ParameterViewStatus, compParam *parametersv1alpha1.ComponentParameter,
+	source *parameterViewSource, templateName string) bool {
+	if status == nil || len(status.Submissions) == 0 {
+		return false
+	}
+	submission := &status.Submissions[0]
+	phase, reason, message := resolveSubmissionResult(compParam, templateName, source)
+	return updateSubmissionResult(submission, phase, reason, message)
+}
+
+func resolveSubmissionResult(compParam *parametersv1alpha1.ComponentParameter, templateName string,
+	source *parameterViewSource) (parametersv1alpha1.ParameterViewSubmissionPhase, string, string) {
+	if itemStatus := findConfigItemStatus(compParam.Status.ConfigurationItemStatus, templateName); itemStatus != nil {
+		switch itemStatus.Phase {
+		case parametersv1alpha1.CMergeFailedPhase:
+			return parametersv1alpha1.ParameterViewSubmissionFailedPhase, parameterViewSubmissionReasonMergeFailed, firstNonEmptyPtr(itemStatus.Message, compParam.Status.Message)
+		case parametersv1alpha1.CFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
+			return parametersv1alpha1.ParameterViewSubmissionFailedPhase, parameterViewSubmissionReasonReconfigureFailed, configItemFailureMessage(itemStatus, compParam.Status.Message)
+		case parametersv1alpha1.CFinishedPhase:
+			if itemStatus.LastDoneRevision == "" || itemStatus.LastDoneRevision == source.revision {
+				return parametersv1alpha1.ParameterViewSubmissionSucceededPhase, parameterViewSubmissionReasonSucceeded, "submission has been applied successfully"
+			}
+		}
+	}
+
+	switch compParam.Status.Phase {
+	case parametersv1alpha1.CMergeFailedPhase:
+		return parametersv1alpha1.ParameterViewSubmissionFailedPhase, parameterViewSubmissionReasonMergeFailed, firstNonEmpty(compParam.Status.Message, "component parameter merge failed")
+	case parametersv1alpha1.CFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
+		return parametersv1alpha1.ParameterViewSubmissionFailedPhase, parameterViewSubmissionReasonReconfigureFailed, firstNonEmpty(compParam.Status.Message, "component parameter reconfigure failed")
+	case parametersv1alpha1.CFinishedPhase:
+		return parametersv1alpha1.ParameterViewSubmissionSucceededPhase, parameterViewSubmissionReasonSucceeded, "submission has been applied successfully"
+	default:
+		return parametersv1alpha1.ParameterViewSubmissionProcessingPhase, parameterViewSubmissionReasonProcessing, "submission is being processed by ComponentParameter"
+	}
+}
+
+func updateSubmissionResult(submission *parametersv1alpha1.ParameterViewSubmission,
+	phase parametersv1alpha1.ParameterViewSubmissionPhase, reason, message string) bool {
+	if submission == nil {
+		return false
+	}
+	changed := false
+	if submission.Result.Phase != phase {
+		submission.Result.Phase = phase
+		changed = true
+	}
+	if submission.Result.Reason != reason {
+		submission.Result.Reason = reason
+		changed = true
+	}
+	if submission.Result.Message != message {
+		submission.Result.Message = message
+		changed = true
+	}
+	if changed {
+		now := metav1.Now()
+		submission.Result.UpdatedAt = &now
+	}
+	return changed
+}
+
+func findConfigItemStatus(items []parametersv1alpha1.ConfigTemplateItemDetailStatus, templateName string) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
+	for i := range items {
+		if items[i].Name == templateName {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
+func configItemFailureMessage(itemStatus *parametersv1alpha1.ConfigTemplateItemDetailStatus, fallback string) string {
+	if itemStatus == nil {
+		return firstNonEmpty(fallback, "component parameter reconfigure failed")
+	}
+	if itemStatus.ReconcileDetail != nil {
+		if msg := firstNonEmpty(itemStatus.ReconcileDetail.ErrMessage, itemStatus.ReconcileDetail.ExecResult); msg != "" {
+			return msg
+		}
+	}
+	return firstNonEmptyPtr(itemStatus.Message, fallback)
+}
+
+func firstNonEmptyPtr(primary *string, fallback string) string {
+	if primary != nil && *primary != "" {
+		return *primary
+	}
+	return firstNonEmpty(fallback)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func composeStatusUpdates(updates ...func(*parametersv1alpha1.ParameterViewStatus)) func(*parametersv1alpha1.ParameterViewStatus) {

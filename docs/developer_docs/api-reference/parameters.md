@@ -2649,6 +2649,121 @@ ParameterValueMap
 <p>Parameters contains the desired parameter updates submitted from the view.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>result</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionResult">
+ParameterViewSubmissionResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Result records the current observed outcome of this submission after it has
+been handed off to the ComponentParameter controller.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionPhase">ParameterViewSubmissionPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionResult">ParameterViewSubmissionResult</a>)
+</p>
+<div>
+<p>ParameterViewSubmissionPhase defines the observed execution state of a submission.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>ParameterViewSubmissionFailedPhase means the submission has reached a final
+failure outcome in the ComponentParameter processing chain.</p>
+</td>
+</tr><tr><td><p>&#34;Processing&#34;</p></td>
+<td><p>ParameterViewSubmissionProcessingPhase means the submission has already
+been handed off to the ComponentParameter controller, and its final
+execution outcome is not known yet.</p>
+</td>
+</tr><tr><td><p>&#34;Succeeded&#34;</p></td>
+<td><p>ParameterViewSubmissionSucceededPhase means the submission has reached a
+final successful outcome in the ComponentParameter processing chain.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionResult">ParameterViewSubmissionResult
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>)
+</p>
+<div>
+<p>ParameterViewSubmissionResult records the current observed outcome of a submission.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionPhase">
+ParameterViewSubmissionPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase describes the current execution state of this submission.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a stable, machine-friendly summary for the current submission result.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message provides a human-readable summary for the current submission result.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatedAt records when the result was last refreshed by the controller.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec

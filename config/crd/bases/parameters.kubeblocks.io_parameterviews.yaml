@@ -309,6 +309,33 @@ spec:
                       description: Parameters contains the desired parameter updates
                         submitted from the view.
                       type: object
+                    result:
+                      description: |-
+                        Result records the current observed outcome of this submission after it has
+                        been handed off to the ComponentParameter controller.
+                      properties:
+                        message:
+                          description: Message provides a human-readable summary for
+                            the current submission result.
+                          type: string
+                        phase:
+                          description: Phase describes the current execution state
+                            of this submission.
+                          enum:
+                          - Processing
+                          - Failed
+                          - Succeeded
+                          type: string
+                        reason:
+                          description: Reason is a stable, machine-friendly summary
+                            for the current submission result.
+                          type: string
+                        updatedAt:
+                          description: UpdatedAt records when the result was last
+                            refreshed by the controller.
+                          format: date-time
+                          type: string
+                      type: object
                     revision:
                       description: Revision records the effective content revision
                         that the submission was based on.

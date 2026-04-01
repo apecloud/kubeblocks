@@ -192,6 +192,35 @@ type ParameterViewSubmission struct {
 	//
 	// +optional
 	Parameters ParameterValueMap `json:"parameters,omitempty"`
+
+	// Result records the current observed outcome of this submission after it has
+	// been handed off to the ComponentParameter controller.
+	//
+	// +optional
+	Result ParameterViewSubmissionResult `json:"result,omitempty"`
+}
+
+// ParameterViewSubmissionResult records the current observed outcome of a submission.
+type ParameterViewSubmissionResult struct {
+	// Phase describes the current execution state of this submission.
+	//
+	// +optional
+	Phase ParameterViewSubmissionPhase `json:"phase,omitempty"`
+
+	// Reason is a stable, machine-friendly summary for the current submission result.
+	//
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// Message provides a human-readable summary for the current submission result.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// UpdatedAt records when the result was last refreshed by the controller.
+	//
+	// +optional
+	UpdatedAt *metav1.Time `json:"updatedAt,omitempty"`
 }
 
 // ParameterViewMode defines whether a ParameterView can be edited.
@@ -230,6 +259,26 @@ const (
 	// submitted desired parameter updates from the current draft and is waiting
 	// for the effective content to catch up.
 	ParameterViewApplyingPhase ParameterViewPhase = "Applying"
+)
+
+// ParameterViewSubmissionPhase defines the observed execution state of a submission.
+// +enum
+// +kubebuilder:validation:Enum={Processing,Failed,Succeeded}
+type ParameterViewSubmissionPhase string
+
+const (
+	// ParameterViewSubmissionProcessingPhase means the submission has already
+	// been handed off to the ComponentParameter controller, and its final
+	// execution outcome is not known yet.
+	ParameterViewSubmissionProcessingPhase ParameterViewSubmissionPhase = "Processing"
+
+	// ParameterViewSubmissionFailedPhase means the submission has reached a final
+	// failure outcome in the ComponentParameter processing chain.
+	ParameterViewSubmissionFailedPhase ParameterViewSubmissionPhase = "Failed"
+
+	// ParameterViewSubmissionSucceededPhase means the submission has reached a
+	// final successful outcome in the ComponentParameter processing chain.
+	ParameterViewSubmissionSucceededPhase ParameterViewSubmissionPhase = "Succeeded"
 )
 
 // ParameterViewContent describes the editable document shown to users.

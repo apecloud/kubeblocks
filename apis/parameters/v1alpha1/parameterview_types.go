@@ -188,10 +188,10 @@ type ParameterViewSubmission struct {
 	// +optional
 	SubmittedAt *metav1.Time `json:"submittedAt,omitempty"`
 
-	// Parameters contains the desired parameter updates submitted from the view.
+	// Assignments contains the desired simple parameter assignments submitted from the view.
 	//
 	// +optional
-	Parameters ParameterValueMap `json:"parameters,omitempty"`
+	Assignments map[string]*string `json:"assignments,omitempty"`
 
 	// Result records the current observed outcome of this submission after it has
 	// been handed off to the ComponentParameter controller.

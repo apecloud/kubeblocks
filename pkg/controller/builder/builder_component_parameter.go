@@ -43,7 +43,7 @@ func (c *ComponentParameterBuilder) SetCompName(compName string) *ComponentParam
 	return c
 }
 
-func (c *ComponentParameterBuilder) SetInit(init *parametersv1alpha1.ParameterValues) *ComponentParameterBuilder {
-	c.get().Spec.Init = init
+func (c *ComponentParameterBuilder) SetInitial(initial *parametersv1alpha1.ParameterInputs) *ComponentParameterBuilder {
+	c.get().Spec.Initial = initial
 	return c
 }

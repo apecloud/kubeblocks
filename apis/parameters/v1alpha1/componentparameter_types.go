@@ -56,7 +56,7 @@ func init() {
 	SchemeBuilder.Register(&ComponentParameter{}, &ComponentParameterList{})
 }
 
-// ComponentParameterSpec defines the desired state of ComponentConfiguration
+// ComponentParameterSpec defines the desired and execution state of ComponentParameter.
 type ComponentParameterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -73,17 +73,10 @@ type ComponentParameterSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ComponentName string `json:"componentName"`
 
-	// ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
+	// ConfigItemDetails is the internal execution model derived and maintained by the controller.
 	//
-	// Each ConfigTemplateItemDetail corresponds to a configuration template,
-	// which is a ConfigMap that contains multiple configuration files.
-	// Each configuration file is stored as a key-value pair within the ConfigMap.
-	//
-	// The ConfigTemplateItemDetail includes information such as:
-	//
-	// - The configuration template (a ConfigMap)
-	// - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
-	// - Volume mounts (for mounting the configuration files)
+	// It corresponds to configuration templates, resolved files, and effective
+	// parameter/template overlays used by the reconcile pipeline.
 	//
 	// +optional
 	// +patchMergeKey=name
@@ -92,15 +85,15 @@ type ComponentParameterSpec struct {
 	// +listMapKey=name
 	ConfigItemDetails []ConfigTemplateItemDetail `json:"configItemDetails,omitempty"`
 
-	// Init provides the initial parameter state used when the managed runtime configuration is created.
+	// Initial provides the initial parameter inputs used when the managed runtime configuration is created.
 	//
 	// +optional
-	Init *ParameterValues `json:"init,omitempty"`
+	Initial *ParameterInputs `json:"initial,omitempty"`
 
-	// Desired is the current desired parameter state.
+	// Desired provides the current desired parameter inputs.
 	//
 	// +optional
-	Desired *ParameterValues `json:"desired,omitempty"`
+	Desired *ParameterInputs `json:"desired,omitempty"`
 }
 
 // Deprecated: It is retained for API compatibility with existing ComponentParameter objects.
@@ -160,20 +153,77 @@ type ConfigTemplateItemDetail struct {
 	ConfigFileParams map[string]ParametersInFile `json:"configFileParams,omitempty"`
 }
 
-// ParameterValueMap is a flat parameter key/value map.
-type ParameterValueMap map[string]*string
-
-// ParameterValues describes user-provided parameter values and template overrides.
-type ParameterValues struct {
-	// Parameters are flat parameter key/value pairs.
+// ParameterInputs describes user-provided parameter inputs and template overrides.
+type ParameterInputs struct {
+	// Assignments are flat managed parameter key/value assignments.
 	//
 	// +optional
-	Parameters ParameterValueMap `json:"parameters,omitempty"`
+	Assignments map[string]*string `json:"assignments,omitempty"`
+
+	// Updates is the advanced path for schema-managed parameter changes with explicit update semantics.
+	//
+	// +optional
+	Updates []ParameterUpdate `json:"updates,omitempty"`
+
+	// UnmanagedUpdates is the advanced path for parameters not defined in ParametersDefinition.
+	//
+	// +optional
+	UnmanagedUpdates []UnmanagedParameterUpdate `json:"unmanagedUpdates,omitempty"`
 
 	// Templates are user-provided template overrides keyed by config template name.
 	//
 	// +optional
 	Templates map[string]ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+}
+
+// ParameterUpdateType defines supported parameter update types.
+// +enum
+type ParameterUpdateType string
+
+const (
+	ParameterUpdateSet    ParameterUpdateType = "Set"
+	ParameterUpdateRemove ParameterUpdateType = "Remove"
+)
+
+// ParameterUpdate is an explicit parameter update.
+type ParameterUpdate struct {
+	// Type defines the update type.
+	//
+	// +kubebuilder:validation:Required
+	Type ParameterUpdateType `json:"type"`
+
+	// Key is the logical parameter key defined in ParametersDefinition.
+	//
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// Value is used by set/update style operations.
+	//
+	// +optional
+	Value *string `json:"value,omitempty"`
+}
+
+// UnmanagedParameterUpdate describes unmanaged parameter updates scoped to a target template, file, and optional section.
+type UnmanagedParameterUpdate struct {
+	// Template is the target config template name.
+	//
+	// +kubebuilder:validation:Required
+	Template string `json:"template"`
+
+	// File is the target config file name under the template.
+	//
+	// +kubebuilder:validation:Required
+	File string `json:"file"`
+
+	// Section optionally identifies a nested scope for formats that support it.
+	//
+	// +optional
+	Section *string `json:"section,omitempty"`
+
+	// Updates are the unmanaged parameter changes to apply within the target file scope.
+	//
+	// +optional
+	Updates []ParameterUpdate `json:"updates,omitempty"`
 }
 
 // ComponentParameterStatus defines the observed state of ComponentConfiguration

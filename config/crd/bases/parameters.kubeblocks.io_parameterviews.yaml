@@ -303,11 +303,11 @@ spec:
                   description: ParameterViewSubmission records the most recent submission
                     derived from a view draft.
                   properties:
-                    parameters:
+                    assignments:
                       additionalProperties:
                         type: string
-                      description: Parameters contains the desired parameter updates
-                        submitted from the view.
+                      description: Assignments contains the desired simple parameter
+                        assignments submitted from the view.
                       type: object
                     result:
                       description: |-

@@ -182,7 +182,7 @@ parameter: {
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
 				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
-				g.Expect(cp.Spec.Desired.Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
 			})).Should(Succeed())
 
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {

@@ -146,14 +146,14 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 	}
 	patch := client.MergeFrom(compParam.DeepCopy())
 	if compParam.Spec.Desired == nil {
-		compParam.Spec.Desired = &parametersv1alpha1.ParameterValues{}
+		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
 	}
 	if len(reconfigure.Parameters) != 0 {
-		if compParam.Spec.Desired.Parameters == nil {
-			compParam.Spec.Desired.Parameters = parametersv1alpha1.ParameterValueMap{}
+		if compParam.Spec.Desired.Assignments == nil {
+			compParam.Spec.Desired.Assignments = map[string]*string{}
 		}
 		for _, param := range reconfigure.Parameters {
-			compParam.Spec.Desired.Parameters[param.Key] = param.Value
+			compParam.Spec.Desired.Assignments[param.Key] = param.Value
 		}
 	}
 	if err := cli.Patch(reqCtx.Ctx, compParam, patch); err != nil {

@@ -25,7 +25,7 @@ import (
 func TestInitParametersRoundTrip(t *testing.T) {
 	value := InitParameters{
 		"mysql": {
-			Parameters: ParameterValueMap{
+			Assignments: map[string]*string{
 				"max_connections": strPtr("200"),
 			},
 			Templates: map[string]ConfigTemplateExtension{
@@ -50,8 +50,8 @@ func TestInitParametersRoundTrip(t *testing.T) {
 	if spec == nil {
 		t.Fatalf("expected mysql spec")
 	}
-	if spec.Parameters["max_connections"] == nil || *spec.Parameters["max_connections"] != "200" {
-		t.Fatalf("unexpected parameter value: %#v", spec.Parameters["max_connections"])
+	if spec.Assignments["max_connections"] == nil || *spec.Assignments["max_connections"] != "200" {
+		t.Fatalf("unexpected parameter value: %#v", spec.Assignments["max_connections"])
 	}
 	tpl := spec.Templates["mysql-config"]
 	if tpl.TemplateRef != "custom-template" || tpl.Namespace != "default" || tpl.Policy != ReplacePolicy {
@@ -63,7 +63,7 @@ func TestParseInitParameters(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	if err := SetInitParameters(cluster, InitParameters{
 		"mysql": {
-			Parameters: ParameterValueMap{
+			Assignments: map[string]*string{
 				"max_connections": strPtr("200"),
 			},
 		},
@@ -75,7 +75,7 @@ func TestParseInitParameters(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	spec := decoded.Get("mysql")
-	if spec == nil || spec.Parameters["max_connections"] == nil || *spec.Parameters["max_connections"] != "200" {
+	if spec == nil || spec.Assignments["max_connections"] == nil || *spec.Assignments["max_connections"] != "200" {
 		t.Fatalf("unexpected decoded payload: %#v", spec)
 	}
 }
@@ -84,7 +84,7 @@ func TestSetInitParameters(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	params := InitParameters{
 		"mysql": {
-			Parameters: ParameterValueMap{
+			Assignments: map[string]*string{
 				"max_connections": strPtr("200"),
 			},
 		},

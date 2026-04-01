@@ -289,7 +289,6 @@ spec:
               phase:
                 description: Phase describes the current state of this view.
                 enum:
-                - Pending
                 - Synced
                 - Conflict
                 - Invalid

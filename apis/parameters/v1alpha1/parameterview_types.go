@@ -204,16 +204,31 @@ const (
 	ParameterViewReadWriteMode ParameterViewMode = "ReadWrite"
 )
 
-// ParameterViewPhase defines the lifecycle state of a ParameterView.
+// ParameterViewPhase defines the current lifecycle state of a ParameterView.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Synced,Conflict,Invalid,Applying}
+// +kubebuilder:validation:Enum={Synced,Conflict,Invalid,Applying}
 type ParameterViewPhase string
 
 const (
-	ParameterViewPendingPhase  ParameterViewPhase = "Pending"
-	ParameterViewSyncedPhase   ParameterViewPhase = "Synced"
+	// ParameterViewSyncedPhase means spec.content is aligned with the latest
+	// effective content revision observed by the controller and there is no
+	// pending submission, invalid draft, or unresolved conflict.
+	ParameterViewSyncedPhase ParameterViewPhase = "Synced"
+
+	// ParameterViewConflictPhase means the preserved draft in spec.content is
+	// based on an older revision and the controller cannot automatically move it
+	// forward to the latest observed effective content revision.
 	ParameterViewConflictPhase ParameterViewPhase = "Conflict"
-	ParameterViewInvalidPhase  ParameterViewPhase = "Invalid"
+
+	// ParameterViewInvalidPhase means the current view or draft cannot be
+	// processed, for example because the reference is invalid, the content type
+	// is unsupported, or the draft cannot be translated into a valid desired
+	// parameter patch.
+	ParameterViewInvalidPhase ParameterViewPhase = "Invalid"
+
+	// ParameterViewApplyingPhase means the controller has already derived and
+	// submitted desired parameter updates from the current draft and is waiting
+	// for the effective content to catch up.
 	ParameterViewApplyingPhase ParameterViewPhase = "Applying"
 )
 

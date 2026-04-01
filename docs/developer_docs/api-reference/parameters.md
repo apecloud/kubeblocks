@@ -2272,7 +2272,7 @@ file fragments that are not defined by the current ParametersDefinition.</p>
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>)
 </p>
 <div>
-<p>ParameterViewPhase defines the lifecycle state of a ParameterView.</p>
+<p>ParameterViewPhase defines the current lifecycle state of a ParameterView.</p>
 </div>
 <table>
 <thead>
@@ -2282,15 +2282,26 @@ file fragments that are not defined by the current ParametersDefinition.</p>
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Applying&#34;</p></td>
-<td></td>
+<td><p>ParameterViewApplyingPhase means the controller has already derived and
+submitted desired parameter updates from the current draft and is waiting
+for the effective content to catch up.</p>
+</td>
 </tr><tr><td><p>&#34;Conflict&#34;</p></td>
-<td></td>
+<td><p>ParameterViewConflictPhase means the preserved draft in spec.content is
+based on an older revision and the controller cannot automatically move it
+forward to the latest observed effective content revision.</p>
+</td>
 </tr><tr><td><p>&#34;Invalid&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td></td>
+<td><p>ParameterViewInvalidPhase means the current view or draft cannot be
+processed, for example because the reference is invalid, the content type
+is unsupported, or the draft cannot be translated into a valid desired
+parameter patch.</p>
+</td>
 </tr><tr><td><p>&#34;Synced&#34;</p></td>
-<td></td>
+<td><p>ParameterViewSyncedPhase means spec.content is aligned with the latest
+effective content revision observed by the controller and there is no
+pending submission, invalid draft, or unresolved conflict.</p>
+</td>
 </tr></tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">ParameterViewRevision

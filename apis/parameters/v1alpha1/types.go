@@ -104,6 +104,11 @@ type ParametersInFile struct {
 	//
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`
+
+	// Represents unmanaged parameter updates for a single configuration file.
+	//
+	// +optional
+	UnmanagedUpdates []UnmanagedParameterSectionUpdate `json:"unmanagedUpdates,omitempty"`
 }
 
 type ComponentParameters map[string]*string

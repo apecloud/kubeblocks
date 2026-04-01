@@ -232,6 +232,51 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
+		It("should project desired unmanaged updates into file content", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterUpdate{{
+						Template: configSpecName,
+						File:     testparameters.MysqlConfigFile,
+						Updates: []parametersv1alpha1.UnmanagedParameterSectionUpdate{{
+							Section: cfgutil.ToPointer("mysqld"),
+							Updates: []parametersv1alpha1.ParameterUpdate{
+								{
+									Type:  parametersv1alpha1.ParameterUpdateSet,
+									Key:   "custom_local",
+									Value: cfgutil.ToPointer("on"),
+								},
+								{
+									Type: parametersv1alpha1.ParameterUpdateRemove,
+									Key:  "gtid_mode",
+								},
+							},
+						}},
+					}},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
+				fileParams := item.ConfigFileParams[testparameters.MysqlConfigFile]
+				g.Expect(fileParams.UnmanagedUpdates).Should(HaveLen(1))
+				g.Expect(fileParams.UnmanagedUpdates[0].Section).Should(Equal(cfgutil.ToPointer("mysqld")))
+				g.Expect(fileParams.UnmanagedUpdates[0].Updates).Should(HaveLen(2))
+				g.Expect(fileParams.Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+		})
+
 		It("should render both new PD and legacy PCR files in mixed mode", func() {
 			templateObj, _, compObj, _, _ := mockReconcileResource()
 

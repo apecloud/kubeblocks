@@ -227,6 +227,46 @@ spec:
                                   description: Represents the updated parameters for
                                     a single configuration file.
                                   type: object
+                                unmanagedUpdates:
+                                  description: Represents unmanaged parameter updates
+                                    for a single configuration file.
+                                  items:
+                                    description: UnmanagedParameterSectionUpdate describes
+                                      unmanaged parameter updates scoped to an optional
+                                      section within a file.
+                                    properties:
+                                      section:
+                                        description: Section optionally identifies
+                                          a nested scope for formats that support
+                                          it.
+                                        type: string
+                                      updates:
+                                        description: Updates are the unmanaged parameter
+                                          changes to apply within the target section
+                                          scope.
+                                        items:
+                                          description: ParameterUpdate is an explicit
+                                            parameter update.
+                                          properties:
+                                            key:
+                                              description: Key is the logical parameter
+                                                key defined in ParametersDefinition.
+                                              type: string
+                                            type:
+                                              description: Type defines the update
+                                                type.
+                                              type: string
+                                            value:
+                                              description: Value is used by set/update
+                                                style operations.
+                                              type: string
+                                          required:
+                                          - key
+                                          - type
+                                          type: object
+                                        type: array
+                                    type: object
+                                  type: array
                               type: object
                             description: Contains the updated parameters.
                             type: object

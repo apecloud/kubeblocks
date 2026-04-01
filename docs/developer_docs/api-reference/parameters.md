@@ -2155,7 +2155,7 @@ updated by the API Server.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterUpdate">ParameterUpdate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterUpdate">UnmanagedParameterUpdate</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate</a>)
 </p>
 <div>
 <p>ParameterUpdate is an explicit parameter update.</p>
@@ -3184,6 +3184,20 @@ map[string]*string
 <p>Represents the updated parameters for a single configuration file.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>unmanagedUpdates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">
+[]UnmanagedParameterSectionUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents unmanaged parameter updates for a single configuration file.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
@@ -3799,13 +3813,57 @@ This field is typically used with an emptyDir volume to ensure a temporary, empt
 </tr>
 </tbody>
 </table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersInFile">ParametersInFile</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterUpdate">UnmanagedParameterUpdate</a>)
+</p>
+<div>
+<p>UnmanagedParameterSectionUpdate describes unmanaged parameter updates scoped to an optional section within a file.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>section</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Section optionally identifies a nested scope for formats that support it.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
+[]ParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updates are the unmanaged parameter changes to apply within the target section scope.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.UnmanagedParameterUpdate">UnmanagedParameterUpdate
 </h3>
 <p>
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>)
 </p>
 <div>
-<p>UnmanagedParameterUpdate describes unmanaged parameter updates scoped to a target template, file, and optional section.</p>
+<p>UnmanagedParameterUpdate describes unmanaged parameter updates scoped to a target template and file.</p>
 </div>
 <table>
 <thead>
@@ -3839,22 +3897,10 @@ string
 </tr>
 <tr>
 <td>
-<code>section</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Section optionally identifies a nested scope for formats that support it.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>updates</code><br/>
 <em>
-<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
-[]ParameterUpdate
+<a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">
+[]UnmanagedParameterSectionUpdate
 </a>
 </em>
 </td>

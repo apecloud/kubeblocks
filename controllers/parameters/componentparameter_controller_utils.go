@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -111,9 +112,6 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 	if inputs == nil {
 		return nil
 	}
-	if len(inputs.UnmanagedUpdates) != 0 {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "unmanagedUpdates is not supported yet")
-	}
 	if err := validateCustomTemplate(ctx, cli, inputs.Templates); err != nil {
 		return err
 	}
@@ -156,6 +154,9 @@ func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
 			item.CustomTemplates = templateExtension.DeepCopy()
 		}
 	}
+	if err := applyUnmanagedParameterUpdates(spec, inputs.UnmanagedUpdates, override, configDescs, nil); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -184,6 +185,87 @@ func normalizeManagedParameterInputs(inputs *parametersv1alpha1.ParameterInputs)
 		}
 	}
 	return normalized, nil
+}
+
+func applyUnmanagedParameterUpdates(spec *parametersv1alpha1.ComponentParameterSpec,
+	updates []parametersv1alpha1.UnmanagedParameterUpdate, override bool,
+	configDescs []parametersv1alpha1.ComponentConfigDescription,
+	_ []*parametersv1alpha1.ParametersDefinition) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	for _, update := range updates {
+		if len(update.Updates) == 0 {
+			continue
+		}
+		item := parameters.GetConfigTemplateItem(spec, update.Template)
+		if item == nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config template item: %s", update.Template)
+		}
+		templateConfigDescs := parameters.GetComponentConfigDescriptions(configDescs, update.Template)
+		if len(templateConfigDescs) == 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for template: %s", update.Template)
+		}
+		fileConfig := parameters.GetComponentConfigDescription(templateConfigDescs, update.File)
+		if fileConfig == nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found config description for file: %s/%s", update.Template, update.File)
+		}
+		if err := validateUnmanagedSectionUpdates(update.Updates, fileConfig.FileFormatConfig); err != nil {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "%s", err.Error())
+		}
+		mergeUnmanagedFileUpdates(item, update.File, update.Updates, override)
+	}
+	return nil
+}
+
+func validateUnmanagedSectionUpdates(updates []parametersv1alpha1.UnmanagedParameterSectionUpdate, base *parametersv1alpha1.FileFormatConfig) error {
+	for _, sectionUpdate := range updates {
+		if sectionUpdate.Section != nil {
+			if base == nil {
+				return fmt.Errorf("section is not supported without file format configuration")
+			}
+			if base.Format != parametersv1alpha1.Ini {
+				return fmt.Errorf("section is only supported for ini unmanaged updates")
+			}
+		}
+		if len(sectionUpdate.Updates) == 0 {
+			continue
+		}
+		if _, err := normalizeUnmanagedParameterUpdates(sectionUpdate.Updates); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func normalizeUnmanagedParameterUpdates(updates []parametersv1alpha1.ParameterUpdate) (map[string]*string, error) {
+	normalized := make(map[string]*string, len(updates))
+	for _, update := range updates {
+		switch update.Type {
+		case parametersv1alpha1.ParameterUpdateSet:
+			if update.Value == nil {
+				return nil, fmt.Errorf("unmanaged parameter update %q with type %q requires a value", update.Key, update.Type)
+			}
+			normalized[update.Key] = update.Value
+		case parametersv1alpha1.ParameterUpdateRemove:
+			normalized[update.Key] = nil
+		default:
+			return nil, fmt.Errorf("unsupported unmanaged parameter update type %q for key %q", update.Type, update.Key)
+		}
+	}
+	return normalized, nil
+}
+
+func mergeUnmanagedFileUpdates(item *parametersv1alpha1.ConfigTemplateItemDetail, file string, updates []parametersv1alpha1.UnmanagedParameterSectionUpdate, override bool) {
+	if item.ConfigFileParams == nil {
+		item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
+	}
+	merged := item.ConfigFileParams[file]
+	if len(merged.UnmanagedUpdates) != 0 && !override {
+		return
+	}
+	merged.UnmanagedUpdates = slices.Clone(updates)
+	item.ConfigFileParams[file] = merged
 }
 
 func resolveComponentRefConfigMap(ctx context.Context, cli client.Client, namespace, clusterName, componentName string) (map[string]*corev1.ConfigMap, error) {

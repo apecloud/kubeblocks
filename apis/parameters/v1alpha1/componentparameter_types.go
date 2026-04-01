@@ -203,7 +203,7 @@ type ParameterUpdate struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// UnmanagedParameterUpdate describes unmanaged parameter updates scoped to a target template, file, and optional section.
+// UnmanagedParameterUpdate describes unmanaged parameter updates scoped to a target template and file.
 type UnmanagedParameterUpdate struct {
 	// Template is the target config template name.
 	//
@@ -215,12 +215,20 @@ type UnmanagedParameterUpdate struct {
 	// +kubebuilder:validation:Required
 	File string `json:"file"`
 
+	// Updates are the unmanaged parameter changes to apply within the target file scope.
+	//
+	// +optional
+	Updates []UnmanagedParameterSectionUpdate `json:"updates,omitempty"`
+}
+
+// UnmanagedParameterSectionUpdate describes unmanaged parameter updates scoped to an optional section within a file.
+type UnmanagedParameterSectionUpdate struct {
 	// Section optionally identifies a nested scope for formats that support it.
 	//
 	// +optional
 	Section *string `json:"section,omitempty"`
 
-	// Updates are the unmanaged parameter changes to apply within the target file scope.
+	// Updates are the unmanaged parameter changes to apply within the target section scope.
 	//
 	// +optional
 	Updates []ParameterUpdate `json:"updates,omitempty"`

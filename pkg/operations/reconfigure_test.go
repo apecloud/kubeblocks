@@ -65,8 +65,8 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
-		testapps.ClearResources(&testCtx, generics.InstanceSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.ComponentParameterSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS)
 	}
 
 	BeforeEach(cleanEnv)

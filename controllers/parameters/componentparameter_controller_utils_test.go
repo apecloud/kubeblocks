@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	parampkg "github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
 func TestNormalizeManagedParameterInputs(t *testing.T) {
@@ -64,6 +65,46 @@ func TestNormalizeManagedParameterInputs(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("expected error for set update without value")
+		}
+	})
+}
+
+func TestMergeItemParameters(t *testing.T) {
+	t.Run("override replaces managed parameter overlay for a file", func(t *testing.T) {
+		item := &parametersv1alpha1.ConfigTemplateItemDetail{
+			ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
+				"my.cnf": {
+					Content: ptr.To("[mysqld]\nmax_connections=1000\n"),
+					Parameters: map[string]*string{
+						"max_connections": ptr.To("1000"),
+						"sync_binlog":     ptr.To("1"),
+					},
+				},
+			},
+		}
+		updated := map[string]parametersv1alpha1.ParametersInFile{
+			"my.cnf": {
+				Parameters: map[string]*string{
+					"max_connections": nil,
+				},
+			},
+		}
+
+		mergeItemParameters(item, updated, true)
+
+		got := item.ConfigFileParams["my.cnf"]
+		if got.Content == nil || *got.Content != "[mysqld]\nmax_connections=1000\n" {
+			t.Fatalf("expected non-managed fields to be preserved, got %#v", got.Content)
+		}
+		if len(got.Parameters) != 1 {
+			t.Fatalf("expected managed overlay to be replaced, got %#v", got.Parameters)
+		}
+		decoded := parampkg.DecodeParameterOverlay(got.Parameters)
+		if _, ok := decoded["max_connections"]; !ok {
+			t.Fatalf("expected max_connections remove marker to be kept")
+		}
+		if decoded["max_connections"] != nil {
+			t.Fatalf("expected max_connections to be overridden to nil remove marker, got %#v", decoded["max_connections"])
 		}
 	})
 }

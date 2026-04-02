@@ -227,8 +227,9 @@ var _ = Describe("ComponentParameter Controller", func() {
 				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
-				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKey("max_connections"))
-				g.Expect(item.ConfigFileParams["my.cnf"].Parameters["max_connections"]).Should(BeNil())
+				decoded := parameters.DecodeParameterOverlay(item.ConfigFileParams["my.cnf"].Parameters)
+				g.Expect(decoded).Should(HaveKey("max_connections"))
+				g.Expect(decoded["max_connections"]).Should(BeNil())
 			})).Should(Succeed())
 		})
 

@@ -98,9 +98,8 @@ func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, co
 	if reflect.DeepEqual(compParam.Spec, *specCopy) {
 		return false, nil
 	}
-	patch := client.MergeFrom(compParam.DeepCopy())
 	compParam.Spec = *specCopy
-	return true, cli.Patch(ctx, compParam, patch)
+	return true, cli.Update(ctx, compParam)
 }
 
 func applyParameterInputs(spec *parametersv1alpha1.ComponentParameterSpec,
@@ -304,11 +303,24 @@ func mergeItemParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, upda
 		if parametersInFile.Content != nil {
 			merged.Content = parametersInFile.Content
 		}
-		if merged.Parameters == nil && len(parametersInFile.Parameters) > 0 {
-			merged.Parameters = map[string]*string{}
-		}
-		for paramKey, paramValue := range parametersInFile.Parameters {
-			merged.Parameters[paramKey] = paramValue
+		if override {
+			encodedParameters := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
+			if len(encodedParameters) == 0 {
+				merged.Parameters = nil
+			} else {
+				merged.Parameters = make(map[string]*string, len(encodedParameters))
+				for paramKey, paramValue := range encodedParameters {
+					merged.Parameters[paramKey] = paramValue
+				}
+			}
+		} else {
+			encodedParameters := parameters.EncodeParameterOverlay(parametersInFile.Parameters)
+			if merged.Parameters == nil && len(encodedParameters) > 0 {
+				merged.Parameters = map[string]*string{}
+			}
+			for paramKey, paramValue := range encodedParameters {
+				merged.Parameters[paramKey] = paramValue
+			}
 		}
 		item.ConfigFileParams[key] = merged
 	}

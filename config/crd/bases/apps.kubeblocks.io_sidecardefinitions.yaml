@@ -565,6 +565,34 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    variables:
+                      description: |-
+                        Declares the user-configurable variables supported by this file template.
+
+
+                        This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+                        variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
+                        template content directly.
+                      items:
+                        description: FileTemplateVariable declares a user-configurable
+                          variable supported by a file template.
+                        properties:
+                          defaultValue:
+                            description: Specifies the default value used.
+                            type: string
+                          description:
+                            description: Provides a human-readable explanation of
+                              the variable's purpose.
+                            type: string
+                          name:
+                            description: |-
+                              Specifies the variable name that can be referenced from the file template and set by users
+                              through `cluster.spec.componentSpecs[*].configs[*].variables`.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                     volumeName:
                       description: |-
                         Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
@@ -2437,6 +2465,34 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    variables:
+                      description: |-
+                        Declares the user-configurable variables supported by this file template.
+
+
+                        This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+                        variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
+                        template content directly.
+                      items:
+                        description: FileTemplateVariable declares a user-configurable
+                          variable supported by a file template.
+                        properties:
+                          defaultValue:
+                            description: Specifies the default value used.
+                            type: string
+                          description:
+                            description: Provides a human-readable explanation of
+                              the variable's purpose.
+                            type: string
+                          name:
+                            description: |-
+                              Specifies the variable name that can be referenced from the file template and set by users
+                              through `cluster.spec.componentSpecs[*].configs[*].variables`.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                     volumeName:
                       description: |-
                         Refers to the volume name of PodTemplate. The file produced through the template will be mounted to

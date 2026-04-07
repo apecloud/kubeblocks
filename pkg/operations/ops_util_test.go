@@ -350,5 +350,77 @@ var _ = Describe("OpsUtil functions", func() {
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
+
+		It("Test swapOpsWithDependentBefore when force ops enqueued before dependent ops", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			By("create a force opsRequest that depends on another ops")
+			ops1 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops2 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops2.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: ops1.Name}
+			ops2.Spec.Force = true
+
+			By("manually add ops2 to cluster annotation first with InQueue=false")
+			ops2Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops2.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     false,
+				QueueBySelf: false,
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{ops2Recorder})
+			})).Should(Succeed())
+
+			By("ops2 should be in queue")
+			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(1))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops2.Name))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
+
+			By("now create ops1 and add it to cluster annotation after ops2")
+			ops1Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops1.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     true,
+				QueueBySelf: false,
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{ops2Recorder, ops1Recorder})
+			})).Should(Succeed())
+
+			By("verify ops1 is after ops2 in the slice")
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(2))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops2.Name))
+			Expect(opsRequestSlice[1].Name).Should(Equal(ops1.Name))
+
+			By("simulate ops2 reconciliation that triggers swap")
+			opsRes.OpsRequest = ops2
+			ops2.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsBehaviour := GetOpsManager().OpsMap[opsv1alpha1.HorizontalScalingType]
+			opsRecorder, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRecorder).ShouldNot(BeNil())
+
+			By("verify ops1 and ops2 have been swapped")
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(2))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[1].Name).Should(Equal(ops2.Name))
+		})
 	})
 })

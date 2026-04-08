@@ -22,7 +22,6 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.17.8
 	github.com/google/go-cmp v0.7.0
-	github.com/imdario/mergo v0.3.14
 	github.com/jhump/protoreflect v1.17.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/json-iterator/go v1.1.12
@@ -100,6 +99,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.1-0.20210315223345-82c243799c99 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
+	github.com/imdario/mergo v0.3.14 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect

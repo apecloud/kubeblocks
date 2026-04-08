@@ -40,6 +40,10 @@ func (c *FakeParametersV1alpha1) Parameters(namespace string) v1alpha1.Parameter
 	return &FakeParameters{c, namespace}
 }
 
+func (c *FakeParametersV1alpha1) ParameterViews(namespace string) v1alpha1.ParameterViewInterface {
+	return &FakeParameterViews{c, namespace}
+}
+
 func (c *FakeParametersV1alpha1) ParametersDefinitions() v1alpha1.ParametersDefinitionInterface {
 	return &FakeParametersDefinitions{c}
 }

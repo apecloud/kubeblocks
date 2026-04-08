@@ -76,7 +76,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CUpgradingPhase))
 			})).Should(Succeed())
 
@@ -91,7 +91,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				status := parameters.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(status).ShouldNot(BeNil())
-				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("2"))
+				g.Expect(status.UpdateRevision).Should(BeEquivalentTo("3"))
 				g.Expect(status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			})).Should(Succeed())
 		})
@@ -131,6 +131,150 @@ var _ = Describe("ComponentParameter Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
 				g.Expect(cfg.Data[testparameters.MysqlConfigFile]).Should(ContainSubstring("server-id=2"))
 				g.Expect(cfg.Annotations[constant.ParametersAppliedComponentGenerationKey]).ShouldNot(BeEmpty())
+			})).Should(Succeed())
+		})
+
+		It("should project desired parameters into config item details", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			customTemplate := testparameters.NewComponentTemplateFactory("desired-template", testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "max_connections=2000\n").
+				Create(&testCtx).
+				GetObject()
+
+			By("update desired state instead of config item details directly")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+						configSpecName: {
+							TemplateRef: customTemplate.Name,
+							Namespace:   customTemplate.Namespace,
+							Policy:      parametersv1alpha1.ReplacePolicy,
+						},
+					},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(customTemplate.Name))
+				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
+				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+		})
+
+		It("should project init first and let desired override it", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Initial = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("1000"),
+					},
+				}
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
+				g.Expect(item.ConfigFileParams["my.cnf"].Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
+			})).Should(Succeed())
+		})
+
+		It("should let explicit desired remove override assignments", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					Updates: []parametersv1alpha1.ParameterUpdate{{
+						Type: parametersv1alpha1.ParameterUpdateRemove,
+						Key:  "max_connections",
+					}},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.ConfigFileParams).Should(HaveKey("my.cnf"))
+				decoded := parameters.DecodeParameterOverlay(item.ConfigFileParams["my.cnf"].Parameters)
+				g.Expect(decoded).Should(HaveKey("max_connections"))
+				g.Expect(decoded["max_connections"]).Should(BeNil())
+			})).Should(Succeed())
+		})
+
+		It("should project desired unmanaged updates into file content", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("2000"),
+					},
+					UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterUpdate{{
+						Template: configSpecName,
+						File:     testparameters.MysqlConfigFile,
+						Updates: []parametersv1alpha1.UnmanagedParameterSectionUpdate{{
+							Section: cfgutil.ToPointer("mysqld"),
+							Updates: []parametersv1alpha1.ParameterUpdate{
+								{
+									Type:  parametersv1alpha1.ParameterUpdateSet,
+									Key:   "custom_local",
+									Value: cfgutil.ToPointer("on"),
+								},
+								{
+									Type: parametersv1alpha1.ParameterUpdateRemove,
+									Key:  "gtid_mode",
+								},
+							},
+						}},
+					}},
+				}
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
+				fileParams := item.ConfigFileParams[testparameters.MysqlConfigFile]
+				g.Expect(fileParams.UnmanagedUpdates).Should(HaveLen(1))
+				g.Expect(fileParams.UnmanagedUpdates[0].Section).Should(Equal(cfgutil.ToPointer("mysqld")))
+				g.Expect(fileParams.UnmanagedUpdates[0].Updates).Should(HaveLen(2))
+				g.Expect(fileParams.Parameters).Should(HaveKeyWithValue("max_connections", cfgutil.ToPointer("2000")))
 			})).Should(Succeed())
 		})
 

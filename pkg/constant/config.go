@@ -32,9 +32,6 @@ const (
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-
-	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
-	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
 )
 
 const (

@@ -29,7 +29,11 @@ import (
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="config status phase."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Parameter is the Schema for the parameters API
+// Deprecated: retained for API compatibility only.
+//
+// # Parameter is the Schema for the parameters API
+//
+// +kubebuilder:deprecatedversion:warning="This CRD has been deprecated since 1.2.0"
 type Parameter struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

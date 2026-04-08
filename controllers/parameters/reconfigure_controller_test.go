@@ -72,7 +72,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}
 			Eventually(testapps.CheckObj(&testCtx, compParameterKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 				g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-				g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
+				g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
 			})).Should(Succeed())
 		})
 
@@ -100,13 +100,18 @@ var _ = Describe("Reconfigure Controller", func() {
 		})
 
 		It("submit changes to cluster", func() {
-			By("submit a parameter update request")
-			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
-			testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
-				AddParameters("innodb_buffer_pool_size", "1024M").
-				AddParameters("max_connections", "100").
-				Create(&testCtx).
-				GetObject()
+			By("submit changes through component parameter")
+			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
+					testparameters.MysqlConfigFile: {
+						Parameters: map[string]*string{
+							"innodb_buffer_pool_size": ptr.To("1024M"),
+							"max_connections":         ptr.To("100"),
+						},
+					},
+				}
+			})).Should(Succeed())
 
 			expectedHash := waitRenderedConfigHash(
 				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,
@@ -142,13 +147,18 @@ var _ = Describe("Reconfigure Controller", func() {
 				pd.Spec.ReloadAction = nil // restart
 			})()).Should(Succeed())
 
-			By("submit a parameter update request")
-			key := testapps.GetRandomizedKey(synthesizedComp.Namespace, synthesizedComp.FullCompName)
-			testparameters.NewParameterFactory(key.Name, key.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name).
-				AddParameters("innodb_buffer_pool_size", "1024M").
-				AddParameters("max_connections", "100").
-				Create(&testCtx).
-				GetObject()
+			By("submit changes through component parameter")
+			Eventually(testapps.GetAndChangeObj(&testCtx, compParameterKey, func(compParameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&compParameter.Spec, configSpecName)
+				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
+					testparameters.MysqlConfigFile: {
+						Parameters: map[string]*string{
+							"innodb_buffer_pool_size": ptr.To("1024M"),
+							"max_connections":         ptr.To("100"),
+						},
+					},
+				}
+			})).Should(Succeed())
 
 			expectedHash := waitRenderedConfigHash(
 				testCtx.DefaultNamespace, synthesizedComp.ClusterName, synthesizedComp.Name, configSpecName,

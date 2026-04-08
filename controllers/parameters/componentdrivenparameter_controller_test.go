@@ -42,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
@@ -89,15 +89,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			}
 		})()).Should(Succeed())
 
-		By("Create init parameters")
-		key := testapps.GetRandomizedKey(testCtx.DefaultNamespace, defaultCompName)
-		testparameters.NewParameterFactory(key.Name, key.Namespace, clusterName, defaultCompName).
-			AddParameters("innodb_buffer_pool_size", "1024M").
-			AddParameters("max_connections", "100").
-			AddLabels(constant.AppInstanceLabelKey, clusterName).
-			AddLabels(constant.ParametersInitLabelKey, "true").
-			Create(&testCtx)
-
 		By("Create a custom template cm")
 		tplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "custom-tpl")
 		tpl := testparameters.NewComponentTemplateFactory(tplKey.Name, testCtx.DefaultNamespace).
@@ -105,19 +96,26 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		customTemplate := parametersv1alpha1.ConfigTemplateExtension{
-			TemplateRef: tpl.Name,
-			Namespace:   tpl.Namespace,
-			Policy:      parametersv1alpha1.ReplacePolicy,
-		}
-		annotationValue, _ := json.Marshal(map[string]parametersv1alpha1.ConfigTemplateExtension{
-			configSpecName: customTemplate,
-		})
-
-		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			AddComponent(defaultCompName, compDefObj.GetName()).
 			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
-			Create(&testCtx)
+			GetObject()
+		Expect(parametersv1alpha1.SetInitialParameters(cluster, parametersv1alpha1.InitialParameters{
+			defaultCompName: {
+				Assignments: map[string]*string{
+					"innodb_buffer_pool_size": pointer.String("1024M"),
+					"max_connections":         pointer.String("100"),
+				},
+				Templates: map[string]parametersv1alpha1.ConfigTemplateExtension{
+					configSpecName: {
+						TemplateRef: tpl.Name,
+						Namespace:   tpl.Namespace,
+						Policy:      parametersv1alpha1.ReplacePolicy,
+					},
+				},
+			},
+		})).Should(Succeed())
+		Expect(testCtx.CreateObj(testCtx.Ctx, cluster)).Should(Succeed())
 
 		By("Create a component obj")
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
@@ -127,7 +125,6 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).
-			SetAnnotations(map[string]string{constant.CustomParameterTemplateAnnotationKey: string(annotationValue)}).
 			Create(&testCtx).
 			GetObject()
 
@@ -148,16 +145,133 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			component := initTestResource()
 			parameterKey := types.NamespacedName{
 				Namespace: component.Namespace,
-				Name:      configcore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+				Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
 			}
 
 			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				g.Expect(parameter.Spec.Initial).ShouldNot(BeNil())
+				g.Expect(parameter.Spec.Initial.Assignments).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
+				g.Expect(parameter.Spec.Initial.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				g.Expect(parameter.Spec.Initial.Templates).Should(HaveKey(configSpecName))
 				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
 				g.Expect(item).ShouldNot(BeNil())
 				g.Expect(item.ConfigFileParams).Should(HaveKey(testparameters.MysqlConfigFile))
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("innodb_buffer_pool_size", pointer.String("1024M")))
 				g.Expect(item.ConfigFileParams[testparameters.MysqlConfigFile].Parameters).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
 			})).Should(Succeed())
+		})
+
+		It("does not reapply init template after runtime updates", func() {
+			component := initTestResource()
+			parameterKey := types.NamespacedName{
+				Namespace: component.Namespace,
+				Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+
+			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+			})).Should(Succeed())
+
+			By("update the ComponentParameter with a runtime custom template")
+			runtimeTplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "runtime-tpl")
+			runtimeTpl := testparameters.NewComponentTemplateFactory(runtimeTplKey.Name, testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "runtime=1").
+				Create(&testCtx).
+				GetObject()
+
+			Expect(testapps.GetAndChangeObj(&testCtx, parameterKey, func(parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				Expect(item).ShouldNot(BeNil())
+				item.CustomTemplates = &parametersv1alpha1.ConfigTemplateExtension{
+					TemplateRef: runtimeTpl.Name,
+					Namespace:   runtimeTpl.Namespace,
+					Policy:      parametersv1alpha1.ReplacePolicy,
+				}
+			})()).Should(Succeed())
+
+			By("touch the component to trigger ComponentDrivenParameter reconciliation")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(component), func(comp *appsv1.Component) {
+				if comp.Annotations == nil {
+					comp.Annotations = map[string]string{}
+				}
+				comp.Annotations["parameters.kubeblocks.io/runtime-template-test"] = "true"
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates.TemplateRef).Should(Equal(runtimeTpl.Name))
+				g.Expect(item.CustomTemplates.Namespace).Should(Equal(runtimeTpl.Namespace))
+				g.Expect(parameter.Spec.Initial).ShouldNot(BeNil())
+				g.Expect(parameter.Spec.Initial.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("100")))
+				g.Expect(parameter.Spec.Initial.Templates).Should(HaveKey(configSpecName))
+			})).Should(Succeed())
+		})
+
+		It("ignores legacy custom-template component annotation", func() {
+			component := initTestResource()
+			parameterKey := types.NamespacedName{
+				Namespace: component.Namespace,
+				Name:      parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+
+			legacyTplKey := testapps.GetRandomizedKey(testCtx.DefaultNamespace, "legacy-custom-tpl")
+			legacyTpl := testparameters.NewComponentTemplateFactory(legacyTplKey.Name, testCtx.DefaultNamespace).
+				AddConfigFile(testparameters.MysqlConfigFile, "legacy=1").
+				Create(&testCtx).
+				GetObject()
+			legacyAnnotation, err := json.Marshal(map[string]parametersv1alpha1.ConfigTemplateExtension{
+				configSpecName: {
+					TemplateRef: legacyTpl.Name,
+					Namespace:   legacyTpl.Namespace,
+					Policy:      parametersv1alpha1.ReplacePolicy,
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("set the legacy component annotation and trigger reconcile")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(component), func(comp *appsv1.Component) {
+				if comp.Spec.Annotations == nil {
+					comp.Spec.Annotations = map[string]string{}
+				}
+				comp.Spec.Annotations["config.kubeblocks.io/custom-template"] = string(legacyAnnotation)
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, parameterKey, func(g Gomega, parameter *parametersv1alpha1.ComponentParameter) {
+				item := parameters.GetConfigTemplateItem(&parameter.Spec, configSpecName)
+				g.Expect(item).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates).ShouldNot(BeNil())
+				g.Expect(item.CustomTemplates.TemplateRef).ShouldNot(Equal(legacyTpl.Name))
+			})).Should(Succeed())
+		})
+	})
+
+	Context("Resolve init parameters from cluster annotation", func() {
+		It("returns error when cluster annotation payload is invalid", func() {
+			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddComponent(defaultCompName, compDefName).
+				AddAnnotations("config.kubeblocks.io/init-parameters", "{invalid-json").
+				Create(&testCtx).
+				GetObject()
+			comp := &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      constant.GenerateClusterComponentName(cluster.Name, defaultCompName),
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: cluster.Name,
+					},
+				},
+			}
+
+			scheme := runtime.NewScheme()
+			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+			fakeReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+			_, err := resolveInitialParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, fakeReader, comp)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("invalid cluster initialization payload"))
 		})
 	})
 

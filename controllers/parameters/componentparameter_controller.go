@@ -110,8 +110,8 @@ func (r *ComponentParameterReconciler) enqueueByComponent(_ context.Context, obj
 	}}
 }
 
-func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
-	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, componentParameter)
+func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
+	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, compParam)
 	if err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to get related object").Error())
 	}
@@ -120,15 +120,37 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 		return intctrlutil.Reconciled()
 	}
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
-		return r.failWithInvalidComponent(componentParameter, reqCtx)
+		return r.failWithInvalidComponent(reqCtx, compParam)
 	}
-	tasks := generateReconcileTasks(reqCtx, componentParameter, fetcherTask.ComponentObj.Generation)
+
+	// Reconcile the internal execution model in stages:
+	// 1. ensure the config item skeleton exists and is aligned with the current component definition;
+	// 2. project spec.init/spec.desired into the skeletonized config item details;
+	// 3. execute the downstream render/reconfigure flow only after spec has stabilized.
+	//
+	// Each spec mutation returns early and relies on the next reconcile to continue with a fresh view.
+	skeletonUpdated, err := r.reconcileConfigItemDetails(reqCtx, compParam, fetcherTask)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to reconcile config item details").Error())
+	}
+	if skeletonUpdated {
+		return intctrlutil.Reconciled()
+	}
+
+	specUpdated, handled, err := r.reconcileParameterValues(reqCtx, compParam, fetcherTask)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to reconcile parameter values").Error())
+	}
+	if handled || specUpdated {
+		return intctrlutil.Reconciled()
+	}
+
+	tasks := generateReconcileTasks(reqCtx, compParam, fetcherTask.ComponentObj.Generation)
 	if len(tasks) == 0 {
 		reqCtx.Log.Info("nothing to reconcile")
 		return intctrlutil.Reconciled()
 	}
-
-	taskCtx, err := newTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)
+	taskCtx, err := newTaskContext(reqCtx.Ctx, r.Client, compParam, fetcherTask)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to create task context").Error())
 	}
@@ -139,17 +161,49 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	return intctrlutil.Reconciled()
 }
 
-func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *parametersv1alpha1.ComponentParameter, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
-	msg := fmt.Sprintf("not found cluster component: [%s]", componentParam.Spec.ComponentName)
+func (r *ComponentParameterReconciler) reconcileConfigItemDetails(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {
+	return reconcileConfigItemDetailsIntoSpec(reqCtx.Ctx, r.Client, compParam, fetchTask)
+}
+
+func (r *ComponentParameterReconciler) reconcileParameterValues(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, bool, error) {
+	if compParam.Spec.Initial == nil && compParam.Spec.Desired == nil {
+		return false, false, nil
+	}
+	patched, err := reconcileParameterValuesIntoSpec(reqCtx.Ctx, r.Client, compParam, fetchTask)
+	if err == nil {
+		return patched, patched, nil
+	}
+	if statusErr := r.failWithParameterValues(reqCtx, compParam, err); statusErr != nil {
+		return false, false, statusErr
+	}
+	return false, true, nil
+}
+
+func (r *ComponentParameterReconciler) failWithInvalidComponent(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
+	msg := fmt.Sprintf("not found cluster component: [%s]", compParam.Spec.ComponentName)
 
 	reqCtx.Log.Error(fmt.Errorf("%s", msg), "")
-	patch := client.MergeFrom(componentParam.DeepCopy())
-	componentParam.Status.Message = msg
-	if err := r.Client.Status().Patch(reqCtx.Ctx, componentParam, patch); err != nil {
+	patch := client.MergeFrom(compParam.DeepCopy())
+	compParam.Status.Message = msg
+	if err := r.Client.Status().Patch(reqCtx.Ctx, compParam, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 			errors.Wrap(err, "failed to update componentParameter status").Error())
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentParameterReconciler) failWithParameterValues(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter, cause error) error {
+	msg := cause.Error()
+	if compParam.Status.ObservedGeneration == compParam.Generation &&
+		compParam.Status.Phase == parametersv1alpha1.CMergeFailedPhase &&
+		compParam.Status.Message == msg {
+		return nil
+	}
+	patch := client.MergeFrom(compParam.DeepCopy())
+	compParam.Status.ObservedGeneration = compParam.Generation
+	compParam.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+	compParam.Status.Message = msg
+	return r.Client.Status().Patch(reqCtx.Ctx, compParam, patch)
 }
 
 func (r *ComponentParameterReconciler) runTasks(taskCtx *taskContext, tasks []Task, resource *Task) error {
@@ -167,7 +221,7 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx *taskContext, tasks []Ta
 		}
 	}
 
-	updateCompParamStatus(&compParameter.Status, errs, compParameter.Generation)
+	r.updateCompParamStatus(&compParameter.Status, errs, compParameter.Generation)
 	if err := r.Client.Status().Patch(taskCtx.ctx, compParameter, patch); err != nil {
 		errs = append(errs, err)
 	}
@@ -177,7 +231,7 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx *taskContext, tasks []Ta
 	return utilerrors.NewAggregate(errs)
 }
 
-func updateCompParamStatus(status *parametersv1alpha1.ComponentParameterStatus, errs []error, generation int64) {
+func (r *ComponentParameterReconciler) updateCompParamStatus(status *parametersv1alpha1.ComponentParameterStatus, errs []error, generation int64) {
 	aggregatePhase := func(ss []parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ParameterPhase {
 		var phase = parametersv1alpha1.CFinishedPhase
 		for _, s := range ss {
@@ -199,12 +253,12 @@ func updateCompParamStatus(status *parametersv1alpha1.ComponentParameterStatus, 
 	}
 }
 
-func (r *ComponentParameterReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) func() (*ctrl.Result, error) {
+func (r *ComponentParameterReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx, compParam *parametersv1alpha1.ComponentParameter) func() (*ctrl.Result, error) {
 	return func() (*ctrl.Result, error) {
 		cms := &corev1.ConfigMapList{}
 		listOpts := []client.ListOption{
-			client.InNamespace(componentParameter.GetNamespace()),
-			client.MatchingLabels(constant.GetCompLabels(componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName)),
+			client.InNamespace(compParam.GetNamespace()),
+			client.MatchingLabels(constant.GetCompLabels(compParam.Spec.ClusterName, compParam.Spec.ComponentName)),
 		}
 		if err := r.Client.List(reqCtx.Ctx, cms, listOpts...); err != nil {
 			return &reconcile.Result{}, err

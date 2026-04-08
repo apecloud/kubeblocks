@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -349,6 +350,92 @@ var _ = Describe("OpsUtil functions", func() {
 			By("expect the ops phase is Creating")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
+		It("Test swapOpsWithDependentBefore when force ops enqueued before dependent ops", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			By("create a force opsRequest that depends on another ops")
+			ops1 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops2 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops3 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops3.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: fmt.Sprintf("%s,%s", ops1.Name, ops2.Name)}
+			ops3.Spec.Force = true
+
+			By("manually add ops3 to cluster annotation first with InQueue=false")
+			ops3Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops3.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     false,
+				QueueBySelf: false,
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{ops3Recorder})
+			})).Should(Succeed())
+
+			By("ops2 should be in queue")
+			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(1))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops3.Name))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
+
+			By("now create ops1 and add it to cluster annotation after ops2")
+			ops1Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops1.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     true,
+				QueueBySelf: false,
+			}
+			ops2Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops2.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     true,
+				QueueBySelf: false,
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{ops3Recorder, ops1Recorder, ops2Recorder})
+			})).Should(Succeed())
+
+			By("verify ops1 is after ops2 in the slice")
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(3))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops3.Name))
+			Expect(opsRequestSlice[1].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[2].Name).Should(Equal(ops2.Name))
+
+			By("simulate ops3 reconciliation that triggers swap")
+			opsRes.OpsRequest = ops3
+			ops3.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsBehaviour := GetOpsManager().OpsMap[opsv1alpha1.HorizontalScalingType]
+			opsRecorder, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRecorder).ShouldNot(BeNil())
+
+			By("verify ops1 and ops2 have been swapped")
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(3))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[1].Name).Should(Equal(ops2.Name))
+			Expect(opsRequestSlice[2].Name).Should(Equal(ops3.Name))
 		})
 	})
 })

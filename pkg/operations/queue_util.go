@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 )
@@ -132,18 +134,43 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		}
 		opsRequestSlice = append(opsRequestSlice, opsRecorder)
 	default:
-		if !opsRecorder.InQueue {
-			// the opsRequest is already running.
-			return &opsRecorder, nil
+		var doSwap bool
+		opsRequestSlice, doSwap = swapOpsWithDependentBefore(opsRequestSlice, index, opsRes)
+		// check if dependent ops are after current ops in the slice, if so swap positions and update the queue in the cluster annotation.
+		if !doSwap {
+			if !opsRecorder.InQueue {
+				// the opsRequest is already running.
+				return &opsRecorder, nil
+			}
+			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
+				// if exists other running opsRequest, return.
+				return &opsRecorder, nil
+			}
+			// mark to handle the next opsRequest
+			opsRequestSlice[index].InQueue = false
 		}
-		if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
-			// if exists other running opsRequest, return.
-			return &opsRecorder, nil
-		}
-		// mark to handle the next opsRequest
-		opsRequestSlice[index].InQueue = false
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, currentIndex int, opsRes *OpsResource) ([]opsv1alpha1.OpsRecorder, bool) {
+	dependentOpsStr := opsRes.OpsRequest.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey]
+	if dependentOpsStr == "" {
+		return opsRequestSlice, false
+	}
+	dependentSet := make(map[string]struct{})
+	for _, name := range strings.Split(dependentOpsStr, ",") {
+		dependentSet[name] = struct{}{}
+	}
+	var doSwap bool
+	for i := currentIndex + 1; i < len(opsRequestSlice); i++ {
+		if _, ok := dependentSet[opsRequestSlice[i].Name]; ok {
+			opsRequestSlice[currentIndex], opsRequestSlice[i] = opsRequestSlice[i], opsRequestSlice[currentIndex]
+			currentIndex = i
+			doSwap = true
+		}
+	}
+	return opsRequestSlice, doSwap
 }
 
 // existOtherRunningOps checks if exists other running opsRequest.

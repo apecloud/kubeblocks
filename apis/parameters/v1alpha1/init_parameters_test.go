@@ -19,6 +19,8 @@ package v1alpha1
 import (
 	"testing"
 
+	"k8s.io/utils/ptr"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
@@ -26,7 +28,7 @@ func TestInitParametersRoundTrip(t *testing.T) {
 	value := InitParameters{
 		"mysql": {
 			Assignments: map[string]*string{
-				"max_connections": strPtr("200"),
+				"max_connections": ptr.To("200"),
 			},
 			Templates: map[string]ConfigTemplateExtension{
 				"mysql-config": {
@@ -64,7 +66,7 @@ func TestParseInitParameters(t *testing.T) {
 	if err := SetInitParameters(cluster, InitParameters{
 		"mysql": {
 			Assignments: map[string]*string{
-				"max_connections": strPtr("200"),
+				"max_connections": ptr.To("200"),
 			},
 		},
 	}); err != nil {
@@ -85,7 +87,7 @@ func TestSetInitParameters(t *testing.T) {
 	params := InitParameters{
 		"mysql": {
 			Assignments: map[string]*string{
-				"max_connections": strPtr("200"),
+				"max_connections": ptr.To("200"),
 			},
 		},
 	}
@@ -110,8 +112,4 @@ func TestSetInitParameters(t *testing.T) {
 			t.Fatalf("expected init parameter annotation to be cleared")
 		}
 	}
-}
-
-func strPtr(v string) *string {
-	return &v
 }

@@ -16,6 +16,11 @@ apis/dataprotection/ @ldming @wangyelei @apecloud/kb-reviewers
 controllers/dataprotection/ @ldming @wangyelei @apecloud/kb-reviewers
 pkg/dataprotection/ @ldming @wangyelei @apecloud/kb-reviewers
 
+# Parameters
+apis/parameters/ @kizuna-lek @apecloud/kb-reviewers
+controllers/parameters/ @kizuna-lek @apecloud/kb-reviewers
+pkg/parameters/ @kizuna-lek @apecloud/kb-reviewers
+
 # Extensions
 apis/extensions/ @ldming @apecloud/kb-reviewers
 controllers/extensions/ @ldming @apecloud/kb-reviewers

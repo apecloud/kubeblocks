@@ -199,7 +199,6 @@ parameter: {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 
 			Expect(err).Should(BeNil())
-
 		})
 	})
 })

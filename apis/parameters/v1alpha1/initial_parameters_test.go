@@ -24,8 +24,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-func TestInitParametersRoundTrip(t *testing.T) {
-	value := InitParameters{
+func TestInitialParametersRoundTrip(t *testing.T) {
+	value := InitialParameters{
 		"mysql": {
 			Assignments: map[string]*string{
 				"max_connections": ptr.To("200"),
@@ -40,11 +40,11 @@ func TestInitParametersRoundTrip(t *testing.T) {
 		},
 	}
 
-	raw, err := EncodeInitParameters(value)
+	raw, err := EncodeInitialParameters(value)
 	if err != nil {
 		t.Fatalf("encode failed: %v", err)
 	}
-	decoded, err := DecodeInitParameters(raw)
+	decoded, err := DecodeInitialParameters(raw)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -61,9 +61,9 @@ func TestInitParametersRoundTrip(t *testing.T) {
 	}
 }
 
-func TestParseInitParameters(t *testing.T) {
+func TestParseInitialParameters(t *testing.T) {
 	cluster := &appsv1.Cluster{}
-	if err := SetInitParameters(cluster, InitParameters{
+	if err := SetInitialParameters(cluster, InitialParameters{
 		"mysql": {
 			Assignments: map[string]*string{
 				"max_connections": ptr.To("200"),
@@ -72,7 +72,7 @@ func TestParseInitParameters(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("set failed: %v", err)
 	}
-	decoded, err := ParseInitParameters(cluster)
+	decoded, err := ParseInitialParameters(cluster)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -82,29 +82,29 @@ func TestParseInitParameters(t *testing.T) {
 	}
 }
 
-func TestSetInitParameters(t *testing.T) {
+func TestSetInitialParameters(t *testing.T) {
 	cluster := &appsv1.Cluster{}
-	params := InitParameters{
+	params := InitialParameters{
 		"mysql": {
 			Assignments: map[string]*string{
 				"max_connections": ptr.To("200"),
 			},
 		},
 	}
-	if err := SetInitParameters(cluster, params); err != nil {
+	if err := SetInitialParameters(cluster, params); err != nil {
 		t.Fatalf("set failed: %v", err)
 	}
 	if cluster.Annotations == nil {
 		t.Fatalf("expected init parameter annotation to be set")
 	}
-	decoded, err := ParseInitParameters(cluster)
+	decoded, err := ParseInitialParameters(cluster)
 	if err != nil {
 		t.Fatalf("parse after set failed: %v", err)
 	}
 	if decoded.Get("mysql") == nil {
 		t.Fatalf("expected mysql init parameter after set")
 	}
-	if err := SetInitParameters(cluster, InitParameters{}); err != nil {
+	if err := SetInitialParameters(cluster, InitialParameters{}); err != nil {
 		t.Fatalf("clear failed: %v", err)
 	}
 	if cluster.Annotations != nil {

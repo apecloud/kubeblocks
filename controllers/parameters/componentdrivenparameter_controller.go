@@ -271,7 +271,7 @@ func (r *ComponentDrivenParameterReconciler) buildComponentParameter(reqCtx intc
 
 	var initialInputs *parametersv1alpha1.ParameterInputs
 	if includeInitOverlay {
-		initial, err := resolveInitParameters(reqCtx, reader, comp)
+		initial, err := resolveInitialParameters(reqCtx, reader, comp)
 		if err != nil {
 			return nil, err
 		}
@@ -298,7 +298,7 @@ func (r *ComponentDrivenParameterReconciler) buildComponentParameter(reqCtx intc
 	return parameterObj, nil
 }
 
-func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ParameterInputs, error) {
+func resolveInitialParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ParameterInputs, error) {
 	if comp == nil {
 		return &parametersv1alpha1.ParameterInputs{}, nil
 	}
@@ -317,12 +317,12 @@ func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, 
 		}
 		return &parametersv1alpha1.ParameterInputs{}, nil
 	}
-	initParams, err := parametersv1alpha1.ParseInitParameters(cluster)
+	initialParams, err := parametersv1alpha1.ParseInitialParameters(cluster)
 	if err != nil {
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal,
 			"invalid cluster initialization payload: %v", err)
 	}
-	spec := initParams.Get(compName)
+	spec := initialParams.Get(compName)
 	if spec == nil {
 		return &parametersv1alpha1.ParameterInputs{}, nil
 	}

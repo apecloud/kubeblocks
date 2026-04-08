@@ -30,12 +30,12 @@ const (
 	initParameterKey = "config.kubeblocks.io/init-parameters"
 )
 
-// InitParameters describes the initialization overlays keyed by cluster sub-resource name,
+// InitialParameters describes the initialization overlays keyed by cluster sub-resource name,
 // such as a component or sharding item name.
-type InitParameters map[string]ParameterInputs
+type InitialParameters map[string]ParameterInputs
 
-// EncodeInitParameters serializes the initialization payload.
-func EncodeInitParameters(v InitParameters) (string, error) {
+// EncodeInitialParameters serializes the initialization payload.
+func EncodeInitialParameters(v InitialParameters) (string, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -43,33 +43,33 @@ func EncodeInitParameters(v InitParameters) (string, error) {
 	return string(data), nil
 }
 
-// DecodeInitParameters deserializes the initialization payload.
+// DecodeInitialParameters deserializes the initialization payload.
 // Empty input returns an empty value without error.
-func DecodeInitParameters(raw string) (InitParameters, error) {
+func DecodeInitialParameters(raw string) (InitialParameters, error) {
 	if raw == "" {
-		return InitParameters{}, nil
+		return InitialParameters{}, nil
 	}
-	ret := InitParameters{}
+	ret := InitialParameters{}
 	if err := json.Unmarshal([]byte(raw), &ret); err != nil {
 		return nil, err
 	}
 	if ret == nil {
-		return InitParameters{}, nil
+		return InitialParameters{}, nil
 	}
 	return ret, nil
 }
 
-// ParseInitParameters extracts and deserializes initialization overlays from the Cluster object.
-func ParseInitParameters(cluster *appsv1.Cluster) (InitParameters, error) {
+// ParseInitialParameters extracts and deserializes initialization overlays from the Cluster object.
+func ParseInitialParameters(cluster *appsv1.Cluster) (InitialParameters, error) {
 	if cluster == nil || len(cluster.Annotations) == 0 {
-		return InitParameters{}, nil
+		return InitialParameters{}, nil
 	}
-	return DecodeInitParameters(cluster.Annotations[initParameterKey])
+	return DecodeInitialParameters(cluster.Annotations[initParameterKey])
 }
 
-// SetInitParameters serializes and stores the initialization payload on the given Cluster object.
+// SetInitialParameters serializes and stores the initialization payload on the given Cluster object.
 // Passing an empty payload clears the metadata entry.
-func SetInitParameters(cluster *appsv1.Cluster, params InitParameters) error {
+func SetInitialParameters(cluster *appsv1.Cluster, params InitialParameters) error {
 	if cluster == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func SetInitParameters(cluster *appsv1.Cluster, params InitParameters) error {
 		}
 		return nil
 	}
-	raw, err := EncodeInitParameters(params)
+	raw, err := EncodeInitialParameters(params)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func SetInitParameters(cluster *appsv1.Cluster, params InitParameters) error {
 }
 
 // Get returns the initialization overlay for the given sub-resource name.
-func (v InitParameters) Get(name string) *ParameterInputs {
+func (v InitialParameters) Get(name string) *ParameterInputs {
 	if len(v) == 0 {
 		return nil
 	}

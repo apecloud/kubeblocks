@@ -100,7 +100,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			AddComponent(defaultCompName, compDefObj.GetName()).
 			AddAnnotations(constant.LegacyConfigManagerRequiredAnnotationKey, "true").
 			GetObject()
-		Expect(parametersv1alpha1.SetInitParameters(cluster, parametersv1alpha1.InitParameters{
+		Expect(parametersv1alpha1.SetInitialParameters(cluster, parametersv1alpha1.InitialParameters{
 			defaultCompName: {
 				Assignments: map[string]*string{
 					"innodb_buffer_pool_size": pointer.String("1024M"),
@@ -269,7 +269,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			scheme := runtime.NewScheme()
 			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
 			fakeReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
-			_, err := resolveInitParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, fakeReader, comp)
+			_, err := resolveInitialParameters(intctrlutil.RequestCtx{Ctx: context.Background()}, fakeReader, comp)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("invalid cluster initialization payload"))
 		})

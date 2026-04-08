@@ -1691,10 +1691,10 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.InitParameters">InitParameters
+<h3 id="parameters.kubeblocks.io/v1alpha1.InitialParameters">InitialParameters
 (<code>map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ParameterInputs</code> alias)</h3>
 <div>
-<p>InitParameters describes the initialization overlays keyed by cluster sub-resource name,
+<p>InitialParameters describes the initialization overlays keyed by cluster sub-resource name,
 such as a component or sharding item name.</p>
 </div>
 <h3 id="parameters.kubeblocks.io/v1alpha1.MergedPolicy">MergedPolicy

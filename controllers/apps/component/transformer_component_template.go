@@ -88,7 +88,7 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
-		if len(tpl.Template) == 0 {
+		if len(tpl.Template) == 0 && !isExternalManagedPending(tpl) {
 			return fmt.Errorf("config/script template has no template specified: %s", tpl.Name)
 		}
 	}
@@ -122,6 +122,9 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 		synthesizedComp.PodSpec.Volumes = []corev1.Volume{}
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
+		if isExternalManagedPending(tpl) {
+			continue
+		}
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
 		// If the file template is managed by external, the volume mount object should be the external object.
 		if isExternalManaged(tpl) {
@@ -316,6 +319,10 @@ func isExternalManaged(tpl component.SynthesizedFileTemplate) bool {
 	return ptr.Deref(tpl.ExternalManaged, false)
 }
 
+func isExternalManagedPending(tpl component.SynthesizedFileTemplate) bool {
+	return isExternalManaged(tpl) && len(tpl.Template) == 0
+}
+
 func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *componentTransformContext,
 	runningObjs, protoObjs map[string]*corev1.ConfigMap, toUpdate sets.Set[string]) error {
 	var (
@@ -374,7 +381,7 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 		}
 	)
 	for _, tpl := range synthesizedComp.FileTemplates {
-		if tpl.Config {
+		if tpl.Config && !isExternalManagedPending(tpl) {
 			config := workloads.ConfigTemplate{
 				Name:                  tpl.Name,
 				ConfigHash:            configHash(tpl),

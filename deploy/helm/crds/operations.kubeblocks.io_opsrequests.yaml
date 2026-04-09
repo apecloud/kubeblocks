@@ -3354,10 +3354,6 @@ spec:
             required:
             - type
             type: object
-            x-kubernetes-validations:
-            - message: forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']
-              rule: 'has(self.cancel) && self.cancel ? (self.type in [''VerticalScaling'',
-                ''HorizontalScaling'']) : true'
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:

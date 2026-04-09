@@ -65,7 +65,7 @@ func ResolveParameterTemplate(cmpd appsv1.ComponentDefinitionSpec, configs []par
 			continue
 		}
 
-		if slices.Contains(tpls, config.Name) {
+		if slices.Contains(tpls, config.Template) {
 			templates = append(templates, config)
 		}
 	}

@@ -86,13 +86,13 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 	return updatedParams, nil
 }
 
-// ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, configRender parametersv1alpha1.ParamConfigRendererSpec) error {
+// ValidateConfigPatch verifies if the changed parameters have been removed.
+func ValidateConfigPatch(patch *ConfigPatchInfo, configs []parametersv1alpha1.ComponentConfigDescription) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}
 
-	vParams := GenerateVisualizedParamsList(patch, configRender.Configs)
+	vParams := GenerateVisualizedParamsList(patch, configs)
 	for _, param := range vParams {
 		for _, p := range param.Parameters {
 			if p.Value == nil {
@@ -179,6 +179,24 @@ func CheckUpdateDynamicParameters(config *parametersv1alpha1.FileFormatConfig, p
 
 	// if the updated parameter is not in list of DynamicParameter,
 	// it is StaticParameter by default, and restart is the default behavior.
+	return false, nil
+}
+
+// HasDynamicParameterUpdate returns true when at least one updated parameter is dynamic.
+func HasDynamicParameterUpdate(config *parametersv1alpha1.FileFormatConfig, paramsDef *parametersv1alpha1.ParametersDefinitionSpec, patch string) (bool, error) {
+	if patch == "" {
+		return false, nil
+	}
+
+	updatedParams, err := resolveUpdateParameter([]byte(patch), NestedPrefixField(config))
+	if err != nil {
+		return false, err
+	}
+	for _, param := range updatedParams {
+		if IsDynamicParameter(param, paramsDef) {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 

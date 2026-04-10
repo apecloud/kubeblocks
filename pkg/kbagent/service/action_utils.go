@@ -22,6 +22,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -376,7 +377,6 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 			return err
 		}
 	}
-
 	go func() {
 		defer cancel()
 		defer close(errChan)
@@ -531,6 +531,21 @@ func setGRPCMessageField(msg *dynamicpb.Message, fieldName, value string) error 
 	field := msg.Descriptor().Fields().ByTextName(fieldName)
 	if field == nil {
 		return fmt.Errorf("field %s not found", fieldName)
+	}
+
+	if field.IsMap() {
+		if field.MapKey().Kind() != protoreflect.StringKind || field.MapValue().Kind() != protoreflect.StringKind {
+			return fmt.Errorf("unsupported map field type: %s", field.Kind())
+		}
+		items := map[string]string{}
+		if err := json.Unmarshal([]byte(value), &items); err != nil {
+			return err
+		}
+		mapField := msg.Mutable(field).Map()
+		for k, v := range items {
+			mapField.Set(protoreflect.ValueOfString(k).MapKey(), protoreflect.ValueOfString(v))
+		}
+		return nil
 	}
 
 	var val protoreflect.Value

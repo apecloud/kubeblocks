@@ -99,16 +99,27 @@ func (c *Context) getTargetReplicas() int {
 	return int(c.ClusterComponent.Replicas)
 }
 
-var (
-	policyMap = map[parametersv1alpha1.ReloadPolicy]func(Context) (Status, error){}
+// Policy defines the policy of reconfiguring.
+type Policy string
+
+const (
+	NonePolicy                    Policy = "none"
+	RestartPolicy                 Policy = "restart"
+	AsyncDynamicReloadPolicy      Policy = "asyncReload"
+	SyncDynamicReloadPolicy       Policy = "syncReload"
+	DynamicReloadAndRestartPolicy Policy = "dynamicReloadBeginRestart"
 )
 
-func registerPolicy(policy parametersv1alpha1.ReloadPolicy, fn func(Context) (Status, error)) {
+var (
+	policyMap = map[Policy]func(Context) (Status, error){}
+)
+
+func registerPolicy(policy Policy, fn func(Context) (Status, error)) {
 	policyMap[policy] = fn
 }
 
 type Task struct {
-	Policy parametersv1alpha1.ReloadPolicy
+	Policy Policy
 	Ctx    Context
 }
 

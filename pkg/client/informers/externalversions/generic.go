@@ -135,6 +135,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParamConfigRenderers().Informer()}, nil
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("parameters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().Parameters().Informer()}, nil
+	case parametersv1alpha1.SchemeGroupVersion.WithResource("parameterviews"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParameterViews().Informer()}, nil
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("parametersdefinitions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParametersDefinitions().Informer()}, nil
 

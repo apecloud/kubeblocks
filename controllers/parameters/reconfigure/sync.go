@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconfigure
 
 import (
+	"encoding/json"
 	"slices"
+	"strconv"
 
 	"k8s.io/utils/ptr"
 
@@ -32,8 +34,8 @@ import (
 )
 
 func init() {
-	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicy)
-	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, syncNRestartPolicy)
+	registerPolicy(SyncDynamicReloadPolicy, syncPolicy)
+	registerPolicy(DynamicReloadAndRestartPolicy, syncNRestartPolicy)
 }
 
 var (
@@ -65,7 +67,23 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 			}
 		}
 		if len(params) == 0 {
-			return makeStatus(StatusNone, withReason("has no updated parameters")), nil
+			// Legacy reload generation in release-1.1 only happened when there were
+			// reloadable params left after filtering. Keep the same gate here for
+			// compatibility, even though "should invoke reload action" is not purely
+			// equivalent to "has reloadable params" as an abstract rule.
+			//
+			// No reloadable params, but a restart can still be required (static params
+			// change or merge-reload-and-restart). Keep the same release-1.1 fallback:
+			// when no reload task is generated, we still submit the restart.
+			if restart {
+				return submit(ctx, nil, true)
+			}
+			return makeStatus(StatusNone, withReason("has NO updated parameters")), nil
+		}
+		if shouldBuildLegacyReconfigureAction(ctx, params, restart) {
+			if err := ValidateLegacyConfigManagerRuntime(ctx.ITS); err != nil {
+				return makeStatus(StatusFailed, withReason(err.Error())), nil
+			}
 		}
 		return submit(ctx, params, restart)
 	}
@@ -93,16 +111,104 @@ func submit(ctx Context, parameters map[string]string, restart bool) (Status, er
 	return syncReconfigureStatus(ctx), nil
 }
 
-func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, parameters map[string]string, restart bool) Status {
-	config.Variables = parameters
+func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
+	config.Variables = params
 	config.ConfigHash = ctx.getTargetConfigHash()
-	if restart {
-		config.Restart = ptr.To(true)
-	} else {
-		config.Restart = nil
+	// Keep restart explicit so an old persisted `restart: true` is actively cleared.
+	config.Restart = ptr.To(restart)
+	config.Reconfigure = ptr.To(false)
+	switch {
+	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
+		config.Reconfigure = ptr.To(true)
+		config.ReconfigureAction = reloadActionToReconfigureAction(ctx, params)
+	case shouldUseTemplateReconfigureAction(ctx, params, restart):
+		config.Reconfigure = ptr.To(true)
+		config.ReconfigureAction = nil
+	default:
+		config.ReconfigureAction = nil
 	}
-	// TODO: reconfigure action?
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+}
+
+// shouldBuildLegacyReconfigureAction returns true only when this change should be translated
+// into a config-manager gRPC proxy call. This excludes auto-triggered legacy reloads and the
+// merged-restart case where release-1.1 would restart without issuing a separate sync reload.
+func shouldBuildLegacyReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
+	if len(params) == 0 {
+		// This compatibility path intentionally follows the legacy task-generation
+		// rule from release-1.1: without reloadable params, no standalone reload task
+		// was produced. Keep that behavior here so the new reconfigure action matches
+		// the old reload-action trigger conditions.
+		return false
+	}
+	if ctx.ParametersDef == nil || ctx.ParametersDef.ReloadAction == nil {
+		return false
+	}
+	if ctx.ParametersDef.ReloadAction.AutoTrigger != nil {
+		return false
+	}
+	if ctx.ParametersDef.ReloadAction.ShellTrigger == nil {
+		return false
+	}
+	if restart && !parameters.NeedDynamicReloadAction(ctx.ParametersDef) {
+		return false
+	}
+	return true
+}
+
+func shouldUseTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
+	if len(params) == 0 || ctx.ConfigTemplate.Reconfigure == nil {
+		return false
+	}
+	if !restart {
+		return true
+	}
+	if ctx.ParametersDef == nil {
+		return false
+	}
+	return parameters.ReloadStaticParameters(ctx.ParametersDef) || parameters.NeedDynamicReloadAction(ctx.ParametersDef)
+}
+
+func reloadActionToReconfigureAction(ctx Context, params map[string]string) *appsv1.Action {
+	pd := ctx.ParametersDef
+	if pd == nil || pd.ReloadAction == nil || pd.ReloadAction.ShellTrigger == nil {
+		return nil
+	}
+	request, err := legacyConfigManagerRequestParams(ctx, params)
+	if err != nil {
+		ctx.Log.Error(err, "failed to build config-manager proxy request")
+		return nil
+	}
+	return &appsv1.Action{
+		GRPC: &appsv1.GRPCAction{
+			Port:    strconv.Itoa(resolveLegacyConfigManagerPort(ctx.ITS)),
+			Service: legacyConfigManagerGRPCService,
+			Method:  legacyConfigManagerGRPCMethod,
+			Request: request,
+			Response: appsv1.GRPCResponse{
+				Status: "errMessage",
+			},
+		},
+	}
+}
+
+func legacyConfigManagerRequestParams(ctx Context, params map[string]string) (appsv1.GRPCRequest, error) {
+	paramsData, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	return appsv1.GRPCRequest{
+		"configSpec": ctx.ConfigTemplate.Name,
+		"configFile": resolveConfigFile(ctx.ConfigDescription),
+		"params":     string(paramsData),
+	}, nil
+}
+
+func resolveConfigFile(desc *parametersv1alpha1.ComponentConfigDescription) string {
+	if desc == nil {
+		return ""
+	}
+	return desc.Name
 }
 
 func syncReconfigureStatus(ctx Context) Status {

@@ -336,6 +336,12 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			return &val
 		}
 		action = func(tpl component.SynthesizedFileTemplate) *kbappsv1.Action {
+			if tpl.ReconfigureRequired != nil && !*tpl.ReconfigureRequired {
+				return nil
+			}
+			if tpl.ReconfigureRequired != nil && *tpl.ReconfigureRequired && tpl.ReconfigureAction != nil {
+				return tpl.ReconfigureAction
+			}
 			if tpl.Reconfigure != nil {
 				return tpl.Reconfigure
 			}
@@ -345,10 +351,16 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			return nil
 		}
 		actionName = func(tpl component.SynthesizedFileTemplate) string {
-			if tpl.Reconfigure != nil {
-				return component.UDFReconfigureActionName(tpl)
+			if tpl.ReconfigureRequired != nil && !*tpl.ReconfigureRequired {
+				return ""
 			}
-			return "" // default reconfigure action or empty
+			if tpl.ReconfigureRequired != nil && *tpl.ReconfigureRequired && tpl.ReconfigureAction != nil {
+				return component.UserReconfigureActionName(tpl)
+			}
+			if tpl.Reconfigure != nil {
+				return component.CMPDReconfigureActionName(tpl)
+			}
+			return "" // lifecycle default reconfigure action or empty
 		}
 		templateChanges = t.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
 		parameters      = func(tpl component.SynthesizedFileTemplate) map[string]string {

@@ -146,8 +146,6 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
-	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
@@ -646,7 +644,7 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParameterReconciler{
+		if err = (&parameterscontrollers.LegacyParameterReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
@@ -660,6 +658,14 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("component-driven-parameter-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.LegacyParamConfigRendererReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("legacy-param-config-renderer-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "LegacyParamConfigRenderer")
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ComponentParameterReconciler{
@@ -678,20 +684,20 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-driven-config-render-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ParamConfigRenderer")
-			os.Exit(1)
-		}
 		if err = (&parameterscontrollers.ParameterTemplateExtensionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("parameter-template-extension-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ParameterTemplateExtension")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParameterViewReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameter-view-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParameterView")
 			os.Exit(1)
 		}
 	}

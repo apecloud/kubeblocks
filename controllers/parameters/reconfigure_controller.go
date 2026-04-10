@@ -63,6 +63,7 @@ const (
 
 	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
 	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
+	legacyReloadValidationPolicy            = "legacyReloadValidation"
 )
 
 var reconfigureRequiredLabels = []string{
@@ -206,7 +207,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 		return intctrlutil.Reconciled()
 	}
 
-	configPatch, forceRestart, err := createConfigPatch(configMap, rctx.configRender, rctx.parametersDefs)
+	configPatch, forceRestart, err := createConfigPatch(configMap, configSpec, rctx.configDescs, rctx.parametersDefs)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
@@ -224,6 +225,13 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 			configPatch.DeleteConfig,
 			configPatch.UpdateConfig))
 	}
+	if err := validateLegacyReloadActionSupport(rctx, configPatch); err != nil {
+		reqCtx.Log.Error(err, "reject legacy reloadAction for unsupported instance")
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed, err.Error())
+		status := reconfigure.Status{Status: reconfigure.StatusFailed, Reason: err.Error(), ExpectedCount: core.Unconfirmed, SucceedCount: core.Unconfirmed}
+		result := reconciled(status, legacyReloadValidationPolicy, parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
+		return updateConfigPhaseWithResult(r.Client, reqCtx, configMap, result)
+	}
 
 	tasks, err := r.buildReconfigureTasks(configSpec, rctx, configPatch, forceRestart)
 	if err != nil {
@@ -236,28 +244,30 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 	rctx *reconcileContext, patch *core.ConfigPatchInfo, forceRestart bool) ([]reconfigure.Task, error) {
 
 	// If the patch or ConfigRender is nil, return a single restart task.
-	if patch == nil || rctx.configRender == nil {
+	if patch == nil || len(rctx.configDescs) == 0 {
 		return []reconfigure.Task{r.buildRestartTask(templateSpec, rctx)}, nil
 	}
 
 	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
-	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
-		return !forceRestart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
+	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy reconfigure.Policy) bool {
+		return !forceRestart || (policy == reconfigure.SyncDynamicReloadPolicy && parameters.NeedDynamicReloadAction(&pd.Spec))
 	}
 
 	var tasks []reconfigure.Task
 	for key, jsonPatch := range patch.UpdateConfig {
 		pd, ok := rctx.parametersDefs[key]
-		// If the ParametersDefinition or its ReloadAction is nil, continue to the next iteration.
-		if !ok || pd.Spec.ReloadAction == nil {
+		if !ok {
 			continue
 		}
-		configFormat := parameters.GetComponentConfigDescription(&rctx.configRender.Spec, key)
+		configFormat := parameters.GetComponentConfigDescription(rctx.configDescs, key)
 		if configFormat == nil || configFormat.FileFormatConfig == nil {
 			continue
 		}
+		if !supportsReloadAction(pd, templateSpec) {
+			continue
+		}
 		// Determine the appropriate ReloadPolicy.
-		policy, err := r.resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
+		policy, err := r.resolveReconfigurePolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec, templateSpec)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +285,34 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 	return tasks, nil
 }
 
-func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.ReloadPolicy,
+func validateLegacyReloadActionSupport(rctx *reconcileContext, patch *core.ConfigPatchInfo) error {
+	if patch == nil {
+		return nil
+	}
+	for configFile := range patch.UpdateConfig {
+		pd, ok := rctx.parametersDefs[configFile]
+		if !ok || pd == nil || pd.Spec.ReloadAction == nil {
+			continue
+		}
+		requirementState, err := parameters.LegacyConfigManagerRequirementStateForCluster(rctx.ClusterObj)
+		if err != nil {
+			return err
+		}
+		// A missing cluster marker is treated as "unknown" during controller upgrade races.
+		// In that case we fall back to the live workload runtime check so existing instances
+		// keep working until the parameters controller explicitly writes "true" or "false".
+		if requirementState == parameters.LegacyConfigManagerRequirementCleanup {
+			return fmt.Errorf("unsupported legacy reloadAction for component %q config %q (ParametersDefinition %q): cluster annotation %q is not enabled; only existing instances explicitly marked for legacy config-manager compatibility are supported, new addons must use ComponentDefinition lifecycle actions",
+				rctx.ComponentName, configFile, pd.Name, constant.LegacyConfigManagerRequiredAnnotationKey)
+		}
+		if err := reconfigure.ValidateLegacyConfigManagerRuntime(rctx.its); err != nil {
+			return fmt.Errorf("unsupported legacy reloadAction for component %q config %q (ParametersDefinition %q): %w; only existing instances explicitly marked for legacy config-manager compatibility and still carrying the legacy config-manager are supported, new addons must use ComponentDefinition lifecycle actions", rctx.ComponentName, configFile, pd.Name, err)
+		}
+	}
+	return nil
+}
+
+func (r *ReconfigureReconciler) buildReloadTask(policy reconfigure.Policy,
 	templateSpec *appsv1.ComponentFileTemplate, rctx *reconcileContext, pd *parametersv1alpha1.ParametersDefinition,
 	configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigure.Task {
 	reCtx := reconfigure.Context{
@@ -295,7 +332,7 @@ func (r *ReconfigureReconciler) buildReloadTask(policy parametersv1alpha1.Reload
 
 func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.ComponentFileTemplate, rctx *reconcileContext) reconfigure.Task {
 	return reconfigure.Task{
-		Policy: parametersv1alpha1.RestartPolicy,
+		Policy: reconfigure.RestartPolicy,
 		Ctx: reconfigure.Context{
 			RequestCtx:       rctx.RequestCtx,
 			Client:           rctx.Client,
@@ -309,25 +346,38 @@ func (r *ReconfigureReconciler) buildRestartTask(configTemplate *appsv1.Componen
 }
 
 func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, format *parametersv1alpha1.FileFormatConfig,
-	pd *parametersv1alpha1.ParametersDefinitionSpec) (parametersv1alpha1.ReloadPolicy, error) {
-	var policy = parametersv1alpha1.NonePolicy
+	pd *parametersv1alpha1.ParametersDefinitionSpec, templateSpec *appsv1.ComponentFileTemplate) (reconfigure.Policy, error) {
+	var policy = reconfigure.NonePolicy
 	dynamicUpdate, err := core.CheckUpdateDynamicParameters(format, pd, jsonPatch)
 	if err != nil {
 		return policy, err
 	}
+	hasDynamicUpdate, err := core.HasDynamicParameterUpdate(format, pd, jsonPatch)
+	if err != nil {
+		return policy, err
+	}
+	if pd.ReloadAction == nil && templateSpec != nil && templateSpec.Reconfigure != nil {
+		if dynamicUpdate {
+			return reconfigure.SyncDynamicReloadPolicy, nil
+		}
+		if parameters.ReloadStaticParameters(pd) || (hasDynamicUpdate && parameters.NeedDynamicReloadAction(pd)) {
+			return reconfigure.DynamicReloadAndRestartPolicy, nil
+		}
+		return reconfigure.RestartPolicy, nil
+	}
 
 	// make decision
 	switch {
-	case !dynamicUpdate && parameters.NeedDynamicReloadAction(pd): // static parameters update and need to do hot update
-		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
+	case !dynamicUpdate && (parameters.ReloadStaticParameters(pd) || (hasDynamicUpdate && parameters.NeedDynamicReloadAction(pd))): // static parameters update and need to do hot update
+		policy = reconfigure.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
-		policy = parametersv1alpha1.RestartPolicy
+		policy = reconfigure.RestartPolicy
 	case isAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
-		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+		policy = reconfigure.AsyncDynamicReloadPolicy
 	case r.enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
-		policy = parametersv1alpha1.SyncDynamicReloadPolicy
+		policy = reconfigure.SyncDynamicReloadPolicy
 	default: // config-manager auto trigger to hot update
-		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+		policy = reconfigure.AsyncDynamicReloadPolicy
 	}
 	return policy, nil
 }
@@ -428,8 +478,9 @@ func computeTargetConfigHash(reqCtx *intctrlutil.RequestCtx, data map[string]str
 	return &hash
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
-	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+func createConfigPatch(cfg *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate,
+	configDescs []parametersv1alpha1.ComponentConfigDescription, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
+	if len(configDescs) == 0 {
 		return nil, true, nil
 	}
 	lastConfig, err := getLastVersionConfig(cfg)
@@ -437,12 +488,12 @@ func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.P
 		return nil, false, core.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	patch, restart, err := core.CreateConfigPatch(lastConfig, cfg.Data, configRender.Spec, true)
+	patch, restart, err := core.CreateConfigPatch(lastConfig, cfg.Data, configDescs, true)
 	if err != nil {
 		return nil, false, err
 	}
 	if !restart {
-		restart = needRestart(paramsDefs, patch)
+		restart = needRestart(paramsDefs, patch, configSpec)
 	}
 	return patch, restart, nil
 }
@@ -461,16 +512,23 @@ func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	return data, nil
 }
 
-func needRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo) bool {
+func needRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo, configSpec *appsv1.ComponentFileTemplate) bool {
 	if patch == nil {
 		return false
 	}
 	for key := range patch.UpdateConfig {
-		if paramsDef, ok := paramsDefs[key]; !ok || !isSupportReload(paramsDef.Spec.ReloadAction) {
+		if paramsDef, ok := paramsDefs[key]; !ok || !supportsReloadAction(paramsDef, configSpec) {
 			return true
 		}
 	}
 	return false
+}
+
+func supportsReloadAction(paramsDef *parametersv1alpha1.ParametersDefinition, configSpec *appsv1.ComponentFileTemplate) bool {
+	if paramsDef != nil && isSupportReload(paramsDef.Spec.ReloadAction) {
+		return true
+	}
+	return configSpec != nil && configSpec.Reconfigure != nil
 }
 
 func isSupportReload(reload *parametersv1alpha1.ReloadAction) bool {

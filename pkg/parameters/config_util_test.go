@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -29,8 +30,11 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -84,110 +88,6 @@ func TestFromUpdatedConfig(t *testing.T) {
 	}
 }
 
-func TestIsRerender(t *testing.T) {
-	type args struct {
-		cm   *corev1.ConfigMap
-		item parametersv1alpha1.ConfigTemplateItemDetail
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{{
-
-		name: "test",
-		args: args{
-			cm: nil,
-			item: parametersv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: parametersv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-			},
-		},
-		want: false,
-	}, {
-		name: "import-template-test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
-				GetObject(),
-			item: parametersv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-				CustomTemplates: &parametersv1alpha1.ConfigTemplateExtension{
-					TemplateRef: "contig-test-template",
-					Namespace:   "default",
-					Policy:      parametersv1alpha1.PatchPolicy,
-				},
-			},
-		},
-		want: true,
-	}, {
-		name: "import-template-test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `
-{
-  "userConfigTemplates": {
-    "templateRef": "contig-test-template",
-    "namespace": "default",
-    "policy": "patch"
-  }
-}
-`).
-				GetObject(),
-			item: parametersv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-				CustomTemplates: &parametersv1alpha1.ConfigTemplateExtension{
-					TemplateRef: "contig-test-template",
-					Namespace:   "default",
-					Policy:      parametersv1alpha1.PatchPolicy,
-				},
-			},
-		},
-		want: false,
-	}, {
-		name: "payload-test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
-				GetObject(),
-			item: parametersv1alpha1.ConfigTemplateItemDetail{
-				Name:    "test",
-				Payload: parametersv1alpha1.Payload{},
-			},
-		},
-		want: false,
-	}, {
-		name: "payload-test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, ` {"payload":{"key":"value"}} `).
-				GetObject(),
-			item: parametersv1alpha1.ConfigTemplateItemDetail{
-				Name: "test",
-				Payload: parametersv1alpha1.Payload{
-					"key": transformPayload("value"),
-				},
-			},
-		},
-		want: false,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := IsRerender(tt.args.cm, tt.args.item); got != tt.want {
-				t.Errorf("IsRerender() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	type args struct {
 		cm     *corev1.ConfigMap
@@ -236,10 +136,512 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetUpdatedParametersReconciledPhase(tt.args.cm, tt.args.item, tt.args.status); got != tt.want {
+			if got := GetUpdatedParametersReconciledPhase(tt.args.cm, tt.args.item, tt.args.status, 0); got != tt.want {
 				t.Errorf("GetUpdatedParametersReconciledPhase() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLegacyConfigManagerRequiredForParamsDefs(t *testing.T) {
+	newParamsDef := func(reloadAction *parametersv1alpha1.ReloadAction) *parametersv1alpha1.ParametersDefinition {
+		pd := &parametersv1alpha1.ParametersDefinition{}
+		pd.Spec.ReloadAction = reloadAction
+		return pd
+	}
+
+	tests := []struct {
+		name       string
+		paramsDefs []*parametersv1alpha1.ParametersDefinition
+		want       bool
+	}{
+		{
+			name: "no legacy actions",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(nil),
+			},
+			want: false,
+		},
+		{
+			name: "auto reload action requires legacy config manager",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(&parametersv1alpha1.ReloadAction{
+					AutoTrigger: &parametersv1alpha1.AutoTrigger{ProcessName: "mysqld"},
+				}),
+			},
+			want: true,
+		},
+		{
+			name: "shell reload action requires legacy config manager",
+			paramsDefs: []*parametersv1alpha1.ParametersDefinition{
+				newParamsDef(&parametersv1alpha1.ReloadAction{
+					ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"bash", "-c", "reload"}},
+				}),
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LegacyConfigManagerRequiredForParamsDefs(tt.paramsDefs); got != tt.want {
+				t.Fatalf("LegacyConfigManagerRequiredForParamsDefs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLegacyConfigManagerRequiredForCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        bool
+		wantErr     bool
+	}{
+		{
+			name: "missing annotation",
+			want: false,
+		},
+		{
+			name: "enabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "true",
+			},
+			want: true,
+		},
+		{
+			name: "disabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "false",
+			},
+			want: false,
+		},
+		{
+			name: "invalid value",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "invalid",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &appsv1.Cluster{}
+			cluster.Annotations = tt.annotations
+			got, err := LegacyConfigManagerRequiredForCluster(cluster)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("LegacyConfigManagerRequiredForCluster() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("LegacyConfigManagerRequiredForCluster() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLegacyConfigManagerRequirementStateForCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        LegacyConfigManagerRequirementState
+		wantErr     bool
+	}{
+		{
+			name: "missing annotation",
+			want: LegacyConfigManagerRequirementUnknown,
+		},
+		{
+			name: "enabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "true",
+			},
+			want: LegacyConfigManagerRequirementKeep,
+		},
+		{
+			name: "disabled",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "false",
+			},
+			want: LegacyConfigManagerRequirementCleanup,
+		},
+		{
+			name: "empty means unknown",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "",
+			},
+			want: LegacyConfigManagerRequirementUnknown,
+		},
+		{
+			name: "invalid value",
+			annotations: map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "invalid",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &appsv1.Cluster{}
+			cluster.Annotations = tt.annotations
+			got, err := LegacyConfigManagerRequirementStateForCluster(cluster)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("LegacyConfigManagerRequirementStateForCluster() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			if got != tt.want {
+				t.Fatalf("LegacyConfigManagerRequirementStateForCluster() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveCmpdParametersDefs(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: "mysql-8",
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if configDescs == nil {
+		t.Fatalf("ResolveCmpdParametersDefs() configDescs = nil")
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsRejectsDuplicateFiles(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	newPD := func(name string) *parametersv1alpha1.ParametersDefinition {
+		return &parametersv1alpha1.ParametersDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: parametersv1alpha1.ParametersDefinitionSpec{
+				ComponentDef: "mysql-8",
+				TemplateName: "mysql-config",
+				FileName:     "my.cnf",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			},
+			Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+		}
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, newPD("pd-1"), newPD("pd-2")).Build()
+	_, _, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err == nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = nil, want duplicate-file error")
+	}
+}
+
+func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{pd.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "mysql-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd, pcr).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsMergesNewParametersDefinitionsWithLegacyParamConfigRenderer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{
+				{Name: "mysql-config", Template: "mysql-config"},
+				{Name: "log-config", Template: "log-config"},
+			},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	newPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: "mysql-8",
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	legacyPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-log-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "log.conf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{legacyPD.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "log.conf",
+				TemplateName: "log-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Properties,
+				},
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, newPD, legacyPD, pcr).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 2 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 2", len(paramsDefs))
+	}
+	if len(configDescs) != 2 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 2", len(configDescs))
+	}
+	gotTemplates := map[string]string{}
+	for _, configDesc := range configDescs {
+		gotTemplates[configDesc.Name] = configDesc.TemplateName
+	}
+	if gotTemplates["my.cnf"] != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName for my.cnf = %q, want %q", gotTemplates["my.cnf"], "mysql-config")
+	}
+	if gotTemplates["log.conf"] != "log-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName for log.conf = %q, want %q", gotTemplates["log.conf"], "log-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsIgnoresMalformedUnrelatedLegacyParamConfigRenderer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:     "mysql-config",
+				Template: "mysql-config",
+			}},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	validPCR := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{pd.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "mysql-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			}},
+		},
+	}
+	invalidPCR := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "broken-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef: "[broken",
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, pd, validPCR, invalidPCR).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsPrefersNewParametersDefinitionOverLegacyParamConfigRendererForSameFile(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	cmpd := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0.30"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			ServiceVersion: "8.0.30",
+			Configs: []appsv1.ComponentFileTemplate{
+				{Name: "mysql-config", Template: "mysql-config"},
+				{Name: "legacy-config", Template: "legacy-config"},
+			},
+		},
+		Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+	}
+	newPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: "mysql-8",
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	legacyPD := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-legacy-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "8.0.30",
+			ParametersDefs: []string{legacyPD.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "legacy-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Properties,
+				},
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmpd, newPD, legacyPD, pcr).Build()
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, cmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs() error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if paramsDefs[0].Name != newPD.Name {
+		t.Fatalf("ResolveCmpdParametersDefs() paramsDef = %q, want %q", paramsDefs[0].Name, newPD.Name)
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs() configs len = %d, want 1", len(configDescs))
+	}
+	if configDescs[0].TemplateName != "mysql-config" {
+		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
 	}
 }
 
@@ -354,83 +756,6 @@ var _ = Describe("config_util", func() {
 
 })
 
-func TestCheckAndPatchPayload(t *testing.T) {
-	type args struct {
-		item      *parametersv1alpha1.ConfigTemplateItemDetail
-		payloadID string
-		payload   interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
-	}{{
-		name: "test",
-		args: args{
-			item:      &parametersv1alpha1.ConfigTemplateItemDetail{},
-			payloadID: constant.BinaryVersionPayload,
-			payload:   "md5-12912uy1232o9y2",
-		},
-		want: true,
-	}, {
-		name: "invalid-item-test",
-		args: args{
-			payloadID: constant.BinaryVersionPayload,
-			payload:   "md5-12912uy1232o9y2",
-		},
-		want: false,
-	}, {
-		name: "test-delete-payload",
-		args: args{
-			item: &parametersv1alpha1.ConfigTemplateItemDetail{
-				Payload: parametersv1alpha1.Payload{
-					constant.BinaryVersionPayload: json.RawMessage("md5-12912uy1232o9y2"),
-				},
-			},
-			payloadID: constant.BinaryVersionPayload,
-			payload:   nil,
-		},
-		want: true,
-	}, {
-		name: "test-update-payload",
-		args: args{
-			item: &parametersv1alpha1.ConfigTemplateItemDetail{
-				Payload: parametersv1alpha1.Payload{
-					constant.BinaryVersionPayload: json.RawMessage("md5-12912uy1232o9y2"),
-					constant.ComponentResourcePayload: transformPayload(map[string]any{
-						"limit": map[string]string{
-							"cpu":    "100m",
-							"memory": "100Mi",
-						},
-					}),
-				},
-			},
-			payloadID: constant.ComponentResourcePayload,
-			payload: corev1.ResourceRequirements{
-				Limits: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    resource.MustParse("200m"),
-					corev1.ResourceMemory: resource.MustParse("200m"),
-				},
-			},
-		},
-		want: true,
-	},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := CheckAndPatchPayload(tt.args.item, tt.args.payloadID, tt.args.payload)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CheckAndPatchPayload() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("CheckAndPatchPayload() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_filterImmutableParameters(t *testing.T) {
 	type args struct {
 		parameters      map[string]any
@@ -486,9 +811,4 @@ func Test_filterImmutableParameters(t *testing.T) {
 			}
 		})
 	}
-}
-
-func transformPayload(data interface{}) json.RawMessage {
-	raw, _ := buildPayloadAsUnstructuredObject(data)
-	return raw
 }

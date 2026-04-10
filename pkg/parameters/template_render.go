@@ -31,10 +31,10 @@ import (
 
 func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
-	configRender *parametersv1alpha1.ParamConfigRenderer,
+	configs []parametersv1alpha1.ComponentConfigDescription,
 	parametersDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
 	parametersValidate := func(m map[string]string) error {
-		return validateRenderedData(m, parametersDefs, configRender)
+		return validateRenderedData(m, parametersDefs, configs)
 	}
 
 	configSpec := *item.ConfigSpec
@@ -56,7 +56,7 @@ func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx,
 		configSpec,
 		rerenderCMObj.Data,
 		parametersDefs,
-		configRender)
+		configs)
 	if err != nil {
 		return nil, err
 	}
@@ -66,13 +66,13 @@ func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx,
 
 func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail,
 	baseConfig *corev1.ConfigMap,
-	configRender *parametersv1alpha1.ParamConfigRenderer,
+	configs []parametersv1alpha1.ComponentConfigDescription,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
-	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+	if len(configs) == 0 {
 		return nil, fmt.Errorf("not support parameter reconfigure")
 	}
 
-	newData, err := DoMerge(baseConfig.Data, item.ConfigFileParams, paramsDefs, configRender.Spec.Configs)
+	newData, err := DoMerge(baseConfig.Data, item.ConfigFileParams, paramsDefs, configs)
 	if err != nil {
 		return nil, err
 	}

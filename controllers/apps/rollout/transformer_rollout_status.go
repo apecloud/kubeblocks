@@ -21,7 +21,6 @@ package rollout
 
 import (
 	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -147,9 +146,8 @@ func (t *rolloutStatusTransformer) compInplace(transCtx *rolloutTransformContext
 func (t *rolloutStatusTransformer) compReplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) (appsv1alpha1.RolloutState, error) {
 	spec := t.compSpec(transCtx, comp.Name)
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
 	if slices.IndexFunc(spec.Instances, func(tpl appsv1.InstanceTemplate) bool {
-		return strings.HasPrefix(tpl.Name, prefix)
+		return isRolloutManagedInstanceTemplate(rollout, tpl)
 	}) < 0 {
 		return appsv1alpha1.PendingRolloutState, nil
 	}
@@ -166,7 +164,7 @@ func (t *rolloutStatusTransformer) compReplace(transCtx *rolloutTransformContext
 	allPodCnt := int32(len(pods.Items))
 	newPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
 		if pod.Labels != nil {
-			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
+			return isRolloutManagedInstanceTemplateName(rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey])
 		}
 		return false
 	}))
@@ -366,9 +364,8 @@ func (t *rolloutStatusTransformer) shardingInplace(transCtx *rolloutTransformCon
 func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) (appsv1alpha1.RolloutState, error) {
 	spec := t.shardingSpec(transCtx, sharding.Name)
-	prefix := replaceInstanceTemplateNamePrefix(rollout)
 	if slices.IndexFunc(spec.Template.Instances, func(tpl appsv1.InstanceTemplate) bool {
-		return strings.HasPrefix(tpl.Name, prefix)
+		return isRolloutManagedInstanceTemplate(rollout, tpl)
 	}) < 0 {
 		return appsv1alpha1.PendingRolloutState, nil
 	}
@@ -387,7 +384,7 @@ func (t *rolloutStatusTransformer) shardingReplace(transCtx *rolloutTransformCon
 	allPodCnt := int32(len(pods.Items))
 	newPodCnt := int32(generics.CountFunc(pods.Items, func(pod corev1.Pod) bool {
 		if pod.Labels != nil {
-			return strings.HasPrefix(pod.Labels[constant.KBAppInstanceTemplateLabelKey], prefix)
+			return isRolloutManagedInstanceTemplateName(rollout, pod.Labels[constant.KBAppInstanceTemplateLabelKey])
 		}
 		return false
 	}))

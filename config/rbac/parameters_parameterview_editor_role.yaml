@@ -1,20 +1,20 @@
-# permissions for end users to edit preflights.
+# permissions for end users to edit parameterviews.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: preflight-editor-role
+    app.kubernetes.io/instance: parameterview-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: kubeblocks
     app.kubernetes.io/part-of: kubeblocks
     app.kubernetes.io/managed-by: kustomize
-  name: preflight-editor-role
+  name: parameterview-editor-role
 rules:
 - apiGroups:
-  - troubleshoot.sh
+  - parameters.kubeblocks.io
   resources:
-  - preflights
+  - parameterviews
   verbs:
   - create
   - delete
@@ -24,8 +24,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - troubleshoot.sh
+  - parameters.kubeblocks.io
   resources:
-  - preflights/status
+  - parameterviews/status
   verbs:
   - get

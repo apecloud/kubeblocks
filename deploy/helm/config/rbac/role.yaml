@@ -7,6 +7,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - nodes
   verbs:
   - list
@@ -855,8 +863,6 @@ rules:
   resources:
   - paramconfigrenderers
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
@@ -871,22 +877,10 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
-  - paramconfigrenderers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
   - parameters
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - parameters.kubeblocks.io
@@ -924,6 +918,32 @@ rules:
   - parameters.kubeblocks.io
   resources:
   - parametersdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterviews
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterviews/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterviews/status
   verbs:
   - get
   - patch

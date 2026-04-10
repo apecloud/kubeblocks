@@ -105,6 +105,8 @@ func objectReferenceToObject(objRef corev1.ObjectReference) (client.Object, erro
 		return &corev1.Secret{ObjectMeta: meta}, nil
 	case objectKind(&corev1.ServiceAccount{}):
 		return &corev1.ServiceAccount{ObjectMeta: meta}, nil
+	case objectKind(&corev1.Service{}):
+		return &corev1.Service{ObjectMeta: meta}, nil
 	case objectKind(&rbacv1.Role{}):
 		return &rbacv1.Role{ObjectMeta: meta}, nil
 	case objectKind(&rbacv1.RoleBinding{}):

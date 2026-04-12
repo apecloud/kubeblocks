@@ -70,25 +70,43 @@ KubeBlocks integrates the most popular database engines and provides rich manage
 
 [Quick Start](https://kubeblocks.io/docs/preview/user_docs/overview/install-kubeblocks) shows you the quickest way to get started with KubeBlocks.
 
+## Addon engine pages on kubeblocks.io
+
+Each of the following addons in [kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) has a dedicated operator landing page on [kubeblocks.io](https://kubeblocks.io). The pages document the operator and engine capabilities and serve as the public home for that addon—together they illustrate KubeBlocks’ breadth of multi-engine support.
+
+| Engine | kubeblocks.io | Code repository & addon directory |
+|--------|---------------|-----------------------------------|
+| ClickHouse | [clickhouse-operator](https://kubeblocks.io/clickhouse-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/clickhouse`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/clickhouse) |
+| Elasticsearch | [elasticsearch-operator](https://kubeblocks.io/elasticsearch-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/elasticsearch`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/elasticsearch) |
+| etcd | [etcd-operator](https://kubeblocks.io/etcd-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/etcd`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/etcd) |
+| Kafka | [kafka-operator](https://kubeblocks.io/kafka-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/kafka`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/kafka) |
+| Milvus | [milvus-operator](https://kubeblocks.io/milvus-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/milvus`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/milvus) |
+| MongoDB | [mongodb-operator](https://kubeblocks.io/mongodb-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/mongodb`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/mongodb) |
+| MySQL | [mysql-operator](https://kubeblocks.io/mysql-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/apecloud-mysql`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/apecloud-mysql) |
+| PostgreSQL | [pg-operator](https://kubeblocks.io/pg-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/postgresql`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/postgresql) |
+| RabbitMQ | [rabbitmq-operator](https://kubeblocks.io/rabbitmq-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/rabbitmq`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/rabbitmq) |
+| Redis | [redis-operator](https://kubeblocks.io/redis-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/redis`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/redis) |
+| ZooKeeper | [zookeeper-operator](https://kubeblocks.io/zookeeper-operator) | [https://github.com/apecloud/kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons) → [`addons/zookeeper`](https://github.com/apecloud/kubeblocks-addons/tree/main/addons/zookeeper) |
+
+Other engines are listed on the [databases](https://kubeblocks.io/databases) page; dedicated `*-operator` landing pages are added on kubeblocks.io as they are published.
+
 ## Resources
 
 [API Reference](https://kubeblocks.io/docs/preview/user_docs/references/api-reference/cluster)
 
 [KubeBlocks: Cloud-Native Data Infrastructure for Kubernetes](https://www.youtube.com/watch?v=KNwpG51Whzg) (A Video made by Viktor Farcic)
 
-[KubeBlocks Enterprise Demo](https://console.kubeblocks.io/)
-
 ## KubeBlocks at KubeCon
 
-KubeCon 2024 in HongKong from 21-23 August 2024: [How to Manage Database Clusters Without a Dedicated Operator, By Shanshan Ying, ApeCloud & Shun Ding, China Mobile Cloud](https://kccncossaidevchn2024.sched.com/event/1eYYL/how-to-manage-database-clusters-without-a-dedicated-operator-nanoxi-operatorzha-fa-lia-zhong-shi-shanshan-ying-apecloud-shun-ding-china-mobile-cloud)
+KubeCon 2024 in HongKong from 21-23 August 2024: [How to Manage Database Clusters Without a Dedicated Operator, By Shanshan Ying, ApeCloud & Shun Ding, China Mobile Cloud](https://www.youtube.com/watch?v=i894E5o36EI)
 
-KubeCon 2024 in HongKong from 21-23 August 2024: [KuaiShou's 100% Resource Utilization Boost: 100K Redis Migration from Bare Metal to Kubernetes, By XueQiang Wu, ApeCloud & YuXing Liu, Kuaishou](https://kccncossaidevchn2024.sched.com/event/1eYat/kuaishous-100-resource-utilization-boost-100k-redis-migration-from-bare-metal-to-kubernetes-zha-100pian-zhi-yi-daeplie-hui-zhe-100k-rediskubernetes-xueqiang-wu-apecloud-yuxing-liu-kuaishou)
+KubeCon 2024 in HongKong from 21-23 August 2024: [KuaiShou's 100% Resource Utilization Boost: 100K Redis Migration from Bare Metal to Kubernetes, By XueQiang Wu, ApeCloud & YuXing Liu, Kuaishou](https://www.youtube.com/watch?v=yHXPOupg-iM)
 
 ## Community
 
 If you have any questions, you can reach out to us through:
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2pjob3ezp-FzaZM7NId~Tbzp6PYNbOzQ)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblockshq/shared_invite/zt-3u7x3hvky-sNWWCp3ljL8oBNzoaxBEmw)
 - KubeBlocks GitHub [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 - KubeBlocks Wechat Account:
 

@@ -172,7 +172,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
-	Shardings []ClusterSharding `json:"shardings,omitempty"`
+	Shardings []ClusterSharding `json:"shardings,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies runtimeClassName for all Pods managed by this Cluster.
 	//

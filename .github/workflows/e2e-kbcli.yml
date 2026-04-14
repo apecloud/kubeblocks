@@ -12,7 +12,7 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql)'
+        description: 'test type (e.g.  mysql|postgresql|redis|mongodb)'
         required: false
         default: ''
       CLOUD_PROVIDER:
@@ -29,9 +29,12 @@ on:
       CLUSTER_VERSION:
         description: 'k8s cluster version'
         required: false
-        default: "1.32"
+        default: "1.33"
         type: choice
         options:
+          - "1.35"
+          - "1.34"
+          - "1.33"
           - "1.32"
           - "1.31"
           - "1.30"

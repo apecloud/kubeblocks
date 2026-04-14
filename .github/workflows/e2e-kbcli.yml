@@ -12,16 +12,13 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|asmysql|elasticsearch|zookeeper|
-        rabbitmq|mysqlscale|weaviate|qdrant|smartengine|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|
-        orioledb|vanilla-pg|polardbx|opensearch|tdengine|milvus|clickhouse|mariadb|tidb|influxdb|mogdb|
-        yashandb|redis-cluster|minio|orchestrator)'
+        description: 'test type (e.g.  mysql|postgresql|redis|mongodb)'
         required: false
         default: ''
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'eks'
+        default: 'aks'
         type: choice
         options:
           - eks
@@ -32,9 +29,12 @@ on:
       CLUSTER_VERSION:
         description: 'k8s cluster version'
         required: false
-        default: "1.32"
+        default: "1.33"
         type: choice
         options:
+          - "1.35"
+          - "1.34"
+          - "1.33"
           - "1.32"
           - "1.31"
           - "1.30"

@@ -32,9 +32,6 @@ const (
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-
-	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
-	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
 )
 
 const (
@@ -42,12 +39,10 @@ const (
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
+	ParametersAppliedComponentGenerationKey     = "parameters.kubeblocks.io/latest-component-generation"
 )
 
 const (
-	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
-	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
-
 	ConfigInstanceType = "instance"
 )
 

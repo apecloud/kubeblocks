@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -111,6 +112,12 @@ var _ = Describe("instance_set builder", func() {
 		}
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
+		configs := []workloads.ConfigTemplate{
+			{
+				Name:       "foo",
+				ConfigHash: ptr.To("123456"),
+			},
+		}
 		instances := []workloads.InstanceTemplate{
 			{
 				Name:     "hello",
@@ -136,6 +143,7 @@ var _ = Describe("instance_set builder", func() {
 			SetInstanceUpdateStrategy(&strategy).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
+			SetConfigs(configs).
 			SetInstances(instances).
 			GetObject()
 
@@ -169,6 +177,7 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Paused).Should(Equal(paused))
+		Expect(its.Spec.Configs).Should(Equal(configs))
 		Expect(its.Spec.Instances).Should(Equal(instances))
 	})
 })

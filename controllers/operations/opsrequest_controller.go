@@ -97,12 +97,12 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
 		Watches(&workloads.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
+		Watches(&parametersv1alpha1.ComponentParameter{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForComponentParameter)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
 		Owns(&batchv1.Job{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Owns(&parametersv1alpha1.Parameter{}).
 		Complete(r)
 }
 
@@ -459,6 +459,22 @@ func (r *OpsRequestReconciler) parseRunningOpsRequestsForInstanceSet(ctx context
 	}
 	cluster := &appsv1.Cluster{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: its.Namespace}, cluster); err != nil {
+		return nil
+	}
+	return r.getRunningOpsRequestsFromCluster(cluster)
+}
+
+func (r *OpsRequestReconciler) parseRunningOpsRequestsForComponentParameter(ctx context.Context, object client.Object) []reconcile.Request {
+	componentParameter := object.(*parametersv1alpha1.ComponentParameter)
+	clusterName := componentParameter.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		clusterName = componentParameter.Spec.ClusterName
+	}
+	if clusterName == "" {
+		return nil
+	}
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: componentParameter.Namespace}, cluster); err != nil {
 		return nil
 	}
 	return r.getRunningOpsRequestsFromCluster(cluster)

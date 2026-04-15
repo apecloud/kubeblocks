@@ -3,8 +3,6 @@
 
 # ignore go generate code files
 pkg/testutil/k8s/mocks/*_mocks.go
-pkg/parameters/proto/mocks/*_mocks.go
-# pkg/parameters/proto/*.pb.go
 
 # ignore go mock temporary files
 **/gomock_reflect*/

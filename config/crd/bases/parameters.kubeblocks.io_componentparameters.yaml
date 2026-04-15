@@ -57,7 +57,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: ComponentParameterSpec defines the desired state of ComponentConfiguration
+            description: ComponentParameterSpec defines the desired and execution
+              state of ComponentParameter.
             properties:
               clusterName:
                 description: Specifies the name of the Cluster that this configuration
@@ -75,20 +76,11 @@ spec:
                   rule: self == oldSelf
               configItemDetails:
                 description: |-
-                  ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
+                  ConfigItemDetails is the internal execution model derived and maintained by the controller.
 
 
-                  Each ConfigTemplateItemDetail corresponds to a configuration template,
-                  which is a ConfigMap that contains multiple configuration files.
-                  Each configuration file is stored as a key-value pair within the ConfigMap.
-
-
-                  The ConfigTemplateItemDetail includes information such as:
-
-
-                  - The configuration template (a ConfigMap)
-                  - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
-                  - Volume mounts (for mounting the configuration files)
+                  It corresponds to configuration templates, resolved files, and effective
+                  parameter/template overlays used by the reconcile pipeline.
                 items:
                   description: ConfigTemplateItemDetail corresponds to settings of
                     a configuration template (a ConfigMap).
@@ -110,6 +102,43 @@ spec:
                             description: Represents the updated parameters for a single
                               configuration file.
                             type: object
+                          unmanagedUpdates:
+                            description: Represents unmanaged parameter updates for
+                              a single configuration file.
+                            items:
+                              description: UnmanagedParameterSectionUpdate describes
+                                unmanaged parameter updates scoped to an optional
+                                section within a file.
+                              properties:
+                                section:
+                                  description: Section optionally identifies a nested
+                                    scope for formats that support it.
+                                  type: string
+                                updates:
+                                  description: Updates are the unmanaged parameter
+                                    changes to apply within the target section scope.
+                                  items:
+                                    description: ParameterUpdate is an explicit parameter
+                                      update.
+                                    properties:
+                                      key:
+                                        description: Key is the logical parameter
+                                          key defined in ParametersDefinition.
+                                        type: string
+                                      type:
+                                        description: Type defines the update type.
+                                        type: string
+                                      value:
+                                        description: Value is used by set/update style
+                                          operations.
+                                        type: string
+                                    required:
+                                    - key
+                                    - type
+                                    type: object
+                                  type: array
+                              type: object
+                            type: array
                         type: object
                       description: |-
                         Specifies the user-defined configuration parameters.
@@ -174,9 +203,6 @@ spec:
 
                             If specified, this action overrides the global reconfigure action defined in lifecycle actions
                             for this specific file template.
-
-
-                            When @restartOnFileChange is set to true, this action will be ignored.
 
 
                             The container executing this action has access to following variables:
@@ -655,12 +681,7 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     payload:
-                      description: |-
-                        External controllers can trigger a configuration rerender by modifying this field.
-
-
-                        Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
-                        Modifying this field will cause a rerender, regardless of the specific content of this field.
+                      description: 'Deprecated: retained for API compatibility only.'
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
                     userConfigTemplates:
@@ -703,6 +724,241 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              desired:
+                description: Desired provides the current desired parameter inputs.
+                properties:
+                  assignments:
+                    additionalProperties:
+                      type: string
+                    description: Assignments are flat managed parameter key/value
+                      assignments.
+                    type: object
+                  unmanagedUpdates:
+                    description: UnmanagedUpdates is the advanced path for parameters
+                      not defined in ParametersDefinition.
+                    items:
+                      description: UnmanagedParameterUpdate describes unmanaged parameter
+                        updates scoped to a target template and file.
+                      properties:
+                        file:
+                          description: File is the target config file name under the
+                            template.
+                          type: string
+                        template:
+                          description: Template is the target config template name.
+                          type: string
+                        updates:
+                          description: Updates are the unmanaged parameter changes
+                            to apply within the target file scope.
+                          items:
+                            description: UnmanagedParameterSectionUpdate describes
+                              unmanaged parameter updates scoped to an optional section
+                              within a file.
+                            properties:
+                              section:
+                                description: Section optionally identifies a nested
+                                  scope for formats that support it.
+                                type: string
+                              updates:
+                                description: Updates are the unmanaged parameter changes
+                                  to apply within the target section scope.
+                                items:
+                                  description: ParameterUpdate is an explicit parameter
+                                    update.
+                                  properties:
+                                    key:
+                                      description: Key is the logical parameter key
+                                        defined in ParametersDefinition.
+                                      type: string
+                                    type:
+                                      description: Type defines the update type.
+                                      type: string
+                                    value:
+                                      description: Value is used by set/update style
+                                        operations.
+                                      type: string
+                                  required:
+                                  - key
+                                  - type
+                                  type: object
+                                type: array
+                            type: object
+                          type: array
+                      required:
+                      - file
+                      - template
+                      type: object
+                    type: array
+                  updates:
+                    description: Updates is the advanced path for schema-managed parameter
+                      changes with explicit update semantics.
+                    items:
+                      description: ParameterUpdate is an explicit parameter update.
+                      properties:
+                        key:
+                          description: Key is the logical parameter key defined in
+                            ParametersDefinition.
+                          type: string
+                        type:
+                          description: Type defines the update type.
+                          type: string
+                        value:
+                          description: Value is used by set/update style operations.
+                          type: string
+                      required:
+                      - key
+                      - type
+                      type: object
+                    type: array
+                  userConfigTemplates:
+                    additionalProperties:
+                      properties:
+                        namespace:
+                          default: default
+                          description: |-
+                            Specifies the namespace of the referenced configuration template ConfigMap object.
+                            An empty namespace is equivalent to the "default" namespace.
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specifies the name of the referenced configuration
+                            template ConfigMap object.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                    description: Templates are user-provided template overrides keyed
+                      by config template name.
+                    type: object
+                type: object
+              initial:
+                description: Initial provides the initial parameter inputs used when
+                  the managed runtime configuration is created.
+                properties:
+                  assignments:
+                    additionalProperties:
+                      type: string
+                    description: Assignments are flat managed parameter key/value
+                      assignments.
+                    type: object
+                  unmanagedUpdates:
+                    description: UnmanagedUpdates is the advanced path for parameters
+                      not defined in ParametersDefinition.
+                    items:
+                      description: UnmanagedParameterUpdate describes unmanaged parameter
+                        updates scoped to a target template and file.
+                      properties:
+                        file:
+                          description: File is the target config file name under the
+                            template.
+                          type: string
+                        template:
+                          description: Template is the target config template name.
+                          type: string
+                        updates:
+                          description: Updates are the unmanaged parameter changes
+                            to apply within the target file scope.
+                          items:
+                            description: UnmanagedParameterSectionUpdate describes
+                              unmanaged parameter updates scoped to an optional section
+                              within a file.
+                            properties:
+                              section:
+                                description: Section optionally identifies a nested
+                                  scope for formats that support it.
+                                type: string
+                              updates:
+                                description: Updates are the unmanaged parameter changes
+                                  to apply within the target section scope.
+                                items:
+                                  description: ParameterUpdate is an explicit parameter
+                                    update.
+                                  properties:
+                                    key:
+                                      description: Key is the logical parameter key
+                                        defined in ParametersDefinition.
+                                      type: string
+                                    type:
+                                      description: Type defines the update type.
+                                      type: string
+                                    value:
+                                      description: Value is used by set/update style
+                                        operations.
+                                      type: string
+                                  required:
+                                  - key
+                                  - type
+                                  type: object
+                                type: array
+                            type: object
+                          type: array
+                      required:
+                      - file
+                      - template
+                      type: object
+                    type: array
+                  updates:
+                    description: Updates is the advanced path for schema-managed parameter
+                      changes with explicit update semantics.
+                    items:
+                      description: ParameterUpdate is an explicit parameter update.
+                      properties:
+                        key:
+                          description: Key is the logical parameter key defined in
+                            ParametersDefinition.
+                          type: string
+                        type:
+                          description: Type defines the update type.
+                          type: string
+                        value:
+                          description: Value is used by set/update style operations.
+                          type: string
+                      required:
+                      - key
+                      - type
+                      type: object
+                    type: array
+                  userConfigTemplates:
+                    additionalProperties:
+                      properties:
+                        namespace:
+                          default: default
+                          description: |-
+                            Specifies the namespace of the referenced configuration template ConfigMap object.
+                            An empty namespace is equivalent to the "default" namespace.
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specifies the name of the referenced configuration
+                            template ConfigMap object.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                    description: Templates are user-provided template overrides keyed
+                      by config template name.
+                    type: object
+                type: object
             required:
             - componentName
             type: object

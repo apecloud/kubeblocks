@@ -168,7 +168,7 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 	if backupType == string(dpv1alpha1.BackupTypeContinuous) {
 		restoreTimeStr, err := restore.FormatRestoreTimeAndValidate(restoreSpec.RestorePointInTime, backup)
 		if err != nil {
-			return nil, err
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		opsRequest.Spec.GetRestore().RestorePointInTime = restoreTimeStr
 	}
@@ -230,6 +230,8 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	cluster.Spec.Services = services
 	for i := range cluster.Spec.ComponentSpecs {
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
+		cluster.Spec.ComponentSpecs[i].TLS = false
+		cluster.Spec.ComponentSpecs[i].Issuer = nil
 	}
 	r.rebuildShardAccountSecrets(cluster)
 	r.normalizeSchedulePolicy(cluster, cluster.Spec.SchedulingPolicy)

@@ -269,7 +269,8 @@ var _ = Describe("file templates transformer test", func() {
 		})
 
 		It("udf reconfigure", func() {
-			transCtx.SynthesizeComponent.FileTemplates[0].Reconfigure = &appsv1.Action{
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureRequired = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction = &appsv1.Action{
 				Exec: &appsv1.ExecAction{
 					Command: []string{"echo", "reconfigure"},
 				},
@@ -285,7 +286,8 @@ var _ = Describe("file templates transformer test", func() {
 		})
 
 		It("external managed", func() {
-			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = &appsv1.Action{
+			transCtx.SynthesizeComponent.FileTemplates[1].ReconfigureRequired = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[1].ReconfigureAction = &appsv1.Action{
 				Exec: &appsv1.ExecAction{
 					Command: []string{"echo", "reconfigure"},
 				},

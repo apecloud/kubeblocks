@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -282,14 +283,14 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
+func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 
 	// In case of the ITS is stopping and replicas is 0, we can't compose the instance template and instance
@@ -297,55 +298,63 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if ptr.Deref(its.Spec.Replicas, 0) == 0 {
 		// the update revisions will be empty
 		if getPodRevision(pod) != updateRevisions[pod.Name] {
-			return recreatePolicy, its.Spec.PodUpdatePolicy, nil
+			return recreatePolicy, its.Spec.PodUpdatePolicy, "0 replica", nil
 		}
+	}
+
+	configRestart, configs, err := hasConfigRestart(its, pod)
+	if err != nil {
+		return noOpsPolicy, "", "", err
+	}
+	if configRestart {
+		return recreatePolicy, its.Spec.PodUpdatePolicy, fmt.Sprintf("config restart: %s", strings.Join(configs, ",")), nil
 	}
 
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
 	templateName, err := getTemplateNameByPod(itsExt, pod)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
 		return templateName == templateExt.Name
 	})
 	if index < 0 {
-		return noOpsPolicy, "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
+		return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
 	}
 	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
-		return recreatePolicy, specUpdatePolicy, nil
+		return recreatePolicy, specUpdatePolicy, "revision update", nil
 	}
 
 	basicUpdate := !equalBasicInPlaceFields(pod, newPod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return inPlaceUpdatePolicy, specUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, "", nil
 		}
-		return noOpsPolicy, "", nil
+		return noOpsPolicy, "", "", nil
 	}
 
 	resourceUpdate := !equalResourcesInPlaceFields(pod, newPod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
-			return inPlaceUpdatePolicy, specUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, "", nil
 		}
-		return recreatePolicy, specUpdatePolicy, nil
+		return recreatePolicy, specUpdatePolicy, "resource update", nil
 	}
 
 	if basicUpdate {
-		return inPlaceUpdatePolicy, specUpdatePolicy, nil
+		return inPlaceUpdatePolicy, specUpdatePolicy, "", nil
 	}
-	return noOpsPolicy, "", nil
+	return noOpsPolicy, "", "", nil
 }
 
 func getPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
@@ -378,7 +387,7 @@ func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.P
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
 // as the pod template revision has been redefined in instanceset.
 func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, _, err := getPodUpdatePolicy(its, pod)
+	policy, _, _, err := getPodUpdatePolicy(its, pod)
 	if err != nil {
 		if errors.Is(err, errTemplateNotFound) {
 			return true, nil

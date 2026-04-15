@@ -104,7 +104,7 @@ var _ = Describe("ParameterExtension Controller", func() {
 				By("check ComponentParameters cr for sharding component : " + spec.Name)
 				Eventually(testapps.CheckObj(&testCtx, shardingCompParamKey, func(g Gomega, compParameter *parametersv1alpha1.ComponentParameter) {
 					g.Expect(compParameter.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-					g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(1)))
+					g.Expect(compParameter.Status.ObservedGeneration).Should(BeEquivalentTo(int64(2)))
 				})).Should(Succeed())
 
 				By("check cm resource")

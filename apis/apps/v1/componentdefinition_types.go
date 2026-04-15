@@ -1116,8 +1116,6 @@ type ComponentFileTemplate struct {
 	// If specified, this action overrides the global reconfigure action defined in lifecycle actions
 	// for this specific file template.
 	//
-	// When @restartOnFileChange is set to true, this action will be ignored.
-	//
 	// The container executing this action has access to following variables:
 	//
 	// - KB_CONFIG_FILES_CREATED: file1,file2...

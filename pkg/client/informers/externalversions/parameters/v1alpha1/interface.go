@@ -30,6 +30,8 @@ type Interface interface {
 	ParamConfigRenderers() ParamConfigRendererInformer
 	// Parameters returns a ParameterInformer.
 	Parameters() ParameterInformer
+	// ParameterViews returns a ParameterViewInformer.
+	ParameterViews() ParameterViewInformer
 	// ParametersDefinitions returns a ParametersDefinitionInformer.
 	ParametersDefinitions() ParametersDefinitionInformer
 }
@@ -58,6 +60,11 @@ func (v *version) ParamConfigRenderers() ParamConfigRendererInformer {
 // Parameters returns a ParameterInformer.
 func (v *version) Parameters() ParameterInformer {
 	return &parameterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ParameterViews returns a ParameterViewInformer.
+func (v *version) ParameterViews() ParameterViewInformer {
+	return &parameterViewInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ParametersDefinitions returns a ParametersDefinitionInformer.

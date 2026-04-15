@@ -32,20 +32,20 @@ import (
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.
-func CreateConfigPatch(oldVersion, newVersion map[string]string, configRender parametersv1alpha1.ParamConfigRendererSpec, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
+func CreateConfigPatch(oldVersion, newVersion map[string]string, configs []parametersv1alpha1.ComponentConfigDescription, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
 	var hasFilesUpdated = false
-	var keys = ResolveConfigFiles(configRender.Configs)
+	var keys = ResolveConfigFiles(configs)
 
 	if comparableAllFiles && len(keys) > 0 {
 		hasFilesUpdated = checkExcludeConfigDifference(oldVersion, newVersion, keys)
 	}
 
-	cmKeyFilter := NewConfigFileFilter(configRender.Configs)
+	cmKeyFilter := NewConfigFileFilter(configs)
 	patch, err := CreateMergePatch(
 		FromConfigData(oldVersion, cmKeyFilter),
 		FromConfigData(newVersion, cmKeyFilter),
 		CfgOption{
-			FileFormatFn: WithConfigFileFormat(configRender.Configs),
+			FileFormatFn: WithConfigFileFormat(configs),
 			Type:         CfgTplType,
 			Log:          log.FromContext(context.TODO()),
 		})
@@ -99,8 +99,8 @@ func FromConfigObject(name, config string, formatConfig *parametersv1alpha1.File
 // TransformConfigFileToKeyValueMap transforms a config file in appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value
 // sectionName means the desired section of config file, such as [mysqld] section.
 // If config file has no section structure, sectionName should be default to get all values in this config file.
-func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1alpha1.ParamConfigRendererSpec, configData []byte) (map[string]string, error) {
-	formatterConfig := ResolveConfigFormat(configRender.Configs, fileName)
+func TransformConfigFileToKeyValueMap(fileName string, configs []parametersv1alpha1.ComponentConfigDescription, configData []byte) (map[string]string, error) {
+	formatterConfig := ResolveConfigFormat(configs, fileName)
 	if formatterConfig == nil {
 		return nil, fmt.Errorf("not found file formatter config: [%s]", fileName)
 	}
@@ -111,11 +111,11 @@ func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1
 	newData := map[string]string{
 		fileName: string(configData),
 	}
-	patchInfo, _, err := CreateConfigPatch(oldData, newData, configRender, false)
+	patchInfo, _, err := CreateConfigPatch(oldData, newData, configs, false)
 	if err != nil {
 		return nil, err
 	}
-	params := GenerateVisualizedParamsList(patchInfo, configRender.Configs)
+	params := GenerateVisualizedParamsList(patchInfo, configs)
 	result := make(map[string]string)
 	for _, param := range params {
 		if param.Key != fileName {

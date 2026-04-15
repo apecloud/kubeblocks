@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -491,7 +492,12 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 		}
 	})
 
-	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
+	// 4. build configs annotation
+	if err = configsToPod(parent.Spec.Configs, pod); err != nil {
+		return nil, err
+	}
+
+	if err = controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
 	return pod, nil
@@ -634,11 +640,11 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 		SetTemplate(*podTemplate).
 		GetObject()
 
-	cr, err := NewRevision(its)
+	cr, err := newRevision(its)
 	if err != nil {
 		return "", err
 	}
-	return cr.Labels[ControllerRevisionHashLabel], nil
+	return cr.Labels[controllerRevisionHashLabel], nil
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {
@@ -654,4 +660,84 @@ func getInstanceTemplateMap(annotations map[string]string) (map[string]string, e
 		return nil, err
 	}
 	return templateMap, nil
+}
+
+func configsToPod(configs []workloads.ConfigTemplate, pod *corev1.Pod) error {
+	if len(configs) == 0 {
+		return nil
+	}
+	m := make(map[string]string)
+	for _, config := range configs {
+		m[config.Name] = ptr.Deref(config.ConfigHash, "")
+	}
+	res, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[constant.CMInsConfigurationHashLabelKey] = string(res)
+	return nil
+}
+
+func configsFromPod(pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	str := pod.Annotations[constant.CMInsConfigurationHashLabelKey]
+	if str == "" {
+		return nil, nil
+	}
+
+	m := make(map[string]string)
+	if err := json.Unmarshal([]byte(str), &m); err != nil {
+		return nil, err
+	}
+	if len(m) == 0 {
+		return nil, nil
+	}
+
+	var configs []workloads.ConfigTemplate
+	for k := range m {
+		configs = append(configs, workloads.ConfigTemplate{
+			Name:       k,
+			ConfigHash: ptr.To(m[k]),
+		})
+	}
+	slices.SortFunc(configs, func(a, b workloads.ConfigTemplate) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return configs, nil
+}
+
+func configsToUpdate(its *workloads.InstanceSet, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	configs, err := configsFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	toUpdate := make([]workloads.ConfigTemplate, 0)
+	for i, config := range its.Spec.Configs {
+		idx := slices.IndexFunc(configs, func(cfg workloads.ConfigTemplate) bool {
+			return cfg.Name == config.Name
+		})
+		if idx < 0 || !ptr.Equal(config.ConfigHash, configs[idx].ConfigHash) {
+			toUpdate = append(toUpdate, its.Spec.Configs[i])
+		}
+	}
+	return toUpdate, nil
+}
+
+func hasConfigRestart(its *workloads.InstanceSet, pod *corev1.Pod) (bool, []string, error) {
+	toUpdate, err := configsToUpdate(its, pod)
+	if err != nil {
+		return false, nil, err
+	}
+	toRestart := make([]string, 0)
+	for _, config := range toUpdate {
+		if ptr.Deref(config.Restart, false) {
+			toRestart = append(toRestart, config.Name) // Config requires restart and is not up-to-date
+		}
+	}
+	if len(toRestart) > 0 {
+		return true, toRestart, nil
+	}
+	return false, nil, nil
 }

@@ -126,3 +126,9 @@ func (factory *MockRolloutFactory) SetShardingStrategy(strategy appsv1alpha1.Rol
 		sharding.Strategy = strategy
 	})
 }
+
+func (factory *MockRolloutFactory) SetShardingReplicas(replicas int32) *MockRolloutFactory {
+	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
+		sharding.Replicas = ptr.To(intstr.FromInt32(replicas))
+	})
+}

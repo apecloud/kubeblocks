@@ -113,13 +113,9 @@ label-crds:
 		mv bin/crd.yaml $$f; \
 	done
 
-.PHONY: preflight-manifests
-preflight-manifests: generate ## Generate external Preflight API
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
-
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: client-sdk-gen
 client-sdk-gen: module ## Generate CRD client code.
@@ -128,13 +124,11 @@ client-sdk-gen: module ## Generate CRD client code.
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./pkg/parameters/proto
 endif
 
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
 	$(GO) generate -x ./pkg/testutil/k8s/mocks/...
-	$(GO) generate -x ./pkg/parameters/proto/mocks/...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -448,4 +442,3 @@ endef
 
 # NOTE: include must be placed at the end
 include docker/docker.mk
-include cmd/cmd.mk

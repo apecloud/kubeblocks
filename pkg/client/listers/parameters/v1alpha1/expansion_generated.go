@@ -38,6 +38,14 @@ type ParameterListerExpansion interface{}
 // ParameterNamespaceLister.
 type ParameterNamespaceListerExpansion interface{}
 
+// ParameterViewListerExpansion allows custom methods to be added to
+// ParameterViewLister.
+type ParameterViewListerExpansion interface{}
+
+// ParameterViewNamespaceListerExpansion allows custom methods to be added to
+// ParameterViewNamespaceLister.
+type ParameterViewNamespaceListerExpansion interface{}
+
 // ParametersDefinitionListerExpansion allows custom methods to be added to
 // ParametersDefinitionLister.
 type ParametersDefinitionListerExpansion interface{}

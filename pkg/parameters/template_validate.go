@@ -26,8 +26,8 @@ import (
 )
 
 // validateRenderedData validates config file against constraint
-func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configRender *parametersv1alpha1.ParamConfigRenderer) error {
-	if len(paramsDefs) == 0 || configRender == nil || len(configRender.Spec.Configs) == 0 {
+func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configs []parametersv1alpha1.ComponentConfigDescription) error {
+	if len(paramsDefs) == 0 || len(configs) == 0 {
 		return nil
 	}
 	for _, paramsDef := range paramsDefs {
@@ -38,7 +38,7 @@ func validateRenderedData(renderedData map[string]string, paramsDefs []*paramete
 		if _, ok := renderedData[fileName]; !ok {
 			continue
 		}
-		if fileConfig := resolveFileFormatConfig(configRender.Spec.Configs, fileName); fileConfig != nil {
+		if fileConfig := resolveFileFormatConfig(configs, fileName); fileConfig != nil {
 			if err := validateConfigContent(renderedData[fileName], &paramsDef.Spec, fileConfig); err != nil {
 				return err
 			}

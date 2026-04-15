@@ -215,13 +215,18 @@ func (in *ClusterComponentConfig) DeepCopyInto(out *ClusterComponentConfig) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.RestartOnConfigChange != nil {
-		in, out := &in.RestartOnConfigChange, &out.RestartOnConfigChange
+	if in.Restart != nil {
+		in, out := &in.Restart, &out.Restart
 		*out = new(bool)
 		**out = **in
 	}
 	if in.Reconfigure != nil {
 		in, out := &in.Reconfigure, &out.Reconfigure
+		*out = new(bool)
+		**out = **in
+	}
+	if in.ReconfigureAction != nil {
+		in, out := &in.ReconfigureAction, &out.ReconfigureAction
 		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}

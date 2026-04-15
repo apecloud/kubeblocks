@@ -22,6 +22,9 @@ package rollout
 import (
 	"slices"
 
+	"k8s.io/utils/ptr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -86,7 +89,7 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 	}
 	newReplicas := replaceInstanceTemplateReplicas(tpls)
 	if newReplicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
-		tpl := tpls[""] // use the default template
+		tpl := tpls[""].DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.ServiceVersion = tpl.ServiceVersion
 		spec.ComponentDef = tpl.CompDef
 		spec.OfflineInstances = slices.DeleteFunc(spec.OfflineInstances, func(instance string) bool {
@@ -97,14 +100,42 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 			}
 			return false
 		})
+		spec.Instances = slices.DeleteFunc(spec.Instances, func(tpl appsv1.InstanceTemplate) bool {
+			if ptr.Deref(tpl.Replicas, 0) > 0 {
+				return false
+			}
+			return isRolloutManagedInstanceTemplate(rollout, tpl)
+		})
+		for i, inst := range spec.Instances {
+			if len(inst.ServiceVersion) > 0 {
+				spec.Instances[i].ServiceVersion = tpl.ServiceVersion
+			}
+			if len(inst.CompDef) > 0 {
+				spec.Instances[i].CompDef = tpl.CompDef
+			}
+		}
 	}
 	return nil
 }
 
 func (t *rolloutTearDownTransformer) compCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, comp appsv1alpha1.RolloutComponent) error {
-	// TODO: impl
-	return createStrategyNotSupportedError
+	spec := transCtx.ClusterComps[comp.Name]
+	canaryTpl := createInstanceTemplate(spec.Instances, replaceInstanceTemplateNamePrefix(rollout))
+	if canaryTpl == nil || ptr.Deref(canaryTpl.Canary, false) || !checkClusterNCompRunning(transCtx, comp.Name) {
+		return nil
+	}
+	compStatus := createCompStatus(rollout, comp.Name)
+	if compStatus == nil || spec.Replicas != compStatus.Replicas {
+		return nil
+	}
+	targetReplicas, err := createComponentTargetReplicas(comp, compStatus.Replicas)
+	if err != nil || targetReplicas != compStatus.Replicas {
+		return err
+	}
+	spec.ServiceVersion = canaryTpl.ServiceVersion
+	spec.ComponentDef = canaryTpl.CompDef
+	return nil
 }
 
 func (t *rolloutTearDownTransformer) shardings(transCtx *rolloutTransformContext) error {
@@ -144,7 +175,7 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 	}
 	newReplicas := replaceInstanceTemplateReplicas(tpls)
 	if newReplicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
-		tpl := tpls[""] // use the default template
+		tpl := tpls[""].DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.Template.ServiceVersion = tpl.ServiceVersion
 		spec.Template.ComponentDef = tpl.CompDef
 		spec.Template.OfflineInstances = slices.DeleteFunc(spec.Template.OfflineInstances, func(instance string) bool {
@@ -155,12 +186,40 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 			}
 			return false
 		})
+		spec.Template.Instances = slices.DeleteFunc(spec.Template.Instances, func(tpl appsv1.InstanceTemplate) bool {
+			if ptr.Deref(tpl.Replicas, 0) > 0 {
+				return false
+			}
+			return isRolloutManagedInstanceTemplate(rollout, tpl)
+		})
+		for i, inst := range spec.Template.Instances {
+			if len(inst.ServiceVersion) > 0 {
+				spec.Template.Instances[i].ServiceVersion = tpl.ServiceVersion
+			}
+			if len(inst.CompDef) > 0 {
+				spec.Template.Instances[i].CompDef = tpl.CompDef
+			}
+		}
 	}
 	return nil
 }
 
 func (t *rolloutTearDownTransformer) shardingCreate(transCtx *rolloutTransformContext,
 	rollout *appsv1alpha1.Rollout, sharding appsv1alpha1.RolloutSharding) error {
-	// TODO: impl
-	return createStrategyNotSupportedError
+	spec := transCtx.ClusterShardings[sharding.Name]
+	canaryTpl := createInstanceTemplate(spec.Template.Instances, replaceInstanceTemplateNamePrefix(rollout))
+	if canaryTpl == nil || ptr.Deref(canaryTpl.Canary, false) || !checkClusterNShardingRunning(transCtx, sharding.Name) {
+		return nil
+	}
+	shardingStatus := createShardingStatus(rollout, sharding.Name)
+	if shardingStatus == nil || spec.Template.Replicas*spec.Shards != shardingStatus.Replicas {
+		return nil
+	}
+	replicas, targetReplicas, err := createShardingReplicas(rollout, sharding, spec)
+	if err != nil || targetReplicas != replicas {
+		return err
+	}
+	spec.Template.ServiceVersion = canaryTpl.ServiceVersion
+	spec.Template.ComponentDef = canaryTpl.CompDef
+	return nil
 }

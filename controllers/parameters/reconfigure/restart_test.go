@@ -34,7 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var _ = ginkgo.Describe("Reconfigure restartPolicy test", func() {
+var _ = ginkgo.Describe("restartPolicy test", func() {
 	ginkgo.Context("restart policy", func() {
 		ginkgo.It("should success without error", func() {
 			configHash := "test-hash"

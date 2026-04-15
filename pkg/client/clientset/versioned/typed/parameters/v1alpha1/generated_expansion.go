@@ -24,4 +24,6 @@ type ParamConfigRendererExpansion interface{}
 
 type ParameterExpansion interface{}
 
+type ParameterViewExpansion interface{}
+
 type ParametersDefinitionExpansion interface{}

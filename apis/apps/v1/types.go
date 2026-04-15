@@ -550,11 +550,17 @@ type ClusterComponentConfig struct {
 	// Specifies whether to restart the component to reload the updated configuration.
 	//
 	// +optional
-	RestartOnConfigChange *bool `json:"restartOnConfigChange,omitempty"`
+	Restart *bool `json:"restart,omitempty"`
 
-	// The custom reconfigure action to reload the updated configuration.
+	// Specifies whether to execute a reconfigure action for the updated configuration.
 	//
-	// When @restartOnConfigChange is set to true, this action will be ignored.
+	// When set to true and `reconfigureAction` is empty, the controller uses the default
+	// reconfigure action defined by the corresponding configuration template or component lifecycle.
+	//
+	// +optional
+	Reconfigure *bool `json:"reconfigure,omitempty"`
+
+	// The custom reconfigure action to apply the updated configuration.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -563,7 +569,7 @@ type ClusterComponentConfig struct {
 	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
 	//
 	// +optional
-	Reconfigure *Action `json:"reconfigure,omitempty"`
+	ReconfigureAction *Action `json:"reconfigureAction,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

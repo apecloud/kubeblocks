@@ -33,10 +33,42 @@ func NewParametersDefinitionFactory(name string) *MockParametersDefinitionFactor
 	f := &MockParametersDefinitionFactory{}
 	f.Init("", name, &parametersv1alpha1.ParametersDefinition{
 		Spec: parametersv1alpha1.ParametersDefinitionSpec{
-			FileName:     MysqlConfigFile,
-			ReloadAction: WithNoneAction(),
+			FileName: MysqlConfigFile,
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{
+					IniConfig: &parametersv1alpha1.IniConfig{
+						SectionName: "mysqld",
+					},
+				},
+			},
 		},
 	}, f)
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetComponentDefinition(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.ComponentDef = name
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetServiceVersion(version string) *MockParametersDefinitionFactory {
+	f.Get().Spec.ServiceVersion = version
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetTemplateName(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.TemplateName = name
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetConfigFile(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.FileName = name
+	return f
+}
+
+func (f *MockParametersDefinitionFactory) SetFileFormatConfig(cfg parametersv1alpha1.FileFormatConfig) *MockParametersDefinitionFactory {
+	f.Get().Spec.FileFormatConfig = &cfg
 	return f
 }
 
@@ -46,11 +78,6 @@ func (f *MockParametersDefinitionFactory) Schema(cue string) *MockParametersDefi
 		CUE:          cue,
 		SchemaInJSON: openAPISchema,
 	}
-	return f
-}
-
-func (f *MockParametersDefinitionFactory) SetConfigFile(name string) *MockParametersDefinitionFactory {
-	f.Get().Spec.FileName = name
 	return f
 }
 
@@ -67,17 +94,4 @@ func (f *MockParametersDefinitionFactory) DynamicParameters(params []string) *Mo
 func (f *MockParametersDefinitionFactory) ImmutableParameters(params []string) *MockParametersDefinitionFactory {
 	f.Get().Spec.ImmutableParameters = params
 	return f
-}
-
-func (f *MockParametersDefinitionFactory) SetReloadAction(action *parametersv1alpha1.ReloadAction) *MockParametersDefinitionFactory {
-	f.Get().Spec.ReloadAction = action
-	return f
-}
-
-func WithNoneAction() *parametersv1alpha1.ReloadAction {
-	return &parametersv1alpha1.ReloadAction{
-		AutoTrigger: &parametersv1alpha1.AutoTrigger{
-			ProcessName: "",
-		},
-	}
 }

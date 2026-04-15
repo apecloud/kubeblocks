@@ -546,7 +546,7 @@ func hasActionDefined(synthesizedComp *SynthesizedComponent) bool {
 		return true
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
-		if tpl.Reconfigure != nil {
+		if tpl.Reconfigure != nil || tpl.ReconfigureAction != nil {
 			return true
 		}
 	}
@@ -557,7 +557,10 @@ func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(na
 	// user-defined actions
 	for i, tpl := range synthesizedComp.FileTemplates {
 		if tpl.Reconfigure != nil {
-			f(lifecycle.UDFActionName(UDFReconfigureActionName(tpl)), synthesizedComp.FileTemplates[i].Reconfigure)
+			f(lifecycle.UDFActionName(CMPDReconfigureActionName(tpl)), synthesizedComp.FileTemplates[i].Reconfigure)
+		}
+		if tpl.ReconfigureAction != nil {
+			f(lifecycle.UDFActionName(UserReconfigureActionName(tpl)), synthesizedComp.FileTemplates[i].ReconfigureAction)
 		}
 	}
 

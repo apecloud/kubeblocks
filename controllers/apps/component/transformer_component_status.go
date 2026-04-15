@@ -361,24 +361,28 @@ func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *com
 		transCtx.EventRecorder,
 		appsv1.ConditionTypeProgressing,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
+			if !t.isWorkloadUpdated() {
+				return metav1.ConditionTrue, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
+			}
+
 			hasRunningScaleOut, _, err := t.hasScaleOutRunning(transCtx)
 			if err != nil {
 				return "", "", "", err
 			}
 			if hasRunningScaleOut {
-				return metav1.ConditionTrue, "ScaleOutRunning", "component scale out is running", nil
+				return metav1.ConditionTrue, "ScaleOut", "component scale out is running", nil
 			}
 
 			hasRunningVolumeExpansion := t.hasVolumeExpansionRunning()
 			if hasRunningVolumeExpansion {
-				return metav1.ConditionTrue, "VolumeExpansionRunning", "component volume expansion is running", nil
+				return metav1.ConditionTrue, "VolumeExpansion", "component volume expansion is running", nil
 			}
 
 			if !checkPostProvisionDone(transCtx) {
-				return metav1.ConditionTrue, "PostProvisioning", "component is running post-provision action", nil
+				return metav1.ConditionTrue, "PostProvision", "component is running post-provision action", nil
 			}
 
-			return metav1.ConditionFalse, "NotProgressing", "", nil
+			return metav1.ConditionFalse, "Completed", "", nil
 		},
 	)
 }
@@ -390,9 +394,6 @@ func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *compone
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			if t.runningITS == nil {
 				return metav1.ConditionFalse, "WorkloadNotExist", "waiting for workload to be created", nil
-			}
-			if !t.isWorkloadUpdated() {
-				return metav1.ConditionFalse, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
 			}
 			if !t.runningITS.IsInstancesReady() {
 				return metav1.ConditionFalse, "WorkloadNotReady", "some instances are not ready", nil
@@ -409,7 +410,7 @@ func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *compone
 				return metav1.ConditionFalse, "ScaleOutFailure", "component scale out has failure", nil
 			}
 
-			return metav1.ConditionTrue, "Healthy", "workload is healthy", nil
+			return metav1.ConditionTrue, "Healthy", "component is healthy", nil
 		},
 	)
 }

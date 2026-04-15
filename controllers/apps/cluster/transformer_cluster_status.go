@@ -121,7 +121,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 			return err
 		}
 		available := true
-		message := ""
+		aggregatedMessage := ""
 		defer func() {
 			var condition metav1.Condition
 			if available {
@@ -135,7 +135,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 				condition = metav1.Condition{
 					Type:    appsv1.ConditionTypeAvailable,
 					Status:  metav1.ConditionFalse,
-					Message: message,
+					Message: aggregatedMessage,
 					Reason:  "Unavailable",
 				}
 			}
@@ -148,8 +148,8 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 			if compCond != nil {
 				if compCond.Status != metav1.ConditionTrue {
 					available = false
-					message = fmt.Sprintf("component %s is not available", comp.Name)
-					return nil
+					message := fmt.Sprintf("component %s is not available", comp.Name)
+					aggregatedMessage += message + "; "
 				}
 			}
 		}
@@ -160,8 +160,8 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 				if compCond != nil {
 					if compCond.Status != metav1.ConditionTrue {
 						available = false
-						message = fmt.Sprintf("component %s of sharding %s is not available", comp.Name, shardingName)
-						return nil
+						message := fmt.Sprintf("component %s of sharding %s is not available", comp.Name, shardingName)
+						aggregatedMessage += message + "; "
 					}
 				}
 			}

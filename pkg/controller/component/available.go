@@ -116,7 +116,7 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 	compCopy, comp *appsv1.Component, status metav1.ConditionStatus, reason, message string) error {
 	var (
 		cond = metav1.Condition{
-			Type:               appsv1.ConditionTypeAvailable,
+			Type:               appsv1.ComponentConditionAvailable,
 			Status:             status,
 			ObservedGeneration: comp.Generation, // TODO: ???
 			LastTransitionTime: metav1.Now(),

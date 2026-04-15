@@ -359,7 +359,7 @@ func (t *componentStatusTransformer) checkNSetCondition(
 func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *componentTransformContext) error {
 	return t.checkNSetCondition(
 		transCtx.EventRecorder,
-		appsv1.ConditionTypeProgressing,
+		appsv1.ComponentConditionProgressing,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			if !t.isWorkloadUpdated() {
 				return metav1.ConditionTrue, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
@@ -390,7 +390,7 @@ func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *com
 func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *componentTransformContext) error {
 	return t.checkNSetCondition(
 		transCtx.EventRecorder,
-		appsv1.ConditionTypeHealthy,
+		appsv1.ComponentConditionHealthy,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			if t.runningITS == nil {
 				return metav1.ConditionFalse, "WorkloadNotExist", "waiting for workload to be created", nil
@@ -423,7 +423,7 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 
 	return t.checkNSetCondition(
 		transCtx.EventRecorder,
-		appsv1.ConditionTypeAvailable,
+		appsv1.ComponentConditionAvailable,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			if policy.WithPhases != nil {
 				status, message1 := t.availableWithPhases(transCtx, transCtx.Component, policy)

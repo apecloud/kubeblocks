@@ -163,7 +163,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileHealthyCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeHealthy)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).Should(Equal("WorkloadNotExist"))
@@ -174,7 +174,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileHealthyCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeHealthy)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).Should(Equal("WorkloadNotUpdated"))
@@ -185,7 +185,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileHealthyCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeHealthy)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).Should(Equal("WorkloadNotReady"))
@@ -199,7 +199,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileHealthyCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeHealthy)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).Should(Equal("RoleProbeNotDone"))
@@ -209,7 +209,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileHealthyCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeHealthy)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).Should(Equal("Healthy"))
@@ -223,7 +223,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileHealthyCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeHealthy)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).Should(Equal("Healthy"))
@@ -235,7 +235,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeProgressing)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).Should(Equal("NotProgressing"))
@@ -248,7 +248,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeProgressing)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).Should(Equal("VolumeExpansionRunning"))
@@ -268,7 +268,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeProgressing)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).Should(Equal("PostProvisioning"))
@@ -277,7 +277,7 @@ var _ = Describe("component status transformer conditions", func() {
 			comp.Annotations[kbCompPostProvisionDoneKey] = time.Now().Format(time.RFC3339Nano)
 			err = transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
-			cond = meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeProgressing)
+			cond = meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 			Expect(cond.Reason).Should(Equal("NotProgressing"))
@@ -291,7 +291,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err = transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeProgressing)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).Should(Equal("ScaleOutRunning"))
@@ -307,7 +307,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileAvailableCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			Expect(cond.Reason).Should(Equal("Available"))
@@ -325,7 +325,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 				Expect(cond.Reason).Should(Equal("Available"))
@@ -336,7 +336,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).Should(Equal("PhaseCheckFail"))
@@ -347,7 +347,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
 			})
@@ -369,7 +369,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 				Expect(cond.Reason).Should(Equal("Available"))
@@ -383,7 +383,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).Should(Equal("RoleCheckFail"))
@@ -394,7 +394,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).Should(Equal("RoleCheckFail"))
@@ -418,7 +418,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
 			})
@@ -432,7 +432,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).Should(Equal("PhaseCheckFail"))
@@ -447,7 +447,7 @@ var _ = Describe("component status transformer conditions", func() {
 				err := transformer.reconcileAvailableCondition(transCtx)
 				Expect(err).Should(BeNil())
 
-				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+				cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 				Expect(cond).ShouldNot(BeNil())
 				Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
 				Expect(cond.Reason).Should(Equal("RoleCheckFail"))
@@ -459,7 +459,7 @@ var _ = Describe("component status transformer conditions", func() {
 			err := transformer.reconcileAvailableCondition(transCtx)
 			Expect(err).Should(BeNil())
 
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 			Expect(cond).Should(BeNil())
 		})
 	})

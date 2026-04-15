@@ -461,11 +461,17 @@ const (
 	FailedComponentPhase ComponentPhase = "Failed"
 )
 
-// component conditions
+// component condition types
 const (
-	// ConditionTypeHealthy indicates component controller is applying updates
-	ConditionTypeProgressing = "Progressing"
+	// ComponentConditionProgressing indicates component controller is applying updates
+	ComponentConditionProgressing = "Progressing"
 
-	// ConditionTypeHealthy indicates its workload resource is updated, running and ready.
-	ConditionTypeHealthy = "Healthy"
+	// ComponentConditionHealthy indicates its workload resource is running and ready.
+	ComponentConditionHealthy = "Healthy"
+
+	// ComponentConditionAvailable indicates the component can serve requests normally.
+	ComponentConditionAvailable = "Available"
+
+	// ComponentConditionProvisioningStarted indicates the operator starts resource provisioning to create or change the cluster
+	ComponentConditionProvisioningStarted = "ProvisioningStarted"
 )

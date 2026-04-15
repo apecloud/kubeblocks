@@ -169,17 +169,6 @@ var _ = Describe("component status transformer conditions", func() {
 			Expect(cond.Reason).Should(Equal("WorkloadNotExist"))
 		})
 
-		It("should be unhealthy when workload generation not matching", func() {
-			runningITS.Annotations[constant.KubeBlocksGenerationKey] = "999"
-			err := transformer.reconcileHealthyCondition(transCtx)
-			Expect(err).Should(BeNil())
-
-			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
-			Expect(cond).ShouldNot(BeNil())
-			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
-			Expect(cond.Reason).Should(Equal("WorkloadNotUpdated"))
-		})
-
 		It("should be unhealthy when instances are not ready", func() {
 			runningITS.Status.ReadyReplicas = 1
 			err := transformer.reconcileHealthyCondition(transCtx)
@@ -238,7 +227,18 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
-			Expect(cond.Reason).Should(Equal("NotProgressing"))
+			Expect(cond.Reason).Should(Equal("Completed"))
+		})
+
+		It("should be progressing when workload generation not matching", func() {
+			runningITS.Annotations[constant.KubeBlocksGenerationKey] = "999"
+			err := transformer.reconcileProgressingCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).Should(Equal("WorkloadNotUpdated"))
 		})
 
 		It("should be progressing when volume expansion is running", func() {
@@ -251,7 +251,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
-			Expect(cond.Reason).Should(Equal("VolumeExpansionRunning"))
+			Expect(cond.Reason).Should(Equal("VolumeExpansion"))
 		})
 
 		It("should be progressing when post-provision is not done", func() {
@@ -271,7 +271,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
-			Expect(cond.Reason).Should(Equal("PostProvisioning"))
+			Expect(cond.Reason).Should(Equal("PostProvision"))
 
 			// set post-provision-done annotation
 			comp.Annotations[kbCompPostProvisionDoneKey] = time.Now().Format(time.RFC3339Nano)
@@ -280,7 +280,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond = meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
-			Expect(cond.Reason).Should(Equal("NotProgressing"))
+			Expect(cond.Reason).Should(Equal("Completed"))
 		})
 
 		It("should be progressing when scale out is running", func() {
@@ -294,7 +294,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
-			Expect(cond.Reason).Should(Equal("ScaleOutRunning"))
+			Expect(cond.Reason).Should(Equal("ScaleOut"))
 
 			// when scale out is done
 			// TODO
@@ -303,7 +303,7 @@ var _ = Describe("component status transformer conditions", func() {
 
 	Context("reconcileAvailableCondition", func() {
 		It("should be available when no available policy is defined", func() {
-			comp.Status.Phase = appsv1.UpdatingComponentPhase
+			comp.Status.Phase = appsv1.RunningComponentPhase
 			err := transformer.reconcileAvailableCondition(transCtx)
 			Expect(err).Should(BeNil())
 

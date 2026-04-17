@@ -199,12 +199,6 @@ func AddInstanceAssistantObject(synthesizedComp *SynthesizedComponent, object cl
 	}
 }
 
-func AddInstanceAssistantObjectsToITS(its *workloads.InstanceSet, objs ...client.Object) {
-	if instanceAPINAssistantObjectsEnabled(its) {
-		its.Spec.InstanceAssistantObjects = addInstanceAssistantObjects(its.Spec.InstanceAssistantObjects, objs...)
-	}
-}
-
 func instanceAPINAssistantObjectsEnabled(its *workloads.InstanceSet) bool {
 	if !ptr.Deref(its.Spec.EnableInstanceAPI, false) {
 		return false

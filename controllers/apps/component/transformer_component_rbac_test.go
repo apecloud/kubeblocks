@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -129,6 +130,39 @@ var _ = Describe("object rbac transformer test.", func() {
 	}
 
 	Context("transformer rbac manager", func() {
+		It("adds RBAC assistant objects to synthesized component before workload exists", func() {
+			init(true, true)
+			dag = graph.NewDAG()
+			graphCli.Root(dag, compObj, compObj, model.ActionStatusPtr())
+			synthesizedComp.EnableInstanceAPI = ptr.To(true)
+			if synthesizedComp.Annotations == nil {
+				synthesizedComp.Annotations = map[string]string{}
+			}
+			synthesizedComp.Annotations[constant.KBAppMultiClusterPlacementKey] = "test-context"
+
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+
+			actual := synthesizedComp.InstanceAssistantObjects
+			Expect(actual).To(HaveLen(3))
+			Expect(actual).To(ContainElements(
+				corev1.ObjectReference{
+					Kind:      "RoleBinding",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      serviceAccountName,
+				},
+				corev1.ObjectReference{
+					Kind:      "RoleBinding",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      fmt.Sprintf("%v-pod", serviceAccountName),
+				},
+				corev1.ObjectReference{
+					Kind:      "ServiceAccount",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      serviceAccountName,
+				},
+			))
+		})
+
 		It("tests labelAndAnnotationEqual", func() {
 			// nil and not nil
 			Expect(labelAndAnnotationEqual(

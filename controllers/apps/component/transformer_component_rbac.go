@@ -173,7 +173,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
-	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+	t.rbacInstanceAssistantObjects(synthesizedComp, objs)
 
 	return nil
 }
@@ -211,7 +211,8 @@ func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransfor
 		}
 	}
 
-	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+	t.rbacInstanceAssistantObjects(synthesizedComp, objs)
+
 	return nil
 }
 
@@ -265,11 +266,9 @@ func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
 	return res, nil
 }
 
-func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {
-	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
-	for _, itsObj := range itsList {
-		its := itsObj.(*workloads.InstanceSet)
-		component.AddInstanceAssistantObjectsToITS(its, objs...)
+func (t *componentRBACTransformer) rbacInstanceAssistantObjects(synthesizedComp *component.SynthesizedComponent, objs []client.Object) {
+	for _, obj := range objs {
+		component.AddInstanceAssistantObject(synthesizedComp, obj)
 	}
 }
 

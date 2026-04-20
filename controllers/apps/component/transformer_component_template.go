@@ -27,6 +27,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
@@ -67,11 +68,34 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 
-	for _, obj := range protoObjs {
-		component.AddInstanceAssistantObject(transCtx.SynthesizeComponent, obj)
+	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+		if obj := t.instanceAssistantObject(transCtx, tpl, protoObjs); obj != nil {
+			component.AddInstanceAssistantObject(transCtx.SynthesizeComponent, obj)
+		}
 	}
 
 	return t.buildPodVolumes(transCtx)
+}
+
+func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *componentTransformContext,
+	tpl component.SynthesizedFileTemplate, protoObjs map[string]*corev1.ConfigMap) client.Object {
+	if isExternalManaged(tpl) {
+		if len(tpl.Template) == 0 {
+			return nil
+		}
+		namespace := tpl.Namespace
+		if len(namespace) == 0 {
+			namespace = transCtx.SynthesizeComponent.Namespace
+		}
+		return &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      tpl.Template,
+			},
+		}
+	}
+	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
+	return protoObjs[objName]
 }
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {

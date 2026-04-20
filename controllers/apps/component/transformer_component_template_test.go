@@ -120,6 +120,10 @@ var _ = Describe("file templates transformer test", func() {
 				ClusterName:  clusterName,
 				Name:         compName,
 				FullCompName: fmt.Sprintf("%s-%s", clusterName, compName),
+				Annotations: map[string]string{
+					constant.KBAppMultiClusterPlacementKey: "member-1",
+				},
+				EnableInstanceAPI: ptr.To(true),
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -214,6 +218,14 @@ var _ = Describe("file templates transformer test", func() {
 		}
 	}
 
+	checkAssistantObject := func(kind, namespace, name string) {
+		Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).Should(ContainElement(corev1.ObjectReference{
+			Kind:      kind,
+			Namespace: namespace,
+			Name:      name,
+		}))
+	}
+
 	// checkEnvWithAction := func(action string) {
 	//	podSpec := transCtx.SynthesizeComponent.PodSpec
 	//	for _, c := range podSpec.Containers {
@@ -300,6 +312,7 @@ var _ = Describe("file templates transformer test", func() {
 
 			checkVolumes([]string{"logConf", "serverConf"})
 			checkTemplateObjects([]string{"logConf", "serverConf"})
+			checkAssistantObject("ConfigMap", serverConfCM.Namespace, serverConfCM.Name)
 			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[1]))
 		})
 

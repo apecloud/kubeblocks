@@ -143,6 +143,12 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 			meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 		}()
 
+		if len(comps) == 0 && len(shardingComps) == 0 {
+			available = false
+			aggregatedMessage = "no component exists; "
+			return nil
+		}
+
 		for _, comp := range comps {
 			compCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeAvailable)
 			if compCond != nil {
@@ -151,6 +157,10 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 					message := fmt.Sprintf("component %s is not available", comp.Name)
 					aggregatedMessage += message + "; "
 				}
+			} else {
+				available = false
+				message := fmt.Sprintf("component %s has no available condition", comp.Name)
+				aggregatedMessage += message + "; "
 			}
 		}
 
@@ -163,6 +173,10 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 						message := fmt.Sprintf("component %s of sharding %s is not available", comp.Name, shardingName)
 						aggregatedMessage += message + "; "
 					}
+				} else {
+					available = false
+					message := fmt.Sprintf("component %s of sharding %s has no available condition", comp.Name, shardingName)
+					aggregatedMessage += message + "; "
 				}
 			}
 		}

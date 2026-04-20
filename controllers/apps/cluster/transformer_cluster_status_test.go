@@ -87,12 +87,12 @@ var _ = Describe("syncClusterConditions", func() {
 		reader = &appsutil.MockReader{Objects: []client.Object{}}
 	})
 
-	It("should set Ready condition when transitioning to Running", func() {
+	It("should set Ready condition when phase is Running", func() {
 		cluster.Status.Phase = appsv1.RunningClusterPhase
 		available := metav1.ConditionTrue
 		reader.Objects = []client.Object{newComponent("comp1", &available, "")}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.CreatingClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
@@ -101,25 +101,13 @@ var _ = Describe("syncClusterConditions", func() {
 		Expect(readyCond.Reason).Should(Equal(ReasonClusterReady))
 	})
 
-	It("should not set Ready condition when phase has not changed to Running", func() {
-		cluster.Status.Phase = appsv1.RunningClusterPhase
-		available := metav1.ConditionTrue
-		reader.Objects = []client.Object{newComponent("comp1", &available, "")}
-
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
-		Expect(err).Should(BeNil())
-
-		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
-		Expect(readyCond).Should(BeNil())
-	})
-
 	It("should set NotReady condition when components have failed", func() {
 		cluster.Status.Components["comp1"] = appsv1.ClusterComponentStatus{Phase: appsv1.FailedComponentPhase}
 		cluster.Status.Phase = appsv1.FailedClusterPhase
 		available := metav1.ConditionTrue
 		reader.Objects = []client.Object{newComponent("comp1", &available, "")}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.FailedClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
@@ -136,7 +124,7 @@ var _ = Describe("syncClusterConditions", func() {
 		available := metav1.ConditionTrue
 		reader.Objects = []client.Object{newComponent("comp1", &available, "")}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.FailedClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
@@ -151,7 +139,7 @@ var _ = Describe("syncClusterConditions", func() {
 			newComponent("comp1", &available, ""),
 		}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		availCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)
@@ -167,7 +155,7 @@ var _ = Describe("syncClusterConditions", func() {
 			newComponent("comp1", &unavailable, ""),
 		}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		availCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)
@@ -183,7 +171,7 @@ var _ = Describe("syncClusterConditions", func() {
 			newComponent("comp1", nil, ""),
 		}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		availCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)
@@ -201,7 +189,7 @@ var _ = Describe("syncClusterConditions", func() {
 			newComponent("shard1-0", &unavailable, "shard1"),
 		}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		availCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)
@@ -219,7 +207,7 @@ var _ = Describe("syncClusterConditions", func() {
 			newComponent("shard1-1", &available, "shard1"),
 		}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		availCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)
@@ -231,7 +219,7 @@ var _ = Describe("syncClusterConditions", func() {
 		cluster.Status.Phase = appsv1.RunningClusterPhase
 		reader.Objects = []client.Object{}
 
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster, appsv1.RunningClusterPhase)
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
 		Expect(err).Should(BeNil())
 
 		availCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)

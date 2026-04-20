@@ -61,8 +61,8 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(ctx context.Context, c
 	if len(cluster.Status.Components) == 0 && len(cluster.Status.Shardings) == 0 {
 		return nil
 	}
-	oldPhase := t.reconcileClusterPhase(cluster)
-	return t.syncClusterConditions(ctx, cli, cluster, oldPhase)
+	t.reconcileClusterPhase(cluster)
+	return t.syncClusterConditions(ctx, cli, cluster)
 }
 
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster) appsv1.ClusterPhase {
@@ -92,8 +92,8 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster
 	return phase
 }
 
-func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, oldPhase appsv1.ClusterPhase) error {
-	if cluster.Status.Phase == appsv1.RunningClusterPhase && oldPhase != cluster.Status.Phase {
+func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
+	if cluster.Status.Phase == appsv1.RunningClusterPhase {
 		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
 	} else {
 		kindNames := map[string][]string{}

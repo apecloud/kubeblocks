@@ -77,11 +77,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		template2TotalReplicas[template.Name] = templateReplicas
 	}
 
-	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-
 	for _, inst := range instanceList {
 		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
@@ -114,16 +109,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			}
 		}
-
-		// TODO: ???
-		// if nodeName, ok := podToNodeMapping[inst.Name]; ok {
-		//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-		//	if inst.Spec.NodeName == nodeName {
-		//		if err := deleteNodeSelectorOnceAnnotation(its, inst.Name); err != nil {
-		//			return kubebuilderx.Continue, err
-		//		}
-		//	}
-		// }
 	}
 	its.Status.Replicas = replicas
 	its.Status.ReadyReplicas = readyReplicas

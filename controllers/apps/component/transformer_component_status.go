@@ -202,8 +202,25 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	if t.comp == nil || t.runningITS == nil {
 		return false
 	}
-	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
-	return generation == strconv.FormatInt(t.comp.Generation, 10)
+	its := t.runningITS
+	generation := its.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	if generation != strconv.FormatInt(t.comp.Generation, 10) {
+		return false
+	}
+
+	// check whether the underlying workload is updated
+	if its.Status.ObservedGeneration != its.Generation {
+		return false
+	}
+	if its.Spec.Replicas == nil {
+		return false
+	}
+	replicas := *its.Spec.Replicas
+	if its.Status.Replicas != replicas ||
+		its.Status.UpdatedReplicas != replicas {
+		return false
+	}
+	return true
 }
 
 // isRunning checks if the component's underlying workload is running.

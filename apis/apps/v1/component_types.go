@@ -463,7 +463,7 @@ const (
 
 // component condition types
 const (
-	// ComponentConditionProgressing indicates component controller is applying updates
+	// ComponentConditionProgressing indicates component controller is applying updates, or workload resource is being updated.
 	ComponentConditionProgressing = "Progressing"
 
 	// ComponentConditionHealthy indicates its workload resource is running and ready.
@@ -472,6 +472,6 @@ const (
 	// ComponentConditionAvailable indicates the component can serve requests normally.
 	ComponentConditionAvailable = "Available"
 
-	// ComponentConditionProvisioningStarted indicates the operator starts resource provisioning to create or change the cluster
+	// ComponentConditionProvisioningStarted indicates the operator starts resource provisioning to create or change the cluster.
 	ComponentConditionProvisioningStarted = "ProvisioningStarted"
 )

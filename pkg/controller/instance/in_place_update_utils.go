@@ -275,6 +275,14 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
+	configRestart, _, err := hasConfigRestart(inst, pod)
+	if err != nil {
+		return noOpsPolicy, "", err
+	}
+	if configRestart {
+		return recreatePolicy, inst.Spec.PodUpdatePolicy, nil
+	}
+
 	newPod, err := buildInstancePod(inst, getPodRevision(pod))
 	if err != nil {
 		return noOpsPolicy, "", err
@@ -322,5 +330,12 @@ func getPodUpdatePolicyInSpec(inst *workloads.Instance, old, new *corev1.Pod) wo
 
 func isPodUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
 	policy, _, err := getPodUpdatePolicy(inst, pod)
-	return policy == noOpsPolicy, err
+	if err != nil {
+		return false, err
+	}
+	toUpdate, err := configsToUpdate(inst, pod)
+	if err != nil {
+		return false, err
+	}
+	return policy == noOpsPolicy && len(toUpdate) == 0, nil
 }

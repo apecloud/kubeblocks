@@ -125,7 +125,8 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
 		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
-		SetLifecycleActions(its.Spec.LifecycleActions)
+		SetLifecycleActions(its.Spec.LifecycleActions).
+		SetConfigs(its.Spec.Configs)
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).
@@ -291,6 +292,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.PodUpgradePolicy = newInst.Spec.PodUpgradePolicy
 	targetInst.Spec.Roles = newInst.Spec.Roles
 	targetInst.Spec.LifecycleActions = newInst.Spec.LifecycleActions
+	targetInst.Spec.Configs = newInst.Spec.Configs
 
 	// object meta
 	mergeMap(&newInst.Labels, &targetInst.Labels)
@@ -396,5 +398,8 @@ func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) boo
 	if !ok {
 		return false
 	}
-	return strconv.FormatInt(its.Generation, 10) == generation
+	if strconv.FormatInt(its.Generation, 10) != generation {
+		return false
+	}
+	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate
 }

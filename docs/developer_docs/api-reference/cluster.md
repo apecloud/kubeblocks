@@ -32297,6 +32297,20 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs define the desired config templates applied to this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceAssistantObjects</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
@@ -32843,7 +32857,7 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 </div>
@@ -33023,7 +33037,7 @@ Kubernetes rbac/v1.RoleBinding
 <h3 id="workloads.kubeblocks.io/v1.InstanceConfigStatus">InstanceConfigStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
 </p>
 <div>
 </div>
@@ -33903,6 +33917,20 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs define the desired config templates applied to this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceAssistantObjects</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
@@ -34121,6 +34149,20 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Represents whether the instance is in volume expansion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceConfigStatus">
+[]InstanceConfigStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the config status observed from the running pod of this instance.</p>
 </td>
 </tr>
 </tbody>

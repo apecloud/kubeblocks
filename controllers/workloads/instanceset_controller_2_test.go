@@ -183,6 +183,39 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 		})
 
+		It("instance status - configs", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					workloads.ConfigTemplate{
+						Name:       "server",
+						ConfigHash: ptr.To("654321"),
+					},
+				)
+			})
+
+			mockPodsReady()
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(int(replicas)))
+				for i := range its.Status.InstanceStatus {
+					g.Expect(its.Status.InstanceStatus[i].Configs).Should(Equal([]workloads.InstanceConfigStatus{
+						{
+							Name:       "log",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("654321"),
+						},
+					}))
+				}
+			})).Should(Succeed())
+		})
+
 		It("pod management - ordered ready", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetPodManagementPolicy(appsv1.OrderedReadyPodManagement)

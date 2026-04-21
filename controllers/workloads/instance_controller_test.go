@@ -21,6 +21,7 @@ package workloads
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -140,6 +141,44 @@ var _ = Describe("Instance Controller", func() {
 				g.Expect(inst.Status.UpToDate).Should(BeTrue())
 				g.Expect(inst.Status.Ready).Should(BeTrue())
 				g.Expect(inst.Status.Available).Should(BeTrue())
+			})).Should(Succeed())
+		})
+
+		It("status - configs", func() {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					workloads.ConfigTemplate{
+						Name:       "server",
+						ConfigHash: ptr.To("654321"),
+					},
+				)
+			})
+
+			podKey := instKey
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				expectConfigHashAnnotation(g, pod, map[string]string{
+					"log":    "123456",
+					"server": "654321",
+				})
+			})).Should(Succeed())
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("654321"),
+					},
+				}))
 			})).Should(Succeed())
 		})
 
@@ -500,10 +539,188 @@ var _ = Describe("Instance Controller", func() {
 			Expect(switchover).Should(BeTrue())
 		})
 
-		// It("reconfigure", func() {
-		//	// TODO
-		// })
-		//
+		It("reconfigure", func() {
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "reconfigure" {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+			defer kbacli.UnsetMockClient()
+
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					workloads.ConfigTemplate{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				)
+			})
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+
+			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+				inst.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				inst.Spec.Configs[0].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				inst.Spec.Configs[0].Parameters = map[string]string{"foo": "bar"}
+			})()).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+
+			podKey := instKey
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				expectConfigHashAnnotation(g, pod, map[string]string{
+					"log":    "abcdef",
+					"server": "123456",
+				})
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{
+						Name:       "log",
+						ConfigHash: ptr.To("abcdef"),
+					},
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				}))
+			})).Should(Succeed())
+		})
+
+		It("restart on config update", func() {
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					workloads.ConfigTemplate{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				)
+			})
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+			podKey := instKey
+			podObj := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, podKey, podObj)).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+				inst.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				inst.Spec.Configs[0].Restart = ptr.To(true)
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.UID).ShouldNot(Equal(podObj.UID))
+				expectConfigHashAnnotation(g, pod, map[string]string{
+					"log":    "abcdef",
+					"server": "123456",
+				})
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{
+						Name:       "log",
+						ConfigHash: ptr.To("abcdef"),
+					},
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				}))
+			})).Should(Succeed())
+		})
+
+		It("reconfigure and restart", func() {
+			var (
+				reconfigure          string
+				parameters           map[string]string
+				reconfigureTimestamp time.Time
+			)
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "reconfigure" {
+						reconfigure = req.Action
+						parameters = req.Parameters
+						reconfigureTimestamp = time.Now()
+						time.Sleep(1200 * time.Millisecond)
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+			defer kbacli.UnsetMockClient()
+
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					workloads.ConfigTemplate{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				)
+			})
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+			podKey := instKey
+			podObj := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, podKey, podObj)).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+				inst.Spec.Configs[0].ConfigHash = ptr.To("abcdef")
+				inst.Spec.Configs[0].Restart = ptr.To(true)
+				inst.Spec.Configs[0].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				inst.Spec.Configs[0].Parameters = map[string]string{"foo": "bar"}
+			})()).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.UID).ShouldNot(Equal(podObj.UID))
+				g.Expect(pod.CreationTimestamp.Time.After(reconfigureTimestamp)).Should(BeTrue())
+				expectConfigHashAnnotation(g, pod, map[string]string{
+					"log":    "abcdef",
+					"server": "123456",
+				})
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{
+						Name:       "log",
+						ConfigHash: ptr.To("abcdef"),
+					},
+					{
+						Name:       "server",
+						ConfigHash: ptr.To("123456"),
+					},
+				}))
+			})).Should(Succeed())
+		})
+
 		// It("member join", func() {
 		//	// TODO
 		// })
@@ -565,4 +782,11 @@ func mockPodReadyNAvailableWithRole(namespace, podName, role string, minReadySec
 	Eventually(testapps.GetAndChangeObj(&testCtx, podKey, func(pod *corev1.Pod) {
 		pod.Labels[constant.RoleLabelKey] = role
 	})()).Should(Succeed())
+}
+
+func expectConfigHashAnnotation(g Gomega, pod *corev1.Pod, expected map[string]string) {
+	g.Expect(pod.Annotations).Should(HaveKey(constant.CMInsConfigurationHashLabelKey))
+	actual := make(map[string]string)
+	g.Expect(json.Unmarshal([]byte(pod.Annotations[constant.CMInsConfigurationHashLabelKey]), &actual)).Should(Succeed())
+	g.Expect(actual).Should(Equal(expected))
 }

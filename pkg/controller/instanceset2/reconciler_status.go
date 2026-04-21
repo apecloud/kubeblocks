@@ -259,7 +259,7 @@ func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instan
 
 	syncMemberStatus(its, instanceStatus, instances)
 
-	syncInstanceConfigStatus(its, instanceStatus)
+	syncInstanceConfigStatus(instanceStatus, instances)
 
 	syncInstancePVCStatus(its, instanceStatus, instances)
 
@@ -296,38 +296,12 @@ func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.Ins
 	}
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
-	if its.Status.InstanceStatus == nil {
-		// initialize
-		configs := make([]workloads.InstanceConfigStatus, 0)
-		for _, config := range its.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				ConfigHash: config.ConfigHash,
-			})
-		}
-		for i := range instanceStatus {
-			instanceStatus[i].Configs = configs
-		}
-	} else {
-		// HACK: copy the existing config status from the current its.status.instanceStatus
-		configs := sets.New[string]()
-		for _, config := range its.Spec.Configs {
-			configs.Insert(config.Name)
-		}
-		for i, newStatus := range instanceStatus {
-			for _, status := range its.Status.InstanceStatus {
-				if status.PodName == newStatus.PodName {
-					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
-					}
-					for j, config := range status.Configs {
-						if configs.Has(config.Name) {
-							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
-						}
-					}
-					break
-				}
+func syncInstanceConfigStatus(instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+	for _, inst := range instances {
+		for i, status := range instanceStatus {
+			if status.PodName == inst.Name {
+				instanceStatus[i].Configs = inst.Status.Configs
+				break
 			}
 		}
 	}

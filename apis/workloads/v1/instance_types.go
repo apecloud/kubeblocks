@@ -128,6 +128,11 @@ type InstanceSpec struct {
 	// +optional
 	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
+	// Describe the configs to be reconfigured.
+	//
+	// +optional
+	Configs []ConfigTemplate `json:"configs,omitempty"`
+
 	// Assistant objects that are necessary to run the instance.
 	//
 	// +optional
@@ -182,6 +187,11 @@ type InstanceStatus2 struct {
 	//
 	// +optional
 	Role string `json:"role,omitempty"`
+
+	// The status of configs.
+	//
+	// +optional
+	Configs []InstanceConfigStatus `json:"configs,omitempty"`
 
 	// Represents whether the instance is in volume expansion.
 	//

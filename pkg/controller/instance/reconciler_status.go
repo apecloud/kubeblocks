@@ -83,6 +83,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 	}
+	syncInstanceConfigStatus(inst)
 	inst.Status.CurrentRevision = getPodRevision(pod)
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
@@ -111,6 +112,34 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func syncInstanceConfigStatus(inst *workloads.Instance) {
+	if len(inst.Spec.Configs) == 0 {
+		inst.Status.Configs = nil
+		return
+	}
+	if len(inst.Status.Configs) == 0 {
+		inst.Status.Configs = make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
+		for _, config := range inst.Spec.Configs {
+			inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{
+				Name:       config.Name,
+				Generation: config.Generation,
+			})
+		}
+		return
+	}
+	currentStatus := make(map[string]workloads.InstanceConfigStatus, len(inst.Status.Configs))
+	for _, config := range inst.Status.Configs {
+		currentStatus[config.Name] = config
+	}
+	configStatus := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
+	for _, config := range inst.Spec.Configs {
+		if status, ok := currentStatus[config.Name]; ok {
+			configStatus = append(configStatus, status)
+		}
+	}
+	inst.Status.Configs = configStatus
 }
 
 func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {

@@ -501,8 +501,150 @@ var _ = Describe("Instance Controller", func() {
 		})
 
 		// It("reconfigure", func() {
-		//	// TODO
-		// })
+		It("reconfigure", func() {
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "reconfigure" {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+			defer kbacli.UnsetMockClient()
+
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "server",
+						Generation: int64(1),
+					},
+					workloads.ConfigTemplate{
+						Name:       "logging",
+						Generation: int64(2),
+					},
+				)
+			})
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+
+			By("check the init config status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(2)},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action not called")
+			Consistently(func(g Gomega) {
+				g.Expect(reconfigure).Should(BeEmpty())
+				g.Expect(parameters).Should(BeNil())
+			}).Should(Succeed())
+
+			By("update configs")
+			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+				inst.Spec.Configs[1].Generation = 128
+				inst.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				inst.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the config status updated")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(128)},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+		})
+
+		It("reconfigure after config removed and added back", func() {
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "reconfigure" {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+			defer kbacli.UnsetMockClient()
+
+			createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "server",
+						Generation: int64(1),
+					},
+					workloads.ConfigTemplate{
+						Name:       "logging",
+						Generation: int64(2),
+					},
+				)
+			})
+
+			mockPodReady(instObj.Namespace, instObj.Name)
+
+			By("check the init config status")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(2)},
+				}))
+			})).Should(Succeed())
+
+			By("remove one config from spec")
+			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+				inst.Spec.Configs = inst.Spec.Configs[:1]
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the removed config status pruned")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+				}))
+			})).Should(Succeed())
+
+			By("add the config back with same generation")
+			Expect(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+				inst.Spec.Configs = append(inst.Spec.Configs, workloads.ConfigTemplate{
+					Name:        "logging",
+					Generation:  int64(2),
+					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+					Parameters:  map[string]string{"foo": "bar"},
+				})
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the config status restored")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(2)},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(reconfigure).Should(Equal("reconfigure"))
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
+		})
 		//
 		// It("member join", func() {
 		//	// TODO

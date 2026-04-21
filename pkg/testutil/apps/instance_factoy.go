@@ -116,3 +116,9 @@ func (factory *MockInstanceFactory) SetLifecycleActions(actions *workloads.Lifec
 	factory.Get().Spec.LifecycleActions = actions
 	return factory
 }
+
+func (factory *MockInstanceFactory) AddConfigs(config ...workloads.ConfigTemplate) *MockInstanceFactory {
+	configs := &factory.Get().Spec.Configs
+	*configs = append(*configs, config...)
+	return factory
+}

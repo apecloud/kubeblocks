@@ -20,9 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package workloads
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -40,6 +43,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -284,6 +289,96 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
 			})).Should(Succeed())
+		})
+
+		It("reconfigure", func() {
+			var (
+				reconfigure string
+				parameters  map[string]string
+			)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if strings.ToLower(req.Action) == "reconfigure" {
+						reconfigure = req.Action
+						parameters = req.Parameters
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+			defer kbacli.UnsetMockClient()
+
+			oldReplicas := replicas
+			replicas = 1
+			defer func() {
+				replicas = oldReplicas
+			}()
+
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+				}).AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "server",
+						Generation: int64(1),
+					},
+					workloads.ConfigTemplate{
+						Name:       "logging",
+						Generation: int64(2),
+					},
+				)
+			})
+
+			mockPodsReady()
+
+			By("check the init instance status")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0].Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(2)},
+				}))
+			})).Should(Succeed())
+
+			instKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName(0)}
+			By("check the instance spec synced")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Spec.Configs).Should(HaveLen(2))
+				g.Expect(inst.Spec.Configs[1].Generation).Should(BeEquivalentTo(2))
+			})).Should(Succeed())
+
+			By("update configs")
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Configs[1].Generation = 128
+				its.Spec.Configs[1].Reconfigure = testapps.NewLifecycleAction("reconfigure")
+				its.Spec.Configs[1].ReconfigureActionName = ""
+				its.Spec.Configs[1].Parameters = map[string]string{"foo": "bar"}
+			})()).ShouldNot(HaveOccurred())
+
+			By("check the instance spec updated")
+			Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Spec.Configs).Should(HaveLen(2))
+				g.Expect(inst.Spec.Configs[1].Generation).Should(BeEquivalentTo(128))
+				g.Expect(inst.Status.Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(128)},
+				}))
+			})).Should(Succeed())
+
+			By("check the its status updated")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+				g.Expect(its.Status.InstanceStatus[0].Configs).Should(Equal([]workloads.InstanceConfigStatus{
+					{Name: "server", Generation: int64(1)},
+					{Name: "logging", Generation: int64(128)},
+				}))
+			})).Should(Succeed())
+
+			By("check the reconfigure action call")
+			Eventually(func(g Gomega) {
+				g.Expect(strings.ToLower(reconfigure)).Should(Equal("reconfigure"))
+				g.Expect(parameters).Should(HaveKeyWithValue("foo", "bar"))
+			}).Should(Succeed())
 		})
 
 		It("scale-in", func() {

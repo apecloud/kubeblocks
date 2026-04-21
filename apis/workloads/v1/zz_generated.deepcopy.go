@@ -433,6 +433,13 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 		*out = new(LifecycleActions)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Configs != nil {
+		in, out := &in.Configs, &out.Configs
+		*out = make([]ConfigTemplate, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.InstanceAssistantObjects != nil {
 		in, out := &in.InstanceAssistantObjects, &out.InstanceAssistantObjects
 		*out = make([]InstanceAssistantObject, len(*in))
@@ -486,6 +493,11 @@ func (in *InstanceStatus2) DeepCopyInto(out *InstanceStatus2) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.Configs != nil {
+		in, out := &in.Configs, &out.Configs
+		*out = make([]InstanceConfigStatus, len(*in))
+		copy(*out, *in)
 	}
 }
 

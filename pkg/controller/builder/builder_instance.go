@@ -211,6 +211,11 @@ func (builder *InstanceBuilder) SetLifecycleActions(actions *workloads.Lifecycle
 	return builder
 }
 
+func (builder *InstanceBuilder) SetConfigs(configs []workloads.ConfigTemplate) *InstanceBuilder {
+	builder.get().Spec.Configs = configs
+	return builder
+}
+
 func (builder *InstanceBuilder) SetInstanceAssistantObjects(objs []workloads.InstanceAssistantObject) *InstanceBuilder {
 	builder.get().Spec.InstanceAssistantObjects = objs
 	return builder

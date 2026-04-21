@@ -65,11 +65,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	ready, available, updated := false, false, false
 	notReadyName, notAvailableName := "", ""
 
-	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-
 	if isCreated(pod) {
 		notReadyName = pod.Name
 	}
@@ -88,17 +83,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 	}
-
-	// TODO: ???
-	// if nodeName, ok := podToNodeMapping[pod.Name]; ok {
-	//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-	//	if pod.Spec.NodeName == nodeName {
-	//		if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
-	//			return kubebuilderx.Continue, err
-	//		}
-	//	}
-	// }
-
 	inst.Status.CurrentRevision = getPodRevision(pod)
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision

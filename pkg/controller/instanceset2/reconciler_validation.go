@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"fmt"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -41,8 +44,22 @@ func (r *validationReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 }
 
 func (r *validationReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	if err := instancetemplate.ValidateInstanceTemplates(tree.GetRoot().(*workloads.InstanceSet), tree); err != nil {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	if err := validateUnsupportedFeatures(its); err != nil {
+		return kubebuilderx.Commit, err
+	}
+	if err := instancetemplate.ValidateInstanceTemplates(its, tree); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func validateUnsupportedFeatures(its *workloads.InstanceSet) error {
+	if its == nil || its.Annotations == nil {
+		return nil
+	}
+	if _, ok := its.Annotations[constant.NodeSelectorOnceAnnotationKey]; ok {
+		return fmt.Errorf("annotation %q is not supported when enableInstanceAPI=true", constant.NodeSelectorOnceAnnotationKey)
+	}
+	return nil
 }

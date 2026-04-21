@@ -109,14 +109,14 @@ func (h *AvailableEventHandler) available(ctx context.Context, cli client.Client
 
 func (h *AvailableEventHandler) unavailable(ctx context.Context, cli client.Client,
 	recorder record.EventRecorder, compCopy, comp *appsv1.Component, message string) error {
-	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionFalse, "Unavailable", message)
+	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionFalse, "ProbeCheckFail", message)
 }
 
 func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, recorder record.EventRecorder,
 	compCopy, comp *appsv1.Component, status metav1.ConditionStatus, reason, message string) error {
 	var (
 		cond = metav1.Condition{
-			Type:               appsv1.ConditionTypeAvailable,
+			Type:               appsv1.ComponentConditionAvailable,
 			Status:             status,
 			ObservedGeneration: comp.Generation, // TODO: ???
 			LastTransitionTime: metav1.Now(),

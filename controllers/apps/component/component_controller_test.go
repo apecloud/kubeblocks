@@ -818,7 +818,7 @@ var _ = Describe("Component Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
 				g.Expect(comp.Spec.Replicas).Should(BeEquivalentTo(replicas))
 				g.Expect(comp.Status.Conditions).Should(HaveLen(1))
-				g.Expect(comp.Status.Conditions[0].Type).Should(BeEquivalentTo(kbappsv1.ConditionTypeProvisioningStarted))
+				g.Expect(comp.Status.Conditions[0].Type).Should(BeEquivalentTo(kbappsv1.ComponentConditionProvisioningStarted))
 				g.Expect(comp.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
 				g.Expect(comp.Status.Conditions[0].Message).Should(ContainSubstring(replicasOutOfLimitError(replicas, *replicasLimit).Error()))
 			})).Should(Succeed())

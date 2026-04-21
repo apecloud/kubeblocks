@@ -51,7 +51,7 @@ func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName
 // newProvisioningStartedCondition creates the provisioning started condition in cluster conditions.
 func newProvisioningStartedCondition(clusterName string, clusterGeneration int64) metav1.Condition {
 	return metav1.Condition{
-		Type:               appsv1.ConditionTypeProvisioningStarted,
+		Type:               appsv1.ComponentConditionProvisioningStarted,
 		ObservedGeneration: clusterGeneration,
 		Status:             metav1.ConditionTrue,
 		Message:            fmt.Sprintf("The operator has started the provisioning of Cluster: %s", clusterName),
@@ -73,7 +73,7 @@ func getConditionReasonWithError(defaultReason string, err error) string {
 // newApplyResourcesCondition creates a condition when applied resources succeed.
 func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 	return metav1.Condition{
-		Type:    appsv1.ConditionTypeProvisioningStarted,
+		Type:    appsv1.ComponentConditionProvisioningStarted,
 		Status:  metav1.ConditionFalse,
 		Message: err.Error(),
 		Reason:  getConditionReasonWithError(reasonPreCheckFailed, err),

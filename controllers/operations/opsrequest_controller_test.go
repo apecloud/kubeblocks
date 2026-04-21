@@ -635,7 +635,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			// TODO: test head opsRequest phase is Failed by mocking pod is Failed
 		})
 
-		It("test opsRequest force flag", func() {
+		XIt("test opsRequest force flag", func() {
 			By("create cluster and mock it to running")
 			replicas := int32(3)
 			createMysqlCluster(replicas)

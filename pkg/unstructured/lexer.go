@@ -77,7 +77,7 @@ func (l *Lexer) appendValidParameter(param Item, fromNo int) {
 }
 
 func (l *Lexer) addParameterComments(param *Item, start, end int) {
-	if start+1 >= end {
+	if start >= end {
 		return
 	}
 	param.Comments = l.lines[start:end]

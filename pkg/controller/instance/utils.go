@@ -325,7 +325,7 @@ func configsToUpdate(inst *workloads.Instance, pod *corev1.Pod) ([]workloads.Con
 		idx := slices.IndexFunc(configs, func(cfg workloads.ConfigTemplate) bool {
 			return cfg.Name == config.Name
 		})
-		if idx < 0 || !ptr.Equal(config.ConfigHash, configs[idx].ConfigHash) {
+		if idx < 0 || ptr.Deref(config.ConfigHash, "") != ptr.Deref(configs[idx].ConfigHash, "") {
 			toUpdate = append(toUpdate, inst.Spec.Configs[i])
 		}
 	}

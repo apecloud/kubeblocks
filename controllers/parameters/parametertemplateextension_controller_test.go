@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,6 +49,31 @@ var _ = Describe("ParameterExtension Controller", func() {
 		return nil
 	}
 
+	It("should only backfill absent config hash from rendered ConfigMap labels", func() {
+		hash := "rendered-hash"
+		rendered := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					constant.CMInsConfigurationHashLabelKey: hash,
+				},
+			},
+		}
+
+		absent := &appsv1.ClusterComponentConfig{}
+		backfillAbsentConfigHash(absent, rendered)
+		Expect(absent.ConfigHash).ShouldNot(BeNil())
+		Expect(*absent.ConfigHash).Should(Equal(hash))
+
+		preset := &appsv1.ClusterComponentConfig{ConfigHash: pointer.String("preset-hash")}
+		backfillAbsentConfigHash(preset, rendered)
+		Expect(preset.ConfigHash).ShouldNot(BeNil())
+		Expect(*preset.ConfigHash).Should(Equal("preset-hash"))
+
+		missing := &appsv1.ClusterComponentConfig{}
+		backfillAbsentConfigHash(missing, &corev1.ConfigMap{})
+		Expect(missing.ConfigHash).Should(BeNil())
+	})
+
 	Context("When updating cluster configs", func() {
 		BeforeEach(cleanEnv)
 
@@ -58,6 +84,7 @@ var _ = Describe("ParameterExtension Controller", func() {
 
 			By("check cm resource")
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: configcore.GetComponentCfgName(clusterObj.Name, defaultCompName, configSpecName), Namespace: clusterObj.Namespace}, &corev1.ConfigMap{}, true)).Should(Succeed())
+			expectedHash := waitRenderedConfigHash(clusterObj.Namespace, clusterObj.Name, defaultCompName, configSpecName)
 
 			By("set external managed")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
@@ -73,6 +100,8 @@ var _ = Describe("ParameterExtension Controller", func() {
 				g.Expect(config).ShouldNot(BeNil())
 				g.Expect(config.ConfigMap).ShouldNot(BeNil())
 				g.Expect(config.ConfigMap.Name).Should(BeEquivalentTo(configcore.GetComponentCfgName(clusterName, defaultCompName, configSpecName)))
+				g.Expect(config.ConfigHash).ShouldNot(BeNil())
+				g.Expect(*config.ConfigHash).Should(Equal(expectedHash))
 			})).Should(Succeed())
 		})
 

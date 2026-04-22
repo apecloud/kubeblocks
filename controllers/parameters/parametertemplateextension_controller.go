@@ -37,6 +37,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	componentctrl "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -124,6 +125,7 @@ func updateConfigsForComponent(reqCtx intctrlutil.RequestCtx, reader client.Clie
 		config.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: cm.Name},
 		}
+		backfillAbsentConfigHash(config, &cm)
 		return nil
 	}
 	defaultExternalManagedHandle := func(compSpec *appsv1.ComponentSpec, tpl *appsv1.ComponentFileTemplate) error {
@@ -161,6 +163,17 @@ func updateConfigsForComponent(reqCtx intctrlutil.RequestCtx, reader client.Clie
 		}
 	}
 	return nil
+}
+
+func backfillAbsentConfigHash(config *appsv1.ClusterComponentConfig, cm *corev1.ConfigMap) {
+	if pointer.StringDeref(config.ConfigHash, "") != "" || cm == nil {
+		return
+	}
+	hash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
+	if hash == "" {
+		return
+	}
+	config.ConfigHash = pointer.String(hash)
 }
 
 func updateConfigsForParameterTemplate(reqCtx intctrlutil.RequestCtx, reader client.Client, component *appsv1.Component) (*appsv1.Component, error) {

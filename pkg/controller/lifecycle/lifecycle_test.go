@@ -483,7 +483,7 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, reader, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not met"))
 		})
 
 		It("precondition - object selector", func() {
@@ -576,7 +576,7 @@ var _ = Describe("lifecycle", func() {
 				PreConditionObjectSelector: labels,
 			}, "custom-action", customAction, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not met"))
 		})
 
 		It("pod selector - any", func() {

@@ -155,11 +155,11 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	for _, comp := range comps {
-		params, err := covertParametersToMap(reqCtx.Ctx, cli, compCustomItem.Parameters, opsRes.OpsRequest.Namespace)
+		params, err := convertParametersToMap(reqCtx.Ctx, cli, compCustomItem.Parameters, opsRes.OpsRequest.Namespace)
 		if err != nil {
 			return err
 		}
-		// get the built-in objects and covert the json tag
+		// get the built-in objects and convert the json tag
 		getBuiltInObjs := func() (map[string]interface{}, error) {
 			b, err := json.Marshal(map[string]interface{}{
 				"cluster":    opsRes.Cluster,
@@ -236,7 +236,7 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 	return 0, true
 }
 
-func covertParametersToMap(ctx context.Context,
+func convertParametersToMap(ctx context.Context,
 	cli client.Client,
 	parameters []opsv1alpha1.Parameter,
 	opsNamespace string) (map[string]string, error) {
@@ -326,11 +326,11 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	for _, v := range customSpec.CustomOpsComponents {
 		// 1. validate OpenApV3Schema
 		if parametersSchema != nil {
-			paramsMap, err := covertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
+			paramsMap, err := convertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
 			if err != nil {
 				return err
 			}
-			// covert to type map[string]interface{}
+			// convert to type map[string]interface{}
 			params, err := common.ConvertStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
 			if err != nil {
 				return intctrlutil.NewFatalError(err.Error())

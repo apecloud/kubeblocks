@@ -295,7 +295,7 @@ func handleServiceRefFromServiceDescriptor(ctx context.Context, cli client.Reade
 
 	match := verifyServiceKindAndVersion(*serviceDescriptor, serviceRefDecl.ServiceRefDeclarationSpecs...)
 	if !match {
-		return nil, fmt.Errorf("service descriptor %s kind or version is not match with service reference declaration %s", serviceDescriptor.Name, serviceRefDecl.Name)
+		return nil, fmt.Errorf("service descriptor %s kind or version does not match service reference declaration %s", serviceDescriptor.Name, serviceRefDecl.Name)
 	}
 	return serviceDescriptor, nil
 }

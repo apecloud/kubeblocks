@@ -25,7 +25,7 @@ import (
 	"strings"
 )
 
-const kubeNameMaxLength = 63
+const KubeNameMaxLength = 63
 
 // GenerateClusterComponentName generates the cluster component name.
 func GenerateClusterComponentName(clusterName, compName string) string {
@@ -41,17 +41,17 @@ func GenerateAccountSecretName(clusterName, compName, name string) string {
 // GenerateClusterServiceName generates the service name for cluster.
 func GenerateClusterServiceName(clusterName, svcName string) string {
 	if len(svcName) > 0 {
-		return shortenKubeName(fmt.Sprintf("%s-%s", clusterName, svcName), kubeNameMaxLength)
+		return ShortenKubeName(fmt.Sprintf("%s-%s", clusterName, svcName), KubeNameMaxLength)
 	}
-	return shortenKubeName(clusterName, kubeNameMaxLength)
+	return ShortenKubeName(clusterName, KubeNameMaxLength)
 }
 
 // GenerateComponentServiceName generates the service name for component.
 func GenerateComponentServiceName(clusterName, compName, svcName string) string {
 	if len(svcName) > 0 {
-		return shortenKubeName(fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName), kubeNameMaxLength)
+		return ShortenKubeName(fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName), KubeNameMaxLength)
 	}
-	return shortenKubeName(fmt.Sprintf("%s-%s", clusterName, compName), kubeNameMaxLength)
+	return ShortenKubeName(fmt.Sprintf("%s-%s", clusterName, compName), KubeNameMaxLength)
 }
 
 // GenerateDefaultComponentServiceName generates the default service name for component.
@@ -62,9 +62,9 @@ func GenerateDefaultComponentServiceName(clusterName, compName string) string {
 // GenerateComponentHeadlessServiceName generates the headless service name for component.
 func GenerateComponentHeadlessServiceName(clusterName, compName, svcName string) string {
 	if len(svcName) > 0 {
-		return shortenKubeNameWithSuffix(fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName), "headless", kubeNameMaxLength)
+		return ShortenKubeNameWithSuffix(fmt.Sprintf("%s-%s-%s", clusterName, compName, svcName), "headless", KubeNameMaxLength)
 	}
-	return shortenKubeNameWithSuffix(fmt.Sprintf("%s-%s", clusterName, compName), "headless", kubeNameMaxLength)
+	return ShortenKubeNameWithSuffix(fmt.Sprintf("%s-%s", clusterName, compName), "headless", KubeNameMaxLength)
 }
 
 // GenerateDefaultComponentHeadlessServiceName generates the default headless service name for component.
@@ -100,7 +100,7 @@ func GenerateWorkloadNamePattern(clusterName, compName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, compName)
 }
 
-func shortenKubeName(raw string, maxLen int) string {
+func ShortenKubeName(raw string, maxLen int) string {
 	if maxLen <= 0 || len(raw) <= maxLen {
 		return raw
 	}
@@ -116,9 +116,9 @@ func shortenKubeName(raw string, maxLen int) string {
 	return fmt.Sprintf("%s-%s", prefix, suffix)
 }
 
-func shortenKubeNameWithSuffix(raw, fixedSuffix string, maxLen int) string {
+func ShortenKubeNameWithSuffix(raw, fixedSuffix string, maxLen int) string {
 	if fixedSuffix == "" {
-		return shortenKubeName(raw, maxLen)
+		return ShortenKubeName(raw, maxLen)
 	}
 	fullName := fmt.Sprintf("%s-%s", raw, fixedSuffix)
 	if maxLen <= 0 || len(fullName) <= maxLen {
@@ -128,7 +128,7 @@ func shortenKubeNameWithSuffix(raw, fixedSuffix string, maxLen int) string {
 	if maxLen <= reserved {
 		return fullName[:maxLen]
 	}
-	return fmt.Sprintf("%s-%s", shortenKubeName(raw, maxLen-reserved), fixedSuffix)
+	return fmt.Sprintf("%s-%s", ShortenKubeName(raw, maxLen-reserved), fixedSuffix)
 }
 
 func shortHash(raw string) string {

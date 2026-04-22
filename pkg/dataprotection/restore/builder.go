@@ -82,7 +82,7 @@ func (r *restoreJobBuilder) buildPVCVolumeAndMount(
 	claimName,
 	identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
 	rawVolumeName := fmt.Sprintf("%s-%s", identifier, claimName)
-	safeVolumeName := shortenRestoreDerivedName(rawVolumeName, 63)
+	safeVolumeName := constant.ShortenKubeName(rawVolumeName, constant.KubeNameMaxLength)
 	volume := &corev1.Volume{
 		Name:         safeVolumeName,
 		VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claimName}},

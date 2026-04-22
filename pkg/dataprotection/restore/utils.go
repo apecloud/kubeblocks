@@ -22,7 +22,6 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -139,30 +138,8 @@ func GetRestoreActionsCountForPrepareData(config *dpv1alpha1.PrepareDataConfig) 
 func BuildRestoreLabels(restoreName string) map[string]string {
 	return map[string]string{
 		constant.AppManagedByLabelKey: dptypes.AppName,
-		DataProtectionRestoreLabelKey: shortenRestoreDerivedName(restoreName, 63),
+		DataProtectionRestoreLabelKey: restoreName,
 	}
-}
-
-func shortenRestoreDerivedName(raw string, maxLen int) string {
-	if maxLen <= 0 || len(raw) <= maxLen {
-		return raw
-	}
-	suffix := shortHash(raw)
-	if maxLen <= len(suffix)+1 {
-		return suffix[:maxLen]
-	}
-	prefixLen := maxLen - len(suffix) - 1
-	prefix := strings.TrimSuffix(raw[:prefixLen], "-")
-	if prefix == "" {
-		return suffix[:maxLen]
-	}
-	return fmt.Sprintf("%s-%s", prefix, suffix)
-}
-
-func shortHash(raw string) string {
-	hasher := fnv.New32a()
-	_, _ = hasher.Write([]byte(raw))
-	return fmt.Sprintf("%08x", hasher.Sum32())
 }
 
 func GetRestoreDuration(status dpv1alpha1.RestoreStatus) *metav1.Duration {

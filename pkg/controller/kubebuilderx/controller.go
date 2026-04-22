@@ -50,7 +50,7 @@ type Controller interface {
 	Prepare(TreeLoader) Controller
 
 	// Do is the computation phase. It contains the business logic and modifies the object tree.
-	Do(...Reconciler) Controller
+	Do(Reconciler) Controller
 
 	// Commit is the plan execution phase. It computes the difference between
 	// the old and new object trees, and applies the difference to Kubernetes.
@@ -88,7 +88,7 @@ func (c *controller) Prepare(reader TreeLoader) Controller {
 	return c
 }
 
-func (c *controller) Do(reconcilers ...Reconciler) Controller {
+func (c *controller) Do(reconciler Reconciler) Controller {
 	if c.err != nil {
 		return c
 	}
@@ -99,11 +99,6 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 	if c.res.Next != cntn {
 		return c
 	}
-	if len(reconcilers) == 0 {
-		return c
-	}
-
-	reconciler := reconcilers[0]
 	switch result := reconciler.PreCondition(c.tree); {
 	case result.Err != nil:
 		c.err = result.Err
@@ -112,8 +107,7 @@ func (c *controller) Do(reconcilers ...Reconciler) Controller {
 		return c
 	}
 	c.res, c.err = reconciler.Reconcile(c.tree)
-
-	return c.Do(reconcilers[1:]...)
+	return c
 }
 
 func (c *controller) Commit() (ctrl.Result, error) {

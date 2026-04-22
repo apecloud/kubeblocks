@@ -74,8 +74,8 @@ type ActionRequest struct {
 	Action         string            `json:"action"`
 	Parameters     map[string]string `json:"parameters,omitempty"`
 	NonBlocking    *bool             `json:"nonBlocking,omitempty"`
-	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"` // TODO: not implemented
-	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`    // TODO: not implemented
+	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
+	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
 }
 
 type ActionResponse struct {

@@ -26,6 +26,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -124,19 +125,20 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	if err := checkReconfigure(ctx, req); err != nil {
 		return nil, err
 	}
+	timeout := resolveTimeout(&action.TimeoutSeconds, req.TimeoutSeconds)
 	if req.NonBlocking == nil || !*req.NonBlocking {
-		return blockingCallAction(ctx, action, req.Parameters, &action.TimeoutSeconds)
+		return callActionWithRetry(ctx, action, req.Parameters, timeout, req.RetryPolicy)
 	}
-	return s.handleRequestNonBlocking(ctx, req, action)
+	return s.handleRequestNonBlocking(ctx, req, action, timeout)
 }
 
-func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {
+func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action, timeout *int32) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	running, ok := s.runningActions[req.Action]
 	if !ok {
-		resultChan, err := nonBlockingCallAction(ctx, action, req.Parameters, &action.TimeoutSeconds)
+		resultChan, err := nonBlockingCallAction(ctx, action, req.Parameters, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -154,4 +156,35 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 		return nil, (*result).err
 	}
 	return (*result).stdout.Bytes(), nil
+}
+
+func resolveTimeout(actionTimeout *int32, requestTimeout *int32) *int32 {
+	if requestTimeout != nil {
+		return requestTimeout
+	}
+	return actionTimeout
+}
+
+func callActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
+	output, err := blockingCallAction(ctx, action, parameters, timeout)
+	if err == nil || retryPolicy == nil || retryPolicy.MaxRetries <= 0 {
+		return output, err
+	}
+
+	interval := retryPolicy.RetryInterval
+	if interval <= 0 {
+		interval = time.Second
+	}
+	for i := 0; i < retryPolicy.MaxRetries; i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(interval):
+		}
+		output, err = blockingCallAction(ctx, action, parameters, timeout)
+		if err == nil {
+			return output, nil
+		}
+	}
+	return output, err
 }

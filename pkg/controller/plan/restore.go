@@ -376,7 +376,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 		r.restoreLabels = constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	}
 	return metav1.ObjectMeta{
-		Name:      name,
+		Name:      constant.ShortenKubeName(name, constant.KubeNameMaxLength),
 		Namespace: r.Cluster.Namespace,
 		Labels:    r.restoreLabels,
 	}

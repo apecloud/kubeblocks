@@ -501,7 +501,7 @@ func (h *AvailableEventHandler) evalActionEvent(assertion appsv1.ActionAssertion
 	}
 	if assertion.Stdout != nil {
 		if assertion.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*assertion.Stdout.EqualTo)) {
-			return false, fmt.Sprintf("probe stdout is not match: %s", prefix16(*assertion.Stdout.EqualTo))
+			return false, fmt.Sprintf("probe stdout does not match: %s", prefix16(*assertion.Stdout.EqualTo))
 		}
 		if assertion.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*assertion.Stdout.Contains)) {
 			return false, fmt.Sprintf("probe stdout does not contain: %s", prefix16(*assertion.Stdout.Contains))
@@ -509,7 +509,7 @@ func (h *AvailableEventHandler) evalActionEvent(assertion appsv1.ActionAssertion
 	}
 	if assertion.Stderr != nil {
 		if assertion.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*assertion.Stderr.EqualTo)) {
-			return false, fmt.Sprintf("probe stderr is not match: %s", prefix16(*assertion.Stderr.EqualTo))
+			return false, fmt.Sprintf("probe stderr does not match: %s", prefix16(*assertion.Stderr.EqualTo))
 		}
 		if assertion.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*assertion.Stderr.Contains)) {
 			return false, fmt.Sprintf("probe stderr does not contain: %s", prefix16(*assertion.Stderr.Contains))

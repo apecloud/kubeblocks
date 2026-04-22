@@ -97,7 +97,7 @@ var _ = Describe("Validation", func() {
 			tree := &kubebuilderx.ObjectTree{}
 			err := ValidateInstanceTemplates(its, tree)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not greater than replicas in spec(3)"))
+			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not be greater than replicas in spec(3)"))
 		})
 
 		It("should fail validation when total replicas restricted by ordinals do not equal to spec.replicas", func() {
@@ -139,7 +139,7 @@ var _ = Describe("Validation", func() {
 			tree := &kubebuilderx.ObjectTree{}
 			err := ValidateInstanceTemplates(its, tree)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not greater than replicas in spec(3)"))
+			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not be greater than replicas in spec(3)"))
 		})
 	})
 })

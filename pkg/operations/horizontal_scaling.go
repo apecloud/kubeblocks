@@ -133,7 +133,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 			insReplicas += v.GetReplicas()
 		}
 		if insReplicas > replicas {
-			errMsg := fmt.Sprintf(`the total number of replicas for the instance template can not greater than the number of replicas for component "%s" after horizontally scaling`,
+			errMsg := fmt.Sprintf(`the total number of replicas for the instance template cannot be greater than the number of replicas for component "%s" after horizontally scaling`,
 				horizontalScaling.ComponentName)
 			return intctrlutil.NewFatalError(errMsg)
 		}

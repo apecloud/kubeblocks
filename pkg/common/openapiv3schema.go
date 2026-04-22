@@ -57,8 +57,8 @@ func ValidateDataWithSchema(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, da
 func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, input map[string]string) (map[string]interface{}, error) {
 	out := map[string]interface{}{}
 	properties := openAPIV3Schema.Properties
-	covertError := func(key string, err error) error {
-		return fmt.Errorf(`covert "%s" failed: %s`, key, err.Error())
+	convertError := func(key string, err error) error {
+		return fmt.Errorf(`convert "%s" failed: %s`, key, err.Error())
 	}
 	var err error
 	for k, v := range input {
@@ -80,7 +80,7 @@ func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONS
 			out[k] = v
 		}
 		if err != nil {
-			return nil, covertError(k, err)
+			return nil, convertError(k, err)
 		}
 	}
 	return out, nil

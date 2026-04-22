@@ -658,7 +658,7 @@ func (r *BackupReconciler) handleRunningPhase(
 	}
 	if existFailedAction {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-			fmt.Errorf("there are failed actions, you can obtain the more informations in the status.actions"))
+			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
 	// all actions completed, update backup status to completed
 	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted

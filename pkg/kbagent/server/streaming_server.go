@@ -58,21 +58,25 @@ func (s *streamingServer) StartNonBlocking() error {
 	}
 
 	go func() {
-		var tempErr error
+		const (
+			minBackoff = 5 * time.Millisecond
+			maxBackoff = 1 * time.Second
+		)
+		backoff := minBackoff
 		for {
 			conn, err2 := s.listener.Accept()
 			if err2 != nil {
 				var netErr net.Error
 				if errors.As(errors.Unwrap(err2), &netErr) && netErr.Temporary() {
-					if tempErr == nil || !errors.Is(err2, tempErr) {
-						s.logger.Error(err2, "accept new connection error")
-					}
-					tempErr = err2
-					continue // TODO: back-off
+					s.logger.Error(err2, "accept new connection temporary error, backing off", "backoff", backoff)
+					time.Sleep(backoff)
+					backoff = min(backoff*2, maxBackoff)
+					continue
 				}
-				panic(fmt.Sprintf("accept new connection error: %v", err2))
+				s.logger.Error(err2, "accept new connection fatal error, stopping accept loop")
+				return
 			}
-			tempErr = nil
+			backoff = minBackoff
 			go s.handleConn(conn)
 		}
 	}()

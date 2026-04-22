@@ -103,14 +103,14 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
-		pod *corev1.Pod,
+		instance Instance,
 		pgRes *progressResource) bool {
 		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
 		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
 		if !ok {
 			return true
 		}
-		return u.podImageApplied(pod, compDef.Spec.Runtime.Containers)
+		return u.instanceImageApplied(instance, compDef.Spec.Runtime.Containers)
 	}
 	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
@@ -159,7 +159,7 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 }
 
 // podImageApplied checks if the pod has applied the new image.
-func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []corev1.Container) bool {
+func (u upgradeOpsHandler) instanceImageApplied(instance Instance, expectContainers []corev1.Container) bool {
 	if len(expectContainers) == 0 {
 		return true
 	}
@@ -168,15 +168,11 @@ func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []c
 		return images[len(images)-1]
 	}
 	for _, v := range expectContainers {
-		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.Name == v.Name && imageName(cs.Image) != imageName(v.Image) {
-				return false
-			}
+		if statusImage := instance.GetStatusImage(v.Name); statusImage != "" && imageName(statusImage) != imageName(v.Image) {
+			return false
 		}
-		for _, c := range pod.Spec.Containers {
-			if c.Name == v.Name && imageName(c.Image) != imageName(v.Image) {
-				return false
-			}
+		if image := instance.GetImage(v.Name); image != "" && imageName(image) != imageName(v.Image) {
+			return false
 		}
 	}
 	return true

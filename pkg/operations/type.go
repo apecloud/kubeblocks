@@ -20,9 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
+	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -78,6 +83,7 @@ type OpsResource struct {
 	Cluster        *appsv1.Cluster
 	Recorder       record.EventRecorder
 	ToClusterPhase appsv1.ClusterPhase
+	Runtimes       map[string]OpsRuntime
 }
 
 type OpsManager struct {
@@ -105,4 +111,66 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
+}
+
+// OpsRuntime abstracts the standard ops paths that only need workload/member views
+// plus a small set of runtime-owned actions.
+//
+// Explicitly out of scope for this abstraction:
+// - RebuildInstance, which still depends on direct Pod/PVC/PV/InstanceSet actions
+// - Custom, which still depends on direct Pod/Job/ConfigMap/Secret based execution
+type OpsRuntime interface {
+	GetWorkload(namespace, clusterName, compName string) (Workload, error)
+	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
+	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
+	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
+	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)
+	Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error
+}
+
+type Workload interface {
+	GetMinReadySeconds() int32
+	GetInstanceNameSet() sets.Set[string]
+	GetCurrentRevisionMap() map[string]string
+	GetNotReadyInstanceNameSet() sets.Set[string]
+	GetNotAvailableInstanceNameSet() sets.Set[string]
+	GetFailedInstanceNameSet() sets.Set[string]
+}
+
+type Instance interface {
+	GetName() string
+	GetComponentName() string
+	GetCreationTimestamp() metav1.Time
+	IsDeleting() bool
+	GetRole() string
+	IsAvailable(minReadySeconds int32, roleAware bool) bool
+	IsFailedAndTimedOut() bool
+	GetImage(containerName string) string
+	GetStatusImage(containerName string) string
+	GetResources(containerName string) corev1.ResourceRequirements
+	GetNodeName() string
+	GetTolerations() []corev1.Toleration
+	GetAffinity() *corev1.Affinity
+	GetTopologySpreadConstraints() []corev1.TopologySpreadConstraint
+	GetPodVolumes() []corev1.Volume
+	GetVolumeMounts(containerName string) []corev1.VolumeMount
+	GetVolume(name string) (InstanceVolume, bool)
+}
+
+type InstanceVolume interface {
+	GetClaimName() string
+	GetRequestedStorage() resource.Quantity
+	GetCapacity() resource.Quantity
+	IsBound() bool
+	IsExpanding() bool
+}
+
+func (r *OpsResource) GetRuntime(name string) (OpsRuntime, error) {
+	if r == nil {
+		return nil, fmt.Errorf("ops resource is nil")
+	}
+	if runtime, ok := r.Runtimes[name]; ok {
+		return runtime, nil
+	}
+	return nil, fmt.Errorf("ops runtime not found for component/sharding %q", name)
 }

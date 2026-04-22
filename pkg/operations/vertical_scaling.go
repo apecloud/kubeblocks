@@ -29,7 +29,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -110,17 +109,17 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			// obtain the pods which should be updated.
 			updatedPodSet := map[string]string{}
 			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
-			workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, pgRes.fullComponentName)
 			templateReplicasCnt := int32(0)
+			runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+			if err != nil {
+				return 0, 0, err
+			}
 			for _, template := range pgRes.clusterComponent.Instances {
 				replicas := template.GetReplicas()
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					ords, err := instanceset.ConvertOrdinalsToSortedList(template.Ordinals)
-					if err != nil {
-						return 0, 0, err
-					}
-					templatePodNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, ords)
+					templatePodNames, err := runtime.GenerateTemplateInstanceNames(
+						opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
 					if err != nil {
 						return 0, 0, err
 					}
@@ -131,7 +130,8 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				templateReplicasCnt += replicas
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				podNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, nil)
+				podNames, err := runtime.GenerateTemplateInstanceNames(
+					opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
 				if err != nil {
 					return 0, 0, err
 				}
@@ -188,9 +188,9 @@ func (vs verticalScalingHandler) setRevertVScalingForCancel(ops *opsv1alpha1.Ops
 
 func (vs verticalScalingHandler) podApplyCompOps(
 	ops *opsv1alpha1.OpsRequest,
-	pod *corev1.Pod,
+	instance Instance,
 	pgRes *progressResource) bool {
-	insTemplateName := pgRes.updatedPodSet[pod.Name]
+	insTemplateName := pgRes.updatedPodSet[instance.GetName()]
 	verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
 	if ops.Spec.Cancel {
 		vs.setRevertVScalingForCancel(ops, &verticalScaling)
@@ -216,16 +216,16 @@ func (vs verticalScalingHandler) podApplyCompOps(
 		return true
 	}
 	if insTemplateName == constant.EmptyInsTemplateName {
-		return matchResources(pod.Spec.Containers[0].Resources, verticalScaling.ResourceRequirements)
+		return matchResources(instance.GetResources(""), verticalScaling.ResourceRequirements)
 	}
 	for _, insTpl := range pgRes.clusterComponent.Instances {
 		if insTpl.Name != insTemplateName {
 			continue
 		}
 		if insTpl.Resources != nil {
-			return matchResources(pod.Spec.Containers[0].Resources, *insTpl.Resources)
+			return matchResources(instance.GetResources(""), *insTpl.Resources)
 		} else {
-			return matchResources(pod.Spec.Containers[0].Resources, pgRes.clusterComponent.Resources)
+			return matchResources(instance.GetResources(""), pgRes.clusterComponent.Resources)
 		}
 	}
 	return false

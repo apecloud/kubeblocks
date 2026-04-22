@@ -40,6 +40,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+// CustomOpsHandler is intentionally not covered by OpsRuntime.
+// It still executes against concrete Pod/Job/ConfigMap/Secret resources.
 type CustomOpsHandler struct{}
 
 var _ OpsHandler = CustomOpsHandler{}

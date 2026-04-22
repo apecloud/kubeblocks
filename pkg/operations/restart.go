@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -104,9 +103,10 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 
 func (r restartOpsHandler) podApplyCompOps(
 	ops *opsv1alpha1.OpsRequest,
-	pod *corev1.Pod,
+	instance Instance,
 	pgRes *progressResource) bool {
-	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
+	creationTimestamp := instance.GetCreationTimestamp()
+	return !creationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
 func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec, componentName string) {

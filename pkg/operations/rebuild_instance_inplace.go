@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -659,44 +658,6 @@ func instanceIsAvailable(
 		return true, nil
 	}
 	return false, nil
-}
-
-// generateAllPodNamesToSet generate all pod names for a component and return a set which key is the pod name and value is a template name.
-//
-// Deprecated: should use instancetemplate.PodNameBuilder
-func generateAllPodNamesToSet(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	clusterName,
-	fullCompName string) (map[string]string, error) {
-	compName := constant.GenerateClusterComponentName(clusterName, fullCompName)
-	instanceNames, err := generateAllPodNames(compReplicas, instances, offlineInstances, compName)
-	if err != nil {
-		return nil, err
-	}
-	// key: podName, value: templateName
-	podSet := map[string]string{}
-	for _, insName := range instanceNames {
-		podSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
-	}
-	return podSet, nil
-}
-
-func generateAllPodNames(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	fullCompName string) ([]string, error) {
-	var templates []instanceset.InstanceTemplate
-	for i := range instances {
-		templates = append(templates, &workloads.InstanceTemplate{
-			Name:     instances[i].Name,
-			Replicas: instances[i].Replicas,
-			Ordinals: instances[i].Ordinals,
-		})
-	}
-	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
 }
 
 func getTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {

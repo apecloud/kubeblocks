@@ -108,6 +108,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
+			var err error
+			runtimes, err := buildOpsRuntimes(ctx, k8sClient, opsRes)
+			Expect(err).Should(BeNil())
+			opsRes.Runtimes = runtimes
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
@@ -121,8 +125,9 @@ var _ = Describe("OpsUtil functions", func() {
 				pgRes *progressResource,
 				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
-					func(ops *opsv1alpha1.OpsRequest, pod *corev1.Pod, pgRes *progressResource) bool {
-						return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
 					})
 			}
 

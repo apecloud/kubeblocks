@@ -22,11 +22,11 @@ package operations
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,7 +35,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -255,16 +254,6 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 	return nil
 }
 
-// pvcIsResizing when pvc start resizing, it will set conditions type to Resizing/FileSystemResizePending
-func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool {
-	for _, condition := range pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimResizing || condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
-			return true
-		}
-	}
-	return false
-}
-
 func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *opsv1alpha1.OpsRequest) map[string]resource.Quantity {
 	storageMap := map[string]resource.Quantity{}
 	setStorageMap := func(vct opsv1alpha1.OpsRequestVolumeClaimTemplate, compOps opsv1alpha1.ComponentOps) {
@@ -297,47 +286,46 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	var (
 		succeedCount   int
 		completedCount int
-		err            error
 	)
 	if veHelper.expectCount <= 0 {
 		return 0, 0, nil
 	}
-	matchingLabels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
-		constant.VolumeClaimTemplateNameLabelKey: veHelper.vctName,
-		constant.KBAppComponentLabelKey:          veHelper.fullComponentName,
-	}
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err = cli.List(reqCtx.Ctx, pvcList, matchingLabels, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
-		return 0, 0, err
-	}
-	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, veHelper.fullComponentName)
-	ordinalList, err := instanceset.ConvertOrdinalsToSortedList(veHelper.ordinals)
+	runtime, err := opsRes.GetRuntime(veHelper.compOps.GetComponentName())
 	if err != nil {
 		return 0, 0, err
 	}
-	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, ordinalList)
+	instanceNames, err := runtime.GenerateTemplateInstanceNames(
+		opsRes.Cluster.Name, veHelper.fullComponentName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, veHelper.ordinals)
 	if err != nil {
 		return 0, 0, err
 	}
 	instanceNameSet := sets.New(instanceNames...)
-	for _, v := range pvcList.Items {
-		if _, ok := instanceNameSet[strings.Replace(v.Name, veHelper.vctName+"-", "", 1)]; !ok {
+	for instanceName := range instanceNameSet {
+		instance, getErr := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName, instanceName)
+		if getErr != nil {
+			if apierrors.IsNotFound(getErr) {
+				continue
+			}
+			return 0, 0, getErr
+		}
+		volume, ok := instance.GetVolume(veHelper.vctName)
+		if !ok {
 			continue
 		}
-		objectKey := getPVCProgressObjectKey(v.Name)
+		objectKey := getPVCProgressObjectKey(volume.GetClaimName())
 		progressDetail := ve.getProgressDetail(veHelper, compStatus, objectKey)
 		if progressDetail.Status == opsv1alpha1.FailedProgressStatus {
 			completedCount += 1
 			continue
 		}
-		currStorageSize := v.Status.Capacity.Storage()
 		// should check if the spec.resources.requests.storage equals to the requested storage
 		// and current storage size is greater than or equal to request storage size.
 		// and pvc is bound if the pvc is re-created for recovery.
-		if currStorageSize.Cmp(requestStorage) >= 0 &&
-			v.Spec.Resources.Requests.Storage().Cmp(requestStorage) == 0 &&
-			v.Status.Phase == corev1.ClaimBound {
+		capacity := volume.GetCapacity()
+		requestedStorage := volume.GetRequestedStorage()
+		if capacity.Cmp(requestStorage) >= 0 &&
+			requestedStorage.Cmp(requestStorage) == 0 &&
+			volume.IsBound() {
 			succeedCount += 1
 			completedCount += 1
 			message := fmt.Sprintf("Successfully expand volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
@@ -345,7 +333,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			continue
 		}
-		if ve.pvcIsResizing(&v) {
+		if volume.IsExpanding() {
 			message := fmt.Sprintf("Start expanding volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus, message)
 		} else {

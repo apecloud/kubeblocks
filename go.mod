@@ -55,7 +55,7 @@ require (
 	k8s.io/client-go v0.29.14
 	k8s.io/code-generator v0.29.14
 	k8s.io/component-helpers v0.29.14
-	k8s.io/klog/v2 v2.120.1
+	k8s.io/klog/v2 v2.140.0
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
 	k8s.io/kubectl v0.29.0
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661

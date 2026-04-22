@@ -30,9 +30,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -79,6 +81,44 @@ var _ = Describe("instance util test", func() {
 			revision := "revision"
 			pod = builder.NewPodBuilder(namespace, name).AddControllerRevisionHashLabel(revision).GetObject()
 			Expect(getPodRevision(pod)).Should(Equal(revision))
+		})
+	})
+
+	Context("configsToUpdate", func() {
+		It("treats nil and empty config hash as equal", func() {
+			its := builder.NewInstanceSetBuilder(namespace, name).
+				SetConfigs([]workloads.ConfigTemplate{{
+					Name: "valkey-replication-config",
+				}}).
+				GetObject()
+			pod := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			Expect(configsToPod([]workloads.ConfigTemplate{{
+				Name:       "valkey-replication-config",
+				ConfigHash: ptr.To(""),
+			}}, pod)).Should(Succeed())
+
+			toUpdate, err := configsToUpdate(its, pod)
+			Expect(err).Should(BeNil())
+			Expect(toUpdate).Should(BeEmpty())
+		})
+
+		It("still reports real config hash mismatch", func() {
+			its := builder.NewInstanceSetBuilder(namespace, name).
+				SetConfigs([]workloads.ConfigTemplate{{
+					Name:       "valkey-replication-config",
+					ConfigHash: ptr.To("desired-hash"),
+				}}).
+				GetObject()
+			pod := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			Expect(configsToPod([]workloads.ConfigTemplate{{
+				Name:       "valkey-replication-config",
+				ConfigHash: ptr.To(""),
+			}}, pod)).Should(Succeed())
+
+			toUpdate, err := configsToUpdate(its, pod)
+			Expect(err).Should(BeNil())
+			Expect(toUpdate).Should(HaveLen(1))
+			Expect(toUpdate[0].Name).Should(Equal("valkey-replication-config"))
 		})
 	})
 

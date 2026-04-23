@@ -44,99 +44,50 @@ import (
 )
 
 type opsRuntime struct {
-	ctx              context.Context
-	cli              client.Client
-	clusterPlacement string
-	multiCluster     bool
-	defaultDataCtx   context.Context
-	dataGetOpts      []client.GetOption
-	dataListOpts     []client.ListOption
+	ctx          context.Context
+	cli          client.Client
+	multiCluster bool
+	dataCtx      context.Context
+	dataGetOpts  []client.GetOption
+	dataListOpts []client.ListOption
 }
 
 func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResource) (map[string]OpsRuntime, error) {
 	runtimes := map[string]OpsRuntime{}
-	clusterPlacement := ""
+	placement := ""
 	if opsRes.Cluster != nil && opsRes.Cluster.Annotations != nil {
-		clusterPlacement = opsRes.Cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
+		placement = opsRes.Cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
 	}
-	logicalPlacements := map[string]string{}
-	if enabledMultiCluster(opsRes.Cluster) {
-		var err error
-		logicalPlacements, err = listLogicalPlacements(ctx, cli, opsRes.Cluster)
-		if err != nil {
-			return nil, err
+	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
+		if enabledMultiCluster(opsRes.Cluster) {
+			runtimes[comp.Name] = newOpsRuntime(ctx, cli, placement)
+		} else {
+			runtimes[comp.Name] = newOpsRuntime(ctx, cli, "")
 		}
 	}
-	localRuntime := newOpsRuntime(ctx, cli, "")
-	for i := range opsRes.Cluster.Spec.ComponentSpecs {
-		comp := opsRes.Cluster.Spec.ComponentSpecs[i]
+	for _, sharding := range opsRes.Cluster.Spec.Shardings {
 		if enabledMultiCluster(opsRes.Cluster) {
-			runtimes[comp.Name] = newOpsRuntime(ctx, cli, getRuntimePlacement(comp.Name, clusterPlacement, logicalPlacements))
+			runtimes[sharding.Name] = newOpsRuntime(ctx, cli, placement)
 		} else {
-			runtimes[comp.Name] = localRuntime
-		}
-	}
-	for i := range opsRes.Cluster.Spec.Shardings {
-		sharding := opsRes.Cluster.Spec.Shardings[i]
-		if enabledMultiCluster(opsRes.Cluster) {
-			runtimes[sharding.Name] = newOpsRuntime(ctx, cli, getRuntimePlacement(sharding.Name, clusterPlacement, logicalPlacements))
-		} else {
-			runtimes[sharding.Name] = localRuntime
+			runtimes[sharding.Name] = newOpsRuntime(ctx, cli, "")
 		}
 	}
 	return runtimes, nil
 }
 
-func getRuntimePlacement(name, clusterPlacement string, logicalPlacements map[string]string) string {
-	if placement, ok := logicalPlacements[name]; ok && placement != "" {
-		return placement
-	}
-	return clusterPlacement
-}
-
-func listLogicalPlacements(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) (map[string]string, error) {
-	compList := &appsv1.ComponentList{}
-	if err := cli.List(ctx, compList,
-		client.InNamespace(cluster.Namespace),
-		client.MatchingLabels(constant.GetClusterLabels(cluster.Name, nil))); err != nil {
-		return nil, err
-	}
-	placements := map[string]string{}
-	for i := range compList.Items {
-		comp := compList.Items[i]
-		logicalName := comp.Labels[constant.KBAppShardingNameLabelKey]
-		if logicalName == "" {
-			logicalName = comp.Labels[constant.KBAppComponentLabelKey]
-		}
-		if logicalName == "" || comp.Annotations == nil {
-			continue
-		}
-		placement := strings.TrimSpace(comp.Annotations[constant.KBAppMultiClusterPlacementKey])
-		if placement == "" {
-			continue
-		}
-		if existed, ok := placements[logicalName]; ok && existed != placement {
-			return nil, fmt.Errorf("multiple multi-cluster placements found for %q: %q and %q", logicalName, existed, placement)
-		}
-		placements[logicalName] = placement
-	}
-	return placements, nil
-}
-
-func newOpsRuntime(ctx context.Context, cli client.Client, clusterPlacement string) *opsRuntime {
+func newOpsRuntime(ctx context.Context, cli client.Client, placement string) *opsRuntime {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	r := &opsRuntime{
-		ctx:              ctx,
-		cli:              cli,
-		clusterPlacement: clusterPlacement,
-		multiCluster:     len(strings.TrimSpace(clusterPlacement)) > 0,
+		ctx:          ctx,
+		cli:          cli,
+		multiCluster: len(strings.TrimSpace(placement)) > 0,
 	}
 	if !r.multiCluster {
 		return r
 	}
-	r.defaultDataCtx = multicluster.IntoContext(ctx, clusterPlacement)
+	r.dataCtx = multicluster.IntoContext(ctx, placement)
 	r.dataGetOpts = []client.GetOption{multicluster.InDataContext()}
 	r.dataListOpts = []client.ListOption{multicluster.InDataContext()}
 	return r
@@ -152,11 +103,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: namespace}, its); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
-	dataCtx, err := r.dataContext(r.ctx)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := component.ListOwnedPods(dataCtx, r.cli, namespace, clusterName, compName, r.dataListOptions()...)
+	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +150,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
 	pod := &corev1.Pod{}
-	dataCtx, ctxErr := r.dataContext(r.ctx)
-	if ctxErr != nil {
-		return nil, ctxErr
-	}
-	if err := r.cli.Get(dataCtx, client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOptions()...); err != nil {
+	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
 		if apierrors.IsNotFound(err) {
 			pvcMap, loadErr := r.loadVolumes(namespace, clusterName, compName)
 			if loadErr != nil {
@@ -227,11 +170,7 @@ func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName 
 }
 
 func (r *opsRuntime) ListInstances(namespace, clusterName, compName string) ([]Instance, error) {
-	dataCtx, err := r.dataContext(r.ctx)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := component.ListOwnedPods(dataCtx, r.cli, namespace, clusterName, compName, r.dataListOptions()...)
+	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -279,11 +218,7 @@ func (r *opsRuntime) buildSynthesizedCompByCompName(ctx context.Context, cli cli
 // We don't need to know if a switchover is actually executed.
 func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) error {
-	dataCtx, err := r.dataContext(ctx)
-	if err != nil {
-		return err
-	}
-	pods, err := component.ListOwnedPods(dataCtx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, r.dataListOptions()...)
+	pods, err := component.ListOwnedPods(r.dataContext(), cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, r.dataListOpts...)
 	if err != nil {
 		return err
 	}
@@ -324,10 +259,6 @@ func (r *opsRuntime) buildInstances(namespace, clusterName, compName string, pod
 
 func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[string]*corev1.PersistentVolumeClaim, error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	dataCtx, err := r.dataContext(r.ctx)
-	if err != nil {
-		return nil, err
-	}
 	opts := []client.ListOption{
 		client.InNamespace(namespace),
 		client.MatchingLabels{
@@ -335,8 +266,8 @@ func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[s
 			constant.KBAppComponentLabelKey: compName,
 		},
 	}
-	opts = append(opts, r.dataListOptions()...)
-	if err := r.cli.List(dataCtx, pvcList, opts...); err != nil {
+	opts = append(opts, r.dataListOpts...)
+	if err := r.cli.List(r.dataContext(), pvcList, opts...); err != nil {
 		return nil, err
 	}
 	pvcMap := make(map[string]*corev1.PersistentVolumeClaim, len(pvcList.Items))
@@ -394,22 +325,11 @@ func (r *opsRuntime) newPVCOnlyInstance(compName, instanceName string, pvcMap ma
 	return inst
 }
 
-func (r *opsRuntime) dataContext(ctx context.Context) (context.Context, error) {
+func (r *opsRuntime) dataContext() context.Context {
 	if !r.multiCluster {
-		return ctx, nil
+		return r.ctx
 	}
-	if r.defaultDataCtx == nil {
-		return nil, fmt.Errorf("multi-cluster placement not configured for ops runtime")
-	}
-	return r.defaultDataCtx, nil
-}
-
-func (r *opsRuntime) dataGetOptions() []client.GetOption {
-	return r.dataGetOpts
-}
-
-func (r *opsRuntime) dataListOptions() []client.ListOption {
-	return r.dataListOpts
+	return r.dataCtx
 }
 
 type defaultWorkload struct {

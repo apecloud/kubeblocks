@@ -11,9 +11,12 @@ spec:
   names:
     categories:
     - kubeblocks
+    - parameters
     kind: ComponentParameter
     listKind: ComponentParameterList
     plural: componentparameters
+    shortNames:
+    - cmpp
     singular: componentparameter
   scope: Namespaced
   versions:

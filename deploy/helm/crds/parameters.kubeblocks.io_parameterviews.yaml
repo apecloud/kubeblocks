@@ -11,11 +11,11 @@ spec:
   names:
     categories:
     - kubeblocks
+    - parameters
     kind: ParameterView
     listKind: ParameterViewList
     plural: parameterviews
     shortNames:
-    - pv
     - pview
     singular: parameterview
   scope: Namespaced

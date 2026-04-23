@@ -28,7 +28,7 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks}
+// +kubebuilder:resource:categories={kubeblocks,parameters},shortName=cmpp
 // +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="cluster name"
 // +kubebuilder:printcolumn:name="COMPONENT",type="string",JSONPath=".spec.componentName",description="component name"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="config status phase."

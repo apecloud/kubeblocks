@@ -25,7 +25,7 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},shortName={pv,pview}
+// +kubebuilder:resource:categories={kubeblocks,parameters},shortName=pview
 // +kubebuilder:printcolumn:name="PARAMETER",type="string",JSONPath=".spec.parameterRef.name",description="referenced parameter name"
 // +kubebuilder:printcolumn:name="TEMPLATE",type="string",JSONPath=".spec.templateName",description="config template name"
 // +kubebuilder:printcolumn:name="FILE",type="string",JSONPath=".spec.fileName",description="config file name"

@@ -219,7 +219,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("ops-request-controller"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{

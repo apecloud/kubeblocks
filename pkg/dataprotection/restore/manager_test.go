@@ -342,6 +342,88 @@ var _ = Describe("RestoreManager Test", func() {
 
 		})
 
+		It("test CheckJobsDone stops restore manager container when job is completed", func() {
+			reqCtx := getReqCtx()
+			startingIndex := 1
+			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
+				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
+			})
+
+			actionSetName := "preparedata-0"
+			viper.Set(constant.KBToolsImage, "kubeblocks-tools")
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+			jobs, err := restoreMGR.BuildPrepareDataJobs(reqCtx, k8sClient, *backupSet, target, actionSetName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(len(jobs)).Should(Equal(replicas))
+
+			By("create only one job")
+			newJobs, err := restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, jobs[0:1])
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("create one pod for job")
+			mockRestorePod := func(job *batchv1.Job) {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      job.Name + "-pod",
+						Namespace: job.Namespace,
+						Labels:    map[string]string{"job-name": job.Name},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: Restore, Image: "test-image"},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+
+				By("update pod status to set restore container as terminated normally")
+				pod.Status = corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: Restore,
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{
+									ExitCode: 0,
+								},
+							},
+						},
+					},
+				}
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+			}
+			mockRestorePod(newJobs[0])
+
+			By("call CheckJobsDone and verify stop restore manager annotation is set")
+			allJobsFinished, existFailedJob, err := restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, newJobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(allJobsFinished).Should(BeFalse())
+			Expect(existFailedJob).Should(BeFalse())
+
+			podList := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, podList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			for _, pod := range podList.Items {
+				Expect(pod.Annotations[DataProtectionStopRestoreManagerAnnotationKey]).Should(BeEmpty())
+			}
+
+			By("create another job and pod")
+			newJobs, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, jobs[1:])
+			Expect(err).ShouldNot(HaveOccurred())
+			mockRestorePod(newJobs[0])
+
+			By("call CheckJobsDone and verify stop restore manager annotation is set")
+			allJobsFinished, existFailedJob, err = restoreMGR.CheckJobsDone(dpv1alpha1.PrepareData, actionSetName, *backupSet, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(allJobsFinished).Should(BeFalse())
+			Expect(existFailedJob).Should(BeFalse())
+
+			podList = &corev1.PodList{}
+			Expect(k8sClient.List(ctx, podList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			for _, pod := range podList.Items {
+				Expect(pod.Annotations[DataProtectionStopRestoreManagerAnnotationKey]).Should(Equal("true"))
+			}
+		})
+
 		It("test with BuildVolumePopulateJob function", func() {
 			reqCtx := getReqCtx()
 			restoreMGR, backupSet := initResources(reqCtx, 0, true, func(f *testdp.MockRestoreFactory) {

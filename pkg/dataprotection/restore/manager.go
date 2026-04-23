@@ -802,12 +802,17 @@ func (r *RestoreManager) CheckJobsDone(
 	backupSet BackupActionSet,
 	fetchedJobs []*batchv1.Job) (bool, bool, error) {
 	var (
-		allJobFinished = true
-		existFailedJob bool
+		allJobFinished    = true
+		existFailedJob    bool
+		needFinishedCount = len(fetchedJobs)
+		prepareDataConfig = r.Restore.Spec.PrepareDataConfig
 	)
 	restoreActions := &r.Restore.Status.Actions.PrepareData
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = &r.Restore.Status.Actions.PostReady
+	} else if prepareDataConfig != nil && prepareDataConfig.VolumeClaimRestorePolicy == dpv1alpha1.VolumeClaimRestorePolicyParallel {
+		// if the restore policy is Parallel in prepareData stage, should wait all jobs finished to ensure scheduling stability.
+		needFinishedCount = GetRestoreActionsCountForPrepareData(prepareDataConfig)
 	}
 	// count the number of jobs that are completed, failed,
 	// or have the normally terminated `restore` container
@@ -844,7 +849,7 @@ func (r *RestoreManager) CheckJobsDone(
 		}
 	}
 	// wait until all `restore` containers are terminated normally or jobs are completed or failed
-	if finishedCount == len(fetchedJobs) {
+	if finishedCount == needFinishedCount {
 		for i := range fetchedJobs {
 			err := r.StopManagerContainerByJob(fetchedJobs[i])
 			if err != nil {

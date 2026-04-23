@@ -73,8 +73,7 @@ func (s *streamingServer) StartNonBlocking() error {
 					backoff = min(backoff*2, maxBackoff)
 					continue
 				}
-				s.logger.Error(err2, "accept new connection fatal error, stopping accept loop")
-				return
+				panic(fmt.Sprintf("accept new connection error: %v", err2))
 			}
 			backoff = minBackoff
 			go s.handleConn(conn)

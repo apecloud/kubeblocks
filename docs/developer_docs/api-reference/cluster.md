@@ -5925,6 +5925,23 @@ bool
 <p>Specifies whether to restart the pod when the file changes.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>variables</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.FileTemplateVariable">
+[]FileTemplateVariable
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Declares the user-configurable variables supported by this file template.</p>
+<p>This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+variables are accepted by <code>cluster.spec.componentSpecs[*].configs[*].variables</code> without reading the
+template content directly.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions
@@ -8233,6 +8250,60 @@ PrometheusScheme
 <p>Specifies the schema to use for scraping.
 <code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
 If empty, Prometheus uses the default value <code>http</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.FileTemplateVariable">FileTemplateVariable
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate</a>)
+</p>
+<div>
+<p>FileTemplateVariable declares a user-configurable variable supported by a file template.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the variable name that can be referenced from the file template and set by users
+through <code>cluster.spec.componentSpecs[*].configs[*].variables</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides a human-readable explanation of the variable&rsquo;s purpose.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultValue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the default value used.</p>
 </td>
 </tr>
 </tbody>

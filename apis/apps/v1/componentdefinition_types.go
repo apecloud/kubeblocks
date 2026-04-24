@@ -1116,6 +1116,34 @@ type ComponentFileTemplate struct {
 	//
 	// +optional
 	RestartOnFileChange *bool `json:"restartOnFileChange,omitempty"`
+
+	// Declares the user-configurable variables supported by this file template.
+	//
+	// This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+	// variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
+	// template content directly.
+	//
+	// +optional
+	Variables []FileTemplateVariable `json:"variables,omitempty"`
+}
+
+// FileTemplateVariable declares a user-configurable variable supported by a file template.
+type FileTemplateVariable struct {
+	// Specifies the variable name that can be referenced from the file template and set by users
+	// through `cluster.spec.componentSpecs[*].configs[*].variables`.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Provides a human-readable explanation of the variable's purpose.
+	//
+	// +optional
+	Description string `json:"description,omitempty"`
+
+	// Specifies the default value used.
+	//
+	// +optional
+	DefaultValue string `json:"defaultValue,omitempty"`
 }
 
 type LogConfig struct {

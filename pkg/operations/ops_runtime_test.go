@@ -104,9 +104,15 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			},
 		},
 		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}},
 			ContainerStatuses: []corev1.ContainerStatus{{
 				Name:  "mysql",
 				Image: "mysql@sha256:abc",
+				Ready: true,
 			}},
 		},
 	}

@@ -38,6 +38,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+const (
+	assistantObjectAnnotationKey = "workloads.kubeblocks.io/assistant-object"
+)
+
 func NewAssistantObjectReconciler() kubebuilderx.Reconciler {
 	return &assistantObjectReconciler{}
 }
@@ -67,10 +71,29 @@ func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 }
 
 func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, assistantObj workloads.InstanceAssistantObject) error {
-	obj := r.checkObjectProvisionPolicy(inst, r.instanceAssistantObject(assistantObj))
+	obj := instanceAssistantObject(assistantObj)
 	if obj == nil {
-		return nil // skip the object
+		return nil
 	}
+	if isOrdinalAssistantObject(obj) {
+		obj = r.checkObjectProvisionPolicy(inst, obj)
+		if obj == nil {
+			return nil // skip the object
+		}
+		return r.createOrUpdateOwned(tree, inst, assistantObj, obj)
+	}
+	return r.createOrUpdateShared(tree, inst, assistantObj, obj)
+}
+
+func (r *assistantObjectReconciler) checkObjectProvisionPolicy(inst *workloads.Instance, obj client.Object) client.Object {
+	if isCurrentInstanceOrdinalAssistantObject(inst, obj) {
+		return obj
+	}
+	return nil
+}
+
+func (r *assistantObjectReconciler) createOrUpdateOwned(tree *kubebuilderx.ObjectTree, inst *workloads.Instance,
+	assistantObj workloads.InstanceAssistantObject, obj client.Object) error {
 	robj, err := tree.Get(obj)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
@@ -94,7 +117,26 @@ func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree
 	return nil
 }
 
-func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
+func (r *assistantObjectReconciler) createOrUpdateShared(tree *kubebuilderx.ObjectTree, inst *workloads.Instance,
+	assistantObj workloads.InstanceAssistantObject, obj client.Object) error {
+	robj, err := tree.Get(obj)
+	if err != nil {
+		return err
+	}
+	if robj == nil {
+		markSharedAssistantObject(inst, obj)
+		return tree.Add(obj)
+	}
+
+	desired := obj.DeepCopyObject().(client.Object)
+	markSharedAssistantObject(inst, desired)
+	if merged := r.copyAndMerge(assistantObj, robj, desired); merged != nil {
+		return tree.Update(merged)
+	}
+	return nil
+}
+
+func instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
 	if obj.Service != nil {
 		return obj.Service
 	}
@@ -113,24 +155,54 @@ func (r *assistantObjectReconciler) instanceAssistantObject(obj workloads.Instan
 	return obj.RoleBinding
 }
 
-func (r *assistantObjectReconciler) checkObjectProvisionPolicy(inst *workloads.Instance, obj client.Object) client.Object {
-	var policy string
-	if obj.GetAnnotations() != nil {
-		policy = obj.GetAnnotations()[constant.KBAppMultiClusterObjectProvisionPolicyKey]
+func isOrdinalAssistantObject(obj client.Object) bool {
+	if obj.GetAnnotations() == nil {
+		return false
 	}
-	if policy != "ordinal" { // HACK
-		return obj
-	}
+	return obj.GetAnnotations()[constant.KBAppMultiClusterObjectProvisionPolicyKey] == constant.KBAppMultiClusterObjectProvisionOrdinal
+}
 
+func isCurrentInstanceOrdinalAssistantObject(inst *workloads.Instance, obj client.Object) bool {
 	ordinal := func() int {
 		subs := strings.Split(inst.GetName(), "-")
 		o, _ := strconv.Atoi(subs[len(subs)-1])
 		return o
 	}
-	if strings.HasSuffix(obj.GetName(), fmt.Sprintf("-%d", ordinal())) {
-		return obj
+	return strings.HasSuffix(obj.GetName(), fmt.Sprintf("-%d", ordinal()))
+}
+
+func markSharedAssistantObject(inst *workloads.Instance, obj client.Object) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
 	}
-	return nil
+	labels[constant.AppManagedByLabelKey] = constant.AppName
+	if clusterName := inst.Labels[constant.AppInstanceLabelKey]; clusterName != "" {
+		labels[constant.AppInstanceLabelKey] = clusterName
+	}
+	if compName := inst.Labels[constant.KBAppComponentLabelKey]; compName != "" {
+		labels[constant.KBAppComponentLabelKey] = compName
+	}
+	delete(labels, constant.KBAppInstanceNameLabelKey)
+	obj.SetLabels(labels)
+
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[assistantObjectAnnotationKey] = "true"
+	obj.SetAnnotations(annotations)
+}
+
+func isSharedAssistantObject(obj client.Object, inst *workloads.Instance) bool {
+	labels := obj.GetLabels()
+	annotations := obj.GetAnnotations()
+	return labels[constant.AppManagedByLabelKey] == constant.AppName &&
+		labels[constant.AppInstanceLabelKey] != "" &&
+		labels[constant.AppInstanceLabelKey] == inst.Labels[constant.AppInstanceLabelKey] &&
+		labels[constant.KBAppComponentLabelKey] != "" &&
+		labels[constant.KBAppComponentLabelKey] == inst.Labels[constant.KBAppComponentLabelKey] &&
+		annotations[assistantObjectAnnotationKey] == "true"
 }
 
 func (r *assistantObjectReconciler) copyAndMerge(obj workloads.InstanceAssistantObject, oldObj, newObj client.Object) client.Object {

@@ -50,7 +50,6 @@ type opsRuntime struct {
 	dataCtx      context.Context
 	dataGetOpts  []client.GetOption
 	dataListOpts []client.ListOption
-	volumeCache  map[string]map[string]*corev1.PersistentVolumeClaim
 }
 
 func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResource) (map[string]OpsRuntime, error) {
@@ -84,7 +83,6 @@ func newOpsRuntime(ctx context.Context, cli client.Client, placement string) *op
 		ctx:          ctx,
 		cli:          cli,
 		multiCluster: len(strings.TrimSpace(placement)) > 0,
-		volumeCache:  map[string]map[string]*corev1.PersistentVolumeClaim{},
 	}
 	if !r.multiCluster {
 		return r
@@ -261,10 +259,6 @@ func (r *opsRuntime) buildInstances(namespace, clusterName, compName string, pod
 }
 
 func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[string]*corev1.PersistentVolumeClaim, error) {
-	cacheKey := fmt.Sprintf("%s/%s/%s", namespace, clusterName, compName)
-	if cached, ok := r.volumeCache[cacheKey]; ok {
-		return cached, nil
-	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	opts := []client.ListOption{
 		client.InNamespace(namespace),
@@ -282,7 +276,6 @@ func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[s
 		pvc := pvcList.Items[i]
 		pvcMap[pvc.Name] = pvc.DeepCopy()
 	}
-	r.volumeCache[cacheKey] = pvcMap
 	return pvcMap, nil
 }
 

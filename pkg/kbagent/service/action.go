@@ -172,14 +172,13 @@ func callActionWithRetry(ctx context.Context, action *proto.Action, parameters m
 	}
 
 	interval := retryPolicy.RetryInterval
-	if interval <= 0 {
-		interval = time.Second
-	}
 	for i := 0; i < retryPolicy.MaxRetries; i++ {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(interval):
+		if interval > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(interval):
+			}
 		}
 		output, err = blockingCallAction(ctx, action, parameters, timeout)
 		if err == nil {

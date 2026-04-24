@@ -50,6 +50,7 @@ type opsRuntime struct {
 	dataCtx      context.Context
 	dataGetOpts  []client.GetOption
 	dataListOpts []client.ListOption
+	volumeCache  map[string]map[string]*corev1.PersistentVolumeClaim
 }
 
 func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResource) (map[string]OpsRuntime, error) {
@@ -83,6 +84,7 @@ func newOpsRuntime(ctx context.Context, cli client.Client, placement string) *op
 		ctx:          ctx,
 		cli:          cli,
 		multiCluster: len(strings.TrimSpace(placement)) > 0,
+		volumeCache:  map[string]map[string]*corev1.PersistentVolumeClaim{},
 	}
 	if !r.multiCluster {
 		return r
@@ -103,6 +105,23 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: namespace}, its); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
+	workload := &defaultWorkload{
+		currentRevisionMap: map[string]string{},
+		notReadySet:        sets.New[string](),
+		notAvailableSet:    sets.New[string](),
+		failedSet:          sets.New[string](),
+		instanceNames:      sets.New[string](),
+	}
+	if its.Name != "" {
+		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+		workload.minReadySeconds = its.Spec.MinReadySeconds
+		workload.currentRevisionMap = currRevisionMap
+		workload.instanceNames = sets.KeySet(currRevisionMap)
+		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
+		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
+		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		return workload, nil
+	}
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
 		return nil, err
@@ -111,29 +130,13 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	if err != nil {
 		return nil, err
 	}
-
-	workload := &defaultWorkload{
-		currentRevisionMap: map[string]string{},
-		notReadySet:        sets.New[string](),
-		notAvailableSet:    sets.New[string](),
-		failedSet:          sets.New[string](),
-		instances:          instances,
-	}
-	if its.Name != "" {
-		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
-		workload.minReadySeconds = its.Spec.MinReadySeconds
-		workload.currentRevisionMap = currRevisionMap
-		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
-		return workload, nil
-	}
 	for _, instance := range instances {
 		podInstance, ok := instance.(*defaultInstance)
 		if !ok || podInstance.pod == nil {
 			continue
 		}
 		name := podInstance.GetName()
+		workload.instanceNames.Insert(name)
 		workload.currentRevisionMap[name] = ""
 		if !podutils.IsPodReady(podInstance.pod) {
 			workload.notReadySet.Insert(name)
@@ -258,6 +261,10 @@ func (r *opsRuntime) buildInstances(namespace, clusterName, compName string, pod
 }
 
 func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[string]*corev1.PersistentVolumeClaim, error) {
+	cacheKey := fmt.Sprintf("%s/%s/%s", namespace, clusterName, compName)
+	if cached, ok := r.volumeCache[cacheKey]; ok {
+		return cached, nil
+	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	opts := []client.ListOption{
 		client.InNamespace(namespace),
@@ -275,6 +282,7 @@ func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[s
 		pvc := pvcList.Items[i]
 		pvcMap[pvc.Name] = pvc.DeepCopy()
 	}
+	r.volumeCache[cacheKey] = pvcMap
 	return pvcMap, nil
 }
 
@@ -338,7 +346,7 @@ type defaultWorkload struct {
 	notReadySet        sets.Set[string]
 	notAvailableSet    sets.Set[string]
 	failedSet          sets.Set[string]
-	instances          []Instance
+	instanceNames      sets.Set[string]
 }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
@@ -356,11 +364,7 @@ func (w *defaultWorkload) GetNotAvailableInstanceNameSet() sets.Set[string] {
 func (w *defaultWorkload) GetFailedInstanceNameSet() sets.Set[string] { return w.failedSet.Clone() }
 
 func (w *defaultWorkload) GetInstanceNameSet() sets.Set[string] {
-	set := sets.New[string]()
-	for _, inst := range w.instances {
-		set.Insert(inst.GetName())
-	}
-	return set
+	return w.instanceNames.Clone()
 }
 
 type defaultInstance struct {

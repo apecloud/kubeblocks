@@ -280,7 +280,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		service.Annotations[constant.KBAppMultiClusterObjectProvisionPolicyKey] = "ordinal" // HACK
+		service.Annotations[constant.KBAppMultiClusterObjectProvisionPolicyKey] = constant.KBAppMultiClusterObjectProvisionOrdinal
 	}
 
 	createOrUpdateService := func(service *corev1.Service) error {

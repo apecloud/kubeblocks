@@ -73,6 +73,7 @@ const (
 	KBAppMultiClusterPlacementKey             = "apps.kubeblocks.io/multi-cluster-placement"
 	KBAppMultiClusterServicePlacementKey      = "apps.kubeblocks.io/multi-cluster-service-placement"
 	KBAppMultiClusterObjectProvisionPolicyKey = "apps.kubeblocks.io/multi-cluster-object-provision-policy"
+	KBAppMultiClusterObjectProvisionOrdinal   = "ordinal"
 )
 
 func InheritedAnnotations() []string {

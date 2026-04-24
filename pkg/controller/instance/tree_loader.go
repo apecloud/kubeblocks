@@ -25,6 +25,8 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +51,10 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 		return nil, err
 	}
 
+	if err = loadAssistantObjects(ctx, reader, tree); err != nil {
+		return nil, err
+	}
+
 	tree.Context = ctx
 	tree.EventRecorder = recorder
 	tree.Logger = logger
@@ -68,4 +74,29 @@ func ownedKinds() []client.ObjectList {
 		&rbacv1.RoleList{},
 		&rbacv1.RoleBindingList{},
 	}
+}
+
+func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+	if tree.GetRoot() == nil {
+		return nil
+	}
+	inst := tree.GetRoot().(*workloads.Instance)
+	for _, assistantObj := range inst.Spec.InstanceAssistantObjects {
+		obj, ok := instanceAssistantObject(assistantObj)
+		if !ok {
+			continue
+		}
+		robj := obj.DeepCopyObject().(client.Object)
+		key := types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
+		if err := reader.Get(ctx, key, robj); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if err := tree.Add(robj); err != nil {
+			return err
+		}
+	}
+	return nil
 }

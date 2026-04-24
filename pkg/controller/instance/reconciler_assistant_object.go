@@ -71,8 +71,8 @@ func (r *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 }
 
 func (r *assistantObjectReconciler) createOrUpdate(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, assistantObj workloads.InstanceAssistantObject) error {
-	obj := instanceAssistantObject(assistantObj)
-	if obj == nil {
+	obj, ok := instanceAssistantObject(assistantObj)
+	if !ok {
 		return nil
 	}
 	if isOrdinalAssistantObject(obj) {
@@ -136,23 +136,26 @@ func (r *assistantObjectReconciler) createOrUpdateShared(tree *kubebuilderx.Obje
 	return nil
 }
 
-func instanceAssistantObject(obj workloads.InstanceAssistantObject) client.Object {
+func instanceAssistantObject(obj workloads.InstanceAssistantObject) (client.Object, bool) {
 	if obj.Service != nil {
-		return obj.Service
+		return obj.Service, true
 	}
 	if obj.ConfigMap != nil {
-		return obj.ConfigMap
+		return obj.ConfigMap, true
 	}
 	if obj.Secret != nil {
-		return obj.Secret
+		return obj.Secret, true
 	}
 	if obj.ServiceAccount != nil {
-		return obj.ServiceAccount
+		return obj.ServiceAccount, true
 	}
 	if obj.Role != nil {
-		return obj.Role
+		return obj.Role, true
 	}
-	return obj.RoleBinding
+	if obj.RoleBinding != nil {
+		return obj.RoleBinding, true
+	}
+	return nil, false
 }
 
 func isOrdinalAssistantObject(obj client.Object) bool {

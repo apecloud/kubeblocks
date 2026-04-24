@@ -210,8 +210,8 @@ func skipAssistantObjectSecondaryDeletion(inst *workloads.Instance, obj client.O
 }
 
 func assistantObjectKey(assistantObj workloads.InstanceAssistantObject) (client.Object, *model.GVKNObjKey, error) {
-	obj := instanceAssistantObject(assistantObj)
-	if obj == nil {
+	obj, ok := instanceAssistantObject(assistantObj)
+	if !ok {
 		return nil, nil, nil
 	}
 	name, err := model.GetGVKName(obj)

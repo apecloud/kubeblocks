@@ -82,8 +82,8 @@ func loadAssistantObjects(ctx context.Context, reader client.Reader, tree *kubeb
 	}
 	inst := tree.GetRoot().(*workloads.Instance)
 	for _, assistantObj := range inst.Spec.InstanceAssistantObjects {
-		obj := instanceAssistantObject(assistantObj)
-		if obj == nil {
+		obj, ok := instanceAssistantObject(assistantObj)
+		if !ok {
 			continue
 		}
 		robj := obj.DeepCopyObject().(client.Object)

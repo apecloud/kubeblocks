@@ -393,7 +393,7 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 		mv "$(LOCALBIN)/golangci-lint" "$(GOLANGCILINT)"; \
 	}
 
-STATICCHECK_VERSION = v0.6.1
+STATICCHECK_VERSION = 2026.1
 STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
 .PHONY: staticcheck-bin
 staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.

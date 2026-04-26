@@ -17,7 +17,6 @@ linters:
     - loggercheck
     - misspell
     - nakedret
-    - staticcheck
     - unconvert
     - unused
   settings:

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: kubeblocks
   name: instancesets.workloads.kubeblocks.io
@@ -88,7 +88,6 @@ spec:
                           description: |-
                             Defines the command to run.
 
-
                             This field cannot be updated.
                           properties:
                             args:
@@ -104,7 +103,6 @@ spec:
                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                               items:
                                 type: string
@@ -114,15 +112,11 @@ spec:
                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                 The resources that can be shared are included:
 
-
                                 - volume mounts
-
 
                                 This field cannot be updated.
                               type: string
@@ -130,7 +124,6 @@ spec:
                               description: |-
                                 Represents a list of environment variables that will be injected into the container.
                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                 This field cannot be updated.
                               items:
@@ -167,7 +160,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -233,7 +225,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -252,10 +243,8 @@ spec:
                               description: |-
                                 Specifies the container image to be used for running the Action.
 
-
                                 When specified, a dedicated container will be created using this image to execute the Action.
                                 All actions with same image will share the same container.
-
 
                                 This field cannot be updated.
                               type: string
@@ -264,11 +253,9 @@ spec:
                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                   will be selected for the Action.
-
 
                                 This field cannot be updated.
                               type: string
@@ -278,11 +265,9 @@ spec:
                                 This is useful when there is no default target replica identified.
                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                 post-provision or pre-terminate of the component.
-
 
                                 This field cannot be updated.
                               enum:
@@ -295,7 +280,6 @@ spec:
                         grpc:
                           description: |-
                             Defines the gRPC call to issue.
-
 
                             This field cannot be updated.
                           properties:
@@ -318,7 +302,6 @@ spec:
                                 type: string
                               description: |-
                                 Request payload for the gRPC method.
-
 
                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                 Templates are rendered with predefined action variables before the request is sent.
@@ -350,13 +333,11 @@ spec:
                           description: |-
                             Defines the HTTP request to perform.
 
-
                             This field cannot be updated.
                           properties:
                             body:
                               description: |-
                                 Optional HTTP request body.
-
 
                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                               type: string
@@ -426,11 +407,9 @@ spec:
                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                             The impact of this field depends on the `targetPodSelector` value:
 
-
                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                               will be selected for the Action.
-
 
                             This field cannot be updated.
                           type: string
@@ -439,9 +418,7 @@ spec:
                             Specifies the state that the cluster must reach before the Action is executed.
                             Currently, this is only applicable to the `postProvision` action.
 
-
                             The conditions are as follows:
-
 
                             - `Immediately`: Executed right after the Component object is created.
                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -452,17 +429,14 @@ spec:
                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                             This field cannot be updated.
                           type: string
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                             It specifies the conditions under which the Action should be retried and the limits to apply,
                             such as the maximum number of retries and backoff strategy.
-
 
                             This field cannot be updated.
                           properties:
@@ -486,11 +460,9 @@ spec:
                             This is useful when there is no default target replica identified.
                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                             post-provision or pre-terminate of the component.
-
 
                             This field cannot be updated.
                           enum:
@@ -504,12 +476,10 @@ spec:
                           description: |-
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                             Behavior based on the value:
                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                             This field cannot be updated.
                           format: int32
@@ -518,7 +488,6 @@ spec:
                     reconfigureActionName:
                       description: |-
                         The name of the custom reconfigure action.
-
 
                         An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
                       type: string
@@ -531,7 +500,6 @@ spec:
                 description: |-
                   Specifies the desired Ordinals of the default template.
                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-
 
                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
                   then the instance names generated under the default template would be
@@ -604,7 +572,6 @@ spec:
                 description: |-
                   Overrides values in default Template.
 
-
                   Instance is the fundamental unit managed by KubeBlocks.
                   It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
                   An InstanceSet manages instances with a total count of Replicas,
@@ -612,12 +579,10 @@ spec:
                   The InstanceTemplate provides a way to override values in the default template,
                   allowing the InstanceSet to manage instances from different templates.
 
-
                   The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
                   The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
                   By default, the ordinal starts from 0 for each InstanceTemplate.
                   It is important to ensure that the Name of each InstanceTemplate is unique.
-
 
                   The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
                   Any remaining replicas will be generated using the default template and will follow the default naming rules.
@@ -670,7 +635,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -733,7 +697,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -768,7 +731,6 @@ spec:
                       description: |-
                         Specifies the desired Ordinals of this InstanceTemplate.
                         The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
-
 
                         For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
                         then the instance names generated under this InstanceTemplate would be
@@ -818,10 +780,8 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
 
                             This field is immutable. It can only be set for containers.
                           items:
@@ -1794,10 +1754,8 @@ spec:
                             Each toleration in the array allows the Pod to tolerate node taints based on
                             specified `key`, `value`, `effect`, and `operator`.
 
-
                             - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                             - The `operator` determines how the toleration matches the taint.
-
 
                             Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                           items:
@@ -1905,7 +1863,6 @@ spec:
                                   Keys that don't exist in the incoming pod labels will
                                   be ignored. A null or empty list means only match against labelSelector.
 
-
                                   This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                 items:
                                   type: string
@@ -1945,7 +1902,6 @@ spec:
                                   Valid values are integers greater than 0.
                                   When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                   For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                   labelSelector spread as 2/2/2:
                                   | zone1 | zone2 | zone3 |
@@ -1954,7 +1910,6 @@ spec:
                                   In this situation, new pod with the same labelSelector cannot be scheduled,
                                   because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                   it will violate MaxSkew.
-
 
                                   This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                 format: int32
@@ -1966,7 +1921,6 @@ spec:
                                   - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                   - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                   If this value is nil, the behavior is equivalent to the Honor policy.
                                   This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                 type: string
@@ -1977,7 +1931,6 @@ spec:
                                   - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                   has a toleration, are included.
                                   - Ignore: node taints are ignored. All nodes are included.
-
 
                                   If this value is nil, the behavior is equivalent to the Ignore policy.
                                   This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -2297,7 +2250,7 @@ spec:
                                   names such as \"example.com/my-custom-resource\"\nApart
                                   from above values - keys that are unprefixed or
                                   have kubernetes.io prefix are considered\nreserved
-                                  and hence may not be used.\n\n\nClaimResourceStatus
+                                  and hence may not be used.\n\nClaimResourceStatus
                                   can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState
                                   set when resize controller starts resizing the volume
                                   in control-plane.\n\t- ControllerResizeFailed:\n\t\tState
@@ -2318,14 +2271,14 @@ spec:
                                   = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
                                   = \"NodeResizeFailed\"\nWhen this field is not set,
                                   it means that no resize operation is in progress
-                                  for the given PVC.\n\n\nA controller that receives
+                                  for the given PVC.\n\nA controller that receives
                                   PVC update with previously unknown resourceName
                                   or ClaimResourceStatus\nshould ignore the update
                                   for the purpose it was designed. For example - a
                                   controller that\nonly is responsible for resizing
                                   capacity of the volume, should ignore PVC updates
                                   that change other valid\nresources associated with
-                                  PVC.\n\n\nThis is an alpha field and requires enabling
+                                  PVC.\n\nThis is an alpha field and requires enabling
                                   RecoverVolumeExpansionFailure feature."
                                 type: object
                                 x-kubernetes-map-type: granular
@@ -2345,7 +2298,7 @@ spec:
                                   names such as \"example.com/my-custom-resource\"\nApart
                                   from above values - keys that are unprefixed or
                                   have kubernetes.io prefix are considered\nreserved
-                                  and hence may not be used.\n\n\nCapacity reported
+                                  and hence may not be used.\n\nCapacity reported
                                   here may be larger than the actual capacity when
                                   a volume expansion operation\nis requested.\nFor
                                   storage quota, the larger value from allocatedResources
@@ -2355,13 +2308,13 @@ spec:
                                   request is lowered, allocatedResources is only\nlowered
                                   if there are no expansion operations in progress
                                   and if the actual volume capacity\nis equal or lower
-                                  than the requested capacity.\n\n\nA controller that
+                                  than the requested capacity.\n\nA controller that
                                   receives PVC update with previously unknown resourceName\nshould
                                   ignore the update for the purpose it was designed.
                                   For example - a controller that\nonly is responsible
                                   for resizing capacity of the volume, should ignore
                                   PVC updates that change other valid\nresources associated
-                                  with PVC.\n\n\nThis is an alpha field and requires
+                                  with PVC.\n\nThis is an alpha field and requires
                                   enabling RecoverVolumeExpansionFailure feature."
                                 type: object
                               capacity:
@@ -2467,7 +2420,6 @@ spec:
                 description: |-
                   Members(Pods) update strategy.
 
-
                   - serial: update Members one by one that guarantee minimum component unavailable time.
                   - parallel: force parallel
                   - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
@@ -2487,7 +2439,6 @@ spec:
                         description: |-
                           Defines the command to run.
 
-
                           This field cannot be updated.
                         properties:
                           args:
@@ -2503,7 +2454,6 @@ spec:
                               Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                               If the shell is required, it must be explicitly invoked in the command.
 
-
                               A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                             items:
                               type: string
@@ -2513,15 +2463,11 @@ spec:
                               Specifies the name of the container within the same pod whose resources will be shared with the action.
                               This allows the action to utilize the specified container's resources without executing within it.
 
-
                               The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                               The resources that can be shared are included:
 
-
                               - volume mounts
-
 
                               This field cannot be updated.
                             type: string
@@ -2529,7 +2475,6 @@ spec:
                             description: |-
                               Represents a list of environment variables that will be injected into the container.
                               These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                               This field cannot be updated.
                             items:
@@ -2566,7 +2511,6 @@ spec:
                                           description: |-
                                             Name of the referent.
                                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                            TODO: Add other useful fields. apiVersion, kind, uid?
                                           type: string
                                         optional:
                                           description: Specify whether the ConfigMap
@@ -2630,7 +2574,6 @@ spec:
                                           description: |-
                                             Name of the referent.
                                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                            TODO: Add other useful fields. apiVersion, kind, uid?
                                           type: string
                                         optional:
                                           description: Specify whether the Secret
@@ -2649,10 +2592,8 @@ spec:
                             description: |-
                               Specifies the container image to be used for running the Action.
 
-
                               When specified, a dedicated container will be created using this image to execute the Action.
                               All actions with same image will share the same container.
-
 
                               This field cannot be updated.
                             type: string
@@ -2661,11 +2602,9 @@ spec:
                               Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                               The impact of this field depends on the `targetPodSelector` value:
 
-
                               - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                               - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                 will be selected for the Action.
-
 
                               This field cannot be updated.
                             type: string
@@ -2675,11 +2614,9 @@ spec:
                               This is useful when there is no default target replica identified.
                               It allows for precise control over which Pod(s) the Action should run in.
 
-
                               If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                               to be removed or added; or a random pod if the Action is triggered at the component level, such as
                               post-provision or pre-terminate of the component.
-
 
                               This field cannot be updated.
                             enum:
@@ -2692,7 +2629,6 @@ spec:
                       grpc:
                         description: |-
                           Defines the gRPC call to issue.
-
 
                           This field cannot be updated.
                         properties:
@@ -2715,7 +2651,6 @@ spec:
                               type: string
                             description: |-
                               Request payload for the gRPC method.
-
 
                               Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                               Templates are rendered with predefined action variables before the request is sent.
@@ -2747,13 +2682,11 @@ spec:
                         description: |-
                           Defines the HTTP request to perform.
 
-
                           This field cannot be updated.
                         properties:
                           body:
                             description: |-
                               Optional HTTP request body.
-
 
                               Supports Go text/template syntax; rendered with predefined variables before sending.
                             type: string
@@ -2823,11 +2756,9 @@ spec:
                           Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                           The impact of this field depends on the `targetPodSelector` value:
 
-
                           - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                           - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                             will be selected for the Action.
-
 
                           This field cannot be updated.
                         type: string
@@ -2836,9 +2767,7 @@ spec:
                           Specifies the state that the cluster must reach before the Action is executed.
                           Currently, this is only applicable to the `postProvision` action.
 
-
                           The conditions are as follows:
-
 
                           - `Immediately`: Executed right after the Component object is created.
                             The readiness of the Component and its resources is not guaranteed at this stage.
@@ -2849,17 +2778,14 @@ spec:
                           - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                             This execution does not alter the Component or the Cluster's state of readiness.
 
-
                           This field cannot be updated.
                         type: string
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
 
-
                           It specifies the conditions under which the Action should be retried and the limits to apply,
                           such as the maximum number of retries and backoff strategy.
-
 
                           This field cannot be updated.
                         properties:
@@ -2883,11 +2809,9 @@ spec:
                           This is useful when there is no default target replica identified.
                           It allows for precise control over which Pod(s) the Action should run in.
 
-
                           If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                           to be removed or added; or a random pod if the Action is triggered at the component level, such as
                           post-provision or pre-terminate of the component.
-
 
                           This field cannot be updated.
                         enum:
@@ -2901,12 +2825,10 @@ spec:
                         description: |-
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                           Behavior based on the value:
                           - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                           This field cannot be updated.
                         format: int32
@@ -2926,15 +2848,12 @@ spec:
                 description: |-
                   Specifies the names of instances to be transitioned to offline status.
 
-
                   Marking an instance as offline results in the following:
-
 
                   1. The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
                      future reuse or data recovery, but it is no longer actively used.
                   2. The ordinal number assigned to this instance is preserved, ensuring it remains unique
                      and avoiding conflicts with new instances.
-
 
                   Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
                   ordinal consistency within the cluster.
@@ -2989,13 +2908,11 @@ spec:
                   Controls how pods are created during initial scale up,
                   when replacing pods on nodes, or when scaling down.
 
-
                   The default policy is `OrderedReady`, where pods are created in increasing order and the controller waits until each pod is ready before
                   continuing. When scaling down, the pods are removed in the opposite order.
                   The alternative policy is `Parallel` which will create pods in parallel
                   to match the desired scale without waiting, and on scale down will delete
                   all pods at once.
-
 
                   Note: This field will be removed in future version.
                 type: string
@@ -3030,7 +2947,6 @@ spec:
                         their labels removed immediately.
                         This helps prevent "Split-Brain" scenarios during network partitions or node failures.
 
-
                         This field is immutable once set.
                       type: boolean
                     name:
@@ -3038,12 +2954,10 @@ spec:
                         Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
                         on the corresponding object to identify its role.
 
-
                         For example, common role names include:
                         - "leader": The primary/master instance that handles write operations
                         - "follower": Secondary/replica instances that replicate data from the leader
                         - "learner": Read-only instances that don't participate in elections
-
 
                         This field is immutable once set.
                       maxLength: 32
@@ -3057,14 +2971,12 @@ spec:
                         in quorum should have higher update priority than roles do not participate in quorum.
                         The default value is false.
 
-
                         For example, in a 5-pod component where:
                         - 2 learner pods (participatesInQuorum=false)
                         - 2 follower pods (participatesInQuorum=true)
                         - 1 leader pod (participatesInQuorum=true)
                         The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
                         of 2 learners and 1 follower while maintaining quorum.
-
 
                         This field is immutable once set.
                       type: boolean
@@ -3076,12 +2988,10 @@ spec:
                         Roles with the highest priority will be updated last.
                         The default priority is 0.
 
-
                         For example:
                         - Leader role may have priority 2 (updated last)
                         - Follower role may have priority 1 (updated before leader)
                         - Learner role may have priority 0 (updated first)
-
 
                         This field is immutable once set.
                       type: integer
@@ -4150,7 +4060,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -4216,7 +4125,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -4250,7 +4158,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -4269,7 +4176,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret must
@@ -4554,10 +4460,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -4767,10 +4673,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -4919,10 +4825,8 @@ spec:
                                     Claims lists the names of resources, defined in spec.resourceClaims,
                                     that are used by this container.
 
-
                                     This is an alpha field and requires enabling the
                                     DynamicResourceAllocation feature gate.
-
 
                                     This field is immutable. It can only be set for containers.
                                   items:
@@ -5114,7 +5018,6 @@ spec:
                                         type indicates which kind of seccomp profile will be applied.
                                         Valid options are:
 
-
                                         Localhost - a profile defined in a file on the node should be used.
                                         RuntimeDefault - the container runtime default profile should be used.
                                         Unconfined - no profile should be applied.
@@ -5195,10 +5098,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -5501,7 +5404,6 @@ spec:
                             removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the
                             Pod to exceed its resource allocation.
 
-
                             To add an ephemeral container, use the ephemeralcontainers subresource of an existing
                             Pod. Ephemeral containers may not be removed or restarted.
                           properties:
@@ -5569,7 +5471,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -5635,7 +5536,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -5669,7 +5569,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -5688,7 +5587,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret must
@@ -5966,10 +5864,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -6167,10 +6065,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -6318,10 +6216,8 @@ spec:
                                     Claims lists the names of resources, defined in spec.resourceClaims,
                                     that are used by this container.
 
-
                                     This is an alpha field and requires enabling the
                                     DynamicResourceAllocation feature gate.
-
 
                                     This field is immutable. It can only be set for containers.
                                   items:
@@ -6501,7 +6397,6 @@ spec:
                                         type indicates which kind of seccomp profile will be applied.
                                         Valid options are:
 
-
                                         Localhost - a profile defined in a file on the node should be used.
                                         RuntimeDefault - the container runtime default profile should be used.
                                         Unconfined - no profile should be applied.
@@ -6575,10 +6470,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -6715,7 +6610,6 @@ spec:
                                 If set, the name of the container from PodSpec that this ephemeral container targets.
                                 The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
                                 If not set then the ephemeral container uses the namespaces configured in the Pod spec.
-
 
                                 The container runtime must implement support for this feature. If the runtime does not
                                 support namespace targeting then the result of setting this field is undefined.
@@ -6888,7 +6782,6 @@ spec:
                               description: |-
                                 Name of the referent.
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
@@ -6976,7 +6869,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -7042,7 +6934,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -7076,7 +6967,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -7095,7 +6985,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret must
@@ -7380,10 +7269,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -7593,10 +7482,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -7745,10 +7634,8 @@ spec:
                                     Claims lists the names of resources, defined in spec.resourceClaims,
                                     that are used by this container.
 
-
                                     This is an alpha field and requires enabling the
                                     DynamicResourceAllocation feature gate.
-
 
                                     This field is immutable. It can only be set for containers.
                                   items:
@@ -7940,7 +7827,6 @@ spec:
                                         type indicates which kind of seccomp profile will be applied.
                                         Valid options are:
 
-
                                         Localhost - a profile defined in a file on the node should be used.
                                         RuntimeDefault - the container runtime default profile should be used.
                                         Unconfined - no profile should be applied.
@@ -8021,10 +7907,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -8278,10 +8164,8 @@ spec:
                           Specifies the OS of the containers in the pod.
                           Some pod and container fields are restricted if this is set.
 
-
                           If the OS field is set to linux, the following fields must be unset:
                           -securityContext.windowsOptions
-
 
                           If the OS field is set to windows, following fields must be unset:
                           - spec.hostPID
@@ -8381,10 +8265,8 @@ spec:
                           will be made available to those containers which consume them
                           by name.
 
-
                           This is an alpha field and requires enabling the
                           DynamicResourceAllocation feature gate.
-
 
                           This field is immutable.
                         items:
@@ -8411,13 +8293,11 @@ spec:
                                     ResourceClaimTemplateName is the name of a ResourceClaimTemplate
                                     object in the same namespace as this pod.
 
-
                                     The template will be used to create a new ResourceClaim, which will
                                     be bound to this pod. When this pod is deleted, the ResourceClaim
                                     will also be deleted. The pod name and resource name, along with a
                                     generated component, will be used to form a unique name for the
                                     ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
-
 
                                     This field is immutable and no changes will be made to the
                                     corresponding ResourceClaim by the control plane after creating the
@@ -8457,9 +8337,7 @@ spec:
                           If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
                           scheduler will not attempt to schedule the pod.
 
-
                           SchedulingGates can only be set at pod creation time, and be removed only afterwards.
-
 
                           This is a beta feature enabled by the PodSchedulingReadiness feature gate.
                         items:
@@ -8489,11 +8367,9 @@ spec:
                               Some volume types allow the Kubelet to change the ownership of that volume
                               to be owned by the pod:
 
-
                               1. The owning GID will be the FSGroup
                               2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
                               3. The permission bits are OR'd with rw-rw----
-
 
                               If unset, the Kubelet will not modify the ownership and permissions of any volume.
                               Note that this field cannot be set when spec.os.name is windows.
@@ -8580,7 +8456,6 @@ spec:
                                 description: |-
                                   type indicates which kind of seccomp profile will be applied.
                                   Valid options are:
-
 
                                   Localhost - a profile defined in a file on the node should be used.
                                   RuntimeDefault - the container runtime default profile should be used.
@@ -8804,7 +8679,6 @@ spec:
                                 Keys that don't exist in the incoming pod labels will
                                 be ignored. A null or empty list means only match against labelSelector.
 
-
                                 This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                               items:
                                 type: string
@@ -8844,7 +8718,6 @@ spec:
                                 Valid values are integers greater than 0.
                                 When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                 For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                 labelSelector spread as 2/2/2:
                                 | zone1 | zone2 | zone3 |
@@ -8853,7 +8726,6 @@ spec:
                                 In this situation, new pod with the same labelSelector cannot be scheduled,
                                 because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                 it will violate MaxSkew.
-
 
                                 This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                               format: int32
@@ -8865,7 +8737,6 @@ spec:
                                 - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                 - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                 If this value is nil, the behavior is equivalent to the Honor policy.
                                 This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                               type: string
@@ -8876,7 +8747,6 @@ spec:
                                 - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                 has a toleration, are included.
                                 - Ignore: node taints are ignored. All nodes are included.
-
 
                                 If this value is nil, the behavior is equivalent to the Ignore policy.
                                 This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -8945,7 +8815,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 partition:
                                   description: |-
@@ -9062,7 +8931,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -9101,7 +8969,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -9170,7 +9037,6 @@ spec:
                                   description: |-
                                     Name of the referent.
                                     More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: optional specify whether the ConfigMap
@@ -9206,7 +9072,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -9346,7 +9211,6 @@ spec:
                                 The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
                                 and deleted when the pod is removed.
 
-
                                 Use this if:
                                 a) the volume is only needed while the pod runs,
                                 b) features of normal volumes like restoring from snapshot or capacity
@@ -9357,16 +9221,13 @@ spec:
                                    information on the connection between this volume type
                                    and PersistentVolumeClaim).
 
-
                                 Use PersistentVolumeClaim or one of the vendor-specific
                                 APIs for volumes that persist for longer than the lifecycle
                                 of an individual pod.
 
-
                                 Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to
                                 be used that way - see the documentation of the driver for
                                 more information.
-
 
                                 A pod can use both types of ephemeral volumes and
                                 persistent volumes at the same time.
@@ -9381,7 +9242,6 @@ spec:
                                     entry. Pod validation will reject the pod if the concatenated name
                                     is not valid for a PVC (for example, too long).
 
-
                                     An existing PVC with that name that is not owned by the pod
                                     will *not* be used for the pod to avoid using an unrelated
                                     volume by mistake. Starting the pod is then blocked until
@@ -9391,10 +9251,8 @@ spec:
                                     this should not be necessary, but it may be useful when
                                     manually reconstructing a broken cluster.
 
-
                                     This field is read-only and no changes will be made by Kubernetes
                                     to the PVC after it has been created.
-
 
                                     Required, must not be nil.
                                   properties:
@@ -9639,7 +9497,6 @@ spec:
                                     fsType is the filesystem type to mount.
                                     Must be a filesystem type supported by the host operating system.
                                     Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 lun:
                                   description: 'lun is Optional: FC target lun number'
@@ -9702,7 +9559,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -9736,7 +9592,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 partition:
                                   description: |-
@@ -9817,9 +9672,6 @@ spec:
                                 used for system agents or other privileged things that are allowed
                                 to see the host machine. Most containers will NOT need this.
                                 More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
-                                ---
-                                TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
-                                mount host directories as read/write.
                               properties:
                                 path:
                                   description: |-
@@ -9856,7 +9708,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 initiatorName:
                                   description: |-
@@ -9896,7 +9747,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -10025,13 +9875,10 @@ spec:
                                           ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
                                           of ClusterTrustBundle objects in an auto-updating file.
 
-
                                           Alpha, gated by the ClusterTrustBundleProjection feature gate.
-
 
                                           ClusterTrustBundle objects can either be selected by name, or by the
                                           combination of signer name and a label selector.
-
 
                                           Kubelet performs aggressive normalization of the PEM contents written
                                           into the pod filesystem.  Esoteric PEM features such as inter-block
@@ -10161,7 +10008,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: optional specify whether
@@ -10298,7 +10144,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: optional field specify whether
@@ -10387,7 +10232,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 image:
                                   description: |-
@@ -10430,7 +10274,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -10477,7 +10320,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -10596,7 +10438,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -10925,7 +10766,7 @@ spec:
                             volume.\n\t* Custom resources must use implementation-defined
                             prefixed names such as \"example.com/my-custom-resource\"\nApart
                             from above values - keys that are unprefixed or have kubernetes.io
-                            prefix are considered\nreserved and hence may not be used.\n\n\nClaimResourceStatus
+                            prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus
                             can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState
                             set when resize controller starts resizing the volume
                             in control-plane.\n\t- ControllerResizeFailed:\n\t\tState
@@ -10945,12 +10786,12 @@ spec:
                             = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
                             = \"NodeResizeFailed\"\nWhen this field is not set, it
                             means that no resize operation is in progress for the
-                            given PVC.\n\n\nA controller that receives PVC update
-                            with previously unknown resourceName or ClaimResourceStatus\nshould
+                            given PVC.\n\nA controller that receives PVC update with
+                            previously unknown resourceName or ClaimResourceStatus\nshould
                             ignore the update for the purpose it was designed. For
                             example - a controller that\nonly is responsible for resizing
                             capacity of the volume, should ignore PVC updates that
-                            change other valid\nresources associated with PVC.\n\n\nThis
+                            change other valid\nresources associated with PVC.\n\nThis
                             is an alpha field and requires enabling RecoverVolumeExpansionFailure
                             feature."
                           type: object
@@ -10969,7 +10810,7 @@ spec:
                             volume.\n\t* Custom resources must use implementation-defined
                             prefixed names such as \"example.com/my-custom-resource\"\nApart
                             from above values - keys that are unprefixed or have kubernetes.io
-                            prefix are considered\nreserved and hence may not be used.\n\n\nCapacity
+                            prefix are considered\nreserved and hence may not be used.\n\nCapacity
                             reported here may be larger than the actual capacity when
                             a volume expansion operation\nis requested.\nFor storage
                             quota, the larger value from allocatedResources and PVC.spec.resources
@@ -10978,12 +10819,12 @@ spec:
                             capacity request is lowered, allocatedResources is only\nlowered
                             if there are no expansion operations in progress and if
                             the actual volume capacity\nis equal or lower than the
-                            requested capacity.\n\n\nA controller that receives PVC
+                            requested capacity.\n\nA controller that receives PVC
                             update with previously unknown resourceName\nshould ignore
                             the update for the purpose it was designed. For example
                             - a controller that\nonly is responsible for resizing
                             capacity of the volume, should ignore PVC updates that
-                            change other valid\nresources associated with PVC.\n\n\nThis
+                            change other valid\nresources associated with PVC.\n\nThis
                             is an alpha field and requires enabling RecoverVolumeExpansionFailure
                             feature."
                           type: object
@@ -11094,16 +10935,8 @@ spec:
                   Represents the latest available observations of an instanceset's current state.
                   Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -11144,12 +10977,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -11237,7 +11065,6 @@ spec:
                             their labels removed immediately.
                             This helps prevent "Split-Brain" scenarios during network partitions or node failures.
 
-
                             This field is immutable once set.
                           type: boolean
                         name:
@@ -11245,12 +11072,10 @@ spec:
                             Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
                             on the corresponding object to identify its role.
 
-
                             For example, common role names include:
                             - "leader": The primary/master instance that handles write operations
                             - "follower": Secondary/replica instances that replicate data from the leader
                             - "learner": Read-only instances that don't participate in elections
-
 
                             This field is immutable once set.
                           maxLength: 32
@@ -11264,14 +11089,12 @@ spec:
                             in quorum should have higher update priority than roles do not participate in quorum.
                             The default value is false.
 
-
                             For example, in a 5-pod component where:
                             - 2 learner pods (participatesInQuorum=false)
                             - 2 follower pods (participatesInQuorum=true)
                             - 1 leader pod (participatesInQuorum=true)
                             The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
                             of 2 learners and 1 follower while maintaining quorum.
-
 
                             This field is immutable once set.
                           type: boolean
@@ -11283,12 +11106,10 @@ spec:
                             Roles with the highest priority will be updated last.
                             The default priority is 0.
 
-
                             For example:
                             - Leader role may have priority 2 (updated last)
                             - Follower role may have priority 1 (updated before leader)
                             - Learner role may have priority 0 (updated first)
-
 
                             This field is immutable once set.
                           type: integer
@@ -11446,7 +11267,6 @@ spec:
                           Specifies the value of the environment variable. This field is optional and defaults to an empty string.
                           The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.
 
-
                           If a variable cannot be resolved, the reference in the input string will remain unchanged.
                           Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal "$(VAR_NAME)".
                           Escaped references will not be expanded, regardless of whether the variable exists or not.
@@ -11466,7 +11286,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its
@@ -11528,7 +11347,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -11550,7 +11368,6 @@ spec:
                           Specifies the value of the environment variable. This field is optional and defaults to an empty string.
                           The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.
 
-
                           If a variable cannot be resolved, the reference in the input string will remain unchanged.
                           Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal "$(VAR_NAME)".
                           Escaped references will not be expanded, regardless of whether the variable exists or not.
@@ -11570,7 +11387,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its
@@ -11632,7 +11448,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -11652,7 +11467,6 @@ spec:
                 description: |-
                   Specifies the desired Ordinals of the default template.
                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the default template.
-
 
                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
                   then the instance names generated under the default template would be
@@ -11685,7 +11499,6 @@ spec:
                 description: |-
                   Overrides values in default Template.
 
-
                   Instance is the fundamental unit managed by KubeBlocks.
                   It represents a Pod with additional objects such as PVCs, Services, ConfigMaps, etc.
                   An InstanceSet manages instances with a total count of Replicas,
@@ -11693,12 +11506,10 @@ spec:
                   The InstanceTemplate provides a way to override values in the default template,
                   allowing the InstanceSet to manage instances from different templates.
 
-
                   The naming convention for instances (pods) based on the InstanceSet Name, InstanceTemplate Name, and ordinal.
                   The constructed instance name follows the pattern: $(instance_set.name)-$(template.name)-$(ordinal).
                   By default, the ordinal starts from 0 for each InstanceTemplate.
                   It is important to ensure that the Name of each InstanceTemplate is unique.
-
 
                   The sum of replicas across all InstanceTemplates should not exceed the total number of Replicas specified for the InstanceSet.
                   Any remaining replicas will be generated using the default template and will follow the default naming rules.
@@ -11754,7 +11565,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -11817,7 +11627,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -11856,7 +11665,6 @@ spec:
                       description: |-
                         Specifies the desired Ordinals of this InstanceTemplate.
                         The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
-
 
                         For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
                         then the instance names generated under this InstanceTemplate would be
@@ -11906,10 +11714,8 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
 
                             This field is immutable. It can only be set for containers.
                           items:
@@ -12882,10 +12688,8 @@ spec:
                             Each toleration in the array allows the Pod to tolerate node taints based on
                             specified `key`, `value`, `effect`, and `operator`.
 
-
                             - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                             - The `operator` determines how the toleration matches the taint.
-
 
                             Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                           items:
@@ -12993,7 +12797,6 @@ spec:
                                   Keys that don't exist in the incoming pod labels will
                                   be ignored. A null or empty list means only match against labelSelector.
 
-
                                   This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                 items:
                                   type: string
@@ -13033,7 +12836,6 @@ spec:
                                   Valid values are integers greater than 0.
                                   When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                   For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                   labelSelector spread as 2/2/2:
                                   | zone1 | zone2 | zone3 |
@@ -13042,7 +12844,6 @@ spec:
                                   In this situation, new pod with the same labelSelector cannot be scheduled,
                                   because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                   it will violate MaxSkew.
-
 
                                   This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                 format: int32
@@ -13054,7 +12855,6 @@ spec:
                                   - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                   - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                   If this value is nil, the behavior is equivalent to the Honor policy.
                                   This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                 type: string
@@ -13065,7 +12865,6 @@ spec:
                                   - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                   has a toleration, are included.
                                   - Ignore: node taints are ignored. All nodes are included.
-
 
                                   If this value is nil, the behavior is equivalent to the Ignore policy.
                                   This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -13386,7 +13185,7 @@ spec:
                                   names such as \"example.com/my-custom-resource\"\nApart
                                   from above values - keys that are unprefixed or
                                   have kubernetes.io prefix are considered\nreserved
-                                  and hence may not be used.\n\n\nClaimResourceStatus
+                                  and hence may not be used.\n\nClaimResourceStatus
                                   can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState
                                   set when resize controller starts resizing the volume
                                   in control-plane.\n\t- ControllerResizeFailed:\n\t\tState
@@ -13407,14 +13206,14 @@ spec:
                                   = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
                                   = \"NodeResizeFailed\"\nWhen this field is not set,
                                   it means that no resize operation is in progress
-                                  for the given PVC.\n\n\nA controller that receives
+                                  for the given PVC.\n\nA controller that receives
                                   PVC update with previously unknown resourceName
                                   or ClaimResourceStatus\nshould ignore the update
                                   for the purpose it was designed. For example - a
                                   controller that\nonly is responsible for resizing
                                   capacity of the volume, should ignore PVC updates
                                   that change other valid\nresources associated with
-                                  PVC.\n\n\nThis is an alpha field and requires enabling
+                                  PVC.\n\nThis is an alpha field and requires enabling
                                   RecoverVolumeExpansionFailure feature."
                                 type: object
                                 x-kubernetes-map-type: granular
@@ -13434,7 +13233,7 @@ spec:
                                   names such as \"example.com/my-custom-resource\"\nApart
                                   from above values - keys that are unprefixed or
                                   have kubernetes.io prefix are considered\nreserved
-                                  and hence may not be used.\n\n\nCapacity reported
+                                  and hence may not be used.\n\nCapacity reported
                                   here may be larger than the actual capacity when
                                   a volume expansion operation\nis requested.\nFor
                                   storage quota, the larger value from allocatedResources
@@ -13444,13 +13243,13 @@ spec:
                                   request is lowered, allocatedResources is only\nlowered
                                   if there are no expansion operations in progress
                                   and if the actual volume capacity\nis equal or lower
-                                  than the requested capacity.\n\n\nA controller that
+                                  than the requested capacity.\n\nA controller that
                                   receives PVC update with previously unknown resourceName\nshould
                                   ignore the update for the purpose it was designed.
                                   For example - a controller that\nonly is responsible
                                   for resizing capacity of the volume, should ignore
                                   PVC updates that change other valid\nresources associated
-                                  with PVC.\n\n\nThis is an alpha field and requires
+                                  with PVC.\n\nThis is an alpha field and requires
                                   enabling RecoverVolumeExpansionFailure feature."
                                 type: object
                               capacity:
@@ -13610,7 +13409,6 @@ spec:
                                   Tip: Ensure that the filesystem type is supported by the host operating system.
                                   Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                   More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
-                                  TODO: how do we prevent errors in the filesystem from compromising the machine
                                 type: string
                               partition:
                                 description: |-
@@ -13727,7 +13525,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -13766,7 +13563,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -13835,7 +13631,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: optional specify whether the ConfigMap
@@ -13871,7 +13666,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -14009,7 +13803,6 @@ spec:
                               The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
                               and deleted when the pod is removed.
 
-
                               Use this if:
                               a) the volume is only needed while the pod runs,
                               b) features of normal volumes like restoring from snapshot or capacity
@@ -14020,16 +13813,13 @@ spec:
                                  information on the connection between this volume type
                                  and PersistentVolumeClaim).
 
-
                               Use PersistentVolumeClaim or one of the vendor-specific
                               APIs for volumes that persist for longer than the lifecycle
                               of an individual pod.
 
-
                               Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to
                               be used that way - see the documentation of the driver for
                               more information.
-
 
                               A pod can use both types of ephemeral volumes and
                               persistent volumes at the same time.
@@ -14044,7 +13834,6 @@ spec:
                                   entry. Pod validation will reject the pod if the concatenated name
                                   is not valid for a PVC (for example, too long).
 
-
                                   An existing PVC with that name that is not owned by the pod
                                   will *not* be used for the pod to avoid using an unrelated
                                   volume by mistake. Starting the pod is then blocked until
@@ -14054,10 +13843,8 @@ spec:
                                   this should not be necessary, but it may be useful when
                                   manually reconstructing a broken cluster.
 
-
                                   This field is read-only and no changes will be made by Kubernetes
                                   to the PVC after it has been created.
-
 
                                   Required, must not be nil.
                                 properties:
@@ -14301,7 +14088,6 @@ spec:
                                   fsType is the filesystem type to mount.
                                   Must be a filesystem type supported by the host operating system.
                                   Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-                                  TODO: how do we prevent errors in the filesystem from compromising the machine
                                 type: string
                               lun:
                                 description: 'lun is Optional: FC target lun number'
@@ -14364,7 +14150,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -14398,7 +14183,6 @@ spec:
                                   Tip: Ensure that the filesystem type is supported by the host operating system.
                                   Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                   More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
-                                  TODO: how do we prevent errors in the filesystem from compromising the machine
                                 type: string
                               partition:
                                 description: |-
@@ -14479,9 +14263,6 @@ spec:
                               used for system agents or other privileged things that are allowed
                               to see the host machine. Most containers will NOT need this.
                               More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
-                              ---
-                              TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
-                              mount host directories as read/write.
                             properties:
                               path:
                                 description: |-
@@ -14518,7 +14299,6 @@ spec:
                                   Tip: Ensure that the filesystem type is supported by the host operating system.
                                   Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                   More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
-                                  TODO: how do we prevent errors in the filesystem from compromising the machine
                                 type: string
                               initiatorName:
                                 description: |-
@@ -14558,7 +14338,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -14687,13 +14466,10 @@ spec:
                                         ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
                                         of ClusterTrustBundle objects in an auto-updating file.
 
-
                                         Alpha, gated by the ClusterTrustBundleProjection feature gate.
-
 
                                         ClusterTrustBundle objects can either be selected by name, or by the
                                         combination of signer name and a label selector.
-
 
                                         Kubelet performs aggressive normalization of the PEM contents written
                                         into the pod filesystem.  Esoteric PEM features such as inter-block
@@ -14823,7 +14599,6 @@ spec:
                                           description: |-
                                             Name of the referent.
                                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                            TODO: Add other useful fields. apiVersion, kind, uid?
                                           type: string
                                         optional:
                                           description: optional specify whether the
@@ -14959,7 +14734,6 @@ spec:
                                           description: |-
                                             Name of the referent.
                                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                            TODO: Add other useful fields. apiVersion, kind, uid?
                                           type: string
                                         optional:
                                           description: optional field specify whether
@@ -15048,7 +14822,6 @@ spec:
                                   Tip: Ensure that the filesystem type is supported by the host operating system.
                                   Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                   More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
-                                  TODO: how do we prevent errors in the filesystem from compromising the machine
                                 type: string
                               image:
                                 description: |-
@@ -15091,7 +14864,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -15138,7 +14910,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -15257,7 +15028,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                 type: object
                                 x-kubernetes-map-type: atomic
@@ -15316,7 +15086,6 @@ spec:
               memberUpdateStrategy:
                 description: |-
                   Members(Pods) update strategy.
-
 
                   - serial: update Members one by one that guarantee minimum component unavailable time.
                   - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
@@ -15442,7 +15211,6 @@ spec:
                       - KB_ITS_TARGET_HOST: Represents the target host
                       - KB_ITS_SERVICE_PORT: Represents the service port
 
-
                       Defines the action to perform a switchover.
                       If the Image is not configured, the latest [BusyBox](https://busybox.net/) image will be used.
                     properties:
@@ -15481,15 +15249,12 @@ spec:
                 description: |-
                   Specifies the names of instances to be transitioned to offline status.
 
-
                   Marking an instance as offline results in the following:
-
 
                   1. The associated pod is stopped, and its PersistentVolumeClaim (PVC) is retained for potential
                      future reuse or data recovery, but it is no longer actively used.
                   2. The ordinal number assigned to this instance is preserved, ensuring it remains unique
                      and avoiding conflicts with new instances.
-
 
                   Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
                   ordinal consistency within the cluster.
@@ -15516,20 +15281,17 @@ spec:
                   Controls how pods are created during initial scale up,
                   when replacing pods on nodes, or when scaling down.
 
-
                   The default policy is `OrderedReady`, where pods are created in increasing order and the controller waits until each pod is ready before
                   continuing. When scaling down, the pods are removed in the opposite order.
                   The alternative policy is `Parallel` which will create pods in parallel
                   to match the desired scale without waiting, and on scale down will delete
                   all pods at once.
 
-
                   Note: This field will be removed in future version.
                 type: string
               podUpdatePolicy:
                 description: |-
                   PodUpdatePolicy indicates how pods should be updated
-
 
                   - `StrictInPlace` indicates that only allows in-place upgrades.
                   Any attempt to modify other fields will be rejected.
@@ -15713,7 +15475,6 @@ spec:
                   Provides read-write service.
                   https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
-
                   Note: This field will be removed in future version.
                 properties:
                   apiVersion:
@@ -15807,7 +15568,6 @@ spec:
                           clients must ensure that clusterIPs[0] and clusterIP have the same
                           value.
 
-
                           This field may hold a maximum of two entries (dual-stack IPs, in either order).
                           These IPs must correspond to the values of the ipFamilies field. Both
                           clusterIPs and ipFamilies are governed by the ipFamilyPolicy field.
@@ -15886,7 +15646,6 @@ spec:
                           NodePort, and LoadBalancer, and does apply to "headless" services.
                           This field will be wiped when updating a Service to type ExternalName.
 
-
                           This field may hold a maximum of two entries (dual-stack families, in
                           either order).  These families must correspond to the values of the
                           clusterIPs field, if specified. Both clusterIPs and ipFamilies are
@@ -15956,16 +15715,13 @@ spec:
                                 This field follows standard Kubernetes label syntax.
                                 Valid values are either:
 
-
                                 * Un-prefixed protocol names - reserved for IANA standard service names (as per
                                 RFC-6335 and https://www.iana.org/assignments/service-names).
-
 
                                 * Kubernetes-defined prefixed names:
                                   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
                                   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
                                   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
-
 
                                 * Other protocols should use implementation-defined prefixed names such as
                                 mycompany.com/my-custom-protocol.
@@ -16101,18 +15857,8 @@ spec:
                       conditions:
                         description: Current service state
                         items:
-                          description: "Condition contains details for one aspect
-                            of the current state of this API Resource.\n---\nThis
-                            struct is intended for direct use as an array at the field
-                            path .status.conditions.  For example,\n\n\n\ttype FooStatus
-                            struct{\n\t    // Represents the observations of a foo's
-                            current state.\n\t    // Known .status.conditions.type
-                            are: \"Available\", \"Progressing\", and \"Degraded\"\n\t
-                            \   // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t
-                            \   // +listType=map\n\t    // +listMapKey=type\n\t    Conditions
-                            []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\"
-                            patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                            \   // other fields\n\t}"
+                          description: Condition contains details for one aspect of
+                            the current state of this API Resource.
                           properties:
                             lastTransitionTime:
                               description: |-
@@ -16154,12 +15900,7 @@ spec:
                               - Unknown
                               type: string
                             type:
-                              description: |-
-                                type of condition in CamelCase or in foo.example.com/CamelCase.
-                                ---
-                                Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                                useful (see .node.status.conditions), the ability to deconflict is important.
-                                The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                              description: type of condition in CamelCase or in foo.example.com/CamelCase.
                               maxLength: 316
                               pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                               type: string
@@ -16221,8 +15962,6 @@ spec:
                                             CamelCase names
                                           - cloud provider specific error values must have names that comply with the
                                             format foo.example.com/CamelCase.
-                                          ---
-                                          The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
                                         maxLength: 316
                                         pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                                         type: string
@@ -16233,12 +15972,12 @@ spec:
                                         format: int32
                                         type: integer
                                       protocol:
-                                        default: TCP
                                         description: |-
                                           Protocol is the protocol of the service port of which status is recorded here
                                           The supported values are: "TCP", "UDP", "SCTP"
                                         type: string
                                     required:
+                                    - error
                                     - port
                                     - protocol
                                     type: object
@@ -17264,7 +17003,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -17330,7 +17068,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -17364,7 +17101,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -17383,7 +17119,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret must
@@ -17668,10 +17403,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -17881,10 +17616,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -18033,10 +17768,8 @@ spec:
                                     Claims lists the names of resources, defined in spec.resourceClaims,
                                     that are used by this container.
 
-
                                     This is an alpha field and requires enabling the
                                     DynamicResourceAllocation feature gate.
-
 
                                     This field is immutable. It can only be set for containers.
                                   items:
@@ -18228,7 +17961,6 @@ spec:
                                         type indicates which kind of seccomp profile will be applied.
                                         Valid options are:
 
-
                                         Localhost - a profile defined in a file on the node should be used.
                                         RuntimeDefault - the container runtime default profile should be used.
                                         Unconfined - no profile should be applied.
@@ -18309,10 +18041,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -18615,7 +18347,6 @@ spec:
                             removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the
                             Pod to exceed its resource allocation.
 
-
                             To add an ephemeral container, use the ephemeralcontainers subresource of an existing
                             Pod. Ephemeral containers may not be removed or restarted.
                           properties:
@@ -18683,7 +18414,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -18749,7 +18479,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -18783,7 +18512,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -18802,7 +18530,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret must
@@ -19080,10 +18807,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -19281,10 +19008,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -19432,10 +19159,8 @@ spec:
                                     Claims lists the names of resources, defined in spec.resourceClaims,
                                     that are used by this container.
 
-
                                     This is an alpha field and requires enabling the
                                     DynamicResourceAllocation feature gate.
-
 
                                     This field is immutable. It can only be set for containers.
                                   items:
@@ -19615,7 +19340,6 @@ spec:
                                         type indicates which kind of seccomp profile will be applied.
                                         Valid options are:
 
-
                                         Localhost - a profile defined in a file on the node should be used.
                                         RuntimeDefault - the container runtime default profile should be used.
                                         Unconfined - no profile should be applied.
@@ -19689,10 +19413,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -19829,7 +19553,6 @@ spec:
                                 If set, the name of the container from PodSpec that this ephemeral container targets.
                                 The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
                                 If not set then the ephemeral container uses the namespaces configured in the Pod spec.
-
 
                                 The container runtime must implement support for this feature. If the runtime does not
                                 support namespace targeting then the result of setting this field is undefined.
@@ -20002,7 +19725,6 @@ spec:
                               description: |-
                                 Name of the referent.
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
@@ -20090,7 +19812,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -20156,7 +19877,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -20190,7 +19910,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -20209,7 +19928,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret must
@@ -20494,10 +20212,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -20707,10 +20425,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -20859,10 +20577,8 @@ spec:
                                     Claims lists the names of resources, defined in spec.resourceClaims,
                                     that are used by this container.
 
-
                                     This is an alpha field and requires enabling the
                                     DynamicResourceAllocation feature gate.
-
 
                                     This field is immutable. It can only be set for containers.
                                   items:
@@ -21054,7 +20770,6 @@ spec:
                                         type indicates which kind of seccomp profile will be applied.
                                         Valid options are:
 
-
                                         Localhost - a profile defined in a file on the node should be used.
                                         RuntimeDefault - the container runtime default profile should be used.
                                         Unconfined - no profile should be applied.
@@ -21135,10 +20850,10 @@ spec:
                                       format: int32
                                       type: integer
                                     service:
+                                      default: ""
                                       description: |-
                                         Service is the name of the service to place in the gRPC HealthCheckRequest
                                         (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                         If this is not specified, the default behavior is defined by gRPC.
                                       type: string
@@ -21392,10 +21107,8 @@ spec:
                           Specifies the OS of the containers in the pod.
                           Some pod and container fields are restricted if this is set.
 
-
                           If the OS field is set to linux, the following fields must be unset:
                           -securityContext.windowsOptions
-
 
                           If the OS field is set to windows, following fields must be unset:
                           - spec.hostPID
@@ -21495,10 +21208,8 @@ spec:
                           will be made available to those containers which consume them
                           by name.
 
-
                           This is an alpha field and requires enabling the
                           DynamicResourceAllocation feature gate.
-
 
                           This field is immutable.
                         items:
@@ -21525,13 +21236,11 @@ spec:
                                     ResourceClaimTemplateName is the name of a ResourceClaimTemplate
                                     object in the same namespace as this pod.
 
-
                                     The template will be used to create a new ResourceClaim, which will
                                     be bound to this pod. When this pod is deleted, the ResourceClaim
                                     will also be deleted. The pod name and resource name, along with a
                                     generated component, will be used to form a unique name for the
                                     ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
-
 
                                     This field is immutable and no changes will be made to the
                                     corresponding ResourceClaim by the control plane after creating the
@@ -21571,9 +21280,7 @@ spec:
                           If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
                           scheduler will not attempt to schedule the pod.
 
-
                           SchedulingGates can only be set at pod creation time, and be removed only afterwards.
-
 
                           This is a beta feature enabled by the PodSchedulingReadiness feature gate.
                         items:
@@ -21603,11 +21310,9 @@ spec:
                               Some volume types allow the Kubelet to change the ownership of that volume
                               to be owned by the pod:
 
-
                               1. The owning GID will be the FSGroup
                               2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
                               3. The permission bits are OR'd with rw-rw----
-
 
                               If unset, the Kubelet will not modify the ownership and permissions of any volume.
                               Note that this field cannot be set when spec.os.name is windows.
@@ -21694,7 +21399,6 @@ spec:
                                 description: |-
                                   type indicates which kind of seccomp profile will be applied.
                                   Valid options are:
-
 
                                   Localhost - a profile defined in a file on the node should be used.
                                   RuntimeDefault - the container runtime default profile should be used.
@@ -21918,7 +21622,6 @@ spec:
                                 Keys that don't exist in the incoming pod labels will
                                 be ignored. A null or empty list means only match against labelSelector.
 
-
                                 This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                               items:
                                 type: string
@@ -21958,7 +21661,6 @@ spec:
                                 Valid values are integers greater than 0.
                                 When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                 For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                 labelSelector spread as 2/2/2:
                                 | zone1 | zone2 | zone3 |
@@ -21967,7 +21669,6 @@ spec:
                                 In this situation, new pod with the same labelSelector cannot be scheduled,
                                 because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                 it will violate MaxSkew.
-
 
                                 This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                               format: int32
@@ -21979,7 +21680,6 @@ spec:
                                 - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                 - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                 If this value is nil, the behavior is equivalent to the Honor policy.
                                 This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                               type: string
@@ -21990,7 +21690,6 @@ spec:
                                 - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                 has a toleration, are included.
                                 - Ignore: node taints are ignored. All nodes are included.
-
 
                                 If this value is nil, the behavior is equivalent to the Ignore policy.
                                 This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -22059,7 +21758,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 partition:
                                   description: |-
@@ -22176,7 +21874,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -22215,7 +21912,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -22284,7 +21980,6 @@ spec:
                                   description: |-
                                     Name of the referent.
                                     More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: optional specify whether the ConfigMap
@@ -22320,7 +22015,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -22460,7 +22154,6 @@ spec:
                                 The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
                                 and deleted when the pod is removed.
 
-
                                 Use this if:
                                 a) the volume is only needed while the pod runs,
                                 b) features of normal volumes like restoring from snapshot or capacity
@@ -22471,16 +22164,13 @@ spec:
                                    information on the connection between this volume type
                                    and PersistentVolumeClaim).
 
-
                                 Use PersistentVolumeClaim or one of the vendor-specific
                                 APIs for volumes that persist for longer than the lifecycle
                                 of an individual pod.
 
-
                                 Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to
                                 be used that way - see the documentation of the driver for
                                 more information.
-
 
                                 A pod can use both types of ephemeral volumes and
                                 persistent volumes at the same time.
@@ -22495,7 +22185,6 @@ spec:
                                     entry. Pod validation will reject the pod if the concatenated name
                                     is not valid for a PVC (for example, too long).
 
-
                                     An existing PVC with that name that is not owned by the pod
                                     will *not* be used for the pod to avoid using an unrelated
                                     volume by mistake. Starting the pod is then blocked until
@@ -22505,10 +22194,8 @@ spec:
                                     this should not be necessary, but it may be useful when
                                     manually reconstructing a broken cluster.
 
-
                                     This field is read-only and no changes will be made by Kubernetes
                                     to the PVC after it has been created.
-
 
                                     Required, must not be nil.
                                   properties:
@@ -22753,7 +22440,6 @@ spec:
                                     fsType is the filesystem type to mount.
                                     Must be a filesystem type supported by the host operating system.
                                     Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 lun:
                                   description: 'lun is Optional: FC target lun number'
@@ -22816,7 +22502,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -22850,7 +22535,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 partition:
                                   description: |-
@@ -22931,9 +22615,6 @@ spec:
                                 used for system agents or other privileged things that are allowed
                                 to see the host machine. Most containers will NOT need this.
                                 More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
-                                ---
-                                TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
-                                mount host directories as read/write.
                               properties:
                                 path:
                                   description: |-
@@ -22970,7 +22651,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 initiatorName:
                                   description: |-
@@ -23010,7 +22690,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -23139,13 +22818,10 @@ spec:
                                           ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
                                           of ClusterTrustBundle objects in an auto-updating file.
 
-
                                           Alpha, gated by the ClusterTrustBundleProjection feature gate.
-
 
                                           ClusterTrustBundle objects can either be selected by name, or by the
                                           combination of signer name and a label selector.
-
 
                                           Kubelet performs aggressive normalization of the PEM contents written
                                           into the pod filesystem.  Esoteric PEM features such as inter-block
@@ -23275,7 +22951,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: optional specify whether
@@ -23412,7 +23087,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: optional field specify whether
@@ -23501,7 +23175,6 @@ spec:
                                     Tip: Ensure that the filesystem type is supported by the host operating system.
                                     Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                     More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
-                                    TODO: how do we prevent errors in the filesystem from compromising the machine
                                   type: string
                                 image:
                                   description: |-
@@ -23544,7 +23217,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -23591,7 +23263,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -23710,7 +23381,6 @@ spec:
                                       description: |-
                                         Name of the referent.
                                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion, kind, uid?
                                       type: string
                                   type: object
                                   x-kubernetes-map-type: atomic
@@ -23769,7 +23439,6 @@ spec:
                   employed to update Pods in the InstanceSet when a revision is made to
                   Template.
 
-
                   Note: This field will be removed in future version.
                 properties:
                   maxUnavailable:
@@ -23786,7 +23455,6 @@ spec:
                   memberUpdateStrategy:
                     description: |-
                       Members(Pods) update strategy.
-
 
                       - serial: update Members one by one that guarantee minimum component unavailable time.
                       - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
@@ -24077,7 +23745,7 @@ spec:
                             volume.\n\t* Custom resources must use implementation-defined
                             prefixed names such as \"example.com/my-custom-resource\"\nApart
                             from above values - keys that are unprefixed or have kubernetes.io
-                            prefix are considered\nreserved and hence may not be used.\n\n\nClaimResourceStatus
+                            prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus
                             can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState
                             set when resize controller starts resizing the volume
                             in control-plane.\n\t- ControllerResizeFailed:\n\t\tState
@@ -24097,12 +23765,12 @@ spec:
                             = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
                             = \"NodeResizeFailed\"\nWhen this field is not set, it
                             means that no resize operation is in progress for the
-                            given PVC.\n\n\nA controller that receives PVC update
-                            with previously unknown resourceName or ClaimResourceStatus\nshould
+                            given PVC.\n\nA controller that receives PVC update with
+                            previously unknown resourceName or ClaimResourceStatus\nshould
                             ignore the update for the purpose it was designed. For
                             example - a controller that\nonly is responsible for resizing
                             capacity of the volume, should ignore PVC updates that
-                            change other valid\nresources associated with PVC.\n\n\nThis
+                            change other valid\nresources associated with PVC.\n\nThis
                             is an alpha field and requires enabling RecoverVolumeExpansionFailure
                             feature."
                           type: object
@@ -24121,7 +23789,7 @@ spec:
                             volume.\n\t* Custom resources must use implementation-defined
                             prefixed names such as \"example.com/my-custom-resource\"\nApart
                             from above values - keys that are unprefixed or have kubernetes.io
-                            prefix are considered\nreserved and hence may not be used.\n\n\nCapacity
+                            prefix are considered\nreserved and hence may not be used.\n\nCapacity
                             reported here may be larger than the actual capacity when
                             a volume expansion operation\nis requested.\nFor storage
                             quota, the larger value from allocatedResources and PVC.spec.resources
@@ -24130,12 +23798,12 @@ spec:
                             capacity request is lowered, allocatedResources is only\nlowered
                             if there are no expansion operations in progress and if
                             the actual volume capacity\nis equal or lower than the
-                            requested capacity.\n\n\nA controller that receives PVC
+                            requested capacity.\n\nA controller that receives PVC
                             update with previously unknown resourceName\nshould ignore
                             the update for the purpose it was designed. For example
                             - a controller that\nonly is responsible for resizing
                             capacity of the volume, should ignore PVC updates that
-                            change other valid\nresources associated with PVC.\n\n\nThis
+                            change other valid\nresources associated with PVC.\n\nThis
                             is an alpha field and requires enabling RecoverVolumeExpansionFailure
                             feature."
                           type: object
@@ -24246,16 +23914,8 @@ spec:
                   Represents the latest available observations of an instanceset's current state.
                   Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -24296,12 +23956,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

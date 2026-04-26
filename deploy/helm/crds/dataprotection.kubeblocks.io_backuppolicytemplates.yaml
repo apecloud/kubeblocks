@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: kubeblocks
   name: backuppolicytemplates.dataprotection.kubeblocks.io
@@ -112,9 +112,7 @@ spec:
                                         Represents an array of the service version that can be mapped to the appropriate value.
                                         Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
 
-
                                         For example:
-
 
                                         - "8.0.33": Matches the exact name "8.0.33"
                                         - "8.0": Matches all names starting with "8.0"
@@ -150,10 +148,8 @@ spec:
                                 Claims lists the names of resources, defined in spec.resourceClaims,
                                 that are used by this container.
 
-
                                 This is an alpha field and requires enabling the
                                 DynamicResourceAllocation feature gate.
-
 
                                 This field is immutable. It can only be set for containers.
                               items:
@@ -211,7 +207,6 @@ spec:
                         If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
                         If this field is not set, the selection method specified in `backupPolicy.target` is used.
 
-
                         This field provides a way to override the global `backupPolicy.target` setting for specific BackupMethod.
                       properties:
                         account:
@@ -232,6 +227,9 @@ spec:
                             portName:
                               description: Specifies the port name.
                               type: string
+                          required:
+                          - containerName
+                          - portName
                           type: object
                         fallbackRole:
                           description: |-
@@ -241,7 +239,6 @@ spec:
                         role:
                           description: |-
                             Specifies the role to select one or more replicas for backup.
-
 
                             - If no replica with the specified role exists, the backup task will fail.
                               Special case: If there is only one replica in the cluster, it will be used for backup,
@@ -257,7 +254,6 @@ spec:
                             Specifies the PodSelectionStrategy to use when multiple pods are
                             selected for the backup target.
                             Valid values are:
-
 
                             - Any: Selects any one pod that matches the labelsSelector.
                             - All: Selects all pods that match the labelsSelector.
@@ -339,9 +335,7 @@ spec:
                   CompDefs specifies names for the component definitions associated with this BackupPolicyTemplate.
                   Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
 
-
                   For example:
-
 
                   - "mysql-8.0.30-v1alpha1": Matches the exact name "mysql-8.0.30-v1alpha1"
                   - "mysql-8.0.30": Matches all names starting with "mysql-8.0.30"
@@ -408,8 +402,8 @@ spec:
                         be kept.\nKubeBlocks will remove all backups that are older
                         than the RetentionPeriod.\nFor example, RetentionPeriod of
                         `30d` will keep only the backups of last 30 days.\nSample
-                        duration format:\n\n\n- years: \t2y\n- months: \t6mo\n- days:
-                        \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\n\nYou can also
+                        duration format:\n\n- years: \t2y\n- months: \t6mo\n- days:
+                        \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\nYou can also
                         combine the above durations. For example: 30d12h30m"
                       type: string
                   required:
@@ -421,7 +415,6 @@ spec:
                 description: |-
                   Defines the type of well-known service protocol that the BackupPolicyTemplate provides, and it is optional.
                   Some examples of well-known service protocols include:
-
 
                   - "MySQL": Indicates that the Component provides a MySQL database service.
                   - "PostgreSQL": Indicates that the Component offers a PostgreSQL database service.
@@ -451,6 +444,9 @@ spec:
                       portName:
                         description: Specifies the port name.
                         type: string
+                    required:
+                    - containerName
+                    - portName
                     type: object
                   fallbackRole:
                     description: |-
@@ -460,7 +456,6 @@ spec:
                   role:
                     description: |-
                       Specifies the role to select one or more replicas for backup.
-
 
                       - If no replica with the specified role exists, the backup task will fail.
                         Special case: If there is only one replica in the cluster, it will be used for backup,
@@ -476,7 +471,6 @@ spec:
                       Specifies the PodSelectionStrategy to use when multiple pods are
                       selected for the backup target.
                       Valid values are:
-
 
                       - Any: Selects any one pod that matches the labelsSelector.
                       - All: Selects all pods that match the labelsSelector.
@@ -495,6 +489,7 @@ spec:
                 type: object
             required:
             - backupMethods
+            - compDefs
             type: object
           status:
             description: Populated by the system, it represents the current information

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: kubeblocks
   name: backuppolicies.dataprotection.kubeblocks.io
@@ -115,7 +115,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -178,7 +177,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -211,10 +209,8 @@ spec:
                                 Claims lists the names of resources, defined in spec.resourceClaims,
                                 that are used by this container.
 
-
                                 This is an alpha field and requires enabling the
                                 DynamicResourceAllocation feature gate.
-
 
                                 This field is immutable. It can only be set for containers.
                               items:
@@ -315,6 +311,9 @@ spec:
                             portName:
                               description: Specifies the port name.
                               type: string
+                          required:
+                          - containerName
+                          - portName
                           type: object
                         name:
                           description: |-
@@ -415,7 +414,6 @@ spec:
                               description: |-
                                 Specifies the strategy to select the target pod when multiple pods are selected.
                                 Valid values are:
-
 
                                 - `Any`: select any one pod that match the labelsSelector.
                                 - `All`: select all pods that match the labelsSelector. The backup data for the current pod
@@ -611,6 +609,9 @@ spec:
                               portName:
                                 description: Specifies the port name.
                                 type: string
+                            required:
+                            - containerName
+                            - portName
                             type: object
                           name:
                             description: |-
@@ -712,7 +713,6 @@ spec:
                                 description: |-
                                   Specifies the strategy to select the target pod when multiple pods are selected.
                                   Valid values are:
-
 
                                   - `Any`: select any one pod that match the labelsSelector.
                                   - `All`: select all pods that match the labelsSelector. The backup data for the current pod
@@ -823,7 +823,6 @@ spec:
                     description: |-
                       Specifies the encryption algorithm. Currently supported algorithms are:
 
-
                       - AES-128-CFB
                       - AES-192-CFB
                       - AES-256-CFB
@@ -845,7 +844,6 @@ spec:
                         description: |-
                           Name of the referent.
                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?
                         type: string
                       optional:
                         description: Specify whether the Secret or its key must be
@@ -919,6 +917,9 @@ spec:
                       portName:
                         description: Specifies the port name.
                         type: string
+                    required:
+                    - containerName
+                    - portName
                     type: object
                   name:
                     description: |-
@@ -1019,7 +1020,6 @@ spec:
                         description: |-
                           Specifies the strategy to select the target pod when multiple pods are selected.
                           Valid values are:
-
 
                           - `Any`: select any one pod that match the labelsSelector.
                           - `All`: select all pods that match the labelsSelector. The backup data for the current pod
@@ -1157,6 +1157,9 @@ spec:
                         portName:
                           description: Specifies the port name.
                           type: string
+                      required:
+                      - containerName
+                      - portName
                       type: object
                     name:
                       description: |-
@@ -1258,7 +1261,6 @@ spec:
                             Specifies the strategy to select the target pod when multiple pods are selected.
                             Valid values are:
 
-
                             - `Any`: select any one pod that match the labelsSelector.
                             - `All`: select all pods that match the labelsSelector. The backup data for the current pod
                             will be stored in a subdirectory named after the pod.
@@ -1351,12 +1353,10 @@ spec:
                 description: |-
                   Specifies whether backup data should be stored in a Kopia repository.
 
-
                   Data within the Kopia repository is both compressed and encrypted. Furthermore,
                   data deduplication is implemented across various backups of the same cluster.
                   This approach significantly reduces the actual storage usage, particularly
                   for clusters with a low update frequency.
-
 
                   NOTE: This feature should NOT be enabled when using KubeBlocks Community Edition, otherwise the backup will not be processed.
                 type: boolean

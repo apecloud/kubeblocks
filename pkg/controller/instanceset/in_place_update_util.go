@@ -256,6 +256,14 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
+func configHashOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
+	oldCopy := old.DeepCopy()
+	newCopy := new.DeepCopy()
+	delete(oldCopy.Annotations, constant.CMInsConfigurationHashLabelKey)
+	delete(newCopy.Annotations, constant.CMInsConfigurationHashLabelKey)
+	return equalBasicInPlaceFields(oldCopy, newCopy) && equalResourcesInPlaceFields(oldCopy, newCopy)
+}
+
 // equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
 // If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
 // will not participate in the comparison.

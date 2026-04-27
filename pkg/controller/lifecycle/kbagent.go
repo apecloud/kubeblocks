@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -303,7 +304,44 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 			m[k] = v
 		}
 	}
+	addShellSafeParameterAliases(m)
 	return m, nil
+}
+
+func addShellSafeParameterAliases(m map[string]string) {
+	for k, v := range m {
+		alias := shellSafeParameterAlias(k)
+		if alias == "" || alias == k {
+			continue
+		}
+		if existing, ok := m[alias]; !ok || existing == "" {
+			m[alias] = v
+		}
+	}
+}
+
+func shellSafeParameterAlias(name string) string {
+	if name == "" {
+		return ""
+	}
+	var b strings.Builder
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c >= 'a' && c <= 'z':
+			b.WriteByte(c - 'a' + 'A')
+		case c >= 'A' && c <= 'Z':
+			b.WriteByte(c)
+		case c >= '0' && c <= '9':
+			if b.Len() == 0 {
+				b.WriteByte('_')
+			}
+			b.WriteByte(c)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
 }
 
 func (a *kbagent) templateVarsParameters() (map[string]string, error) {

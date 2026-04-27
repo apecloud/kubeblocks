@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -27,9 +28,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -38,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -296,6 +300,79 @@ func TestValidateLegacyReloadActionSupport(t *testing.T) {
 				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
 			}
 		})
+	}
+}
+
+func TestResolveComponentConfigSpecFallsBackToComponentDefinition(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	namespace := "default"
+	clusterName := "r8a"
+	componentName := "valkey"
+	configName := "valkey-replication-config"
+	cmpdName := "valkey-9"
+	externalManaged := true
+
+	component := &appsv1.Component{}
+	component.Namespace = namespace
+	component.Name = constant.GenerateClusterComponentName(clusterName, componentName)
+	component.Spec.CompDef = cmpdName
+
+	cmpd := &appsv1.ComponentDefinition{}
+	cmpd.Name = cmpdName
+	cmpd.Spec.Configs = []appsv1.ComponentFileTemplate{{
+		Name:            configName,
+		Template:        "valkey9-config-template-0.1.1",
+		ExternalManaged: &externalManaged,
+		Reconfigure: &appsv1.Action{Exec: &appsv1.ExecAction{
+			Container:         "valkey",
+			Command:           []string{"/bin/sh", "-c", "reload"},
+			TargetPodSelector: appsv1.AllReplicas,
+		}},
+	}}
+
+	cm := &corev1.ConfigMap{}
+	cm.Namespace = namespace
+	cm.Name = "r8a-config"
+	cm.Labels = map[string]string{
+		constant.AppInstanceLabelKey:                 clusterName,
+		constant.KBAppComponentLabelKey:              componentName,
+		constant.CMConfigurationSpecProviderLabelKey: configName,
+	}
+	item := &parametersv1alpha1.ConfigTemplateItemDetail{
+		Name: configName,
+		ConfigSpec: &appsv1.ComponentFileTemplate{
+			Name:            configName,
+			Template:        "valkey9-config-template-0.1.1",
+			ExternalManaged: &externalManaged,
+		},
+	}
+
+	for _, obj := range []client.Object{component, cmpd, cm} {
+		if err := cli.Create(ctx, obj); err != nil {
+			t.Fatalf("create %T: %v", obj, err)
+		}
+	}
+	t.Cleanup(func() {
+		_ = cli.Delete(ctx, cm)
+		_ = cli.Delete(ctx, component)
+		_ = cli.Delete(ctx, cmpd)
+	})
+
+	r := &ReconfigureReconciler{Client: cli, Scheme: scheme}
+	got := r.resolveComponentConfigSpec(intctrlutil.RequestCtx{Ctx: ctx}, cm, item)
+	if got == nil || got.Reconfigure == nil || got.Reconfigure.Exec == nil {
+		t.Fatalf("expected complete ComponentDefinition config spec, got %#v", got)
+	}
+	if got.Reconfigure.Exec.TargetPodSelector != appsv1.AllReplicas {
+		t.Fatalf("TargetPodSelector = %q, want %q", got.Reconfigure.Exec.TargetPodSelector, appsv1.AllReplicas)
 	}
 }
 

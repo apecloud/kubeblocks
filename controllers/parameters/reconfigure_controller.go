@@ -186,7 +186,37 @@ func (r *ReconfigureReconciler) getConfigSpec(reqCtx intctrlutil.RequestCtx, cm 
 	if configSpec == nil {
 		return nil, fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, obj.Name)
 	}
+	if fullSpec := r.resolveComponentConfigSpec(reqCtx, cm, configSpec); fullSpec != nil {
+		return fullSpec, nil
+	}
 	return configSpec.ConfigSpec, nil
+}
+
+func (r *ReconfigureReconciler) resolveComponentConfigSpec(reqCtx intctrlutil.RequestCtx, cm *corev1.ConfigMap, item *parametersv1alpha1.ConfigTemplateItemDetail) *appsv1.ComponentFileTemplate {
+	componentKey := client.ObjectKey{
+		Namespace: cm.Namespace,
+		Name:      constant.GenerateClusterComponentName(cm.Labels[constant.AppInstanceLabelKey], cm.Labels[constant.KBAppComponentLabelKey]),
+	}
+	component := &appsv1.Component{}
+	if err := r.Client.Get(reqCtx.Ctx, componentKey, component); err != nil {
+		reqCtx.Log.V(1).Info("failed to fetch component when resolving config spec", "component", componentKey, "error", err)
+		return nil
+	}
+	cmpd := &appsv1.ComponentDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: component.Spec.CompDef}, cmpd); err != nil {
+		reqCtx.Log.V(1).Info("failed to fetch component definition when resolving config spec", "componentDefinition", component.Spec.CompDef, "error", err)
+		return nil
+	}
+	configName := item.Name
+	if item.ConfigSpec != nil && item.ConfigSpec.Name != "" {
+		configName = item.ConfigSpec.Name
+	}
+	for i := range cmpd.Spec.Configs {
+		if cmpd.Spec.Configs[i].Name == configName {
+			return cmpd.Spec.Configs[i].DeepCopy()
+		}
+	}
+	return nil
 }
 
 func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, configSpec *appsv1.ComponentFileTemplate) (ctrl.Result, error) {

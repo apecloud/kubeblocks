@@ -120,6 +120,27 @@ var _ = Describe("instance util test", func() {
 			Expect(toUpdate).Should(HaveLen(1))
 			Expect(toUpdate[0].Name).Should(Equal("valkey-replication-config"))
 		})
+
+		It("identifies config hash annotation only in-place updates", func() {
+			oldPod := builder.NewPodBuilder(namespace, name+"-0").
+				AddAnnotations("kept", "value").
+				SetContainers(template.Spec.Containers).
+				GetObject()
+			Expect(configsToPod([]workloads.ConfigTemplate{{
+				Name:       "valkey-replication-config",
+				ConfigHash: ptr.To("old-hash"),
+			}}, oldPod)).Should(Succeed())
+
+			newPod := oldPod.DeepCopy()
+			Expect(configsToPod([]workloads.ConfigTemplate{{
+				Name:       "valkey-replication-config",
+				ConfigHash: ptr.To("new-hash"),
+			}}, newPod)).Should(Succeed())
+			Expect(configHashOnlyInPlaceUpdate(oldPod, newPod)).Should(BeTrue())
+
+			newPod.Labels = map[string]string{"extra": "label"}
+			Expect(configHashOnlyInPlaceUpdate(oldPod, newPod)).Should(BeFalse())
+		})
 	})
 
 	Context("buildInstancePodByTemplate", func() {

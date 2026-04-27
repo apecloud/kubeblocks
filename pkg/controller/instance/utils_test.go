@@ -22,6 +22,7 @@ package instance
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -48,6 +49,35 @@ func TestConfigsToUpdateTreatsNilAndEmptyConfigHashAsEqual(t *testing.T) {
 	}
 	if len(toUpdate) != 0 {
 		t.Fatalf("expected no config drift, got %#v", toUpdate)
+	}
+}
+
+func TestConfigHashOnlyInPlaceUpdate(t *testing.T) {
+	oldPod := builder.NewPodBuilder("default", "valkey-0").
+		AddAnnotations("kept", "value").
+		SetContainers([]corev1.Container{{Name: "valkey", Image: "valkey:9"}}).
+		GetObject()
+	if err := configsToPod([]workloads.ConfigTemplate{{
+		Name:       "valkey-replication-config",
+		ConfigHash: ptr.To("old-hash"),
+	}}, oldPod); err != nil {
+		t.Fatalf("configsToPod() error = %v", err)
+	}
+
+	newPod := oldPod.DeepCopy()
+	if err := configsToPod([]workloads.ConfigTemplate{{
+		Name:       "valkey-replication-config",
+		ConfigHash: ptr.To("new-hash"),
+	}}, newPod); err != nil {
+		t.Fatalf("configsToPod() error = %v", err)
+	}
+	if !configHashOnlyInPlaceUpdate(oldPod, newPod) {
+		t.Fatalf("expected config hash only update")
+	}
+
+	newPod.Labels = map[string]string{"extra": "label"}
+	if configHashOnlyInPlaceUpdate(oldPod, newPod) {
+		t.Fatalf("expected non-config label update not to be config hash only")
 	}
 }
 

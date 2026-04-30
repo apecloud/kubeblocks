@@ -23,7 +23,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -262,6 +264,257 @@ func managedSharedConfigMap(name string) *corev1.ConfigMap {
 		assistantObjectAnnotationKey: "true",
 	}
 	return cm
+}
+
+func TestInstanceAssistantObject(t *testing.T) {
+	t.Run("service", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{Service: &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1"}}}
+		result, ok := instanceAssistantObject(obj)
+		assert.True(t, ok)
+		assert.Equal(t, "svc1", result.GetName())
+	})
+
+	t.Run("configmap", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{ConfigMap: &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}}}
+		result, ok := instanceAssistantObject(obj)
+		assert.True(t, ok)
+		assert.Equal(t, "cm1", result.GetName())
+	})
+
+	t.Run("secret", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{Secret: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "sec1"}}}
+		result, ok := instanceAssistantObject(obj)
+		assert.True(t, ok)
+		assert.Equal(t, "sec1", result.GetName())
+	})
+
+	t.Run("serviceaccount", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{ServiceAccount: &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "sa1"}}}
+		result, ok := instanceAssistantObject(obj)
+		assert.True(t, ok)
+		assert.Equal(t, "sa1", result.GetName())
+	})
+
+	t.Run("role", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{Role: &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: "role1"}}}
+		result, ok := instanceAssistantObject(obj)
+		assert.True(t, ok)
+		assert.Equal(t, "role1", result.GetName())
+	})
+
+	t.Run("rolebinding", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{RoleBinding: &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "rb1"}}}
+		result, ok := instanceAssistantObject(obj)
+		assert.True(t, ok)
+		assert.Equal(t, "rb1", result.GetName())
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		obj := workloads.InstanceAssistantObject{}
+		_, ok := instanceAssistantObject(obj)
+		assert.False(t, ok)
+	})
+}
+
+func TestCopyAndMergeAssistantObject_NoChange(t *testing.T) {
+	old := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "cm1",
+			Labels:      map[string]string{"l": "v"},
+			Annotations: map[string]string{"a": "v"},
+		},
+		Data: map[string]string{"key": "value"},
+	}
+	new := old.DeepCopy()
+
+	result := copyAndMergeAssistantObject(old, new,
+		func(o, n client.Object) bool {
+			return o.(*corev1.ConfigMap).Data["key"] == n.(*corev1.ConfigMap).Data["key"]
+		},
+		func(o, n client.Object) {
+			o.(*corev1.ConfigMap).Data = n.(*corev1.ConfigMap).Data
+		})
+	assert.Nil(t, result) // no change
+}
+
+func TestCopyAndMergeAssistantObject_DataChanged(t *testing.T) {
+	old := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "cm1",
+			Labels:      map[string]string{"l": "v"},
+			Annotations: map[string]string{"a": "v"},
+		},
+		Data: map[string]string{"key": "old"},
+	}
+	new := old.DeepCopy()
+	new.Data["key"] = "new"
+
+	result := copyAndMergeAssistantObject(old, new,
+		func(o, n client.Object) bool {
+			return o.(*corev1.ConfigMap).Data["key"] == n.(*corev1.ConfigMap).Data["key"]
+		},
+		func(o, n client.Object) {
+			o.(*corev1.ConfigMap).Data = n.(*corev1.ConfigMap).Data
+		})
+	assert.NotNil(t, result)
+	assert.Equal(t, "new", result.(*corev1.ConfigMap).Data["key"])
+}
+
+func TestReconcilerCopyAndMerge_AllTypes(t *testing.T) {
+	r := &assistantObjectReconciler{}
+
+	t.Run("service", func(t *testing.T) {
+		old := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc1"},
+			Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+		}
+		new := old.DeepCopy()
+		new.Spec.Ports[0].Port = 8080
+		obj := workloads.InstanceAssistantObject{Service: &corev1.Service{}}
+		result := r.copyAndMerge(obj, old, new)
+		assert.NotNil(t, result)
+		assert.Equal(t, int32(8080), result.(*corev1.Service).Spec.Ports[0].Port)
+	})
+
+	t.Run("configmap", func(t *testing.T) {
+		old := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "cm1"},
+			Data:       map[string]string{"key": "old"},
+		}
+		new := old.DeepCopy()
+		new.Data["key"] = "new"
+		obj := workloads.InstanceAssistantObject{ConfigMap: &corev1.ConfigMap{}}
+		result := r.copyAndMerge(obj, old, new)
+		assert.NotNil(t, result)
+		assert.Equal(t, "new", result.(*corev1.ConfigMap).Data["key"])
+	})
+
+	t.Run("secret", func(t *testing.T) {
+		old := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "sec1"},
+			Data:       map[string][]byte{"key": []byte("old")},
+		}
+		new := old.DeepCopy()
+		new.Data["key"] = []byte("new")
+		obj := workloads.InstanceAssistantObject{Secret: &corev1.Secret{}}
+		result := r.copyAndMerge(obj, old, new)
+		assert.NotNil(t, result)
+		assert.Equal(t, []byte("new"), result.(*corev1.Secret).Data["key"])
+	})
+
+	t.Run("serviceaccount", func(t *testing.T) {
+		old := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{Name: "sa1"},
+		}
+		new := old.DeepCopy()
+		new.Labels = map[string]string{"new": "label"}
+		obj := workloads.InstanceAssistantObject{ServiceAccount: &corev1.ServiceAccount{}}
+		result := r.copyAndMerge(obj, old, new)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("role", func(t *testing.T) {
+		old := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: "role1"},
+			Rules:      []rbacv1.PolicyRule{{Verbs: []string{"get"}}},
+		}
+		new := old.DeepCopy()
+		new.Rules[0].Verbs = []string{"get", "list"}
+		obj := workloads.InstanceAssistantObject{Role: &rbacv1.Role{}}
+		result := r.copyAndMerge(obj, old, new)
+		assert.NotNil(t, result)
+		assert.Len(t, result.(*rbacv1.Role).Rules[0].Verbs, 2)
+	})
+
+	t.Run("rolebinding", func(t *testing.T) {
+		old := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "rb1"},
+			Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1"}},
+			RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: "role1"},
+		}
+		new := old.DeepCopy()
+		new.Subjects[0].Name = "sa2"
+		obj := workloads.InstanceAssistantObject{RoleBinding: &rbacv1.RoleBinding{}}
+		result := r.copyAndMerge(obj, old, new)
+		assert.NotNil(t, result)
+		assert.Equal(t, "sa2", result.(*rbacv1.RoleBinding).Subjects[0].Name)
+	})
+}
+
+func TestIsSharedAssistantObject(t *testing.T) {
+	inst := newTestInstance("inst-0")
+
+	t.Run("matches", func(t *testing.T) {
+		obj := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cm1",
+				Labels: map[string]string{
+					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.AppInstanceLabelKey:    testCluster,
+					constant.KBAppComponentLabelKey: testComponent,
+				},
+				Annotations: map[string]string{
+					assistantObjectAnnotationKey: "true",
+				},
+			},
+		}
+		assert.True(t, isSharedAssistantObject(obj, inst))
+	})
+
+	t.Run("no labels", func(t *testing.T) {
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}}
+		assert.False(t, isSharedAssistantObject(obj, inst))
+	})
+
+	t.Run("wrong cluster", func(t *testing.T) {
+		obj := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cm1",
+				Labels: map[string]string{
+					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.AppInstanceLabelKey:    "other-cluster",
+					constant.KBAppComponentLabelKey: testComponent,
+				},
+				Annotations: map[string]string{
+					assistantObjectAnnotationKey: "true",
+				},
+			},
+		}
+		assert.False(t, isSharedAssistantObject(obj, inst))
+	})
+}
+
+func TestIsOrdinalAssistantObject(t *testing.T) {
+	t.Run("no annotations", func(t *testing.T) {
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}}
+		assert.False(t, isOrdinalAssistantObject(obj))
+	})
+
+	t.Run("ordinal annotation", func(t *testing.T) {
+		obj := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cm1",
+				Annotations: map[string]string{
+					constant.KBAppMultiClusterObjectProvisionPolicyKey: constant.KBAppMultiClusterObjectProvisionOrdinal,
+				},
+			},
+		}
+		assert.True(t, isOrdinalAssistantObject(obj))
+	})
+}
+
+func TestIsCurrentInstanceOrdinalAssistantObject(t *testing.T) {
+	inst := newTestInstance("cluster-component-0")
+
+	t.Run("matching ordinal", func(t *testing.T) {
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "env-0"}}
+		assert.True(t, isCurrentInstanceOrdinalAssistantObject(inst, obj))
+	})
+
+	t.Run("different ordinal", func(t *testing.T) {
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "env-1"}}
+		assert.False(t, isCurrentInstanceOrdinalAssistantObject(inst, obj))
+	})
 }
 
 func ordinalConfigMap(name string) *corev1.ConfigMap {

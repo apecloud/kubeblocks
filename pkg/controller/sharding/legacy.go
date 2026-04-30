@@ -53,7 +53,7 @@ func GenShardingCompSpecList4Test(ctx context.Context, cli client.Reader,
 	shards := removeOfflineShards4Test(undeletedShardingCompSpecs, offline)
 
 	shardNames := sets.Set[string]{}
-	for _, existShardingCompSpec := range undeletedShardingCompSpecs {
+	for _, existShardingCompSpec := range shards {
 		shardNames.Insert(existShardingCompSpec.Name)
 	}
 	shardNames.Insert(offline...) // exclude offline shard names

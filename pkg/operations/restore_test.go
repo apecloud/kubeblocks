@@ -34,6 +34,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -112,7 +113,15 @@ var _ = Describe("Restore OpsRequest", func() {
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
 
 			By("test restore reconcile function")
-			opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
+				opsRes.Cluster.Status.Conditions = append(opsRes.Cluster.Status.Conditions, metav1.Condition{
+					Type:               dptypes.RestoreSessionConditionType,
+					Status:             metav1.ConditionTrue,
+					Reason:             string(dpv1alpha1.RestorePhaseCompleted),
+					LastTransitionTime: metav1.Now(),
+				})
+			})).Should(Succeed())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -134,6 +143,11 @@ var _ = Describe("Restore OpsRequest", func() {
 
 			By("create Restore OpsRequest")
 			opsRes.OpsRequest = createRestoreOpsObj(restoreClusterName, "restore-ops-"+randomStr, backupName)
+			restoreSpec := opsRes.OpsRequest.Spec.GetRestore()
+			restoreSpec.RestorePointInTime = "2026-05-04T08:00:00Z"
+			restoreSpec.VolumeRestorePolicy = string(dpv1alpha1.VolumeClaimRestorePolicySerial)
+			restoreSpec.Env = []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}
+			restoreSpec.Parameters = []dpv1alpha1.ParameterPair{{Name: "restore-param", Value: "restore-value"}}
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
@@ -144,8 +158,65 @@ var _ = Describe("Restore OpsRequest", func() {
 
 			By("test restore action")
 			restoreHandler := RestoreOpsHandler{}
-			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
+			Expect(restoreHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
 		}
+
+		It("injects DP restore API into target cluster PVC templates", func() {
+			handleRestoreOpsWithCustomOldCluster()
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1.Cluster) {
+				g.Expect(restoreCluster.Annotations).ShouldNot(HaveKey(constant.RestoreFromBackupAnnotationKey))
+				g.Expect(restoreCluster.Annotations[dptypes.RestoreSessionIDAnnotationKey]).ShouldNot(BeEmpty())
+				g.Expect(restoreCluster.Spec.ComponentSpecs).ShouldNot(BeEmpty())
+				g.Expect(restoreCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates).ShouldNot(BeEmpty())
+
+				vct := restoreCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0]
+				g.Expect(dprestore.IsBackupDataSourceRef(vct.Spec.DataSourceRef)).Should(BeTrue())
+				g.Expect(vct.Spec.DataSourceRef.Name).Should(Equal(backupName))
+				options, err := dprestore.ParseRestoreOptions(vct.Annotations)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(options.RestoreTime).Should(Equal("2026-05-04T08:00:00Z"))
+				g.Expect(options.VolumeSource).Should(Equal(vct.Name))
+				g.Expect(options.VolumeRestorePolicy).Should(Equal(dpv1alpha1.VolumeClaimRestorePolicySerial))
+				g.Expect(options.Env).Should(Equal([]corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}))
+				g.Expect(options.Parameters).Should(Equal([]dpv1alpha1.ParameterPair{{Name: "restore-param", Value: "restore-value"}}))
+			})).Should(Succeed())
+		})
+
+		It("waits for DP restore session status", func() {
+			handleRestoreOpsWithCustomOldCluster()
+
+			restoreHandler := RestoreOpsHandler{}
+			phase, _, err := restoreHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(cluster *appsv1.Cluster) {
+				cluster.Status.Phase = appsv1.RunningClusterPhase
+				cluster.Status.Conditions = append(cluster.Status.Conditions, metav1.Condition{
+					Type:               dptypes.RestoreSessionConditionType,
+					Status:             metav1.ConditionTrue,
+					Reason:             string(dpv1alpha1.RestorePhaseCompleted),
+					LastTransitionTime: metav1.Now(),
+				})
+			})).Should(Succeed())
+			phase, _, err = restoreHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(cluster *appsv1.Cluster) {
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               dptypes.RestoreSessionConditionType,
+					Status:             metav1.ConditionFalse,
+					Reason:             string(dpv1alpha1.RestorePhaseFailed),
+					Message:            "restore failed",
+					LastTransitionTime: metav1.Now(),
+				}}
+			})).Should(Succeed())
+			phase, _, err = restoreHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
 
 		It("test if source cluster exists services", func() {
 			opsRes.Cluster.Spec.Services = []appsv1.ClusterService{
@@ -254,7 +325,11 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *opsv1a
 			Type:        opsv1alpha1.RestoreType,
 			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
 				Restore: &opsv1alpha1.Restore{
-					BackupName: backupName,
+					BackupName:          backupName,
+					RestorePointInTime:  "2026-05-04T08:00:00Z",
+					VolumeRestorePolicy: string(dpv1alpha1.VolumeClaimRestorePolicySerial),
+					Env:                 []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}},
+					Parameters:          []dpv1alpha1.ParameterPair{{Name: "restore-param", Value: "restore-value"}},
 				},
 			},
 		},

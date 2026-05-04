@@ -141,8 +141,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterShardingAccountTransformer{},
 			// handle cluster services
 			&clusterServiceTransformer{},
-			// handle the restore for cluster
-			&clusterRestoreTransformer{},
 			// create all cluster components objects
 			&clusterComponentTransformer{},
 			// update cluster components' status

@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -110,7 +111,6 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	opsRequest := opsRes.OpsRequest
 	clusterDef := opsRequest.Spec.GetClusterName()
 
-	// get cluster
 	cluster := &appsv1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRequest.GetNamespace(),
@@ -122,11 +122,18 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
 	opsRes.Cluster = cluster
-	// check if the cluster is running
-	if cluster.Status.Phase == appsv1.RunningClusterPhase {
-		return opsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
+	if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
+	}
+	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, dptypes.RestoreSessionConditionType)
+	if restoreCond == nil {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	switch restoreCond.Reason {
+	case string(dpv1alpha1.RestorePhaseCompleted):
+		return opsv1alpha1.OpsSucceedPhase, 0, nil
+	case string(dpv1alpha1.RestorePhaseFailed):
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: %s", restoreCond.Message)
 	}
 	return opsv1alpha1.OpsRunningPhase, 0, nil
 }
@@ -198,18 +205,18 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		return nil, err
 	}
 	restoreSpec := opsRequest.Spec.GetRestore()
-	// set the restore annotation to cluster
-	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestorePointInTime,
-		restoreSpec.Env, restoreSpec.DeferPostReadyUntilClusterRunning, restoreSpec.Parameters)
-	if err != nil {
-		return nil, err
-	}
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
-	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
+	delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+	if cluster.Annotations[dptypes.RestoreSessionIDAnnotationKey] == "" {
+		cluster.Annotations[dptypes.RestoreSessionIDAnnotationKey] = restoreSessionID(opsRequest)
+	}
 	cluster.Name = opsRequest.Spec.GetClusterName()
 	cluster.Namespace = opsRequest.Namespace
+	if err := injectBackupDataSourceRef(cluster, backup, restoreSpec); err != nil {
+		return nil, err
+	}
 	// Reset cluster services
 	var services []appsv1.ClusterService
 	for i := range cluster.Spec.Services {
@@ -242,6 +249,61 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		r.normalizeSchedulePolicy(cluster, cluster.Spec.Shardings[i].Template.SchedulingPolicy)
 	}
 	return cluster, nil
+}
+
+func restoreSessionID(opsRequest *opsv1alpha1.OpsRequest) string {
+	if opsRequest.UID != "" {
+		return string(opsRequest.UID)
+	}
+	return opsRequest.Name
+}
+
+func injectBackupDataSourceRef(cluster *appsv1.Cluster, backup *dpv1alpha1.Backup, restoreSpec *opsv1alpha1.Restore) error {
+	if restoreSpec == nil {
+		return nil
+	}
+	inject := func(vct *appsv1.PersistentVolumeClaimTemplate) error {
+		vct.Spec.DataSourceRef = restore.BackupDataSourceRef(backup.Name)
+		options := restore.DefaultRestoreOptions()
+		options.BackupNamespace = backup.Namespace
+		if options.BackupNamespace == "" || options.BackupNamespace == cluster.Namespace {
+			options.BackupNamespace = ""
+		}
+		options.RestoreTime = restoreSpec.RestorePointInTime
+		options.VolumeSource = vct.Name
+		options.VolumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(restoreSpec.VolumeRestorePolicy)
+		options.DeferPostReadyUntilClusterRunning = restoreSpec.DeferPostReadyUntilClusterRunning
+		options.Env = restoreSpec.Env
+		options.Parameters = restoreSpec.Parameters
+		annotations, err := restore.SetRestoreOptions(vct.Annotations, options)
+		if err != nil {
+			return err
+		}
+		vct.Annotations = annotations
+		return nil
+	}
+	for i := range cluster.Spec.ComponentSpecs {
+		for j := range cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates {
+			if err := inject(&cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates[j]); err != nil {
+				return err
+			}
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		for j := range cluster.Spec.Shardings[i].Template.VolumeClaimTemplates {
+			if err := inject(&cluster.Spec.Shardings[i].Template.VolumeClaimTemplates[j]); err != nil {
+				return err
+			}
+		}
+		for j := range cluster.Spec.Shardings[i].ShardTemplates {
+			for k := range cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates {
+				if err := inject(&cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates[k]); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // normalizeSchedulePolicy normalizes the schedule policy of the new cluster.

@@ -39,14 +39,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/operations/util"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type RestoreOpsHandler struct{}
 
 var _ OpsHandler = RestoreOpsHandler{}
-
-const restoredSystemAccountLabel = "apps.kubeblocks.io/system-account"
 
 func init() {
 	// register restore operation, it will create a new cluster
@@ -74,19 +71,6 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	// restore the cluster from the backup
 	if cluster, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
-		return err
-	}
-
-	restoreSpec := opsRequest.Spec.GetRestore()
-	backupNamespace := restoreSpec.BackupNamespace
-	if backupNamespace == "" {
-		backupNamespace = opsRequest.Namespace
-	}
-	backup := &dpv1alpha1.Backup{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreSpec.BackupName, Namespace: backupNamespace}, backup); err != nil {
-		return err
-	}
-	if err = r.prepareRestoredSystemAccounts(reqCtx, cli, cluster, backup); err != nil {
 		return err
 	}
 
@@ -329,81 +313,6 @@ func inferBackupSourceTargetName(backup *dpv1alpha1.Backup, ownerName string) st
 		}
 	}
 	return ""
-}
-
-func (r RestoreOpsHandler) prepareRestoredSystemAccounts(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, backup *dpv1alpha1.Backup) error {
-	encryptedAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
-	if encryptedAccounts == "" {
-		return nil
-	}
-	accountMap := map[string]map[string]string{}
-	if err := json.Unmarshal([]byte(encryptedAccounts), &accountMap); err != nil {
-		return err
-	}
-	decryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	createSecret := func(secretName string, labels map[string]string, accountName, encryptedPassword string) error {
-		password, err := decryptor.Decrypt([]byte(encryptedPassword))
-		if err != nil {
-			return err
-		}
-		labels[restoredSystemAccountLabel] = accountName
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: cluster.Namespace,
-				Labels:    labels,
-				Annotations: map[string]string{
-					constant.SystemAccountProvisionedAnnotationKey: "true",
-				},
-			},
-			Data: map[string][]byte{
-				constant.AccountNameForSecret:   []byte(accountName),
-				constant.AccountPasswdForSecret: []byte(password),
-			},
-		}
-		current := &corev1.Secret{}
-		key := client.ObjectKeyFromObject(secret)
-		if err := cli.Get(reqCtx.Ctx, key, current); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-			if err = cli.Create(reqCtx.Ctx, secret); err != nil && !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-		} else {
-			patch := client.MergeFrom(current.DeepCopy())
-			current.Labels = secret.Labels
-			current.Annotations = secret.Annotations
-			current.Data = secret.Data
-			if err = cli.Patch(reqCtx.Ctx, current, patch); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	for i := range cluster.Spec.ComponentSpecs {
-		comp := &cluster.Spec.ComponentSpecs[i]
-		for accountName, encryptedPassword := range accountMap[comp.Name] {
-			secretName := constant.GenerateAccountSecretName(cluster.Name, comp.Name, accountName)
-			if err := createSecret(secretName, constant.GetCompLabels(cluster.Name, comp.Name), accountName, encryptedPassword); err != nil {
-				return err
-			}
-		}
-	}
-	for i := range cluster.Spec.Shardings {
-		sharding := &cluster.Spec.Shardings[i]
-		for accountName, encryptedPassword := range accountMap[sharding.Name] {
-			labels := constant.GetClusterLabels(cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: sharding.Name})
-			if err := createSecret(shardingAccountSecretName(cluster.Name, sharding.Name, accountName), labels, accountName, encryptedPassword); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func shardingAccountSecretName(cluster, sharding, account string) string {
-	return constant.ShortenKubeName(fmt.Sprintf("%s-%s-%s", cluster, sharding, account), constant.KubeNameMaxLength)
 }
 
 // normalizeSchedulePolicy normalizes the schedule policy of the new cluster.

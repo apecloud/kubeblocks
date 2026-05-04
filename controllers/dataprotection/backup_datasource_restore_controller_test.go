@@ -39,6 +39,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestBackupDataSourceRestoreReconcileSwitchPath(t *testing.T) {
@@ -60,6 +61,10 @@ func TestBackupDataSourceRestoreReconcileSwitchPath(t *testing.T) {
 	restoreOptions.VolumeSource = "data"
 	restoreOptions.SourceTargetName = "mysql"
 	annotations, err := dprestore.SetRestoreOptions(nil, restoreOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encryptedPassword, err := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey)).Encrypt([]byte("restored-password"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,8 +112,9 @@ func TestBackupDataSourceRestoreReconcileSwitchPath(t *testing.T) {
 	}
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "backup",
-			Namespace: "default",
+			Name:        "backup",
+			Namespace:   "default",
+			Annotations: map[string]string{constant.EncryptedSystemAccountsAnnotationKey: `{"mysql":{"root":"` + encryptedPassword + `"}}`},
 		},
 		Status: dpv1alpha1.BackupStatus{
 			Targets: []dpv1alpha1.BackupStatusTarget{{
@@ -147,6 +153,19 @@ func TestBackupDataSourceRestoreReconcileSwitchPath(t *testing.T) {
 	cond := meta.FindStatusCondition(latestCluster.Status.Conditions, dptypes.RestoreSessionConditionType)
 	if cond == nil || cond.Reason != string(dpv1alpha1.RestorePhaseRunning) {
 		t.Fatalf("expected running restore condition, got %#v", cond)
+	}
+	accountSecret := &corev1.Secret{}
+	if err = cli.Get(context.Background(), client.ObjectKey{Namespace: cluster.Namespace, Name: constant.GenerateAccountSecretName(cluster.Name, "mysql", "root")}, accountSecret); err != nil {
+		t.Fatal(err)
+	}
+	if string(accountSecret.Data[constant.AccountPasswdForSecret]) != "restored-password" {
+		t.Fatalf("expected restored account password, got %q", string(accountSecret.Data[constant.AccountPasswdForSecret]))
+	}
+	if accountSecret.Labels[backupDataSourceSystemAccountLabel] != "root" {
+		t.Fatalf("expected restored account label, got %#v", accountSecret.Labels)
+	}
+	if accountSecret.Annotations[constant.SystemAccountProvisionedAnnotationKey] != "true" {
+		t.Fatalf("expected externally provisioned annotation, got %#v", accountSecret.Annotations)
 	}
 
 	internalRestores := &dpv1alpha1.RestoreList{}

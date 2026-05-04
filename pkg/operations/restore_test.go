@@ -40,7 +40,6 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Restore OpsRequest", func() {
@@ -130,8 +129,6 @@ var _ = Describe("Restore OpsRequest", func() {
 
 		handleRestoreOpsWithCustomOldCluster := func() {
 			By("mock backup annotations and labels")
-			encryptedPassword, err := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey)).Encrypt([]byte("restored-password"))
-			Expect(err).ShouldNot(HaveOccurred())
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				backup.Labels = map[string]string{
 					dptypes.BackupTypeLabelKey:      string(dpv1alpha1.BackupTypeFull),
@@ -140,8 +137,7 @@ var _ = Describe("Restore OpsRequest", func() {
 				opsRes.Cluster.ResourceVersion = ""
 				clusterBytes, _ := json.Marshal(opsRes.Cluster)
 				backup.Annotations = map[string]string{
-					constant.ClusterSnapshotAnnotationKey:         string(clusterBytes),
-					constant.EncryptedSystemAccountsAnnotationKey: `{"` + defaultCompName + `":{"root":"` + encryptedPassword + `"}}`,
+					constant.ClusterSnapshotAnnotationKey: string(clusterBytes),
 				}
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
@@ -161,7 +157,7 @@ var _ = Describe("Restore OpsRequest", func() {
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("mock restore OpsRequest is Running")
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
@@ -189,15 +185,6 @@ var _ = Describe("Restore OpsRequest", func() {
 				g.Expect(options.VolumeRestorePolicy).Should(Equal(dpv1alpha1.VolumeClaimRestorePolicySerial))
 				g.Expect(options.Env).Should(Equal([]corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}))
 				g.Expect(options.Parameters).Should(Equal([]dpv1alpha1.ParameterPair{{Name: "restore-param", Value: "restore-value"}}))
-
-				secret := &corev1.Secret{}
-				secretName := constant.GenerateAccountSecretName(restoreCluster.Name, defaultCompName, "root")
-				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: restoreCluster.Namespace, Name: secretName}, secret)).Should(Succeed())
-				g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(Equal([]byte("restored-password")))
-				g.Expect(secret.Labels[constant.AppInstanceLabelKey]).Should(Equal(restoreCluster.Name))
-				g.Expect(secret.Labels[constant.KBAppComponentLabelKey]).Should(Equal(defaultCompName))
-				g.Expect(secret.Labels[restoredSystemAccountLabel]).Should(Equal("root"))
-				g.Expect(secret.Annotations[constant.SystemAccountProvisionedAnnotationKey]).Should(Equal("true"))
 			})).Should(Succeed())
 		})
 

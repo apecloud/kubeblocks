@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -45,12 +46,14 @@ import (
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
 	backupDataSourceRestoreLabelCluster   = "dataprotection.kubeblocks.io/target-cluster"
 	backupDataSourceRestoreLabelComponent = "dataprotection.kubeblocks.io/target-component"
 	backupDataSourceRestoreLabelBackup    = "dataprotection.kubeblocks.io/source-backup"
+	backupDataSourceSystemAccountLabel    = "apps.kubeblocks.io/system-account"
 )
 
 // BackupDataSourceRestoreReconciler reconciles Cluster-level restore sessions
@@ -72,6 +75,7 @@ type backupDataSourcePVC struct {
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch;create;patch;update
@@ -100,6 +104,14 @@ func (r *BackupDataSourceRestoreReconciler) Reconcile(ctx context.Context, req c
 			return intctrlutil.Reconciled()
 		}
 		return r.updateClusterConditionFromRestores(reqCtx, cluster, restores)
+	}
+	if err := r.prepareRestoredSystemAccounts(reqCtx, cluster); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+			_ = r.patchClusterRestoreCondition(reqCtx, cluster, metav1.ConditionFalse, string(dpv1alpha1.RestorePhaseFailed), err.Error())
+			r.Recorder.Event(cluster, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, err.Error())
+			return intctrlutil.Reconciled()
+		}
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	items, err := r.listBackupDataSourcePVCs(reqCtx, cluster)
@@ -463,6 +475,143 @@ func (r *BackupDataSourceRestoreReconciler) patchClusterRestoreCondition(reqCtx 
 		LastTransitionTime: metav1.Now(),
 	})
 	return r.Client.Status().Patch(reqCtx.Ctx, latest, patch)
+}
+
+func (r *BackupDataSourceRestoreReconciler) prepareRestoredSystemAccounts(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) error {
+	backups, err := r.listBackupDataSourceBackupsFromCluster(reqCtx, cluster)
+	if err != nil {
+		return err
+	}
+	for i := range backups {
+		if err = r.prepareRestoredSystemAccountsFromBackup(reqCtx, cluster, backups[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *BackupDataSourceRestoreReconciler) listBackupDataSourceBackupsFromCluster(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) ([]*dpv1alpha1.Backup, error) {
+	backupKeys := map[types.NamespacedName]struct{}{}
+	addBackup := func(vct appsv1.PersistentVolumeClaimTemplate) error {
+		if !dprestore.IsBackupDataSourceRef(vct.Spec.DataSourceRef) {
+			return nil
+		}
+		options, err := dprestore.ParseRestoreOptions(vct.Annotations)
+		if err != nil {
+			return intctrlutil.NewFatalError(fmt.Sprintf("failed to parse restore options from Cluster %s/%s PVC template %s: %v", cluster.Namespace, cluster.Name, vct.Name, err))
+		}
+		backupNamespace := options.BackupNamespace
+		if backupNamespace == "" {
+			backupNamespace = cluster.Namespace
+		}
+		backupKeys[types.NamespacedName{Name: vct.Spec.DataSourceRef.Name, Namespace: backupNamespace}] = struct{}{}
+		return nil
+	}
+	for i := range cluster.Spec.ComponentSpecs {
+		for j := range cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates {
+			if err := addBackup(cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates[j]); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		for j := range cluster.Spec.Shardings[i].Template.VolumeClaimTemplates {
+			if err := addBackup(cluster.Spec.Shardings[i].Template.VolumeClaimTemplates[j]); err != nil {
+				return nil, err
+			}
+		}
+		for j := range cluster.Spec.Shardings[i].ShardTemplates {
+			for k := range cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates {
+				if err := addBackup(cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates[k]); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	backups := make([]*dpv1alpha1.Backup, 0, len(backupKeys))
+	for key := range backupKeys {
+		backup := &dpv1alpha1.Backup{}
+		if err := r.Client.Get(reqCtx.Ctx, key, backup); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewFatalError(err.Error())
+			}
+			return nil, err
+		}
+		backups = append(backups, backup)
+	}
+	return backups, nil
+}
+
+func (r *BackupDataSourceRestoreReconciler) prepareRestoredSystemAccountsFromBackup(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster, backup *dpv1alpha1.Backup) error {
+	encryptedAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
+	if encryptedAccounts == "" {
+		return nil
+	}
+	accountMap := map[string]map[string]string{}
+	if err := json.Unmarshal([]byte(encryptedAccounts), &accountMap); err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	decryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	createSecret := func(secretName string, labels map[string]string, accountName, encryptedPassword string) error {
+		password, err := decryptor.Decrypt([]byte(encryptedPassword))
+		if err != nil {
+			return intctrlutil.NewFatalError(err.Error())
+		}
+		labels[backupDataSourceSystemAccountLabel] = accountName
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: cluster.Namespace,
+				Labels:    labels,
+				Annotations: map[string]string{
+					constant.SystemAccountProvisionedAnnotationKey: "true",
+				},
+			},
+			Data: map[string][]byte{
+				constant.AccountNameForSecret:   []byte(accountName),
+				constant.AccountPasswdForSecret: []byte(password),
+			},
+		}
+		current := &corev1.Secret{}
+		key := client.ObjectKeyFromObject(secret)
+		if err = r.Client.Get(reqCtx.Ctx, key, current); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+			if err = r.Client.Create(reqCtx.Ctx, secret); err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+			return nil
+		}
+		patch := client.MergeFrom(current.DeepCopy())
+		current.Labels = secret.Labels
+		current.Annotations = secret.Annotations
+		current.Data = secret.Data
+		return r.Client.Patch(reqCtx.Ctx, current, patch)
+	}
+	for i := range cluster.Spec.ComponentSpecs {
+		comp := &cluster.Spec.ComponentSpecs[i]
+		for accountName, encryptedPassword := range accountMap[comp.Name] {
+			secretName := constant.GenerateAccountSecretName(cluster.Name, comp.Name, accountName)
+			if err := createSecret(secretName, constant.GetCompLabels(cluster.Name, comp.Name), accountName, encryptedPassword); err != nil {
+				return err
+			}
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		sharding := &cluster.Spec.Shardings[i]
+		for accountName, encryptedPassword := range accountMap[sharding.Name] {
+			labels := constant.GetClusterLabels(cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: sharding.Name})
+			if err := createSecret(backupDataSourceShardingAccountSecretName(cluster.Name, sharding.Name, accountName), labels, accountName, encryptedPassword); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func backupDataSourceShardingAccountSecretName(cluster, sharding, account string) string {
+	return constant.ShortenKubeName(fmt.Sprintf("%s-%s-%s", cluster, sharding, account), constant.KubeNameMaxLength)
 }
 
 func (r *BackupDataSourceRestoreReconciler) mapPVCToCluster(ctx context.Context, object client.Object) []reconcile.Request {

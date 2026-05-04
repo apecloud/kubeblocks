@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -705,11 +706,8 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if err != nil || !backupTargetExists {
 		return false, err
 	}
-	if cluster.Annotations == nil {
-		return false, nil
-	}
-	_, ok = cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-	return ok, nil
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, dptypes.RestoreSessionConditionType)
+	return cond != nil && cond.Reason == string(dpv1alpha1.RestorePhaseRunning), nil
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

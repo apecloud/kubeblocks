@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -312,53 +311,6 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 
 func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
-}
-
-func GetRestoreFromBackupAnnotation(
-	backup *dpv1alpha1.Backup,
-	volumeRestorePolicy string,
-	restoreTime string,
-	env []corev1.EnvVar,
-	doReadyRestoreAfterClusterRunning bool,
-	parameters []dpv1alpha1.ParameterPair,
-) (string, error) {
-	componentName := getComponentNameFromObj(backup)
-	if len(componentName) == 0 {
-		return "", intctrlutil.NewFatalError("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
-	}
-	restoreInfoMap := map[string]string{}
-	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name
-	restoreInfoMap[constant.BackupNamespaceKeyForRestore] = backup.Namespace
-	restoreInfoMap[constant.VolumeRestorePolicyKeyForRestore] = volumeRestorePolicy
-	restoreInfoMap[constant.DoReadyRestoreAfterClusterRunning] = strconv.FormatBool(doReadyRestoreAfterClusterRunning)
-	if restoreTime != "" {
-		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
-	}
-	if env != nil {
-		bytes, err := json.Marshal(env)
-		if err != nil {
-			return "", err
-		}
-		restoreInfoMap[constant.EnvForRestore] = string(bytes)
-	}
-	if len(parameters) > 0 {
-		bytes, err := json.Marshal(parameters)
-		if err != nil {
-			return "", err
-		}
-		restoreInfoMap[constant.ParametersForRestore] = string(bytes)
-	}
-	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordAnnotationKey]
-	if connectionPassword != "" {
-		restoreInfoMap[constant.ConnectionPassword] = connectionPassword
-	}
-	restoreForClusterMap := map[string]map[string]string{}
-	restoreForClusterMap[componentName] = restoreInfoMap
-	bytes, err := json.Marshal(restoreForClusterMap)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
 }
 
 // GetSourcePodNameFromTarget gets the source pod name from backup status target according to 'RequiredPolicyForAllPodSelection'.

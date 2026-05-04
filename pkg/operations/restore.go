@@ -208,7 +208,6 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
-	delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
 	cluster.Name = opsRequest.Spec.GetClusterName()
 	cluster.Namespace = opsRequest.Namespace
 	if err := injectBackupDataSourceRef(cluster, backup, restoreSpec); err != nil {

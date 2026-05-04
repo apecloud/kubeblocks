@@ -170,7 +170,6 @@ var _ = Describe("Restore OpsRequest", func() {
 			handleRestoreOpsWithCustomOldCluster()
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1.Cluster) {
-				g.Expect(restoreCluster.Annotations).ShouldNot(HaveKey(constant.RestoreFromBackupAnnotationKey))
 				g.Expect(restoreCluster.Spec.ComponentSpecs).ShouldNot(BeEmpty())
 				g.Expect(restoreCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates).ShouldNot(BeEmpty())
 

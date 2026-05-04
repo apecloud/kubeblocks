@@ -1065,13 +1065,15 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		It("delays backup job when restore is in progress", func() {
-			By("setting restore annotation on cluster")
-			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *kbappsv1.Cluster) {
-				if cluster.Annotations == nil {
-					cluster.Annotations = make(map[string]string)
-				}
-				cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = "any-value"
+		It("delays backup job when DP restore session is in progress", func() {
+			By("setting restore condition on cluster")
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterInfo.Cluster, func() {
+				clusterInfo.Cluster.Status.Conditions = append(clusterInfo.Cluster.Status.Conditions, metav1.Condition{
+					Type:               dptypes.RestoreSessionConditionType,
+					Status:             metav1.ConditionFalse,
+					Reason:             string(dpv1alpha1.RestorePhaseRunning),
+					LastTransitionTime: metav1.Now(),
+				})
 			})).Should(Succeed())
 
 			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
@@ -1104,9 +1106,14 @@ var _ = Describe("Backup Controller test", func() {
 				return false
 			}).Should(BeTrue())
 
-			By("delete restore annotation")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
-				delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+			By("mark restore condition completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               dptypes.RestoreSessionConditionType,
+					Status:             metav1.ConditionTrue,
+					Reason:             string(dpv1alpha1.RestorePhaseCompleted),
+					LastTransitionTime: metav1.Now(),
+				}}
 			})).Should(Succeed())
 
 			By("check job is created")

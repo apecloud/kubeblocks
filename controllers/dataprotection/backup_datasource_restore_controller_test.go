@@ -23,10 +23,13 @@ import (
 	"context"
 	"testing"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -38,9 +41,150 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
+func TestBackupDataSourceRestoreReconcileSwitchPath(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := batchv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreOptions := dprestore.DefaultRestoreOptions()
+	restoreOptions.VolumeSource = "data"
+	restoreOptions.SourceTargetName = "mysql"
+	annotations, err := dprestore.SetRestoreOptions(nil, restoreOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cluster := &appsv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore-cluster",
+			Namespace: "default",
+			UID:       types.UID("restore-cluster-uid"),
+		},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "mysql",
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name:        "data",
+					Annotations: annotations,
+					Spec: corev1.PersistentVolumeClaimSpec{
+						DataSourceRef: dprestore.BackupDataSourceRef("backup"),
+					},
+				}},
+				SystemAccounts: []appsv1.ComponentSystemAccount{{Name: "root"}},
+			}},
+		},
+		Status: appsv1.ClusterStatus{
+			Phase: appsv1.RunningClusterPhase,
+		},
+	}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "data-restore-cluster-mysql-0",
+			Namespace:   "default",
+			Annotations: annotations,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    cluster.Name,
+				constant.KBAppComponentLabelKey: "mysql",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: dprestore.BackupDataSourceRef("backup"),
+			VolumeName:    "pv-data",
+		},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup",
+			Namespace: "default",
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Targets: []dpv1alpha1.BackupStatusTarget{{
+				BackupTarget: dpv1alpha1.BackupTarget{Name: "mysql"},
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&appsv1.Cluster{}, &dpv1alpha1.Restore{}).
+		WithObjects(cluster, pvc, backup).
+		Build()
+	reconciler := &BackupDataSourceRestoreReconciler{
+		Client: cli,
+		Scheme: scheme,
+	}
+
+	_, err = reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(cluster),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	latestCluster := &appsv1.Cluster{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), latestCluster); err != nil {
+		t.Fatal(err)
+	}
+	vct := latestCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0]
+	if vct.Spec.DataSourceRef != nil {
+		t.Fatalf("expected dataSourceRef to be cleaned, got %#v", vct.Spec.DataSourceRef)
+	}
+	if _, ok := vct.Annotations[dptypes.RestoreOptionsAnnotationKey]; ok {
+		t.Fatalf("expected restore options annotation to be cleaned")
+	}
+	cond := meta.FindStatusCondition(latestCluster.Status.Conditions, dptypes.RestoreSessionConditionType)
+	if cond == nil || cond.Reason != string(dpv1alpha1.RestorePhaseRunning) {
+		t.Fatalf("expected running restore condition, got %#v", cond)
+	}
+
+	internalRestores := &dpv1alpha1.RestoreList{}
+	if err = cli.List(context.Background(), internalRestores, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		backupDataSourceRestoreLabelCluster: cluster.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(internalRestores.Items) != 1 {
+		t.Fatalf("expected one internal restore, got %d", len(internalRestores.Items))
+	}
+	internalRestore := &internalRestores.Items[0]
+	internalRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+	if err = cli.Status().Update(context.Background(), internalRestore); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(cluster),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), latestCluster); err != nil {
+		t.Fatal(err)
+	}
+	cond = meta.FindStatusCondition(latestCluster.Status.Conditions, dptypes.RestoreSessionConditionType)
+	if cond == nil || cond.Reason != string(dpv1alpha1.RestorePhaseCompleted) || cond.Status != metav1.ConditionTrue {
+		t.Fatalf("expected completed restore condition, got %#v", cond)
+	}
+}
+
 func TestBackupDataSourceRestoreCreatesPostReadyRestoreBeforeCleanup(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := batchv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	if err := appsv1.AddToScheme(scheme); err != nil {

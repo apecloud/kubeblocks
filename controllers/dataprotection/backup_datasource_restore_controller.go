@@ -398,7 +398,7 @@ func (r *BackupDataSourceRestoreReconciler) buildInternalPostReadyRestore(cluste
 		ConnectionCredential: r.connectionCredential(cluster, componentName),
 	}
 	target := dputils.GetBackupStatusTarget(item.backup, item.options.SourceTargetName)
-	if target != nil {
+	if target != nil && target.PodSelector != nil {
 		readyConfig.JobAction.Target.PodSelector.Strategy = target.PodSelector.Strategy
 	}
 	if item.backup.Status.BackupMethod != nil && item.backup.Status.BackupMethod.TargetVolumes != nil {

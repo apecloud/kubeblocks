@@ -319,6 +319,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.BackupDataSourceRestoreReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-datasource-restore-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupDataSourceRestore")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.BackupPolicyReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

@@ -39,11 +39,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/operations/util"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type RestoreOpsHandler struct{}
 
 var _ OpsHandler = RestoreOpsHandler{}
+
+const restoredSystemAccountLabel = "apps.kubeblocks.io/system-account"
 
 func init() {
 	// register restore operation, it will create a new cluster
@@ -71,6 +74,19 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	// restore the cluster from the backup
 	if cluster, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
+		return err
+	}
+
+	restoreSpec := opsRequest.Spec.GetRestore()
+	backupNamespace := restoreSpec.BackupNamespace
+	if backupNamespace == "" {
+		backupNamespace = opsRequest.Namespace
+	}
+	backup := &dpv1alpha1.Backup{}
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreSpec.BackupName, Namespace: backupNamespace}, backup); err != nil {
+		return err
+	}
+	if err = r.prepareRestoredSystemAccounts(reqCtx, cli, cluster, backup); err != nil {
 		return err
 	}
 
@@ -209,9 +225,6 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		cluster.Annotations = map[string]string{}
 	}
 	delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
-	if cluster.Annotations[dptypes.RestoreSessionIDAnnotationKey] == "" {
-		cluster.Annotations[dptypes.RestoreSessionIDAnnotationKey] = restoreSessionID(opsRequest)
-	}
 	cluster.Name = opsRequest.Spec.GetClusterName()
 	cluster.Namespace = opsRequest.Namespace
 	if err := injectBackupDataSourceRef(cluster, backup, restoreSpec); err != nil {
@@ -251,18 +264,11 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	return cluster, nil
 }
 
-func restoreSessionID(opsRequest *opsv1alpha1.OpsRequest) string {
-	if opsRequest.UID != "" {
-		return string(opsRequest.UID)
-	}
-	return opsRequest.Name
-}
-
 func injectBackupDataSourceRef(cluster *appsv1.Cluster, backup *dpv1alpha1.Backup, restoreSpec *opsv1alpha1.Restore) error {
 	if restoreSpec == nil {
 		return nil
 	}
-	inject := func(vct *appsv1.PersistentVolumeClaimTemplate) error {
+	inject := func(ownerName string, vct *appsv1.PersistentVolumeClaimTemplate) error {
 		vct.Spec.DataSourceRef = restore.BackupDataSourceRef(backup.Name)
 		options := restore.DefaultRestoreOptions()
 		options.BackupNamespace = backup.Namespace
@@ -271,6 +277,7 @@ func injectBackupDataSourceRef(cluster *appsv1.Cluster, backup *dpv1alpha1.Backu
 		}
 		options.RestoreTime = restoreSpec.RestorePointInTime
 		options.VolumeSource = vct.Name
+		options.SourceTargetName = inferBackupSourceTargetName(backup, ownerName)
 		options.VolumeRestorePolicy = dpv1alpha1.VolumeClaimRestorePolicy(restoreSpec.VolumeRestorePolicy)
 		options.DeferPostReadyUntilClusterRunning = restoreSpec.DeferPostReadyUntilClusterRunning
 		options.Env = restoreSpec.Env
@@ -284,26 +291,119 @@ func injectBackupDataSourceRef(cluster *appsv1.Cluster, backup *dpv1alpha1.Backu
 	}
 	for i := range cluster.Spec.ComponentSpecs {
 		for j := range cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates {
-			if err := inject(&cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates[j]); err != nil {
+			if err := inject(cluster.Spec.ComponentSpecs[i].Name, &cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates[j]); err != nil {
 				return err
 			}
 		}
 	}
 	for i := range cluster.Spec.Shardings {
 		for j := range cluster.Spec.Shardings[i].Template.VolumeClaimTemplates {
-			if err := inject(&cluster.Spec.Shardings[i].Template.VolumeClaimTemplates[j]); err != nil {
+			if err := inject(cluster.Spec.Shardings[i].Name, &cluster.Spec.Shardings[i].Template.VolumeClaimTemplates[j]); err != nil {
 				return err
 			}
 		}
 		for j := range cluster.Spec.Shardings[i].ShardTemplates {
 			for k := range cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates {
-				if err := inject(&cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates[k]); err != nil {
+				if err := inject(cluster.Spec.Shardings[i].ShardTemplates[j].Name, &cluster.Spec.Shardings[i].ShardTemplates[j].VolumeClaimTemplates[k]); err != nil {
 					return err
 				}
 			}
 		}
 	}
 	return nil
+}
+
+func inferBackupSourceTargetName(backup *dpv1alpha1.Backup, ownerName string) string {
+	if backup == nil {
+		return ""
+	}
+	if backup.Status.Target != nil {
+		return backup.Status.Target.Name
+	}
+	if len(backup.Status.Targets) == 1 {
+		return backup.Status.Targets[0].Name
+	}
+	for i := range backup.Status.Targets {
+		if backup.Status.Targets[i].Name == ownerName {
+			return backup.Status.Targets[i].Name
+		}
+	}
+	return ""
+}
+
+func (r RestoreOpsHandler) prepareRestoredSystemAccounts(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, backup *dpv1alpha1.Backup) error {
+	encryptedAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
+	if encryptedAccounts == "" {
+		return nil
+	}
+	accountMap := map[string]map[string]string{}
+	if err := json.Unmarshal([]byte(encryptedAccounts), &accountMap); err != nil {
+		return err
+	}
+	decryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	createSecret := func(secretName string, labels map[string]string, accountName, encryptedPassword string) error {
+		password, err := decryptor.Decrypt([]byte(encryptedPassword))
+		if err != nil {
+			return err
+		}
+		labels[restoredSystemAccountLabel] = accountName
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: cluster.Namespace,
+				Labels:    labels,
+				Annotations: map[string]string{
+					constant.SystemAccountProvisionedAnnotationKey: "true",
+				},
+			},
+			Data: map[string][]byte{
+				constant.AccountNameForSecret:   []byte(accountName),
+				constant.AccountPasswdForSecret: []byte(password),
+			},
+		}
+		current := &corev1.Secret{}
+		key := client.ObjectKeyFromObject(secret)
+		if err := cli.Get(reqCtx.Ctx, key, current); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+			if err = cli.Create(reqCtx.Ctx, secret); err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+		} else {
+			patch := client.MergeFrom(current.DeepCopy())
+			current.Labels = secret.Labels
+			current.Annotations = secret.Annotations
+			current.Data = secret.Data
+			if err = cli.Patch(reqCtx.Ctx, current, patch); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for i := range cluster.Spec.ComponentSpecs {
+		comp := &cluster.Spec.ComponentSpecs[i]
+		for accountName, encryptedPassword := range accountMap[comp.Name] {
+			secretName := constant.GenerateAccountSecretName(cluster.Name, comp.Name, accountName)
+			if err := createSecret(secretName, constant.GetCompLabels(cluster.Name, comp.Name), accountName, encryptedPassword); err != nil {
+				return err
+			}
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		sharding := &cluster.Spec.Shardings[i]
+		for accountName, encryptedPassword := range accountMap[sharding.Name] {
+			labels := constant.GetClusterLabels(cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: sharding.Name})
+			if err := createSecret(shardingAccountSecretName(cluster.Name, sharding.Name, accountName), labels, accountName, encryptedPassword); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func shardingAccountSecretName(cluster, sharding, account string) string {
+	return constant.ShortenKubeName(fmt.Sprintf("%s-%s-%s", cluster, sharding, account), constant.KubeNameMaxLength)
 }
 
 // normalizeSchedulePolicy normalizes the schedule policy of the new cluster.

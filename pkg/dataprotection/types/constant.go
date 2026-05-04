@@ -73,9 +73,6 @@ const (
 	// RestoreOptionsAnnotationKey stores DP-owned restore options on PVC templates
 	// and PVCs whose spec.dataSourceRef points to a DP Backup.
 	RestoreOptionsAnnotationKey = "dataprotection.kubeblocks.io/restore-options"
-	// RestoreSessionIDAnnotationKey identifies a cluster restore session. It is a
-	// DP-owned indexing annotation and is not interpreted by apps.
-	RestoreSessionIDAnnotationKey = "dataprotection.kubeblocks.io/restore-session-id"
 )
 
 // condition types

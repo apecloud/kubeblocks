@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -158,15 +157,8 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 }
 
 func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) ([]byte, error) {
-	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation, err: %w", account.Name, shardingName, err)
-	}
-	if len(password) == 0 {
-		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
-		return []byte(password), err
-	}
-	return password, nil
+	password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+	return []byte(password), err
 }
 
 func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCtx *clusterTransformContext,

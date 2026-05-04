@@ -58,6 +58,7 @@ func TestRestoreOptionsRoundTrip(t *testing.T) {
 		VolumeSource:                      "data",
 		MountPath:                         "/data",
 		SourceTargetName:                  "target-0",
+		SourceTargetPodName:               "target-0-pod-0",
 		VolumeRestorePolicy:               dpv1alpha1.VolumeClaimRestorePolicySerial,
 		DeferPostReadyUntilClusterRunning: true,
 		Env: []corev1.EnvVar{{
@@ -86,6 +87,7 @@ func TestRestoreOptionsRoundTrip(t *testing.T) {
 		parsed.VolumeSource != options.VolumeSource ||
 		parsed.MountPath != options.MountPath ||
 		parsed.SourceTargetName != options.SourceTargetName ||
+		parsed.SourceTargetPodName != options.SourceTargetPodName ||
 		parsed.VolumeRestorePolicy != options.VolumeRestorePolicy ||
 		parsed.DeferPostReadyUntilClusterRunning != options.DeferPostReadyUntilClusterRunning {
 		t.Fatalf("parsed options = %#v, want %#v", parsed, options)

@@ -45,6 +45,9 @@ type RestoreOptions struct {
 	MountPath string `json:"mountPath,omitempty"`
 	// SourceTargetName identifies the backup source target used by this PVC.
 	SourceTargetName string `json:"sourceTargetName,omitempty"`
+	// SourceTargetPodName identifies the source pod used when restoring a PVC
+	// from a Backup target whose pod selection strategy is All.
+	SourceTargetPodName string `json:"sourceTargetPodName,omitempty"`
 	// VolumeRestorePolicy controls prepare-data execution order.
 	VolumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy `json:"volumeRestorePolicy,omitempty"`
 	// DeferPostReadyUntilClusterRunning delays post-ready actions until the

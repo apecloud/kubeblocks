@@ -221,6 +221,13 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&BackupDataSourceRestoreReconciler{
+		Client:   k8sClient,
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("backup-datasource-restore-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	if err = (&LogCollectionReconciler{
 		Client:     k8sClient,
 		Scheme:     k8sManager.GetScheme(),

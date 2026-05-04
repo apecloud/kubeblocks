@@ -70,6 +70,20 @@ const (
 	SkipReconciliationAnnotationKey = "dataprotection.kubeblocks.io/skip-reconciliation"
 	// SkipRestorationCheckAnnotationKey specifies whether to skip restoration check.
 	SkipRestorationCheckAnnotationKey = "dataprotection.kubeblocks.io/skip-restoration-check"
+	// RestoreOptionsAnnotationKey stores DP-owned restore options on PVC templates
+	// and PVCs whose spec.dataSourceRef points to a DP Backup.
+	RestoreOptionsAnnotationKey = "dataprotection.kubeblocks.io/restore-options"
+	// RestoreSessionIDAnnotationKey identifies a cluster restore session. It is a
+	// DP-owned indexing annotation and is not interpreted by apps.
+	RestoreSessionIDAnnotationKey = "dataprotection.kubeblocks.io/restore-session-id"
+)
+
+// condition types
+const (
+	// RestoreSessionConditionType is set by DP on the target Cluster status to
+	// expose the overall cluster restore session state to callers such as
+	// Restore Ops.
+	RestoreSessionConditionType = "DataProtectionRestore"
 )
 
 // label keys

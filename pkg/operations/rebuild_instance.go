@@ -109,7 +109,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			}
 			roleAware := len(synthesizedComp.Roles) > 0
 			if !opsRes.OpsRequest.Spec.Force && targetInstance.IsAvailable(synthesizedComp.MinReadySeconds, roleAware) {
-				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is availabled, can not rebuild it`, ins.Name))
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is available, can not rebuild it`, ins.Name))
 			}
 			instanceNames = append(instanceNames, ins.Name)
 		}
@@ -488,7 +488,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		progressDetail := r.getInstanceProgressDetail(*compStatus, instance.Name)
 		scalingOutPodName := r.getScalingOutPodNameFromMessage(progressDetail.Message)
 		if _, ok := currPodSet[scalingOutPodName]; !ok {
-			return 0, 0, nil, intctrlutil.NewFatalError(fmt.Sprintf(`the replicas of the component "%s" has been modifeied by another operation`, compSpec.Name))
+			return 0, 0, nil, intctrlutil.NewFatalError(fmt.Sprintf(`the replicas of the component "%s" has been modified by another operation`, compSpec.Name))
 		}
 		scaledOutInstance, err := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, scalingOutPodName)
 		if err != nil {

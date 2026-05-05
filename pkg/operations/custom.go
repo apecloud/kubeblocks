@@ -302,7 +302,7 @@ func validateAndGetCompSpec(cluster *appsv1.Cluster, opsDef *opsv1alpha1.OpsDefi
 	}
 	shardingSpec := cluster.Spec.GetShardingByName(componentName)
 	if shardingSpec == nil {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot found the component "%s" in cluster "%s"`, componentName, cluster.Name))
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot find the component "%s" in cluster "%s"`, componentName, cluster.Name))
 	}
 	if len(opsDef.Spec.PodInfoExtractors) == 0 {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`podInfoExtractors cannot be empty in opsDef "%s" when the component "%s" is a shard component`, opsDef.Name, componentName))

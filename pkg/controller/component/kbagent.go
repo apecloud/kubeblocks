@@ -22,6 +22,7 @@ package component
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,10 +49,15 @@ const (
 
 	defaultProbeReportPeriodSeconds = 60
 	minProbeReportPeriodSeconds     = 15
+
+	roleLabelVolumeName  = "kubeblocks-role-label"
+	podMetadataMountPath = "/etc/kubeblocks/pod-metadata"
+	podRoleLabelFileName = "role"
 )
 
 var (
-	sharedVolumeMount = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
+	sharedVolumeMount    = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
+	roleLabelVolumeMount = corev1.VolumeMount{Name: roleLabelVolumeName, MountPath: podMetadataMountPath, ReadOnly: true}
 )
 
 func IsKBAgentContainer(c *corev1.Container) bool {
@@ -189,6 +195,10 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
+	if err = mountPodRoleLabelFile(synthesizedComp, container); err != nil {
+		return err
+	}
+
 	// set kb-agent container ports to host network
 	if synthesizedComp.HostNetwork != nil {
 		if synthesizedComp.HostNetwork.ContainerPorts == nil {
@@ -211,6 +221,48 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *workerContainer)
 
+	return nil
+}
+
+func mountPodRoleLabelFile(synthesizedComp *SynthesizedComponent, container *corev1.Container) error {
+	volume := corev1.Volume{
+		Name: roleLabelVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			DownwardAPI: &corev1.DownwardAPIVolumeSource{
+				Items: []corev1.DownwardAPIVolumeFile{
+					{
+						Path: podRoleLabelFileName,
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: fmt.Sprintf("metadata.labels['%s']", constant.RoleLabelKey),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, v := range synthesizedComp.PodSpec.Volumes {
+		if v.Name != roleLabelVolumeName {
+			continue
+		}
+		if !reflect.DeepEqual(v, volume) {
+			return fmt.Errorf("volume %s conflicts with kbagent role label volume", roleLabelVolumeName)
+		}
+		volume = corev1.Volume{}
+		break
+	}
+	if volume.Name != "" {
+		synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, volume)
+	}
+
+	for _, mount := range container.VolumeMounts {
+		if reflect.DeepEqual(mount, roleLabelVolumeMount) {
+			return nil
+		}
+		if mount.MountPath == roleLabelVolumeMount.MountPath {
+			return fmt.Errorf("volumeMount path %s conflicts with kbagent role label volume mount", roleLabelVolumeMount.MountPath)
+		}
+	}
+	container.VolumeMounts = append(container.VolumeMounts, roleLabelVolumeMount)
 	return nil
 }
 
@@ -302,6 +354,8 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		}
 
 		if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
+			p.ReportOnFileChange = []string{podMetadataMountPath}
+			p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
 			actions = append(actions, *a)
 			probes = append(probes, *p)
 		}

@@ -100,6 +100,10 @@ type Probe struct {
 	SuccessThreshold    int32  `json:"successThreshold,omitempty"`
 	FailureThreshold    int32  `json:"failureThreshold,omitempty"`
 	ReportPeriodSeconds int32  `json:"reportPeriodSeconds,omitempty"`
+	// ReportOnFileChange triggers a forced probe report when any configured path changes.
+	// Directory paths watch immediate child create/remove/rename events only; file paths
+	// watch create/write/remove/rename events for the exact file path.
+	ReportOnFileChange []string `json:"reportOnFileChange,omitempty"`
 }
 
 type ProbeEvent struct {

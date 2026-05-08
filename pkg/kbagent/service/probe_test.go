@@ -22,8 +22,11 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -135,6 +138,81 @@ var _ = Describe("probe", func() {
 			Eventually(event.Probe).Should(Equal(probeName))
 			Eventually(event.Code).Should(Equal(int32(0)))
 			Eventually(event.Output).Should(Equal([]byte("leader")))
+		})
+
+		It("send event when report-on-file-change trigger fires with unchanged output", func() {
+			tmpDir, err := os.MkdirTemp("", "kbagent-file-change-*")
+			Expect(err).Should(BeNil())
+			defer os.RemoveAll(tmpDir)
+
+			triggerPath := filepath.Join(tmpDir, "trigger")
+			Expect(os.WriteFile(triggerPath, []byte("current"), 0644)).Should(Succeed())
+			probesWithTrigger := append([]proto.Probe(nil), probes...)
+			probesWithTrigger[0].ReportOnFileChange = []string{triggerPath}
+
+			By("create probe service")
+			service, err := newProbeService(logr.New(nil), actionSvc, probesWithTrigger)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			By("mock send event function")
+			eventChan := make(chan struct {
+				reason  string
+				message string
+			}, 128)
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+				eventChan <- struct{ reason, message string }{reason, message}
+				return nil
+			}
+
+			By("start probe service")
+			Expect(service.Start()).Should(Succeed())
+
+			By("drain initial event")
+			var receivedData struct{ reason, message string }
+			Eventually(eventChan).Should(Receive(&receivedData))
+
+			By("update watched file")
+			Expect(os.WriteFile(triggerPath, []byte("changed"), 0644)).Should(Succeed())
+
+			By("check received event even though probe output has not changed")
+			Eventually(eventChan, 5*time.Second).Should(Receive(&receivedData))
+			Expect(receivedData.reason).Should(Equal(probeName))
+			var event proto.ProbeEvent
+			Expect(json.Unmarshal([]byte(receivedData.message), &event)).Should(Succeed())
+			Expect(event.Probe).Should(Equal(probeName))
+			Expect(event.Code).Should(Equal(int32(0)))
+			Expect(event.Output).Should(Equal([]byte("leader")))
+		})
+
+		It("matches file-change events by configured path type", func() {
+			dir := filepath.Clean("/tmp/watch-dir")
+			file := filepath.Join(dir, "watched")
+			sibling := filepath.Join(dir, "sibling")
+			child := filepath.Join(dir, "child")
+			nested := filepath.Join(child, "nested")
+
+			Expect(watchedFileChanged(fsnotify.Event{Name: file, Op: fsnotify.Write},
+				[]fileChangeWatch{{path: file}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: file, Op: fsnotify.Create},
+				[]fileChangeWatch{{path: file}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: file, Op: fsnotify.Remove},
+				[]fileChangeWatch{{path: file}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: file, Op: fsnotify.Rename},
+				[]fileChangeWatch{{path: file}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: sibling, Op: fsnotify.Write},
+				[]fileChangeWatch{{path: file}})).Should(BeFalse())
+
+			Expect(watchedFileChanged(fsnotify.Event{Name: child, Op: fsnotify.Create},
+				[]fileChangeWatch{{path: dir, dir: true}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: child, Op: fsnotify.Remove},
+				[]fileChangeWatch{{path: dir, dir: true}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: child, Op: fsnotify.Rename},
+				[]fileChangeWatch{{path: dir, dir: true}})).Should(BeTrue())
+			Expect(watchedFileChanged(fsnotify.Event{Name: child, Op: fsnotify.Write},
+				[]fileChangeWatch{{path: dir, dir: true}})).Should(BeFalse())
+			Expect(watchedFileChanged(fsnotify.Event{Name: nested, Op: fsnotify.Create},
+				[]fileChangeWatch{{path: dir, dir: true}})).Should(BeFalse())
 		})
 
 		It("send event - API server error", func() {

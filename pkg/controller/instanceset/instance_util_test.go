@@ -932,6 +932,18 @@ var _ = Describe("instance util test", func() {
 			}}
 			Expect(isImageMatched(pod)).Should(BeTrue())
 
+			By("spec: mutable tag, status image: different tag, status imageID: digest")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "docker.io/nginx:1.0.0",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "docker.io/nginx:latest",
+				ImageID: "docker.io/nginx@sha256:0f37a86c04f8",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+
 			By("digest not matches")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,

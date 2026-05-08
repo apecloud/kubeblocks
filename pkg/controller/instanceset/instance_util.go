@@ -188,7 +188,9 @@ func isImageMatched(pod *corev1.Pod) bool {
 		specName, specTag, specDigest := imageSplit(specImage)
 		statusName, statusTag, statusDigest := imageSplit(statusImage)
 		_, _, statusImageIDDigest := imageSplit(status.ImageID)
-		// if digest presents in spec, it must be same in status
+		// If the spec is digest-pinned, accept the pulled digest from either
+		// status.image or status.imageID. Do not use imageID for tag-only specs:
+		// mutable tags must still match status.image by tag.
 		if len(specDigest) != 0 && specDigest != statusDigest && specDigest != statusImageIDDigest {
 			return false
 		}

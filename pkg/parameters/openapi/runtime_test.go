@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -46,7 +46,7 @@ func TestNewRuntime(t *testing.T) {
                     //  mysql server param: a set of name/value pairs.
                     mysqld: {
                         // SectionName is extract section name
-                		SectionName: string	
+                		SectionName: string
                 	}
                 }
                 `,

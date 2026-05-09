@@ -287,7 +287,7 @@ var _ = Describe("OpsUtil functions", func() {
 				for sourcePVCName, pvName := range sourcePVCToPV {
 					pvc := &corev1.PersistentVolumeClaim{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
-					g.Expect(pvc.Spec.VolumeName).Should(BeEmpty())
+					g.Expect(pvc.Spec.VolumeName).Should(Equal(pvName))
 					pv := &corev1.PersistentVolume{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvName}, pv)).Should(Succeed())
 					g.Expect(pv.Spec.ClaimRef).ShouldNot(BeNil())
@@ -501,6 +501,20 @@ var _ = Describe("OpsUtil functions", func() {
 				Should(MatchError(ContainSubstring(earlier.Name)))
 			Expect(helper.failIfAnotherActiveRebuildOwnsTarget(reqCtx, k8sClient, earlier, sourcePVCName)).
 				Should(Succeed())
+		})
+
+		It("sets volumeName on an unbound replacement source PVC", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			sourcePVC := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, "data-rebuild-unbound-"+testCtx.GetRandomStr(), clusterName, defaultCompName, testapps.DataVolumeName).
+				SetStorage("20Gi").
+				Create(&testCtx).
+				GetObject()
+
+			helper := &inplaceRebuildHelper{}
+			Expect(helper.setSourcePVCVolumeNameForRebuild(reqCtx, k8sClient, sourcePVC, "restored-pv-"+testCtx.GetRandomStr())).Should(Succeed())
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(sourcePVC), sourcePVC)).Should(Succeed())
+			Expect(sourcePVC.Spec.VolumeName).Should(ContainSubstring("restored-pv-"))
 		})
 
 		testRebuildInstanceWithBackup := func(ignoreRoleCheck bool) {

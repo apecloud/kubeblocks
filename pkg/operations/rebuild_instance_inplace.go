@@ -407,7 +407,11 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 		}
 
 		waitingForSourcePVC = true
-		if sourcePVC.Spec.VolumeName != "" {
+		if sourcePVC.Spec.VolumeName == "" {
+			if err := inPlaceHelper.setSourcePVCVolumeNameForRebuild(reqCtx, cli, sourcePVC, pv.Name); err != nil {
+				return err
+			}
+		} else {
 			if err := inPlaceHelper.failIfSourcePVCBoundToOtherActiveRebuildPV(reqCtx, cli, opsRequest, sourcePVC, pv); err != nil {
 				return err
 			}
@@ -442,6 +446,18 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intc
 		options = append(options, client.GracePeriodSeconds(0))
 	}
 	return client.IgnoreNotFound(intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...))
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) setSourcePVCVolumeNameForRebuild(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	sourcePVC *corev1.PersistentVolumeClaim,
+	pvName string) error {
+	patch := client.MergeFrom(sourcePVC.DeepCopy())
+	// Bind the replacement PVC that InstanceSet just created to the restored PV.
+	// If it has already bound to another PV, the caller deletes it and waits for
+	// a fresh PVC instead of changing an immutable bound claim.
+	sourcePVC.Spec.VolumeName = pvName
+	return cli.Patch(reqCtx.Ctx, sourcePVC, patch)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) setInstanceNodeSelectorForRebuild(reqCtx intctrlutil.RequestCtx,

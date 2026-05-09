@@ -186,14 +186,14 @@ func isImageMatched(pod *corev1.Pod) bool {
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
 		specName, specTag, specDigest := imageSplit(specImage)
-		statusName, statusTag, statusDigest := imageSplit(statusImage)
 		_, _, statusImageIDDigest := imageSplit(status.ImageID)
-		// If the spec is digest-pinned, accept the pulled digest from either
-		// status.image or status.imageID. Do not use imageID for tag-only specs:
-		// mutable tags must still match status.image by tag.
-		if len(specDigest) != 0 && specDigest != statusDigest && specDigest != statusImageIDDigest {
-			return false
+		if len(specDigest) != 0 {
+			if specDigest != statusImageIDDigest {
+				return false
+			}
+			continue
 		}
+		statusName, statusTag, _ := imageSplit(statusImage)
 		// if tag presents in spec, it must be same in status
 		if len(specTag) != 0 && specTag != statusTag {
 			return false

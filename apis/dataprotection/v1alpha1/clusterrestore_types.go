@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -35,6 +36,13 @@ type ClusterRestoreSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.backupRef"
 	BackupRef ClusterRestoreBackupRef `json:"backupRef"`
+
+	// Specifies the template used to create the target Cluster.
+	// If omitted, the target Cluster is created from the Cluster snapshot stored in the Backup.
+	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.targetClusterTemplate"
+	// +optional
+	TargetClusterTemplate *ClusterRestoreTargetClusterTemplate `json:"targetClusterTemplate,omitempty"`
 
 	// Specifies the point in time for restoring.
 	//
@@ -85,6 +93,25 @@ type ClusterRestoreBackupRef struct {
 	//
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
+}
+
+// ClusterRestoreTargetClusterTemplate describes the target Cluster to create.
+type ClusterRestoreTargetClusterTemplate struct {
+	// Specifies labels to set on the target Cluster.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies annotations to set on the target Cluster.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Specifies the desired target Cluster spec.
+	//
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Required
+	Spec runtime.RawExtension `json:"spec"`
 }
 
 // ClusterRestoreStatus defines the observed state of ClusterRestore.

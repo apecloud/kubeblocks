@@ -179,6 +179,141 @@ func TestClusterRestoreBuildTargetClusterInjectsRestoreAPI(t *testing.T) {
 	}
 }
 
+func TestClusterRestoreBuildsTargetClusterFromTemplate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "source-backup",
+			Namespace: "backup-ns",
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Targets: []dpv1alpha1.BackupStatusTarget{{
+				BackupTarget: dpv1alpha1.BackupTarget{Name: "mysql"},
+			}},
+		},
+	}
+	clusterRestore := &dpv1alpha1.ClusterRestore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore-session",
+			Namespace: "target-ns",
+			UID:       types.UID("restore-session-uid"),
+		},
+		Spec: dpv1alpha1.ClusterRestoreSpec{
+			TargetClusterName: "target-cluster",
+			BackupRef:         dpv1alpha1.ClusterRestoreBackupRef{Name: backup.Name, Namespace: backup.Namespace},
+			TargetClusterTemplate: &dpv1alpha1.ClusterRestoreTargetClusterTemplate{
+				Labels:      map[string]string{"user-label": "user-value"},
+				Annotations: map[string]string{"user-annotation": "user-value"},
+				Spec: runtime.RawExtension{Raw: mustMarshal(t, appsv1.ClusterSpec{
+					ClusterDef:        "mysql",
+					TerminationPolicy: appsv1.Delete,
+					ComponentSpecs: []appsv1.ClusterComponentSpec{{
+						Name:           "mysql",
+						ServiceVersion: "8.0.30",
+						Replicas:       3,
+						VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+							Name: "data",
+							Spec: corev1.PersistentVolumeClaimSpec{},
+						}},
+					}},
+				})},
+			},
+			VolumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client: cli,
+		Scheme: scheme,
+	}
+
+	target, err := reconciler.buildTargetCluster(intctrlutil.RequestCtx{Ctx: context.Background()}, clusterRestore, backup, clusterRestore.Spec.RestoreTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if target.Name != clusterRestore.Spec.TargetClusterName || target.Namespace != clusterRestore.Namespace {
+		t.Fatalf("unexpected target cluster identity: %s/%s", target.Namespace, target.Name)
+	}
+	if target.Labels["user-label"] != "user-value" || target.Labels[dptypes.ClusterRestoreLabelKey] != clusterRestore.Name {
+		t.Fatalf("unexpected target labels: %#v", target.Labels)
+	}
+	if target.Annotations["user-annotation"] != "user-value" ||
+		target.Annotations[dptypes.ClusterRestoreUIDAnnotationKey] != string(clusterRestore.UID) {
+		t.Fatalf("unexpected target annotations: %#v", target.Annotations)
+	}
+	if target.Spec.ClusterDef != "mysql" ||
+		target.Spec.ComponentSpecs[0].ServiceVersion != "8.0.30" ||
+		target.Spec.ComponentSpecs[0].Replicas != 3 {
+		t.Fatalf("expected target spec to come from template, got %#v", target.Spec)
+	}
+	vct := target.Spec.ComponentSpecs[0].VolumeClaimTemplates[0]
+	if !dprestore.IsBackupDataSourceRef(vct.Spec.DataSourceRef) {
+		t.Fatalf("expected Backup dataSourceRef, got %#v", vct.Spec.DataSourceRef)
+	}
+	if vct.Annotations[dptypes.SourceTargetNameAnnotationKey] != "mysql" ||
+		vct.Annotations[dptypes.VolumeSourceAnnotationKey] != "data" {
+		t.Fatalf("unexpected restore annotations: %#v", vct.Annotations)
+	}
+}
+
+func mustMarshal(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestClusterRestoreRequiresBackupSnapshotWithoutTargetTemplate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "source-backup",
+			Namespace: "backup-ns",
+		},
+	}
+	clusterRestore := &dpv1alpha1.ClusterRestore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore-session",
+			Namespace: "target-ns",
+			UID:       types.UID("restore-session-uid"),
+		},
+		Spec: dpv1alpha1.ClusterRestoreSpec{
+			TargetClusterName: "target-cluster",
+			BackupRef:         dpv1alpha1.ClusterRestoreBackupRef{Name: backup.Name, Namespace: backup.Namespace},
+		},
+	}
+	reconciler := &ClusterRestoreReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme: scheme,
+	}
+
+	if _, err := reconciler.buildTargetCluster(intctrlutil.RequestCtx{Ctx: context.Background()}, clusterRestore, backup, clusterRestore.Spec.RestoreTime); err == nil {
+		t.Fatal("expected missing backup snapshot to fail when target template is omitted")
+	}
+}
+
 func TestClusterRestoreFailsWhenTargetClusterAlreadyExists(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {

@@ -307,9 +307,18 @@ func (r *ClusterRestoreReconciler) getAndValidateBackup(reqCtx intctrlutil.Reque
 }
 
 func (r *ClusterRestoreReconciler) buildTargetCluster(reqCtx intctrlutil.RequestCtx, clusterRestore *dpv1alpha1.ClusterRestore, backup *dpv1alpha1.Backup, restoreTime string) (*appsv1.Cluster, error) {
-	cluster, err := clusterFromBackupSnapshot(backup)
-	if err != nil {
-		return nil, err
+	var cluster *appsv1.Cluster
+	var err error
+	if clusterRestore.Spec.TargetClusterTemplate != nil {
+		cluster, err = clusterFromTargetTemplate(clusterRestore.Spec.TargetClusterTemplate)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		cluster, err = clusterFromBackupSnapshot(backup)
+		if err != nil {
+			return nil, err
+		}
 	}
 	normalizeRestoredCluster(cluster, clusterRestore)
 	if err = injectClusterRestoreDataSources(cluster, clusterRestore, backup, restoreTime); err != nil {
@@ -317,6 +326,24 @@ func (r *ClusterRestoreReconciler) buildTargetCluster(reqCtx intctrlutil.Request
 	}
 	if err = r.prepareSourceSystemAccounts(reqCtx, clusterRestore, cluster, backup); err != nil {
 		return nil, err
+	}
+	return cluster, nil
+}
+
+func clusterFromTargetTemplate(template *dpv1alpha1.ClusterRestoreTargetClusterTemplate) (*appsv1.Cluster, error) {
+	if len(template.Spec.Raw) == 0 {
+		return nil, intctrlutil.NewFatalError("missing target cluster template spec")
+	}
+	spec := &appsv1.ClusterSpec{}
+	if err := json.Unmarshal(template.Spec.Raw, spec); err != nil {
+		return nil, err
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      cloneStringMap(template.Labels),
+			Annotations: cloneStringMap(template.Annotations),
+		},
+		Spec: *spec,
 	}
 	return cluster, nil
 }
@@ -331,6 +358,17 @@ func clusterFromBackupSnapshot(backup *dpv1alpha1.Backup) (*appsv1.Cluster, erro
 		return nil, err
 	}
 	return cluster, nil
+}
+
+func cloneStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func normalizeRestoredCluster(cluster *appsv1.Cluster, clusterRestore *dpv1alpha1.ClusterRestore) {

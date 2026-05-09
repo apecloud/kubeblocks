@@ -931,6 +931,21 @@ ClusterRestoreBackupRef
 </tr>
 <tr>
 <td>
+<code>targetClusterTemplate</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreTargetClusterTemplate">
+ClusterRestoreTargetClusterTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the template used to create the target Cluster.
+If omitted, the target Cluster is created from the Cluster snapshot stored in the Backup.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>restoreTime</code><br/>
 <em>
 string
@@ -4242,6 +4257,21 @@ ClusterRestoreBackupRef
 </tr>
 <tr>
 <td>
+<code>targetClusterTemplate</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreTargetClusterTemplate">
+ClusterRestoreTargetClusterTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the template used to create the target Cluster.
+If omitted, the target Cluster is created from the Cluster snapshot stored in the Backup.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>restoreTime</code><br/>
 <em>
 string
@@ -4432,6 +4462,88 @@ k8s.io/apimachinery/pkg/types.UID
 <td>
 <em>(Optional)</em>
 <p>Specifies the Cluster UID.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreTargetClusterTemplate">ClusterRestoreTargetClusterTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreSpec">ClusterRestoreSpec</a>)
+</p>
+<div>
+<p>ClusterRestoreTargetClusterTemplate describes the target Cluster to create.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies labels to set on the target Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies annotations to set on the target Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+k8s.io/apimachinery/pkg/runtime.RawExtension
+</em>
+</td>
+<td>
+<p>Specifies the desired target Cluster spec.</p>
+<br/>
+<br/>
+<table>
+<tbody>
+<tr>
+<td>
+<code>-</code><br/>
+<em>
+[]byte
+</em>
+</td>
+<td>
+<p>Raw is the underlying serialization of this object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>-</code><br/>
+<em>
+k8s.io/apimachinery/pkg/runtime.Object
+</em>
+</td>
+<td>
+<p>Object can hold a representation of this extension - useful for working with versioned
+structs.</p>
+</td>
+</tr>
+</tbody>
+</table>
 </td>
 </tr>
 </tbody>

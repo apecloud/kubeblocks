@@ -231,6 +231,31 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.targetClusterName
                   rule: self == oldSelf
+              targetClusterTemplate:
+                description: |-
+                  Specifies the template used to create the target Cluster.
+                  If omitted, the target Cluster is created from the Cluster snapshot stored in the Backup.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Specifies annotations to set on the target Cluster.
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Specifies labels to set on the target Cluster.
+                    type: object
+                  spec:
+                    description: Specifies the desired target Cluster spec.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                required:
+                - spec
+                type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.targetClusterTemplate
+                  rule: self == oldSelf
               volumeRestorePolicy:
                 allOf:
                 - enum:

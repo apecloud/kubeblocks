@@ -125,6 +125,8 @@ var BackupScheduleSignature = func(_ dpv1alpha1.BackupSchedule, _ *dpv1alpha1.Ba
 }
 var RestoreSignature = func(_ dpv1alpha1.Restore, _ *dpv1alpha1.Restore, _ dpv1alpha1.RestoreList, _ *dpv1alpha1.RestoreList) {
 }
+var ClusterRestoreSignature = func(_ dpv1alpha1.ClusterRestore, _ *dpv1alpha1.ClusterRestore, _ dpv1alpha1.ClusterRestoreList, _ *dpv1alpha1.ClusterRestoreList) {
+}
 var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ *dpv1alpha1.ActionSet, _ dpv1alpha1.ActionSetList, _ *dpv1alpha1.ActionSetList) {
 }
 var BackupRepoSignature = func(_ dpv1alpha1.BackupRepo, _ *dpv1alpha1.BackupRepo, _ dpv1alpha1.BackupRepoList, _ *dpv1alpha1.BackupRepoList) {

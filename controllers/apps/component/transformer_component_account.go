@@ -175,10 +175,11 @@ func (t *componentAccountTransformer) buildAccountHash(account synthesizedSystem
 
 func (t *componentAccountTransformer) buildAccountSecret(transCtx *componentTransformContext, account synthesizedSystemAccount) (*corev1.Secret, error) {
 	var password []byte
+	var provisioned bool
 	var err error
 	switch {
 	case account.SecretRef != nil:
-		if password, err = t.getPasswordFromSecret(transCtx, account); err != nil {
+		if password, provisioned, err = t.getPasswordFromSecret(transCtx, account); err != nil {
 			return nil, err
 		}
 	default:
@@ -190,10 +191,20 @@ func (t *componentAccountTransformer) buildAccountSecret(transCtx *componentTran
 	if len(password) > maximumPasswordLength {
 		return nil, errPasswordTooLong
 	}
-	return t.buildAccountSecretWithPassword(transCtx, account, password)
+	secret, err := t.buildAccountSecretWithPassword(transCtx, account, password)
+	if err != nil {
+		return nil, err
+	}
+	if provisioned {
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] = "true"
+	}
+	return secret, nil
 }
 
-func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
+func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, bool, error) {
 	secretKey := types.NamespacedName{
 		Namespace: account.SecretRef.Namespace,
 		Name:      account.SecretRef.Name,
@@ -203,7 +214,7 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 	}
 	secret := &corev1.Secret{}
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	passwordKey := constant.AccountPasswdForSecret
@@ -211,9 +222,9 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 		passwordKey = account.SecretRef.Password
 	}
 	if _, ok := secret.Data[passwordKey]; !ok {
-		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
+		return nil, false, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
 	}
-	return secret.Data[passwordKey], nil
+	return secret.Data[passwordKey], secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] == "true", nil
 }
 
 func (t *componentAccountTransformer) buildPassword(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {

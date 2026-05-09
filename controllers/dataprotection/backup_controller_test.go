@@ -79,6 +79,7 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterRestoreSignature, true, inNS)
 
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
@@ -1066,14 +1067,23 @@ var _ = Describe("Backup Controller test", func() {
 		})
 
 		It("delays backup job when DP restore session is in progress", func() {
-			By("setting restore condition on cluster")
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterInfo.Cluster, func() {
-				clusterInfo.Cluster.Status.Conditions = append(clusterInfo.Cluster.Status.Conditions, metav1.Condition{
-					Type:               dptypes.RestoreSessionConditionType,
-					Status:             metav1.ConditionFalse,
-					Reason:             string(dpv1alpha1.RestorePhaseRunning),
-					LastTransitionTime: metav1.Now(),
-				})
+			By("creating an in-progress ClusterRestore")
+			clusterRestore := &dpv1alpha1.ClusterRestore{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "restore-session",
+					Namespace: testCtx.DefaultNamespace,
+				},
+				Spec: dpv1alpha1.ClusterRestoreSpec{
+					TargetClusterName: clusterInfo.Cluster.Name,
+					BackupRef: dpv1alpha1.ClusterRestoreBackupRef{
+						Name:      testdp.BackupName,
+						Namespace: testCtx.DefaultNamespace,
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterRestore)).Should(Succeed())
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterRestore), func(restore *dpv1alpha1.ClusterRestore) {
+				restore.Status.Phase = dpv1alpha1.ClusterRestorePhaseRestoring
 			})).Should(Succeed())
 
 			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
@@ -1091,29 +1101,9 @@ var _ = Describe("Backup Controller test", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
 
-			By("check event fired")
-			Eventually(func() bool {
-				eventList := &corev1.EventList{}
-				err := k8sClient.List(ctx, eventList, client.InNamespace(clusterInfo.Cluster.Namespace))
-				if err != nil {
-					return false
-				}
-				for _, e := range eventList.Items {
-					if e.Reason == "RestoreInProgress" && e.InvolvedObject.Name == backup.Name {
-						return true
-					}
-				}
-				return false
-			}).Should(BeTrue())
-
-			By("mark restore condition completed")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
-				cluster.Status.Conditions = []metav1.Condition{{
-					Type:               dptypes.RestoreSessionConditionType,
-					Status:             metav1.ConditionTrue,
-					Reason:             string(dpv1alpha1.RestorePhaseCompleted),
-					LastTransitionTime: metav1.Now(),
-				}}
+			By("mark ClusterRestore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterRestore), func(restore *dpv1alpha1.ClusterRestore) {
+				restore.Status.Phase = dpv1alpha1.ClusterRestorePhaseCompleted
 			})).Should(Succeed())
 
 			By("check job is created")

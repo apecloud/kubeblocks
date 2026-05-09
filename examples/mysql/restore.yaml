@@ -1,31 +1,11 @@
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: ClusterRestore
 metadata:
   name: mysql-cluster-restore
   namespace: demo
-  annotations:
-    kubeblocks.io/restore-from-backup: '{"mysql":{"encryptedSystemAccounts":"<ENCRYPTED-SYSTEM-ACCOUNTS>","name":"mysql-cluster-backup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
-  terminationPolicy: Delete
-  componentSpecs:
-    - name: mysql
-      componentDef: "mysql-8.0"  # match all CMPD named with 'mysql-8.0-'
-      serviceVersion: 8.0.35
-      disableExporter: false
-      replicas: 2
-      resources:
-        limits:
-          cpu: '0.5'
-          memory: 0.5Gi
-        requests:
-          cpu: '0.5'
-          memory: 0.5Gi
-      volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: ""
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+  targetClusterName: mysql-cluster-restore
+  backupRef:
+    name: mysql-cluster-backup
+    namespace: demo
+  volumeRestorePolicy: Parallel

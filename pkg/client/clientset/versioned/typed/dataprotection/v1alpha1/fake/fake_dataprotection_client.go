@@ -52,6 +52,10 @@ func (c *FakeDataprotectionV1alpha1) BackupSchedules(namespace string) v1alpha1.
 	return &FakeBackupSchedules{c, namespace}
 }
 
+func (c *FakeDataprotectionV1alpha1) ClusterRestores(namespace string) v1alpha1.ClusterRestoreInterface {
+	return &FakeClusterRestores{c, namespace}
+}
+
 func (c *FakeDataprotectionV1alpha1) Restores(namespace string) v1alpha1.RestoreInterface {
 	return &FakeRestores{c, namespace}
 }

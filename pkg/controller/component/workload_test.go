@@ -41,7 +41,7 @@ var _ = Describe("workload PVC templates", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "data",
 					Annotations: map[string]string{
-						dptypes.RestoreOptionsAnnotationKey: `{"volumeSource":"data"}`,
+						dptypes.VolumeSourceAnnotationKey: "data",
 					},
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
@@ -52,7 +52,7 @@ var _ = Describe("workload PVC templates", func() {
 
 		Expect(pvcs).Should(HaveLen(1))
 		Expect(pvcs[0].Spec.DataSourceRef).Should(Equal(ref))
-		Expect(pvcs[0].Annotations[dptypes.RestoreOptionsAnnotationKey]).Should(Equal(`{"volumeSource":"data"}`))
+		Expect(pvcs[0].Annotations[dptypes.VolumeSourceAnnotationKey]).Should(Equal("data"))
 		Expect(pvcs[0].Annotations["static"]).Should(Equal("true"))
 		Expect(pvcs[0].Annotations["dynamic"]).Should(Equal("true"))
 	})

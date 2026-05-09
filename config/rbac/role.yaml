@@ -679,6 +679,25 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
+  - clusterrestores
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - clusterrestores/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
   - restores
   verbs:
   - create

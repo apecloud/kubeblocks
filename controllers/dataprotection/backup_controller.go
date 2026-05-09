@@ -31,7 +31,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -695,19 +694,27 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if backup.Annotations[dptypes.SkipRestorationCheckAnnotationKey] == trueVal {
 		return false, nil
 	}
-	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
-	if !ok {
-		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
-		return false, nil
-	}
-	cluster := &kbappsv1.Cluster{}
-	backupTargetExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
-		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
-	if err != nil || !backupTargetExists {
+	clusterRestores := &dpv1alpha1.ClusterRestoreList{}
+	if err := r.Client.List(reqCtx.Ctx, clusterRestores); err != nil {
 		return false, err
 	}
-	cond := meta.FindStatusCondition(cluster.Status.Conditions, dptypes.RestoreSessionConditionType)
-	return cond != nil && cond.Reason == string(dpv1alpha1.RestorePhaseRunning), nil
+	for i := range clusterRestores.Items {
+		clusterRestore := &clusterRestores.Items[i]
+		backupNamespace := clusterRestore.Spec.BackupRef.Namespace
+		if backupNamespace == "" {
+			backupNamespace = clusterRestore.Namespace
+		}
+		if clusterRestore.Spec.BackupRef.Name != backup.Name || backupNamespace != backup.Namespace {
+			continue
+		}
+		switch clusterRestore.Status.Phase {
+		case dpv1alpha1.ClusterRestorePhaseCompleted, dpv1alpha1.ClusterRestorePhaseFailed:
+			continue
+		default:
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

@@ -30,6 +30,8 @@ type BackupRepoExpansion interface{}
 
 type BackupScheduleExpansion interface{}
 
+type ClusterRestoreExpansion interface{}
+
 type RestoreExpansion interface{}
 
 type StorageProviderExpansion interface{}

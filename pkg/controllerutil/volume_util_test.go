@@ -41,7 +41,7 @@ var _ = Describe("volume util", func() {
 			{
 				Name: "data",
 				Annotations: map[string]string{
-					dptypes.RestoreOptionsAnnotationKey: `{"volumeSource":"data"}`,
+					dptypes.VolumeSourceAnnotationKey: "data",
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					DataSourceRef: ref,
@@ -51,6 +51,6 @@ var _ = Describe("volume util", func() {
 
 		Expect(pvcts).Should(HaveLen(1))
 		Expect(pvcts[0].Spec.DataSourceRef).Should(Equal(ref))
-		Expect(pvcts[0].Annotations[dptypes.RestoreOptionsAnnotationKey]).Should(Equal(`{"volumeSource":"data"}`))
+		Expect(pvcts[0].Annotations[dptypes.VolumeSourceAnnotationKey]).Should(Equal("data"))
 	})
 })

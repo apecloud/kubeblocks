@@ -2668,7 +2668,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+<a href="#apps.kubeblocks.io/v1.RetentionPeriod">
+RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -10651,6 +10653,15 @@ NamedVar
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.RetentionPeriod">RetentionPeriod
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterBackup">ClusterBackup</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup</a>)
+</p>
+<div>
+<p>RetentionPeriod represents a duration in the format &ldquo;1y2mo3w4d5h6m&rdquo;, where
+y=year, mo=month, w=week, d=day, h=hour, m=minute.</p>
+</div>
 <h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
 </h3>
 <p>
@@ -17115,7 +17126,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+<a href="#apps.kubeblocks.io/v1.RetentionPeriod">
+RetentionPeriod
+</a>
 </em>
 </td>
 <td>

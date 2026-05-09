@@ -19,8 +19,9 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // ClusterRestoreSpec defines the desired state of ClusterRestore.
@@ -109,9 +110,8 @@ type ClusterRestoreTargetClusterTemplate struct {
 
 	// Specifies the desired target Cluster spec.
 	//
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
-	Spec runtime.RawExtension `json:"spec"`
+	Spec appsv1.ClusterSpec `json:"spec"`
 }
 
 // ClusterRestoreStatus defines the observed state of ClusterRestore.

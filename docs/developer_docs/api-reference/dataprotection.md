@@ -306,9 +306,7 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
-RetentionPeriod
-</a>
+github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
 </em>
 </td>
 <td>
@@ -3511,9 +3509,7 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
-RetentionPeriod
-</a>
+github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
 </em>
 </td>
 <td>
@@ -4510,7 +4506,7 @@ map[string]string
 <td>
 <code>spec</code><br/>
 <em>
-k8s.io/apimachinery/pkg/runtime.RawExtension
+github.com/apecloud/kubeblocks/apis/apps/v1.ClusterSpec
 </em>
 </td>
 <td>
@@ -4521,25 +4517,150 @@ k8s.io/apimachinery/pkg/runtime.RawExtension
 <tbody>
 <tr>
 <td>
-<code>-</code><br/>
+<code>clusterDef</code><br/>
 <em>
-[]byte
+string
 </em>
 </td>
 <td>
-<p>Raw is the underlying serialization of this object.</p>
+<em>(Optional)</em>
+<p>Specifies the name of the ClusterDefinition to use when creating a Cluster.</p>
+<p>This field enables users to create a Cluster based on a specific ClusterDefinition.
+Which, in conjunction with the <code>topology</code> field, determine:</p>
+<ul>
+<li>The Components to be included in the Cluster.</li>
+<li>The sequences in which the Components are created, updated, and terminate.</li>
+</ul>
+<p>This facilitates multiple-components management with predefined ClusterDefinition.</p>
+<p>Users with advanced requirements can bypass this general setting and specify more precise control over
+the composition of the Cluster by directly referencing specific ComponentDefinitions for each component
+within <code>componentSpecs[*].componentDef</code>.</p>
+<p>If this field is not provided, each component must be explicitly defined in <code>componentSpecs[*].componentDef</code>.</p>
+<p>Note: Once set, this field cannot be modified; it is immutable.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>-</code><br/>
+<code>topology</code><br/>
 <em>
-k8s.io/apimachinery/pkg/runtime.Object
+string
 </em>
 </td>
 <td>
-<p>Object can hold a representation of this extension - useful for working with versioned
-structs.</p>
+<em>(Optional)</em>
+<p>Specifies the name of the ClusterTopology to be used when creating the Cluster.</p>
+<p>This field defines which set of Components, as outlined in the ClusterDefinition, will be used to
+construct the Cluster based on the named topology.
+The ClusterDefinition may list multiple topologies under <code>clusterdefinition.spec.topologies[*]</code>,
+each tailored to different use cases or environments.</p>
+<p>If <code>topology</code> is not specified, the Cluster will use the default topology defined in the ClusterDefinition.</p>
+<p>Note: Once set during the Cluster creation, the <code>topology</code> field cannot be modified.
+It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>terminationPolicy</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/apps/v1.TerminationPolicyType
+</em>
+</td>
+<td>
+<p>Specifies the behavior when a Cluster is deleted.
+It defines how resources, data, and backups associated with a Cluster are managed during termination.
+Choose a policy based on the desired level of resource cleanup and data preservation:</p>
+<ul>
+<li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
+<li><code>Delete</code>: Deletes all runtime resources belong to the Cluster.</li>
+<li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
+backups in external storage.
+This results in complete data removal and should be used cautiously, primarily in non-production environments
+to avoid irreversible data loss.</li>
+</ul>
+<p>Warning: Choosing an inappropriate termination policy can result in data loss.
+The <code>WipeOut</code> policy is particularly risky in production environments due to its irreversible nature.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentSpecs</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentSpec
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of ClusterComponentSpec objects used to define the individual Components that make up a Cluster.
+This field allows for detailed configuration of each Component within the Cluster.</p>
+<p>Note: <code>shardings</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterSharding
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of ClusterSharding objects that manage the sharding topology for Cluster Components.
+Each ClusterSharding organizes components into shards, with each shard corresponding to a Component.
+Components within a shard are all based on a common ClusterComponentSpec template, ensuring uniform configurations.</p>
+<p>This field supports dynamic resharding by facilitating the addition or removal of shards
+through the <code>shards</code> field in ClusterSharding.</p>
+<p>Note: <code>shardings</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtimeClassName for all Pods managed by this Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/apps/v1.SchedulingPolicy
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>services</code><br/>
+<em>
+[]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterService
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a list of additional Services that are exposed by a Cluster.
+This field allows Services of selected Components, either from <code>componentSpecs</code> or <code>shardings</code> to be exposed,
+alongside Services defined with ComponentService.</p>
+<p>Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backup</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/apps/v1.ClusterBackup
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the backup configuration of the Cluster.</p>
 </td>
 </tr>
 </tbody>
@@ -6417,15 +6538,6 @@ The minimum value is 0.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">RetentionPeriod
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy</a>)
-</p>
-<div>
-<p>RetentionPeriod represents a duration in the format &ldquo;1y2mo3w4d5h6m&rdquo;, where
-y=year, mo=month, w=week, d=day, h=hour, m=minute.</p>
-</div>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RuntimeSettings">RuntimeSettings
 </h3>
 <p>
@@ -6546,9 +6658,7 @@ see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/C
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
-RetentionPeriod
-</a>
+github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
 </em>
 </td>
 <td>

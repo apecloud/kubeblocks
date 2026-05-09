@@ -23,8 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // +genclient
@@ -820,7 +818,7 @@ type ClusterBackup struct {
 	//
 	// +kubebuilder:default="7d"
 	// +optional
-	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
+	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 
 	// Specifies the backup method to use, as defined in backupPolicy.
 	//

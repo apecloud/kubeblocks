@@ -339,19 +339,12 @@ func (r *ClusterRestoreReconciler) buildTargetCluster(reqCtx intctrlutil.Request
 }
 
 func clusterFromTargetTemplate(template *dpv1alpha1.ClusterRestoreTargetClusterTemplate) (*appsv1.Cluster, error) {
-	if len(template.Spec.Raw) == 0 {
-		return nil, intctrlutil.NewFatalError("missing target cluster template spec")
-	}
-	spec := &appsv1.ClusterSpec{}
-	if err := json.Unmarshal(template.Spec.Raw, spec); err != nil {
-		return nil, err
-	}
 	cluster := &appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      cloneStringMap(template.Labels),
 			Annotations: cloneStringMap(template.Annotations),
 		},
-		Spec: *spec,
+		Spec: *template.Spec.DeepCopy(),
 	}
 	return cluster, nil
 }

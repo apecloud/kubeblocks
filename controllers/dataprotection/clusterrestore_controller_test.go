@@ -217,7 +217,7 @@ func TestClusterRestoreBuildsTargetClusterFromTemplate(t *testing.T) {
 			TargetClusterTemplate: &dpv1alpha1.ClusterRestoreTargetClusterTemplate{
 				Labels:      map[string]string{"user-label": "user-value"},
 				Annotations: map[string]string{"user-annotation": "user-value"},
-				Spec: runtime.RawExtension{Raw: mustMarshal(t, appsv1.ClusterSpec{
+				Spec: appsv1.ClusterSpec{
 					ClusterDef:        "mysql",
 					TerminationPolicy: appsv1.Delete,
 					ComponentSpecs: []appsv1.ClusterComponentSpec{{
@@ -229,7 +229,7 @@ func TestClusterRestoreBuildsTargetClusterFromTemplate(t *testing.T) {
 							Spec: corev1.PersistentVolumeClaimSpec{},
 						}},
 					}},
-				})},
+				},
 			},
 			VolumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
 		},
@@ -268,15 +268,6 @@ func TestClusterRestoreBuildsTargetClusterFromTemplate(t *testing.T) {
 		vct.Annotations[dptypes.VolumeSourceAnnotationKey] != "data" {
 		t.Fatalf("unexpected restore annotations: %#v", vct.Annotations)
 	}
-}
-
-func mustMarshal(t *testing.T, value any) []byte {
-	t.Helper()
-	data, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
 }
 
 func TestClusterRestoreRequiresBackupSnapshotWithoutTargetTemplate(t *testing.T) {
@@ -408,14 +399,14 @@ func TestClusterRestoreFailsWhenTargetClusterCreateIsInvalid(t *testing.T) {
 			TargetClusterName: "target-cluster",
 			BackupRef:         dpv1alpha1.ClusterRestoreBackupRef{Name: backup.Name, Namespace: backup.Namespace},
 			TargetClusterTemplate: &dpv1alpha1.ClusterRestoreTargetClusterTemplate{
-				Spec: runtime.RawExtension{Raw: mustMarshal(t, appsv1.ClusterSpec{
+				Spec: appsv1.ClusterSpec{
 					ClusterDef:        "mysql",
 					TerminationPolicy: appsv1.Delete,
 					ComponentSpecs: []appsv1.ClusterComponentSpec{{
 						Name:     "mysql",
 						Replicas: 1,
 					}},
-				})},
+				},
 			},
 		},
 	}

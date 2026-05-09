@@ -920,17 +920,67 @@ var _ = Describe("instance util test", func() {
 			}}
 			Expect(isImageMatched(pod)).Should(BeTrue())
 
+			By("spec: digest, status image: tag, status imageID: digest")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "docker.io/nginx@sha256:0f37a86c04f8",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "docker.io/nginx:latest",
+				ImageID: "docker.io/nginx@sha256:0f37a86c04f8",
+			}}
+			Expect(isImageMatched(pod)).Should(BeTrue())
+
+			By("spec: digest, status image: local image ID, status imageID: digest")
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "sha256:runtime-local-image-id",
+				ImageID: "docker.io/nginx@sha256:0f37a86c04f8",
+			}}
+			Expect(isImageMatched(pod)).Should(BeTrue())
+
+			By("spec: digest, status image: matching digest, status imageID: different digest")
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "docker.io/nginx@sha256:0f37a86c04f8",
+				ImageID: "docker.io/nginx@sha256:different",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+
+			By("spec: mutable tag, status image: different tag, status imageID: digest")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "docker.io/nginx:1.0.0",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "docker.io/nginx:latest",
+				ImageID: "docker.io/nginx@sha256:0f37a86c04f8",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+
 			By("digest not matches")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,
 				Image: "nginx:latest@xxxxxxxxx",
 			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "nginx:latest@xxxxxxxxx",
+				ImageID: "docker.io/nginx@sha256:0f37a86c04f8",
+			}}
 			Expect(isImageMatched(pod)).Should(BeFalse())
 
-			By("tag not matches")
+			By("tag not matches for tag-only spec")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,
-				Image: "nginx:xxxx@0f37a86c04f8",
+				Image: "nginx:xxxx",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "docker.io/nginx:latest",
+				ImageID: "docker.io/nginx@sha256:0f37a86c04f8",
 			}}
 			Expect(isImageMatched(pod)).Should(BeFalse())
 

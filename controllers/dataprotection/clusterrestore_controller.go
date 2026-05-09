@@ -162,6 +162,14 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 		}
 		if err = r.Client.Create(ctx, target); err != nil {
+			if apierrors.IsInvalid(err) {
+				msg := fmt.Sprintf("failed to create target Cluster %s/%s: %s", target.Namespace, target.Name, err.Error())
+				if statusErr := r.patchClusterRestoreStatus(reqCtx, clusterRestore, dpv1alpha1.ClusterRestorePhaseFailed, metav1.ConditionFalse, "Failed", msg, nil); statusErr != nil {
+					return intctrlutil.RequeueWithError(statusErr, reqCtx.Log, "")
+				}
+				r.Recorder.Event(clusterRestore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, msg)
+				return intctrlutil.Reconciled()
+			}
 			if !apierrors.IsAlreadyExists(err) {
 				return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 			}

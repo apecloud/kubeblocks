@@ -26,9 +26,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -373,6 +376,92 @@ func TestClusterRestoreFailsWhenTargetClusterAlreadyExists(t *testing.T) {
 	if latest.Status.Phase != dpv1alpha1.ClusterRestorePhaseFailed {
 		t.Fatalf("expected ClusterRestore to fail when target exists, got %q", latest.Status.Phase)
 	}
+}
+
+func TestClusterRestoreFailsWhenTargetClusterCreateIsInvalid(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "source-backup",
+			Namespace: "default",
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+		},
+	}
+	clusterRestore := &dpv1alpha1.ClusterRestore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore-session",
+			Namespace: "default",
+			UID:       types.UID("restore-session-uid"),
+		},
+		Spec: dpv1alpha1.ClusterRestoreSpec{
+			TargetClusterName: "target-cluster",
+			BackupRef:         dpv1alpha1.ClusterRestoreBackupRef{Name: backup.Name, Namespace: backup.Namespace},
+			TargetClusterTemplate: &dpv1alpha1.ClusterRestoreTargetClusterTemplate{
+				Spec: runtime.RawExtension{Raw: mustMarshal(t, appsv1.ClusterSpec{
+					ClusterDef:        "mysql",
+					TerminationPolicy: appsv1.Delete,
+					ComponentSpecs: []appsv1.ClusterComponentSpec{{
+						Name:     "mysql",
+						Replicas: 1,
+					}},
+				})},
+			},
+		},
+	}
+	invalidErr := apierrors.NewInvalid(
+		schema.GroupKind{Group: appsv1.GroupVersion.Group, Kind: "Cluster"},
+		clusterRestore.Spec.TargetClusterName,
+		field.ErrorList{field.Required(field.NewPath("spec", "componentSpecs", "0", "componentDef"), "test invalid cluster")},
+	)
+	baseClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore, backup).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   invalidClusterCreateClient{Client: baseClient, err: invalidErr},
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(clusterRestore)}); err != nil {
+		t.Fatal(err)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err := baseClient.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	if latest.Status.Phase != dpv1alpha1.ClusterRestorePhaseFailed {
+		t.Fatalf("expected ClusterRestore to fail on invalid target Cluster, got %q", latest.Status.Phase)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil || cond.Message == "" {
+		t.Fatalf("expected failure condition message, got %#v", latest.Status.Conditions)
+	}
+}
+
+type invalidClusterCreateClient struct {
+	client.Client
+	err error
+}
+
+func (c invalidClusterCreateClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if _, ok := obj.(*appsv1.Cluster); ok {
+		return c.err
+	}
+	return c.Client.Create(ctx, obj, opts...)
 }
 
 func TestClusterRestoreTerminalPhaseDoesNotReconcileAgain(t *testing.T) {

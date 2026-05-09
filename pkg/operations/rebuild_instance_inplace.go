@@ -366,11 +366,15 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 		if err != nil {
 			return err
 		}
-		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, tmpPVC.Namespace)
-		if err != nil {
+		if err := inPlaceHelper.failIfAnotherActiveRebuildOwnsTarget(reqCtx, cli, opsRequest, sourcePVCName); err != nil {
 			return err
 		}
-		if err := inPlaceHelper.failIfAnotherActiveRebuildOwnsTarget(reqCtx, cli, opsRequest, sourcePVCName); err != nil {
+		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, tmpPVC.Namespace)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				waitingForSourcePVC = true
+				continue
+			}
 			return err
 		}
 		if _, ok := pv.Annotations[rebuildFromAnnotation]; !ok {

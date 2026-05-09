@@ -266,7 +266,17 @@ var _ = Describe("OpsUtil functions", func() {
 					err := k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)
 					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 				}).Should(Succeed())
+			}
 
+			initInstanceSetPods(ctx, k8sClient, opsRes)
+			By("expect rebuild to wait while InstanceSet has not recreated the source PVCs")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(Succeed())
+			for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
+				Expect(detail.Message).Should(Equal("Waiting for source PVCs to bind restored PVs"))
+			}
+
+			for sourcePVCName := range sourcePVCToPV {
 				sourcePVCTemplate := sourcePVCTemplates[sourcePVCName]
 				Expect(sourcePVCTemplate).ShouldNot(BeNil())
 				recreatedSourcePVC := sourcePVCTemplate.DeepCopy()
@@ -279,7 +289,6 @@ var _ = Describe("OpsUtil functions", func() {
 				recreatedSourcePVC.Spec.VolumeName = ""
 				Expect(k8sClient.Create(ctx, recreatedSourcePVC)).Should(Succeed())
 			}
-			initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			Eventually(func(g Gomega) {
 				_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -312,7 +321,7 @@ var _ = Describe("OpsUtil functions", func() {
 					pv.Status.Phase = corev1.VolumeBound
 				})).Should(Succeed())
 			}
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(Succeed())
 
 			Expect(k8sClient.List(ctx, pvcList, client.MatchingLabels{constant.KBAppComponentLabelKey: defaultCompName}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())

@@ -182,18 +182,17 @@ func isImageMatched(pod *corev1.Pod) bool {
 		}
 		specImage := container.Image
 		status := pod.Status.ContainerStatuses[index]
-		statusImage := status.Image
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
 		specName, specTag, specDigest := imageSplit(specImage)
-		_, _, statusImageIDDigest := imageSplit(status.ImageID)
+		_, _, statusDigest := imageSplit(status.ImageID)
 		if len(specDigest) != 0 {
-			if specDigest != statusImageIDDigest {
+			if specDigest != statusDigest {
 				return false
 			}
 			continue
 		}
-		statusName, statusTag, _ := imageSplit(statusImage)
+		statusName, statusTag, _ := imageSplit(status.Image)
 		// if tag presents in spec, it must be same in status
 		if len(specTag) != 0 && specTag != statusTag {
 			return false

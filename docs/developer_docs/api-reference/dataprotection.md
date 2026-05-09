@@ -27,6 +27,8 @@ Resource Types:
 </li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSchedule">BackupSchedule</a>
 </li><li>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestore">ClusterRestore</a>
+</li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.Restore">Restore</a>
 </li><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.StorageProvider">StorageProvider</a>
@@ -839,6 +841,170 @@ misses its scheduled time for any reason.</p>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupScheduleStatus">
 BackupScheduleStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestore">ClusterRestore
+</h3>
+<div>
+<p>ClusterRestore is the Schema for cluster restore requests.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>dataprotection.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ClusterRestore</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreSpec">
+ClusterRestoreSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tbody>
+<tr>
+<td>
+<code>targetClusterName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the target Cluster name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupRef</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreBackupRef">
+ClusterRestoreBackupRef
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the backup used as the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restoreTime</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the point in time for restoring.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeRestorePolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.VolumeClaimRestorePolicy">
+VolumeClaimRestorePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for restoring volume claims of a Cluster&rsquo;s Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deferPostReadyUntilClusterRunning</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls whether post-ready restore actions are delayed until the whole Cluster is running.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of environment variables to be set in the restore container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of name-value pairs representing restore parameters.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreStatus">
+ClusterRestoreStatus
 </a>
 </em>
 </td>
@@ -3964,6 +4130,312 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreBackupRef">ClusterRestoreBackupRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreSpec">ClusterRestoreSpec</a>)
+</p>
+<div>
+<p>ClusterRestoreBackupRef describes the backup source of a cluster restore.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the backup name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the backup namespace. If empty, the ClusterRestore namespace is used.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestorePhase">ClusterRestorePhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreStatus">ClusterRestoreStatus</a>)
+</p>
+<div>
+<p>ClusterRestorePhase is the high-level state of a cluster restore.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Completed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;CreatingCluster&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Preparing&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Restoring&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreSpec">ClusterRestoreSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestore">ClusterRestore</a>)
+</p>
+<div>
+<p>ClusterRestoreSpec defines the desired state of ClusterRestore.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>targetClusterName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the target Cluster name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupRef</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreBackupRef">
+ClusterRestoreBackupRef
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the backup used as the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restoreTime</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the point in time for restoring.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeRestorePolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.VolumeClaimRestorePolicy">
+VolumeClaimRestorePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the policy for restoring volume claims of a Cluster&rsquo;s Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deferPostReadyUntilClusterRunning</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Controls whether post-ready restore actions are delayed until the whole Cluster is running.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of environment variables to be set in the restore container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of name-value pairs representing restore parameters.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreStatus">ClusterRestoreStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestore">ClusterRestore</a>)
+</p>
+<div>
+<p>ClusterRestoreStatus defines the observed state of ClusterRestore.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestorePhase">
+ClusterRestorePhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The most recent generation observed by the controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetClusterRef</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreTargetClusterRef">
+ClusterRestoreTargetClusterRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>References the target Cluster created for this restore.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Describes the current state of this restore.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreTargetClusterRef">ClusterRestoreTargetClusterRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreStatus">ClusterRestoreStatus</a>)
+</p>
+<div>
+<p>ClusterRestoreTargetClusterRef references a restored Cluster.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the Cluster name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the Cluster namespace.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the Cluster UID.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ConnectionCredential">ConnectionCredential
 </h3>
 <p>
@@ -4593,7 +5065,7 @@ The default value is empty.</p>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ParameterPair">ParameterPair
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreSpec">ClusterRestoreSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy</a>)
 </p>
 <div>
 </div>
@@ -6662,7 +7134,7 @@ Typically used to set up the tools image required for backup operations.</p>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.VolumeClaimRestorePolicy">VolumeClaimRestorePolicy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ClusterRestoreSpec">ClusterRestoreSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig</a>)
 </p>
 <div>
 <p>VolumeClaimRestorePolicy defines restore policy for persistent volume claim.

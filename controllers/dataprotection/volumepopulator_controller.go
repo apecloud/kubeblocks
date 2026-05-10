@@ -309,6 +309,14 @@ func (r *VolumePopulatorReconciler) waitForPVCSelectedNode(reqCtx intctrlutil.Re
 		storageClassName := *pvc.Spec.StorageClassName
 		storageClass := &storagev1.StorageClass{}
 		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: storageClassName}, storageClass); err != nil {
+			// Distinguish NotFound so callers (notably ClusterRestoreReconciler,
+			// which invokes Populate directly for Backup-dataSource PVCs) can
+			// translate the case into a user-facing WaitingForStorageClass
+			// condition with a bounded retry window. Other GET errors keep the
+			// existing raw-error contract.
+			if apierrors.IsNotFound(err) {
+				return false, nodeName, &dprestore.StorageClassNotFoundError{Name: storageClassName}
+			}
 			return false, nodeName, err
 		}
 

@@ -23,6 +23,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -53,6 +55,26 @@ const (
 	backupDataSourceRestoreLabelCluster   = "dataprotection.kubeblocks.io/target-cluster"
 	backupDataSourceRestoreLabelComponent = "dataprotection.kubeblocks.io/target-component"
 	backupDataSourceRestoreLabelBackup    = "dataprotection.kubeblocks.io/source-backup"
+
+	// reasonWaitingForStorageClass marks the ClusterRestore.status Ready
+	// condition while a referenced StorageClass is missing from the API
+	// surface and the controller is bounded-retrying for it to appear.
+	reasonWaitingForStorageClass = "WaitingForStorageClass"
+	// reasonStorageClassMissing marks the ClusterRestore.status Ready condition
+	// after the bounded retry window elapses without the StorageClass becoming
+	// visible. The phase is escalated to Failed alongside this reason.
+	reasonStorageClassMissing = "StorageClassMissing"
+
+	// storageClassWaitTimeout is the bounded window during which a missing
+	// StorageClass keeps ClusterRestore in Restoring/WaitingForStorageClass.
+	// After this elapses the condition is escalated to Failed/StorageClassMissing.
+	// Chosen to give 2-3x typical fresh-vcluster sync settling time (~1-2min)
+	// before declaring the StorageClass actually absent.
+	storageClassWaitTimeout = 5 * time.Minute
+	// storageClassRequeueAfter is the requeue cadence while waiting; gives the
+	// caller a predictable, log-visible retry beat instead of relying on the
+	// controller-runtime exponential default.
+	storageClassRequeueAfter = 30 * time.Second
 )
 
 // ClusterRestoreReconciler reconciles ClusterRestore orchestration sessions.
@@ -244,6 +266,9 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 			}
 			if err = r.volumePopulator().Populate(reqCtx, item.pvc, restoreMgr); err != nil {
+				if scErr, ok := dprestore.IsStorageClassNotFoundError(err); ok {
+					return r.handleStorageClassNotFound(reqCtx, clusterRestore, scErr, targetRef, item.pvc)
+				}
 				if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 					_ = r.patchClusterRestoreStatus(reqCtx, clusterRestore, dpv1alpha1.ClusterRestorePhaseFailed, metav1.ConditionFalse, "Failed", err.Error(), targetRef)
 					r.Recorder.Event(clusterRestore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, err.Error())
@@ -1158,6 +1183,107 @@ func (r *ClusterRestoreReconciler) patchClusterRestoreStatus(reqCtx intctrlutil.
 		LastTransitionTime: metav1.Now(),
 	})
 	return r.Client.Status().Patch(reqCtx.Ctx, latest, patch)
+}
+
+// patchClusterRestoreReadyConditionAt is a variant of patchClusterRestoreStatus
+// that lets callers supply an explicit LastTransitionTime for the Ready
+// condition. It is used by the WaitingForStorageClass branch so the original
+// wait-start time survives across reconciles, regardless of whether the
+// condition.Status changes between calls. (meta.SetStatusCondition only
+// preserves LastTransitionTime when Status is unchanged, which is the wrong
+// semantics for tracking a bounded wait window keyed by Reason.)
+func (r *ClusterRestoreReconciler) patchClusterRestoreReadyConditionAt(reqCtx intctrlutil.RequestCtx, clusterRestore *dpv1alpha1.ClusterRestore, phase dpv1alpha1.ClusterRestorePhase, status metav1.ConditionStatus, reason, message string, targetRef *dpv1alpha1.ClusterRestoreTargetClusterRef, transitionTime metav1.Time) error {
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		return err
+	}
+	patch := client.MergeFrom(latest.DeepCopy())
+	latest.Status.Phase = phase
+	latest.Status.ObservedGeneration = latest.Generation
+	if targetRef != nil {
+		latest.Status.TargetClusterRef = targetRef
+	}
+	cond := metav1.Condition{
+		Type:               dpv1alpha1.ClusterRestoreReadyCondition,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		ObservedGeneration: latest.Generation,
+		LastTransitionTime: transitionTime,
+	}
+	replaced := false
+	for i := range latest.Status.Conditions {
+		if latest.Status.Conditions[i].Type == cond.Type {
+			latest.Status.Conditions[i] = cond
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		latest.Status.Conditions = append(latest.Status.Conditions, cond)
+	}
+	return r.Client.Status().Patch(reqCtx.Ctx, latest, patch)
+}
+
+// handleStorageClassNotFound translates a *dprestore.StorageClassNotFoundError
+// returned by VolumePopulator.Populate into a user-facing condition on
+// ClusterRestore.status. While within storageClassWaitTimeout, the condition
+// is set to Restoring/WaitingForStorageClass with a stable LastTransitionTime
+// (the wait-start), and the Reconcile is requeued after storageClassRequeueAfter.
+// Once elapsed time crosses the bound, the phase is escalated to Failed with
+// reason StorageClassMissing and a Warning event.
+func (r *ClusterRestoreReconciler) handleStorageClassNotFound(reqCtx intctrlutil.RequestCtx, clusterRestore *dpv1alpha1.ClusterRestore, scErr *dprestore.StorageClassNotFoundError, targetRef *dpv1alpha1.ClusterRestoreTargetClusterRef, pvc *corev1.PersistentVolumeClaim) (ctrl.Result, error) {
+	now := metav1.Now()
+	waitingMsg := storageClassWaitingMessage(clusterRestore, scErr.Name, pvc)
+	waitStart := now
+	if existing := meta.FindStatusCondition(clusterRestore.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition); isSameStorageClassWait(existing, clusterRestore, scErr.Name) {
+		if !existing.LastTransitionTime.IsZero() {
+			waitStart = existing.LastTransitionTime
+		}
+	}
+	elapsed := now.Sub(waitStart.Time)
+
+	if elapsed >= storageClassWaitTimeout {
+		failedMsg := fmt.Sprintf(
+			"StorageClass %q not found after %s; please create the StorageClass and re-apply ClusterRestore %s/%s",
+			scErr.Name, storageClassWaitTimeout, clusterRestore.Namespace, clusterRestore.Name,
+		)
+		if err := r.patchClusterRestoreStatus(reqCtx, clusterRestore,
+			dpv1alpha1.ClusterRestorePhaseFailed, metav1.ConditionFalse,
+			reasonStorageClassMissing, failedMsg, targetRef); err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
+		r.Recorder.Event(clusterRestore, corev1.EventTypeWarning, dprestore.ReasonRestoreFailed, failedMsg)
+		return intctrlutil.Reconciled()
+	}
+
+	if err := r.patchClusterRestoreReadyConditionAt(reqCtx, clusterRestore,
+		dpv1alpha1.ClusterRestorePhaseRestoring, metav1.ConditionFalse,
+		reasonWaitingForStorageClass, waitingMsg, targetRef, waitStart); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	return ctrl.Result{RequeueAfter: storageClassRequeueAfter}, nil
+}
+
+func isSameStorageClassWait(cond *metav1.Condition, clusterRestore *dpv1alpha1.ClusterRestore, storageClassName string) bool {
+	return cond != nil &&
+		cond.Reason == reasonWaitingForStorageClass &&
+		strings.HasPrefix(cond.Message, storageClassWaitingPrefix(clusterRestore, storageClassName))
+}
+
+func storageClassWaitingPrefix(clusterRestore *dpv1alpha1.ClusterRestore, storageClassName string) string {
+	return fmt.Sprintf("StorageClass %q not found for ClusterRestore %s/%s", storageClassName, clusterRestore.Namespace, clusterRestore.Name)
+}
+
+func storageClassWaitingMessage(clusterRestore *dpv1alpha1.ClusterRestore, storageClassName string, pvc *corev1.PersistentVolumeClaim) string {
+	pvcRef := ""
+	if pvc != nil {
+		pvcRef = fmt.Sprintf(" (target PVC %s/%s)", pvc.Namespace, pvc.Name)
+	}
+	return fmt.Sprintf(
+		"%s%s; waiting for sync (timeout %s); to fix: pre-create or sync the StorageClass into the cluster",
+		storageClassWaitingPrefix(clusterRestore, storageClassName), pvcRef, storageClassWaitTimeout,
+	)
 }
 
 func clusterRestoreTargetRef(cluster *appsv1.Cluster) *dpv1alpha1.ClusterRestoreTargetClusterRef {

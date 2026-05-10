@@ -22,9 +22,12 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -267,6 +270,541 @@ func TestClusterRestoreBuildsTargetClusterFromTemplate(t *testing.T) {
 	if vct.Annotations[dptypes.SourceTargetNameAnnotationKey] != "mysql" ||
 		vct.Annotations[dptypes.VolumeSourceAnnotationKey] != "data" {
 		t.Fatalf("unexpected restore annotations: %#v", vct.Annotations)
+	}
+}
+
+func TestVolumePopulatorWaitForPVCSelectedNodeReturnsStorageClassSentinel(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := storagev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme: scheme,
+	}
+	storageClassName := "missing-sc"
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore-pvc", Namespace: "default"},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClassName,
+		},
+	}
+
+	wait, nodeName, err := reconciler.waitForPVCSelectedNode(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	if wait {
+		t.Fatal("expected missing StorageClass to stop waiting and return an error")
+	}
+	if nodeName != "" {
+		t.Fatalf("nodeName = %q, want empty", nodeName)
+	}
+	scErr, ok := dprestore.IsStorageClassNotFoundError(err)
+	if !ok || scErr == nil {
+		t.Fatalf("expected StorageClassNotFoundError, got %T: %v", err, err)
+	}
+	if scErr.Name != storageClassName {
+		t.Fatalf("StorageClassNotFoundError.Name = %q, want %q", scErr.Name, storageClassName)
+	}
+}
+
+func TestVolumePopulatorWaitForPVCSelectedNodePropagatesOtherStorageClassGetErrors(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := storagev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	rawErr := apierrors.NewForbidden(schema.GroupResource{Group: storagev1.GroupName, Resource: "storageclasses"}, "blocked-sc", nil)
+	reconciler := &VolumePopulatorReconciler{
+		Client: storageClassGetErrorClient{
+			Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+			err:    rawErr,
+		},
+		Scheme: scheme,
+	}
+	storageClassName := "blocked-sc"
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore-pvc", Namespace: "default"},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClassName,
+		},
+	}
+
+	wait, nodeName, err := reconciler.waitForPVCSelectedNode(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	if wait {
+		t.Fatal("expected raw StorageClass GET error to stop waiting and return the error")
+	}
+	if nodeName != "" {
+		t.Fatalf("nodeName = %q, want empty", nodeName)
+	}
+	if err != rawErr {
+		t.Fatalf("err = %v, want raw error %v", err, rawErr)
+	}
+	if scErr, ok := dprestore.IsStorageClassNotFoundError(err); ok || scErr != nil {
+		t.Fatalf("raw GET error must not match StorageClassNotFoundError, got (%v, %v)", scErr, ok)
+	}
+}
+
+type storageClassGetErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c storageClassGetErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*storagev1.StorageClass); ok {
+		return c.err
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func TestClusterRestoreHandlesStorageClassNotFoundWithinBoundedWindow(t *testing.T) {
+	scheme := newClusterRestoreUnitScheme(t)
+	clusterRestore := newStorageClassTestClusterRestore()
+	targetRef := &dpv1alpha1.ClusterRestoreTargetClusterRef{
+		Name:      "target-cluster",
+		Namespace: "default",
+		UID:       types.UID("target-cluster-uid"),
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+	pvc := newStorageClassTestPVC()
+
+	result, err := reconciler.handleStorageClassNotFound(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		clusterRestore,
+		&dprestore.StorageClassNotFoundError{Name: "missing-sc"},
+		targetRef,
+		pvc,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != storageClassRequeueAfter {
+		t.Fatalf("RequeueAfter = %s, want %s", result.RequeueAfter, storageClassRequeueAfter)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	if latest.Status.Phase != dpv1alpha1.ClusterRestorePhaseRestoring {
+		t.Fatalf("phase = %q, want %q", latest.Status.Phase, dpv1alpha1.ClusterRestorePhaseRestoring)
+	}
+	if latest.Status.TargetClusterRef == nil || latest.Status.TargetClusterRef.Name != targetRef.Name {
+		t.Fatalf("target ref not preserved: %#v", latest.Status.TargetClusterRef)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil {
+		t.Fatalf("Ready condition missing: %#v", latest.Status.Conditions)
+	}
+	if other := meta.FindStatusCondition(latest.Status.Conditions, "OtherControllerCondition"); other == nil || other.Reason != "KeepMe" {
+		t.Fatalf("expected unrelated conditions to be preserved, got %#v", latest.Status.Conditions)
+	}
+	if cond.Status != metav1.ConditionFalse ||
+		cond.Reason != reasonWaitingForStorageClass ||
+		cond.ObservedGeneration != latest.Generation {
+		t.Fatalf("unexpected Ready condition: %#v", cond)
+	}
+	if cond.LastTransitionTime.IsZero() {
+		t.Fatalf("expected LastTransitionTime to mark wait start: %#v", cond)
+	}
+	assertContainsAll(t, cond.Message,
+		`StorageClass "missing-sc" not found`,
+		"ClusterRestore default/restore-session",
+		"target PVC default/data-target-cluster-mysql-0",
+		"pre-create or sync the StorageClass",
+	)
+}
+
+func TestClusterRestoreKeepsStorageClassWaitStartAcrossRetries(t *testing.T) {
+	scheme := newClusterRestoreUnitScheme(t)
+	waitStart := metav1.NewTime(time.Now().Add(-2 * time.Minute).Truncate(time.Second))
+	clusterRestore := newStorageClassTestClusterRestore()
+	pvc := newStorageClassTestPVC()
+	clusterRestore.Status.Conditions = []metav1.Condition{{
+		Type:               dpv1alpha1.ClusterRestoreReadyCondition,
+		Status:             metav1.ConditionFalse,
+		Reason:             reasonWaitingForStorageClass,
+		Message:            storageClassWaitingMessage(clusterRestore, "missing-sc", pvc),
+		ObservedGeneration: clusterRestore.Generation,
+		LastTransitionTime: waitStart,
+	}, {
+		Type:               "OtherControllerCondition",
+		Status:             metav1.ConditionTrue,
+		Reason:             "KeepMe",
+		Message:            "owned by another status writer",
+		ObservedGeneration: 1,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute).Truncate(time.Second)),
+	}}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+
+	result, err := reconciler.handleStorageClassNotFound(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		clusterRestore,
+		&dprestore.StorageClassNotFoundError{Name: "missing-sc"},
+		clusterRestoreTargetRef(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "target-cluster", Namespace: "default", UID: types.UID("target-cluster-uid")}}),
+		pvc,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != storageClassRequeueAfter {
+		t.Fatalf("RequeueAfter = %s, want %s", result.RequeueAfter, storageClassRequeueAfter)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil {
+		t.Fatalf("Ready condition missing: %#v", latest.Status.Conditions)
+	}
+	if !cond.LastTransitionTime.Time.Equal(waitStart.Time) {
+		t.Fatalf("LastTransitionTime = %s, want original wait start %s", cond.LastTransitionTime.Time, waitStart.Time)
+	}
+	if cond.Reason != reasonWaitingForStorageClass {
+		t.Fatalf("Reason = %q, want %q", cond.Reason, reasonWaitingForStorageClass)
+	}
+	if other := meta.FindStatusCondition(latest.Status.Conditions, "OtherControllerCondition"); other == nil || other.Reason != "KeepMe" {
+		t.Fatalf("expected unrelated conditions to be preserved, got %#v", latest.Status.Conditions)
+	}
+}
+
+func TestClusterRestoreResetsStorageClassWaitStartForDifferentMissingStorageClass(t *testing.T) {
+	scheme := newClusterRestoreUnitScheme(t)
+	previousWaitStart := metav1.NewTime(time.Now().Add(-storageClassWaitTimeout - time.Minute).Truncate(time.Second))
+	clusterRestore := newStorageClassTestClusterRestore()
+	previousPVC := newStorageClassTestPVC()
+	clusterRestore.Status.Conditions = []metav1.Condition{{
+		Type:               dpv1alpha1.ClusterRestoreReadyCondition,
+		Status:             metav1.ConditionFalse,
+		Reason:             reasonWaitingForStorageClass,
+		Message:            storageClassWaitingMessage(clusterRestore, "old-missing-sc", previousPVC),
+		ObservedGeneration: clusterRestore.Generation,
+		LastTransitionTime: previousWaitStart,
+	}}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+
+	result, err := reconciler.handleStorageClassNotFound(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		clusterRestore,
+		&dprestore.StorageClassNotFoundError{Name: "new-missing-sc"},
+		clusterRestoreTargetRef(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "target-cluster", Namespace: "default", UID: types.UID("target-cluster-uid")}}),
+		previousPVC,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != storageClassRequeueAfter {
+		t.Fatalf("RequeueAfter = %s, want %s", result.RequeueAfter, storageClassRequeueAfter)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil {
+		t.Fatalf("Ready condition missing: %#v", latest.Status.Conditions)
+	}
+	if cond.Reason != reasonWaitingForStorageClass {
+		t.Fatalf("Reason = %q, want %q", cond.Reason, reasonWaitingForStorageClass)
+	}
+	if !cond.LastTransitionTime.After(previousWaitStart.Time) {
+		t.Fatalf("LastTransitionTime = %s, should reset after previous wait start %s", cond.LastTransitionTime.Time, previousWaitStart.Time)
+	}
+	assertContainsAll(t, cond.Message, `StorageClass "new-missing-sc" not found`)
+}
+
+func TestClusterRestoreKeepsStorageClassWaitStartForSameStorageClassAcrossDifferentPVCs(t *testing.T) {
+	scheme := newClusterRestoreUnitScheme(t)
+	waitStart := metav1.NewTime(time.Now().Add(-2 * time.Minute).Truncate(time.Second))
+	clusterRestore := newStorageClassTestClusterRestore()
+	previousPVC := newStorageClassTestPVC()
+	currentPVC := newStorageClassTestPVC()
+	currentPVC.Name = "data-target-cluster-mysql-1"
+	clusterRestore.Status.Conditions = []metav1.Condition{{
+		Type:               dpv1alpha1.ClusterRestoreReadyCondition,
+		Status:             metav1.ConditionFalse,
+		Reason:             reasonWaitingForStorageClass,
+		Message:            storageClassWaitingMessage(clusterRestore, "missing-sc", previousPVC),
+		ObservedGeneration: clusterRestore.Generation,
+		LastTransitionTime: waitStart,
+	}}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+
+	result, err := reconciler.handleStorageClassNotFound(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		clusterRestore,
+		&dprestore.StorageClassNotFoundError{Name: "missing-sc"},
+		clusterRestoreTargetRef(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "target-cluster", Namespace: "default", UID: types.UID("target-cluster-uid")}}),
+		currentPVC,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != storageClassRequeueAfter {
+		t.Fatalf("RequeueAfter = %s, want %s", result.RequeueAfter, storageClassRequeueAfter)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil {
+		t.Fatalf("Ready condition missing: %#v", latest.Status.Conditions)
+	}
+	if !cond.LastTransitionTime.Time.Equal(waitStart.Time) {
+		t.Fatalf("LastTransitionTime = %s, want original wait start %s", cond.LastTransitionTime.Time, waitStart.Time)
+	}
+	assertContainsAll(t, cond.Message,
+		`StorageClass "missing-sc" not found`,
+		"target PVC default/data-target-cluster-mysql-1",
+	)
+}
+
+func TestClusterRestoreResetsStorageClassWaitStartForDifferentClusterRestore(t *testing.T) {
+	scheme := newClusterRestoreUnitScheme(t)
+	previousWaitStart := metav1.NewTime(time.Now().Add(-storageClassWaitTimeout - time.Minute).Truncate(time.Second))
+	clusterRestore := newStorageClassTestClusterRestore()
+	otherClusterRestore := clusterRestore.DeepCopy()
+	otherClusterRestore.Name = "other-restore-session"
+	pvc := newStorageClassTestPVC()
+	clusterRestore.Status.Conditions = []metav1.Condition{{
+		Type:               dpv1alpha1.ClusterRestoreReadyCondition,
+		Status:             metav1.ConditionFalse,
+		Reason:             reasonWaitingForStorageClass,
+		Message:            storageClassWaitingMessage(otherClusterRestore, "missing-sc", pvc),
+		ObservedGeneration: clusterRestore.Generation,
+		LastTransitionTime: previousWaitStart,
+	}}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+
+	result, err := reconciler.handleStorageClassNotFound(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		clusterRestore,
+		&dprestore.StorageClassNotFoundError{Name: "missing-sc"},
+		clusterRestoreTargetRef(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "target-cluster", Namespace: "default", UID: types.UID("target-cluster-uid")}}),
+		pvc,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != storageClassRequeueAfter {
+		t.Fatalf("RequeueAfter = %s, want %s", result.RequeueAfter, storageClassRequeueAfter)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil {
+		t.Fatalf("Ready condition missing: %#v", latest.Status.Conditions)
+	}
+	if !cond.LastTransitionTime.After(previousWaitStart.Time) {
+		t.Fatalf("LastTransitionTime = %s, should reset after previous wait start %s", cond.LastTransitionTime.Time, previousWaitStart.Time)
+	}
+	assertContainsAll(t, cond.Message,
+		`StorageClass "missing-sc" not found`,
+		"ClusterRestore default/restore-session",
+	)
+}
+
+func TestClusterRestoreFailsStorageClassNotFoundAfterBoundedWindow(t *testing.T) {
+	scheme := newClusterRestoreUnitScheme(t)
+	waitStart := metav1.NewTime(time.Now().Add(-storageClassWaitTimeout - time.Second).Truncate(time.Second))
+	clusterRestore := newStorageClassTestClusterRestore()
+	pvc := newStorageClassTestPVC()
+	clusterRestore.Status.Conditions = []metav1.Condition{{
+		Type:               dpv1alpha1.ClusterRestoreReadyCondition,
+		Status:             metav1.ConditionFalse,
+		Reason:             reasonWaitingForStorageClass,
+		Message:            storageClassWaitingMessage(clusterRestore, "missing-sc", pvc),
+		ObservedGeneration: clusterRestore.Generation,
+		LastTransitionTime: waitStart,
+	}, {
+		Type:               "OtherControllerCondition",
+		Status:             metav1.ConditionTrue,
+		Reason:             "KeepMe",
+		Message:            "owned by another status writer",
+		ObservedGeneration: 1,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute).Truncate(time.Second)),
+	}}
+	recorder := record.NewFakeRecorder(8)
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.ClusterRestore{}).
+		WithObjects(clusterRestore).
+		Build()
+	reconciler := &ClusterRestoreReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: recorder,
+	}
+
+	result, err := reconciler.handleStorageClassNotFound(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		clusterRestore,
+		&dprestore.StorageClassNotFoundError{Name: "missing-sc"},
+		clusterRestoreTargetRef(&appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "target-cluster", Namespace: "default", UID: types.UID("target-cluster-uid")}}),
+		pvc,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (ctrl.Result{}) {
+		t.Fatalf("result = %#v, want reconciled empty result", result)
+	}
+
+	latest := &dpv1alpha1.ClusterRestore{}
+	if err = cli.Get(context.Background(), client.ObjectKeyFromObject(clusterRestore), latest); err != nil {
+		t.Fatal(err)
+	}
+	if latest.Status.Phase != dpv1alpha1.ClusterRestorePhaseFailed {
+		t.Fatalf("phase = %q, want %q", latest.Status.Phase, dpv1alpha1.ClusterRestorePhaseFailed)
+	}
+	cond := meta.FindStatusCondition(latest.Status.Conditions, dpv1alpha1.ClusterRestoreReadyCondition)
+	if cond == nil {
+		t.Fatalf("Ready condition missing: %#v", latest.Status.Conditions)
+	}
+	if other := meta.FindStatusCondition(latest.Status.Conditions, "OtherControllerCondition"); other == nil || other.Reason != "KeepMe" {
+		t.Fatalf("expected unrelated conditions to be preserved, got %#v", latest.Status.Conditions)
+	}
+	if cond.Reason != reasonStorageClassMissing || cond.Status != metav1.ConditionFalse {
+		t.Fatalf("unexpected Ready condition: %#v", cond)
+	}
+	assertContainsAll(t, cond.Message,
+		`StorageClass "missing-sc" not found after 5m0s`,
+		"re-apply ClusterRestore default/restore-session",
+	)
+
+	select {
+	case event := <-recorder.Events:
+		assertContainsAll(t, event,
+			corev1.EventTypeWarning,
+			dprestore.ReasonRestoreFailed,
+			`StorageClass "missing-sc" not found after 5m0s`,
+		)
+	default:
+		t.Fatal("expected Warning event for bounded StorageClass wait timeout")
+	}
+}
+
+func newClusterRestoreUnitScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	return scheme
+}
+
+func newStorageClassTestClusterRestore() *dpv1alpha1.ClusterRestore {
+	return &dpv1alpha1.ClusterRestore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "restore-session",
+			Namespace:  "default",
+			UID:        types.UID("restore-session-uid"),
+			Generation: 2,
+		},
+		Spec: dpv1alpha1.ClusterRestoreSpec{
+			TargetClusterName: "target-cluster",
+			BackupRef:         dpv1alpha1.ClusterRestoreBackupRef{Name: "backup", Namespace: "default"},
+		},
+		Status: dpv1alpha1.ClusterRestoreStatus{
+			Phase: dpv1alpha1.ClusterRestorePhaseRestoring,
+			Conditions: []metav1.Condition{{
+				Type:               "OtherControllerCondition",
+				Status:             metav1.ConditionTrue,
+				Reason:             "KeepMe",
+				Message:            "owned by another status writer",
+				ObservedGeneration: 1,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute).Truncate(time.Second)),
+			}},
+		},
+	}
+}
+
+func newStorageClassTestPVC() *corev1.PersistentVolumeClaim {
+	storageClassName := "missing-sc"
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "data-target-cluster-mysql-0",
+			Namespace: "default",
+			Annotations: map[string]string{
+				dptypes.VolumeSourceAnnotationKey: "data",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClassName,
+		},
+	}
+}
+
+func assertContainsAll(t *testing.T, got string, wantSubstrings ...string) {
+	t.Helper()
+	for _, want := range wantSubstrings {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected %q to contain %q", got, want)
+		}
 	}
 }
 

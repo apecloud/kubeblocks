@@ -256,6 +256,132 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			})
 
+			// These tests pin the wiring of
+			// RestoreManager.ReleaseManagerSidecarIfRestoreTerminated into
+			// VolumePopulator.Populate's step 2.5 (between CreateJobsIfNotExist
+			// and IsJobFinished). They drive Populate through the normal
+			// controller reconcile loop so a missing call site shows up as a
+			// missing annotation, not as a passing helper-level test.
+			runPopulateAndExpectAnnotation := func(
+				volumeBinding storagev1.VolumeBindingMode,
+				restoreState corev1.ContainerState,
+				preExistingAnnotation bool,
+				expectAnnotation bool,
+			) {
+				pvc := initResources(volumeBinding, false, true)
+				pvcKey := client.ObjectKeyFromObject(pvc)
+
+				if volumeBinding == storagev1.VolumeBindingWaitForFirstConsumer {
+					Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+						g.Expect(len(tmpPVC.Status.Conditions)).Should(Equal(0))
+					})).Should(Succeed())
+				}
+
+				By("mock pvc has selected the node")
+				Expect(testapps.ChangeObj(&testCtx, pvc, func(claim *corev1.PersistentVolumeClaim) {
+					if claim.Annotations == nil {
+						claim.Annotations = map[string]string{}
+					}
+					claim.Annotations[AnnSelectedNode] = "test-node"
+				})).Should(Succeed())
+
+				By("wait for populator job to be created")
+				populatePVCName := getPopulatePVCName(pvc.UID)
+				jobList := &batchv1.JobList{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.List(ctx, jobList,
+						client.MatchingLabels{dprestore.DataProtectionPopulatePVCLabelKey: populatePVCName},
+						client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+					g.Expect(jobList.Items).Should(HaveLen(1))
+				}).Should(Succeed())
+				job := &jobList.Items[0]
+
+				By("inject a Pod owned by the job with the desired restore container state")
+				podAnnotations := map[string]string{}
+				if preExistingAnnotation {
+					podAnnotations[dprestore.DataProtectionStopRestoreManagerAnnotationKey] = "true"
+				}
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      job.Name + "-rocco-pod",
+						Namespace: job.Namespace,
+						Labels: map[string]string{
+							"job-name": job.Name,
+						},
+						Annotations: podAnnotations,
+					},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyNever,
+						Containers: []corev1.Container{
+							{Name: dprestore.Restore, Image: "busybox"},
+							{Name: "restore-manager", Image: "busybox"},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{Name: dprestore.Restore, State: restoreState},
+					{Name: "restore-manager", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+				}
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+
+				By("nudge PVC to trigger another reconcile cycle")
+				Expect(testapps.ChangeObj(&testCtx, pvc, func(claim *corev1.PersistentVolumeClaim) {
+					if claim.Annotations == nil {
+						claim.Annotations = map[string]string{}
+					}
+					claim.Annotations["dataprotection.kubeblocks.io/rocco-test-nudge"] = "1"
+				})).Should(Succeed())
+
+				By("assert annotation outcome via the reconcile loop")
+				podKey := client.ObjectKeyFromObject(pod)
+				if expectAnnotation {
+					Eventually(testapps.CheckObj(&testCtx, podKey, func(g Gomega, p *corev1.Pod) {
+						g.Expect(p.Annotations).Should(HaveKeyWithValue(
+							dprestore.DataProtectionStopRestoreManagerAnnotationKey, "true"))
+					})).Should(Succeed())
+				} else {
+					Consistently(testapps.CheckObj(&testCtx, podKey, func(g Gomega, p *corev1.Pod) {
+						g.Expect(p.Annotations).ShouldNot(HaveKey(
+							dprestore.DataProtectionStopRestoreManagerAnnotationKey))
+					}), "5s", "1s").Should(Succeed())
+				}
+
+				By("clean up Pod ahead of next test")
+				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
+			}
+
+			It("VolumePopulator.Populate wires the sidecar release when restore container Terminated Exit 0", func() {
+				runPopulateAndExpectAnnotation(
+					storagev1.VolumeBindingImmediate,
+					corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"}},
+					false,
+					true,
+				)
+			})
+
+			It("VolumePopulator.Populate does not release the sidecar while restore container is still Running", func() {
+				runPopulateAndExpectAnnotation(
+					storagev1.VolumeBindingImmediate,
+					corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+					false,
+					false,
+				)
+			})
+
+			It("VolumePopulator.Populate is idempotent when the sidecar stop annotation is already present", func() {
+				// The Restore CR controller's CheckJobsDone path may have
+				// already patched this annotation; calling Populate again
+				// from the standalone watcher must not surface an error and
+				// must not flap the annotation value.
+				runPopulateAndExpectAnnotation(
+					storagev1.VolumeBindingImmediate,
+					corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"}},
+					true,
+					true,
+				)
+			})
+
 		})
 	})
 })

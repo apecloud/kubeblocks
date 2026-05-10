@@ -886,6 +886,55 @@ func (r *RestoreManager) CheckIfRestoreContainerTerminated(job *batchv1.Job) (no
 	return normalTerminated, nil
 }
 
+// ReleaseManagerSidecarIfRestoreTerminated patches the stop annotation on
+// every Pod of the given Job whose `restore` container has reached the
+// Terminated state, regardless of exit code. This lets the `restore-manager`
+// sidecar exit so the Pod can transition to Succeeded (on Exit 0) or Failed
+// (on Exit != 0); without this the Pod stays in Running forever and the
+// owning Job never reaches Complete, which blocks the K8s volume populator
+// framework from rebinding the populator PVC's PV to the user PVC.
+//
+// Pods that are still Running their `restore` container, or that have a
+// non-zero DeletionTimestamp (already terminating), are left untouched; the
+// caller revisits them on the next reconcile.
+//
+// This helper does NOT write to r.Restore.Status; the only side effect is a
+// Pod annotation Patch. It is therefore safe to call from code paths that
+// invoke VolumePopulator.Populate with an in-memory RestoreManager that does
+// not own a persisted Restore CR. Cross-Job coordinated stop semantics, when
+// required, remain the responsibility of the caller that owns the broader
+// reconcile (e.g. the Restore CR controller's CheckJobsDone path).
+func (r *RestoreManager) ReleaseManagerSidecarIfRestoreTerminated(ctx context.Context, job *batchv1.Job) error {
+	podList, err := utils.GetAssociatedPodsOfJob(ctx, r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return err
+	}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if !pod.DeletionTimestamp.IsZero() {
+			// Pod is terminating; leave Kubernetes GC to drive lifecycle.
+			continue
+		}
+		restoreTerminated := false
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Name != Restore {
+				continue
+			}
+			if cs.State.Terminated != nil {
+				restoreTerminated = true
+			}
+			break
+		}
+		if !restoreTerminated {
+			continue
+		}
+		if err := r.StopManagerContainer(pod); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // StopManagerContainerByJob stops the `restore manager` containers by the job.
 func (r *RestoreManager) StopManagerContainerByJob(job *batchv1.Job) error {
 	podList, err := utils.GetAssociatedPodsOfJob(context.Background(), r.Client, job.Namespace, job.Name)

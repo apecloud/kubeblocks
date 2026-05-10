@@ -20,15 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backup
 
 import (
+	"errors"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -37,10 +42,12 @@ import (
 
 var _ = Describe("Backup Deleter Test", func() {
 	const (
-		backupRepoPVCName = "backup-repo-pvc"
-		backupPath        = "/backup/test-backup"
-		backupVSName      = "backup-vs"
-		backupPVCName     = "backup-pvc"
+		backupRepoPVCName  = "backup-repo-pvc"
+		backupPath         = "/backup/test-backup"
+		backupVSName       = "backup-vs"
+		backupPVCName      = "backup-pvc"
+		workerSAName       = "dp-worker"
+		deleteJobNamespace = "delete-job-ns"
 	)
 
 	buildDeleter := func() *Deleter {
@@ -50,17 +57,22 @@ var _ = Describe("Backup Deleter Test", func() {
 				Ctx:      testCtx.Ctx,
 				Recorder: recorder,
 			},
-			Scheme: testEnv.Scheme,
-			Client: testCtx.Cli,
+			Scheme:               testEnv.Scheme,
+			Client:               testCtx.Cli,
+			WorkerServiceAccount: workerSAName,
 		}
 	}
 
 	cleanEnv := func() {
 		By("clean resources")
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		deleteJobNS := client.InNamespace(deleteJobNamespace)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, deleteJobNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true)
 	}
 
 	BeforeEach(func() {
@@ -122,6 +134,9 @@ var _ = Describe("Backup Deleter Test", func() {
 			job := &batchv1.Job{}
 			key := BuildDeleteBackupFilesJobKey(backup, false)
 			Eventually(testapps.CheckObjExists(&testCtx, key, job, true)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, fetched *batchv1.Job) {
+				g.Expect(fetched.Spec.Template.Spec.ServiceAccountName).Should(Equal(workerSAName))
+			})).Should(Succeed())
 
 			By("delete backup with job running")
 			backupKey := client.ObjectKeyFromObject(backup)
@@ -146,6 +161,136 @@ var _ = Describe("Backup Deleter Test", func() {
 				Expect(err).Should(HaveOccurred())
 				Expect(status).Should(Equal(DeletionStatusFailed))
 			})).Should(Succeed())
+		})
+
+		It("should not get worker service account when deletion job already exists", func() {
+			By("mock backup repo PVC")
+			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
+
+			By("create a deletion job")
+			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
+			backup.Status.Path = backupPath
+			status, err := deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusDeleting))
+
+			key := BuildDeleteBackupFilesJobKey(backup, false)
+			testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobComplete)
+
+			By("delete backup with job succeed without resolving a worker service account")
+			deleter.WorkerServiceAccount = ""
+			workerFuncCalled := false
+			deleter.WorkerServiceAccountFunc = func() (string, error) {
+				workerFuncCalled = true
+				return "", errors.New("worker service account should not be requested")
+			}
+			status, err = deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(workerFuncCalled).Should(BeFalse())
+		})
+
+		It("should get worker service account lazily when creating a deletion job", func() {
+			By("mock backup repo PVC")
+			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
+
+			By("delete backup file")
+			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
+			backup.Status.Path = backupPath
+			deleter.WorkerServiceAccount = ""
+			workerFuncCalled := 0
+			deleter.WorkerServiceAccountFunc = func() (string, error) {
+				workerFuncCalled++
+				return "lazy-worker", nil
+			}
+			status, err := deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusDeleting))
+			Expect(workerFuncCalled).Should(Equal(1))
+
+			By("check job service account")
+			key := BuildDeleteBackupFilesJobKey(backup, false)
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, fetched *batchv1.Job) {
+				g.Expect(fetched.Spec.Template.Spec.ServiceAccountName).Should(Equal("lazy-worker"))
+			})).Should(Succeed())
+		})
+
+		It("should create and clean up tool delete job in configured delete job namespace", func() {
+			By("mock delete job namespace and tool BackupRepo")
+			Expect(client.IgnoreAlreadyExists(testCtx.CreateObj(testCtx.Ctx, &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: deleteJobNamespace},
+			}))).Should(Succeed())
+			backupRepo := &dpv1alpha1.BackupRepo{
+				ObjectMeta: metav1.ObjectMeta{Name: testdp.BackupRepoName},
+				Spec: dpv1alpha1.BackupRepoSpec{
+					StorageProviderRef: testdp.StorageProviderName,
+					AccessMethod:       dpv1alpha1.AccessMethodTool,
+					PVReclaimPolicy:    corev1.PersistentVolumeReclaimRetain,
+				},
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, backupRepo)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, backupRepo, func() {
+				backupRepo.Status.ToolConfigSecretName = "backup-repo-tool-config"
+			})).Should(Succeed())
+
+			By("delete backup file through the controller namespace")
+			backup.Status.BackupRepoName = backupRepo.Name
+			backup.Status.Path = backupPath
+			deleter.WorkerServiceAccount = ""
+			deleter.DeleteJobNamespace = deleteJobNamespace
+			var workerNamespace, preparedNamespace string
+			deleter.WorkerServiceAccountForNamespaceFunc = func(namespace string) (string, error) {
+				workerNamespace = namespace
+				return workerSAName, nil
+			}
+			deleter.PrepareDeleteJobBackupRepoFunc = func(repo *dpv1alpha1.BackupRepo, namespace string) error {
+				preparedNamespace = namespace
+				return nil
+			}
+			status, err := deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusDeleting))
+			Expect(workerNamespace).Should(Equal(deleteJobNamespace))
+			Expect(preparedNamespace).Should(Equal(deleteJobNamespace))
+
+			By("check external delete job contract")
+			key := BuildDeleteBackupFilesJobKey(backup, false)
+			key.Namespace = deleteJobNamespace
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, fetched *batchv1.Job) {
+				g.Expect(fetched.OwnerReferences).Should(BeEmpty())
+				g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
+				g.Expect(fetched.Labels[dptypes.BackupNameLabelKey]).Should(Equal(backup.Name))
+				g.Expect(fetched.Labels[dptypes.BackupNamespaceLabelKey]).Should(Equal(backup.Namespace))
+				g.Expect(fetched.Labels[DeleteBackupFilesJobLabelKey]).Should(Equal("true"))
+				g.Expect(fetched.Spec.Template.Spec.ServiceAccountName).Should(Equal(workerSAName))
+				g.Expect(fetched.Spec.Template.Spec.Volumes).Should(ContainElement(WithTransform(func(v corev1.Volume) string {
+					if v.Secret == nil {
+						return ""
+					}
+					return v.Secret.SecretName
+				}, Equal(backupRepo.Status.ToolConfigSecretName))))
+			})).Should(Succeed())
+
+			By("delete external job after it succeeds")
+			testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobComplete)
+			status, err = deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Eventually(testapps.CheckObjExists(&testCtx, key, &batchv1.Job{}, false)).Should(Succeed())
+		})
+
+		It("should reject an external delete job for non-tool BackupRepo", func() {
+			mountRepo := &dpv1alpha1.BackupRepo{
+				ObjectMeta: metav1.ObjectMeta{Name: "mount-repo"},
+				Spec: dpv1alpha1.BackupRepoSpec{
+					AccessMethod: dpv1alpha1.AccessMethodMount,
+				},
+			}
+
+			err := deleter.createDeleteJob(corev1.Container{Name: deleteContainerName},
+				client.ObjectKey{Namespace: deleteJobNamespace, Name: "delete-mount-backup"},
+				backup, mountRepo, backupRepoPVCName)
+			Expect(err).Should(MatchError(ContainSubstring("requires a tool-access BackupRepo")))
 		})
 
 		It("delete backup with backup repo", func() {

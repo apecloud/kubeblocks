@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -219,6 +220,102 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bp), func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(BeEmpty())
 				})).Should(Succeed())
+			})
+
+			It("should preserve backup file delete job during backup workload cleanup", func() {
+				backupLabels := map[string]string{
+					dptypes.BackupNameLabelKey:    backup.Name,
+					constant.AppManagedByLabelKey: dptypes.AppName,
+				}
+				backupJob := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "backup-workload-job",
+						Namespace: backup.Namespace,
+						Labels:    backupLabels,
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers: []corev1.Container{{
+									Name:  "worker",
+									Image: testapps.ApeCloudMySQLImage,
+								}},
+							},
+						},
+					},
+				}
+				deleteJobLabels := map[string]string{}
+				for k, v := range backupLabels {
+					deleteJobLabels[k] = v
+				}
+				deleteJobLabels[dptypes.BackupNamespaceLabelKey] = backup.Namespace
+				deleteJobLabels[dpbackup.DeleteBackupFilesJobLabelKey] = "true"
+				deleteJob := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "delete-backup-files-job",
+						Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+						Labels:    deleteJobLabels,
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers: []corev1.Container{{
+									Name:  "worker",
+									Image: testapps.ApeCloudMySQLImage,
+								}},
+							},
+						},
+					},
+				}
+				Expect(testCtx.CreateObj(testCtx.Ctx, backupJob)).Should(Succeed())
+				Expect(testCtx.CreateObj(testCtx.Ctx, deleteJob)).Should(Succeed())
+
+				reconciler := &BackupReconciler{
+					Client: k8sClient,
+					Scheme: k8sManager.GetScheme(),
+				}
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: testCtx.Ctx,
+					Log: ctrl.Log.WithName("test"),
+				}
+				Expect(reconciler.deleteExternalResources(reqCtx, backup)).Should(Succeed())
+
+				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(backupJob), &batchv1.Job{}, false)).Should(Succeed())
+				Consistently(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(deleteJob), &batchv1.Job{}, true)).Should(Succeed())
+			})
+
+			It("should prepare tool config secret for backup file delete job namespace", func() {
+				repo := testdp.NewBackupRepoFactory("", "delete-job-tool-repo").
+					SetStorageProviderRef(testdp.StorageProviderName).
+					Apply(func(repo *dpv1alpha1.BackupRepo) {
+						repo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
+					}).
+					Create(&testCtx).
+					GetObject()
+				Expect(testapps.ChangeObjStatus(&testCtx, repo, func() {
+					repo.Status.ToolConfigSecretName = "delete-job-tool-config"
+				})).Should(Succeed())
+
+				reconciler := &BackupReconciler{
+					Client:   k8sClient,
+					Scheme:   k8sManager.GetScheme(),
+					Recorder: k8sManager.GetEventRecorderFor("backup-mock-controller"),
+				}
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: testCtx.Ctx,
+					Log: ctrl.Log.WithName("test"),
+				}
+				namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				Expect(reconciler.prepareDeleteJobBackupRepo(reqCtx, repo, namespace)).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx,
+					client.ObjectKey{Name: repo.Status.ToolConfigSecretName, Namespace: namespace},
+					func(g Gomega, fetched *corev1.Secret) {
+						g.Expect(fetched.Labels[dataProtectionBackupRepoKey]).Should(Equal(repo.Name))
+						g.Expect(fetched.Labels[dataProtectionIsToolConfigKey]).Should(Equal(trueVal))
+						g.Expect(fetched.Data).Should(HaveKey("datasafed.conf"))
+					})).Should(Succeed())
 			})
 		})
 
@@ -1545,5 +1642,25 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())
 			})
 		})
+	})
+})
+
+var _ = Describe("backup cleanup ordering helpers", func() {
+	It("should detect namespace terminating forbidden errors", func() {
+		err := apierrors.NewForbidden(
+			corev1.Resource("rolebindings"),
+			"kubeblocks-dataprotection-worker-rolebinding",
+			fmt.Errorf("unable to create new content in namespace test because it is being terminated"),
+		)
+		Expect(isNamespaceTerminatingForbidden(err)).Should(BeTrue())
+		Expect(isNamespaceTerminatingForbidden(fmt.Errorf("failed to get worker service account: %w", err))).Should(BeTrue())
+
+		otherForbidden := apierrors.NewForbidden(
+			corev1.Resource("rolebindings"),
+			"kubeblocks-dataprotection-worker-rolebinding",
+			fmt.Errorf("permission denied"),
+		)
+		Expect(isNamespaceTerminatingForbidden(otherForbidden)).Should(BeFalse())
+		Expect(isNamespaceTerminatingForbidden(fmt.Errorf("namespace is being terminated"))).Should(BeFalse())
 	})
 })

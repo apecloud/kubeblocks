@@ -226,6 +226,22 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 			return err
 		}
 
+		// 2.5. Release the `restore-manager` sidecar for any Pod whose
+		// `restore` container has terminated. The populate Pod template
+		// pairs a one-shot `restore` data-mover container with a sleep-loop
+		// `restore-manager` sidecar that exits only when a stop annotation
+		// is set on the Pod. Without this release the Pod stays in Running
+		// after `restore` finishes, the owning Job never reaches Complete,
+		// and the volume populator framework cannot rebind the populator
+		// PVC's PV. The helper only patches an annotation; it does not
+		// touch RestoreManager.Status, so it is safe to invoke from
+		// callers that build a transient RestoreManager without a
+		// persisted Restore CR. Cross-Job coordinated stop semantics, if
+		// any, remain with the caller that owns the broader reconcile.
+		if err := restoreMgr.ReleaseManagerSidecarIfRestoreTerminated(reqCtx.Ctx, jobs[0]); err != nil {
+			return err
+		}
+
 		// 3. check if jobs are finished.
 		isCompleted, _, errMsg := utils.IsJobFinished(jobs[0])
 		if !isCompleted {

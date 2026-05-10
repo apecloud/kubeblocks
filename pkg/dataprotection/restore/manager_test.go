@@ -528,6 +528,173 @@ var _ = Describe("RestoreManager Test", func() {
 				})
 			})
 		})
+
+		Context("ReleaseManagerSidecarIfRestoreTerminated", func() {
+			// These tests pin the single-Job VolumePopulator contract: when the
+			// `restore` container of a populator Pod reaches Terminated, the
+			// helper patches the stop annotation so the `restore-manager`
+			// sidecar can exit. The helper must NOT touch Restore.Status, so
+			// it is safe for callers that build a transient RestoreManager
+			// without a persisted Restore CR (e.g. ClusterRestoreReconciler's
+			// manual VolumePopulator.Populate invocation). Cross-Job
+			// coordinated stop semantics remain with the Restore CR
+			// controller's CheckJobsDone path and are exercised separately.
+			var (
+				restoreMGR *RestoreManager
+				job        *batchv1.Job
+			)
+
+			newPopulatePod := func(name string, restoreState corev1.ContainerState) *corev1.Pod {
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: testCtx.DefaultNamespace,
+						Labels: map[string]string{
+							"job-name": job.Name,
+						},
+					},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyNever,
+						Containers: []corev1.Container{
+							{Name: Restore, Image: "busybox"},
+							{Name: "restore-manager", Image: "busybox"},
+						},
+					},
+				}
+			}
+
+			applyPodStatus := func(pod *corev1.Pod, restoreState corev1.ContainerState) {
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{Name: Restore, State: restoreState},
+					{Name: "restore-manager", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+				}
+			}
+
+			BeforeEach(func() {
+				restoreMGR = NewRestoreManager(&dpv1alpha1.Restore{
+					ObjectMeta: metav1.ObjectMeta{Namespace: testCtx.DefaultNamespace, Name: "rocco-rm-test"},
+				}, recorder, k8sClient.Scheme(), k8sClient)
+				job = &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      "rocco-rm-test-job",
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers:    []corev1.Container{{Name: Restore, Image: "busybox"}},
+							},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, job)).Should(Succeed())
+			})
+
+			It("patches stop annotation when restore container Terminated Exit 0", func() {
+				pod := newPopulatePod("rocco-rm-pod-exit0", corev1.ContainerState{})
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+				applyPodStatus(pod, corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"},
+				})
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+
+				Expect(restoreMGR.ReleaseManagerSidecarIfRestoreTerminated(ctx, job)).Should(Succeed())
+
+				latest := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), latest)).Should(Succeed())
+				Expect(latest.Annotations).Should(HaveKeyWithValue(
+					DataProtectionStopRestoreManagerAnnotationKey, "true"))
+			})
+
+			It("patches stop annotation when restore container Terminated Exit non-zero", func() {
+				pod := newPopulatePod("rocco-rm-pod-exit1", corev1.ContainerState{})
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+				applyPodStatus(pod, corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: 1, Reason: "Error"},
+				})
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+
+				Expect(restoreMGR.ReleaseManagerSidecarIfRestoreTerminated(ctx, job)).Should(Succeed())
+
+				latest := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), latest)).Should(Succeed())
+				// Non-zero exit must still release the sidecar so the Job can
+				// transition to Failed via its own BackoffLimit / completion
+				// state — leaving the sidecar Running on a failed restore
+				// stalls the Job same way as a successful one.
+				Expect(latest.Annotations).Should(HaveKeyWithValue(
+					DataProtectionStopRestoreManagerAnnotationKey, "true"))
+			})
+
+			It("leaves Pod untouched when restore container is still Running", func() {
+				pod := newPopulatePod("rocco-rm-pod-running", corev1.ContainerState{})
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+				applyPodStatus(pod, corev1.ContainerState{Running: &corev1.ContainerStateRunning{}})
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+
+				Expect(restoreMGR.ReleaseManagerSidecarIfRestoreTerminated(ctx, job)).Should(Succeed())
+
+				latest := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), latest)).Should(Succeed())
+				Expect(latest.Annotations).ShouldNot(HaveKey(
+					DataProtectionStopRestoreManagerAnnotationKey))
+			})
+
+			It("skips Pods that are already terminating", func() {
+				pod := newPopulatePod("rocco-rm-pod-terminating", corev1.ContainerState{})
+				pod.Finalizers = []string{"dataprotection.kubeblocks.io/test-finalizer"}
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+				applyPodStatus(pod, corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"},
+				})
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+				// Delete to set DeletionTimestamp; the finalizer keeps the
+				// Pod visible to the helper's List call so we can assert the
+				// terminating branch is actually exercised.
+				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
+				latest := &corev1.Pod{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), latest)).Should(Succeed())
+					g.Expect(latest.DeletionTimestamp.IsZero()).Should(BeFalse())
+				}).Should(Succeed())
+
+				Expect(restoreMGR.ReleaseManagerSidecarIfRestoreTerminated(ctx, job)).Should(Succeed())
+
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), latest)).Should(Succeed())
+				Expect(latest.Annotations).ShouldNot(HaveKey(
+					DataProtectionStopRestoreManagerAnnotationKey))
+
+				// Clean up the finalizer so the Pod can be removed.
+				Expect(testapps.ChangeObj(&testCtx, latest, func(p *corev1.Pod) {
+					p.Finalizers = nil
+				})).Should(Succeed())
+			})
+
+			It("is a no-op when the Job has no associated Pods", func() {
+				Expect(restoreMGR.ReleaseManagerSidecarIfRestoreTerminated(ctx, job)).Should(Succeed())
+			})
+
+			It("is idempotent for already-stopped sidecars (regression for Restore CR path)", func() {
+				pod := newPopulatePod("rocco-rm-pod-already", corev1.ContainerState{})
+				pod.Annotations = map[string]string{
+					DataProtectionStopRestoreManagerAnnotationKey: "true",
+				}
+				Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+				applyPodStatus(pod, corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{ExitCode: 0, Reason: "Completed"},
+				})
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+				before := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), before)).Should(Succeed())
+
+				Expect(restoreMGR.ReleaseManagerSidecarIfRestoreTerminated(ctx, job)).Should(Succeed())
+
+				after := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pod), after)).Should(Succeed())
+				Expect(after.ResourceVersion).Should(Equal(before.ResourceVersion))
+			})
+		})
 	})
 
 })

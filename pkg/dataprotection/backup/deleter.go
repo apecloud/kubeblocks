@@ -51,6 +51,18 @@ const (
 	// jobs run after backup workload cleanup starts, so the controller must not
 	// delete them as ordinary backup workload jobs before they finish.
 	DeleteBackupFilesJobLabelKey = "dataprotection.kubeblocks.io/delete-backup-files-job"
+
+	// externalDeleteJobTTLSecondsAfterFinished bounds how long a completed
+	// backup-file cleanup Job created outside the Backup's own namespace
+	// lingers before kube-controller-manager's ttl-after-finished controller
+	// garbage-collects it (Job + Pod) alongside the existing best-effort
+	// BackgroundDeleteObject path. Defense in depth: the Backup CR's
+	// finalizer is removed as soon as DeleteBackupFiles returns Succeeded,
+	// so if that async delete never propagates the Job has no other
+	// cleanup signal — no cross-namespace ownerReference, no controller
+	// re-reconcile. The 300s window keeps a short audit/diagnostic
+	// inspection budget while bounding controller-namespace residue.
+	externalDeleteJobTTLSecondsAfterFinished int32 = 300
 )
 
 type DeletionStatus string
@@ -361,6 +373,17 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 			},
 			BackoffLimit: &dptypes.DefaultBackOffLimit,
 		},
+	}
+	if externalDeleteJob {
+		// External Jobs live outside the Backup's namespace, so no
+		// cross-namespace ownerReference can wire them to the Backup.
+		// Set a TTL so kube-controller-manager garbage-collects the
+		// completed Job + Pod even when the existing best-effort
+		// BackgroundDeleteObject path does not propagate (e.g. the
+		// Backup CR's finalizer is removed before the async delete
+		// lands and no future reconcile is triggered).
+		ttl := externalDeleteJobTTLSecondsAfterFinished
+		job.Spec.TTLSecondsAfterFinished = &ttl
 	}
 	if !externalDeleteJob {
 		if err := utils.SetControllerReference(backup, job, d.Scheme); err != nil {

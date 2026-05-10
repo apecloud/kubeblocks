@@ -136,6 +136,13 @@ var _ = Describe("Backup Deleter Test", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, key, job, true)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, fetched *batchv1.Job) {
 				g.Expect(fetched.Spec.Template.Spec.ServiceAccountName).Should(Equal(workerSAName))
+				// In-namespace delete Jobs are scoped to the Backup CR via an
+				// ownerReference and are GC'd by Kubernetes when the Backup is
+				// deleted. They must not carry the external-only TTL — the
+				// scoping decision for case-003 (only delete Jobs created in
+				// a controller-side namespace need TTL fallback).
+				g.Expect(fetched.Spec.TTLSecondsAfterFinished).Should(BeNil())
+				g.Expect(fetched.OwnerReferences).ShouldNot(BeEmpty())
 			})).Should(Succeed())
 
 			By("delete backup with job running")
@@ -262,6 +269,13 @@ var _ = Describe("Backup Deleter Test", func() {
 				g.Expect(fetched.Labels[dptypes.BackupNameLabelKey]).Should(Equal(backup.Name))
 				g.Expect(fetched.Labels[dptypes.BackupNamespaceLabelKey]).Should(Equal(backup.Namespace))
 				g.Expect(fetched.Labels[DeleteBackupFilesJobLabelKey]).Should(Equal("true"))
+				// External delete Jobs cannot use a cross-namespace
+				// ownerReference, so a TTL bounds how long the completed
+				// Job + Pod linger even when the best-effort
+				// BackgroundDeleteObject path does not propagate after
+				// the Backup CR finalizer is removed.
+				g.Expect(fetched.Spec.TTLSecondsAfterFinished).ShouldNot(BeNil())
+				g.Expect(*fetched.Spec.TTLSecondsAfterFinished).Should(Equal(externalDeleteJobTTLSecondsAfterFinished))
 				g.Expect(fetched.Spec.Template.Spec.ServiceAccountName).Should(Equal(workerSAName))
 				g.Expect(fetched.Spec.Template.Spec.Volumes).Should(ContainElement(WithTransform(func(v corev1.Volume) string {
 					if v.Secret == nil {

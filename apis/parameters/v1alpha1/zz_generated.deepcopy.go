@@ -25,8 +25,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
-
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/apis/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )

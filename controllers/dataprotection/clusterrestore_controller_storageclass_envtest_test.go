@@ -52,13 +52,13 @@ import (
 // (early return on terminal phase) and does not race with the spec.
 var _ = Describe("ClusterRestore StorageClass missing envtest", func() {
 	const (
-		envtestStorageClassName    = "envtest-missing-sc"
-		envtestTargetClusterName   = "envtest-target-cluster"
-		envtestTargetClusterUID    = types.UID("envtest-target-cluster-uid")
-		envtestSourceBackupName    = "envtest-backup"
-		envtestSourceBackupNS      = "envtest-backup-ns"
-		envtestPVCName             = "data-envtest-target-cluster-mysql-0"
-		envtestEventDrainTimeout   = 2 * time.Second
+		envtestStorageClassName  = "envtest-missing-sc"
+		envtestTargetClusterName = "envtest-target-cluster"
+		envtestTargetClusterUID  = types.UID("envtest-target-cluster-uid")
+		envtestSourceBackupName  = "envtest-backup"
+		envtestSourceBackupNS    = "envtest-backup-ns"
+		envtestPVCName           = "data-envtest-target-cluster-mysql-0"
+		envtestEventDrainTimeout = 2 * time.Second
 	)
 
 	var (

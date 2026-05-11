@@ -25,8 +25,10 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -351,75 +353,159 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest,
 	progressDetail *opsv1alpha1.ProgressStatusDetail) error {
-	for sourcePVCName, v := range inPlaceHelper.pvcMap {
-		tmpPVC := &corev1.PersistentVolumeClaim{}
-		_ = cli.Get(reqCtx.Ctx, types.NamespacedName{Name: v.Name, Namespace: v.Namespace}, tmpPVC)
-		if tmpPVC.UID == "" {
-			// if the tmp pvc not exists in k8s, replace with the built pvc.
-			tmpPVC = v
+	itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
+
+	needDeleteTargetPod := false
+	waitingForSourcePVC := false
+	for sourcePVCName, builtTmpPVC := range inPlaceHelper.pvcMap {
+		tmpPVC, err := inPlaceHelper.getLiveTmpPVCOrBuilt(reqCtx, cli, builtTmpPVC)
+		if err != nil {
+			return err
 		}
-		// 1. get the restored pv
 		pv, err := inPlaceHelper.getRestoredPV(reqCtx, cli, tmpPVC)
 		if err != nil {
 			return err
 		}
-		sourcePvc := &corev1.PersistentVolumeClaim{}
-		if err = cli.Get(reqCtx.Ctx, types.NamespacedName{Name: sourcePVCName, Namespace: tmpPVC.Namespace}, sourcePvc); err != nil {
-			// if not exists, wait for the pvc to recreate by external controller.
+		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, tmpPVC.Namespace)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				waitingForSourcePVC = true
+				continue
+			}
 			return err
 		}
 		if _, ok := pv.Annotations[rebuildFromAnnotation]; !ok {
 			if pv.Labels[rebuildTmpPVCNameLabel] != tmpPVC.Name {
-				// 2. retain and label the pv with 'rebuildTmpPVCNameLabel'
-				if err = inPlaceHelper.retainAndAnnotatePV(reqCtx, cli, opsRequest.Name, pv, tmpPVC, sourcePvc); err != nil {
+				if err = inPlaceHelper.retainAndAnnotatePV(reqCtx, cli, opsRequest.Name, pv, tmpPVC, sourcePVC); err != nil {
 					return err
 				}
 			}
+		} else if pv.Annotations[rebuildFromAnnotation] != opsRequest.Name {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the pv "%s" is rebuilt by another OpsRequest "%s"`, pv.Name, pv.Annotations[rebuildFromAnnotation]))
 		}
-		// 3. cleanup the tmp pvc firstly.
-		if err = inPlaceHelper.cleanupTmpPVC(reqCtx, cli, tmpPVC); err != nil {
+		if err = inPlaceHelper.preBindPVToSourcePVC(reqCtx, cli, pv, tmpPVC, sourcePVCName, sourcePVC); err != nil {
 			return err
 		}
-		// set volumeName to tmp pvc, it will be used when recreating the source pvc.
-		tmpPVC.Spec.VolumeName = pv.Name
-		// 4. recreate the source pvc.
-		if err = inPlaceHelper.recreateSourcePVC(reqCtx, cli, tmpPVC, sourcePvc, opsRequest.Name); err != nil {
-			return err
+		if sourcePVC.DeletionTimestamp != nil {
+			waitingForSourcePVC = true
+			if err := inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC); err != nil {
+				return err
+			}
+			continue
+		}
+		if sourcePVC.Spec.VolumeName == pv.Name {
+			if err := inPlaceHelper.cleanupTmpPVC(reqCtx, cli, tmpPVC); err != nil {
+				return err
+			}
+			latestPV := &corev1.PersistentVolume{}
+			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: pv.Name}, latestPV); err != nil {
+				return err
+			}
+			if err := inPlaceHelper.revertReclaimPolicy(reqCtx, cli, latestPV); err != nil {
+				return err
+			}
+			continue
 		}
 
-		// 5. rebound the pv to the source pvc.
-		if err = inPlaceHelper.reboundPV(reqCtx, cli, sourcePvc, pv, opsRequest.Name); err != nil {
+		waitingForSourcePVC = true
+		if sourcePVC.Spec.VolumeName == "" {
+			if err := inPlaceHelper.setSourcePVCVolumeNameForRebuild(reqCtx, cli, sourcePVC, pv.Name); err != nil {
+				return err
+			}
+		} else {
+			if err := inPlaceHelper.failIfSourcePVCBoundToOtherActiveRebuildPV(reqCtx, cli, opsRequest, sourcePVC, pv); err != nil {
+				return err
+			}
+			needDeleteTargetPod = true
+			if err := inPlaceHelper.deleteSourcePVCForRebuild(reqCtx, cli, sourcePVC); err != nil {
+				return err
+			}
+		}
+	}
+	if needDeleteTargetPod {
+		if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
 			return err
 		}
-		// 6. revert the reclaim policy of the pv.
-		if err = inPlaceHelper.revertReclaimPolicy(reqCtx, cli, pv); err != nil {
+		if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
 			return err
 		}
 	}
-	// update progress message and recreate the target instance by deleting it.
+	if waitingForSourcePVC {
+		progressDetail.Message = "Waiting for source PVCs to bind restored PVs"
+		return nil
+	}
+
 	progressDetail.Message = waitingForInstanceReadyMessage
+	return nil
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest) error {
 	var options []client.DeleteOption
 	if opsRequest.Spec.Force {
 		options = append(options, client.GracePeriodSeconds(0))
 	}
+	return client.IgnoreNotFound(intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...))
+}
 
-	if inPlaceHelper.instance.TargetNodeName != "" {
-		// under the circumstance of using cloud disks, need to set node selector again to make sure pod
-		// goes to the specified node
+func (inPlaceHelper *inplaceRebuildHelper) setSourcePVCVolumeNameForRebuild(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	sourcePVC *corev1.PersistentVolumeClaim,
+	pvName string) error {
+	patch := client.MergeFrom(sourcePVC.DeepCopy())
+	// Bind the replacement PVC that InstanceSet just created to the restored PV.
+	// If it has already bound to another PV, the caller deletes it and waits for
+	// a fresh PVC instead of changing an immutable bound claim.
+	sourcePVC.Spec.VolumeName = pvName
+	return cli.Patch(reqCtx.Ctx, sourcePVC, patch)
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) setInstanceNodeSelectorForRebuild(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	itsName string) error {
+	if inPlaceHelper.instance.TargetNodeName == "" {
+		return nil
+	}
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		its := &workloads.InstanceSet{}
-		itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: itsName, Namespace: inPlaceHelper.synthesizedComp.Namespace}, its); err != nil {
 			return err
 		}
+		patch := client.MergeFrom(its.DeepCopy())
+		// If the rebuilt instance targets a node, ask InstanceSet to apply that node selector when it recreates the pod.
 		if err := instanceset.MergeNodeSelectorOnceAnnotation(its, map[string]string{inPlaceHelper.targetPod.Name: inPlaceHelper.instance.TargetNodeName}); err != nil {
 			return err
 		}
-		if err := cli.Update(reqCtx.Ctx, its); err != nil {
-			return err
-		}
+		return cli.Patch(reqCtx.Ctx, its, patch)
+	}); err != nil {
+		return err
 	}
+	return nil
+}
 
-	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...)
+func (inPlaceHelper *inplaceRebuildHelper) getLiveTmpPVCOrBuilt(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	builtTmpPVC *corev1.PersistentVolumeClaim) (*corev1.PersistentVolumeClaim, error) {
+	tmpPVC := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: builtTmpPVC.Name, Namespace: builtTmpPVC.Namespace}, tmpPVC); err != nil {
+		if apierrors.IsNotFound(err) {
+			return builtTmpPVC, nil
+		}
+		return nil, err
+	}
+	return tmpPVC, nil
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) getSourcePVC(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	name string,
+	namespace string) (*corev1.PersistentVolumeClaim, error) {
+	sourcePVC := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: name, Namespace: namespace}, sourcePVC); err != nil {
+		return nil, err
+	}
+	return sourcePVC, nil
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) getRestoredPV(reqCtx intctrlutil.RequestCtx,
@@ -454,7 +540,7 @@ func (inPlaceHelper *inplaceRebuildHelper) retainAndAnnotatePV(reqCtx intctrluti
 	patchPV := client.MergeFrom(pv.DeepCopy())
 	// Examine the claimRef for the PV and see if it's bound to the correct PVC
 	claimRef := pv.Spec.ClaimRef
-	if claimRef != nil && claimRef.Name != tmpPVC.Name || claimRef.Namespace != tmpPVC.Namespace {
+	if claimRef != nil && (claimRef.Name != tmpPVC.Name || claimRef.Namespace != tmpPVC.Namespace) {
 		return intctrlutil.NewFatalError(fmt.Sprintf(`the pv "%s" is not bound by the pvc "%s"`, pv.Name, tmpPVC.Name))
 	}
 	// 1. retain and label the pv
@@ -481,6 +567,80 @@ func (inPlaceHelper *inplaceRebuildHelper) retainAndAnnotatePV(reqCtx intctrluti
 	return cli.Patch(reqCtx.Ctx, pv, patchPV)
 }
 
+func (inPlaceHelper *inplaceRebuildHelper) preBindPVToSourcePVC(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	pv *corev1.PersistentVolume,
+	tmpPVC *corev1.PersistentVolumeClaim,
+	sourcePVCName string,
+	sourcePVC *corev1.PersistentVolumeClaim) error {
+	uid := types.UID("")
+	if sourcePVC.Spec.VolumeName == "" || sourcePVC.Spec.VolumeName == pv.Name {
+		uid = sourcePVC.UID
+	}
+	claimRef := pv.Spec.ClaimRef
+	if claimRef != nil &&
+		claimRef.Name == sourcePVCName &&
+		claimRef.Namespace == tmpPVC.Namespace &&
+		claimRef.UID == uid &&
+		claimRef.APIVersion == "v1" &&
+		claimRef.Kind == "PersistentVolumeClaim" {
+		return nil
+	}
+	if claimRef != nil &&
+		(claimRef.Name != tmpPVC.Name || claimRef.Namespace != tmpPVC.Namespace) &&
+		(claimRef.Name != sourcePVCName || claimRef.Namespace != tmpPVC.Namespace) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`the pv "%s" is not owned by the rebuild pvc "%s"`, pv.Name, tmpPVC.Name))
+	}
+	patchPV := client.MergeFrom(pv.DeepCopy())
+	// Reserve the restored PV for the current source PVC object. If InstanceSet
+	// recreates that PVC later, this check will run again and update the UID.
+	pv.Spec.ClaimRef = &corev1.ObjectReference{
+		APIVersion: "v1",
+		Kind:       "PersistentVolumeClaim",
+		Namespace:  tmpPVC.Namespace,
+		Name:       sourcePVCName,
+		UID:        uid,
+	}
+	return cli.Patch(reqCtx.Ctx, pv, patchPV)
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) failIfSourcePVCBoundToOtherActiveRebuildPV(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	sourcePVC *corev1.PersistentVolumeClaim,
+	restoredPV *corev1.PersistentVolume) error {
+	if sourcePVC.Spec.VolumeName == "" || sourcePVC.Spec.VolumeName == restoredPV.Name {
+		return nil
+	}
+	sourcePV := &corev1.PersistentVolume{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: sourcePVC.Spec.VolumeName}, sourcePV); err != nil {
+		return err
+	}
+	if sourcePV.Annotations == nil {
+		return nil
+	}
+	ownerName := sourcePV.Annotations[rebuildFromAnnotation]
+	if ownerName == "" || ownerName == opsRequest.Name {
+		return nil
+	}
+	claimRef := sourcePV.Spec.ClaimRef
+	if claimRef == nil || claimRef.Name != sourcePVC.Name || claimRef.Namespace != sourcePVC.Namespace {
+		return nil
+	}
+	owner := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: ownerName, Namespace: opsRequest.Namespace}, owner); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if owner.IsComplete() {
+		return nil
+	}
+	return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is already bound to pv "%s" restored by OpsRequest "%s"`,
+		sourcePVC.Name, sourcePV.Name, ownerName))
+}
+
 func (inPlaceHelper *inplaceRebuildHelper) cleanupTmpPVC(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	tmpPVC *corev1.PersistentVolumeClaim) error {
@@ -494,72 +654,37 @@ func (inPlaceHelper *inplaceRebuildHelper) cleanupTmpPVC(reqCtx intctrlutil.Requ
 	return inPlaceHelper.removePVCFinalizer(reqCtx, cli, tmpPVC)
 }
 
-// recreateSourcePVC recreates the source pvc to bound the restored pv.
-func (inPlaceHelper *inplaceRebuildHelper) recreateSourcePVC(reqCtx intctrlutil.RequestCtx,
+func (inPlaceHelper *inplaceRebuildHelper) deleteSourcePVCForRebuild(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	tmpPVC,
-	sourcePvc *corev1.PersistentVolumeClaim,
-	opsRequestName string) error {
-
-	// if the pvc is rebuilt by current opsRequest, return.
-	if sourcePvc.Annotations[rebuildFromAnnotation] == opsRequestName {
+	sourcePVC *corev1.PersistentVolumeClaim) error {
+	if sourcePVC.DeletionTimestamp != nil {
 		return nil
 	}
-	// 1. merge the labels of the source pvc.
-	intctrlutil.MergeMetadataMapInplace(sourcePvc.Labels, &tmpPVC.Labels)
-	// 2. delete the old pvc
-	if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePvc); err != nil {
+	// Remove the old source PVC name. InstanceSet will recreate it from the normal volumeClaimTemplate.
+	if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePVC); err != nil {
 		return err
 	}
-	if err := inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePvc); err != nil {
-		return err
-	}
-
-	// 3. recreate the pvc with restored PV.
-	newPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        sourcePvc.Name,
-			Namespace:   tmpPVC.Namespace,
-			Labels:      tmpPVC.Labels,
-			Annotations: sourcePvc.Annotations,
-		},
-		Spec: tmpPVC.Spec,
-	}
-	// merge the annotations of the source pvc.
-	if newPVC.Annotations == nil {
-		newPVC.Annotations = map[string]string{}
-	}
-	newPVC.Annotations[rebuildFromAnnotation] = opsRequestName
-	return cli.Create(reqCtx.Ctx, newPVC)
-}
-
-// reboundPV rebounds the PV to the source PVC if it is bound to another PVC.
-func (inPlaceHelper *inplaceRebuildHelper) reboundPV(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	sourcePvc *corev1.PersistentVolumeClaim,
-	pv *corev1.PersistentVolume,
-	opsRequestName string) error {
-	// if the pvc is not rebuilt by current opsRequest, return.
-	if sourcePvc.Annotations[rebuildFromAnnotation] != opsRequestName {
-		return nil
-	}
-	if pv.Spec.ClaimRef == nil || pv.Spec.ClaimRef.UID == sourcePvc.UID {
-		return nil
-	}
-	pv.Spec.ClaimRef = nil
-	return cli.Update(reqCtx.Ctx, pv)
+	return inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) revertReclaimPolicy(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, pv *corev1.PersistentVolume) error {
-	if string(pv.Spec.PersistentVolumeReclaimPolicy) == pv.Annotations[sourcePVReclaimPolicyAnnotation] {
-		return nil
+	reclaimPolicy := pv.Annotations[sourcePVReclaimPolicyAnnotation]
+	patch := client.MergeFrom(pv.DeepCopy())
+	if reclaimPolicy != "" && string(pv.Spec.PersistentVolumeReclaimPolicy) != reclaimPolicy {
+		if pv.Status.Phase != corev1.VolumeBound {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `wait for the PV "%s" to be bound`, pv.GetName())
+		}
+		pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(reclaimPolicy)
 	}
-	if pv.Status.Phase != corev1.VolumeBound {
-		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `wait for the PV "%s" to be bound`, pv.GetName())
+	if pv.Annotations != nil {
+		delete(pv.Annotations, rebuildFromAnnotation)
+		delete(pv.Annotations, sourcePVReclaimPolicyAnnotation)
 	}
-	pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(pv.Annotations[sourcePVReclaimPolicyAnnotation])
-	return cli.Update(reqCtx.Ctx, pv)
+	if pv.Labels != nil {
+		delete(pv.Labels, rebuildTmpPVCNameLabel)
+	}
+	return cli.Patch(reqCtx.Ctx, pv, patch)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) removePVCFinalizer(reqCtx intctrlutil.RequestCtx,
@@ -598,7 +723,10 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]
 		if sourcePVCName == "" {
-			return nil, nil, nil, intctrlutil.NewFatalError("")
+			sourcePVCName = intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{
+				ObjectMeta: vct.ObjectMeta,
+				Spec:       vct.Spec,
+			}, workloadName, targetPod.Name)
 		}
 		pvcLabels := getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{

@@ -425,6 +425,29 @@ var _ = Describe("lifecycle", func() {
 			Expect(output).Should(Equal([]byte(val)))
 		})
 
+		It("data load builtin vars", func() {
+			lifecycleActions.DataLoad = &appsv1.Action{
+				Exec: &appsv1.ExecAction{
+					Command: []string{"/bin/bash", "-c", "echo -n data-load"},
+				},
+			}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, pods[0], pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("dataLoad"))
+					Expect(req.Parameters).ShouldNot(BeNil())
+					Expect(req.Parameters[targetPodNameVar]).Should(Equal(pods[0].Name))
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.DataLoad(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
+		})
+
 		It("precondition", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
 			lifecycleActions.PostProvision.PreCondition = &clusterReady

@@ -83,7 +83,6 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	handlers := []eventHandler{
 		&instanceset.PodRoleEventHandler{},
 		&component.AvailableEventHandler{},
-		&component.KBAgentTaskEventHandler{},
 	}
 	for _, handler := range handlers {
 		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {

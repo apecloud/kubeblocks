@@ -22,7 +22,6 @@ package component
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -478,24 +477,6 @@ var _ = Describe("Component Controller", func() {
 
 		scaleInCheck := func() {
 			checkUpdatedItsReplicas()
-
-			By("Checking pod's annotation should be updated consistently")
-			Eventually(func(g Gomega) {
-				podList := corev1.PodList{}
-				g.Expect(k8sClient.List(testCtx.Ctx, &podList, client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: compName,
-				})).Should(Succeed())
-				for _, pod := range podList.Items {
-					ss := strings.Split(pod.Name, "-")
-					ordinal, _ := strconv.Atoi(ss[len(ss)-1])
-					if ordinal >= updatedReplicas {
-						continue
-					}
-					// The annotation was updated by the mocked member leave action.
-					g.Expect(pod.Annotations[podAnnotationKey4Test]).Should(Equal(fmt.Sprintf("%d", updatedReplicas)))
-				}
-			}).Should(Succeed())
 		}
 
 		if int(comp.Spec.Replicas) < updatedReplicas {

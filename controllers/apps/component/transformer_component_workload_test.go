@@ -16,188 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
-	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("Component Workload Operations Test", func() {
 	const (
-		clusterName    = "test-cluster"
-		compName       = "test-comp"
-		kubeblocksName = "kubeblocks"
+		clusterName = "test-cluster"
+		compName    = "test-comp"
 	)
-
-	var (
-		reader         *appsutil.MockReader
-		dag            *graph.DAG
-		comp           *appsv1.Component
-		synthesizeComp *component.SynthesizedComponent
-	)
-
-	roles := []appsv1.ReplicaRole{
-		{Name: "leader", UpdatePriority: 3},
-		{Name: "follower", UpdatePriority: 2},
-	}
-
-	newDAG := func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
-		d := graph.NewDAG()
-		graphCli.Root(d, comp, comp, model.ActionStatusPtr())
-		return d
-	}
-
-	BeforeEach(func() {
-		reader = &appsutil.MockReader{}
-		comp = &appsv1.Component{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      constant.GenerateClusterComponentName(clusterName, compName),
-				Labels: map[string]string{
-					constant.AppManagedByLabelKey:   constant.AppName,
-					constant.AppInstanceLabelKey:    clusterName,
-					constant.KBAppComponentLabelKey: compName,
-				},
-			},
-			Spec: appsv1.ComponentSpec{},
-		}
-
-		synthesizeComp = &component.SynthesizedComponent{
-			Namespace:   testCtx.DefaultNamespace,
-			ClusterName: clusterName,
-			Name:        compName,
-			Roles:       roles,
-			LifecycleActions: component.SynthesizedLifecycleActions{
-				ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
-					MemberJoin: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Image: "test-image",
-						},
-					},
-					MemberLeave: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Image: "test-image",
-						},
-					},
-					Switchover: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Image: "test-image",
-						},
-					},
-				},
-			},
-		}
-
-		graphCli := model.NewGraphClient(reader)
-		dag = newDAG(graphCli, comp)
-	})
 
 	Context("Member Leave Operations", func() {
-		var (
-			ops  *componentWorkloadOps
-			pod0 *corev1.Pod
-			pod1 *corev1.Pod
-			pods []*corev1.Pod
-		)
-
-		BeforeEach(func() {
-			pod0 = testapps.NewPodFactory(testCtx.DefaultNamespace, "test-pod-0").
-				AddContainer(corev1.Container{
-					Image: "test-image",
-					Name:  "test-container",
-				}).
-				AddLabels(
-					constant.AppManagedByLabelKey, kubeblocksName,
-					constant.AppInstanceLabelKey, clusterName,
-					constant.KBAppComponentLabelKey, compName,
-				).
-				GetObject()
-
-			pod1 = testapps.NewPodFactory(testCtx.DefaultNamespace, "test-pod-1").
-				AddContainer(corev1.Container{
-					Image: "test-image",
-					Name:  "test-container",
-				}).
-				AddLabels(
-					constant.AppManagedByLabelKey, kubeblocksName,
-					constant.AppInstanceLabelKey, clusterName,
-					constant.KBAppComponentLabelKey, compName,
-				).
-				GetObject()
-
-			pods = []*corev1.Pod{pod0, pod1}
-
-			container := corev1.Container{
-				Name:            "mock-container-name",
-				Image:           testapps.ApeCloudMySQLImage,
-				ImagePullPolicy: corev1.PullIfNotPresent,
-			}
-
-			mockITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
-				"test-its", clusterName, compName).
-				AddFinalizers([]string{constant.DBClusterFinalizerName}).
-				AddContainer(container).
-				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(compName).
-				AddAppManagedByLabel().
-				SetReplicas(2).
-				SetRoles(roles).
-				GetObject()
-
-			ops = &componentWorkloadOps{
-				transCtx: &componentTransformContext{
-					Context:       ctx,
-					Logger:        logger,
-					EventRecorder: clusterRecorder,
-				},
-				cli:            k8sClient,
-				component:      comp,
-				synthesizeComp: synthesizeComp,
-				runningITS:     mockITS,
-				protoITS:       mockITS.DeepCopy(),
-				dag:            dag,
-			}
-		})
-
-		It("should handle switchover for when scale in", func() {
-			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-				recorder.Action(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
-					switch req.Action {
-					case "switchover":
-						Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(pod1.Name))
-					case "memberLeave":
-						Expect(req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]).Should(Equal(pod1.Name))
-					}
-					rsp := kbagentproto.ActionResponse{Message: "mock success"}
-					return rsp, nil
-				})
-			})
-
-			By("setting up leader pod")
-			pod1.Labels[constant.RoleLabelKey] = "follower"
-			pod1.Labels[constant.RoleLabelKey] = "leader"
-
-			By("executing leave member for leader")
-			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
-		})
-
 		It("should eliminate upgrade-only diff by preserving legacy config-manager", func() {
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				"old-its", clusterName, compName).

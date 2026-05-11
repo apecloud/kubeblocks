@@ -221,6 +221,17 @@ var _ = Describe("utils test", func() {
 				},
 			}
 			Expect(its.IsInstanceSetReady()).Should(BeTrue())
+
+			By("set lifecycle status to not ready")
+			its.Status.InstanceStatus[0].DataLoaded = boolPtr(false)
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
+
+			By("set lifecycle status to ready again")
+			its.Status.InstanceStatus[0].DataLoaded = boolPtr(true)
+			its.Status.InstanceStatus[0].MemberJoined = boolPtr(true)
+			its.Status.InstanceStatus[1].MemberJoined = boolPtr(true)
+			its.Status.InstanceStatus[2].MemberJoined = boolPtr(true)
+			Expect(its.IsInstanceSetReady()).Should(BeTrue())
 		})
 	})
 

@@ -37,6 +37,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 var _ = Describe("status reconciler test", func() {
 	BeforeEach(func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).
@@ -408,6 +412,83 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.InstanceStatus[1].Role).Should(Equal("leader"))
 			Expect(its.Status.InstanceStatus[2].PodName).Should(Equal("pod-2"))
 			Expect(its.Status.InstanceStatus[2].Role).Should(Equal(""))
+			Expect(its.Status.InstanceStatus[0].Provisioned).Should(BeTrue())
+			Expect(its.Status.InstanceStatus[1].Provisioned).Should(BeTrue())
+			Expect(its.Status.InstanceStatus[2].Provisioned).Should(BeTrue())
+		})
+
+		It("should preserve lifecycle status for tracked actions", func() {
+			pods := []*corev1.Pod{
+				builder.NewPodBuilder(namespace, "pod-0").GetObject(),
+				builder.NewPodBuilder(namespace, "pod-1").GetObject(),
+			}
+			readyCondition := corev1.PodCondition{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}
+			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
+			replicas := int32(2)
+			its.Spec.Replicas = &replicas
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberJoin: &workloads.Action{},
+				DataLoad:   &workloads.Action{},
+			}
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{
+					PodName:         "pod-0",
+					Provisioned:     true,
+					DataLoaded:      boolPtr(false),
+					MemberJoined:    boolPtr(false),
+					VolumeExpansion: true,
+				},
+			}
+
+			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
+
+			Expect(its.Status.InstanceStatus).Should(HaveLen(2))
+			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))
+			Expect(its.Status.InstanceStatus[0].Provisioned).Should(BeTrue())
+			Expect(*its.Status.InstanceStatus[0].DataLoaded).Should(BeFalse())
+			Expect(*its.Status.InstanceStatus[0].MemberJoined).Should(BeFalse())
+			Expect(its.Status.InstanceStatus[1].PodName).Should(Equal("pod-1"))
+			Expect(its.Status.InstanceStatus[1].Provisioned).Should(BeTrue())
+			Expect(*its.Status.InstanceStatus[1].DataLoaded).Should(BeFalse())
+			Expect(*its.Status.InstanceStatus[1].MemberJoined).Should(BeFalse())
+		})
+
+		It("should drop stale lifecycle status for pods that no longer exist", func() {
+			pods := []*corev1.Pod{
+				builder.NewPodBuilder(namespace, "pod-0").GetObject(),
+			}
+			readyCondition := corev1.PodCondition{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}
+			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
+			replicas := int32(1)
+			its.Spec.Replicas = &replicas
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				MemberJoin: &workloads.Action{},
+			}
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{
+					PodName:      "pod-0",
+					Provisioned:  true,
+					MemberJoined: boolPtr(true),
+				},
+				{
+					PodName:      "pod-1",
+					Provisioned:  true,
+					MemberJoined: boolPtr(true),
+				},
+			}
+
+			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
+
+			Expect(its.Status.InstanceStatus).Should(HaveLen(1))
+			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))
+			Expect(its.Status.InstanceStatus[0].Provisioned).Should(BeTrue())
+			Expect(*its.Status.InstanceStatus[0].MemberJoined).Should(BeTrue())
 		})
 	})
 })

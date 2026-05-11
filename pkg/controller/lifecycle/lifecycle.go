@@ -49,6 +49,8 @@ type Lifecycle interface {
 
 	MemberLeave(ctx context.Context, cli client.Reader, opts *Options) error
 
+	DataLoad(ctx context.Context, cli client.Reader, opts *Options) error
+
 	// Readonly(ctx context.Context, cli client.Reader, opts *Options) error
 
 	// Readwrite(ctx context.Context, cli client.Reader, opts *Options) error

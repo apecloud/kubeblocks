@@ -312,10 +312,16 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
 	instanceStatus := make([]workloads.InstanceStatus, 0)
+	oldStatusMap := make(map[string]workloads.InstanceStatus, len(its.Status.InstanceStatus))
+	for _, status := range its.Status.InstanceStatus {
+		oldStatusMap[status.PodName] = status
+	}
 	for _, pod := range pods {
 		status := workloads.InstanceStatus{
 			PodName: pod.Name,
 		}
+		oldStatus, ok := oldStatusMap[pod.Name]
+		syncInstanceLifecycleStatus(its, &status, pod, oldStatus, ok, len(oldStatusMap) > 0)
 		instanceStatus = append(instanceStatus, status)
 	}
 
@@ -362,6 +368,49 @@ func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.Ins
 			}
 		}
 	}
+}
+
+func syncInstanceLifecycleStatus(its *workloads.InstanceSet, status *workloads.InstanceStatus, pod *corev1.Pod, oldStatus workloads.InstanceStatus, oldStatusExists bool, hasObservedReplicas bool) {
+	status.Provisioned = true
+	status.DataLoaded = initLifecycleBool(oldStatus.DataLoaded, shouldTrackDataLoad(its, oldStatus.DataLoaded, oldStatusExists, hasObservedReplicas))
+	status.MemberJoined = initMemberJoinedStatus(its, pod, oldStatus.MemberJoined, oldStatusExists, hasObservedReplicas)
+}
+
+func initLifecycleBool(old *bool, shouldTrack bool) *bool {
+	if !shouldTrack {
+		return nil
+	}
+	if old != nil {
+		return old
+	}
+	defaultValue := false
+	return &defaultValue
+}
+
+func shouldTrackDataLoad(its *workloads.InstanceSet, old *bool, oldStatusExists bool, hasObservedReplicas bool) bool {
+	return its.Spec.LifecycleActions != nil &&
+		its.Spec.LifecycleActions.DataLoad != nil &&
+		(old != nil || (!oldStatusExists && hasObservedReplicas))
+}
+
+func shouldTrackMembership(its *workloads.InstanceSet, old *bool, oldStatusExists bool, hasObservedReplicas bool) bool {
+	return its.Spec.LifecycleActions != nil &&
+		(its.Spec.LifecycleActions.MemberJoin != nil || its.Spec.LifecycleActions.MemberLeave != nil) &&
+		(old != nil || !oldStatusExists || !hasObservedReplicas)
+}
+
+func initMemberJoinedStatus(its *workloads.InstanceSet, pod *corev1.Pod, old *bool, oldStatusExists bool, hasObservedReplicas bool) *bool {
+	if !shouldTrackMembership(its, old, oldStatusExists, hasObservedReplicas) {
+		return nil
+	}
+	if old != nil {
+		return old
+	}
+	defaultValue := !hasObservedReplicas
+	if !defaultValue && !oldStatusExists {
+		defaultValue = false
+	}
+	return &defaultValue
 }
 
 func syncInstanceConfigStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) error {

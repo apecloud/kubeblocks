@@ -240,20 +240,18 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 		return false, false, nil
 	}
 
-	replicas, err := component.GetReplicasStatusFunc(t.protoITS, func(status component.ReplicaStatus) bool {
-		return status.DataLoaded != nil && !*status.DataLoaded ||
-			status.MemberJoined != nil && !*status.MemberJoined
-	})
-	if err != nil {
-		return false, false, err
-	}
-	if len(replicas) == 0 {
-		return false, false, nil
+	for _, status := range t.runningITS.Status.InstanceStatus {
+		if status.DataLoaded != nil && !*status.DataLoaded {
+			return true, false, nil
+		}
+		if status.MemberJoined != nil && !*status.MemberJoined {
+			return true, false, nil
+		}
 	}
 
 	// TODO: scale-out failed
 
-	return true, false, nil
+	return false, false, nil
 }
 
 func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {

@@ -60,6 +60,7 @@ func (o SkipToReconcile) ApplyToObject(opts *ObjectOptions) {
 type ObjectTree struct {
 	// TODO(free6om): should find a better place to hold these two params?
 	context.Context
+	client.Reader
 	record.EventRecorder
 	logr.Logger
 
@@ -157,6 +158,7 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 	out.childrenOptions = childrenOptions
 	out.finalizer = t.finalizer
 	out.Context = t.Context
+	out.Reader = t.Reader
 	out.EventRecorder = t.EventRecorder
 	out.Logger = t.Logger
 	return out, nil

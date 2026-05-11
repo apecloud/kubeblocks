@@ -366,9 +366,6 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 		if err != nil {
 			return err
 		}
-		if err := inPlaceHelper.failIfAnotherActiveRebuildOwnsTarget(reqCtx, cli, opsRequest, sourcePVCName); err != nil {
-			return err
-		}
 		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, tmpPVC.Namespace)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -642,53 +639,6 @@ func (inPlaceHelper *inplaceRebuildHelper) failIfSourcePVCBoundToOtherActiveRebu
 	}
 	return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is already bound to pv "%s" restored by OpsRequest "%s"`,
 		sourcePVC.Name, sourcePV.Name, ownerName))
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) failIfAnotherActiveRebuildOwnsTarget(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRequest *opsv1alpha1.OpsRequest,
-	sourcePVCName string) error {
-	opsList := &opsv1alpha1.OpsRequestList{}
-	if err := cli.List(reqCtx.Ctx, opsList, client.InNamespace(opsRequest.Namespace)); err != nil {
-		return err
-	}
-	for i := range opsList.Items {
-		other := &opsList.Items[i]
-		if other.Name == opsRequest.Name ||
-			other.DeletionTimestamp != nil ||
-			other.Spec.Type != opsv1alpha1.RebuildInstanceType ||
-			other.Spec.ClusterName != opsRequest.Spec.ClusterName ||
-			other.IsComplete() ||
-			!rebuildOpsTargetsInstance(other, inPlaceHelper.synthesizedComp.Name, inPlaceHelper.targetPod.Name) {
-			continue
-		}
-		if rebuildOpsPrecedes(other, opsRequest) {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is already being rebuilt by OpsRequest "%s"`,
-				sourcePVCName, other.Name))
-		}
-	}
-	return nil
-}
-
-func rebuildOpsTargetsInstance(opsRequest *opsv1alpha1.OpsRequest, componentName, instanceName string) bool {
-	for _, rebuild := range opsRequest.Spec.RebuildFrom {
-		if rebuild.ComponentName != componentName {
-			continue
-		}
-		for _, instance := range rebuild.Instances {
-			if instance.Name == instanceName {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func rebuildOpsPrecedes(a, b *opsv1alpha1.OpsRequest) bool {
-	if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
-		return a.CreationTimestamp.Before(&b.CreationTimestamp)
-	}
-	return a.Name < b.Name
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) cleanupTmpPVC(reqCtx intctrlutil.RequestCtx,

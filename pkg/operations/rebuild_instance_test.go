@@ -481,37 +481,6 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(pv.Spec.ClaimRef.UID).Should(Equal(recreatedSourcePVC.UID))
 		})
 
-		It("rejects the later active rebuild for the same target instance", func() {
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			targetPodName := "rebuild-target-" + testCtx.GetRandomStr()
-			sourcePVCName := "data-" + targetPodName
-			newOps := func(name string) *opsv1alpha1.OpsRequest {
-				ops := testops.NewOpsRequestObj(name, testCtx.DefaultNamespace, clusterName, opsv1alpha1.RebuildInstanceType)
-				ops.Spec.RebuildFrom = []opsv1alpha1.RebuildInstance{
-					{
-						ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-						Instances: []opsv1alpha1.Instance{
-							{Name: targetPodName},
-						},
-						InPlace: true,
-					},
-				}
-				Expect(testCtx.CreateObj(ctx, ops)).Should(Succeed())
-				return ops
-			}
-			earlier := newOps("rebuild-a-" + testCtx.GetRandomStr())
-			later := newOps("rebuild-b-" + testCtx.GetRandomStr())
-			helper := &inplaceRebuildHelper{
-				targetPod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: targetPodName}},
-				synthesizedComp: &component.SynthesizedComponent{Name: defaultCompName},
-			}
-
-			Expect(helper.failIfAnotherActiveRebuildOwnsTarget(reqCtx, k8sClient, later, sourcePVCName)).
-				Should(MatchError(ContainSubstring(earlier.Name)))
-			Expect(helper.failIfAnotherActiveRebuildOwnsTarget(reqCtx, k8sClient, earlier, sourcePVCName)).
-				Should(Succeed())
-		})
-
 		It("sets volumeName on an unbound replacement source PVC", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			sourcePVC := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, "data-rebuild-unbound-"+testCtx.GetRandomStr(), clusterName, defaultCompName, testapps.DataVolumeName).

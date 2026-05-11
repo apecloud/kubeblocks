@@ -138,6 +138,102 @@ var _ = Describe("ComponentDrivenParameter re-enqueue contract", func() {
 			"Step 5 forward contract: ComponentParameter must be created within 15s after the matching ParametersDefinition becomes Available")
 	})
 
+	It("should reconcile Components affected by both sides of a ParametersDefinition pattern change", func() {
+		configmap := testparameters.NewComponentTemplateFactory(configSpecName, testCtx.DefaultNamespace).
+			AddLabels(
+				constant.AppNameLabelKey, clusterName,
+				constant.AppInstanceLabelKey, clusterName,
+				constant.KBAppComponentLabelKey, defaultCompName,
+				constant.CMConfigurationTemplateNameLabelKey, configSpecName,
+				constant.CMConfigurationConstraintsNameLabelKey, cmName,
+				constant.CMConfigurationSpecProviderLabelKey, configSpecName,
+				constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
+			).
+			AddAnnotations(constant.ConfigurationRevision, "1").
+			Create(&testCtx).
+			GetObject()
+
+		compDefA := testapps.NewComponentDefinitionFactory(compDefName).
+			WithRandomName().
+			SetDefaultSpec().
+			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName, true).
+			Create(&testCtx).
+			GetObject()
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefA), func(obj *appsv1.ComponentDefinition) {
+			obj.Status.Phase = appsv1.AvailablePhase
+		})()).Should(Succeed())
+
+		compDefB := testapps.NewComponentDefinitionFactory(compDefName).
+			WithRandomName().
+			SetDefaultSpec().
+			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName, true).
+			Create(&testCtx).
+			GetObject()
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefB), func(obj *appsv1.ComponentDefinition) {
+			obj.Status.Phase = appsv1.AvailablePhase
+		})()).Should(Succeed())
+
+		compNameA := defaultCompName
+		compNameB := defaultCompName + "-alt"
+		testapps.NewComponentFactory(testCtx.DefaultNamespace, constant.GenerateClusterComponentName(clusterName, compNameA), compDefA.Name).
+			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
+			AddLabels(constant.AppInstanceLabelKey, clusterName).
+			SetReplicas(1).
+			Create(&testCtx)
+		testapps.NewComponentFactory(testCtx.DefaultNamespace, constant.GenerateClusterComponentName(clusterName, compNameB), compDefB.Name).
+			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
+			AddLabels(constant.AppInstanceLabelKey, clusterName).
+			SetReplicas(1).
+			Create(&testCtx)
+
+		cfgKeyA := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      core.GenerateComponentConfigurationName(clusterName, compNameA),
+		}
+		cfgKeyB := client.ObjectKey{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      core.GenerateComponentConfigurationName(clusterName, compNameB),
+		}
+
+		paramsDef := testparameters.NewParametersDefinitionFactory(paramsDefName).
+			Schema(mockSchemaData()).
+			SetComponentDefinition(compDefA.Name).
+			SetTemplateName(configSpecName).
+			Create(&testCtx).
+			GetObject()
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(paramsDef), func(obj *parametersv1alpha1.ParametersDefinition) {
+			obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+		})()).Should(Succeed())
+
+		Eventually(func() error {
+			cp := &parametersv1alpha1.ComponentParameter{}
+			return testCtx.Cli.Get(testCtx.Ctx, cfgKeyA, cp)
+		}, 15*time.Second, 200*time.Millisecond).Should(Succeed(),
+			"setup: ComponentParameter for the original PD ComponentDef pattern should be created")
+		Consistently(func() bool {
+			cp := &parametersv1alpha1.ComponentParameter{}
+			err := testCtx.Cli.Get(testCtx.Ctx, cfgKeyB, cp)
+			return apierrors.IsNotFound(err)
+		}, 3*time.Second, 200*time.Millisecond).Should(BeTrue(),
+			"setup: ComponentParameter for the new PD ComponentDef pattern should not exist before the pattern changes")
+
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(paramsDef), func(obj *parametersv1alpha1.ParametersDefinition) {
+			obj.Spec.ComponentDef = compDefB.Name
+		})()).Should(Succeed())
+
+		Eventually(func() bool {
+			cp := &parametersv1alpha1.ComponentParameter{}
+			err := testCtx.Cli.Get(testCtx.Ctx, cfgKeyA, cp)
+			return apierrors.IsNotFound(err)
+		}, 15*time.Second, 200*time.Millisecond).Should(BeTrue(),
+			"the old ComponentDef pattern must be re-enqueued so stale ComponentParameter is deleted")
+		Eventually(func() error {
+			cp := &parametersv1alpha1.ComponentParameter{}
+			return testCtx.Cli.Get(testCtx.Ctx, cfgKeyB, cp)
+		}, 15*time.Second, 200*time.Millisecond).Should(Succeed(),
+			"the new ComponentDef pattern must be re-enqueued so ComponentParameter is created")
+	})
+
 	It("regression guard: a Component update event still re-enqueues reconcile to create ComponentParameter", func() {
 		// Step 1: configmap + ComponentDefinition (Available) + one config slot.
 		// As in the forward It, no PD yet.

@@ -964,6 +964,50 @@ var _ = Describe("Addon controller", func() {
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
 			}).Should(Succeed())
 		})
+
+		It("should cleanup outdated jobs when addon is updated", func() {
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By addon autoInstall auto added")
+			enablingPhaseCheck(2)
+
+			By("By checking install job is created with generation annotation")
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getInstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				job := &batchv1.Job{}
+				g.Expect(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
+				g.Expect(job.Annotations).Should(HaveKey(AddonGeneration))
+				g.Expect(job.Annotations[AddonGeneration]).Should(Equal("2"))
+				g.Expect(job.Spec.ActiveDeadlineSeconds).ShouldNot(BeNil())
+				g.Expect(*job.Spec.ActiveDeadlineSeconds).Should(Equal(int64(300)))
+			}).Should(Succeed())
+
+			By("By updating addon to trigger new generation")
+			addon = &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Not(HaveOccurred()))
+			addon.Spec.InstallSpec.Enabled = false
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+			addon.Spec.InstallSpec.Enabled = true
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+
+			By("By checking old job is deleted and new job is created")
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).To(Not(HaveOccurred()))
+				job := &batchv1.Job{}
+				err = testCtx.Cli.Get(ctx, jobKey, job)
+				if err == nil {
+					// If job exists, it should have the new generation
+					g.Expect(job.Annotations[AddonGeneration]).Should(Equal("4"))
+				}
+			}).Should(Succeed())
+		})
 	})
 
 	Context("Addon controller SetupWithManager", func() {

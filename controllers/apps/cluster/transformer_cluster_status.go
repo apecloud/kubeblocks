@@ -235,6 +235,8 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		return nil
 	}
 	if total == 0 && cluster.Spec.Restore != nil {
+		// TODO: if cluster-level restore later covers non-PVC resources such as
+		// system accounts, add a non-PVC restore signal before treating this as completed.
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    appsv1.ConditionTypeRestore,
 			Status:  metav1.ConditionTrue,

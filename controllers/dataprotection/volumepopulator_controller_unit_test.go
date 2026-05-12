@@ -66,7 +66,11 @@ func TestResolveSourceTargetPodNameRequiresExplicitMappingForInstanceTemplate(t 
 	require.Error(t, err)
 	require.Empty(t, sourcePodName)
 
-	pvc.Annotations[dptypes.SourceTargetPodNameAnnotationKey] = "source-mysql-tpl-b-1"
+	parameters, err := json.Marshal(map[string]string{
+		dptypes.SourceTargetPodNameAnnotationKey: "source-mysql-tpl-b-1",
+	})
+	require.NoError(t, err)
+	pvc.Annotations[constant.RestoreParametersAnnotationKey] = string(parameters)
 	sourcePodName, err = resolveSourceTargetPodName(target, pvc)
 	require.NoError(t, err)
 	require.Equal(t, "source-mysql-tpl-b-1", sourcePodName)

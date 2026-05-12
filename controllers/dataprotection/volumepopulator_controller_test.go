@@ -416,7 +416,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 					SetAnnotations(map[string]string{
 						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
 						constant.RestoreVolumeTemplateAnnotationKey:  testdp.DataVolumeName,
-						dptypes.SourceTargetPodNameAnnotationKey:     "source-mysql-tpl-b-1",
+						constant.RestoreParametersAnnotationKey:      fmt.Sprintf(`{"%s":"source-mysql-tpl-b-1"}`, dptypes.SourceTargetPodNameAnnotationKey),
 					}).
 					AddLabels(constant.KBAppPodNameLabelKey, "target-mysql-tpl-b-1").
 					AddLabels(constant.KBAppInstanceTemplateLabelKey, "tpl-b").

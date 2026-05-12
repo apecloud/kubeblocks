@@ -100,9 +100,6 @@ func (r *VolumePopulatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return intctrlutil.Reconciled()
 		} else if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
-		} else if r.ContainPopulatingCondition(pvc) {
-			// ignore the error if external controller handles it.
-			return intctrlutil.Reconciled()
 		}
 		return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
 	}
@@ -158,7 +155,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if backupNamespace == "" {
 		backupNamespace = pvc.Namespace
 	}
-	parameters, err := restoreParametersFromPVC(pvc)
+	parameters, err := restoreParametersMapFromPVC(pvc)
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
@@ -185,7 +182,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 				},
 				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
 			},
-			Parameters: parameters,
+			Parameters: restoreParametersToPairs(parameters),
 		},
 	}
 	if restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource == "" {
@@ -230,7 +227,11 @@ func (r *VolumePopulatorReconciler) resolveSourceTarget(reqCtx intctrlutil.Reque
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
 		return nil, err
 	}
-	if sourceTargetName := pvc.Annotations[dptypes.SourceTargetNameAnnotationKey]; sourceTargetName != "" {
+	parameters, err := restoreParametersMapFromPVC(pvc)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
+	if sourceTargetName := restoreParameterOrAnnotation(pvc, parameters, dptypes.SourceTargetNameAnnotationKey); sourceTargetName != "" {
 		target := utils.GetBackupStatusTarget(backup, sourceTargetName)
 		if target == nil {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup target %s does not exist for PVC %s/%s", sourceTargetName, pvc.Namespace, pvc.Name))
@@ -325,7 +326,11 @@ func requiredPolicyForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.Per
 }
 
 func resolveSourceTargetPodName(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) (string, error) {
-	if sourceTargetPodName := pvc.Annotations[dptypes.SourceTargetPodNameAnnotationKey]; sourceTargetPodName != "" {
+	parameters, err := restoreParametersMapFromPVC(pvc)
+	if err != nil {
+		return "", intctrlutil.NewFatalError(err.Error())
+	}
+	if sourceTargetPodName := restoreParameterOrAnnotation(pvc, parameters, dptypes.SourceTargetPodNameAnnotationKey); sourceTargetPodName != "" {
 		return sourceTargetPodName, nil
 	}
 	if len(target.SelectedTargetPods) == 1 {
@@ -425,7 +430,7 @@ func (r *VolumePopulatorReconciler) ensureInternalRestore(reqCtx intctrlutil.Req
 	return existing, nil
 }
 
-func restoreParametersFromPVC(pvc *corev1.PersistentVolumeClaim) ([]dpv1alpha1.ParameterPair, error) {
+func restoreParametersMapFromPVC(pvc *corev1.PersistentVolumeClaim) (map[string]string, error) {
 	parametersJSON := pvc.Annotations[constant.RestoreParametersAnnotationKey]
 	if parametersJSON == "" {
 		return nil, nil
@@ -434,11 +439,25 @@ func restoreParametersFromPVC(pvc *corev1.PersistentVolumeClaim) ([]dpv1alpha1.P
 	if err := json.Unmarshal([]byte(parametersJSON), &parameters); err != nil {
 		return nil, err
 	}
+	return parameters, nil
+}
+
+func restoreParametersToPairs(parameters map[string]string) []dpv1alpha1.ParameterPair {
+	if len(parameters) == 0 {
+		return nil
+	}
 	result := make([]dpv1alpha1.ParameterPair, 0, len(parameters))
 	for k, v := range parameters {
 		result = append(result, dpv1alpha1.ParameterPair{Name: k, Value: v})
 	}
-	return result, nil
+	return result
+}
+
+func restoreParameterOrAnnotation(pvc *corev1.PersistentVolumeClaim, parameters map[string]string, key string) string {
+	if value := parameters[key]; value != "" {
+		return value
+	}
+	return pvc.Annotations[key]
 }
 
 func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreMgr *dprestore.RestoreManager) error {

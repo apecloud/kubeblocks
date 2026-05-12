@@ -25,11 +25,13 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -184,7 +186,81 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 		return nil
 	}
 
-	return setAvailableCondition()
+	if err := setAvailableCondition(); err != nil {
+		return err
+	}
+	return t.setRestoreCondition(ctx, cli, cluster)
+}
+
+func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
+	if cluster.Spec.Restore == nil && meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore) == nil {
+		return nil
+	}
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(ctx, pvcList, client.InNamespace(cluster.Namespace), client.MatchingLabels(constant.GetClusterLabels(cluster.Name))); err != nil {
+		return err
+	}
+	total := 0
+	completed := 0
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		total++
+		cond := findPVCCondition(pvc, appsv1.ConditionTypeRestore)
+		if cond == nil {
+			continue
+		}
+		switch cond.Status {
+		case corev1.ConditionTrue:
+			completed++
+		case corev1.ConditionFalse:
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    appsv1.ConditionTypeRestore,
+				Status:  metav1.ConditionFalse,
+				Reason:  ReasonRestoreFailed,
+				Message: fmt.Sprintf("PVC %s restore failed: %s", pvc.Name, cond.Message),
+			})
+			return nil
+		}
+	}
+	if total > 0 && total == completed {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionTrue,
+			Reason:  ReasonRestoreCompleted,
+			Message: "All initial restore PVCs have completed",
+		})
+		return nil
+	}
+	if total == 0 && cluster.Spec.Restore != nil {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionTrue,
+			Reason:  ReasonRestoreCompleted,
+			Message: "No restore PVCs are required",
+		})
+		return nil
+	}
+	if cluster.Spec.Restore != nil {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionUnknown,
+			Reason:  ReasonRestoreRunning,
+			Message: "Waiting for initial restore PVCs to complete",
+		})
+	}
+	return nil
+}
+
+func findPVCCondition(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {
+	for i := range pvc.Status.Conditions {
+		if string(pvc.Status.Conditions[i].Type) == conditionType {
+			return &pvc.Status.Conditions[i]
+		}
+	}
+	return nil
 }
 
 func (t *clusterStatusTransformer) shardingToCompStatus(shardingStatus map[string]appsv1.ClusterShardingStatus) map[string]appsv1.ClusterComponentStatus {

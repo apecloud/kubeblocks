@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -79,8 +80,6 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterRestoreSignature, true, inNS)
-
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
@@ -1066,25 +1065,31 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		It("delays backup job when DP restore session is in progress", func() {
-			By("creating an in-progress ClusterRestore")
-			clusterRestore := &dpv1alpha1.ClusterRestore{
+		It("delays backup job when Backup dataSource PVC restore is in progress", func() {
+			By("creating an in-progress Backup dataSource PVC")
+			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "restore-session",
+					Name:      "restore-pvc",
 					Namespace: testCtx.DefaultNamespace,
+					Annotations: map[string]string{
+						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+					},
 				},
-				Spec: dpv1alpha1.ClusterRestoreSpec{
-					TargetClusterName: clusterInfo.Cluster.Name,
-					BackupRef: dpv1alpha1.ClusterRestoreBackupRef{
-						Name:      testdp.BackupName,
-						Namespace: testCtx.DefaultNamespace,
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: pointer.String(dptypes.DataprotectionAPIGroup),
+						Kind:     dptypes.BackupKind,
+						Name:     testdp.BackupName,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, clusterRestore)).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterRestore), func(restore *dpv1alpha1.ClusterRestore) {
-				restore.Status.Phase = dpv1alpha1.ClusterRestorePhaseRestoring
-			})).Should(Succeed())
+			Expect(k8sClient.Create(ctx, pvc)).Should(Succeed())
 
 			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 			backup := testdp.NewFakeBackup(&testCtx, nil)
@@ -1101,9 +1106,13 @@ var _ = Describe("Backup Controller test", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
 
-			By("mark ClusterRestore completed")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterRestore), func(restore *dpv1alpha1.ClusterRestore) {
-				restore.Status.Phase = dpv1alpha1.ClusterRestorePhaseCompleted
+			By("mark PVC restore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+					Type:   corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore),
+					Status: corev1.ConditionTrue,
+					Reason: ReasonPopulatingSucceed,
+				}}
 			})).Should(Succeed())
 
 			By("check job is created")

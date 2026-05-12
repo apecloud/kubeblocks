@@ -694,27 +694,46 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if backup.Annotations[dptypes.SkipRestorationCheckAnnotationKey] == trueVal {
 		return false, nil
 	}
-	clusterRestores := &dpv1alpha1.ClusterRestoreList{}
-	if err := r.Client.List(reqCtx.Ctx, clusterRestores); err != nil {
+	pvcs := &corev1.PersistentVolumeClaimList{}
+	if err := r.Client.List(reqCtx.Ctx, pvcs); err != nil {
 		return false, err
 	}
-	for i := range clusterRestores.Items {
-		clusterRestore := &clusterRestores.Items[i]
-		backupNamespace := clusterRestore.Spec.BackupRef.Namespace
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+		ref := pvc.Spec.DataSourceRef
+		if ref == nil {
+			continue
+		}
+		apiGroup := ""
+		if ref.APIGroup != nil {
+			apiGroup = *ref.APIGroup
+		}
+		if apiGroup != dptypes.DataprotectionAPIGroup || ref.Kind != dptypes.BackupKind || ref.Name != backup.Name {
+			continue
+		}
+		backupNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
 		if backupNamespace == "" {
-			backupNamespace = clusterRestore.Namespace
+			backupNamespace = pvc.Namespace
 		}
-		if clusterRestore.Spec.BackupRef.Name != backup.Name || backupNamespace != backup.Namespace {
+		if backupNamespace != backup.Namespace {
 			continue
 		}
-		switch clusterRestore.Status.Phase {
-		case dpv1alpha1.ClusterRestorePhaseCompleted, dpv1alpha1.ClusterRestorePhaseFailed:
+		cond := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+		if cond != nil && (cond.Status == corev1.ConditionTrue || cond.Status == corev1.ConditionFalse) {
 			continue
-		default:
-			return true, nil
 		}
+		return true, nil
 	}
 	return false, nil
+}
+
+func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {
+	for i := range pvc.Status.Conditions {
+		if string(pvc.Status.Conditions[i].Type) == conditionType {
+			return &pvc.Status.Conditions[i]
+		}
+	}
+	return nil
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

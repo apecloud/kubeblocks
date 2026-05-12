@@ -20,10 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +38,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	"github.com/apecloud/kubeblocks/pkg/operations/util"
 )
 
 type RestoreOpsHandler struct{}
@@ -59,28 +64,35 @@ func (r RestoreOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 
 // Action implements the restore action.
 func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	var cluster *appsv1.Cluster
+	var err error
+
 	opsRequest := opsRes.OpsRequest
 
-	clusterRestore, err := r.buildClusterRestore(reqCtx, cli, opsRequest)
-	if err != nil {
+	if cluster, err = r.restoreClusterFromBackup(reqCtx, cli, opsRequest); err != nil {
 		return err
 	}
-	if err = intctrlutil.SetControllerReference(opsRequest, clusterRestore); err != nil {
-		return err
-	}
+	markRestoreClusterWithOps(cluster, opsRequest)
 
-	if err = cli.Create(reqCtx.Ctx, clusterRestore); apierrors.IsAlreadyExists(err) {
-		existing := &dpv1alpha1.ClusterRestore{}
-		if getErr := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(clusterRestore), existing); getErr != nil {
+	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		existing := &appsv1.Cluster{}
+		if getErr := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cluster), existing); getErr != nil {
 			return getErr
 		}
-		if !isClusterRestoreOwnedByOpsRequest(existing, opsRequest) {
-			return intctrlutil.NewFatalError(fmt.Sprintf("cluster restore %s/%s already exists and is not owned by OpsRequest %s/%s", clusterRestore.Namespace, clusterRestore.Name, opsRequest.Namespace, opsRequest.Name))
+		if err = validateRestoreClusterForOps(existing, cluster, opsRequest); err != nil {
+			return err
 		}
-	} else if err != nil {
-		return err
+		cluster = existing
 	}
+	opsRes.Cluster = cluster
 
+	return patchRestoreOpsRequestLabels(reqCtx, cli, opsRequest)
+}
+
+func patchRestoreOpsRequestLabels(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *opsv1alpha1.OpsRequest) error {
 	// add labels of clusterRef and type to OpsRequest
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Labels == nil {
@@ -88,58 +100,58 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
-	if err = cli.Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-		return err
+	return cli.Patch(reqCtx.Ctx, opsRequest, patch)
+}
+
+func markRestoreClusterWithOps(cluster *appsv1.Cluster, opsRequest *opsv1alpha1.OpsRequest) {
+	if cluster.Labels == nil {
+		cluster.Labels = map[string]string{}
+	}
+	cluster.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
+	cluster.Labels[constant.OpsRequestNameLabelKey] = opsRequest.Name
+	cluster.Labels[constant.OpsRequestNamespaceLabelKey] = opsRequest.Namespace
+	cluster.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
+}
+
+func validateRestoreClusterForOps(existing, desired *appsv1.Cluster, opsRequest *opsv1alpha1.OpsRequest) error {
+	if existing.Labels[constant.OpsRequestNameLabelKey] != opsRequest.Name ||
+		existing.Labels[constant.OpsRequestNamespaceLabelKey] != opsRequest.Namespace ||
+		existing.Labels[constant.OpsRequestTypeLabelKey] != string(opsRequest.Spec.Type) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("target cluster %s/%s already exists and is not owned by OpsRequest %s/%s", existing.Namespace, existing.Name, opsRequest.Namespace, opsRequest.Name))
+	}
+	if !reflect.DeepEqual(existing.Spec.Restore, desired.Spec.Restore) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("target cluster %s/%s restore intent does not match OpsRequest %s/%s", existing.Namespace, existing.Name, opsRequest.Namespace, opsRequest.Name))
 	}
 	return nil
 }
 
 // ReconcileAction implements the restore action.
-// It waits for ClusterRestore completion before checking the target Cluster phase.
+// It waits for the Cluster restore condition before checking the target Cluster phase.
 func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	opsRequest := opsRes.OpsRequest
-	clusterRestore := &dpv1alpha1.ClusterRestore{}
+	cluster := &appsv1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: opsRequest.Namespace,
-		Name:      clusterRestoreName(opsRequest),
-	}, clusterRestore); err != nil {
+		Name:      opsRequest.Spec.GetClusterName(),
+	}, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
-			return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("cluster restore %s not found", clusterRestoreName(opsRequest))
-		}
-		return opsv1alpha1.OpsFailedPhase, 0, err
-	}
-
-	switch clusterRestore.Status.Phase {
-	case dpv1alpha1.ClusterRestorePhaseFailed:
-		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("cluster restore %s failed", clusterRestore.Name)
-	case dpv1alpha1.ClusterRestorePhaseCompleted:
-	default:
-		return opsv1alpha1.OpsRunningPhase, 0, nil
-	}
-
-	targetClusterKey := client.ObjectKey{
-		Namespace: clusterRestore.Namespace,
-		Name:      clusterRestore.Spec.TargetClusterName,
-	}
-	if clusterRestore.Status.TargetClusterRef != nil {
-		if clusterRestore.Status.TargetClusterRef.Namespace != "" {
-			targetClusterKey.Namespace = clusterRestore.Status.TargetClusterRef.Namespace
-		}
-		if clusterRestore.Status.TargetClusterRef.Name != "" {
-			targetClusterKey.Name = clusterRestore.Status.TargetClusterRef.Name
-		}
-	}
-
-	cluster := &appsv1.Cluster{}
-	if err := cli.Get(reqCtx.Ctx, targetClusterKey, cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			return opsv1alpha1.OpsRunningPhase, 0, nil
+			if opsRes.Cluster != nil {
+				_ = PatchClusterNotFound(reqCtx.Ctx, cli, opsRes)
+			}
 		}
 		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
 	opsRes.Cluster = cluster
+
 	if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
+	}
+	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	if restoreCond == nil || restoreCond.Status == metav1.ConditionUnknown {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	if restoreCond.Status == metav1.ConditionFalse {
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: %s", restoreCond.Message)
 	}
 	if cluster.Status.Phase != appsv1.RunningClusterPhase {
 		return opsv1alpha1.OpsRunningPhase, 0, nil
@@ -152,7 +164,7 @@ func (r RestoreOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r RestoreOpsHandler) buildClusterRestore(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *opsv1alpha1.OpsRequest) (*dpv1alpha1.ClusterRestore, error) {
+func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *opsv1alpha1.OpsRequest) (*appsv1.Cluster, error) {
 	restoreSpec := opsRequest.Spec.GetRestore()
 	if restoreSpec == nil {
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
@@ -189,42 +201,146 @@ func (r RestoreOpsHandler) buildClusterRestore(reqCtx intctrlutil.RequestCtx, cl
 		restoreSpec.RestorePointInTime = restoreTimeStr
 	}
 
-	return &dpv1alpha1.ClusterRestore{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterRestoreName(opsRequest),
-			Namespace: opsRequest.Namespace,
-			Labels: map[string]string{
-				constant.AppInstanceLabelKey:    opsRequest.Spec.GetClusterName(),
-				constant.OpsRequestTypeLabelKey: string(opsRequest.Spec.Type),
-			},
+	clusterObj, err := r.getClusterObjFromBackup(backup, opsRequest)
+	if err != nil {
+		return nil, err
+	}
+	opsRequestSlice := []opsv1alpha1.OpsRecorder{
+		{
+			Name: opsRequest.Name,
+			Type: opsRequest.Spec.Type,
 		},
-		Spec: dpv1alpha1.ClusterRestoreSpec{
-			TargetClusterName: opsRequest.Spec.GetClusterName(),
-			BackupRef: dpv1alpha1.ClusterRestoreBackupRef{
-				Name:      backupName,
-				Namespace: backupNamespace,
-			},
-			RestoreTime:                       restoreSpec.RestorePointInTime,
-			VolumeRestorePolicy:               dpv1alpha1.VolumeClaimRestorePolicy(restoreSpec.VolumeRestorePolicy),
-			DeferPostReadyUntilClusterRunning: restoreSpec.DeferPostReadyUntilClusterRunning,
-			Env:                               restoreSpec.Env,
-			Parameters:                        restoreSpec.Parameters,
-		},
-	}, nil
+	}
+	util.SetOpsRequestToCluster(clusterObj, opsRequestSlice)
+	return clusterObj, nil
 }
 
-func clusterRestoreName(opsRequest *opsv1alpha1.OpsRequest) string {
-	return opsRequest.Name
+func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, opsRequest *opsv1alpha1.OpsRequest) (*appsv1.Cluster, error) {
+	cluster := &appsv1.Cluster{}
+	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
+	if !ok {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("missing snapshot annotation in backup %s, %s is empty in Annotations", backup.Name, constant.ClusterSnapshotAnnotationKey))
+	}
+	if err := json.Unmarshal([]byte(clusterString), &cluster); err != nil {
+		return nil, err
+	}
+	restoreSpec := opsRequest.Spec.GetRestore()
+	cluster.Name = opsRequest.Spec.GetClusterName()
+	cluster.Namespace = opsRequest.Namespace
+	cluster.Spec.Restore = &appsv1.ClusterRestore{
+		Source: appsv1.ClusterRestoreSource{
+			APIGroup:  dptypes.DataprotectionAPIGroup,
+			Kind:      dptypes.BackupKind,
+			Name:      restoreSpec.BackupName,
+			Namespace: restoreSpec.BackupNamespace,
+		},
+		Parameters: restoreParametersToMap(restoreSpec.Parameters),
+	}
+	if cluster.Spec.Restore.Source.Namespace == "" {
+		cluster.Spec.Restore.Source.Namespace = opsRequest.Namespace
+	}
+	if restoreSpec.RestorePointInTime != "" {
+		cluster.Spec.Restore.PITR = restoreSpec.RestorePointInTime
+	}
+
+	var services []appsv1.ClusterService
+	for i := range cluster.Spec.Services {
+		svc := cluster.Spec.Services[i]
+		if svc.Service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			continue
+		}
+		if svc.Service.Spec.Type == corev1.ServiceTypeNodePort {
+			for j := range svc.Spec.Ports {
+				svc.Spec.Ports[j].NodePort = 0
+			}
+		}
+		if svc.Service.Spec.Selector != nil {
+			delete(svc.Service.Spec.Selector, constant.AppInstanceLabelKey)
+		}
+		services = append(services, svc)
+	}
+	cluster.Spec.Services = services
+	for i := range cluster.Spec.ComponentSpecs {
+		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
+		cluster.Spec.ComponentSpecs[i].TLS = false
+		cluster.Spec.ComponentSpecs[i].Issuer = nil
+	}
+	r.rebuildShardAccountSecrets(cluster)
+	r.normalizeSchedulePolicy(cluster, cluster.Spec.SchedulingPolicy)
+	for i := range cluster.Spec.ComponentSpecs {
+		r.normalizeSchedulePolicy(cluster, cluster.Spec.ComponentSpecs[i].SchedulingPolicy)
+	}
+	for i := range cluster.Spec.Shardings {
+		r.normalizeSchedulePolicy(cluster, cluster.Spec.Shardings[i].Template.SchedulingPolicy)
+	}
+	return cluster, nil
 }
 
-func isClusterRestoreOwnedByOpsRequest(clusterRestore *dpv1alpha1.ClusterRestore, opsRequest *opsv1alpha1.OpsRequest) bool {
-	for _, ref := range clusterRestore.OwnerReferences {
-		if ref.UID == opsRequest.UID &&
-			ref.Name == opsRequest.Name &&
-			ref.Kind == "OpsRequest" &&
-			ref.APIVersion == opsv1alpha1.GroupVersion.String() {
-			return true
+func restoreParametersToMap(parameters []dpv1alpha1.ParameterPair) map[string]string {
+	if len(parameters) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(parameters))
+	for _, parameter := range parameters {
+		result[parameter.Name] = parameter.Value
+	}
+	return result
+}
+
+func (r RestoreOpsHandler) normalizeSchedulePolicy(cluster *appsv1.Cluster, schedulePolicy *appsv1.SchedulingPolicy) {
+	if schedulePolicy == nil {
+		return
+	}
+	updateLabelSelector := func(selector *metav1.LabelSelector) {
+		if selector == nil {
+			return
+		}
+		if _, ok := selector.MatchLabels[constant.AppInstanceLabelKey]; ok {
+			selector.MatchLabels[constant.AppInstanceLabelKey] = cluster.Name
+		}
+		for i := range selector.MatchExpressions {
+			matchExpression := &selector.MatchExpressions[i]
+			if matchExpression.Key == constant.AppInstanceLabelKey {
+				matchExpression.Values = []string{cluster.Name}
+			}
 		}
 	}
-	return false
+	for i := range schedulePolicy.TopologySpreadConstraints {
+		updateLabelSelector(schedulePolicy.TopologySpreadConstraints[i].LabelSelector)
+	}
+	if schedulePolicy.Affinity == nil {
+		return
+	}
+	updatePodAffinityTerm := func(pats []corev1.PodAffinityTerm, wpats []corev1.WeightedPodAffinityTerm) {
+		for i := range pats {
+			podAffinityTerm := &pats[i]
+			updateLabelSelector(podAffinityTerm.LabelSelector)
+		}
+		for i := range wpats {
+			wpat := &wpats[i]
+			updateLabelSelector(wpat.PodAffinityTerm.LabelSelector)
+		}
+	}
+	if schedulePolicy.Affinity.PodAntiAffinity != nil {
+		updatePodAffinityTerm(schedulePolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			schedulePolicy.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+	if schedulePolicy.Affinity.PodAffinity != nil {
+		updatePodAffinityTerm(schedulePolicy.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			schedulePolicy.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+}
+
+func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {
+	if len(cluster.Spec.Shardings) == 0 {
+		return
+	}
+	for i := range cluster.Spec.Shardings {
+		shardingSpec := &cluster.Spec.Shardings[i]
+		template := &shardingSpec.Template
+		for j := range template.SystemAccounts {
+			account := &template.SystemAccounts[j]
+			account.SecretRef = nil
+		}
+	}
 }

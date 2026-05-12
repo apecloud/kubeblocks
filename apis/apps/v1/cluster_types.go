@@ -196,6 +196,11 @@ type ClusterSpec struct {
 	//
 	// +optional
 	Backup *ClusterBackup `json:"backup,omitempty"`
+
+	// Specifies the restore configuration of the Cluster.
+	//
+	// +optional
+	Restore *ClusterRestore `json:"restore,omitempty"`
 }
 
 // ClusterStatus defines the observed state of the Cluster.
@@ -865,6 +870,47 @@ type ClusterBackup struct {
 	//
 	// +optional
 	IncrementalCronExpression string `json:"incrementalCronExpression,omitempty"`
+}
+
+// ClusterRestore specifies how to initialize a Cluster from a restore source.
+type ClusterRestore struct {
+	// Specifies the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Source ClusterRestoreSource `json:"source"`
+
+	// Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.
+	//
+	// +optional
+	PITR string `json:"pitr,omitempty"`
+
+	// Specifies runtime-specific restore parameters.
+	//
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// ClusterRestoreSource describes the source object used by a Cluster restore.
+type ClusterRestoreSource struct {
+	// Specifies the API group of the restore source.
+	//
+	// +optional
+	APIGroup string `json:"apiGroup,omitempty"`
+
+	// Specifies the kind of the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Kind string `json:"kind"`
+
+	// Specifies the name of the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the namespace of the restore source. If empty, the Cluster namespace is used.
+	//
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // ClusterPhase defines the phase of the Cluster within the .status.phase field.

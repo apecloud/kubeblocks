@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -30,7 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -63,6 +68,8 @@ var _ = Describe("Volume Populator Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS)
 
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
@@ -111,18 +118,16 @@ var _ = Describe("Volume Populator Controller test", func() {
 			By("create backup")
 			backup := mockBackupForRestore(actionSet.Name, "", "", mockBackupCompleted, useVolumeSnapshotBackup, "")
 
-			By("create restore ")
-			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
-				SetBackup(backup.Name, testCtx.DefaultNamespace).
-				SetDataSourceRef(testdp.DataVolumeName, testdp.DataVolumeMountPath).
-				Create(&testCtx).GetObject()
-
-			By("create PVC and set spec.dataSourceRef to restore")
+			By("create PVC and set spec.dataSourceRef to backup")
 			pvc := testapps.NewPersistentVolumeClaimFactory(
 				testCtx.DefaultNamespace, pvcName, testdp.ClusterName, testdp.ComponentName, testdp.DataVolumeName).
+				SetAnnotations(map[string]string{
+					constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+					constant.RestoreVolumeTemplateAnnotationKey:  testdp.DataVolumeName,
+				}).
 				SetStorage(storageSize).
 				SetStorageClass(testdp.StorageClassName).
-				SetDataSourceRef(dptypes.DataprotectionAPIGroup, dptypes.RestoreKind, restore.Name).
+				SetDataSourceRef(dptypes.DataprotectionAPIGroup, dptypes.BackupKind, backup.Name).
 				Create(&testCtx).GetObject()
 			return pvc
 		}
@@ -166,6 +171,24 @@ var _ = Describe("Volume Populator Controller test", func() {
 			}
 		}
 
+		findPVCCondition := func(pvc *corev1.PersistentVolumeClaim, conditionType corev1.PersistentVolumeClaimConditionType) *corev1.PersistentVolumeClaimCondition {
+			for i := range pvc.Status.Conditions {
+				if pvc.Status.Conditions[i].Type == conditionType {
+					return &pvc.Status.Conditions[i]
+				}
+			}
+			return nil
+		}
+
+		findRestoreCondition := func(restore *dpv1alpha1.Restore, conditionType string) *metav1.Condition {
+			for i := range restore.Status.Conditions {
+				if restore.Status.Conditions[i].Type == conditionType {
+					return &restore.Status.Conditions[i]
+				}
+			}
+			return nil
+		}
+
 		testVolumePopulate := func(volumeBinding storagev1.VolumeBindingMode, useVolumeSnapshotBackup bool) {
 			pvc := initResources(volumeBinding, useVolumeSnapshotBackup, true)
 
@@ -185,8 +208,12 @@ var _ = Describe("Volume Populator Controller test", func() {
 				claim.Annotations[AnnSelectedNode] = "test-node"
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
-				g.Expect(len(tmpPVC.Status.Conditions)).Should(Equal(1))
-				g.Expect(tmpPVC.Status.Conditions[0].Type).Should(Equal(PersistentVolumeClaimPopulating))
+				populatingCondition := findPVCCondition(tmpPVC, PersistentVolumeClaimPopulating)
+				g.Expect(populatingCondition).ShouldNot(BeNil())
+				g.Expect(populatingCondition.Reason).Should(Equal(ReasonPopulatingProcessing))
+				restoreCondition := findPVCCondition(tmpPVC, corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore))
+				g.Expect(restoreCondition).ShouldNot(BeNil())
+				g.Expect(restoreCondition.Status).Should(Equal(corev1.ConditionUnknown))
 			})).Should(Succeed())
 
 			By("expect for populate pvc created")
@@ -194,6 +221,13 @@ var _ = Describe("Volume Populator Controller test", func() {
 			populatePVC := &corev1.PersistentVolumeClaim{}
 			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
 				Name: populatePVCName}, populatePVC, true))
+			Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
+				Name: populatePVCName}, func(g Gomega, restore *dpv1alpha1.Restore) {
+				g.Expect(restore.Spec.Backup.Name).Should(Equal(pvc.Spec.DataSourceRef.Name))
+				g.Expect(restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource).Should(Equal(testdp.DataVolumeName))
+				g.Expect(restore.OwnerReferences).ShouldNot(BeEmpty())
+				g.Expect(restore.OwnerReferences[0].UID).Should(Equal(pvc.UID))
+			})).Should(Succeed())
 
 			By("expect for job created")
 			Eventually(testapps.List(&testCtx, generics.JobSignature,
@@ -213,7 +247,18 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			By("expect for pvc has been populated")
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
-				g.Expect(tmpPVC.Status.Conditions[0].Reason).Should(Equal(ReasonPopulatingSucceed))
+				populatingCondition := findPVCCondition(tmpPVC, PersistentVolumeClaimPopulating)
+				g.Expect(populatingCondition).ShouldNot(BeNil())
+				g.Expect(populatingCondition.Reason).Should(Equal(ReasonPopulatingSucceed))
+				restoreCondition := findPVCCondition(tmpPVC, corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore))
+				g.Expect(restoreCondition).ShouldNot(BeNil())
+				g.Expect(restoreCondition.Status).Should(Equal(corev1.ConditionTrue))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
+				Name: populatePVCName}, func(g Gomega, restore *dpv1alpha1.Restore) {
+				condition := findRestoreCondition(restore, dprestore.ConditionTypeRestorePreparedData)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pv), func(g Gomega, tmpPV *corev1.PersistentVolume) {
@@ -247,11 +292,214 @@ var _ = Describe("Volume Populator Controller test", func() {
 				testVolumePopulate(storagev1.VolumeBindingWaitForFirstConsumer, true)
 			})
 
+			It("infers source target from PVC labels for multi-target backups", func() {
+				createStorageClass(storagev1.VolumeBindingImmediate)
+				backup := mockBackupForRestore(actionSet.Name, "", "", true, false, "")
+				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+					backup.Status.Target = nil
+					backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{
+						{
+							BackupTarget: dpv1alpha1.BackupTarget{
+								Name: "other",
+								PodSelector: &dpv1alpha1.PodSelector{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											constant.AppInstanceLabelKey:    "source-cluster",
+											constant.KBAppComponentLabelKey: "other",
+										},
+									},
+									Strategy: dpv1alpha1.PodSelectionStrategyAny,
+								},
+							},
+						},
+						{
+							BackupTarget: dpv1alpha1.BackupTarget{
+								Name: "mysql",
+								PodSelector: &dpv1alpha1.PodSelector{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											constant.AppInstanceLabelKey:    "source-cluster",
+											constant.KBAppComponentLabelKey: testdp.ComponentName,
+										},
+									},
+									Strategy: dpv1alpha1.PodSelectionStrategyAny,
+								},
+							},
+						},
+					}
+				})).Should(Succeed())
+
+				pvc := testapps.NewPersistentVolumeClaimFactory(
+					testCtx.DefaultNamespace, pvcName, testdp.ClusterName, testdp.ComponentName, testdp.DataVolumeName).
+					SetAnnotations(map[string]string{
+						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+						constant.RestoreVolumeTemplateAnnotationKey:  testdp.DataVolumeName,
+					}).
+					SetStorage(storageSize).
+					SetStorageClass(testdp.StorageClassName).
+					SetDataSourceRef(dptypes.DataprotectionAPIGroup, dptypes.BackupKind, backup.Name).
+					Create(&testCtx).GetObject()
+
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
+					Name: getPopulatePVCName(pvc.UID)}, func(g Gomega, restore *dpv1alpha1.Restore) {
+					g.Expect(restore.Spec.Backup.SourceTargetName).Should(Equal("mysql"))
+				})).Should(Succeed())
+			})
+
+			It("infers source target pod for all-pod target backups", func() {
+				createStorageClass(storagev1.VolumeBindingImmediate)
+				backup := mockBackupForRestore(actionSet.Name, "", "", true, false, "")
+				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+					backup.Status.Target = nil
+					backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{{
+						BackupTarget: dpv1alpha1.BackupTarget{
+							Name: "mysql",
+							PodSelector: &dpv1alpha1.PodSelector{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										constant.KBAppComponentLabelKey: testdp.ComponentName,
+									},
+								},
+								Strategy: dpv1alpha1.PodSelectionStrategyAll,
+							},
+						},
+						SelectedTargetPods: []string{"source-mysql-0", "source-mysql-1"},
+					}}
+				})).Should(Succeed())
+
+				pvc := testapps.NewPersistentVolumeClaimFactory(
+					testCtx.DefaultNamespace, pvcName, testdp.ClusterName, testdp.ComponentName, testdp.DataVolumeName).
+					SetAnnotations(map[string]string{
+						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+						constant.RestoreVolumeTemplateAnnotationKey:  testdp.DataVolumeName,
+					}).
+					AddLabels(constant.KBAppPodNameLabelKey, "target-mysql-1").
+					SetStorage(storageSize).
+					SetStorageClass(testdp.StorageClassName).
+					SetDataSourceRef(dptypes.DataprotectionAPIGroup, dptypes.BackupKind, backup.Name).
+					Create(&testCtx).GetObject()
+
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
+					Name: getPopulatePVCName(pvc.UID)}, func(g Gomega, restore *dpv1alpha1.Restore) {
+					requiredPolicy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+					g.Expect(restore.Spec.Backup.SourceTargetName).Should(Equal("mysql"))
+					g.Expect(requiredPolicy).ShouldNot(BeNil())
+					g.Expect(requiredPolicy.DataRestorePolicy).Should(Equal(dpv1alpha1.OneToManyRestorePolicy))
+					g.Expect(requiredPolicy.SourceOfOneToMany).ShouldNot(BeNil())
+					g.Expect(requiredPolicy.SourceOfOneToMany.TargetPodName).Should(Equal("source-mysql-1"))
+				})).Should(Succeed())
+			})
+
+			It("uses explicit source target pod annotation when instance template ordinals overlap", func() {
+				createStorageClass(storagev1.VolumeBindingImmediate)
+				backup := mockBackupForRestore(actionSet.Name, "", "", true, false, "")
+				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+					backup.Status.Target = nil
+					backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{{
+						BackupTarget: dpv1alpha1.BackupTarget{
+							Name: "mysql",
+							PodSelector: &dpv1alpha1.PodSelector{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										constant.KBAppComponentLabelKey: testdp.ComponentName,
+									},
+								},
+								Strategy: dpv1alpha1.PodSelectionStrategyAll,
+							},
+						},
+						SelectedTargetPods: []string{"source-mysql-tpl-a-1", "source-mysql-tpl-b-1"},
+					}}
+				})).Should(Succeed())
+
+				pvc := testapps.NewPersistentVolumeClaimFactory(
+					testCtx.DefaultNamespace, pvcName, testdp.ClusterName, testdp.ComponentName, testdp.DataVolumeName).
+					SetAnnotations(map[string]string{
+						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+						constant.RestoreVolumeTemplateAnnotationKey:  testdp.DataVolumeName,
+						dptypes.SourceTargetPodNameAnnotationKey:     "source-mysql-tpl-b-1",
+					}).
+					AddLabels(constant.KBAppPodNameLabelKey, "target-mysql-tpl-b-1").
+					AddLabels(constant.KBAppInstanceTemplateLabelKey, "tpl-b").
+					SetStorage(storageSize).
+					SetStorageClass(testdp.StorageClassName).
+					SetDataSourceRef(dptypes.DataprotectionAPIGroup, dptypes.BackupKind, backup.Name).
+					Create(&testCtx).GetObject()
+
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
+					Name: getPopulatePVCName(pvc.UID)}, func(g Gomega, restore *dpv1alpha1.Restore) {
+					requiredPolicy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+					g.Expect(requiredPolicy).ShouldNot(BeNil())
+					g.Expect(requiredPolicy.SourceOfOneToMany).ShouldNot(BeNil())
+					g.Expect(requiredPolicy.SourceOfOneToMany.TargetPodName).Should(Equal("source-mysql-tpl-b-1"))
+				})).Should(Succeed())
+			})
+
+			It("restores system account secrets before volume population", func() {
+				pvc := initResources(storagev1.VolumeBindingWaitForFirstConsumer, false, true)
+				Expect(testCtx.CreateObj(testCtx.Ctx, &kbappsv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      testdp.ClusterName,
+					},
+					Spec: kbappsv1.ClusterSpec{
+						TerminationPolicy: kbappsv1.Delete,
+					},
+				})).Should(Succeed())
+				Expect(testCtx.CreateObj(testCtx.Ctx, &kbappsv1.Component{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      constant.GenerateClusterComponentName(testdp.ClusterName, testdp.ComponentName),
+					},
+					Spec: kbappsv1.ComponentSpec{
+						TerminationPolicy: kbappsv1.Delete,
+						CompDef:           testdp.ComponentName,
+						Replicas:          1,
+					},
+				})).Should(Succeed())
+				pvcKey := client.ObjectKeyFromObject(pvc)
+				backupKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: pvc.Spec.DataSourceRef.Name}
+				encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+				encryptedPassword, err := encryptor.Encrypt([]byte("restored-password"))
+				Expect(err).ShouldNot(HaveOccurred())
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(backup *dpv1alpha1.Backup) {
+					if backup.Annotations == nil {
+						backup.Annotations = map[string]string{}
+					}
+					backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] = fmt.Sprintf(`{"%s":{"admin":"%s"}}`, testdp.ComponentName, encryptedPassword)
+				})).Should(Succeed())
+
+				Expect(testapps.ChangeObj(&testCtx, pvc, func(claim *corev1.PersistentVolumeClaim) {
+					if claim.Annotations == nil {
+						claim.Annotations = map[string]string{}
+					}
+					claim.Annotations[AnnSelectedNode] = "test-node"
+				})).Should(Succeed())
+
+				secretKey := types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      constant.GenerateAccountSecretName(testdp.ClusterName, testdp.ComponentName, "admin"),
+				}
+				Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
+					g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+					g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("restored-password")))
+					g.Expect(secret.Annotations).Should(HaveKeyWithValue(constant.SystemAccountProvisionedAnnotationKey, "true"))
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+					restoreCondition := findPVCCondition(tmpPVC, corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore))
+					g.Expect(restoreCondition).ShouldNot(BeNil())
+					g.Expect(restoreCondition.Status).Should(Equal(corev1.ConditionUnknown))
+				})).Should(Succeed())
+			})
+
 			It("test VolumePopulator when it fails", func() {
 				pvc := initResources(storagev1.VolumeBindingImmediate, false, false)
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvc), func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
-					g.Expect(len(tmpPVC.Status.Conditions)).Should(Equal(1))
-					g.Expect(tmpPVC.Status.Conditions[0].Reason).Should(Equal(ReasonPopulatingFailed))
+					populatingCondition := findPVCCondition(tmpPVC, PersistentVolumeClaimPopulating)
+					g.Expect(populatingCondition).ShouldNot(BeNil())
+					g.Expect(populatingCondition.Reason).Should(Equal(ReasonPopulatingFailed))
+					restoreCondition := findPVCCondition(tmpPVC, corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore))
+					g.Expect(restoreCondition).ShouldNot(BeNil())
+					g.Expect(restoreCondition.Status).Should(Equal(corev1.ConditionFalse))
 				})).Should(Succeed())
 
 			})

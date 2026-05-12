@@ -52,6 +52,15 @@ const (
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 
+	RestoreSourceAPIGroupAnnotationKey  = "apps.kubeblocks.io/restore-source-api-group"
+	RestoreSourceKindAnnotationKey      = "apps.kubeblocks.io/restore-source-kind"
+	RestoreSourceNameAnnotationKey      = "apps.kubeblocks.io/restore-source-name"
+	RestoreSourceNamespaceAnnotationKey = "apps.kubeblocks.io/restore-source-namespace"
+	RestorePITRAnnotationKey            = "apps.kubeblocks.io/restore-pitr"
+	RestoreParametersAnnotationKey      = "apps.kubeblocks.io/restore-parameters"
+	RestoreComponentAnnotationKey       = "apps.kubeblocks.io/restore-component"
+	RestoreVolumeTemplateAnnotationKey  = "apps.kubeblocks.io/restore-volume-template"
+
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.
 	// They will be removed in the future.

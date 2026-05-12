@@ -70,8 +70,6 @@ const (
 	SkipReconciliationAnnotationKey = "dataprotection.kubeblocks.io/skip-reconciliation"
 	// SkipRestorationCheckAnnotationKey specifies whether to skip restoration check.
 	SkipRestorationCheckAnnotationKey = "dataprotection.kubeblocks.io/skip-restoration-check"
-	// ClusterRestoreUIDAnnotationKey records the ClusterRestore UID on DP-managed restore resources.
-	ClusterRestoreUIDAnnotationKey = "dataprotection.kubeblocks.io/cluster-restore-uid"
 	// VolumeSourceAnnotationKey records the source volume name for Backup dataSource PVC restores.
 	VolumeSourceAnnotationKey = "dataprotection.kubeblocks.io/volume-source"
 	// SourceTargetNameAnnotationKey records the backup target name for Backup dataSource PVC restores.
@@ -100,8 +98,6 @@ const (
 	AutoBackupLabelKey = "dataprotection.kubeblocks.io/autobackup"
 	// BackupTargetPodLabelKey specifies the backup target pod label key.
 	BackupTargetPodLabelKey = "dataprotection.kubeblocks.io/target-pod-name"
-	// ClusterRestoreLabelKey links DP-managed restore resources to a ClusterRestore.
-	ClusterRestoreLabelKey = "dataprotection.kubeblocks.io/cluster-restore"
 )
 
 // env names

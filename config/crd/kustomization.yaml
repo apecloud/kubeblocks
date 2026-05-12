@@ -13,7 +13,6 @@ resources:
 - bases/extensions.kubeblocks.io_addons.yaml
 - bases/workloads.kubeblocks.io_instancesets.yaml
 - bases/dataprotection.kubeblocks.io_backuprepos.yaml
-- bases/dataprotection.kubeblocks.io_clusterrestores.yaml
 - bases/dataprotection.kubeblocks.io_restores.yaml
 - bases/apps.kubeblocks.io_configurations.yaml
 - bases/apps.kubeblocks.io_servicedescriptors.yaml

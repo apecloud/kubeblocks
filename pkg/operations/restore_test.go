@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"encoding/json"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,7 +55,7 @@ var _ = Describe("Restore OpsRequest", func() {
 		reqCtx = intctrlutil.RequestCtx{Ctx: ctx}
 	})
 
-	It("creates ClusterRestore and does not create Cluster", func() {
+	It("creates Cluster with spec.restore", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
 		restoreSpec := opsRequest.Spec.GetRestore()
 		restoreSpec.DeferPostReadyUntilClusterRunning = true
@@ -65,22 +65,49 @@ var _ = Describe("Restore OpsRequest", func() {
 
 		Expect(restoreHandler.Action(reqCtx, cli, opsRes)).Should(Succeed())
 
-		clusterRestore := &dpv1alpha1.ClusterRestore{}
-		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreOpsName, Namespace: opsRequest.Namespace}, clusterRestore)).Should(Succeed())
-		Expect(clusterRestore.Spec.TargetClusterName).Should(Equal(restoreClusterName))
-		Expect(clusterRestore.Spec.BackupRef.Name).Should(Equal(backupName))
-		Expect(clusterRestore.Spec.BackupRef.Namespace).Should(Equal(opsRequest.Namespace))
-		Expect(clusterRestore.Spec.RestoreTime).Should(Equal("2026-05-04T08:00:00Z"))
-		Expect(clusterRestore.Spec.VolumeRestorePolicy).Should(Equal(dpv1alpha1.VolumeClaimRestorePolicySerial))
-		Expect(clusterRestore.Spec.DeferPostReadyUntilClusterRunning).Should(BeTrue())
-		Expect(clusterRestore.Spec.Env).Should(Equal([]corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}))
-		Expect(clusterRestore.Spec.Parameters).Should(Equal([]dpv1alpha1.ParameterPair{{Name: "restore-param", Value: "restore-value"}}))
-		Expect(clusterRestore.OwnerReferences).Should(HaveLen(1))
-		Expect(clusterRestore.OwnerReferences[0].UID).Should(Equal(opsRequest.UID))
-
 		cluster := &appsv1.Cluster{}
-		err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRequest.Namespace}, cluster)
-		Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRequest.Namespace}, cluster)).Should(Succeed())
+		Expect(cluster.Spec.Restore).ShouldNot(BeNil())
+		Expect(cluster.Spec.Restore.Source.Name).Should(Equal(backupName))
+		Expect(cluster.Spec.Restore.Source.Namespace).Should(Equal(opsRequest.Namespace))
+		Expect(cluster.Spec.Restore.PITR).Should(Equal("2026-05-04T08:00:00Z"))
+		Expect(cluster.Spec.Restore.Parameters).Should(Equal(map[string]string{"restore-param": "restore-value"}))
+		Expect(cluster.Annotations).ShouldNot(HaveKey("kubeblocks.io/restore-from-backup"))
+		Expect(cluster.Labels).Should(HaveKeyWithValue(constant.OpsRequestNameLabelKey, opsRequest.Name))
+		Expect(cluster.Labels).Should(HaveKeyWithValue(constant.OpsRequestNamespaceLabelKey, opsRequest.Namespace))
+		Expect(cluster.Labels).Should(HaveKeyWithValue(constant.OpsRequestTypeLabelKey, string(opsv1alpha1.RestoreType)))
+		Expect(cluster.OwnerReferences).Should(BeEmpty())
+	})
+
+	It("re-enters when target Cluster already belongs to the same restore OpsRequest", func() {
+		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
+		opsRequest.Labels = nil
+		backup := newRestoreOpsBackup(backupName, nil)
+		existing, err := restoreHandler.getClusterObjFromBackup(backup, opsRequest)
+		Expect(err).ShouldNot(HaveOccurred())
+		markRestoreClusterWithOps(existing, opsRequest)
+		cli := newRestoreOpsFakeClient(opsRequest, backup, existing)
+		opsRes := &OpsResource{OpsRequest: opsRequest}
+
+		Expect(restoreHandler.Action(reqCtx, cli, opsRes)).Should(Succeed())
+
+		Expect(opsRes.Cluster.Name).Should(Equal(restoreClusterName))
+		Expect(opsRequest.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, restoreClusterName))
+		Expect(opsRequest.Labels).Should(HaveKeyWithValue(constant.OpsRequestTypeLabelKey, string(opsv1alpha1.RestoreType)))
+	})
+
+	It("fails when target Cluster already exists and is not created by this restore OpsRequest", func() {
+		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
+		backup := newRestoreOpsBackup(backupName, nil)
+		existing := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      restoreClusterName,
+				Namespace: opsRequest.Namespace,
+			},
+		}
+		cli := newRestoreOpsFakeClient(opsRequest, backup, existing)
+
+		Expect(restoreHandler.Action(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})).ShouldNot(Succeed())
 	})
 
 	It("formats and validates continuous backup restore time", func() {
@@ -98,15 +125,15 @@ var _ = Describe("Restore OpsRequest", func() {
 
 		Expect(restoreHandler.Action(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})).Should(Succeed())
 
-		clusterRestore := &dpv1alpha1.ClusterRestore{}
-		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreOpsName, Namespace: opsRequest.Namespace}, clusterRestore)).Should(Succeed())
-		Expect(clusterRestore.Spec.RestoreTime).Should(Equal("2026-05-04T08:00:00Z"))
+		cluster := &appsv1.Cluster{}
+		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRequest.Namespace}, cluster)).Should(Succeed())
+		Expect(cluster.Spec.Restore.PITR).Should(Equal("2026-05-04T08:00:00Z"))
 	})
 
-	It("keeps running while ClusterRestore is not completed", func() {
+	It("keeps running while restore condition is not completed", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		clusterRestore := newClusterRestore(opsRequest, dpv1alpha1.ClusterRestorePhaseRestoring)
-		cli := newRestoreOpsFakeClient(opsRequest, clusterRestore)
+		cluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.CreatingClusterPhase, metav1.ConditionUnknown)
+		cli := newRestoreOpsFakeClient(opsRequest, cluster)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
 
@@ -114,10 +141,10 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 	})
 
-	It("fails when ClusterRestore failed", func() {
+	It("fails when restore condition failed", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		clusterRestore := newClusterRestore(opsRequest, dpv1alpha1.ClusterRestorePhaseFailed)
-		cli := newRestoreOpsFakeClient(opsRequest, clusterRestore)
+		cluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.CreatingClusterPhase, metav1.ConditionFalse)
+		cli := newRestoreOpsFakeClient(opsRequest, cluster)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
 
@@ -125,11 +152,10 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 	})
 
-	It("succeeds after ClusterRestore completed and target Cluster is running", func() {
+	It("succeeds after restore completed and target Cluster is running", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		clusterRestore := newClusterRestore(opsRequest, dpv1alpha1.ClusterRestorePhaseCompleted)
-		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.RunningClusterPhase)
-		cli := newRestoreOpsFakeClient(opsRequest, clusterRestore, targetCluster)
+		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.RunningClusterPhase, metav1.ConditionTrue)
+		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
 		opsRes := &OpsResource{OpsRequest: opsRequest}
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, opsRes)
@@ -139,11 +165,10 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(opsRes.Cluster.Name).Should(Equal(restoreClusterName))
 	})
 
-	It("keeps running after ClusterRestore completed while target Cluster is not running", func() {
+	It("keeps running after restore completed while target Cluster is not running", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		clusterRestore := newClusterRestore(opsRequest, dpv1alpha1.ClusterRestorePhaseCompleted)
-		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.CreatingClusterPhase)
-		cli := newRestoreOpsFakeClient(opsRequest, clusterRestore, targetCluster)
+		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.CreatingClusterPhase, metav1.ConditionTrue)
+		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
 
@@ -151,11 +176,10 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 	})
 
-	It("fails after ClusterRestore completed when target Cluster failed", func() {
+	It("fails after restore completed when target Cluster failed", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		clusterRestore := newClusterRestore(opsRequest, dpv1alpha1.ClusterRestorePhaseCompleted)
-		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase)
-		cli := newRestoreOpsFakeClient(opsRequest, clusterRestore, targetCluster)
+		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase, metav1.ConditionTrue)
+		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
 
@@ -163,15 +187,14 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 	})
 
-	It("keeps running after ClusterRestore completed when target Cluster is not visible yet", func() {
+	It("fails when target Cluster is not visible", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		clusterRestore := newClusterRestore(opsRequest, dpv1alpha1.ClusterRestorePhaseCompleted)
-		cli := newRestoreOpsFakeClient(opsRequest, clusterRestore)
+		cli := newRestoreOpsFakeClient(opsRequest)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
 
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		Expect(err).Should(HaveOccurred())
+		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 	})
 })
 
@@ -203,11 +226,30 @@ func createRestoreOpsObj(clusterName, restoreOpsName, backupName string) *opsv1a
 }
 
 func newRestoreOpsBackup(name string, labels map[string]string) *dpv1alpha1.Backup {
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "source-cluster",
+			Namespace: testCtx.DefaultNamespace,
+		},
+		Spec: appsv1.ClusterSpec{
+			TerminationPolicy: appsv1.Delete,
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:         "mysql",
+				ComponentDef: "mysql",
+				Replicas:     1,
+			}},
+		},
+	}
+	snapshot, err := json.Marshal(cluster)
+	Expect(err).ShouldNot(HaveOccurred())
 	return &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: testCtx.DefaultNamespace,
 			Labels:    labels,
+			Annotations: map[string]string{
+				constant.ClusterSnapshotAnnotationKey: string(snapshot),
+			},
 		},
 		Status: dpv1alpha1.BackupStatus{
 			Phase: dpv1alpha1.BackupPhaseCompleted,
@@ -215,30 +257,7 @@ func newRestoreOpsBackup(name string, labels map[string]string) *dpv1alpha1.Back
 	}
 }
 
-func newClusterRestore(opsRequest *opsv1alpha1.OpsRequest, phase dpv1alpha1.ClusterRestorePhase) *dpv1alpha1.ClusterRestore {
-	return &dpv1alpha1.ClusterRestore{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterRestoreName(opsRequest),
-			Namespace: opsRequest.Namespace,
-		},
-		Spec: dpv1alpha1.ClusterRestoreSpec{
-			TargetClusterName: opsRequest.Spec.GetClusterName(),
-			BackupRef: dpv1alpha1.ClusterRestoreBackupRef{
-				Name:      opsRequest.Spec.GetRestore().BackupName,
-				Namespace: opsRequest.Namespace,
-			},
-		},
-		Status: dpv1alpha1.ClusterRestoreStatus{
-			Phase: phase,
-			TargetClusterRef: &dpv1alpha1.ClusterRestoreTargetClusterRef{
-				Name:      opsRequest.Spec.GetClusterName(),
-				Namespace: opsRequest.Namespace,
-			},
-		},
-	}
-}
-
-func newRestoreTargetCluster(namespace, name string, phase appsv1.ClusterPhase) *appsv1.Cluster {
+func newRestoreTargetCluster(namespace, name string, phase appsv1.ClusterPhase, restoreStatus metav1.ConditionStatus) *appsv1.Cluster {
 	return &appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -246,6 +265,12 @@ func newRestoreTargetCluster(namespace, name string, phase appsv1.ClusterPhase) 
 		},
 		Status: appsv1.ClusterStatus{
 			Phase: phase,
+			Conditions: []metav1.Condition{{
+				Type:    appsv1.ConditionTypeRestore,
+				Status:  restoreStatus,
+				Reason:  "test",
+				Message: "test",
+			}},
 		},
 	}
 }

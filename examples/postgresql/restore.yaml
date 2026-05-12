@@ -1,11 +1,29 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: ClusterRestore
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
 metadata:
   name: pg-restore
   namespace: demo
 spec:
-  targetClusterName: pg-restore
-  backupRef:
-    name: pg-cluster-pg-basebackup
-    namespace: demo
-  volumeRestorePolicy: Parallel
+  terminationPolicy: Delete
+  clusterDef: postgresql
+  topology: replication
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: pg-cluster-pg-basebackup
+      namespace: demo
+  componentSpecs:
+    - name: postgresql
+      serviceVersion: "14.7.2"
+      labels:
+        apps.kubeblocks.postgres.patroni/scope: pg-restore-postgresql
+      replicas: 2
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

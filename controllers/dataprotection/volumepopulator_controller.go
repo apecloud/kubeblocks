@@ -47,6 +47,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -147,6 +148,9 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if pvc.Spec.VolumeName == "" {
 		return r.Populate(reqCtx, pvc, restoreMgr)
 	}
+	if err = r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreMgr); err != nil {
+		return err
+	}
 	return r.Cleanup(reqCtx, pvc)
 }
 
@@ -206,6 +210,9 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, err
 	}
+	if err = r.ensureInternalRestoreBackupRepoReady(reqCtx, restore); err != nil {
+		return nil, err
+	}
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err
@@ -220,6 +227,40 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	}
 	restoreMgr.WorkerServiceAccount = saName
 	return restoreMgr, nil
+}
+
+func (r *VolumePopulatorReconciler) ensureInternalRestoreBackupRepoReady(reqCtx intctrlutil.RequestCtx,
+	restore *dpv1alpha1.Restore) error {
+	original := restore.DeepCopy()
+	repoName, err := CheckBackupRepoForRestore(reqCtx, r.Client, restore)
+	switch {
+	case intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForBackupRepoPreparation):
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonWaitForBackupRepo, err.Error())
+		if restore.Labels == nil {
+			restore.Labels = map[string]string{}
+		}
+		restore.Labels[dataProtectionBackupRepoKey] = repoName
+		restore.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
+		if patchErr := r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore); patchErr != nil {
+			return patchErr
+		}
+		return intctrlutil.NewRequeueError(reconcileInterval, err.Error())
+	case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoFailed, err.Error())
+		if patchErr := r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore); patchErr != nil {
+			return patchErr
+		}
+		return err
+	case err != nil:
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, ReasonUnknownError, err.Error())
+		if patchErr := r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore); patchErr != nil {
+			return patchErr
+		}
+		return err
+	default:
+		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoSuccessfully, "")
+		return r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore)
+	}
 }
 
 func (r *VolumePopulatorReconciler) resolveSourceTarget(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, backupNamespace string) (*dpv1alpha1.BackupStatusTarget, error) {
@@ -584,6 +625,48 @@ func (r *VolumePopulatorReconciler) patchInternalRestoreStatus(reqCtx intctrluti
 	return r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))
 }
 
+func (r *VolumePopulatorReconciler) patchInternalRestoreMetaAndStatus(reqCtx intctrlutil.RequestCtx,
+	original, restore *dpv1alpha1.Restore) error {
+	if !reflect.DeepEqual(original.ObjectMeta, restore.ObjectMeta) {
+		if err := r.Client.Patch(reqCtx.Ctx, restore, client.MergeFrom(original)); err != nil {
+			return err
+		}
+	}
+	if reflect.DeepEqual(original.Status, restore.Status) {
+		return nil
+	}
+	latest := &dpv1alpha1.Restore{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(restore), latest); err != nil {
+		return err
+	}
+	statusPatch := client.MergeFrom(latest.DeepCopy())
+	latest.Status = restore.Status
+	return r.Client.Status().Patch(reqCtx.Ctx, latest, statusPatch)
+}
+
+func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	restoreMgr *dprestore.RestoreManager) error {
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != appsv1.ConditionTypeRestore {
+			continue
+		}
+		switch condition.Status {
+		case corev1.ConditionTrue:
+			return nil
+		case corev1.ConditionFalse:
+			return nil
+		}
+		break
+	}
+	if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingSucceed, "Populator finished"); err != nil {
+		return err
+	}
+	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")
+	return r.patchInternalRestoreStatus(reqCtx, restoreMgr)
+}
+
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
@@ -796,11 +879,20 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 			continue
 		}
 		if reason == v.Reason {
-			return nil
+			if pvcConditionMatches(pvc.Status.Conditions, restoreCondition) {
+				return nil
+			}
+			existPopulating = true
+			pvc.Status.Conditions[i] = progressCondition
+			continue
 		}
 		if v.Reason == ReasonPopulatingSucceed {
 			// ignore succeed condition
-			return nil
+			if pvcConditionMatches(pvc.Status.Conditions, restoreCondition) {
+				return nil
+			}
+			existPopulating = true
+			continue
 		}
 		existPopulating = true
 		pvc.Status.Conditions[i] = progressCondition
@@ -816,6 +908,16 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)
 	}
 	return r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch)
+}
+
+func pvcConditionMatches(conditions []corev1.PersistentVolumeClaimCondition, condition corev1.PersistentVolumeClaimCondition) bool {
+	for i := range conditions {
+		existing := conditions[i]
+		if existing.Type == condition.Type && existing.Status == condition.Status && existing.Reason == condition.Reason {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, backupNamespace string) error {
@@ -1032,16 +1134,4 @@ func upsertPVCCondition(conditions *[]corev1.PersistentVolumeClaimCondition, con
 		}
 	}
 	*conditions = append(*conditions, condition)
-}
-
-func (r *VolumePopulatorReconciler) ContainPopulatingCondition(pvc *corev1.PersistentVolumeClaim) bool {
-	if pvc == nil {
-		return false
-	}
-	for _, v := range pvc.Status.Conditions {
-		if v.Type == PersistentVolumeClaimPopulating {
-			return true
-		}
-	}
-	return false
 }

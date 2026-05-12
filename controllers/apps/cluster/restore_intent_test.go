@@ -33,7 +33,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+)
+
+const (
+	testRestoreSourceAPIGroup = "dataprotection.kubeblocks.io"
+	testRestoreSourceKind     = "Backup"
 )
 
 func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
@@ -42,8 +46,8 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	cluster.Namespace = "test-ns"
 	cluster.Spec.Restore = &appsv1.ClusterRestore{
 		Source: appsv1.ClusterRestoreSource{
-			APIGroup: dptypes.DataprotectionAPIGroup,
-			Kind:     dptypes.BackupKind,
+			APIGroup: testRestoreSourceAPIGroup,
+			Kind:     testRestoreSourceKind,
 			Name:     "backup",
 		},
 	}
@@ -59,7 +63,7 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 
 	require.NotContains(t, vct.Annotations, constant.RestorePITRAnnotationKey)
 	require.NotContains(t, vct.Annotations, constant.RestoreParametersAnnotationKey)
-	require.Equal(t, dptypes.BackupKind, vct.Spec.DataSourceRef.Kind)
+	require.Equal(t, testRestoreSourceKind, vct.Spec.DataSourceRef.Kind)
 	require.Equal(t, "backup", vct.Spec.DataSourceRef.Name)
 }
 
@@ -71,19 +75,19 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 		Type:   appsv1.ConditionTypeRestore,
 		Status: metav1.ConditionTrue,
 	}}
-	dataSourceAPIGroup := dptypes.DataprotectionAPIGroup
+	dataSourceAPIGroup := testRestoreSourceAPIGroup
 	component := &appsv1.ClusterComponentSpec{
 		Name: "mysql",
 		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
 			Name: "data",
 			Annotations: map[string]string{
-				constant.RestoreSourceKindAnnotationKey: dptypes.BackupKind,
+				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
 				constant.RestorePITRAnnotationKey:       "stale-pitr",
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				DataSourceRef: &corev1.TypedObjectReference{
 					APIGroup: &dataSourceAPIGroup,
-					Kind:     dptypes.BackupKind,
+					Kind:     testRestoreSourceKind,
 					Name:     "backup",
 				},
 			},
@@ -141,8 +145,8 @@ func TestSetRestoreConditionSucceedsWhenNoRestorePVCsExist(t *testing.T) {
 		Spec: appsv1.ClusterSpec{
 			Restore: &appsv1.ClusterRestore{
 				Source: appsv1.ClusterRestoreSource{
-					APIGroup: dptypes.DataprotectionAPIGroup,
-					Kind:     dptypes.BackupKind,
+					APIGroup: testRestoreSourceAPIGroup,
+					Kind:     testRestoreSourceKind,
 					Name:     "backup",
 				},
 			},

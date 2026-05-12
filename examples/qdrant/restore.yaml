@@ -1,11 +1,27 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: ClusterRestore
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
 metadata:
   name: qdrant-cluster-restore
   namespace: demo
 spec:
-  targetClusterName: qdrant-cluster-restore
-  backupRef:
-    name: qdrant-cluster-backup
-    namespace: demo
-  volumeRestorePolicy: Parallel
+  terminationPolicy: Delete
+  clusterDef: qdrant
+  topology: cluster
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: qdrant-cluster-backup
+      namespace: demo
+  componentSpecs:
+    - name: qdrant
+      serviceVersion: 1.10.0
+      replicas: 3
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

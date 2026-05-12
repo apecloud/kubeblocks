@@ -1,11 +1,26 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: ClusterRestore
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
 metadata:
   name: mysql-cluster-restore
   namespace: demo
 spec:
-  targetClusterName: mysql-cluster-restore
-  backupRef:
-    name: mysql-cluster-backup
-    namespace: demo
-  volumeRestorePolicy: Parallel
+  terminationPolicy: Delete
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: mysql-cluster-backup
+      namespace: demo
+  componentSpecs:
+    - name: mysql
+      componentDef: "mysql-8.0"
+      serviceVersion: 8.0.35
+      replicas: 2
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

@@ -49,6 +49,10 @@ const (
 
 	// defaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
 	defaultRoleProbeTimeoutAfterPodsReady int32 = 60
+
+	reasonRestoreCompleted = "RestoreCompleted"
+	reasonRestoreRunning   = "RestoreRunning"
+	reasonRestoreFailed    = "RestoreFailed"
 )
 
 // componentStatusTransformer computes the current status: read the underlying workload status and update the component status
@@ -348,7 +352,86 @@ func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componen
 		t.reconcileAvailableCondition(transCtx),
 		t.reconcileProgressingCondition(transCtx),
 		t.reconcileHealthyCondition(transCtx),
+		t.reconcileRestoreCondition(transCtx),
 	)
+}
+
+func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *componentTransformContext) error {
+	if transCtx.SynthesizeComponent == nil {
+		return nil
+	}
+	clusterName := transCtx.SynthesizeComponent.ClusterName
+	if clusterName == "" {
+		clusterName = t.comp.Labels[constant.AppInstanceLabelKey]
+	}
+	componentName := transCtx.SynthesizeComponent.Name
+	if componentName == "" {
+		componentName = t.comp.Labels[constant.KBAppComponentLabelKey]
+	}
+	if clusterName == "" || componentName == "" {
+		return nil
+	}
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := transCtx.Client.List(transCtx.Context, pvcList,
+		client.InNamespace(t.comp.Namespace), client.MatchingLabels(constant.GetCompLabels(clusterName, componentName))); err != nil {
+		return err
+	}
+	total := 0
+	completed := 0
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		total++
+		cond := findPVCRestoreCondition(pvc)
+		if cond == nil {
+			continue
+		}
+		switch cond.Status {
+		case corev1.ConditionTrue:
+			completed++
+		case corev1.ConditionFalse:
+			meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: t.comp.Generation,
+				Reason:             reasonRestoreFailed,
+				Message:            fmt.Sprintf("PVC %s restore failed: %s", pvc.Name, cond.Message),
+			})
+			return nil
+		}
+	}
+	if total == 0 {
+		return nil
+	}
+	if total == completed {
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             reasonRestoreCompleted,
+			Message:            "All initial restore PVCs have completed",
+		})
+		return nil
+	}
+	meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+		Type:               appsv1.ConditionTypeRestore,
+		Status:             metav1.ConditionUnknown,
+		ObservedGeneration: t.comp.Generation,
+		Reason:             reasonRestoreRunning,
+		Message:            "Waiting for initial restore PVCs to complete",
+	})
+	return nil
+}
+
+func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {
+	for i := range pvc.Status.Conditions {
+		if string(pvc.Status.Conditions[i].Type) == appsv1.ConditionTypeRestore {
+			return &pvc.Status.Conditions[i]
+		}
+	}
+	return nil
 }
 
 func (t *componentStatusTransformer) checkNSetCondition(

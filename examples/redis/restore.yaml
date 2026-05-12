@@ -1,11 +1,37 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: ClusterRestore
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
 metadata:
-  name: redis-replication-restore
+  name: redis-restore
   namespace: demo
 spec:
-  targetClusterName: redis-replication-restore
-  backupRef:
-    name: redis-replication-backup
-    namespace: demo
-  volumeRestorePolicy: Parallel
+  terminationPolicy: Delete
+  clusterDef: redis
+  topology: replication
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: redis-cluster-backup
+      namespace: demo
+  componentSpecs:
+    - name: redis
+      serviceVersion: "7.2.4"
+      replicas: 2
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: redis-sentinel
+      replicas: 3
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

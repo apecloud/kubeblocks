@@ -1,11 +1,27 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: ClusterRestore
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
 metadata:
   name: mongo-cluster-restore
   namespace: demo
 spec:
-  targetClusterName: mongo-cluster-restore
-  backupRef:
-    name: mongo-cluster-backup
-    namespace: demo
-  volumeRestorePolicy: Parallel
+  terminationPolicy: Delete
+  clusterDef: mongodb
+  topology: replicaset
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: mongo-cluster-backup
+      namespace: demo
+  componentSpecs:
+    - name: mongodb
+      serviceVersion: "6.0.16"
+      replicas: 3
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

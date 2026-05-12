@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -155,6 +156,69 @@ var _ = Describe("component status transformer conditions", func() {
 		transformer.runningITS = runningITS
 		transformer.protoITS = protoITS
 		transformer.synthesizeComp = transCtx.SynthesizeComponent
+	})
+
+	newRestorePVC := func(name string, status corev1.ConditionStatus) *corev1.PersistentVolumeClaim {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      name,
+				Labels:    constant.GetCompLabels(clusterName, compName),
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: "Backup",
+				},
+			},
+		}
+		if status != "" {
+			pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+				Type:    corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+				Status:  status,
+				Reason:  "Restore",
+				Message: "restore status",
+			}}
+		}
+		return pvc
+	}
+
+	Context("reconcileRestoreCondition", func() {
+		It("should be running while restore PVCs are not completed", func() {
+			pvc := newRestorePVC("data-mysql-0", corev1.ConditionUnknown)
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
+			Expect(cond.Reason).Should(Equal(reasonRestoreRunning))
+		})
+
+		It("should complete when all restore PVCs are completed", func() {
+			pvc := newRestorePVC("data-mysql-0", corev1.ConditionTrue)
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).Should(Equal(reasonRestoreCompleted))
+		})
+
+		It("should fail when any restore PVC fails", func() {
+			pvc := newRestorePVC("data-mysql-0", corev1.ConditionFalse)
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).Should(Equal(reasonRestoreFailed))
+		})
 	})
 
 	Context("reconcileHealthyCondition", func() {

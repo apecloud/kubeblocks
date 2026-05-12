@@ -123,7 +123,7 @@ func handleK8sQuantityType(s string) (int64, error) {
 func handleIECQuantityType(s string) (int64, error) {
 	if !isAllNumber(s) {
 		// IEC 80000-13 requires explicit 'B' suffix (e.g. "256MB", "256MiB").
-		if !strings.HasSuffix(s, "B") && !strings.HasSuffix(s, "b") {
+		if !strings.HasSuffix(s, "B") {
 			return 0, core.MakeError("require explicit byte-unit suffixing[%s]", s)
 		}
 		s = s[:len(s)-1]

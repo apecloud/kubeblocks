@@ -33,11 +33,12 @@ const (
 	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
 
 	// addon config keys
-	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
-	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"
+	CfgKeyAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgKeyAddonJobResources     = "ADDON_JOB_RESOURCES"
 
 	// addon charts config keys
-	CfgAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"
+	CfgKeyAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"
 
 	// storage config keys
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"

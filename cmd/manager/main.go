@@ -264,6 +264,12 @@ func validateRequiredToParseConfigs() error {
 			return err
 		}
 	}
+	if jobResources := viper.GetString(constant.CfgKeyAddonJobResources); jobResources != "" {
+		resources := corev1.ResourceRequirements{}
+		if err := json.Unmarshal([]byte(jobResources), &resources); err != nil {
+			return err
+		}
+	}
 	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
 		return err
 	}

@@ -452,6 +452,9 @@ addonController:
   enabled: true
   jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
+  ## @param addonController.jobResources - resources for addon install/uninstall jobs.
+  ## Set this when namespace LimitRange policies require non-zero requests.
+  jobResources: {}
 
 
 ## @param keepAddons - keep Addon CR objects when delete this chart.

@@ -63,7 +63,7 @@ var _ = Describe("Restore Controller test", func() {
 			inNS := client.InNamespace(namespace)
 
 			// namespaced
-			testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS, ml)
 			testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 

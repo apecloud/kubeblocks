@@ -31,13 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -86,21 +84,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	// then list all the others objects owned by this cluster in cache, and delete them all
 	ml := getAppInstanceML(*cluster)
 
-	toDeleteObjs := func(objs owningObjects) []client.Object {
-		var delObjs []client.Object
-		for _, obj := range objs {
-			if obj.GetObjectKind().GroupVersionKind().Kind == dptypes.BackupKind {
-				backupObj := obj.(*dpv1alpha1.Backup)
-				// retain backup for data protection even if the cluster is wiped out.
-				if backupObj.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
-					continue
-				}
-			}
-			delObjs = append(delObjs, obj)
-		}
-		return delObjs
-	}
-
 	// add namespaced objects deletion vertex
 	namespacedObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, cluster.Namespace, ml, toDeleteNamespacedKinds)
 	if err != nil {
@@ -109,12 +92,10 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			return err
 		}
 	}
-	if cluster.Spec.TerminationPolicy != appsv1.WipeOut {
-		if err = getFailedBackups(transCtx.Context, transCtx.Client, cluster.Namespace, ml, namespacedObjs); err != nil {
-			return err
-		}
+	delObjs := make([]client.Object, 0, len(namespacedObjs))
+	for _, obj := range namespacedObjs {
+		delObjs = append(delObjs, obj)
 	}
-	delObjs := toDeleteObjs(namespacedObjs)
 
 	// add non-namespaced objects deletion vertex
 	nonNamespacedObjs, err := getOwningNonNamespacedObjects(transCtx.Context, transCtx.Client, ml, toDeleteNonNamespacedKinds)
@@ -124,7 +105,9 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			return err
 		}
 	}
-	delObjs = append(delObjs, toDeleteObjs(nonNamespacedObjs)...)
+	for _, obj := range nonNamespacedObjs {
+		delObjs = append(delObjs, obj)
+	}
 
 	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
@@ -166,11 +149,7 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 }
 
 func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
-	namespacedKinds, nonNamespacedKinds := kindsForDelete()
-	namespacedKindsPlus := []client.ObjectList{
-		&dpv1alpha1.BackupList{},
-	}
-	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
+	return kindsForDelete()
 }
 
 func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {

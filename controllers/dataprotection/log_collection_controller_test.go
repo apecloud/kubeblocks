@@ -45,7 +45,7 @@ var _ = Describe("Log Collection Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)

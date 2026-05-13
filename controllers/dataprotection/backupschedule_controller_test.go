@@ -49,7 +49,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)

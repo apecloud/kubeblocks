@@ -139,6 +139,11 @@ func (r *ClusterBackupReconciler) listCandidateBackups(ctx context.Context, clus
 			candidates = append(candidates, backup)
 			continue
 		}
+		// TODO(r11y): This preserves the legacy apps-side behavior for non-WipeOut
+		// deletion by selecting only failed, non-continuous backups. Because backup
+		// deletion rewrites status.phase to Deleting, a backup chosen here may stop
+		// matching before the Backup CR is fully removed. Revisit with an explicit
+		// cluster-cleanup marker if we need to wait for CR disappearance strictly.
 		if backup.Status.Phase != dpv1alpha1.BackupPhaseFailed {
 			continue
 		}

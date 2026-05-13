@@ -95,6 +95,7 @@ rules:
   resources:
   - clusters/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - apps.kubeblocks.io

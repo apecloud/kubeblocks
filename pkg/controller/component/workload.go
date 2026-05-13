@@ -98,7 +98,9 @@ func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.C
 
 	itsObj := itsBuilder.GetObject()
 
-	setDefaultResourceLimits(itsObj)
+	if err := setDefaultResourceLimits(itsObj); err != nil {
+		return nil, err
+	}
 
 	return itsObj, nil
 }
@@ -205,8 +207,11 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 	return ptr.To(workloads.SerialUpdateStrategy)
 }
 
-func setDefaultResourceLimits(its *workloads.InstanceSet) {
-	clusterResources := getClusterDefaultResources()
+func setDefaultResourceLimits(its *workloads.InstanceSet) error {
+	clusterResources, err := getClusterDefaultResources()
+	if err != nil {
+		return err
+	}
 	for i := range its.Spec.Template.Spec.Containers {
 		container := &its.Spec.Template.Spec.Containers[i]
 		if i > 0 {
@@ -218,6 +223,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) {
 	for i := range its.Spec.Template.Spec.InitContainers {
 		setClusterDefaultResources(&its.Spec.Template.Spec.InitContainers[i], clusterResources)
 	}
+	return nil
 }
 
 type clusterDefaultResources struct {
@@ -226,16 +232,16 @@ type clusterDefaultResources struct {
 	Limits   corev1.ResourceList `json:"limits,omitempty"`
 }
 
-func getClusterDefaultResources() clusterDefaultResources {
-	resources := clusterDefaultResources{Zero: true}
+func getClusterDefaultResources() (clusterDefaultResources, error) {
+	resources := clusterDefaultResources{}
 	value := viper.GetString(constant.CfgKeyClusterDefaultResources)
 	if value == "" {
-		return resources
+		return resources, nil
 	}
 	if err := json.Unmarshal([]byte(value), &resources); err != nil {
-		return clusterDefaultResources{Zero: true}
+		return clusterDefaultResources{}, err
 	}
-	return resources
+	return resources, nil
 }
 
 func setClusterDefaultResources(container *corev1.Container, resources clusterDefaultResources) {

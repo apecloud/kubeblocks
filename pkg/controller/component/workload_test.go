@@ -54,10 +54,23 @@ var _ = Describe("workload resource defaults", func() {
 		}
 	}
 
-	It("should keep zero resource limit behavior when cluster default resources are not configured", func() {
+	It("should not inject zero resources when cluster default resources are not configured", func() {
 		its := newInstanceSet()
 
-		setDefaultResourceLimits(its)
+		Expect(setDefaultResourceLimits(its)).Should(Succeed())
+
+		Expect(its.Spec.Template.Spec.Containers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
+		Expect(its.Spec.Template.Spec.Containers[1].Resources.Requests).Should(BeNil())
+		Expect(its.Spec.Template.Spec.Containers[1].Resources.Limits).Should(BeNil())
+		Expect(its.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(BeNil())
+		Expect(its.Spec.Template.Spec.InitContainers[0].Resources.Limits).Should(BeNil())
+	})
+
+	It("should keep zero resource limit behavior when zero is true", func() {
+		viper.Set(constant.CfgKeyClusterDefaultResources, `{"zero":true,"requests":{},"limits":{}}`)
+		its := newInstanceSet()
+
+		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
 		Expect(its.Spec.Template.Spec.Containers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
 		Expect(its.Spec.Template.Spec.Containers[1].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
@@ -68,7 +81,7 @@ var _ = Describe("workload resource defaults", func() {
 		viper.Set(constant.CfgKeyClusterDefaultResources, `{"zero":false,"requests":{},"limits":{}}`)
 		its := newInstanceSet()
 
-		setDefaultResourceLimits(its)
+		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
 		Expect(its.Spec.Template.Spec.Containers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
 		Expect(its.Spec.Template.Spec.Containers[1].Resources.Requests).Should(BeNil())
@@ -81,7 +94,7 @@ var _ = Describe("workload resource defaults", func() {
 		viper.Set(constant.CfgKeyClusterDefaultResources, `{"zero":true,"requests":{"cpu":"10m","memory":"16Mi"},"limits":{"cpu":"100m","memory":"64Mi"}}`)
 		its := newInstanceSet()
 
-		setDefaultResourceLimits(its)
+		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
 		main := its.Spec.Template.Spec.Containers[0]
 		sidecar := its.Spec.Template.Spec.Containers[1]
@@ -102,7 +115,7 @@ var _ = Describe("workload resource defaults", func() {
 		viper.Set(constant.CfgKeyClusterDefaultResources, `{"zero":true,"requests":{"cpu":"10m"},"limits":{}}`)
 		its := newInstanceSet()
 
-		setDefaultResourceLimits(its)
+		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
 		sidecar := its.Spec.Template.Spec.Containers[1]
 		initContainer := its.Spec.Template.Spec.InitContainers[0]
@@ -122,12 +135,19 @@ var _ = Describe("workload resource defaults", func() {
 			corev1.ResourceCPU: resource.MustParse("250m"),
 		}
 
-		setDefaultResourceLimits(its)
+		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
 		sidecar := its.Spec.Template.Spec.Containers[1]
 		Expect(sidecar.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("250m")))
 		Expect(sidecar.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("16Mi")))
 		Expect(sidecar.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("250m")))
 		Expect(sidecar.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("64Mi")))
+	})
+
+	It("should return an error when cluster default resources are invalid", func() {
+		viper.Set(constant.CfgKeyClusterDefaultResources, `{"zero":`)
+		its := newInstanceSet()
+
+		Expect(setDefaultResourceLimits(its)).ShouldNot(Succeed())
 	})
 })

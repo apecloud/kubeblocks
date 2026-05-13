@@ -10,5 +10,8 @@ RUN bash /tmp/fetch-all-helm-charts.sh deploy/helm /tmp/charts
 
 FROM docker.io/alpine:3.22 AS dist
 
+# Apply security updates (e.g. OpenSSL 3.5.5 for CVE-2025-15467, CVE-2025-69419, CVE-2025-69421)
+RUN apk update && apk upgrade --no-cache
+
 COPY --from=builder /tmp/charts /charts
 USER 65532:65532

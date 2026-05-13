@@ -120,6 +120,7 @@ func init() {
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
+	viper.SetDefault(constant.CfgKeyClusterDefaultResources, `{"zero":true}`)
 }
 
 func main() {
@@ -467,6 +468,11 @@ func validateRequiredToParseConfigs() error {
 	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
 		secrets := make([]corev1.LocalObjectReference, 0)
 		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
+			return err
+		}
+	}
+	if clusterDefaultResources := viper.GetString(constant.CfgKeyClusterDefaultResources); clusterDefaultResources != "" {
+		if _, err := intctrlutil.ParseClusterDefaultResources(clusterDefaultResources); err != nil {
 			return err
 		}
 	}

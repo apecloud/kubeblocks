@@ -558,7 +558,10 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 			continue
 		}
 		// build job and append
-		job := jobBuilder.setJobName(jobBuilder.builderRestoreJobName(i)).addCommonEnv(sourceTargetPodName).build()
+		job, err := jobBuilder.setJobName(jobBuilder.builderRestoreJobName(i)).addCommonEnv(sourceTargetPodName).build()
+		if err != nil {
+			return nil, err
+		}
 		if prepareDataConfig.IsSerialPolicy() &&
 			restoreJobHasCompleted(r.Restore.Status.Actions.PrepareData, job.Name) {
 			// if the job has completed and the restore policy is Serial, continue
@@ -603,7 +606,10 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	if err != nil {
 		return nil, err
 	}
-	job := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build()
+	job, err := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build()
+	if err != nil {
+		return nil, err
+	}
 	return job, nil
 }
 
@@ -651,7 +657,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) *batchv1.Job {
+		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) (*batchv1.Job, error) {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
 				jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
@@ -693,7 +699,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i))
+			job, err := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
+			if err != nil {
+				return nil, err
+			}
+			jobs = append(jobs, job)
 		}
 		return jobs, nil
 	}
@@ -717,7 +727,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			jobBuilder.setImage(viper.GetString(constant.KBToolsImage)).setCommand([]string{"kubectl"}).setArgs(args).
 				setJobName(buildJobName(i)).
 				setToleration(targetPodList.Items[i].Spec.Tolerations)
-			job := jobBuilder.build()
+			job, err := jobBuilder.build()
+			if err != nil {
+				return nil, err
+			}
 			// create exec job in kubeblocks namespace for security
 			kbInstalledNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			if kbInstalledNamespace != "" {

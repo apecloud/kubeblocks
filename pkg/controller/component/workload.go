@@ -21,7 +21,6 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"maps"
 	"reflect"
 
@@ -40,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
@@ -208,91 +206,22 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 }
 
 func setDefaultResourceLimits(its *workloads.InstanceSet) error {
-	clusterResources, err := getClusterDefaultResources()
+	clusterResources, err := intctrlutil.GetClusterDefaultResources()
 	if err != nil {
 		return err
 	}
 	for i := range its.Spec.Template.Spec.Containers {
 		container := &its.Spec.Template.Spec.Containers[i]
 		if i > 0 {
-			setClusterDefaultResources(container, clusterResources)
+			intctrlutil.SetClusterDefaultResources(container, clusterResources)
 			continue
 		}
 		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	}
 	for i := range its.Spec.Template.Spec.InitContainers {
-		setClusterDefaultResources(&its.Spec.Template.Spec.InitContainers[i], clusterResources)
+		intctrlutil.SetClusterDefaultResources(&its.Spec.Template.Spec.InitContainers[i], clusterResources)
 	}
 	return nil
-}
-
-type clusterDefaultResources struct {
-	Zero     bool                `json:"zero,omitempty"`
-	Requests corev1.ResourceList `json:"requests,omitempty"`
-	Limits   corev1.ResourceList `json:"limits,omitempty"`
-}
-
-func getClusterDefaultResources() (clusterDefaultResources, error) {
-	resources := clusterDefaultResources{}
-	value := viper.GetString(constant.CfgKeyClusterDefaultResources)
-	if value == "" {
-		return resources, nil
-	}
-	if err := json.Unmarshal([]byte(value), &resources); err != nil {
-		return clusterDefaultResources{}, err
-	}
-	return resources, nil
-}
-
-func setClusterDefaultResources(container *corev1.Container, resources clusterDefaultResources) {
-	for _, name := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
-		if hasClusterDefaultResource(resources, name) {
-			completeResource(container, resources, name)
-			continue
-		}
-		if resources.Zero {
-			intctrlutil.InjectZeroResourceLimitIfEmpty(container, name)
-		}
-	}
-}
-
-func hasClusterDefaultResource(resources clusterDefaultResources, name corev1.ResourceName) bool {
-	_, hasRequest := resources.Requests[name]
-	_, hasLimit := resources.Limits[name]
-	return hasRequest || hasLimit
-}
-
-func completeResource(container *corev1.Container, resources clusterDefaultResources, name corev1.ResourceName) {
-	if container.Resources.Requests == nil {
-		container.Resources.Requests = corev1.ResourceList{}
-	}
-	if container.Resources.Limits == nil {
-		container.Resources.Limits = corev1.ResourceList{}
-	}
-
-	request, hasRequest := container.Resources.Requests[name]
-	limit, hasLimit := container.Resources.Limits[name]
-	if hasRequest && hasLimit {
-		return
-	}
-	if hasRequest {
-		container.Resources.Limits[name] = request
-		return
-	}
-	if hasLimit {
-		container.Resources.Requests[name] = limit
-		return
-	}
-
-	request, hasRequest = resources.Requests[name]
-	limit, hasLimit = resources.Limits[name]
-	if hasRequest && !hasLimit {
-		limit = request
-	} else if !hasRequest && hasLimit {
-		request = limit
-	}
-	container.Resources.Requests[name] = request
-	container.Resources.Limits[name] = limit
 }
 
 func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {

@@ -284,12 +284,7 @@ func validateRequiredToParseConfigs() error {
 		}
 	}
 	if clusterDefaultResources := viper.GetString(constant.CfgKeyClusterDefaultResources); clusterDefaultResources != "" {
-		resources := struct {
-			Zero     bool                `json:"zero,omitempty"`
-			Requests corev1.ResourceList `json:"requests,omitempty"`
-			Limits   corev1.ResourceList `json:"limits,omitempty"`
-		}{}
-		if err := json.Unmarshal([]byte(clusterDefaultResources), &resources); err != nil {
+		if _, err := intctrlutil.ParseClusterDefaultResources(clusterDefaultResources); err != nil {
 			return err
 		}
 	}

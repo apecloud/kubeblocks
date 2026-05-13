@@ -328,7 +328,9 @@ func (inPlaceHelper *inplaceRebuildHelper) createTmpPVCsAndPod(reqCtx intctrluti
 		Image:           viper.GetString(constant.KBToolsImage),
 		VolumeMounts:    inPlaceHelper.volumeMounts,
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(container); err != nil {
+		return err
+	}
 	rebuildPodBuilder := builder.NewPodBuilder(inPlaceHelper.targetPod.Namespace, tmpPodName).AddTolerations(inPlaceHelper.targetPod.Spec.Tolerations...).
 		AddContainer(*container).
 		AddVolumes(inPlaceHelper.volumes...).

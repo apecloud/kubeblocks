@@ -40,13 +40,18 @@ const (
 )
 
 func InjectDatasafed(podSpec *corev1.PodSpec, repo *dpv1alpha1.BackupRepo, repoVolumeMountPath string,
-	encryptionConfig *dpv1alpha1.EncryptionConfig, kopiaRepoPath string) {
+	encryptionConfig *dpv1alpha1.EncryptionConfig, kopiaRepoPath string) error {
 	if repo.AccessByMount() {
-		InjectDatasafedWithPVC(podSpec, repo.Status.BackupPVCName, repoVolumeMountPath, kopiaRepoPath)
+		if err := InjectDatasafedWithPVC(podSpec, repo.Status.BackupPVCName, repoVolumeMountPath, kopiaRepoPath); err != nil {
+			return err
+		}
 	} else if repo.AccessByTool() {
-		InjectDatasafedWithConfig(podSpec, repo.Status.ToolConfigSecretName, kopiaRepoPath)
+		if err := InjectDatasafedWithConfig(podSpec, repo.Status.ToolConfigSecretName, kopiaRepoPath); err != nil {
+			return err
+		}
 	}
 	injectEncryptionEnvs(podSpec, encryptionConfig)
+	return nil
 }
 
 func injectEncryptionEnvs(podSpec *corev1.PodSpec, encryptionConfig *dpv1alpha1.EncryptionConfig) {
@@ -68,7 +73,7 @@ func injectEncryptionEnvs(podSpec *corev1.PodSpec, encryptionConfig *dpv1alpha1.
 	injectElements(podSpec, nil, nil, envs)
 }
 
-func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath string, kopiaRepoPath string) {
+func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath string, kopiaRepoPath string) error {
 	volumeName := "dp-backup-data"
 	volume := corev1.Volume{
 		Name: volumeName,
@@ -96,10 +101,10 @@ func InjectDatasafedWithPVC(podSpec *corev1.PodSpec, pvcName string, mountPath s
 		})
 	}
 	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), envs)
-	injectDatasafedInstaller(podSpec)
+	return injectDatasafedInstaller(podSpec)
 }
 
-func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string, kopiaRepoPath string) {
+func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string, kopiaRepoPath string) error {
 	volumeName := "dp-datasafed-config"
 	volume := corev1.Volume{
 		Name: volumeName,
@@ -122,10 +127,10 @@ func InjectDatasafedWithConfig(podSpec *corev1.PodSpec, configSecretName string,
 		})
 	}
 	injectElements(podSpec, toSlice(volume), toSlice(volumeMount), envs)
-	injectDatasafedInstaller(podSpec)
+	return injectDatasafedInstaller(podSpec)
 }
 
-func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
+func injectDatasafedInstaller(podSpec *corev1.PodSpec) error {
 	sharedVolumeName := "dp-datasafed-bin"
 	sharedVolume := corev1.Volume{
 		Name: sharedVolumeName,
@@ -157,9 +162,12 @@ func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
 			AllowPrivilegeEscalation: boolptr.False(),
 		},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&initContainer)
+	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(&initContainer); err != nil {
+		return err
+	}
 	podSpec.InitContainers = append(podSpec.InitContainers, initContainer)
 	injectElements(podSpec, toSlice(sharedVolume), toSlice(sharedVolumeMount), toSlice(env))
+	return nil
 }
 
 func injectElements(podSpec *corev1.PodSpec, volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, envs []corev1.EnvVar) {

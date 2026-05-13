@@ -246,7 +246,9 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
 	legacyPVCName string) error {
-	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	if err := ctrlutil.SetClusterDefaultResourcesFromConfig(&container); err != nil {
+		return err
+	}
 
 	// build pod
 	podSpec := corev1.PodSpec{
@@ -260,9 +262,13 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	kopiaRepoPath := backup.Status.KopiaRepoPath
 	encryptionConfig := backup.Status.EncryptionConfig
 	if backupRepo != nil {
-		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, encryptionConfig, kopiaRepoPath)
+		if err := utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, encryptionConfig, kopiaRepoPath); err != nil {
+			return err
+		}
 	} else {
-		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, kopiaRepoPath)
+		if err := utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, kopiaRepoPath); err != nil {
+			return err
+		}
 	}
 
 	// build job

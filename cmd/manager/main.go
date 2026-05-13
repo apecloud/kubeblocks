@@ -151,6 +151,7 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "1025-65536")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
+	viper.SetDefault(constant.CfgKeyClusterDefaultResources, `{"zero":true}`)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
@@ -283,7 +284,16 @@ func validateRequiredToParseConfigs() error {
 			return err
 		}
 	}
-
+	if clusterDefaultResources := viper.GetString(constant.CfgKeyClusterDefaultResources); clusterDefaultResources != "" {
+		resources := struct {
+			Zero     bool                `json:"zero,omitempty"`
+			Requests corev1.ResourceList `json:"requests,omitempty"`
+			Limits   corev1.ResourceList `json:"limits,omitempty"`
+		}{}
+		if err := json.Unmarshal([]byte(clusterDefaultResources), &resources); err != nil {
+			return err
+		}
+	}
 	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
 		secrets := make([]corev1.LocalObjectReference, 0)
 		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {

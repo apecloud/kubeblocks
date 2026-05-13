@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
@@ -94,6 +95,37 @@ var _ = Describe("Addon controller", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	Context("Addon job resources", func() {
+		AfterEach(func() {
+			viper.Set(constant.CfgKeyAddonJobResources, "")
+		})
+
+		It("should apply configured resources to addon job containers", func() {
+			viper.Set(constant.CfgKeyAddonJobResources, `{"requests":{"cpu":"10m","memory":"16Mi"},"limits":{"cpu":"100m","memory":"64Mi"}}`)
+			addon := &extensionsv1alpha1.Addon{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-addon"},
+				Spec: extensionsv1alpha1.AddonSpec{
+					Helm: &extensionsv1alpha1.HelmTypeInstallSpec{
+						ChartLocationURL: "file://test-chart",
+						ChartsImage:      "test-charts-image",
+					},
+				},
+			}
+
+			job, err := createHelmJobProto(addon)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(job.Spec.Template.Spec.Containers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
+			Expect(job.Spec.Template.Spec.Containers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("16Mi")))
+			Expect(job.Spec.Template.Spec.Containers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
+			Expect(job.Spec.Template.Spec.Containers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("64Mi")))
+
+			Expect(setInitContainer(addon, &job.Spec.Template.Spec)).Should(Succeed())
+			Expect(job.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
+			Expect(job.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("16Mi")))
+		})
 	})
 
 	Context("Addon controller test", func() {

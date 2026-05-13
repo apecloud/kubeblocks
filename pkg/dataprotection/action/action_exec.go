@@ -58,11 +58,7 @@ func (e *ExecAction) Execute(ctx ActionContext) (*dpv1alpha1.ActionStatus, error
 	if err := e.validate(); err != nil {
 		return nil, err
 	}
-	podSpec, err := e.buildPodSpec()
-	if err != nil {
-		return nil, err
-	}
-	e.JobAction.PodSpec = podSpec
+	e.JobAction.PodSpec = e.buildPodSpec()
 	return e.JobAction.Execute(ctx)
 }
 
@@ -79,7 +75,7 @@ func (e *ExecAction) validate() error {
 	return nil
 }
 
-func (e *ExecAction) buildPodSpec() (*corev1.PodSpec, error) {
+func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
 	container := &corev1.Container{
 		Name:            e.Name,
 		Image:           viper.GetString(constant.KBToolsImage),
@@ -95,9 +91,7 @@ func (e *ExecAction) buildPodSpec() (*corev1.PodSpec, error) {
 			"--",
 		}, e.Command...),
 	}
-	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(container); err != nil {
-		return nil, err
-	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	return &corev1.PodSpec{
 		RestartPolicy:      corev1.RestartPolicyNever,
 		ServiceAccountName: e.ServiceAccountName,
@@ -111,7 +105,7 @@ func (e *ExecAction) buildPodSpec() (*corev1.PodSpec, error) {
 		},
 		Affinity:     &corev1.Affinity{},
 		NodeSelector: map[string]string{},
-	}, nil
+	}
 }
 
 var _ Action = &ExecAction{}

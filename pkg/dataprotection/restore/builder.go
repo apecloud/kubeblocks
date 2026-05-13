@@ -317,7 +317,7 @@ func (r *restoreJobBuilder) builderRestoreJobName(jobIndex int) string {
 }
 
 // build the restore job by this builder.
-func (r *restoreJobBuilder) build() (*batchv1.Job, error) {
+func (r *restoreJobBuilder) build() *batchv1.Job {
 	if r.jobName == "" {
 		r.jobName = r.builderRestoreJobName(0)
 	}
@@ -412,9 +412,7 @@ func (r *restoreJobBuilder) build() (*batchv1.Job, error) {
 	// downward backup.status.extras to volumes
 	buildBackupExtrasDownward()
 
-	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(&container); err != nil {
-		return nil, err
-	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
@@ -427,9 +425,7 @@ func (r *restoreJobBuilder) build() (*batchv1.Job, error) {
 	// scheduling policy for job pods. However, the scheduler might not consider the restore job pod
 	// when scheduling other pods if it is completed too quickly, which may lead to incorrect scheduling.
 	// This container ensures that all job pods are considered by the scheduler.
-	if err := r.InjectManagerContainer(&job.Spec.Template.Spec); err != nil {
-		return nil, err
-	}
+	r.InjectManagerContainer(&job.Spec.Template.Spec)
 
 	// 4. inject datasafed if needed
 	if r.buildWithRepo {
@@ -437,22 +433,18 @@ func (r *restoreJobBuilder) build() (*batchv1.Job, error) {
 		kopiaRepoPath := r.backupSet.Backup.Status.KopiaRepoPath
 		encryptionConfig := r.backupSet.Backup.Status.EncryptionConfig
 		if r.backupRepo != nil {
-			if err := utils.InjectDatasafed(&job.Spec.Template.Spec, r.backupRepo, mountPath,
-				encryptionConfig, kopiaRepoPath); err != nil {
-				return nil, err
-			}
+			utils.InjectDatasafed(&job.Spec.Template.Spec, r.backupRepo, mountPath,
+				encryptionConfig, kopiaRepoPath)
 		} else if pvcName := r.backupSet.Backup.Status.PersistentVolumeClaimName; pvcName != "" {
 			// If the backup object was created in an old version that doesn't have the backupRepo field,
 			// use the PVC name field as a fallback.
-			if err := utils.InjectDatasafedWithPVC(&job.Spec.Template.Spec, pvcName, mountPath, kopiaRepoPath); err != nil {
-				return nil, err
-			}
+			utils.InjectDatasafedWithPVC(&job.Spec.Template.Spec, pvcName, mountPath, kopiaRepoPath)
 		}
 	}
-	return job, nil
+	return job
 }
 
-func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) error {
+func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) {
 	container := corev1.Container{
 		Name:            restoreManagerContainerName,
 		Image:           viper.GetString(constant.KBToolsImage),
@@ -460,9 +452,7 @@ func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) erro
 		Resources:       corev1.ResourceRequirements{Limits: nil, Requests: nil},
 		Command:         []string{"sh", "-c"},
 	}
-	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(&container); err != nil {
-		return err
-	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	checkIntervalSeconds := int32(1)
 	volumeName := "downward-volume-sidecard"
@@ -514,5 +504,4 @@ echo "restore manager stopped"
 	}
 	container.Args = []string{buildSyncProgressCommand()}
 	podSpec.Containers = append(podSpec.Containers, container)
-	return nil
 }

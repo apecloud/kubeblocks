@@ -231,9 +231,7 @@ EOF
 		Command:         []string{"sh", "-c"},
 		Args:            []string{createBackupCmd},
 	}
-	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(&container); err != nil {
-		return nil, err
-	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	podSpec := &corev1.PodSpec{
 		ServiceAccountName: s.WorkerServiceAccount,

@@ -177,9 +177,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 		if err != nil {
 			return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
 		}
-		if err := r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand()); err != nil {
-			return nil, err
-		}
+		r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildSyncProgressCommand())
 		return &action.JobAction{
 			Name:         name,
 			ObjectMeta:   *buildBackupJobObjMeta(r.Backup, name),
@@ -192,9 +190,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 		if err != nil {
 			return nil, err
 		}
-		if err := r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildContinuousSyncProgressCommand()); err != nil {
-			return nil, err
-		}
+		r.InjectManagerContainer(podSpec, backupDataAct.SyncProgress, r.buildContinuousSyncProgressCommand())
 		return &action.StatefulSetAction{
 			Name: name,
 			ObjectMeta: metav1.ObjectMeta{
@@ -453,9 +449,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		container.EnvFrom = append(container.EnvFrom, r.ActionSet.Spec.EnvFrom...)
 	}
 
-	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(&container); err != nil {
-		return nil, err
-	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
 
 	podSpec := &corev1.PodSpec{
 		Containers:         []corev1.Container{container},
@@ -478,10 +472,8 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		}
 	}
 
-	if err := utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
-		r.Status.EncryptionConfig, r.Status.KopiaRepoPath); err != nil {
-		return nil, err
-	}
+	utils.InjectDatasafed(podSpec, r.BackupRepo, RepoVolumeMountPath,
+		r.Status.EncryptionConfig, r.Status.KopiaRepoPath)
 	return podSpec, nil
 }
 
@@ -575,7 +567,7 @@ done
 // InjectManagerContainer injects a sidecar that will sync the backup status
 // or push the backup CR object to the backup repo.
 func (r *Request) InjectManagerContainer(podSpec *corev1.PodSpec,
-	sync *dpv1alpha1.SyncProgress, command string) error {
+	sync *dpv1alpha1.SyncProgress, command string) {
 
 	// build container to sync backup progress that will update the backup status
 	container := podSpec.Containers[0].DeepCopy()
@@ -583,9 +575,7 @@ func (r *Request) InjectManagerContainer(podSpec *corev1.PodSpec,
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Resources = corev1.ResourceRequirements{Limits: nil, Requests: nil}
-	if err := intctrlutil.SetClusterDefaultResourcesFromConfig(container); err != nil {
-		return err
-	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
 	container.Command = []string{"sh", "-c"}
 
 	// append some envs
@@ -600,7 +590,6 @@ func (r *Request) InjectManagerContainer(podSpec *corev1.PodSpec,
 	)
 	container.Args = []string{command}
 	podSpec.Containers = append(podSpec.Containers, *container)
-	return nil
 }
 
 func (r *Request) backupActionSetExists() bool {

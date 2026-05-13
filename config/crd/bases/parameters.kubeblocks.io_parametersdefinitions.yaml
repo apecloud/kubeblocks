@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: kubeblocks
   name: parametersdefinitions.parameters.kubeblocks.io
@@ -82,17 +82,13 @@ spec:
                 type: object
               downwardAPIChangeTriggeredActions:
                 description: |-
-                  TODO: migrate DownwardAPITriggeredActions to ComponentDefinition.spec.lifecycleActions
                   Specifies a list of actions to execute specified commands based on Pod labels.
-
 
                   It utilizes the K8s Downward API to mount label information as a volume into the pod.
                   The 'config-manager' sidecar container watches for changes in the role label and dynamically invoke
                   registered commands (usually execute some SQL statements) when a change is detected.
 
-
                   It is designed for scenarios where:
-
 
                   - Replicas with different roles have different configurations, such as Redis primary & secondary replicas.
                   - After a role switch (e.g., from secondary to primary), some changes in configuration are needed
@@ -236,10 +232,8 @@ spec:
                 description: |-
                   Indicates whether to consolidate dynamic reload and restart actions into a single restart.
 
-
                   - If true, updates requiring both actions will result in only a restart, merging the actions.
                   - If false, updates will trigger both actions executed sequentially: first dynamic reload, then restart.
-
 
                   This flag allows for more efficient handling of configuration changes by potentially eliminating
                   an unnecessary reload step.
@@ -255,11 +249,9 @@ spec:
                       Each item is detailed with its name, default value, description, type (e.g. string, integer, float),
                       and constraints (permissible values or the valid range of values).
 
-
                       CUE (Configure, Unify, Execute) is a declarative language designed for defining and validating
                       complex data configurations.
                       It is particularly useful in environments like K8s where complex configurations and validation rules are common.
-
 
                       This script functions as a validator for user-provided configurations, ensuring compliance with
                       the established specifications and constraints.
@@ -279,19 +271,15 @@ spec:
                   Specifies the dynamic reload (dynamic reconfiguration) actions supported by the engine.
                   When set, the controller executes the scripts defined in these actions to handle dynamic parameter updates.
 
-
                   Dynamic reloading is triggered only if both of the following conditions are met:
-
 
                   1. The modified parameters are listed in the `dynamicParameters` field.
                      If `dynamicParameterSelectedPolicy` is set to "all", modifications to `staticParameters`
                      can also trigger a reload.
                   2. `reloadAction` is set.
 
-
                   If `reloadAction` is not set or the modified parameters are not listed in `dynamicParameters`,
                   dynamic reloading will not be triggered.
-
 
                   Example:
                   ```yaml
@@ -321,9 +309,7 @@ spec:
                           The template accesses key-value pairs of updated parameters via the '$' variable.
                           This allows for custom formatting of the input data.
 
-
                           Example template:
-
 
                           ```yaml
                           batchParamsFormatterTemplate: |-
@@ -332,14 +318,12 @@ spec:
                           {{- end }}
                           ```
 
-
                           This example generates batch input data in a key:value format, sorted by keys.
                           ```
                           key1:value1
                           key2:value2
                           key3:value3
                           ```
-
 
                           If not specified, the default format is key=value, sorted by keys, for each updated parameter.
                           ```
@@ -352,10 +336,8 @@ spec:
                         description: |-
                           Controls whether parameter updates are processed individually or collectively in a batch:
 
-
                           - 'True': Processes all changes in one batch reload.
                           - 'False': Processes each change individually.
-
 
                           Defaults to 'False' if unspecified.
                         type: boolean
@@ -389,7 +371,6 @@ spec:
                         description: |-
                           Determines the synchronization mode of parameter updates with "config-manager".
 
-
                           - 'True': Executes reload actions synchronously, pausing until completion.
                           - 'False': Executes reload actions asynchronously, without waiting for completion.
                         type: boolean
@@ -398,7 +379,6 @@ spec:
                           Specifies the tools container image used by ShellTrigger for dynamic reload.
                           If the dynamic reload action is triggered by a ShellTrigger, this field is required.
                           This image must contain all necessary tools for executing the ShellTrigger scripts.
-
 
                           Usually the specified image is referenced by the init container,
                           which is then responsible for copy the tools from the image to a bin volume.
@@ -422,16 +402,16 @@ spec:
                                     be used as the container image for a sidecar.\nThis
                                     is useful for large tool images, such as those
                                     for C++ tools, which may depend on\nnumerous libraries
-                                    (e.g., *.so files).\n\n\nIf enabled, the tool
-                                    image is deployed as a sidecar container image.\n\n\nExamples:\n```yaml\n
+                                    (e.g., *.so files).\n\nIf enabled, the tool image
+                                    is deployed as a sidecar container image.\n\nExamples:\n```yaml\n
                                     toolsSetup::\n   mountPoint: /kb_tools\n   toolConfigs:\n
                                     \    - name: kb-tools\n       asContainerImage:
-                                    true\n       image:  apecloud/oceanbase:4.2.0.0-100010032023083021\n```\n\n\ngenerated
+                                    true\n       image:  apecloud/oceanbase:4.2.0.0-100010032023083021\n```\n\ngenerated
                                     containers:\n```yaml\ninitContainers:\n - name:
                                     install-config-manager-tool\n   image: apecloud/kubeblocks-tools:${version}\n
                                     \  command:\n   - cp\n   - /bin/config_render\n
                                     \  - /opt/tools\n   volumemounts:\n   - name:
-                                    kb-tools\n     mountpath: /opt/tools\n\n\ncontainers:\n
+                                    kb-tools\n     mountpath: /opt/tools\n\ncontainers:\n
                                     - name: config-manager\n   image: apecloud/oceanbase:4.2.0.0-100010032023083021\n
                                     \  imagePullPolicy: IfNotPresent\n\t  command:\n
                                     \  - /opt/tools/reloader\n   - --log-level\n   -
@@ -476,6 +456,8 @@ spec:
                                   maxLength: 63
                                   pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                                   type: string
+                              required:
+                              - name
                               type: object
                             type: array
                         required:
@@ -488,10 +470,8 @@ spec:
                     description: |-
                       Used to match labels on the pod to determine whether a dynamic reload should be performed.
 
-
                       In some scenarios, only specific pods (e.g., primary replicas) need to undergo a dynamic reload.
                       The `reloadedPodSelector` allows you to specify label selectors to target the desired pods for the reload process.
-
 
                       If the `reloadedPodSelector` is not specified or is nil, all pods managed by the workload will be considered for the dynamic
                       reload.
@@ -557,7 +537,6 @@ spec:
                           Determines whether parameter updates should be synchronized with the "config-manager".
                           Specifies the controller's reload strategy:
 
-
                           - If set to 'True', the controller executes the reload action in synchronous mode,
                             pausing execution until the reload completes.
                           - If set to 'False', the controller executes the reload action in asynchronous mode,
@@ -621,7 +600,6 @@ spec:
                   Configures whether the dynamic reload specified in `reloadAction` applies only to dynamic parameters or
                   to all parameters (including static parameters).
 
-
                   - false (default): Only modifications to the dynamic parameters listed in `dynamicParameters`
                     will trigger a dynamic reload.
                   - true: Modifications to both dynamic parameters listed in `dynamicParameters` and static parameters
@@ -646,21 +624,12 @@ spec:
                 description: |-
                   Represents a list of detailed status of the ParametersDescription object.
 
-
                   This field is crucial for administrators and developers to monitor and respond to changes within the ParametersDescription.
                   It provides a history of state transitions and a snapshot of the current state that can be used for
                   automated logic or direct inspection.
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -701,12 +670,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string

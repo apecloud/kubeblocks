@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   labels:
     app.kubernetes.io/name: kubeblocks
   name: servicedescriptors.apps.kubeblocks.io
@@ -75,21 +75,16 @@ spec:
                         description: |-
                           Holds a direct string or an expression that can be evaluated to a string.
 
-
                           It can include variables denoted by $(VAR_NAME).
                           These variables are expanded to the value of the environment variables defined in the container.
                           If a variable cannot be resolved, it remains unchanged in the output.
 
-
                           To escape variable expansion and retain the literal value, use double $ characters.
-
 
                           For example:
 
-
                           - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                           - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                           Default value is an empty string.
                         type: string
@@ -106,7 +101,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its
@@ -168,7 +162,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -187,21 +180,16 @@ spec:
                         description: |-
                           Holds a direct string or an expression that can be evaluated to a string.
 
-
                           It can include variables denoted by $(VAR_NAME).
                           These variables are expanded to the value of the environment variables defined in the container.
                           If a variable cannot be resolved, it remains unchanged in the output.
 
-
                           To escape variable expansion and retain the literal value, use double $ characters.
-
 
                           For example:
 
-
                           - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                           - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                           Default value is an empty string.
                         type: string
@@ -218,7 +206,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its
@@ -280,7 +267,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -297,28 +283,22 @@ spec:
                 description: |-
                   Specifies the endpoint of the external service.
 
-
                   If the service is exposed via a cluster, the endpoint will be provided in the format of `host:port`.
                 properties:
                   value:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -335,7 +315,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -397,7 +376,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -416,21 +394,16 @@ spec:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -447,7 +420,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -509,7 +481,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -528,21 +499,16 @@ spec:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -559,7 +525,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -621,7 +586,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -640,21 +604,16 @@ spec:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -671,7 +630,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -733,7 +691,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -752,9 +709,7 @@ spec:
                   This field categorizes databases by their functionality, protocol and compatibility, facilitating appropriate
                   service integration based on their unique capabilities.
 
-
                   This field is case-insensitive.
-
 
                   It also supports abbreviations for some well-known databases:
                   - "pg", "pgsql", "postgres", "postgresql": PostgreSQL service
@@ -854,21 +809,16 @@ spec:
                         description: |-
                           Holds a direct string or an expression that can be evaluated to a string.
 
-
                           It can include variables denoted by $(VAR_NAME).
                           These variables are expanded to the value of the environment variables defined in the container.
                           If a variable cannot be resolved, it remains unchanged in the output.
 
-
                           To escape variable expansion and retain the literal value, use double $ characters.
-
 
                           For example:
 
-
                           - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                           - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                           Default value is an empty string.
                         type: string
@@ -885,7 +835,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its
@@ -947,7 +896,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -966,21 +914,16 @@ spec:
                         description: |-
                           Holds a direct string or an expression that can be evaluated to a string.
 
-
                           It can include variables denoted by $(VAR_NAME).
                           These variables are expanded to the value of the environment variables defined in the container.
                           If a variable cannot be resolved, it remains unchanged in the output.
 
-
                           To escape variable expansion and retain the literal value, use double $ characters.
-
 
                           For example:
 
-
                           - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                           - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                           Default value is an empty string.
                         type: string
@@ -997,7 +940,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its
@@ -1059,7 +1001,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -1076,28 +1017,22 @@ spec:
                 description: |-
                   Specifies the endpoint of the external service.
 
-
                   If the service is exposed via a cluster, the endpoint will be provided in the format of `host:port`.
                 properties:
                   value:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -1114,7 +1049,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -1176,7 +1110,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -1195,21 +1128,16 @@ spec:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -1226,7 +1154,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -1288,7 +1215,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -1307,21 +1233,16 @@ spec:
                     description: |-
                       Holds a direct string or an expression that can be evaluated to a string.
 
-
                       It can include variables denoted by $(VAR_NAME).
                       These variables are expanded to the value of the environment variables defined in the container.
                       If a variable cannot be resolved, it remains unchanged in the output.
 
-
                       To escape variable expansion and retain the literal value, use double $ characters.
-
 
                       For example:
 
-
                       - "$(VAR_NAME)" will be expanded to the value of the environment variable VAR_NAME.
                       - "$$(VAR_NAME)" will result in "$(VAR_NAME)" in the output, without any variable expansion.
-
 
                       Default value is an empty string.
                     type: string
@@ -1338,7 +1259,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the ConfigMap or its key
@@ -1400,7 +1320,6 @@ spec:
                             description: |-
                               Name of the referent.
                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?
                             type: string
                           optional:
                             description: Specify whether the Secret or its key must
@@ -1419,9 +1338,7 @@ spec:
                   This field categorizes databases by their functionality, protocol and compatibility, facilitating appropriate
                   service integration based on their unique capabilities.
 
-
                   This field is case-insensitive.
-
 
                   It also supports abbreviations for some well-known databases:
                   - "pg", "pgsql", "postgres", "postgresql": PostgreSQL service

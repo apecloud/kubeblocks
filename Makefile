@@ -358,7 +358,7 @@ $(LOCALBIN):
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.1.1
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.5
 ENVTEST_VERSION ?= release-0.21
 
 ## Tool Binaries
@@ -383,7 +383,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-GOLANGCILINT_VERSION = v1.64.8
+GOLANGCILINT_VERSION = v2.11.4
 GOLANGCILINT = $(LOCALBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
 .PHONY: golangci-lint-bin
 golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
@@ -393,7 +393,7 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 		mv "$(LOCALBIN)/golangci-lint" "$(GOLANGCILINT)"; \
 	}
 
-STATICCHECK_VERSION = v0.6.1
+STATICCHECK_VERSION = 2026.1
 STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
 .PHONY: staticcheck-bin
 staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.

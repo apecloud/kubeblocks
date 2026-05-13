@@ -111,5 +111,5 @@ func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) 
 	dialer := &net.Dialer{
 		Timeout: defaultConnectTimeout,
 	}
-	return dialer.Dial("tcp", fmt.Sprintf("%s:%d", s.task.Remote, s.task.Port))
+	return dialer.Dial("tcp", net.JoinHostPort(s.task.Remote, fmt.Sprintf("%d", s.task.Port)))
 }

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"fmt"
 	"slices"
 
 	"k8s.io/utils/ptr"
@@ -91,9 +92,11 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 	if newReplicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
 		defaultTpl := tpls[""]
 		if defaultTpl == nil {
-			// No default template managed by this rollout. Nothing to promote;
-			// skip the spec promotion to avoid a nil-pointer dereference.
-			return nil
+			// The replace transformer is expected to have produced a default
+			// canary template before teardown can be reached. A missing entry
+			// here indicates an inconsistent rollout state; surface it instead
+			// of silently no-op'ing (and instead of dereferencing nil).
+			return fmt.Errorf("component %s: no default rollout-managed template found in cluster spec during teardown", comp.Name)
 		}
 		tpl := defaultTpl.DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.ServiceVersion = tpl.ServiceVersion
@@ -185,9 +188,11 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 	if newReplicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
 		defaultTpl := tpls[""]
 		if defaultTpl == nil {
-			// No default template managed by this rollout. Nothing to promote;
-			// skip the spec promotion to avoid a nil-pointer dereference.
-			return nil
+			// The replace transformer is expected to have produced a default
+			// canary template before teardown can be reached. A missing entry
+			// here indicates an inconsistent rollout state; surface it instead
+			// of silently no-op'ing (and instead of dereferencing nil).
+			return fmt.Errorf("sharding %s: no default rollout-managed template found in cluster spec during teardown", sharding.Name)
 		}
 		tpl := defaultTpl.DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.Template.ServiceVersion = tpl.ServiceVersion

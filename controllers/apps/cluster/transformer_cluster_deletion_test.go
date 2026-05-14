@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -161,6 +162,53 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		})
 		dag = newDag(transCtx.Client.(model.GraphClient))
 		err = transformer.Transform(transCtx, dag)
+		Expect(err).Should(Equal(graph.ErrPrematureStop))
+		Expect(dag.Vertices()).Should(HaveLen(1))
+	})
+
+	It("does not delete backups on wipeout", func() {
+		cluster.Spec.TerminationPolicy = appsv1.WipeOut
+		reader = &appsutil.MockReader{
+			Objects: []client.Object{
+				clusterDef,
+				&dpv1alpha1.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      "test-cluster-backup",
+						Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+					},
+				},
+			},
+		}
+		transCtx.Client = model.NewGraphClient(reader)
+		dag = newDag(transCtx.Client.(model.GraphClient))
+
+		transformer := &clusterDeletionTransformer{}
+		err := transformer.Transform(transCtx, dag)
+		Expect(err).Should(Equal(graph.ErrPrematureStop))
+		Expect(dag.Vertices()).Should(HaveLen(1))
+	})
+
+	It("does not special-case failed backups on non-wipeout deletion", func() {
+		cluster.Spec.TerminationPolicy = appsv1.Delete
+		reader = &appsutil.MockReader{
+			Objects: []client.Object{
+				clusterDef,
+				&dpv1alpha1.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      "test-cluster-failed-backup",
+						Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+					},
+					Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseFailed},
+				},
+			},
+		}
+		transCtx.Client = model.NewGraphClient(reader)
+		dag = newDag(transCtx.Client.(model.GraphClient))
+
+		transformer := &clusterDeletionTransformer{}
+		err := transformer.Transform(transCtx, dag)
 		Expect(err).Should(Equal(graph.ErrPrematureStop))
 		Expect(dag.Vertices()).Should(HaveLen(1))
 	})

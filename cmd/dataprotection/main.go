@@ -337,6 +337,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.ClusterBackupReconciler{
+		Client:   mgr.GetClient(),
+		Recorder: mgr.GetEventRecorderFor("cluster-backup-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterBackup")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.BackupScheduleReconciler{
 		Client:   dputils.NewCompatClient(mgr.GetClient()),
 		Scheme:   mgr.GetScheme(),

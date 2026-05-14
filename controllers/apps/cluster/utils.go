@@ -30,11 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 type gvkNObjKey struct {
@@ -62,32 +60,6 @@ func getAppInstanceML(cluster appsv1.Cluster) client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}
-}
-
-func getFailedBackups(ctx context.Context,
-	cli client.Reader,
-	namespace string,
-	labels client.MatchingLabels,
-	owningNamespacedObjects owningObjects) error {
-	backupList := &dpv1alpha1.BackupList{}
-	if err := cli.List(ctx, backupList, client.InNamespace(namespace), labels); err != nil {
-		return err
-	}
-
-	for i := range backupList.Items {
-		backup := &backupList.Items[i]
-		if backup.Status.Phase != dpv1alpha1.BackupPhaseFailed {
-			continue
-		}
-		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
-			gvr, err := getGVKName(backup, model.GetScheme())
-			if err != nil {
-				return err
-			}
-			owningNamespacedObjects[*gvr] = backup
-		}
-	}
-	return nil
 }
 
 func getOwningNamespacedObjects(ctx context.Context,

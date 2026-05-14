@@ -235,8 +235,15 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		return nil
 	}
 	if total == 0 && cluster.Spec.Restore != nil {
-		// TODO: if cluster-level restore later covers non-PVC resources such as
-		// system accounts, add a non-PVC restore signal before treating this as completed.
+		if expectedRestoreVCTCount(cluster) > 0 {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    appsv1.ConditionTypeRestore,
+				Status:  metav1.ConditionUnknown,
+				Reason:  ReasonRestoreRunning,
+				Message: "Waiting for initial restore PVCs to be created",
+			})
+			return nil
+		}
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    appsv1.ConditionTypeRestore,
 			Status:  metav1.ConditionTrue,
@@ -254,6 +261,21 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		})
 	}
 	return nil
+}
+
+func expectedRestoreVCTCount(cluster *appsv1.Cluster) int {
+	total := 0
+	for i := range cluster.Spec.ComponentSpecs {
+		total += len(cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates)
+	}
+	for i := range cluster.Spec.Shardings {
+		sharding := &cluster.Spec.Shardings[i]
+		total += len(sharding.Template.VolumeClaimTemplates)
+		for j := range sharding.ShardTemplates {
+			total += len(sharding.ShardTemplates[j].VolumeClaimTemplates)
+		}
+	}
+	return total
 }
 
 func findPVCCondition(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {

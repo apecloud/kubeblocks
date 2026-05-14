@@ -163,6 +163,14 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
+	env, err := restoreEnvFromParameters(parameters)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
+	volumeRestorePolicy, err := volumeRestorePolicyFromParameters(parameters)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getPopulatePVCName(pvc.UID),
@@ -184,9 +192,10 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 				DataSourceRef: &dpv1alpha1.VolumeConfig{
 					VolumeSource: pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey],
 				},
-				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
+				VolumeClaimRestorePolicy: volumeRestorePolicy,
 			},
-			Parameters: restoreParametersToPairs(parameters),
+			Env:        env,
+			Parameters: restoreParametersToPairs(restoreActionParameters(parameters)),
 		},
 	}
 	if restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource == "" {
@@ -490,6 +499,56 @@ func restoreParametersToPairs(parameters map[string]string) []dpv1alpha1.Paramet
 	result := make([]dpv1alpha1.ParameterPair, 0, len(parameters))
 	for k, v := range parameters {
 		result = append(result, dpv1alpha1.ParameterPair{Name: k, Value: v})
+	}
+	return result
+}
+
+func restoreEnvFromParameters(parameters map[string]string) ([]corev1.EnvVar, error) {
+	envJSON := parameters[dptypes.RestoreEnvParameterKey]
+	if envJSON == "" {
+		return nil, nil
+	}
+	env := []corev1.EnvVar{}
+	if err := json.Unmarshal([]byte(envJSON), &env); err != nil {
+		return nil, fmt.Errorf("invalid restore env parameter %s: %w", dptypes.RestoreEnvParameterKey, err)
+	}
+	return env, nil
+}
+
+func volumeRestorePolicyFromParameters(parameters map[string]string) (dpv1alpha1.VolumeClaimRestorePolicy, error) {
+	policy := parameters[dptypes.VolumeRestorePolicyParameterKey]
+	if policy == "" {
+		return dpv1alpha1.VolumeClaimRestorePolicyParallel, nil
+	}
+	switch dpv1alpha1.VolumeClaimRestorePolicy(policy) {
+	case dpv1alpha1.VolumeClaimRestorePolicyParallel, dpv1alpha1.VolumeClaimRestorePolicySerial:
+		return dpv1alpha1.VolumeClaimRestorePolicy(policy), nil
+	default:
+		return "", fmt.Errorf("invalid volume restore policy %q", policy)
+	}
+}
+
+func restoreActionParameters(parameters map[string]string) map[string]string {
+	if len(parameters) == 0 {
+		return nil
+	}
+	internalKeys := map[string]struct{}{
+		dptypes.VolumeSourceAnnotationKey:                     {},
+		dptypes.SourceTargetNameAnnotationKey:                 {},
+		dptypes.SourceTargetPodNameAnnotationKey:              {},
+		dptypes.VolumeRestorePolicyParameterKey:               {},
+		dptypes.RestoreEnvParameterKey:                        {},
+		dptypes.DeferPostReadyUntilClusterRunningParameterKey: {},
+	}
+	result := make(map[string]string, len(parameters))
+	for k, v := range parameters {
+		if _, ok := internalKeys[k]; ok {
+			continue
+		}
+		result[k] = v
+	}
+	if len(result) == 0 {
+		return nil
 	}
 	return result
 }

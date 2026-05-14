@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -234,7 +235,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 			Name:      restoreSpec.BackupName,
 			Namespace: restoreSpec.BackupNamespace,
 		},
-		Parameters: restoreParametersToMap(restoreSpec.Parameters),
+		Parameters: restoreSpecToParametersMap(restoreSpec),
 	}
 	if cluster.Spec.Restore.Source.Namespace == "" {
 		cluster.Spec.Restore.Source.Namespace = opsRequest.Namespace
@@ -276,13 +277,27 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	return cluster, nil
 }
 
-func restoreParametersToMap(parameters []dpv1alpha1.ParameterPair) map[string]string {
-	if len(parameters) == 0 {
+func restoreSpecToParametersMap(restoreSpec *opsv1alpha1.Restore) map[string]string {
+	if restoreSpec == nil {
 		return nil
 	}
-	result := make(map[string]string, len(parameters))
-	for _, parameter := range parameters {
+	result := make(map[string]string, len(restoreSpec.Parameters)+3)
+	for _, parameter := range restoreSpec.Parameters {
 		result[parameter.Name] = parameter.Value
+	}
+	if restoreSpec.VolumeRestorePolicy != "" {
+		result[dptypes.VolumeRestorePolicyParameterKey] = restoreSpec.VolumeRestorePolicy
+	}
+	if len(restoreSpec.Env) > 0 {
+		if data, err := json.Marshal(restoreSpec.Env); err == nil {
+			result[dptypes.RestoreEnvParameterKey] = string(data)
+		}
+	}
+	if restoreSpec.DeferPostReadyUntilClusterRunning {
+		result[dptypes.DeferPostReadyUntilClusterRunningParameterKey] = strconv.FormatBool(true)
+	}
+	if len(result) == 0 {
+		return nil
 	}
 	return result
 }

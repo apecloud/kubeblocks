@@ -160,3 +160,38 @@ func TestSetRestoreConditionSucceedsWhenNoRestorePVCsExist(t *testing.T) {
 	require.Equal(t, metav1.ConditionTrue, cond.Status)
 	require.Equal(t, ReasonRestoreCompleted, cond.Reason)
 }
+
+func TestSetRestoreConditionWaitsWhenRestorePVCsAreNotCreatedYet(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster",
+		},
+		Spec: appsv1.ClusterSpec{
+			Restore: &appsv1.ClusterRestore{
+				Source: appsv1.ClusterRestoreSource{
+					APIGroup: testRestoreSourceAPIGroup,
+					Kind:     testRestoreSourceKind,
+					Name:     "backup",
+				},
+			},
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "mysql",
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name: "data",
+				}},
+			}},
+		},
+	}
+
+	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
+
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	require.NotNil(t, cond)
+	require.Equal(t, metav1.ConditionUnknown, cond.Status)
+	require.Equal(t, ReasonRestoreRunning, cond.Reason)
+}

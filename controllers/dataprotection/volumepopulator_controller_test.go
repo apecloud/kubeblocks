@@ -551,6 +551,34 @@ func TestResolveSourceTargetPodNameRequiresExplicitMappingForInstanceTemplate(t 
 	require.Equal(t, "source-mysql-tpl-b-1", sourcePodName)
 }
 
+func TestRestoreParametersKeepRuntimeSettingsOutOfActionParameters(t *testing.T) {
+	parameters := map[string]string{
+		"restore-param":                                       "restore-value",
+		dptypes.SourceTargetPodNameAnnotationKey:              "source-mysql-0",
+		dptypes.VolumeRestorePolicyParameterKey:               string(dpv1alpha1.VolumeClaimRestorePolicySerial),
+		dptypes.DeferPostReadyUntilClusterRunningParameterKey: "true",
+	}
+
+	actionParameters := restoreActionParameters(parameters)
+
+	require.Equal(t, map[string]string{"restore-param": "restore-value"}, actionParameters)
+	policy, err := volumeRestorePolicyFromParameters(parameters)
+	require.NoError(t, err)
+	require.Equal(t, dpv1alpha1.VolumeClaimRestorePolicySerial, policy)
+}
+
+func TestRestoreEnvFromParameters(t *testing.T) {
+	envJSON, err := json.Marshal([]corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}})
+	require.NoError(t, err)
+
+	env, err := restoreEnvFromParameters(map[string]string{
+		dptypes.RestoreEnvParameterKey: string(envJSON),
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}, env)
+}
+
 func TestRebindPVCAndPVWaitsUntilPopulatePVCIsBound(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

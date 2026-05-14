@@ -43,6 +43,7 @@ const (
 	K8SQuantityType         CueType = "quantity"
 	ClassicStorageType      CueType = "storage"
 	ClassicTimeDurationType CueType = "timeDuration"
+	IECQuantityType         CueType = "iecQuantity"
 )
 
 // CueValidate validates cue file

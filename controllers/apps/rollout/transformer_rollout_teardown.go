@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rollout
 
 import (
+	"fmt"
 	"slices"
 
 	"k8s.io/utils/ptr"
@@ -89,7 +90,15 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 	}
 	newReplicas := replaceInstanceTemplateReplicas(tpls)
 	if newReplicas == replicas && spec.Replicas == replicas && checkClusterNCompRunning(transCtx, comp.Name) {
-		tpl := tpls[""].DeepCopy() // use the default template, use DeepCopy to avoid it been removed
+		defaultTpl := tpls[""]
+		if defaultTpl == nil {
+			// The replace transformer is expected to have produced a default
+			// canary template before teardown can be reached. A missing entry
+			// here indicates an inconsistent rollout state; surface it instead
+			// of silently no-op'ing (and instead of dereferencing nil).
+			return fmt.Errorf("component %s: no default rollout-managed template found in cluster spec during teardown", comp.Name)
+		}
+		tpl := defaultTpl.DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.ServiceVersion = tpl.ServiceVersion
 		spec.ComponentDef = tpl.CompDef
 		spec.OfflineInstances = slices.DeleteFunc(spec.OfflineInstances, func(instance string) bool {
@@ -104,7 +113,9 @@ func (t *rolloutTearDownTransformer) compReplace(transCtx *rolloutTransformConte
 			if ptr.Deref(tpl.Replicas, 0) > 0 {
 				return false
 			}
-			return isRolloutManagedInstanceTemplate(rollout, tpl)
+			// Drop drained canaries from this rollout AND any drained canary
+			// left over from previous rollouts (they no longer back pods).
+			return isRolloutManagedInstanceTemplate(rollout, tpl) || hasInstanceTemplateCreatedByAnnotation(tpl)
 		})
 		for i, inst := range spec.Instances {
 			if len(inst.ServiceVersion) > 0 {
@@ -175,7 +186,15 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 	}
 	newReplicas := replaceInstanceTemplateReplicas(tpls)
 	if newReplicas == replicas && spec.Template.Replicas == replicas && checkClusterNShardingRunning(transCtx, sharding.Name) {
-		tpl := tpls[""].DeepCopy() // use the default template, use DeepCopy to avoid it been removed
+		defaultTpl := tpls[""]
+		if defaultTpl == nil {
+			// The replace transformer is expected to have produced a default
+			// canary template before teardown can be reached. A missing entry
+			// here indicates an inconsistent rollout state; surface it instead
+			// of silently no-op'ing (and instead of dereferencing nil).
+			return fmt.Errorf("sharding %s: no default rollout-managed template found in cluster spec during teardown", sharding.Name)
+		}
+		tpl := defaultTpl.DeepCopy() // use the default template, use DeepCopy to avoid it been removed
 		spec.Template.ServiceVersion = tpl.ServiceVersion
 		spec.Template.ComponentDef = tpl.CompDef
 		spec.Template.OfflineInstances = slices.DeleteFunc(spec.Template.OfflineInstances, func(instance string) bool {
@@ -190,7 +209,9 @@ func (t *rolloutTearDownTransformer) shardingReplace(transCtx *rolloutTransformC
 			if ptr.Deref(tpl.Replicas, 0) > 0 {
 				return false
 			}
-			return isRolloutManagedInstanceTemplate(rollout, tpl)
+			// Drop drained canaries from this rollout AND any drained canary
+			// left over from previous rollouts (they no longer back pods).
+			return isRolloutManagedInstanceTemplate(rollout, tpl) || hasInstanceTemplateCreatedByAnnotation(tpl)
 		})
 		for i, inst := range spec.Template.Instances {
 			if len(inst.ServiceVersion) > 0 {

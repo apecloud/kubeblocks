@@ -257,6 +257,19 @@ resources:
   cpu: 500m
   memory: 1Gi
 
+## Default resources for init and sidecar containers in KubeBlocks-managed Cluster workloads.
+## Main containers are not affected; they are controlled by Cluster/Component resources.
+## If a resource name is specified in requests or limits, both request and limit are set for that resource name.
+## For unspecified resource names, zero controls whether to keep the legacy zero-limit behavior.
+##
+## @param clusterDefaultResources.zero
+## @param clusterDefaultResources.requests
+## @param clusterDefaultResources.limits
+clusterDefaultResources:
+  zero: true
+  requests: {}
+  limits: {}
+
 ## @param priorityClassName
 ##
 priorityClassName:
@@ -452,6 +465,9 @@ addonController:
   enabled: true
   jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
+  ## @param addonController.jobResources - resources for addon install/uninstall jobs.
+  ## Set this when namespace LimitRange policies require non-zero requests.
+  jobResources: {}
 
 
 ## @param keepAddons - keep Addon CR objects when delete this chart.

@@ -652,8 +652,14 @@ func buildReplaceInstanceTemplateName(tpl appsv1.InstanceTemplate, suffix string
 }
 
 func isRolloutManagedInstanceTemplate(rollout *appsv1alpha1.Rollout, tpl appsv1.InstanceTemplate) bool {
-	return isRolloutManagedInstanceTemplateName(rollout, tpl.Name) ||
-		hasInstanceTemplateCreatedByAnnotation(tpl)
+	// Only match templates whose name carries this rollout's UID. The
+	// "created-by-rollout" annotation alone is not enough: it is set by every
+	// Rollout that creates a canary template, so an OR-match would treat
+	// leftover canary templates from previous rollouts as managed by the
+	// current one. That misclassification breaks setup (no fresh canary is
+	// created) and panics teardown (the resolved template map has no default
+	// entry; tpls[""].DeepCopy() dereferences nil).
+	return isRolloutManagedInstanceTemplateName(rollout, tpl.Name)
 }
 
 func isRolloutManagedInstanceTemplateName(rollout *appsv1alpha1.Rollout, tplName string) bool {

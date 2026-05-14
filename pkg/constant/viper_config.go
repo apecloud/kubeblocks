@@ -31,6 +31,7 @@ const (
 	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
 	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"
 	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
+	CfgKeyClusterDefaultResources       = "CLUSTER_DEFAULT_RESOURCES"
 
 	// addon config keys
 	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"

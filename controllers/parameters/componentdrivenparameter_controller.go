@@ -33,7 +33,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -89,10 +91,88 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// In addition to the primary `For(Component)` watch, we also watch
+// `ParametersDefinition` so that a Component which was reconciled into the
+// silent "no valid parameter template" branch (because its dependent PD was
+// not yet Available) gets re-enqueued once the matching PD becomes Available.
+// The watch layer stays intentionally notification-only:
+//
+//   - Availability, ServiceVersion, create/update/delete/no-op, and stale
+//     cleanup semantics remain centralized in the reconcile path through
+//     `ResolveCmpdParametersDefs` and `buildComponentParameter`.
+//   - The map function `componentsAffectedByParametersDefinition` only lists
+//     Components from the controller-runtime cache and filters them by the
+//     PD's `Spec.ComponentDef` pattern using the same matcher as
+//     `ResolveCmpdParametersDefs`. Only Components whose `Spec.CompDef` would
+//     have plausibly matched this PD are enqueued.
+//   - controller-runtime runs EnqueueRequestsFromMapFunc on both old and new
+//     objects for Update events, so a PD pattern change enqueues Components
+//     matching either side of the change.
 func (r *ComponentDrivenParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Component{}).
+		Watches(
+			&parametersv1alpha1.ParametersDefinition{},
+			handler.EnqueueRequestsFromMapFunc(r.componentsAffectedByParametersDefinition),
+		).
 		Complete(r)
+}
+
+// componentsAffectedByParametersDefinition resolves the set of Components
+// that may be affected by a change to the given ParametersDefinition.
+//
+// It applies the same `ComponentDef` pattern matching that
+// `ResolveCmpdParametersDefs` uses, so the enqueue set is the dependency
+// inverse of the resolution graph: if the reconcile would have considered
+// this PD as a candidate descriptor, the Component is enqueued.
+//
+// We deliberately do NOT enforce the ServiceVersion narrowing here. The
+// reconcile is idempotent and the existing silent-nil branch covers
+// mismatched SVs, so any over-enqueue collapses cheaply rather than risking
+// a missed re-enqueue.
+//
+// For Update events, controller-runtime calls this map function for both the
+// old and new ParametersDefinition objects. That means ComponentDef pattern
+// changes enqueue Components matching either side of the update; reconcile
+// then creates, updates, deletes, or no-ops from the current dependency state.
+func (r *ComponentDrivenParameterReconciler) componentsAffectedByParametersDefinition(ctx context.Context, obj client.Object) []reconcile.Request {
+	paramsDef, ok := obj.(*parametersv1alpha1.ParametersDefinition)
+	if !ok {
+		return nil
+	}
+	pattern := paramsDef.Spec.ComponentDef
+	if pattern == "" {
+		return nil
+	}
+	logger := log.FromContext(ctx).
+		WithName("ComponentDrivenParameterReconciler").
+		WithValues("ParametersDefinition", paramsDef.Name)
+
+	compList := &appsv1.ComponentList{}
+	if err := r.Client.List(ctx, compList); err != nil {
+		logger.V(1).Info("componentsAffectedByParametersDefinition: list Components failed", "error", err)
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(compList.Items))
+	for i := range compList.Items {
+		comp := &compList.Items[i]
+		if comp.Spec.CompDef == "" {
+			continue
+		}
+		if !component.PrefixOrRegexMatched(comp.Spec.CompDef, pattern) {
+			continue
+		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: comp.Namespace,
+				Name:      comp.Name,
+			},
+		})
+	}
+	logger.V(1).Info("componentsAffectedByParametersDefinition: enqueued",
+		"pattern", pattern, "matched", len(requests), "scanned", len(compList.Items))
+	return requests
 }
 
 func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, component *appsv1.Component) (ctrl.Result, error) {

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -102,10 +103,28 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 // ReconcileAction implements the restore action.
-// It will check the cluster status and update the OpsRequest status.
-// If the cluster is running, it will update the OpsRequest status to Complete.
-// If the cluster is failed, it will update the OpsRequest status to Failed.
-// If the cluster is not running, it will update the OpsRequest status to Running.
+//
+// Failure-gate ordering:
+//
+//  1. cluster.Status.Phase == Running -> OpsSucceedPhase. The cluster
+//     Running phase is authoritative for restore success even when a
+//     Restore CR is still in progress.
+//  2. cluster.IsDeleting() -> OpsFailedPhase. A deleting cluster is a
+//     terminal restore failure regardless of Restore CR state.
+//  3. cluster.Status.Phase == Failed -> consult Restore CRs through the
+//     restore-aware failure gate. A transiently Failed cluster while
+//     Restore CRs are still running is not a terminal restore failure;
+//     it can recover once the restore workflow completes. The failure
+//     gate distinguishes:
+//     - any Restore CR Failed: terminal restore failure.
+//     - all Restore CRs Completed but cluster still Failed: terminal
+//     restore failure.
+//     - some Restore CR still in progress: keep OpsRequest Running.
+//     - empty Restore CR list: pre-create window; quiet bounded
+//     requeue with explicit log.
+//     - Restore CR list API error: non-terminal explicit error,
+//     controller-runtime will requeue.
+//  4. otherwise -> OpsRunningPhase.
 func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	opsRequest := opsRes.OpsRequest
 	clusterDef := opsRequest.Spec.GetClusterName()
@@ -122,13 +141,91 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
 	opsRes.Cluster = cluster
-	// check if the cluster is running
+
+	// Step 1: cluster Running -> Succeed (success contract preserved).
 	if cluster.Status.Phase == appsv1.RunningClusterPhase {
 		return opsv1alpha1.OpsSucceedPhase, 0, nil
-	} else if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
+	}
+	// Step 2: cluster IsDeleting -> Failed (existing deleting contract).
+	if cluster.IsDeleting() {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
+	// Step 3: cluster Failed -> D restore-semantic-aware failure gate.
+	if cluster.Status.Phase == appsv1.FailedClusterPhase {
+		restoreCRs, listErr := r.listRestoreCRsForRestoreOps(reqCtx.Ctx, cli, opsRequest, cluster)
+		if listErr != nil {
+			// List API error: non-terminal + explicit error so the controller
+			// re-queues loudly. Avoids silent allow.
+			return opsv1alpha1.OpsRunningPhase, 0, fmt.Errorf("list Restore CRs for restore failure gate failed: %w", listErr)
+		}
+		if len(restoreCRs) == 0 {
+			// Empty list: possibly a normal pre-create window. Non-terminal
+			// quiet retry with bounded backoff plus an explicit log so the
+			// state is observable. Not silent Running, not terminal Failed.
+			reqCtx.Log.Info("restore failure-gate: cluster Failed but no Restore CRs found yet; requeue",
+				"cluster", cluster.Name, "namespace", cluster.Namespace)
+			return opsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+		}
+		anyRestoreFailed := false
+		allRestoresCompleted := true
+		for i := range restoreCRs {
+			switch restoreCRs[i].Status.Phase {
+			case dpv1alpha1.RestorePhaseFailed:
+				anyRestoreFailed = true
+			case dpv1alpha1.RestorePhaseCompleted:
+				// counts toward all-completed
+			default:
+				// Running, AsDataSource, or empty -> not yet terminal-completed.
+				allRestoresCompleted = false
+			}
+		}
+		if anyRestoreFailed {
+			return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
+		}
+		if allRestoresCompleted {
+			return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
+		}
+		// Race case: at least one Restore CR is still in progress; cluster
+		// transient Failed during restore is NOT a terminal restore failure.
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	// Step 4: other cluster phases -> Running.
 	return opsv1alpha1.OpsRunningPhase, 0, nil
+}
+
+// listRestoreCRsForRestoreOps returns the Restore CRs that belong to the
+// cluster being restored by this OpsRequest. It is used by the restore
+// failure gate to distinguish "in-progress restore" from "terminal restore
+// failure" when the cluster Status.Phase is Failed.
+//
+// Lookup convention: same namespace as the cluster, label-selected by
+// `app.kubernetes.io/instance=<cluster.Name>`. This is the narrowest
+// readily-available filter that ties Restore CRs to a cluster; it can be
+// tightened later (for example with an OpsRequest-id label or an explicit
+// OwnerRef from the OpsRequest to the Restore CR) without changing the
+// failure-gate contract.
+//
+// Known caveat: historical Restore CRs from a prior restore on the same
+// cluster will also match this label. If such stale CRs are still observable
+// in the namespace and are in a terminal Failed phase, the failure gate
+// can prematurely fail a new restore OpsRequest. Operators should clean up
+// stale Restore CRs as part of cluster lifecycle, or a future change can
+// add a stronger filter.
+func (r RestoreOpsHandler) listRestoreCRsForRestoreOps(
+	ctx context.Context,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	cluster *appsv1.Cluster,
+) ([]dpv1alpha1.Restore, error) {
+	_ = opsRequest // reserved for future ops-id-based filtering refinement
+	restoreList := &dpv1alpha1.RestoreList{}
+	if err := cli.List(ctx, restoreList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name},
+	); err != nil {
+		return nil, err
+	}
+	return restoreList.Items, nil
 }
 
 // SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration

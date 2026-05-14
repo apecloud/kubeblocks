@@ -65,9 +65,6 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
-// dataprotection get list and delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
-
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client

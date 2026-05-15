@@ -677,13 +677,12 @@ func (inPlaceHelper *inplaceRebuildHelper) revertReclaimPolicy(reqCtx intctrluti
 		}
 		pv.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimPolicy(reclaimPolicy)
 	}
-	if pv.Annotations != nil {
-		delete(pv.Annotations, rebuildFromAnnotation)
-		delete(pv.Annotations, sourcePVReclaimPolicyAnnotation)
-	}
-	if pv.Labels != nil {
-		delete(pv.Labels, rebuildTmpPVCNameLabel)
-	}
+	// Preserve the rebuild identity metadata (rebuildFromAnnotation,
+	// sourcePVReclaimPolicyAnnotation, rebuildTmpPVCNameLabel) on the PV
+	// so that a later re-entry on this OpsRequest can still resolve the
+	// restored PV via the tmp PVC label. Clearing them eagerly here
+	// caused getRestoredPV to return a Fatal error when the tmp PVC was
+	// cleaned up between reconciles.
 	return cli.Patch(reqCtx.Ctx, pv, patch)
 }
 

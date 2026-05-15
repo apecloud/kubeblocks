@@ -495,6 +495,48 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(sourcePVC.Spec.VolumeName).Should(ContainSubstring("restored-pv-"))
 		})
 
+		It("preserves rebuild identity metadata when reverting the reclaim policy", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRequestName := "rebuild-reclaim-revert-" + testCtx.GetRandomStr()
+			tmpPVCName := "rebuild-tmp-" + testCtx.GetRandomStr()
+			pvName := "restored-pv-" + testCtx.GetRandomStr()
+			pv := testapps.NewPersistentVolumeFactory(testCtx.DefaultNamespace, pvName, tmpPVCName).
+				SetStorage("20Gi").
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObj(&testCtx, pv, func(p *corev1.PersistentVolume) {
+				if p.Labels == nil {
+					p.Labels = map[string]string{}
+				}
+				p.Labels[rebuildTmpPVCNameLabel] = tmpPVCName
+				if p.Annotations == nil {
+					p.Annotations = map[string]string{}
+				}
+				p.Annotations[rebuildFromAnnotation] = opsRequestName
+				p.Annotations[sourcePVReclaimPolicyAnnotation] = string(corev1.PersistentVolumeReclaimDelete)
+				p.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, pv, func() {
+				pv.Status.Phase = corev1.VolumeBound
+			})).Should(Succeed())
+
+			helper := &inplaceRebuildHelper{}
+			Expect(helper.revertReclaimPolicy(reqCtx, k8sClient, pv)).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pv), func(g Gomega, p *corev1.PersistentVolume) {
+				// Reclaim policy must be reverted to the value recorded in
+				// sourcePVReclaimPolicyAnnotation.
+				g.Expect(p.Spec.PersistentVolumeReclaimPolicy).Should(Equal(corev1.PersistentVolumeReclaimDelete))
+				// Rebuild identity metadata must be preserved so a later
+				// re-entry can still resolve the restored PV by its tmp
+				// PVC label even after the tmp PVC itself has been cleaned
+				// up.
+				g.Expect(p.Labels).Should(HaveKeyWithValue(rebuildTmpPVCNameLabel, tmpPVCName))
+				g.Expect(p.Annotations).Should(HaveKeyWithValue(rebuildFromAnnotation, opsRequestName))
+				g.Expect(p.Annotations).Should(HaveKeyWithValue(sourcePVReclaimPolicyAnnotation, string(corev1.PersistentVolumeReclaimDelete)))
+			})).Should(Succeed())
+		})
+
 		testRebuildInstanceWithBackup := func(ignoreRoleCheck bool) {
 			By("init operation resources and backup")
 			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",

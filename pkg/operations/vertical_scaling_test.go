@@ -366,3 +366,109 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		})
 	})
 })
+
+var _ = Describe("verticalScalingHandler resource match contract", func() {
+	// These tests pin the contract that podApplyCompOps must use when comparing
+	// a Pod's actual container resources against the target requirements declared
+	// in a VerticalScaling spec. They distinguish two distinct intents that the
+	// previous implementation collapsed into a single state:
+	//   1) the caller omitted a request key entirely (defaulting it to the limit
+	//      value matches the apiserver behaviour for an absent request);
+	//   2) the caller explicitly set the request value to zero (which is a valid
+	//      Pod spec and must be compared as a literal zero, not silently
+	//      promoted to the limit value).
+	const (
+		clusterCompName = "c1"
+		podName         = "pod-0"
+		containerName   = "main"
+	)
+
+	vs := verticalScalingHandler{}
+
+	makePod := func(limits, requests corev1.ResourceList) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: podName},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: containerName,
+						Resources: corev1.ResourceRequirements{
+							Limits:   limits,
+							Requests: requests,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	makeInstance := func(pod *corev1.Pod) Instance {
+		return &defaultInstance{name: podName, componentName: clusterCompName, pod: pod}
+	}
+
+	makePgRes := func(target corev1.ResourceRequirements) *progressResource {
+		return &progressResource{
+			updatedPodSet:    map[string]string{podName: constant.EmptyInsTemplateName},
+			clusterComponent: &appsv1.ClusterComponentSpec{Name: clusterCompName},
+			compOps: opsv1alpha1.VerticalScaling{
+				ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: clusterCompName},
+				ResourceRequirements: target,
+			},
+		}
+	}
+
+	ops := &opsv1alpha1.OpsRequest{}
+
+	It("treats an explicit requests=0 with limits>0 as a match when the Pod actual has the same explicit zero request", func() {
+		target := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("0"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+		pod := makePod(target.Limits.DeepCopy(), target.Requests.DeepCopy())
+		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeTrue())
+	})
+
+	It("defaults an absent request key to its limit value when comparing", func() {
+		target := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			Requests: corev1.ResourceList{
+				// cpu key is intentionally absent here.
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+		podRequests := corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		}
+		pod := makePod(target.Limits.DeepCopy(), podRequests)
+		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeTrue())
+	})
+
+	It("returns false when the Pod's actual requests differ from the target", func() {
+		target := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+		podRequests := corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("300m"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		}
+		pod := makePod(target.Limits.DeepCopy(), podRequests)
+		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeFalse())
+	})
+})

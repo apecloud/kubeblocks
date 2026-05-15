@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -694,6 +695,21 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if backup.Annotations[dptypes.SkipRestorationCheckAnnotationKey] == trueVal {
 		return false, nil
 	}
+	clusters := &kbappsv1.ClusterList{}
+	if err := r.Client.List(reqCtx.Ctx, clusters); err != nil {
+		return false, err
+	}
+	for i := range clusters.Items {
+		cluster := &clusters.Items[i]
+		if !clusterRestoreReferencesBackup(cluster, backup) {
+			continue
+		}
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, kbappsv1.ConditionTypeRestore)
+		if cond != nil && (cond.Status == metav1.ConditionTrue || cond.Status == metav1.ConditionFalse) {
+			continue
+		}
+		return true, nil
+	}
 	pvcs := &corev1.PersistentVolumeClaimList{}
 	if err := r.Client.List(reqCtx.Ctx, pvcs); err != nil {
 		return false, err
@@ -725,6 +741,21 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 		return true, nil
 	}
 	return false, nil
+}
+
+func clusterRestoreReferencesBackup(cluster *kbappsv1.Cluster, backup *dpv1alpha1.Backup) bool {
+	if cluster.Spec.Restore == nil {
+		return false
+	}
+	source := cluster.Spec.Restore.Source
+	if source.APIGroup != dptypes.DataprotectionAPIGroup || source.Kind != dptypes.BackupKind || source.Name != backup.Name {
+		return false
+	}
+	sourceNamespace := source.Namespace
+	if sourceNamespace == "" {
+		sourceNamespace = cluster.Namespace
+	}
+	return sourceNamespace == backup.Namespace
 }
 
 func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {

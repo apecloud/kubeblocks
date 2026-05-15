@@ -47,6 +47,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -92,6 +93,7 @@ type pvcRestoreDecision struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -1123,6 +1125,14 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	if err != nil {
 		return nil, err
 	}
+	jobActionLabels := constant.GetCompLabels(clusterName, componentName)
+	roleName, err := r.highestPriorityRoleName(reqCtx, comp)
+	if err != nil {
+		return nil, err
+	}
+	if roleName != "" {
+		jobActionLabels[instanceset.RoleLabelKey] = roleName
+	}
 	readyConfig := &dpv1alpha1.ReadyConfig{
 		ExecAction: &dpv1alpha1.ExecAction{
 			Target: dpv1alpha1.ExecActionTarget{
@@ -1135,7 +1145,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 			Target: dpv1alpha1.JobActionTarget{
 				PodSelector: dpv1alpha1.PodSelector{
 					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: constant.GetCompLabels(clusterName, componentName),
+						MatchLabels: jobActionLabels,
 					},
 				},
 			},
@@ -1143,7 +1153,9 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 		ConnectionCredential: connectionCredential,
 	}
 	if sourceTarget != nil {
-		readyConfig.JobAction.Target.PodSelector.Strategy = sourceTarget.PodSelector.Strategy
+		if sourceTarget.PodSelector != nil {
+			readyConfig.JobAction.Target.PodSelector.Strategy = sourceTarget.PodSelector.Strategy
+		}
 		readyConfig.JobAction.RequiredPolicyForAllPodSelection = postReadyRequiredPolicy(sourceTarget)
 		backup := &dpv1alpha1.Backup{}
 		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
@@ -1177,6 +1189,26 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 		return nil, err
 	}
 	return restore, nil
+}
+
+func (r *VolumePopulatorReconciler) highestPriorityRoleName(reqCtx intctrlutil.RequestCtx, comp *appsv1.Component) (string, error) {
+	if comp.Spec.CompDef == "" {
+		return "", nil
+	}
+	compDef := &appsv1.ComponentDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: comp.Spec.CompDef}, compDef); err != nil {
+		return "", err
+	}
+	if len(compDef.Spec.Roles) == 0 {
+		return "", nil
+	}
+	role := compDef.Spec.Roles[0]
+	for i := 1; i < len(compDef.Spec.Roles); i++ {
+		if compDef.Spec.Roles[i].UpdatePriority > role.UpdatePriority {
+			role = compDef.Spec.Roles[i]
+		}
+	}
+	return role.Name, nil
 }
 
 func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (bool, error) {
@@ -1242,15 +1274,18 @@ func (r *VolumePopulatorReconciler) postReadyConnectionCredential(reqCtx intctrl
 	pvc *corev1.PersistentVolumeClaim,
 	backupNamespace, clusterName, componentName string,
 	comp *appsv1.Component) (*dpv1alpha1.ConnectionCredential, error) {
-	accountName := ""
-	if len(comp.Spec.SystemAccounts) == 0 {
+	accountName, err := r.postReadySystemAccountName(reqCtx, comp)
+	if err != nil {
+		return nil, err
+	}
+	if accountName == "" {
 		backup := &dpv1alpha1.Backup{}
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
 			return nil, err
 		}
 		accountsByComponent := map[string]map[string]string{}
 		if encryptedAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]; encryptedAccounts != "" {
-			if err := json.Unmarshal([]byte(encryptedAccounts), &accountsByComponent); err != nil {
+			if err = json.Unmarshal([]byte(encryptedAccounts), &accountsByComponent); err != nil {
 				return nil, intctrlutil.NewFatalError(err.Error())
 			}
 		}
@@ -1265,14 +1300,42 @@ func (r *VolumePopulatorReconciler) postReadyConnectionCredential(reqCtx intctrl
 		if accountName == "" {
 			return nil, nil
 		}
-	} else {
-		accountName = comp.Spec.SystemAccounts[0].Name
 	}
 	return &dpv1alpha1.ConnectionCredential{
 		SecretName:  constant.GenerateAccountSecretName(clusterName, componentName, accountName),
 		PasswordKey: constant.AccountPasswdForSecret,
 		UsernameKey: constant.AccountNameForSecret,
 	}, nil
+}
+
+func (r *VolumePopulatorReconciler) postReadySystemAccountName(reqCtx intctrlutil.RequestCtx, comp *appsv1.Component) (string, error) {
+	if comp.Spec.CompDef == "" {
+		return "", nil
+	}
+	compDef := &appsv1.ComponentDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: comp.Spec.CompDef}, compDef); err != nil {
+		return "", err
+	}
+	disabled := map[string]bool{}
+	for i := range comp.Spec.SystemAccounts {
+		if comp.Spec.SystemAccounts[i].Disabled != nil && *comp.Spec.SystemAccounts[i].Disabled {
+			disabled[comp.Spec.SystemAccounts[i].Name] = true
+		}
+	}
+	firstAccount := ""
+	for i := range compDef.Spec.SystemAccounts {
+		account := compDef.Spec.SystemAccounts[i]
+		if disabled[account.Name] {
+			continue
+		}
+		if firstAccount == "" {
+			firstAccount = account.Name
+		}
+		if account.InitAccount {
+			return account.Name, nil
+		}
+	}
+	return firstAccount, nil
 }
 
 func postReadyRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {

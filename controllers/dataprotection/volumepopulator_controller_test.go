@@ -43,6 +43,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -726,6 +727,82 @@ func TestProvisionOnlyCreatesPopulatePVCWithoutJob(t *testing.T) {
 	jobs := &batchv1.JobList{}
 	require.NoError(t, reconciler.Client.List(context.Background(), jobs))
 	require.Empty(t, jobs.Items)
+}
+
+func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	compDef := &kbappsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql"},
+		Spec: kbappsv1.ComponentDefinitionSpec{
+			Roles: []kbappsv1.ReplicaRole{
+				{Name: "follower", UpdatePriority: 1},
+				{Name: "leader", UpdatePriority: 10},
+			},
+		},
+	}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+		},
+		Spec: kbappsv1.ComponentSpec{CompDef: compDef.Name},
+	}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, compDef).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+
+	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp)
+
+	require.NoError(t, err)
+	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
+	require.NotContains(t, restore.Spec.ReadyConfig.ExecAction.Target.PodSelector.MatchLabels, instanceset.RoleLabelKey)
+}
+
+func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	compDef := &kbappsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql"},
+		Spec: kbappsv1.ComponentDefinitionSpec{
+			SystemAccounts: []kbappsv1.SystemAccount{
+				{Name: "app"},
+				{Name: "root", InitAccount: true},
+			},
+		},
+	}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+		},
+		Spec: kbappsv1.ComponentSpec{CompDef: compDef.Name},
+	}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, compDef).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+
+	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp)
+
+	require.NoError(t, err)
+	require.NotNil(t, restore.Spec.ReadyConfig.ConnectionCredential)
+	require.Equal(t, constant.GenerateAccountSecretName("cluster", "mysql", "root"), restore.Spec.ReadyConfig.ConnectionCredential.SecretName)
 }
 
 func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {

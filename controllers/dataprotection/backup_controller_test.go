@@ -1118,6 +1118,56 @@ var _ = Describe("Backup Controller test", func() {
 			By("check job is created")
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
 		})
+
+		It("delays backup job when Cluster restore references the Backup before PVCs exist", func() {
+			By("creating a cluster restore intent that references the backup")
+			cluster := &kbappsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "restore-cluster",
+					Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+				},
+				Spec: kbappsv1.ClusterSpec{
+					TerminationPolicy: kbappsv1.Delete,
+					Restore: &kbappsv1.ClusterRestore{
+						Source: kbappsv1.ClusterRestoreSource{
+							APIGroup:  dptypes.DataprotectionAPIGroup,
+							Kind:      dptypes.BackupKind,
+							Name:      testdp.BackupName,
+							Namespace: testCtx.DefaultNamespace,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
+
+			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			backupKey := client.ObjectKeyFromObject(backup)
+			jobKey := client.ObjectKey{
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
+				Namespace: backup.Namespace,
+			}
+
+			By("check backup is delayed before restore condition completes")
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
+
+			By("mark cluster restore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(cluster *kbappsv1.Cluster) {
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               kbappsv1.ConditionTypeRestore,
+					Status:             metav1.ConditionTrue,
+					Reason:             "RestoreCompleted",
+					LastTransitionTime: metav1.Now(),
+				}}
+			})).Should(Succeed())
+
+			By("check job is created")
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
+		})
 	})
 
 	When("with exceptional settings", func() {

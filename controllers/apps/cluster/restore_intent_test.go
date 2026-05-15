@@ -195,3 +195,141 @@ func TestSetRestoreConditionWaitsWhenRestorePVCsAreNotCreatedYet(t *testing.T) {
 	require.Equal(t, metav1.ConditionUnknown, cond.Status)
 	require.Equal(t, ReasonRestoreRunning, cond.Reason)
 }
+
+func TestSetRestoreConditionWaitsForAllExpectedRestorePVCs(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster",
+		},
+		Spec: appsv1.ClusterSpec{
+			Restore: &appsv1.ClusterRestore{
+				Source: appsv1.ClusterRestoreSource{
+					APIGroup: testRestoreSourceAPIGroup,
+					Kind:     testRestoreSourceKind,
+					Name:     "backup",
+				},
+			},
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:     "mysql",
+				Replicas: 2,
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name: "data",
+				}},
+			}},
+		},
+	}
+	component := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster-mysql",
+			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
+		},
+		Spec: appsv1.ComponentSpec{
+			Replicas: 2,
+			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+				Name: "data",
+			}},
+		},
+	}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "data-test-cluster-mysql-0",
+			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
+			Annotations: map[string]string{
+				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component, pvc).Build()
+
+	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
+
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	require.NotNil(t, cond)
+	require.Equal(t, metav1.ConditionUnknown, cond.Status)
+	require.Equal(t, ReasonRestoreRunning, cond.Reason)
+}
+
+func TestSetRestoreConditionKeepsTerminalRestoreCondition(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster",
+		},
+		Spec: appsv1.ClusterSpec{
+			Restore: &appsv1.ClusterRestore{
+				Source: appsv1.ClusterRestoreSource{
+					APIGroup: testRestoreSourceAPIGroup,
+					Kind:     testRestoreSourceKind,
+					Name:     "backup",
+				},
+			},
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:     "mysql",
+				Replicas: 3,
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name: "data",
+				}},
+			}},
+		},
+		Status: appsv1.ClusterStatus{
+			Conditions: []metav1.Condition{{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionTrue,
+				Reason:             ReasonRestoreCompleted,
+				LastTransitionTime: metav1.Now(),
+			}},
+		},
+	}
+	component := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster-mysql",
+			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
+		},
+		Spec: appsv1.ComponentSpec{
+			Replicas: 3,
+			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+				Name: "data",
+			}},
+		},
+	}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "data-test-cluster-mysql-0",
+			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
+			Annotations: map[string]string{
+				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component, pvc).Build()
+
+	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
+
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	require.NotNil(t, cond)
+	require.Equal(t, metav1.ConditionTrue, cond.Status)
+	require.Equal(t, ReasonRestoreCompleted, cond.Reason)
+}

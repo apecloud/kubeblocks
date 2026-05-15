@@ -193,13 +193,24 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 }
 
 func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
-	if cluster.Spec.Restore == nil && meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore) == nil {
+	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	if cluster.Spec.Restore == nil && restoreCond == nil {
+		return nil
+	}
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return nil
 	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcList, client.InNamespace(cluster.Namespace), client.MatchingLabels(constant.GetClusterLabels(cluster.Name))); err != nil {
 		return err
 	}
+	componentList := &appsv1.ComponentList{}
+	if err := cli.List(ctx, componentList, client.InNamespace(cluster.Namespace), client.MatchingLabels(constant.GetClusterLabels(cluster.Name))); err != nil {
+		return err
+	}
+	expectedComponents := expectedRestoreComponentCount(cluster)
+	existingComponents := countExistingRestoreComponents(componentList)
+	expectedPVCs := expectedRestorePVCCount(componentList)
 	total := 0
 	completed := 0
 	for i := range pvcList.Items {
@@ -225,7 +236,16 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 			return nil
 		}
 	}
-	if total > 0 && total == completed {
+	if expectedComponents > 0 && existingComponents < expectedComponents {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionUnknown,
+			Reason:  ReasonRestoreRunning,
+			Message: "Waiting for initial restore components to be created",
+		})
+		return nil
+	}
+	if total > 0 && total == completed && total >= expectedPVCs {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    appsv1.ConditionTypeRestore,
 			Status:  metav1.ConditionTrue,
@@ -235,7 +255,7 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		return nil
 	}
 	if total == 0 && cluster.Spec.Restore != nil {
-		if expectedRestoreVCTCount(cluster) > 0 {
+		if expectedRestoreVCTCount(cluster) > 0 || expectedPVCs > 0 {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:    appsv1.ConditionTypeRestore,
 				Status:  metav1.ConditionUnknown,
@@ -261,6 +281,36 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		})
 	}
 	return nil
+}
+
+func expectedRestoreComponentCount(cluster *appsv1.Cluster) int {
+	total := len(cluster.Spec.ComponentSpecs)
+	for i := range cluster.Spec.Shardings {
+		total += int(cluster.Spec.Shardings[i].Shards)
+	}
+	return total
+}
+
+func countExistingRestoreComponents(componentList *appsv1.ComponentList) int {
+	total := 0
+	for i := range componentList.Items {
+		if componentList.Items[i].DeletionTimestamp.IsZero() {
+			total++
+		}
+	}
+	return total
+}
+
+func expectedRestorePVCCount(componentList *appsv1.ComponentList) int {
+	total := 0
+	for i := range componentList.Items {
+		comp := &componentList.Items[i]
+		if !comp.DeletionTimestamp.IsZero() {
+			continue
+		}
+		total += int(comp.Spec.Replicas) * len(comp.Spec.VolumeClaimTemplates)
+	}
+	return total
 }
 
 func expectedRestoreVCTCount(cluster *appsv1.Cluster) int {

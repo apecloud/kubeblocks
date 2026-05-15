@@ -6519,6 +6519,9 @@ spec:
                 required:
                 - source
                 type: object
+                x-kubernetes-validations:
+                - message: restore is immutable
+                  rule: self == oldSelf
               runtimeClassName:
                 description: Specifies runtimeClassName for all Pods managed by this
                   Cluster.

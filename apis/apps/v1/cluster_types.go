@@ -199,6 +199,7 @@ type ClusterSpec struct {
 
 	// Specifies the restore configuration of the Cluster.
 	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="restore is immutable"
 	// +optional
 	Restore *ClusterRestore `json:"restore,omitempty"`
 }

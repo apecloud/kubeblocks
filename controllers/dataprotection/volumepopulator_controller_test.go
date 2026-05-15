@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -577,6 +578,335 @@ func TestRestoreEnvFromParameters(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}, env)
+}
+
+func TestDecidePVCRestoreUsesTargetVolumes(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc := newPVCForRestoreDecision("logs", "mysql", "")
+
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+
+	pvc = newPVCForRestoreDecision("data", "mysql", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeRestoreData, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+}
+
+func TestDecidePVCRestoreTreatsNilTargetVolumesAsProvisionOnly(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady)
+}
+
+func TestDecidePVCRestoreAssignsShardingTargetsByStableComponentOrder(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	cluster := newClusterForShardingDecision(3)
+	components := []client.Object{
+		newComponentForShardingDecision("shard-c"),
+		newComponentForShardingDecision("shard-a"),
+		newComponentForShardingDecision("shard-b"),
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(append([]client.Object{cluster}, components...)...).
+			Build(),
+	}
+	backup := newBackupForRestoreDecision([]string{"data"}, []string{"target-a", "target-b"})
+	pvc := newPVCForRestoreDecision("data", "shard-b", "shard")
+
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeRestoreData, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+	require.Equal(t, "target-b", decision.sourceTarget.Name)
+
+	pvc = newPVCForRestoreDecision("data", "shard-c", "shard")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady)
+	require.Nil(t, decision.sourceTarget)
+}
+
+func TestDecidePVCRestoreFailsWhenShardingTargetsExceedShards(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	cluster := newClusterForShardingDecision(2)
+	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()}
+	backup := newBackupForRestoreDecision([]string{"data"}, []string{"target-a", "target-b", "target-c"})
+	pvc := newPVCForRestoreDecision("data", "shard-a", "shard")
+
+	_, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+}
+
+func TestDecidePVCRestoreRequeuesWhenShardingComponentsIncomplete(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	cluster := newClusterForShardingDecision(3)
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(cluster, newComponentForShardingDecision("shard-a")).
+			Build(),
+	}
+	backup := newBackupForRestoreDecision([]string{"data"}, []string{"target-a", "target-b"})
+	pvc := newPVCForRestoreDecision("data", "shard-a", "shard")
+
+	_, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+}
+
+func TestProvisionOnlyCreatesPopulatePVCWithoutJob(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "logs-target-0",
+			UID:       "logs-target-0-uid",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			},
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreCtx := &pvcRestoreContext{
+		mode: pvcRestoreModeProvisionOnly,
+		restoreMgr: dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+			Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"}},
+		}, nil, scheme, reconciler.Client),
+	}
+
+	err := reconciler.ProvisionOnly(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	populatePVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: getPopulatePVCName(pvc.UID)}, populatePVC))
+	jobs := &batchv1.JobList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), jobs))
+	require.Empty(t, jobs.Items)
+}
+
+func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	previous := newRestorePVCForSerialTest("data-target-0", "")
+	current := newRestorePVCForSerialTest("data-target-1", "")
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	reconciler := &VolumePopulatorReconciler{
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build(),
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+			},
+		},
+	}, nil, scheme, reconciler.Client)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(current), current))
+	current.Spec.DataSourceRef.APIGroup = &apiGroup
+
+	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+}
+
+func TestWaitForSerialPredecessorsAllowsAfterEarlierBoundPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
+	current := newRestorePVCForSerialTest("data-target-1", "")
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+			},
+		},
+	}, nil, scheme, reconciler.Client)
+
+	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
+
+	require.NoError(t, err)
+}
+
+func TestWaitForSerialPredecessorsSkipsProvisionOnlyPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	previous := newRestorePVCForSerialTest("logs-target-0", "")
+	previous.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	previous.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
+	current := newRestorePVCForSerialTest("data-target-1", "")
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+			},
+		},
+	}, nil, scheme, reconciler.Client)
+
+	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
+
+	require.NoError(t, err)
+}
+
+func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolumeClaim {
+	apiGroup := dptypes.DataprotectionAPIGroup
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      name,
+			UID:       types.UID(name + "-uid"),
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey:            constant.AppName,
+				constant.AppInstanceLabelKey:             "cluster",
+				constant.KBAppComponentLabelKey:          "mysql",
+				constant.KBAppPodNameLabelKey:            name,
+				constant.VolumeClaimTemplateNameLabelKey: "data",
+			},
+			Annotations: map[string]string{
+				constant.RestoreSourceKindAnnotationKey:      dptypes.BackupKind,
+				constant.RestoreSourceNamespaceAnnotationKey: "default",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: volumeName,
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+}
+
+func newBackupForRestoreDecision(targetVolumes []string, targets []string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "backup",
+		},
+		Status: dpv1alpha1.BackupStatus{
+			BackupMethod: &dpv1alpha1.BackupMethod{},
+			Target: &dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{Name: "target"},
+			},
+		},
+	}
+	if targetVolumes != nil {
+		backup.Status.BackupMethod.TargetVolumes = &dpv1alpha1.TargetVolumeInfo{Volumes: targetVolumes}
+	}
+	if targets != nil {
+		backup.Status.Target = nil
+		for _, target := range targets {
+			backup.Status.Targets = append(backup.Status.Targets, dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{Name: target},
+			})
+		}
+	}
+	return backup
+}
+
+func newPVCForRestoreDecision(volumeName, componentName, shardingName string) *corev1.PersistentVolumeClaim {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      volumeName + "-" + componentName + "-0",
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey:            constant.AppName,
+				constant.AppInstanceLabelKey:             "cluster",
+				constant.KBAppComponentLabelKey:          componentName,
+				constant.VolumeClaimTemplateNameLabelKey: volumeName,
+			},
+			Annotations: map[string]string{
+				constant.RestoreVolumeTemplateAnnotationKey: volumeName,
+			},
+		},
+	}
+	if shardingName != "" {
+		pvc.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+	}
+	return pvc
+}
+
+func newClusterForShardingDecision(shards int32) *kbappsv1.Cluster {
+	return &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "cluster",
+		},
+		Spec: kbappsv1.ClusterSpec{
+			Shardings: []kbappsv1.ClusterSharding{{
+				Name:   "shard",
+				Shards: shards,
+			}},
+		},
+	}
+}
+
+func newComponentForShardingDecision(componentName string) *kbappsv1.Component {
+	return &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "cluster-" + componentName,
+			Labels: map[string]string{
+				constant.AppManagedByLabelKey:      constant.AppName,
+				constant.AppInstanceLabelKey:       "cluster",
+				constant.KBAppComponentLabelKey:    componentName,
+				constant.KBAppShardingNameLabelKey: "shard",
+			},
+		},
+	}
 }
 
 func TestRebindPVCAndPVWaitsUntilPopulatePVCIsBound(t *testing.T) {

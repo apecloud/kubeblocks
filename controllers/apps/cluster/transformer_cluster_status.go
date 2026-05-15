@@ -308,22 +308,62 @@ func expectedRestorePVCCount(componentList *appsv1.ComponentList) int {
 		if !comp.DeletionTimestamp.IsZero() {
 			continue
 		}
-		total += int(comp.Spec.Replicas) * len(comp.Spec.VolumeClaimTemplates)
+		total += expectedRestorePVCCountForComponentSpec(comp.Spec.Replicas, comp.Spec.VolumeClaimTemplates, comp.Spec.Instances)
 	}
 	return total
+}
+
+func expectedRestorePVCCountForComponentSpec(replicas int32, vcts []appsv1.PersistentVolumeClaimTemplate, instances []appsv1.InstanceTemplate) int {
+	total := 0
+	replicasInTemplates := int32(0)
+	for i := range instances {
+		instanceReplicas := int32(1)
+		if instances[i].Replicas != nil {
+			instanceReplicas = *instances[i].Replicas
+		}
+		if instanceReplicas < 0 {
+			instanceReplicas = 0
+		}
+		replicasInTemplates += instanceReplicas
+		total += int(instanceReplicas) * mergedRestoreVCTCount(vcts, instances[i].VolumeClaimTemplates)
+	}
+	defaultReplicas := replicas - replicasInTemplates
+	if defaultReplicas < 0 {
+		defaultReplicas = 0
+	}
+	return total + int(defaultReplicas)*len(vcts)
+}
+
+func mergedRestoreVCTCount(base []appsv1.PersistentVolumeClaimTemplate, overrides []appsv1.PersistentVolumeClaimTemplate) int {
+	names := map[string]struct{}{}
+	for i := range base {
+		names[base[i].Name] = struct{}{}
+	}
+	for i := range overrides {
+		names[overrides[i].Name] = struct{}{}
+	}
+	return len(names)
 }
 
 func expectedRestoreVCTCount(cluster *appsv1.Cluster) int {
 	total := 0
 	for i := range cluster.Spec.ComponentSpecs {
-		total += len(cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates)
+		total += restoreTemplateCount(cluster.Spec.ComponentSpecs[i].VolumeClaimTemplates, cluster.Spec.ComponentSpecs[i].Instances)
 	}
 	for i := range cluster.Spec.Shardings {
 		sharding := &cluster.Spec.Shardings[i]
-		total += len(sharding.Template.VolumeClaimTemplates)
+		total += restoreTemplateCount(sharding.Template.VolumeClaimTemplates, sharding.Template.Instances)
 		for j := range sharding.ShardTemplates {
-			total += len(sharding.ShardTemplates[j].VolumeClaimTemplates)
+			total += restoreTemplateCount(sharding.ShardTemplates[j].VolumeClaimTemplates, sharding.ShardTemplates[j].Instances)
 		}
+	}
+	return total
+}
+
+func restoreTemplateCount(vcts []appsv1.PersistentVolumeClaimTemplate, instances []appsv1.InstanceTemplate) int {
+	total := len(vcts)
+	for i := range instances {
+		total += len(instances[i].VolumeClaimTemplates)
 	}
 	return total
 }

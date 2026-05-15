@@ -36,13 +36,13 @@ func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.Clu
 		return nil
 	}
 	for _, comp := range components {
-		applyRestoreIntentToVCTs(cluster, comp.Name, comp.VolumeClaimTemplates, completed)
+		applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
 	}
 	for _, sharding := range shardings {
-		applyRestoreIntentToVCTs(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, completed)
+		applyRestoreIntentToComponent(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances, completed)
 		for i := range sharding.ShardTemplates {
 			template := &sharding.ShardTemplates[i]
-			applyRestoreIntentToVCTs(cluster, template.Name, template.VolumeClaimTemplates, completed)
+			applyRestoreIntentToComponent(cluster, template.Name, template.VolumeClaimTemplates, template.Instances, completed)
 		}
 	}
 	return nil
@@ -51,6 +51,13 @@ func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.Clu
 func isClusterRestoreCompleted(cluster *appsv1.Cluster) bool {
 	cond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
 	return cond != nil && cond.Status == metav1.ConditionTrue
+}
+
+func applyRestoreIntentToComponent(cluster *appsv1.Cluster, componentName string, vcts []appsv1.PersistentVolumeClaimTemplate, instances []appsv1.InstanceTemplate, completed bool) {
+	applyRestoreIntentToVCTs(cluster, componentName, vcts, completed)
+	for i := range instances {
+		applyRestoreIntentToVCTs(cluster, componentName, instances[i].VolumeClaimTemplates, completed)
+	}
 }
 
 func applyRestoreIntentToVCTs(cluster *appsv1.Cluster, componentName string, vcts []appsv1.PersistentVolumeClaimTemplate, completed bool) {

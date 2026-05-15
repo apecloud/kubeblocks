@@ -87,6 +87,18 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
 
+	// instrumentation: emit a compact, deterministic snapshot of the old pods
+	// observed by this reconcile pass. Logged at V(1) so it does not appear in
+	// the default INFO stream. The `namespace` and `instanceSet` keys are
+	// emitted as separate structured fields so log consumers can filter by
+	// (namespace, instanceSet) without parsing a combined "ns/name" string.
+	tree.Logger.V(1).Info(
+		"alignment: oldInstance snapshot",
+		"namespace", its.Namespace,
+		"instanceSet", its.Name,
+		"oldPods", formatOldInstanceMapSnapshot(oldInstanceMap, its.Spec.MinReadySeconds),
+	)
+
 	// default OrderedReady policy
 	isOrderedReady := true
 	concurrency := 0
@@ -98,6 +110,23 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		isOrderedReady = false
 	}
 	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
+
+	// instrumentation: emit the four name sets used by the alignment loop plus
+	// the policy/concurrency context. Logged at V(1).
+	{
+		setSnapshot := formatNameSetSnapshot(oldNameSet, newNameSet, createNameSet, deleteNameSet)
+		tree.Logger.V(1).Info(
+			"alignment: nameSet snapshot",
+			"namespace", its.Namespace,
+			"instanceSet", its.Name,
+			"podManagementPolicy", string(its.Spec.PodManagementPolicy),
+			"concurrencyInit", concurrency,
+			"oldNameSet", setSnapshot["oldNameSet"],
+			"newNameSet", setSnapshot["newNameSet"],
+			"createNameSet", setSnapshot["createNameSet"],
+			"deleteNameSet", setSnapshot["deleteNameSet"],
+		)
+	}
 
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
@@ -124,13 +153,75 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	for i, name := range newNameList {
 		if _, ok := createNameSet[name]; !ok {
 			currentAlignedNameList = append(currentAlignedNameList, name)
+			// instrumentation: this desired name already has a corresponding
+			// pod in oldInstanceMap, so the alignment loop reuses the existing
+			// instance instead of creating a new one. Logged at V(1) with a
+			// nil-safe pod snapshot so the "expected old pod but got nil" case
+			// is distinguishable from the normal reuse case via the
+			// `oldPodFound=false` field rendered by formatPodSnapshot.
+			// `namespace`, `instanceSet`, `podName`, and `podUID` are emitted
+			// as separate structured fields so log consumers can filter by
+			// (namespace, instanceSet, podName/uid) without parsing the
+			// embedded snapshot string.
+			existing := oldInstanceMap[name]
+			var podUID string
+			if existing != nil {
+				podUID = string(existing.UID)
+			}
+			tree.Logger.V(1).Info(
+				"alignment: reuse-existing-instance",
+				"namespace", its.Namespace,
+				"instanceSet", its.Name,
+				"podName", name,
+				"podUID", podUID,
+				"podSnapshot", formatPodSnapshot(name, existing, its.Spec.MinReadySeconds),
+			)
 			continue
 		}
 		if !isOrderedReady && concurrency <= 0 {
+			// instrumentation: parallel pod-management has exhausted its
+			// per-reconcile concurrency budget, so no more new pods will be
+			// created in this pass. Logged at V(1). `podName` carries the
+			// desired name that did NOT get created in this pass so callers
+			// can filter on the blocked pod even though no pod object yet
+			// exists; `podUID` is empty because the pod has not been
+			// constructed.
+			tree.Logger.V(1).Info(
+				"alignment: stop-create-loop",
+				"namespace", its.Namespace,
+				"instanceSet", its.Name,
+				"reason", "concurrency-exhausted",
+				"podName", name,
+				"podUID", "",
+				"podManagementPolicy", string(its.Spec.PodManagementPolicy),
+				"concurrency", concurrency,
+				"currentIndex", i,
+				"totalNameCount", len(newNameList),
+			)
 			break
 		}
 		predecessor := getPredecessor(i)
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
+			// instrumentation: ordered pod-management is waiting for the
+			// previous-ordinal pod to become Available before it will create
+			// the next pod. Logged at V(1). The predecessor snapshot is
+			// nil-safe; in this branch predecessor is guaranteed non-nil by
+			// the guard above but formatPodSnapshot still handles nil for
+			// defensive reasons. `predecessorPodUID` is emitted as a separate
+			// structured field for filtering.
+			tree.Logger.V(1).Info(
+				"alignment: stop-create-loop",
+				"namespace", its.Namespace,
+				"instanceSet", its.Name,
+				"reason", "predecessor-not-available",
+				"podName", name,
+				"podUID", "",
+				"podManagementPolicy", "OrderedReady",
+				"currentIndex", i,
+				"predecessorPodName", predecessor.Name,
+				"predecessorPodUID", string(predecessor.UID),
+				"predecessorSnapshot", formatPodSnapshot(predecessor.Name, predecessor, its.Spec.MinReadySeconds),
+			)
 			break
 		}
 		inst, err := buildInstanceByTemplate(name, nameToTemplateMap[name], its, "")

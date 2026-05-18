@@ -1229,6 +1229,15 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intct
 	return true, nil
 }
 
+func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {
+	for i := range pvc.Status.Conditions {
+		if string(pvc.Status.Conditions[i].Type) == conditionType {
+			return &pvc.Status.Conditions[i]
+		}
+	}
+	return nil
+}
+
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	componentName := restoreComponentName(pvc)

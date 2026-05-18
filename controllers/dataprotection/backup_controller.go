@@ -728,15 +728,6 @@ func clusterRestoreReferencesBackup(cluster *kbappsv1.Cluster, backup *dpv1alpha
 	return sourceNamespace == backup.Namespace
 }
 
-func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {
-	for i := range pvc.Status.Conditions {
-		if string(pvc.Status.Conditions[i].Type) == conditionType {
-			return &pvc.Status.Conditions[i]
-		}
-	}
-	return nil
-}
-
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,
 // backup phase should be Completed.
 func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.RequestCtx,

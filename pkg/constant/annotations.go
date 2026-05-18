@@ -30,7 +30,6 @@ const (
 	OpsRequestAnnotationKey              = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	ReconcileAnnotationKey               = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
 	RestartAnnotationKey                 = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target"
 
 	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
 	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"
@@ -91,7 +90,6 @@ const (
 
 func InheritedAnnotations() []string {
 	return []string{
-		BackupSourceTargetAnnotationKey,
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
 		LegacyConfigManagerRequiredAnnotationKey,

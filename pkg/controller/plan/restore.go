@@ -174,8 +174,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	if len(templates) == 0 {
 		return nil, nil
 	}
-	sourceTargetName := comp.Annotations[constant.BackupSourceTargetAnnotationKey]
-	sourceTarget := dputils.GetBackupStatusTarget(backupObj, sourceTargetName)
+	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -237,7 +236,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		}
 		jobActionLabels[instanceset.RoleLabelKey] = highestPriorityRole.Name
 	}
-	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]
+	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PostReady, ""),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -270,7 +269,6 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 			},
 		},
 	}
-	sourceTarget := dputils.GetBackupStatusTarget(backupObj, sourceTargetName)
 	if sourceTarget != nil {
 		// TODO: input the pod selection strategy by user.
 		restore.Spec.ReadyConfig.JobAction.Target.PodSelector.Strategy = sourceTarget.PodSelector.Strategy
@@ -281,6 +279,19 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		restore.Spec.ReadyConfig.JobAction.Target.VolumeMounts = backupMethod.TargetVolumes.VolumeMounts
 	}
 	return r.createRestoreAndWait(compObj, restore)
+}
+
+func backupSourceTargetForRestore(backupObj *dpv1alpha1.Backup) (string, *dpv1alpha1.BackupStatusTarget) {
+	if backupObj == nil {
+		return "", nil
+	}
+	if backupObj.Status.Target != nil {
+		return "", backupObj.Status.Target
+	}
+	if len(backupObj.Status.Targets) == 1 {
+		return backupObj.Status.Targets[0].Name, &backupObj.Status.Targets[0]
+	}
+	return "", nil
 }
 
 func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {

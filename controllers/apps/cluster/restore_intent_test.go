@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/stretchr/testify/require"
@@ -106,6 +105,7 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 
 	vct := component.VolumeClaimTemplates[0]
 	require.Nil(t, vct.Spec.DataSourceRef)
+	require.Nil(t, vct.Annotations)
 	require.NotContains(t, vct.Annotations, constant.RestoreSourceKindAnnotationKey)
 	require.NotContains(t, vct.Annotations, constant.RestorePITRAnnotationKey)
 }
@@ -292,26 +292,13 @@ func TestSetRestoreConditionWaitsForAllExpectedRestorePVCs(t *testing.T) {
 			Replicas: 2,
 			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
 				Name: "data",
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+				},
 			}},
 		},
 	}
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test-ns",
-			Name:      "data-test-cluster-mysql-0",
-			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
-			Annotations: map[string]string{
-				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
-			},
-		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
-				Status: corev1.ConditionTrue,
-			}},
-		},
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component, pvc).Build()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
 
 	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
 
@@ -319,6 +306,64 @@ func TestSetRestoreConditionWaitsForAllExpectedRestorePVCs(t *testing.T) {
 	require.NotNil(t, cond)
 	require.Equal(t, metav1.ConditionUnknown, cond.Status)
 	require.Equal(t, ReasonRestoreRunning, cond.Reason)
+}
+
+func TestSetRestoreConditionSucceedsWhenAllComponentsRestoreCompleted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster",
+		},
+		Spec: appsv1.ClusterSpec{
+			Restore: &appsv1.ClusterRestore{
+				Source: appsv1.ClusterRestoreSource{
+					APIGroup: testRestoreSourceAPIGroup,
+					Kind:     testRestoreSourceKind,
+					Name:     "backup",
+				},
+			},
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:     "mysql",
+				Replicas: 1,
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name: "data",
+				}},
+			}},
+		},
+	}
+	component := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-ns",
+			Name:      "test-cluster-mysql",
+			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
+		},
+		Spec: appsv1.ComponentSpec{
+			Replicas: 1,
+			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+				Name: "data",
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+				},
+			}},
+		},
+		Status: appsv1.ComponentStatus{
+			Conditions: []metav1.Condition{{
+				Type:   appsv1.ConditionTypeRestore,
+				Status: metav1.ConditionTrue,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
+
+	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
+
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	require.NotNil(t, cond)
+	require.Equal(t, metav1.ConditionTrue, cond.Status)
+	require.Equal(t, ReasonRestoreCompleted, cond.Reason)
 }
 
 func TestSetRestoreConditionWaitsForInstanceTemplateRestorePVCs(t *testing.T) {
@@ -367,23 +412,28 @@ func TestSetRestoreConditionWaitsForInstanceTemplateRestorePVCs(t *testing.T) {
 			Replicas: 2,
 			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
 				Name: "data",
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+				},
 			}},
 			Instances: []appsv1.InstanceTemplate{{
 				Name:     "hot",
 				Replicas: &replicas,
 				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
 					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+					},
 				}, {
 					Name: "log",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+					},
 				}},
 			}},
 		},
 	}
-	pvcs := []client.Object{
-		restorePVC("test-ns", "data-test-cluster-mysql-0"),
-		restorePVC("test-ns", "data-test-cluster-mysql-hot-0"),
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(append(pvcs, component)...).Build()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
 
 	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
 
@@ -437,26 +487,13 @@ func TestSetRestoreConditionKeepsTerminalRestoreCondition(t *testing.T) {
 			Replicas: 3,
 			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
 				Name: "data",
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
+				},
 			}},
 		},
 	}
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test-ns",
-			Name:      "data-test-cluster-mysql-0",
-			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
-			Annotations: map[string]string{
-				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
-			},
-		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
-				Status: corev1.ConditionTrue,
-			}},
-		},
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component, pvc).Build()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
 
 	require.NoError(t, (&clusterStatusTransformer{}).setRestoreCondition(context.Background(), cli, cluster))
 
@@ -464,23 +501,4 @@ func TestSetRestoreConditionKeepsTerminalRestoreCondition(t *testing.T) {
 	require.NotNil(t, cond)
 	require.Equal(t, metav1.ConditionTrue, cond.Status)
 	require.Equal(t, ReasonRestoreCompleted, cond.Reason)
-}
-
-func restorePVC(namespace, name string) *corev1.PersistentVolumeClaim {
-	return &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-			Labels:    constant.GetCompLabels("test-cluster", "mysql"),
-			Annotations: map[string]string{
-				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
-			},
-		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
-				Status: corev1.ConditionTrue,
-			}},
-		},
-	}
 }

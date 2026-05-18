@@ -364,78 +364,57 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return nil
 	}
-	clusterName := transCtx.SynthesizeComponent.ClusterName
-	if clusterName == "" {
-		clusterName = t.comp.Labels[constant.AppInstanceLabelKey]
-	}
-	componentName := transCtx.SynthesizeComponent.Name
-	if componentName == "" {
-		componentName = t.comp.Labels[constant.KBAppComponentLabelKey]
-	}
-	if clusterName == "" || componentName == "" {
-		return nil
-	}
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := transCtx.Client.List(transCtx.Context, pvcList,
-		client.InNamespace(t.comp.Namespace), client.MatchingLabels(constant.GetCompLabels(clusterName, componentName))); err != nil {
-		return err
-	}
-	total := 0
-	completed := 0
 	expectedPVCs := expectedComponentRestorePVCCount(transCtx.SynthesizeComponent)
-	for i := range pvcList.Items {
-		pvc := &pvcList.Items[i]
-		if pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
-			continue
-		}
-		total++
-		cond := findPVCRestoreCondition(pvc)
-		if cond == nil {
-			continue
-		}
-		switch cond.Status {
-		case corev1.ConditionTrue:
-			completed++
-		case corev1.ConditionFalse:
-			meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
-				Type:               appsv1.ConditionTypeRestore,
-				Status:             metav1.ConditionFalse,
-				ObservedGeneration: t.comp.Generation,
-				Reason:             reasonRestoreFailed,
-				Message:            fmt.Sprintf("PVC %s restore failed: %s", pvc.Name, cond.Message),
-			})
-			return nil
-		}
-	}
-	if total == 0 {
-		if expectedPVCs > 0 {
-			meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
-				Type:               appsv1.ConditionTypeRestore,
-				Status:             metav1.ConditionUnknown,
-				ObservedGeneration: t.comp.Generation,
-				Reason:             reasonRestoreRunning,
-				Message:            "Waiting for initial restore PVCs to be created",
-			})
-		}
+	if expectedPVCs == 0 {
 		return nil
 	}
-	if total == completed && total >= expectedPVCs {
+	if t.runningITS == nil {
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             reasonRestoreRunning,
+			Message:            "Waiting for workload restore status",
+		})
+		return nil
+	}
+	workloadCond := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceRestore))
+	if workloadCond == nil {
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             reasonRestoreRunning,
+			Message:            "Waiting for workload restore status",
+		})
+		return nil
+	}
+	switch workloadCond.Status {
+	case metav1.ConditionTrue:
 		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: t.comp.Generation,
 			Reason:             reasonRestoreCompleted,
-			Message:            "All initial restore PVCs have completed",
+			Message:            workloadCond.Message,
 		})
-		return nil
+	case metav1.ConditionFalse:
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             reasonRestoreFailed,
+			Message:            workloadCond.Message,
+		})
+	default:
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             reasonRestoreRunning,
+			Message:            workloadCond.Message,
+		})
 	}
-	meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
-		Type:               appsv1.ConditionTypeRestore,
-		Status:             metav1.ConditionUnknown,
-		ObservedGeneration: t.comp.Generation,
-		Reason:             reasonRestoreRunning,
-		Message:            "Waiting for initial restore PVCs to complete",
-	})
 	return nil
 }
 
@@ -493,15 +472,6 @@ func coreVCTHasRestoreIntent(vct *corev1.PersistentVolumeClaimTemplate) bool {
 
 func appVCTHasRestoreIntent(vct *appsv1.PersistentVolumeClaimTemplate) bool {
 	return vct.Annotations[constant.RestoreSourceKindAnnotationKey] != ""
-}
-
-func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {
-	for i := range pvc.Status.Conditions {
-		if string(pvc.Status.Conditions[i].Type) == appsv1.ConditionTypeRestore {
-			return &pvc.Status.Conditions[i]
-		}
-	}
-	return nil
 }
 
 func (t *componentStatusTransformer) checkNSetCondition(

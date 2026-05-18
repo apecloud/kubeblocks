@@ -75,11 +75,11 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
-	if err = applyClusterRestoreIntent(cluster, transCtx.components, transCtx.shardings); err != nil {
+	if err = t.checkNPatchCRDAPIVersionKey(transCtx); err != nil {
 		return err
 	}
 
-	if err = t.checkNPatchCRDAPIVersionKey(transCtx); err != nil {
+	if err = applyClusterRestoreIntent(cluster, transCtx.components, transCtx.shardings); err != nil {
 		return err
 	}
 

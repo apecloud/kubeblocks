@@ -117,6 +117,9 @@ func cleanupRestoreIntentFromVCT(vct *appsv1.PersistentVolumeClaimTemplate) {
 		delete(vct.Annotations, constant.RestoreParametersAnnotationKey)
 		delete(vct.Annotations, constant.RestoreComponentAnnotationKey)
 		delete(vct.Annotations, constant.RestoreVolumeTemplateAnnotationKey)
+		if len(vct.Annotations) == 0 {
+			vct.Annotations = nil
+		}
 	}
 	vct.Spec.DataSourceRef = nil
 }

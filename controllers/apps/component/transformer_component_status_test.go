@@ -158,32 +158,31 @@ var _ = Describe("component status transformer conditions", func() {
 		transformer.synthesizeComp = transCtx.SynthesizeComponent
 	})
 
-	newRestorePVC := func(name string, status corev1.ConditionStatus) *corev1.PersistentVolumeClaim {
-		pvc := &corev1.PersistentVolumeClaim{
+	setExpectedRestoreVCT := func() {
+		transCtx.SynthesizeComponent.Replicas = 1
+		transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      name,
-				Labels:    constant.GetCompLabels(clusterName, compName),
+				Name: "data",
 				Annotations: map[string]string{
 					constant.RestoreSourceKindAnnotationKey: "Backup",
 				},
 			},
-		}
-		if status != "" {
-			pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-				Type:    corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
-				Status:  status,
-				Reason:  "Restore",
-				Message: "restore status",
-			}}
-		}
-		return pvc
+		}}
+	}
+
+	setWorkloadRestoreCondition := func(status metav1.ConditionStatus) {
+		runningITS.Status.Conditions = []metav1.Condition{{
+			Type:    string(workloads.InstanceRestore),
+			Status:  status,
+			Reason:  workloads.ReasonRestoreRunning,
+			Message: "workload restore status",
+		}}
 	}
 
 	Context("reconcileRestoreCondition", func() {
 		It("should be running while restore PVCs are not completed", func() {
-			pvc := newRestorePVC("data-mysql-0", corev1.ConditionUnknown)
-			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(metav1.ConditionUnknown)
 
 			err := transformer.reconcileRestoreCondition(transCtx)
 			Expect(err).Should(BeNil())
@@ -195,8 +194,8 @@ var _ = Describe("component status transformer conditions", func() {
 		})
 
 		It("should complete when all restore PVCs are completed", func() {
-			pvc := newRestorePVC("data-mysql-0", corev1.ConditionTrue)
-			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(metav1.ConditionTrue)
 
 			err := transformer.reconcileRestoreCondition(transCtx)
 			Expect(err).Should(BeNil())
@@ -233,12 +232,6 @@ var _ = Describe("component status transformer conditions", func() {
 					},
 				}},
 			}}
-			pvcs := []client.Object{
-				newRestorePVC("data-mysql-0", corev1.ConditionTrue),
-				newRestorePVC("data-mysql-hot-0", corev1.ConditionTrue),
-			}
-			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: append([]client.Object{compDef, comp}, pvcs...)})
-
 			err := transformer.reconcileRestoreCondition(transCtx)
 			Expect(err).Should(BeNil())
 
@@ -264,8 +257,7 @@ var _ = Describe("component status transformer conditions", func() {
 					},
 				},
 			}}
-			pvc := newRestorePVC("data-mysql-0", corev1.ConditionTrue)
-			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+			setWorkloadRestoreCondition(metav1.ConditionFalse)
 
 			err := transformer.reconcileRestoreCondition(transCtx)
 			Expect(err).Should(BeNil())
@@ -277,8 +269,8 @@ var _ = Describe("component status transformer conditions", func() {
 		})
 
 		It("should fail when any restore PVC fails", func() {
-			pvc := newRestorePVC("data-mysql-0", corev1.ConditionFalse)
-			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(metav1.ConditionFalse)
 
 			err := transformer.reconcileRestoreCondition(transCtx)
 			Expect(err).Should(BeNil())

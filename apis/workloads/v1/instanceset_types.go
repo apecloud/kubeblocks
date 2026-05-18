@@ -309,7 +309,7 @@ type InstanceSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
 	//
 	// +optional
 	// +patchMergeKey=type
@@ -639,6 +639,9 @@ const (
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 
+	// InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.
+	InstanceRestore ConditionType = "Restore"
+
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
 	InstanceUpdateRestricted ConditionType = "InstanceUpdateRestricted"
@@ -659,6 +662,15 @@ const (
 
 	// ReasonInstanceFailure is a reason for condition InstanceFailure.
 	ReasonInstanceFailure = "InstanceFailure"
+
+	// ReasonRestoreCompleted is a reason for condition InstanceRestore.
+	ReasonRestoreCompleted = "RestoreCompleted"
+
+	// ReasonRestoreRunning is a reason for condition InstanceRestore.
+	ReasonRestoreRunning = "RestoreRunning"
+
+	// ReasonRestoreFailed is a reason for condition InstanceRestore.
+	ReasonRestoreFailed = "RestoreFailed"
 
 	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"

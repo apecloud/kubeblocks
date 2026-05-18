@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -184,7 +185,158 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 		return nil
 	}
 
-	return setAvailableCondition()
+	if err := setAvailableCondition(); err != nil {
+		return err
+	}
+	return t.setRestoreCondition(ctx, cli, cluster)
+}
+
+func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
+	if cluster.Spec.Restore == nil {
+		return nil
+	}
+	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
+		return nil
+	}
+	componentList := &appsv1.ComponentList{}
+	if err := cli.List(ctx, componentList, client.InNamespace(cluster.Namespace), client.MatchingLabels(constant.GetClusterLabels(cluster.Name))); err != nil {
+		return err
+	}
+	expectedComponents := expectedRestoreComponentCount(cluster)
+	existingComponents := countExistingRestoreComponents(componentList)
+	restoreComponents := 0
+	completed := 0
+	for i := range componentList.Items {
+		comp := &componentList.Items[i]
+		if !comp.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if expectedRestorePVCCountForComponentSpec(comp.Spec.Replicas, comp.Spec.VolumeClaimTemplates, comp.Spec.Instances) == 0 {
+			continue
+		}
+		restoreComponents++
+		cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+		if cond == nil {
+			continue
+		}
+		switch cond.Status {
+		case metav1.ConditionTrue:
+			completed++
+		case metav1.ConditionFalse:
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    appsv1.ConditionTypeRestore,
+				Status:  metav1.ConditionFalse,
+				Reason:  ReasonRestoreFailed,
+				Message: fmt.Sprintf("Component %s restore failed: %s", comp.Name, cond.Message),
+			})
+			return nil
+		}
+	}
+	if expectedComponents > 0 && existingComponents < expectedComponents {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionUnknown,
+			Reason:  ReasonRestoreRunning,
+			Message: "Waiting for initial restore components to be created",
+		})
+		return nil
+	}
+	if restoreComponents == 0 {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionTrue,
+			Reason:  ReasonRestoreCompleted,
+			Message: "No restore PVCs are required",
+		})
+		return nil
+	}
+	if restoreComponents == completed {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    appsv1.ConditionTypeRestore,
+			Status:  metav1.ConditionTrue,
+			Reason:  ReasonRestoreCompleted,
+			Message: "All initial restore components have completed",
+		})
+		return nil
+	}
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    appsv1.ConditionTypeRestore,
+		Status:  metav1.ConditionUnknown,
+		Reason:  ReasonRestoreRunning,
+		Message: "Waiting for initial restore components to complete",
+	})
+	return nil
+}
+
+func expectedRestoreComponentCount(cluster *appsv1.Cluster) int {
+	total := len(cluster.Spec.ComponentSpecs)
+	for i := range cluster.Spec.Shardings {
+		total += int(cluster.Spec.Shardings[i].Shards)
+	}
+	return total
+}
+
+func countExistingRestoreComponents(componentList *appsv1.ComponentList) int {
+	total := 0
+	for i := range componentList.Items {
+		if componentList.Items[i].DeletionTimestamp.IsZero() {
+			total++
+		}
+	}
+	return total
+}
+
+func expectedRestorePVCCountForComponentSpec(replicas int32, vcts []appsv1.PersistentVolumeClaimTemplate, instances []appsv1.InstanceTemplate) int {
+	total := 0
+	replicasInTemplates := int32(0)
+	for i := range instances {
+		instanceReplicas := int32(1)
+		if instances[i].Replicas != nil {
+			instanceReplicas = *instances[i].Replicas
+		}
+		if instanceReplicas < 0 {
+			instanceReplicas = 0
+		}
+		replicasInTemplates += instanceReplicas
+		total += int(instanceReplicas) * mergedRestoreVCTCount(vcts, instances[i].VolumeClaimTemplates)
+	}
+	defaultReplicas := replicas - replicasInTemplates
+	if defaultReplicas < 0 {
+		defaultReplicas = 0
+	}
+	return total + int(defaultReplicas)*restoreVCTCount(vcts)
+}
+
+func mergedRestoreVCTCount(base []appsv1.PersistentVolumeClaimTemplate, overrides []appsv1.PersistentVolumeClaimTemplate) int {
+	restoreVCTs := map[string]bool{}
+	for i := range base {
+		restoreVCTs[base[i].Name] = hasRestoreVCTAnnotation(base[i].Annotations)
+	}
+	for i := range overrides {
+		restoreVCTs[overrides[i].Name] = hasRestoreVCTAnnotation(overrides[i].Annotations)
+	}
+	total := 0
+	for _, hasRestore := range restoreVCTs {
+		if hasRestore {
+			total++
+		}
+	}
+	return total
+}
+
+func restoreVCTCount(vcts []appsv1.PersistentVolumeClaimTemplate) int {
+	total := 0
+	for i := range vcts {
+		if hasRestoreVCTAnnotation(vcts[i].Annotations) {
+			total++
+		}
+	}
+	return total
+}
+
+func hasRestoreVCTAnnotation(annotations map[string]string) bool {
+	return annotations[constant.RestoreSourceKindAnnotationKey] != ""
 }
 
 func (t *clusterStatusTransformer) shardingToCompStatus(shardingStatus map[string]appsv1.ClusterShardingStatus) map[string]appsv1.ClusterComponentStatus {

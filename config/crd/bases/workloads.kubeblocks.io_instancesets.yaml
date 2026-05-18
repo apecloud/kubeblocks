@@ -11666,7 +11666,7 @@ spec:
               conditions:
                 description: |-
                   Represents the latest available observations of an instanceset's current state.
-                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
+                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource.\n---\nThis struct is intended for

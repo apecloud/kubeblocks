@@ -282,6 +282,20 @@ ClusterBackup
 <p>Specifies the backup configuration of the Cluster.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>restore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore configuration of the Cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -2668,7 +2682,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+<a href="#apps.kubeblocks.io/v1.RetentionPeriod">
+RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -3857,6 +3873,125 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
+</p>
+<div>
+<p>ClusterRestore specifies how to initialize a Cluster from a restore source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>source</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestoreSource">
+ClusterRestoreSource
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pitr</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtime-specific restore parameters.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterRestoreSource">ClusterRestoreSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore</a>)
+</p>
+<div>
+<p>ClusterRestoreSource describes the source object used by a Cluster restore.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiGroup</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the API group of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the kind of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the restore source. If empty, the Cluster namespace is used.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterService">ClusterService
 </h3>
 <p>
@@ -4314,6 +4449,20 @@ ClusterBackup
 <td>
 <em>(Optional)</em>
 <p>Specifies the backup configuration of the Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore configuration of the Cluster.</p>
 </td>
 </tr>
 </tbody>
@@ -10651,6 +10800,15 @@ NamedVar
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.RetentionPeriod">RetentionPeriod
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterBackup">ClusterBackup</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup</a>)
+</p>
+<div>
+<p>RetentionPeriod represents a duration in the format &ldquo;1y2mo3w4d5h6m&rdquo;, where
+y=year, mo=month, w=week, d=day, h=hour, m=minute.</p>
+</div>
 <h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
 </h3>
 <p>
@@ -17115,7 +17273,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+<a href="#apps.kubeblocks.io/v1.RetentionPeriod">
+RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -32922,6 +33082,9 @@ and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be se
 ConditionStatus will be True if all its instances(pods) are in a Ready condition.
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
 </td>
+</tr><tr><td><p>&#34;Restore&#34;</p></td>
+<td><p>InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.</p>
+</td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
@@ -33673,7 +33836,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instanceset&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>

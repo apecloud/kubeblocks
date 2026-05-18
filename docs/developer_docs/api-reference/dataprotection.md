@@ -304,9 +304,7 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
-RetentionPeriod
-</a>
+github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
 </em>
 </td>
 <td>
@@ -3330,9 +3328,7 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
-RetentionPeriod
-</a>
+github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
 </em>
 </td>
 <td>
@@ -5833,15 +5829,6 @@ The minimum value is 0.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">RetentionPeriod
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy</a>)
-</p>
-<div>
-<p>RetentionPeriod represents a duration in the format &ldquo;1y2mo3w4d5h6m&rdquo;, where
-y=year, mo=month, w=week, d=day, h=hour, m=minute.</p>
-</div>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RuntimeSettings">RuntimeSettings
 </h3>
 <p>
@@ -5962,9 +5949,7 @@ see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/C
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
-RetentionPeriod
-</a>
+github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
 </em>
 </td>
 <td>

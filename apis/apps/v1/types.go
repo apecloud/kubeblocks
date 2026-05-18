@@ -47,6 +47,7 @@ const (
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
 	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
+	ConditionTypeRestore             = "Restore"             // ConditionTypeRestore indicates whether the initial cluster restore has completed.
 )
 
 type ServiceRef struct {

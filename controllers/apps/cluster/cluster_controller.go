@@ -65,9 +65,6 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
-// dataprotection get list and delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
-
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
@@ -141,8 +138,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterShardingAccountTransformer{},
 			// handle cluster services
 			&clusterServiceTransformer{},
-			// handle the restore for cluster
-			&clusterRestoreTransformer{},
 			// create all cluster components objects
 			&clusterComponentTransformer{},
 			// update cluster components' status

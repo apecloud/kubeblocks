@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -155,6 +156,130 @@ var _ = Describe("component status transformer conditions", func() {
 		transformer.runningITS = runningITS
 		transformer.protoITS = protoITS
 		transformer.synthesizeComp = transCtx.SynthesizeComponent
+	})
+
+	setExpectedRestoreVCT := func() {
+		transCtx.SynthesizeComponent.Replicas = 1
+		transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "data",
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: "Backup",
+				},
+			},
+		}}
+	}
+
+	setWorkloadRestoreCondition := func(status metav1.ConditionStatus) {
+		runningITS.Status.Conditions = []metav1.Condition{{
+			Type:    string(workloads.InstanceRestore),
+			Status:  status,
+			Reason:  workloads.ReasonRestoreRunning,
+			Message: "workload restore status",
+		}}
+	}
+
+	Context("reconcileRestoreCondition", func() {
+		It("should be running while restore PVCs are not completed", func() {
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(metav1.ConditionUnknown)
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreRunning))
+		})
+
+		It("should complete when all restore PVCs are completed", func() {
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(metav1.ConditionTrue)
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreCompleted))
+		})
+
+		It("should wait for restore PVCs declared by instance templates", func() {
+			replicas := int32(1)
+			transCtx.SynthesizeComponent.Replicas = 2
+			transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				},
+			}}
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{
+				Name:     "hot",
+				Replicas: &replicas,
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				}, {
+					Name: "log",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				}},
+			}}
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreRunning))
+		})
+
+		It("should keep terminal restore condition", func() {
+			comp.Status.Conditions = []metav1.Condition{{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionTrue,
+				Reason:             workloads.ReasonRestoreCompleted,
+				LastTransitionTime: metav1.Now(),
+			}}
+			transCtx.SynthesizeComponent.Replicas = 2
+			transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				},
+			}}
+			setWorkloadRestoreCondition(metav1.ConditionFalse)
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreCompleted))
+		})
+
+		It("should fail when any restore PVC fails", func() {
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(metav1.ConditionFalse)
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreFailed))
+		})
 	})
 
 	Context("reconcileHealthyCondition", func() {

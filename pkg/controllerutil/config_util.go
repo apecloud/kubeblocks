@@ -330,6 +330,15 @@ func parseFileParameters(name, content string, formatConfig *parametersv1alpha1.
 	if err != nil {
 		return nil, err
 	}
+	if configObject == nil {
+		// core.FromConfigObject returns nil when the requested sub-section is
+		// absent (e.g., the INI [section] header is missing or has been
+		// removed in the content payload). Treat as an empty parameter map
+		// so the caller's diff sees this as "all keys in that section
+		// removed" and rejects immutable removals, instead of nil-deref
+		// panicking on GetAllParameters below.
+		return map[string]interface{}{}, nil
+	}
 	return configObject.GetAllParameters(), nil
 }
 

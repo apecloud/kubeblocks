@@ -213,6 +213,33 @@ func TestDoMergeAcceptsContentOnFileWithoutImmutableCandidate(t *testing.T) {
 	}
 }
 
+func TestDoMergeRejectsContentRemovingEntireSectionContainingImmutableParameter(t *testing.T) {
+	// Regression for the nil-deref panic introduced by core.FromConfigObject
+	// returning nil when an INI sub-section is absent. The content payload
+	// drops the entire [mysqld] section that contains the immutable
+	// parameter gtid_mode; the guard must reject the change (immutable
+	// removed) instead of panicking on GetAllParameters of a nil
+	// ConfigObject.
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[other]\nfoo=bar\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter removal via whole-section deletion to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
+	}
+}
+
 func TestDoMergeRejectsContentWhenImmutableDeclaredButFormatMissing(t *testing.T) {
 	// File has an immutable parameter declared but no FileFormatConfig is
 	// available. Fail-safe: reject rather than silently allow because the

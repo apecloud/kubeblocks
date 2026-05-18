@@ -49,10 +49,6 @@ const (
 
 	// defaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
 	defaultRoleProbeTimeoutAfterPodsReady int32 = 60
-
-	reasonRestoreCompleted = "RestoreCompleted"
-	reasonRestoreRunning   = "RestoreRunning"
-	reasonRestoreFailed    = "RestoreFailed"
 )
 
 // componentStatusTransformer computes the current status: read the underlying workload status and update the component status
@@ -373,7 +369,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionUnknown,
 			ObservedGeneration: t.comp.Generation,
-			Reason:             reasonRestoreRunning,
+			Reason:             workloads.ReasonRestoreRunning,
 			Message:            "Waiting for workload restore status",
 		})
 		return nil
@@ -384,7 +380,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionUnknown,
 			ObservedGeneration: t.comp.Generation,
-			Reason:             reasonRestoreRunning,
+			Reason:             workloads.ReasonRestoreRunning,
 			Message:            "Waiting for workload restore status",
 		})
 		return nil
@@ -395,7 +391,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: t.comp.Generation,
-			Reason:             reasonRestoreCompleted,
+			Reason:             workloads.ReasonRestoreCompleted,
 			Message:            workloadCond.Message,
 		})
 	case metav1.ConditionFalse:
@@ -403,7 +399,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionFalse,
 			ObservedGeneration: t.comp.Generation,
-			Reason:             reasonRestoreFailed,
+			Reason:             workloads.ReasonRestoreFailed,
 			Message:            workloadCond.Message,
 		})
 	default:
@@ -411,7 +407,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionUnknown,
 			ObservedGeneration: t.comp.Generation,
-			Reason:             reasonRestoreRunning,
+			Reason:             workloads.ReasonRestoreRunning,
 			Message:            workloadCond.Message,
 		})
 	}

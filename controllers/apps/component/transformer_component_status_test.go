@@ -190,7 +190,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
-			Expect(cond.Reason).Should(Equal(reasonRestoreRunning))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreRunning))
 		})
 
 		It("should complete when all restore PVCs are completed", func() {
@@ -203,7 +203,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
-			Expect(cond.Reason).Should(Equal(reasonRestoreCompleted))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreCompleted))
 		})
 
 		It("should wait for restore PVCs declared by instance templates", func() {
@@ -238,14 +238,14 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
-			Expect(cond.Reason).Should(Equal(reasonRestoreRunning))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreRunning))
 		})
 
 		It("should keep terminal restore condition", func() {
 			comp.Status.Conditions = []metav1.Condition{{
 				Type:               appsv1.ConditionTypeRestore,
 				Status:             metav1.ConditionTrue,
-				Reason:             reasonRestoreCompleted,
+				Reason:             workloads.ReasonRestoreCompleted,
 				LastTransitionTime: metav1.Now(),
 			}}
 			transCtx.SynthesizeComponent.Replicas = 2
@@ -265,7 +265,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
-			Expect(cond.Reason).Should(Equal(reasonRestoreCompleted))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreCompleted))
 		})
 
 		It("should fail when any restore PVC fails", func() {
@@ -278,7 +278,7 @@ var _ = Describe("component status transformer conditions", func() {
 			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			Expect(cond).ShouldNot(BeNil())
 			Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
-			Expect(cond.Reason).Should(Equal(reasonRestoreFailed))
+			Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreFailed))
 		})
 	})
 

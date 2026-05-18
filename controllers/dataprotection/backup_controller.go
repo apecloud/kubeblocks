@@ -710,36 +710,6 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 		}
 		return true, nil
 	}
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := r.Client.List(reqCtx.Ctx, pvcs); err != nil {
-		return false, err
-	}
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
-		ref := pvc.Spec.DataSourceRef
-		if ref == nil {
-			continue
-		}
-		apiGroup := ""
-		if ref.APIGroup != nil {
-			apiGroup = *ref.APIGroup
-		}
-		if apiGroup != dptypes.DataprotectionAPIGroup || ref.Kind != dptypes.BackupKind || ref.Name != backup.Name {
-			continue
-		}
-		backupNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
-		if backupNamespace == "" {
-			backupNamespace = pvc.Namespace
-		}
-		if backupNamespace != backup.Namespace {
-			continue
-		}
-		cond := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
-		if cond != nil && (cond.Status == corev1.ConditionTrue || cond.Status == corev1.ConditionFalse) {
-			continue
-		}
-		return true, nil
-	}
 	return false, nil
 }
 

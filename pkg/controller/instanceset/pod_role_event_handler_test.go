@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -213,7 +215,7 @@ var _ = Describe("pod role label event handler test", func() {
 			handler = &PodRoleEventHandler{}
 		})
 
-		It("should remove exclusive role labels from other pods when a new pod claims exclusive role", func() {
+		It("should remove exclusive role labels from other pods for an authoritative global role snapshot", func() {
 			// Create an exclusive role
 			exclusiveRole := workloads.ReplicaRole{
 				Name:                 "leader",
@@ -222,7 +224,23 @@ var _ = Describe("pod role label event handler test", func() {
 				IsExclusive:          true, // Exclusive role
 			}
 
-			// Create an event for the new pod claiming the exclusive role
+			// An authoritative GlobalRoleSnapshot JSON message declares the
+			// new exclusive holder. Only this path retains the authority to
+			// remove the old holders' labels; a plain per-pod role string
+			// must NOT trigger removeExclusiveRoleLabels (see "exclusive
+			// role - plain per-pod path" tests below).
+			snapshot := common.GlobalRoleSnapshot{
+				Version: "term-1",
+				PodRoleNamePairs: []common.PodRoleNamePair{
+					{
+						PodName:  pod.Name,
+						RoleName: exclusiveRole.Name,
+						PodUID:   string(pod.UID),
+					},
+				},
+			}
+			snapshotJSON, err := json.Marshal(snapshot)
+			Expect(err).ShouldNot(HaveOccurred())
 			objectRef := corev1.ObjectReference{
 				APIVersion: "v1",
 				Kind:       "Pod",
@@ -231,11 +249,15 @@ var _ = Describe("pod role label event handler test", func() {
 				UID:        pod.UID,
 				FieldPath:  lorryEventFieldPath,
 			}
-			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", exclusiveRole.Name)
+			eventMessage, err := json.Marshal(probeMessage{
+				Event: successEvent,
+				Role:  string(snapshotJSON),
+			})
+			Expect(err).ShouldNot(HaveOccurred())
 			event := builder.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
 				SetReason(checkRoleOperation).
-				SetMessage(message).
+				SetMessage(string(eventMessage)).
 				GetObject()
 
 			// Mock other pods with the same exclusive role label

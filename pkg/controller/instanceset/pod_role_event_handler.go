@@ -142,10 +142,10 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
 	}
-	role := strings.ToLower(message.Role)
-
-	snapshot := parseGlobalRoleSnapshot(role, event)
+	snapshot, authoritative := parseGlobalRoleSnapshot(message.Role, event)
+	role := ""
 	for _, pair := range snapshot.PodRoleNamePairs {
+		role = strings.ToLower(pair.RoleName)
 		podName := types.NamespacedName{
 			Namespace: event.InvolvedObject.Namespace,
 			Name:      pair.PodName,
@@ -175,9 +175,9 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, _ 
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, its); err != nil {
 			return "", err
 		}
-		reqCtx.Log.Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+		reqCtx.Log.Info("handle role change event", "pod", pod.Name, "role", pair.RoleName, "originalRole", message.OriginalRole)
 
-		if err := updatePodRoleLabel(cli, reqCtx, *its, pod, pair.RoleName, snapshot.Version); err != nil {
+		if err := updatePodRoleLabel(cli, reqCtx, *its, pod, pair.RoleName, snapshot.Version, authoritative); err != nil {
 			return "", err
 		}
 	}
@@ -196,19 +196,19 @@ func checkStaleLastSnapshotVersion(version string, pod *corev1.Pod) bool {
 	return false
 }
 
-func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRoleSnapshot {
+func parseGlobalRoleSnapshot(role string, event *corev1.Event) (*common.GlobalRoleSnapshot, bool) {
 	snapshot := &common.GlobalRoleSnapshot{}
 	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
-		return snapshot
+		return snapshot, true
 	}
 	snapshot.Version = strconv.FormatInt(event.EventTime.UnixMicro(), 10)
 	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
-		RoleName: role,
+		RoleName: strings.ToLower(role),
 		PodUID:   string(event.InvolvedObject.UID),
 	}
 	snapshot.PodRoleNamePairs = append(snapshot.PodRoleNamePairs, pair)
-	return snapshot
+	return snapshot, false
 }
 
 // parseProbeEventMessage parses probe event message.
@@ -244,13 +244,24 @@ func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) 
 }
 
 func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet,
-	pod *corev1.Pod, roleName string, version string) error {
+	pod *corev1.Pod, roleName string, version string, authoritative bool) error {
 	var (
 		ctx                = reqCtx.Ctx
 		roleMap            = composeRoleMap(its)
 		normalizedRoleName = strings.ToLower(roleName)
 		role, defined      = roleMap[normalizedRoleName]
 	)
+	if defined && role.IsExclusive && !authoritative {
+		allowed, err := canApplyPlainExclusiveRole(cli, reqCtx, its, pod, normalizedRoleName)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			reqCtx.Log.Info("skip plain per-pod exclusive role promotion because another active holder exists",
+				"pod", pod.Name, "role", normalizedRoleName)
+			return nil
+		}
+	}
 	// update pod role label
 	newPod := pod.DeepCopy()
 	if defined {
@@ -270,6 +281,22 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, its wo
 		return removeExclusiveRoleLabels(cli, reqCtx, its, pod.Name, normalizedRoleName, version)
 	}
 	return nil
+}
+
+func canApplyPlainExclusiveRole(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet, pod *corev1.Pod, roleName string) (bool, error) {
+	labels := getMatchLabels(its.Name)
+	labels[RoleLabelKey] = roleName
+	var pods corev1.PodList
+	if err := cli.List(reqCtx.Ctx, &pods, client.InNamespace(its.Namespace), client.MatchingLabels(labels)); err != nil {
+		return false, err
+	}
+	for _, holder := range pods.Items {
+		if holder.Name == pod.Name || holder.DeletionTimestamp != nil {
+			continue
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 func removeExclusiveRoleLabels(cli client.Client, reqCtx intctrlutil.RequestCtx, its workloads.InstanceSet, newPodName, roleName, version string) error {

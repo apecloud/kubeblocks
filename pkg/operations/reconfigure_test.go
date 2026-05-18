@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -199,6 +201,71 @@ parameter: {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 
 			Expect(err).Should(BeNil())
+		})
+
+		It("rejects parameter values outside ParametersDefinition schema", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			By("prepare parameter schema and component parameter")
+			paramsDef := testparameters.NewParametersDefinitionFactory("valkey-params-" + randomStr).
+				SetComponentDefinition(compDefName).
+				SetTemplateName("valkey-config").
+				SetConfigFile("valkey.conf").
+				SetFileFormatConfig(parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}).
+				Schema(`
+parameter: {
+  "maxmemory-samples"?: int & >=1 & <=10
+  "maxmemory-policy"?: string & "noeviction" | "allkeys-lru" | "volatile-lru"
+}`).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
+				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})).Should(Succeed())
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			By("create an invalid reconfigure opsRequest")
+			ops := testops.NewOpsRequestObj("invalid-reconfigure-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					Parameters: []opsv1alpha1.ParameterPair{
+						{
+							Key:   "maxmemory-samples",
+							Value: pointer.String("0"),
+						},
+					},
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			By("reject the ops before marking validation passed or writing invalid desired assignments")
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeValidated)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+				g.Expect(condition.Message).Should(ContainSubstring("maxmemory-samples"))
+				g.Expect(condition.Message).Should(ContainSubstring("invalid"))
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired).Should(BeNil())
+			})).Should(Succeed())
 		})
 	})
 })

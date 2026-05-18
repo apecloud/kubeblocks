@@ -24,16 +24,20 @@ import (
 	"fmt"
 	"time"
 
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	parameters "github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
 type reconfigureAction struct {
@@ -57,6 +61,9 @@ var noRequeueAfter time.Duration = 0
 
 // ActionStartedCondition the started condition when handle the reconfiguring request.
 func (r *reconfigureAction) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	if err := r.validateReconfigures(reqCtx.Ctx, cli, opsRes.Cluster, opsRes.OpsRequest.Spec.Reconfigures); err != nil {
+		return nil, err
+	}
 	return opsv1alpha1.NewReconfigureCondition(opsRes.OpsRequest), nil
 }
 
@@ -144,6 +151,9 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 	if err != nil {
 		return err
 	}
+	if err := r.validateReconfigureParameters(reqCtx.Ctx, cli, cluster, reconfigure); err != nil {
+		return err
+	}
 	patch := client.MergeFrom(compParam.DeepCopy())
 	if compParam.Spec.Desired == nil {
 		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
@@ -160,6 +170,130 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 		return err
 	}
 	return nil
+}
+
+func (r *reconfigureAction) validateReconfigures(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, reconfigures []opsv1alpha1.Reconfigure) error {
+	for _, reconfigure := range reconfigures {
+		if err := r.validateReconfigureParameters(ctx, cli, cluster, reconfigure); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *reconfigureAction) validateReconfigureParameters(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, reconfigure opsv1alpha1.Reconfigure) error {
+	if len(reconfigure.Parameters) == 0 {
+		return nil
+	}
+	compDefName, err := r.resolveComponentDefinitionName(ctx, cli, cluster, reconfigure.ComponentName)
+	if err != nil {
+		return err
+	}
+	if compDefName == "" {
+		return nil
+	}
+	compDef, err := component.GetCompDefByName(ctx, cli, compDefName)
+	if err != nil {
+		return err
+	}
+	_, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, compDef)
+	if err != nil {
+		return err
+	}
+	if !hasParameterSchema(paramsDefs) {
+		return nil
+	}
+	assignments := make(parametersv1alpha1.ComponentParameters, len(reconfigure.Parameters))
+	for _, param := range reconfigure.Parameters {
+		assignments[param.Key] = param.Value
+	}
+	if err := validateParameterAssignments(assignments, paramsDefs); err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request for component %s: %s", reconfigure.ComponentName, err.Error()))
+	}
+	return nil
+}
+
+func (r *reconfigureAction) resolveComponentDefinitionName(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) (string, error) {
+	if compSpec := cluster.Spec.GetComponentByName(compName); compSpec != nil {
+		if compSpec.ComponentDef != "" {
+			return compSpec.ComponentDef, nil
+		}
+		return r.resolveComponentDefinitionNameFromComponent(ctx, cli, cluster, compName)
+	}
+	if shardingSpec := cluster.Spec.GetShardingByName(compName); shardingSpec != nil {
+		if shardingSpec.Template.ComponentDef != "" {
+			return shardingSpec.Template.ComponentDef, nil
+		}
+		comps, err := sharding.ListShardingComponents(ctx, cli, cluster, compName)
+		if err != nil {
+			return "", err
+		}
+		if len(comps) == 0 {
+			return "", fmt.Errorf("no component found for sharding %s", compName)
+		}
+		return comps[0].Spec.CompDef, nil
+	}
+	return "", intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", compName)
+}
+
+func (r *reconfigureAction) resolveComponentDefinitionNameFromComponent(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) (string, error) {
+	comp, err := component.GetComponentByName(ctx, cli, cluster.Namespace, component.FullName(cluster.Name, compName))
+	if err != nil {
+		return "", err
+	}
+	return comp.Spec.CompDef, nil
+}
+
+func hasParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition) bool {
+	for _, paramsDef := range paramsDefs {
+		if paramsDef != nil && paramsDef.Spec.ParametersSchema != nil && paramsDef.Spec.ParametersSchema.SchemaInJSON != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func validateParameterAssignments(assignments parametersv1alpha1.ComponentParameters, paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
+	for key, value := range assignments {
+		paramSchema, ok := findParameterSchema(paramsDefs, key)
+		if !ok {
+			return fmt.Errorf("parameter %s not found in parameters schema", key)
+		}
+		if value == nil {
+			continue
+		}
+		schema := &apiext.JSONSchemaProps{
+			Type: "object",
+			Properties: map[string]apiext.JSONSchemaProps{
+				key: paramSchema,
+			},
+		}
+		typedValue, err := common.ConvertStringToInterfaceBySchemaType(schema, map[string]string{key: *value})
+		if err != nil {
+			return fmt.Errorf("parameter %s value %q is invalid: %w", key, *value, err)
+		}
+		if err := common.ValidateDataWithSchema(schema, typedValue); err != nil {
+			return fmt.Errorf("parameter %s value %q is invalid: %w", key, *value, err)
+		}
+	}
+	return nil
+}
+
+func findParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition, key string) (apiext.JSONSchemaProps, bool) {
+	for _, paramsDef := range paramsDefs {
+		if paramsDef == nil || paramsDef.Spec.ParametersSchema == nil || paramsDef.Spec.ParametersSchema.SchemaInJSON == nil {
+			continue
+		}
+		specSchema, ok := paramsDef.Spec.ParametersSchema.SchemaInJSON.Properties[openapi.DefaultSchemaName]
+		if !ok {
+			continue
+		}
+		flattenedSchema := openapi.FlattenSchema(specSchema)
+		if schema, ok := parameters.FindParameterSchema(flattenedSchema.Properties, key); ok {
+			return schema, true
+		}
+	}
+	return apiext.JSONSchemaProps{}, false
 }
 
 func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {

@@ -360,6 +360,10 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 	if transCtx.SynthesizeComponent == nil {
 		return nil
 	}
+	restoreCond := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeRestore)
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
+		return nil
+	}
 	clusterName := transCtx.SynthesizeComponent.ClusterName
 	if clusterName == "" {
 		clusterName = t.comp.Labels[constant.AppInstanceLabelKey]
@@ -378,6 +382,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 	}
 	total := 0
 	completed := 0
+	expectedPVCs := expectedComponentRestorePVCCount(transCtx.SynthesizeComponent)
 	for i := range pvcList.Items {
 		pvc := &pvcList.Items[i]
 		if pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
@@ -403,9 +408,18 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 		}
 	}
 	if total == 0 {
+		if expectedPVCs > 0 {
+			meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionUnknown,
+				ObservedGeneration: t.comp.Generation,
+				Reason:             reasonRestoreRunning,
+				Message:            "Waiting for initial restore PVCs to be created",
+			})
+		}
 		return nil
 	}
-	if total == completed {
+	if total == completed && total >= expectedPVCs {
 		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
 			Type:               appsv1.ConditionTypeRestore,
 			Status:             metav1.ConditionTrue,
@@ -423,6 +437,62 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 		Message:            "Waiting for initial restore PVCs to complete",
 	})
 	return nil
+}
+
+func expectedComponentRestorePVCCount(comp *component.SynthesizedComponent) int {
+	total := 0
+	replicasInTemplates := int32(0)
+	for i := range comp.Instances {
+		instanceReplicas := int32(1)
+		if comp.Instances[i].Replicas != nil {
+			instanceReplicas = *comp.Instances[i].Replicas
+		}
+		if instanceReplicas < 0 {
+			instanceReplicas = 0
+		}
+		replicasInTemplates += instanceReplicas
+		total += int(instanceReplicas) * mergedComponentRestoreVCTCount(comp.VolumeClaimTemplates, comp.Instances[i].VolumeClaimTemplates)
+	}
+	defaultReplicas := comp.Replicas - replicasInTemplates
+	if defaultReplicas < 0 {
+		defaultReplicas = 0
+	}
+	return total + int(defaultReplicas)*componentRestoreVCTCount(comp.VolumeClaimTemplates)
+}
+
+func mergedComponentRestoreVCTCount(base []corev1.PersistentVolumeClaimTemplate, overrides []appsv1.PersistentVolumeClaimTemplate) int {
+	restoreVCTs := map[string]bool{}
+	for i := range base {
+		restoreVCTs[base[i].Name] = coreVCTHasRestoreIntent(&base[i])
+	}
+	for i := range overrides {
+		restoreVCTs[overrides[i].Name] = appVCTHasRestoreIntent(&overrides[i])
+	}
+	total := 0
+	for _, hasRestore := range restoreVCTs {
+		if hasRestore {
+			total++
+		}
+	}
+	return total
+}
+
+func componentRestoreVCTCount(vcts []corev1.PersistentVolumeClaimTemplate) int {
+	total := 0
+	for i := range vcts {
+		if coreVCTHasRestoreIntent(&vcts[i]) {
+			total++
+		}
+	}
+	return total
+}
+
+func coreVCTHasRestoreIntent(vct *corev1.PersistentVolumeClaimTemplate) bool {
+	return vct.Annotations[constant.RestoreSourceKindAnnotationKey] != ""
+}
+
+func appVCTHasRestoreIntent(vct *appsv1.PersistentVolumeClaimTemplate) bool {
+	return vct.Annotations[constant.RestoreSourceKindAnnotationKey] != ""
 }
 
 func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {

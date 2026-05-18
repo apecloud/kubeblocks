@@ -193,10 +193,10 @@ func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cl
 }
 
 func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
-	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
-	if cluster.Spec.Restore == nil && restoreCond == nil {
+	if cluster.Spec.Restore == nil {
 		return nil
 	}
+	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return nil
 	}
@@ -254,7 +254,7 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		})
 		return nil
 	}
-	if total == 0 && cluster.Spec.Restore != nil {
+	if total == 0 {
 		if expectedRestoreVCTCount(cluster) > 0 || expectedPVCs > 0 {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:    appsv1.ConditionTypeRestore,
@@ -272,14 +272,12 @@ func (t *clusterStatusTransformer) setRestoreCondition(ctx context.Context, cli 
 		})
 		return nil
 	}
-	if cluster.Spec.Restore != nil {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    appsv1.ConditionTypeRestore,
-			Status:  metav1.ConditionUnknown,
-			Reason:  ReasonRestoreRunning,
-			Message: "Waiting for initial restore PVCs to complete",
-		})
-	}
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    appsv1.ConditionTypeRestore,
+		Status:  metav1.ConditionUnknown,
+		Reason:  ReasonRestoreRunning,
+		Message: "Waiting for initial restore PVCs to complete",
+	})
 	return nil
 }
 

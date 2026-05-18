@@ -207,6 +207,75 @@ var _ = Describe("component status transformer conditions", func() {
 			Expect(cond.Reason).Should(Equal(reasonRestoreCompleted))
 		})
 
+		It("should wait for restore PVCs declared by instance templates", func() {
+			replicas := int32(1)
+			transCtx.SynthesizeComponent.Replicas = 2
+			transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				},
+			}}
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{
+				Name:     "hot",
+				Replicas: &replicas,
+				VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				}, {
+					Name: "log",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				}},
+			}}
+			pvcs := []client.Object{
+				newRestorePVC("data-mysql-0", corev1.ConditionTrue),
+				newRestorePVC("data-mysql-hot-0", corev1.ConditionTrue),
+			}
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: append([]client.Object{compDef, comp}, pvcs...)})
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
+			Expect(cond.Reason).Should(Equal(reasonRestoreRunning))
+		})
+
+		It("should keep terminal restore condition", func() {
+			comp.Status.Conditions = []metav1.Condition{{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionTrue,
+				Reason:             reasonRestoreCompleted,
+				LastTransitionTime: metav1.Now(),
+			}}
+			transCtx.SynthesizeComponent.Replicas = 2
+			transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				},
+			}}
+			pvc := newRestorePVC("data-mysql-0", corev1.ConditionTrue)
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})
+
+			err := transformer.reconcileRestoreCondition(transCtx)
+			Expect(err).Should(BeNil())
+
+			cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(cond).ShouldNot(BeNil())
+			Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(cond.Reason).Should(Equal(reasonRestoreCompleted))
+		})
+
 		It("should fail when any restore PVC fails", func() {
 			pvc := newRestorePVC("data-mysql-0", corev1.ConditionFalse)
 			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{compDef, comp, pvc}})

@@ -72,6 +72,13 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 	cluster := &appsv1.Cluster{}
 	cluster.Name = "test-cluster"
 	cluster.Namespace = "test-ns"
+	cluster.Spec.Restore = &appsv1.ClusterRestore{
+		Source: appsv1.ClusterRestoreSource{
+			APIGroup: testRestoreSourceAPIGroup,
+			Kind:     testRestoreSourceKind,
+			Name:     "backup",
+		},
+	}
 	cluster.Status.Conditions = []metav1.Condition{{
 		Type:   appsv1.ConditionTypeRestore,
 		Status: metav1.ConditionTrue,
@@ -105,6 +112,13 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 
 func TestApplyClusterRestoreIntentKeepsNonRestoreDataSourceAfterRestoreCompleted(t *testing.T) {
 	cluster := &appsv1.Cluster{}
+	cluster.Spec.Restore = &appsv1.ClusterRestore{
+		Source: appsv1.ClusterRestoreSource{
+			APIGroup: testRestoreSourceAPIGroup,
+			Kind:     testRestoreSourceKind,
+			Name:     "backup",
+		},
+	}
 	cluster.Status.Conditions = []metav1.Condition{{
 		Type:   appsv1.ConditionTypeRestore,
 		Status: metav1.ConditionTrue,

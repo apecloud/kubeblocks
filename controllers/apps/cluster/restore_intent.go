@@ -31,10 +31,10 @@ import (
 )
 
 func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
-	completed := isClusterRestoreCompleted(cluster)
-	if cluster.Spec.Restore == nil && !completed {
+	if cluster.Spec.Restore == nil {
 		return nil
 	}
+	completed := isClusterRestoreCompleted(cluster)
 	for _, comp := range components {
 		applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
 	}
@@ -73,9 +73,6 @@ func applyRestoreIntentToVCTs(cluster *appsv1.Cluster, componentName string, vct
 
 func injectRestoreIntentToVCT(cluster *appsv1.Cluster, componentName string, vct *appsv1.PersistentVolumeClaimTemplate) {
 	restore := cluster.Spec.Restore
-	if restore == nil {
-		return
-	}
 	if vct.Annotations == nil {
 		vct.Annotations = map[string]string{}
 	}

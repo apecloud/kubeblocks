@@ -108,6 +108,8 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	reqCtx.Log = reqCtx.Log.
 		WithValues("ClusterName", config.Labels[constant.AppInstanceLabelKey]).
 		WithValues("ComponentName", config.Labels[constant.KBAppComponentLabelKey])
+	reqCtx.Log.V(1).Info("reconcile reconfigure ConfigMap",
+		"ConfigurationRevision", config.Annotations[constant.ConfigurationRevision])
 
 	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
@@ -148,23 +150,37 @@ func (r *ReconfigureReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func checkConfigurationObject(object client.Object) bool {
+	ok, reason := checkConfigurationObjectWithReason(object)
+	if !ok {
+		log.Log.WithName("ReconfigureRequestPredicate").V(1).Info("skip reconfigure ConfigMap",
+			"ConfigMap", client.ObjectKeyFromObject(object),
+			"reason", reason)
+	}
+	return ok
+}
+
+func checkConfigurationObjectWithReason(object client.Object) (bool, string) {
 	labels := object.GetLabels()
 	if len(labels) == 0 {
-		return false
+		return false, "missing labels"
 	}
 
 	for _, label := range reconfigureRequiredLabels {
 		if _, ok := labels[label]; !ok {
-			return false
+			return false, fmt.Sprintf("missing required label %s", label)
 		}
 	}
 
 	// reconfigure ConfigMap for db instance
 	if ins, ok := labels[constant.CMConfigurationTypeLabelKey]; !ok || ins != constant.ConfigInstanceType {
-		return false
+		return false, fmt.Sprintf("configuration type is %q, want %q", ins, constant.ConfigInstanceType)
 	}
 
-	return checkEnableCfgUpgrade(object)
+	if !checkEnableCfgUpgrade(object) {
+		return false, fmt.Sprintf("%s=true", constant.DisableUpgradeInsConfigurationAnnotationKey)
+	}
+
+	return true, ""
 }
 
 func (r *ReconfigureReconciler) getConfigSpec(reqCtx intctrlutil.RequestCtx, cm *corev1.ConfigMap) (*appsv1.ComponentFileTemplate, error) {

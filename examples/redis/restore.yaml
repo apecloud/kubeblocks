@@ -1,30 +1,25 @@
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: redis-replication-restore
+  name: redis-restore
   namespace: demo
-  annotations:
-    kubeblocks.io/restore-from-backup: '{"redis":{"encryptedSystemAccounts":"<ENCRYPTED-SYSTEM-ACCOUNTS>","name":"redis-replication-backup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
   terminationPolicy: Delete
   clusterDef: redis
   topology: replication
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: redis-cluster-backup
+      namespace: demo
   componentSpecs:
     - name: redis
       serviceVersion: "7.2.4"
-      disableExporter: false
       replicas: 2
-      resources:
-        limits:
-          cpu: '0.5'
-          memory: 0.5Gi
-        requests:
-          cpu: '0.5'
-          memory: 0.5Gi
       volumeClaimTemplates:
         - name: data
           spec:
-            storageClassName: ""
             accessModes:
               - ReadWriteOnce
             resources:
@@ -32,17 +27,9 @@ spec:
                 storage: 20Gi
     - name: redis-sentinel
       replicas: 3
-      resources:
-        limits:
-          cpu: '0.5'
-          memory: 0.5Gi
-        requests:
-          cpu: '0.5'
-          memory: 0.5Gi
       volumeClaimTemplates:
         - name: data
           spec:
-            storageClassName: ""
             accessModes:
               - ReadWriteOnce
             resources:

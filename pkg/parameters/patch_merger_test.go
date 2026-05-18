@@ -85,9 +85,9 @@ func strPtr(v string) *string {
 //   - content modifies an immutable parameter   -> reject
 //   - content adds an immutable parameter       -> reject
 //   - content removes an immutable parameter    -> reject
-//   - content only reorders / re-formats        -> accept (no误伤)
+//   - content only reorders / re-formats        -> accept (no false positive)
 //   - file has no immutable candidate, missing
-//     FileFormatConfig                          -> accept (no兼容性回归)
+//     FileFormatConfig                          -> accept (no backward-compat regression)
 //   - file has immutable candidate but missing
 //     FileFormatConfig                          -> reject (fail-safe)
 
@@ -199,9 +199,9 @@ func TestDoMergeAcceptsContentWithOnlyFormatChange(t *testing.T) {
 func TestDoMergeAcceptsContentWithMutableChangeAndFormatNoiseWhileImmutableUnchanged(t *testing.T) {
 	// Realistic MySQL-style fixture covering the joint case the guard must
 	// accept:
-	//   1) format noise — comment rewrites, extra blank lines, `key=value`
-	//      vs `key = value` spacing — must NOT trip the immutable check;
-	//   2) a mutable parameter (max_connections) changes value — that is
+	//   1) format noise -- comment rewrites, extra blank lines, `key=value`
+	//      vs `key = value` spacing -- must NOT trip the immutable check;
+	//   2) a mutable parameter (max_connections) changes value -- that is
 	//      explicitly allowed because it is not in ImmutableParameters;
 	//   3) the immutable parameter (gtid_mode) keeps the same parsed value
 	//      across base and patch, so the guard must let the merge through.

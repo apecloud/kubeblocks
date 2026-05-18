@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -50,6 +51,7 @@ func DequeueOpsRequestInClusterAnnotation(ctx context.Context, cli client.Client
 	}
 	index, _ := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
 	if index == -1 {
+		logOpsQueueState(ctx, "skip dequeue because OpsRequest is not in cluster queue annotation", opsRes, opsRequestSlice)
 		return nil
 	}
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsFailedPhase && index == 0 {
@@ -87,7 +89,13 @@ func DequeueOpsRequestInClusterAnnotation(ctx context.Context, cli client.Client
 		// delete the opsRequest in Cluster.annotations
 		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
 	}
-	return opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+	if err = opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice); err != nil {
+		return err
+	}
+	logOpsQueueState(ctx, "dequeue OpsRequest from cluster queue annotation", opsRes, opsRequestSlice,
+		"removedIndex", index,
+		"phase", opsRes.OpsRequest.Status.Phase)
+	return nil
 }
 
 // enqueueOpsRequestToClusterAnnotation adds the OpsRequest Annotation to Cluster.metadata.Annotations to acquire the lock.
@@ -111,7 +119,14 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		if opsRes.OpsRequest.Force() && !opsRes.OpsRequest.Spec.EnqueueOnForce {
 			return false
 		}
-		return existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest.Spec.Type, opsBehaviour)
+		exists := existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest.Spec.Type, opsBehaviour)
+		if exists {
+			logOpsQueueState(ctx, "queue OpsRequest because another OpsRequest is running", opsRes, opsRequestSlice,
+				"force", opsRes.OpsRequest.Spec.Force,
+				"queueByCluster", opsBehaviour.QueueByCluster,
+				"queueBySelf", opsBehaviour.QueueBySelf)
+		}
+		return exists
 	}
 
 	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
@@ -140,17 +155,46 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		if !doSwap {
 			if !opsRecorder.InQueue {
 				// the opsRequest is already running.
+				logOpsQueueState(ctx, "skip enqueue because OpsRequest is already running in cluster queue annotation", opsRes, opsRequestSlice,
+					"existingIndex", index)
 				return &opsRecorder, nil
 			}
 			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
 				// if exists other running opsRequest, return.
+				logOpsQueueState(ctx, "keep OpsRequest queued because another OpsRequest is running", opsRes, opsRequestSlice,
+					"existingIndex", index,
+					"force", opsRes.OpsRequest.Spec.Force,
+					"queueByCluster", opsBehaviour.QueueByCluster,
+					"queueBySelf", opsBehaviour.QueueBySelf)
 				return &opsRecorder, nil
 			}
 			// mark to handle the next opsRequest
 			opsRequestSlice[index].InQueue = false
 		}
 	}
-	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+	if err = opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice); err != nil {
+		return nil, err
+	}
+	_, opsRecorder = GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+	logOpsQueueState(ctx, "updated cluster queue annotation after enqueue decision", opsRes, opsRequestSlice,
+		"existingIndex", index,
+		"inQueue", opsRecorder.InQueue,
+		"force", opsRes.OpsRequest.Spec.Force,
+		"queueByCluster", opsBehaviour.QueueByCluster,
+		"queueBySelf", opsBehaviour.QueueBySelf)
+	return &opsRecorder, nil
+}
+
+func logOpsQueueState(ctx context.Context, msg string, opsRes *OpsResource, opsRequestSlice []opsv1alpha1.OpsRecorder, keysAndValues ...any) {
+	values := []any{
+		"cluster", client.ObjectKeyFromObject(opsRes.Cluster),
+		"opsRequest", client.ObjectKeyFromObject(opsRes.OpsRequest),
+		"opsType", opsRes.OpsRequest.Spec.Type,
+		"queueLength", len(opsRequestSlice),
+		"queue", opsRequestSlice,
+	}
+	values = append(values, keysAndValues...)
+	log.FromContext(ctx).V(1).Info(msg, values...)
 }
 
 func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, currentIndex int, opsRes *OpsResource) ([]opsv1alpha1.OpsRecorder, bool) {

@@ -126,6 +126,11 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 // handleDeletion handles the delete event of the OpsRequest.
 func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsRunningPhase && !opsRes.Cluster.IsDeleting() {
+		reqCtx.Log.V(1).Info("skip deleting running OpsRequest while cluster is not deleting",
+			"cluster", client.ObjectKeyFromObject(opsRes.Cluster),
+			"phase", opsRes.OpsRequest.Status.Phase,
+			"finalizers", opsRes.OpsRequest.Finalizers,
+			"deletionTimestamp", opsRes.OpsRequest.DeletionTimestamp)
 		return nil, nil
 	}
 	if opsRes.Cluster.IsDeleting() && opsRes.OpsRequest.DeletionTimestamp.IsZero() {

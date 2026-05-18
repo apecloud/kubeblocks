@@ -200,8 +200,11 @@ func (vs verticalScalingHandler) podApplyCompOps(
 			vsResources.Requests = corev1.ResourceList{}
 		}
 		for resName, resValue := range vsResources.Limits {
-			requestResource := vsResources.Requests[resName]
-			if requestResource.IsZero() {
+			// Only default a request value to the matching limit when the caller
+			// omitted the request key entirely. An explicit zero value is a valid
+			// Pod spec and must be compared as a literal zero, not silently
+			// promoted to the limit value.
+			if _, ok := vsResources.Requests[resName]; !ok {
 				vsResources.Requests[resName] = resValue
 			}
 			if !resValue.Equal(podResources.Limits[resName]) {

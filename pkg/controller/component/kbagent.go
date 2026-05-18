@@ -134,11 +134,12 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if err != nil {
 		return err
 	}
+	imagePullPolicy := kbAgentImagePullPolicy()
 
 	newContainer := func(name string, f func(*builder.ContainerBuilder) error) (*corev1.Container, error) {
 		b := builder.NewContainerBuilder(name).
 			SetImage(viper.GetString(constant.KBToolsImage)).
-			SetImagePullPolicy(corev1.PullIfNotPresent).
+			SetImagePullPolicy(imagePullPolicy).
 			AddCommands(kbAgentCommand).
 			AddEnv(mergedActionEnv4KBAgent(synthesizedComp)...).
 			AddEnv(envVars...).
@@ -462,7 +463,7 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 		// init-container to copy binaries to the shared mount point /kubeblocks
 		initContainer := builder.NewContainerBuilder(kbagent.InitContainerName).
 			SetImage(viper.GetString(constant.KBToolsImage)).
-			SetImagePullPolicy(corev1.PullIfNotPresent).
+			SetImagePullPolicy(kbAgentImagePullPolicy()).
 			AddCommands([]string{"cp", "-r", kbAgentCommand, kbAgentSharedMountPath + "/"}...).
 			AddVolumeMounts(sharedVolumeMount).
 			GetObject()
@@ -483,6 +484,13 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 	}
 
 	return nil
+}
+
+func kbAgentImagePullPolicy() corev1.PullPolicy {
+	if policy := corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)); policy != "" {
+		return policy
+	}
+	return corev1.PullIfNotPresent
 }
 
 func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, *corev1.Container, error) {

@@ -138,8 +138,47 @@ var _ = Describe("instance util test", func() {
 			}}, newPod)).Should(Succeed())
 			Expect(configHashOnlyInPlaceUpdate(oldPod, newPod)).Should(BeTrue())
 
-			newPod.Labels = map[string]string{"extra": "label"}
-			Expect(configHashOnlyInPlaceUpdate(oldPod, newPod)).Should(BeFalse())
+			newConfigHashPod := func() *corev1.Pod {
+				pod := oldPod.DeepCopy()
+				Expect(configsToPod([]workloads.ConfigTemplate{{
+					Name:       "valkey-replication-config",
+					ConfigHash: ptr.To("new-hash"),
+				}}, pod)).Should(Succeed())
+				return pod
+			}
+
+			cases := []struct {
+				name   string
+				mutate func(*corev1.Pod)
+			}{{
+				name: "label",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels = map[string]string{"extra": "label"}
+				},
+			}, {
+				name: "non config-hash annotation",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations["other"] = "changed"
+				},
+			}, {
+				name: "container image",
+				mutate: func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Image = "valkey:10"
+				},
+			}, {
+				name: "container resources",
+				mutate: func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("1"),
+					}
+				},
+			}}
+			for _, tc := range cases {
+				By("rejecting " + tc.name + " as config-hash-only")
+				pod := newConfigHashPod()
+				tc.mutate(pod)
+				Expect(configHashOnlyInPlaceUpdate(oldPod, pod)).Should(BeFalse())
+			}
 		})
 	})
 

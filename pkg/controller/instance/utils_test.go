@@ -22,11 +22,86 @@ package instance
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
+
+const (
+	testImageDigestA = "sha256:abc1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc"
+	testImageDigestB = "sha256:def0000000000000000000000000000000000000000000000000000000000000"
+)
+
+func TestIsImageMatchedDigestPinnedFallsBackToImageID(t *testing.T) {
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name:  "main",
+				Image: "apecloud/kubeblocks@" + testImageDigestA,
+			}},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:    "main",
+				Image:   "apecloud/kubeblocks:1.0.3-beta.7",
+				ImageID: "docker.io/apecloud/kubeblocks@" + testImageDigestA,
+			}},
+		},
+	}
+	if !isImageMatched(pod) {
+		t.Fatalf("expected digest-pinned spec to match via status.ImageID when status.Image lacks digest")
+	}
+}
+
+func TestIsImageMatchedDigestPinnedRejectsOnImageIDMismatch(t *testing.T) {
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name:  "main",
+				Image: "apecloud/kubeblocks@" + testImageDigestA,
+			}},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:    "main",
+				Image:   "apecloud/kubeblocks:1.0.3-beta.7",
+				ImageID: "docker.io/apecloud/kubeblocks@" + testImageDigestB,
+			}},
+		},
+	}
+	if isImageMatched(pod) {
+		t.Fatalf("expected digest-pinned spec to reject when status.ImageID digest does not match")
+	}
+}
+
+func TestIsImageMatchedTagOnlySpecKeepsStrictTagComparison(t *testing.T) {
+	// Tag-only spec must continue to enforce strict status.Image tag match
+	// even when status.ImageID carries a non-empty digest. The ImageID
+	// fallback is intentionally limited to digest-pinned specs; tag-only
+	// specs cannot be resolved to a digest at the controller level, so a
+	// status tag drift must still surface as a non-match (otherwise a
+	// pending image upgrade would be misreported as already realized).
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name:  "main",
+				Image: "apecloud/kubeblocks:1.0.3-beta.7",
+			}},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:    "main",
+				Image:   "apecloud/kubeblocks:1.0.3-beta.6",
+				ImageID: "docker.io/apecloud/kubeblocks@" + testImageDigestA,
+			}},
+		},
+	}
+	if isImageMatched(pod) {
+		t.Fatalf("expected tag-only spec to reject when status.Image tag differs, ignoring status.ImageID")
+	}
+}
 
 func TestConfigsToUpdateTreatsNilAndEmptyConfigHashAsEqual(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "valkey-0").

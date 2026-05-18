@@ -178,9 +178,18 @@ func isImageMatched(pod *corev1.Pod) bool {
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
 		specName, specTag, specDigest := imageSplit(specImage)
 		statusName, statusTag, statusDigest := imageSplit(statusImage)
-		// if digest presents in spec, it must be same in status
+		// if digest presents in spec, it must be same in status.
+		// status.Image may not carry the digest (kubelet often reports the
+		// image as a tag form), so fall back to status.ImageID, which is
+		// the canonical hash of the actually loaded image. This keeps the
+		// digest-pinned spec match working when the kubelet only surfaces
+		// a tag in status.Image.
 		if len(specDigest) != 0 && specDigest != statusDigest {
-			return false
+			statusImageID := pod.Status.ContainerStatuses[index].ImageID
+			_, _, idDigest := imageSplit(statusImageID)
+			if specDigest != idDigest {
+				return false
+			}
 		}
 		// if tag presents in spec, it must be same in status
 		if len(specTag) != 0 && specTag != statusTag {

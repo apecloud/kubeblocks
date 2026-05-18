@@ -518,6 +518,38 @@ var _ = Describe("instance util test", func() {
 				Image: "apecloud.com/nginx",
 			}}
 			Expect(isImageMatched(pod)).Should(BeTrue())
+
+			By("digest-pinned spec matches via status.ImageID when status.Image carries no digest")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "apecloud/kubeblocks@sha256:abc1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "apecloud/kubeblocks:1.0.3-beta.7",
+				ImageID: "docker.io/apecloud/kubeblocks@sha256:abc1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc",
+			}}
+			Expect(isImageMatched(pod)).Should(BeTrue())
+
+			By("digest-pinned spec rejects when status.ImageID digest is different")
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "apecloud/kubeblocks:1.0.3-beta.7",
+				ImageID: "docker.io/apecloud/kubeblocks@sha256:def0000000000000000000000000000000000000000000000000000000000000",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+
+			By("tag-only spec keeps strict tag match (no ImageID fallback for tag-only)")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "apecloud/kubeblocks:1.0.3-beta.7",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:    name,
+				Image:   "apecloud/kubeblocks:1.0.3-beta.6",
+				ImageID: "docker.io/apecloud/kubeblocks@sha256:abc1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
 		})
 	})
 

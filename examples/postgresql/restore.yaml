@@ -3,32 +3,25 @@ kind: Cluster
 metadata:
   name: pg-restore
   namespace: demo
-  annotations:
-    # NOTE: replace <ENCRYPTED-SYSTEM-ACCOUNTS> with the accounts info from you backup
-    kubeblocks.io/restore-from-backup: '{"postgresql":{"encryptedSystemAccounts":"<ENCRYPTED-SYSTEM-ACCOUNTS>","name":"pg-cluster-pg-basebackup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
   terminationPolicy: Delete
   clusterDef: postgresql
   topology: replication
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: pg-cluster-pg-basebackup
+      namespace: demo
   componentSpecs:
     - name: postgresql
       serviceVersion: "14.7.2"
-      disableExporter: true
       labels:
-        # NOTE: update the label accordingly
         apps.kubeblocks.postgres.patroni/scope: pg-restore-postgresql
       replicas: 2
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
       volumeClaimTemplates:
         - name: data
           spec:
-            storageClassName: ""
             accessModes:
               - ReadWriteOnce
             resources:

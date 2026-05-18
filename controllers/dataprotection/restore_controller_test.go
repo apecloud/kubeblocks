@@ -526,6 +526,64 @@ var _ = Describe("Restore Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), restore, false)).Should(Succeed())
 			})
 
+			It("should complete an existing postReady job when target pod is no longer ready", func() {
+				By("remove the prepareData stage for testing post ready actions")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+				})).Should(Succeed())
+
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+					}, nil)
+
+				By("wait for creating two exec jobs with the matchLabels")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
+
+				By("mock exec jobs are completed")
+				mockRestoreJobsCompleted(restore)
+
+				By("wait for creating a job of jobAction with the matchLabels")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
+
+				By("make the target pods unavailable before the existing postReady job is observed as complete")
+				podList := &corev1.PodList{}
+				Expect(k8sClient.List(ctx, podList,
+					client.MatchingLabels(matchLabels),
+					client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+				Expect(podList.Items).ShouldNot(BeEmpty())
+				for i := range podList.Items {
+					pod := &podList.Items[i]
+					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+						pod.Status.Conditions = []corev1.PodCondition{{
+							Type:               corev1.PodReady,
+							Status:             corev1.ConditionFalse,
+							LastTransitionTime: metav1.Now(),
+						}}
+					})).Should(Succeed())
+				}
+
+				By("expect the existing postReady job is tracked before rebuilding from unavailable target pods")
+				Consistently(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
+
+				By("mock all postReady jobs are completed")
+				mockRestoreJobsCompleted(restore)
+
+				By("wait for restore to complete from the existing job status")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseCompleted))
+				})).Should(Succeed())
+			})
+
 			It("test jobAction env", func() {
 				By("remove the prepareData stage for testing post ready actions")
 				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {

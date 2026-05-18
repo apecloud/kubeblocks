@@ -230,8 +230,8 @@ func filterImmutableParameters(parameters map[string]any, fileName string, param
 // will.
 //
 // Fail-safe: when a file *does* have immutable-parameter candidates but the
-// parser cannot be applied — missing FileFormatConfig in configDescs, or
-// parse error on base/merged content — the operation is rejected rather
+// parser cannot be applied -- missing FileFormatConfig in configDescs, or
+// parse error on base/merged content -- the operation is rejected rather
 // than silently allowed. Otherwise an unknown-format file would let
 // immutable parameter changes leak through this guard.
 func validateImmutableContentChanges(

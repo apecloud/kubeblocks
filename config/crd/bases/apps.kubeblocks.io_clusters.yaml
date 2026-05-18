@@ -6484,6 +6484,44 @@ spec:
                 - message: two kinds of definition API can not be used simultaneously
                   rule: self.all(x, size(self.filter(c, has(c.componentDef))) == 0)
                     || self.all(x, size(self.filter(c, has(c.componentDef))) == size(self))
+              restore:
+                description: Specifies the restore configuration of the Cluster.
+                properties:
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: Specifies runtime-specific restore parameters.
+                    type: object
+                  pitr:
+                    description: Specifies the point-in-time recovery target. The
+                      value is opaque to apps and interpreted by the restore runtime.
+                    type: string
+                  source:
+                    description: Specifies the restore source.
+                    properties:
+                      apiGroup:
+                        description: Specifies the API group of the restore source.
+                        type: string
+                      kind:
+                        description: Specifies the kind of the restore source.
+                        type: string
+                      name:
+                        description: Specifies the name of the restore source.
+                        type: string
+                      namespace:
+                        description: Specifies the namespace of the restore source.
+                          If empty, the Cluster namespace is used.
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                required:
+                - source
+                type: object
+                x-kubernetes-validations:
+                - message: restore is immutable
+                  rule: self == oldSelf
               runtimeClassName:
                 description: Specifies runtimeClassName for all Pods managed by this
                   Cluster.

@@ -105,7 +105,8 @@ func Requeue(logger logr.Logger, msg string, keysAndValues ...interface{}) (reco
 }
 
 // HandleCRDeletion handles CR deletion, adds finalizer if found a non-deleting object and removes finalizer during
-// deletion process. Passes optional 'deletionHandler' func for external dependency deletion. Returns Result pointer
+// deletion process. It patches only finalizer metadata so chart-owned spec fields keep their field ownership.
+// Passes optional 'deletionHandler' func for external dependency deletion. Returns Result pointer
 // if required to return out of outer 'Reconcile' reconciliation loop.
 func HandleCRDeletion(reqCtx RequestCtx,
 	r client.Writer,
@@ -118,8 +119,9 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		// then add the finalizer and update the object. This is equivalent to
 		// registering our finalizer.
 		if !controllerutil.ContainsFinalizer(cr, finalizer) {
+			patch := client.MergeFrom(cr.DeepCopyObject().(client.Object))
 			controllerutil.AddFinalizer(cr, finalizer)
-			if err := r.Update(reqCtx.Ctx, cr); err != nil {
+			if err := r.Patch(reqCtx.Ctx, cr, patch); err != nil {
 				return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 			}
 		}
@@ -156,8 +158,9 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				}
 			}
 			// remove our finalizer from the list and update it.
+			patch := client.MergeFrom(cr.DeepCopyObject().(client.Object))
 			if controllerutil.RemoveFinalizer(cr, finalizer) {
-				if err := r.Update(reqCtx.Ctx, cr); err != nil {
+				if err := r.Patch(reqCtx.Ctx, cr, patch); err != nil {
 					return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 				}
 				// record resources deleted event

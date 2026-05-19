@@ -265,8 +265,9 @@ func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv
 	return strings.Join(versions, ",") // TODO(API): service versions length
 }
 
-func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,
+func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Writer, rctx intctrlutil.RequestCtx,
 	compVersion *appsv1.ComponentVersion, releaseToCompDefinitions map[string]map[string]*appsv1.ComponentDefinition) error {
+	patch := client.MergeFrom(compVersion.DeepCopy())
 	if compVersion.Annotations == nil {
 		compVersion.Annotations = make(map[string]string)
 	}
@@ -294,7 +295,7 @@ func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Cli
 	}
 	compVersion.Labels = labels
 	compVersion.Annotations[compatibleDefinitionsKey] = strings.Join(labelKeys, ",")
-	return cli.Update(rctx.Ctx, compVersion)
+	return cli.Patch(rctx.Ctx, compVersion, patch)
 }
 
 func (r *ComponentVersionReconciler) validate(compVersion *appsv1.ComponentVersion,

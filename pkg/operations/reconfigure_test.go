@@ -250,7 +250,7 @@ parameter: {
 				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
 				cp.Status.Message = "parameter maxmemory-samples value \"0\" is invalid"
 				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
-					Name:  cp.Spec.ConfigItemDetails[0].Name,
+					Name:  "mysql-config",
 					Phase: parametersv1alpha1.CMergeFailedPhase,
 				}}
 			})()).Should(Succeed())

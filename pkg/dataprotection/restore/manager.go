@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -605,6 +606,60 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	}
 	job := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build()
 	return job, nil
+}
+
+// GetExistingActionJobs returns jobs already recorded in Restore status for an in-flight action.
+// If any recorded Processing Job is missing, it returns an empty list so callers can follow
+// the original build/create path.
+func (r *RestoreManager) GetExistingActionJobs(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	stage dpv1alpha1.RestoreStage,
+	backupName string,
+	actionName string) ([]*batchv1.Job, error) {
+	restoreActions := r.Restore.Status.Actions.PrepareData
+	if stage == dpv1alpha1.PostReady {
+		restoreActions = r.Restore.Status.Actions.PostReady
+	}
+	namespaces := []string{r.Restore.Namespace}
+	if controllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS); controllerNamespace != "" && controllerNamespace != r.Restore.Namespace {
+		namespaces = append(namespaces, controllerNamespace)
+	}
+
+	var jobs []*batchv1.Job
+	missingActionJob := false
+	jobKeyPrefix := fmt.Sprintf("%s/", constant.JobKind)
+	for i := range restoreActions {
+		action := restoreActions[i]
+		if action.BackupName != backupName ||
+			action.Name != actionName ||
+			action.Status != dpv1alpha1.RestoreActionProcessing ||
+			!strings.HasPrefix(action.ObjectKey, jobKeyPrefix) {
+			continue
+		}
+		jobName := strings.TrimPrefix(action.ObjectKey, jobKeyPrefix)
+		found := false
+		for _, namespace := range namespaces {
+			job := &batchv1.Job{}
+			err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: jobName, Namespace: namespace}, job)
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			jobs = append(jobs, job)
+			found = true
+			break
+		}
+		if !found {
+			missingActionJob = true
+		}
+	}
+	if missingActionJob {
+		return nil, nil
+	}
+	return jobs, nil
 }
 
 // BuildPostReadyActionJobs builds the post ready jobs.

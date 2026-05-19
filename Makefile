@@ -383,7 +383,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-GOLANGCILINT_VERSION = v2.8.0
+GOLANGCILINT_VERSION = v1.64.8
 GOLANGCILINT = $(LOCALBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
 .PHONY: golangci-lint-bin
 golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
@@ -394,17 +394,10 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 	}
 
 STATICCHECK_VERSION = v0.6.1
-STATICCHECK_GOTOOLCHAIN ?= go1.25.10
 STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
 .PHONY: staticcheck-bin
 staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.
-	@[ -f $(STATICCHECK) ] || { \
-	set -e; \
-	package=honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ;\
-	echo "Installing $${package} with $(STATICCHECK_GOTOOLCHAIN)" ;\
-	GOBIN=$(LOCALBIN) GOTOOLCHAIN=$(STATICCHECK_GOTOOLCHAIN) go install $${package} ;\
-	mv "$$(echo "$(STATICCHECK)" | sed "s/-$(STATICCHECK_VERSION)$$//")" $(STATICCHECK) ;\
-	}
+	$(call go-install-tool,$(STATICCHECK),honnef.co/go/tools/cmd/staticcheck,$(STATICCHECK_VERSION))
 
 GOIMPORTS_VERSION = v0.34.0
 GOIMPORTS = $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)

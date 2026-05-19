@@ -1,49 +1,52 @@
-version: "2"
+# options for analysis running
 run:
+  # default concurrency is a available CPU number
   concurrency: 4
+
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  deadline: 15m
+
   timeout: 30m
+
+issues:
+  exclude-files:
+    - "^zz_generated.*"
+
+#  build-tags:
+#    - containers_image_openpgp
+
 output:
+  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
   formats:
-    text:
+    - format: colored-line-number
       path: stdout
-      print-linter-name: true
-      print-issued-lines: true
+
+  # print lines of code with issue, default is true
+  print-issued-lines: true
+
+  # print linter name in the end of issue text, default is true
+  print-linter-name: true
+
+# check available linters @ https://golangci-lint.run/usage/linters/
 linters:
-  default: none
-  enable:
+  disable-all: true
+  enable: # please keep this alphabetized
+  # - gocyclo
+    - loggercheck
     - errcheck
     - gocritic
+    # - goconst
+    - goimports
+    - gofmt  # We enable this as well as goimports for its simplify mode.
+    - gosimple
     - govet
     - ineffassign
-    - loggercheck
+    - typecheck
     - misspell
     - nakedret
     - unconvert
     - unused
-  settings:
-    errcheck:
-      check-blank: false
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    rules:
-      - linters:
-          - gocritic
-        text: "deprecatedComment"
-      - linters:
-          - govet
-        text: "hostport"
-    paths:
-      - ^zz_generated.*
-formatters:
-  enable:
-    - gofmt
-    - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - ^zz_generated.*
+
+linters-settings:
+  errcheck:
+    check-blank: false # to keep `_ = viper.BindPFlag(...)` from throwing errors

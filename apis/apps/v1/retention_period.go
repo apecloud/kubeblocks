@@ -122,14 +122,10 @@ func (r RetentionPeriod) nextNumber(input string) (num int, rest string, err err
 		return 0, "", nil
 	}
 
-	var (
-		n        string
-		negative bool
-	)
+	var n string
 
 	if input[0] == '-' {
-		negative = true
-		input = input[1:]
+		return 0, input, errInvalidDuration
 	}
 
 	for i, s := range input {
@@ -150,8 +146,5 @@ func (r RetentionPeriod) nextNumber(input string) (num int, rest string, err err
 		return 0, input, err
 	}
 
-	if negative {
-		num = -num
-	}
 	return num, rest, nil
 }

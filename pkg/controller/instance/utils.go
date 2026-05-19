@@ -118,76 +118,14 @@ func isImageMatched(pod *corev1.Pod) bool {
 			continue
 		}
 		specImage := container.Image
-		statusImage := pod.Status.ContainerStatuses[index].Image
+		status := pod.Status.ContainerStatuses[index]
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		specName, specTag, specDigest := imageSplit(specImage)
-		statusName, statusTag, statusDigest := imageSplit(statusImage)
-		// if digest presents in spec, it must be same in status
-		if len(specDigest) != 0 && specDigest != statusDigest {
+		if !intctrlutil.MatchContainerImageInStatus(specImage, status.Image, status.ImageID) {
 			return false
-		}
-		// if tag presents in spec, it must be same in status
-		if len(specTag) != 0 && specTag != statusTag {
-			return false
-		}
-		// otherwise, statusName should be same as or has suffix of specName
-		if specName != statusName {
-			specNames := strings.Split(specName, "/")
-			statusNames := strings.Split(statusName, "/")
-			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
-				return false
-			}
 		}
 	}
 	return true
-}
-
-// imageSplit separates and returns the name and tag parts
-// from the image string using either colon `:` or at `@` separators.
-// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
-func imageSplit(imageName string) (name string, tag string, digest string) {
-	// check if image name contains a domain
-	// if domain is present, ignore domain and check for `:`
-	searchName := imageName
-	slashIndex := strings.Index(imageName, "/")
-	if slashIndex > 0 {
-		searchName = imageName[slashIndex:]
-	} else {
-		slashIndex = 0
-	}
-
-	id := strings.Index(searchName, "@")
-	ic := strings.Index(searchName, ":")
-
-	// no tag or digest
-	if ic < 0 && id < 0 {
-		return imageName, "", ""
-	}
-
-	// digest only
-	if id >= 0 && (id < ic || ic < 0) {
-		id += slashIndex
-		name = imageName[:id]
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, "", digest
-	}
-
-	// tag and digest
-	if id >= 0 && ic >= 0 {
-		id += slashIndex
-		ic += slashIndex
-		name = imageName[:ic]
-		tag = strings.TrimPrefix(imageName[ic:id], ":")
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, tag, digest
-	}
-
-	// tag only
-	ic += slashIndex
-	name = imageName[:ic]
-	tag = strings.TrimPrefix(imageName[ic:], ":")
-	return name, tag, ""
 }
 
 func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, error) {

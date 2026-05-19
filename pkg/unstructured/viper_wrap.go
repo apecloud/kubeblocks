@@ -62,8 +62,18 @@ func (v *viperWrap) RemoveKey(key string) error {
 }
 
 func (v *viperWrap) SubConfig(key string) ConfigObject {
+	sub := v.Sub(key)
+	if sub == nil {
+		// Stay consistent with the other ConfigObject implementations
+		// (properties / redis / xml / yaml) which return nil when the
+		// requested sub-section is absent. Returning a non-nil wrapper
+		// around a nil viper would panic on later AllKeys / AllSettings
+		// calls; the existing nil-check in pkg/configuration/core/config.go
+		// already expects nil for absent sections.
+		return nil
+	}
 	return &viperWrap{
-		Viper:  v.Sub(key),
+		Viper:  sub,
 		format: v.format,
 	}
 }

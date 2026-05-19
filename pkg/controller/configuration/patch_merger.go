@@ -60,6 +60,14 @@ func mergeUpdatedParams(base map[string]string,
 	// merge updated files into configmap
 	if len(updatedFiles) != 0 {
 		updatedConfig = core.MergeUpdatedConfig(base, updatedFiles)
+		// Reject content-level updates that would alter any immutable parameter.
+		// MergeUpdatedConfig substitutes whole file contents key-by-key, so
+		// without this guard a user submitting raw file content could bypass
+		// the parameter-level immutable check performed below by
+		// MergeAndValidateConfigs/filterImmutableParameters.
+		if err := intctrlutil.ValidateImmutableContentChanges(base, updatedConfig, updatedFiles, paramsDefs, configDescs); err != nil {
+			return nil, err
+		}
 	}
 	if len(configDescs) == 0 {
 		return updatedConfig, nil

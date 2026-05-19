@@ -320,6 +320,26 @@ var _ = Describe("kb-agent", func() {
 			Expect(c.VolumeMounts[0]).Should(Equal(roleLabelVolumeMount))
 		})
 
+		It("uses configured image pull policy", func() {
+			previous := viperx.GetString(constant.KBImagePullPolicy)
+			viperx.Set(constant.KBImagePullPolicy, string(corev1.PullNever))
+			DeferCleanup(func() {
+				viperx.Set(constant.KBImagePullPolicy, previous)
+			})
+			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = "custom-action-image"
+
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			Expect(c.ImagePullPolicy).Should(Equal(corev1.PullNever))
+
+			ic := kbAgentInitContainer()
+			Expect(ic).ShouldNot(BeNil())
+			Expect(ic.ImagePullPolicy).Should(Equal(corev1.PullNever))
+		})
+
 		It("custom container - volume mounts", func() {
 			synthesizedComp.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{
 				{

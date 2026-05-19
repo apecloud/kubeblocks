@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package parameters
 
 import (
 	"testing"
@@ -28,7 +28,7 @@ import (
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
-func TestValidateParameterAssignments(t *testing.T) {
+func TestValidateComponentParameterAssignments(t *testing.T) {
 	paramsDef := testparameters.NewParametersDefinitionFactory("valkey-params").
 		SetTemplateName("valkey-config").
 		SetConfigFile("valkey.conf").
@@ -104,7 +104,7 @@ parameter: {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateParameterAssignments(tt.assignments, []*parametersv1alpha1.ParametersDefinition{paramsDef})
+			err := ValidateComponentParameterAssignments(tt.assignments, []*parametersv1alpha1.ParametersDefinition{paramsDef})
 			if tt.wantErr && err == nil {
 				t.Fatalf("expected validation error")
 			}

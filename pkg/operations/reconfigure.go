@@ -24,20 +24,17 @@ import (
 	"fmt"
 	"time"
 
-	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	parameters "github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
-	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
 
 type reconfigureAction struct {
@@ -200,14 +197,11 @@ func (r *reconfigureAction) validateReconfigureParameters(ctx context.Context, c
 	if err != nil {
 		return err
 	}
-	if !hasParameterSchema(paramsDefs) {
-		return nil
-	}
 	assignments := make(parametersv1alpha1.ComponentParameters, len(reconfigure.Parameters))
 	for _, param := range reconfigure.Parameters {
 		assignments[param.Key] = param.Value
 	}
-	if err := validateParameterAssignments(assignments, paramsDefs); err != nil {
+	if err := parameters.ValidateComponentParameterAssignments(assignments, paramsDefs); err != nil {
 		return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request for component %s: %s", reconfigure.ComponentName, err.Error()))
 	}
 	return nil
@@ -242,58 +236,6 @@ func (r *reconfigureAction) resolveComponentDefinitionNameFromComponent(ctx cont
 		return "", err
 	}
 	return comp.Spec.CompDef, nil
-}
-
-func hasParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition) bool {
-	for _, paramsDef := range paramsDefs {
-		if paramsDef != nil && paramsDef.Spec.ParametersSchema != nil && paramsDef.Spec.ParametersSchema.SchemaInJSON != nil {
-			return true
-		}
-	}
-	return false
-}
-
-func validateParameterAssignments(assignments parametersv1alpha1.ComponentParameters, paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
-	for key, value := range assignments {
-		paramSchema, ok := findParameterSchema(paramsDefs, key)
-		if !ok {
-			return fmt.Errorf("parameter %s not found in parameters schema", key)
-		}
-		if value == nil {
-			continue
-		}
-		schema := &apiext.JSONSchemaProps{
-			Type: "object",
-			Properties: map[string]apiext.JSONSchemaProps{
-				key: paramSchema,
-			},
-		}
-		typedValue, err := common.ConvertStringToInterfaceBySchemaType(schema, map[string]string{key: *value})
-		if err != nil {
-			return fmt.Errorf("parameter %s value %q is invalid: %w", key, *value, err)
-		}
-		if err := common.ValidateDataWithSchema(schema, typedValue); err != nil {
-			return fmt.Errorf("parameter %s value %q is invalid: %w", key, *value, err)
-		}
-	}
-	return nil
-}
-
-func findParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition, key string) (apiext.JSONSchemaProps, bool) {
-	for _, paramsDef := range paramsDefs {
-		if paramsDef == nil || paramsDef.Spec.ParametersSchema == nil || paramsDef.Spec.ParametersSchema.SchemaInJSON == nil {
-			continue
-		}
-		specSchema, ok := paramsDef.Spec.ParametersSchema.SchemaInJSON.Properties[openapi.DefaultSchemaName]
-		if !ok {
-			continue
-		}
-		flattenedSchema := openapi.FlattenSchema(specSchema)
-		if schema, ok := parameters.FindParameterSchema(flattenedSchema.Properties, key); ok {
-			return schema, true
-		}
-	}
-	return apiext.JSONSchemaProps{}, false
 }
 
 func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {

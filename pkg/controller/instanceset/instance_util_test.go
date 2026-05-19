@@ -121,63 +121,103 @@ var _ = Describe("instance util test", func() {
 			Expect(toUpdate[0].Name).Should(Equal("valkey-replication-config"))
 		})
 
-		It("identifies config hash annotation only in-place updates", func() {
-			oldPod := builder.NewPodBuilder(namespace, name+"-0").
+		It("identifies safe metadata-only in-place updates per process-impact semantic", func() {
+			basePod := builder.NewPodBuilder(namespace, name+"-0").
 				AddAnnotations("kept", "value").
+				AddLabels("app", "valkey").
 				SetContainers(template.Spec.Containers).
 				GetObject()
 			Expect(configsToPod([]workloads.ConfigTemplate{{
 				Name:       "valkey-replication-config",
 				ConfigHash: ptr.To("old-hash"),
-			}}, oldPod)).Should(Succeed())
+			}}, basePod)).Should(Succeed())
 
-			newPod := oldPod.DeepCopy()
-			Expect(configsToPod([]workloads.ConfigTemplate{{
-				Name:       "valkey-replication-config",
-				ConfigHash: ptr.To("new-hash"),
-			}}, newPod)).Should(Succeed())
-			Expect(configHashOnlyInPlaceUpdate(oldPod, newPod)).Should(BeTrue())
-
-			newConfigHashPod := func() *corev1.Pod {
-				pod := oldPod.DeepCopy()
-				Expect(configsToPod([]workloads.ConfigTemplate{{
-					Name:       "valkey-replication-config",
-					ConfigHash: ptr.To("new-hash"),
-				}}, pod)).Should(Succeed())
-				return pod
-			}
-
-			cases := []struct {
+			positiveCases := []struct {
 				name   string
 				mutate func(*corev1.Pod)
 			}{{
-				name: "label",
+				name: "config-hash annotation patch",
 				mutate: func(pod *corev1.Pod) {
-					pod.Labels = map[string]string{"extra": "label"}
+					Expect(configsToPod([]workloads.ConfigTemplate{{
+						Name:       "valkey-replication-config",
+						ConfigHash: ptr.To("new-hash"),
+					}}, pod)).Should(Succeed())
 				},
 			}, {
-				name: "non config-hash annotation",
+				name: "non-restart annotation added",
 				mutate: func(pod *corev1.Pod) {
-					pod.Annotations["other"] = "changed"
+					pod.Annotations["custom"] = "value"
 				},
 			}, {
-				name: "container image",
+				name: "non-restart annotation value changed",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations["kept"] = "changed"
+				},
+			}, {
+				name: "label added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels["extra"] = "value"
+				},
+			}, {
+				name: "label value changed",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels["app"] = "valkey-renamed"
+				},
+			}, {
+				name: "role label state synchronization",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels[constant.RoleLabelKey] = "primary"
+				},
+			}}
+			for _, tc := range positiveCases {
+				By("skipping switchover when " + tc.name)
+				newPod := basePod.DeepCopy()
+				tc.mutate(newPod)
+				Expect(safeMetadataOnlyInPlaceUpdate(basePod, newPod)).Should(BeTrue())
+			}
+
+			negativeCases := []struct {
+				name   string
+				mutate func(*corev1.Pod)
+			}{{
+				name:   "no diff",
+				mutate: func(pod *corev1.Pod) {},
+			}, {
+				name: "restart annotation added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations[constant.RestartAnnotationKey] = "2026-05-19T14:00:00Z"
+				},
+			}, {
+				name: "restart annotation value changed",
+				mutate: func(pod *corev1.Pod) {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[constant.RestartAnnotationKey] = "next"
+				},
+			}, {
+				name: "container image changed",
 				mutate: func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Image = "valkey:10"
 				},
 			}, {
-				name: "container resources",
+				name: "container resources changed",
 				mutate: func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("1"),
 					}
 				},
+			}, {
+				name: "container env added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{Name: "EXTRA", Value: "v"})
+				},
 			}}
-			for _, tc := range cases {
-				By("rejecting " + tc.name + " as config-hash-only")
-				pod := newConfigHashPod()
-				tc.mutate(pod)
-				Expect(configHashOnlyInPlaceUpdate(oldPod, pod)).Should(BeFalse())
+			for _, tc := range negativeCases {
+				By("invoking switchover when " + tc.name)
+				newPod := basePod.DeepCopy()
+				tc.mutate(newPod)
+				Expect(safeMetadataOnlyInPlaceUpdate(basePod, newPod)).Should(BeFalse())
 			}
 		})
 	})

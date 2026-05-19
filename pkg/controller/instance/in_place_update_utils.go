@@ -247,12 +247,42 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func configHashOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
+// safeMetadataOnlyInPlaceUpdate returns true when the only difference between
+// old and new is a Pod metadata patch (annotations and/or labels) that has no
+// effect on the running database process or availability. In that case the
+// caller can skip the lifecycle switchover that is normally invoked before an
+// in-place pod update.
+//
+// Specifically, it returns true if and only if:
+//   - old and new are otherwise equal when annotations and labels are ignored
+//     (basic spec fields + container resources match)
+//   - metadata has actually changed (do not vacuously skip switchover when
+//     there is no real diff)
+//   - the annotation diff does not include constant.RestartAnnotationKey, the
+//     explicit restart trigger which always implies a process restart
+//
+// Label changes are allowed because pure label patches do not restart the
+// container, do not change the spec, and do not touch the database process.
+// Service-selector routing impact is a network-layer concern and is not
+// resolved by invoking lifecycle switchover. Role-label patches are likewise
+// state synchronization, not a trigger for additional switchover.
+func safeMetadataOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
 	oldCopy := old.DeepCopy()
 	newCopy := new.DeepCopy()
-	delete(oldCopy.Annotations, constant.CMInsConfigurationHashLabelKey)
-	delete(newCopy.Annotations, constant.CMInsConfigurationHashLabelKey)
-	return equalBasicInPlaceFields(oldCopy, newCopy) && equalResourcesInPlaceFields(oldCopy, newCopy)
+	oldCopy.Annotations = nil
+	newCopy.Annotations = nil
+	oldCopy.Labels = nil
+	newCopy.Labels = nil
+	if !equalBasicInPlaceFields(oldCopy, newCopy) || !equalResourcesInPlaceFields(oldCopy, newCopy) {
+		return false
+	}
+	if equalField(old.Annotations, new.Annotations) && equalField(old.Labels, new.Labels) {
+		return false
+	}
+	if !equalField(old.Annotations[constant.RestartAnnotationKey], new.Annotations[constant.RestartAnnotationKey]) {
+		return false
+	}
+	return true
 }
 
 // equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.

@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
 
@@ -53,73 +54,111 @@ func TestConfigsToUpdateTreatsNilAndEmptyConfigHashAsEqual(t *testing.T) {
 	}
 }
 
-func TestConfigHashOnlyInPlaceUpdate(t *testing.T) {
-	oldPod := builder.NewPodBuilder("default", "valkey-0").
+func TestSafeMetadataOnlyInPlaceUpdate(t *testing.T) {
+	basePod := builder.NewPodBuilder("default", "valkey-0").
 		AddAnnotations("kept", "value").
+		AddLabels("app", "valkey").
 		SetContainers([]corev1.Container{{Name: "valkey", Image: "valkey:9"}}).
 		GetObject()
 	if err := configsToPod([]workloads.ConfigTemplate{{
 		Name:       "valkey-replication-config",
 		ConfigHash: ptr.To("old-hash"),
-	}}, oldPod); err != nil {
+	}}, basePod); err != nil {
 		t.Fatalf("configsToPod() error = %v", err)
 	}
 
-	newPod := oldPod.DeepCopy()
-	if err := configsToPod([]workloads.ConfigTemplate{{
-		Name:       "valkey-replication-config",
-		ConfigHash: ptr.To("new-hash"),
-	}}, newPod); err != nil {
-		t.Fatalf("configsToPod() error = %v", err)
-	}
-	if !configHashOnlyInPlaceUpdate(oldPod, newPod) {
-		t.Fatalf("expected config hash only update")
-	}
-
-	newConfigHashPod := func(t *testing.T) *corev1.Pod {
-		t.Helper()
-		pod := oldPod.DeepCopy()
-		if err := configsToPod([]workloads.ConfigTemplate{{
-			Name:       "valkey-replication-config",
-			ConfigHash: ptr.To("new-hash"),
-		}}, pod); err != nil {
-			t.Fatalf("configsToPod() error = %v", err)
-		}
-		return pod
-	}
-
-	cases := []struct {
+	positiveCases := []struct {
 		name   string
 		mutate func(*corev1.Pod)
 	}{{
-		name: "label",
+		name: "config-hash annotation patch",
 		mutate: func(pod *corev1.Pod) {
-			pod.Labels = map[string]string{"extra": "label"}
+			if err := configsToPod([]workloads.ConfigTemplate{{
+				Name:       "valkey-replication-config",
+				ConfigHash: ptr.To("new-hash"),
+			}}, pod); err != nil {
+				t.Fatalf("configsToPod() error = %v", err)
+			}
 		},
 	}, {
-		name: "non config-hash annotation",
+		name: "non-restart annotation added",
 		mutate: func(pod *corev1.Pod) {
-			pod.Annotations["other"] = "changed"
+			pod.Annotations["custom"] = "value"
 		},
 	}, {
-		name: "container image",
+		name: "non-restart annotation value changed",
+		mutate: func(pod *corev1.Pod) {
+			pod.Annotations["kept"] = "changed"
+		},
+	}, {
+		name: "label added",
+		mutate: func(pod *corev1.Pod) {
+			pod.Labels["extra"] = "value"
+		},
+	}, {
+		name: "label value changed",
+		mutate: func(pod *corev1.Pod) {
+			pod.Labels["app"] = "valkey-renamed"
+		},
+	}, {
+		name: "role label state synchronization",
+		mutate: func(pod *corev1.Pod) {
+			pod.Labels[constant.RoleLabelKey] = "primary"
+		},
+	}}
+	for _, tc := range positiveCases {
+		t.Run("skip switchover when "+tc.name, func(t *testing.T) {
+			newPod := basePod.DeepCopy()
+			tc.mutate(newPod)
+			if !safeMetadataOnlyInPlaceUpdate(basePod, newPod) {
+				t.Fatalf("expected %s to be a safe metadata-only update", tc.name)
+			}
+		})
+	}
+
+	negativeCases := []struct {
+		name   string
+		mutate func(*corev1.Pod)
+	}{{
+		name: "no diff",
+		mutate: func(pod *corev1.Pod) {},
+	}, {
+		name: "restart annotation added",
+		mutate: func(pod *corev1.Pod) {
+			pod.Annotations[constant.RestartAnnotationKey] = "2026-05-19T14:00:00Z"
+		},
+	}, {
+		name: "restart annotation value changed",
+		mutate: func(pod *corev1.Pod) {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			pod.Annotations[constant.RestartAnnotationKey] = "next"
+		},
+	}, {
+		name: "container image changed",
 		mutate: func(pod *corev1.Pod) {
 			pod.Spec.Containers[0].Image = "valkey:10"
 		},
 	}, {
-		name: "container resources",
+		name: "container resources changed",
 		mutate: func(pod *corev1.Pod) {
 			pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 				corev1.ResourceCPU: resource.MustParse("1"),
 			}
 		},
+	}, {
+		name: "container env added",
+		mutate: func(pod *corev1.Pod) {
+			pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{Name: "EXTRA", Value: "v"})
+		},
 	}}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			pod := newConfigHashPod(t)
-			tc.mutate(pod)
-			if configHashOnlyInPlaceUpdate(oldPod, pod) {
-				t.Fatalf("expected %s update not to be config hash only", tc.name)
+	for _, tc := range negativeCases {
+		t.Run("invoke switchover when "+tc.name, func(t *testing.T) {
+			newPod := basePod.DeepCopy()
+			tc.mutate(newPod)
+			if safeMetadataOnlyInPlaceUpdate(basePod, newPod) {
+				t.Fatalf("expected %s not to be a safe metadata-only update", tc.name)
 			}
 		})
 	}

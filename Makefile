@@ -394,10 +394,17 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 	}
 
 STATICCHECK_VERSION = v0.6.1
+STATICCHECK_GOTOOLCHAIN ?= go1.25.10
 STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
 .PHONY: staticcheck-bin
 staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.
-	$(call go-install-tool,$(STATICCHECK),honnef.co/go/tools/cmd/staticcheck,$(STATICCHECK_VERSION))
+	@[ -f $(STATICCHECK) ] || { \
+	set -e; \
+	package=honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ;\
+	echo "Installing $${package} with $(STATICCHECK_GOTOOLCHAIN)" ;\
+	GOBIN=$(LOCALBIN) GOTOOLCHAIN=$(STATICCHECK_GOTOOLCHAIN) go install $${package} ;\
+	mv "$$(echo "$(STATICCHECK)" | sed "s/-$(STATICCHECK_VERSION)$$//")" $(STATICCHECK) ;\
+	}
 
 GOIMPORTS_VERSION = v0.34.0
 GOIMPORTS = $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)

@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -182,60 +183,22 @@ func (r *reconfigureAction) validateReconfigureParameters(ctx context.Context, c
 	if len(reconfigure.Parameters) == 0 {
 		return nil
 	}
-	compDefName, err := r.resolveComponentDefinitionName(ctx, cli, cluster, reconfigure.ComponentName)
-	if err != nil {
-		return err
-	}
-	if compDefName == "" {
-		return nil
-	}
-	compDef, err := component.GetCompDefByName(ctx, cli, compDefName)
-	if err != nil {
-		return err
-	}
-	_, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, cli, compDef)
-	if err != nil {
-		return err
-	}
 	assignments := make(parametersv1alpha1.ComponentParameters, len(reconfigure.Parameters))
 	for _, param := range reconfigure.Parameters {
 		assignments[param.Key] = param.Value
 	}
-	if err := parameters.ValidateComponentParameterAssignments(assignments, paramsDefs); err != nil {
-		return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request for component %s: %s", reconfigure.ComponentName, err.Error()))
+	if err := parameters.ValidateComponentParameterAssignmentsForCluster(ctx, cli, cluster, reconfigure.ComponentName, assignments); err != nil {
+		var validationErr *parameters.AssignmentValidationError
+		if errors.As(err, &validationErr) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request for component %s: %s", reconfigure.ComponentName, err.Error()))
+		}
+		var targetNotFoundErr *parameters.AssignmentTargetNotFoundError
+		if errors.As(err, &targetNotFoundErr) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request: %s", err.Error()))
+		}
+		return err
 	}
 	return nil
-}
-
-func (r *reconfigureAction) resolveComponentDefinitionName(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) (string, error) {
-	if compSpec := cluster.Spec.GetComponentByName(compName); compSpec != nil {
-		if compSpec.ComponentDef != "" {
-			return compSpec.ComponentDef, nil
-		}
-		return r.resolveComponentDefinitionNameFromComponent(ctx, cli, cluster, compName)
-	}
-	if shardingSpec := cluster.Spec.GetShardingByName(compName); shardingSpec != nil {
-		if shardingSpec.Template.ComponentDef != "" {
-			return shardingSpec.Template.ComponentDef, nil
-		}
-		comps, err := sharding.ListShardingComponents(ctx, cli, cluster, compName)
-		if err != nil {
-			return "", err
-		}
-		if len(comps) == 0 {
-			return "", fmt.Errorf("no component found for sharding %s", compName)
-		}
-		return comps[0].Spec.CompDef, nil
-	}
-	return "", intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", compName)
-}
-
-func (r *reconfigureAction) resolveComponentDefinitionNameFromComponent(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) (string, error) {
-	comp, err := component.GetComponentByName(ctx, cli, cluster.Namespace, component.FullName(cluster.Name, compName))
-	if err != nil {
-		return "", err
-	}
-	return comp.Spec.CompDef, nil
 }
 
 func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {

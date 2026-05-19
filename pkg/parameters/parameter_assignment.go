@@ -20,14 +20,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"fmt"
 
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 )
+
+type AssignmentValidationError struct {
+	Err error
+}
+
+func (e *AssignmentValidationError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *AssignmentValidationError) Unwrap() error {
+	return e.Err
+}
+
+type AssignmentTargetNotFoundError struct {
+	ComponentName string
+}
+
+func (e *AssignmentTargetNotFoundError) Error() string {
+	return fmt.Sprintf("component not found: %s", e.ComponentName)
+}
+
+// ValidateComponentParameterAssignmentsForCluster resolves the component's ParametersDefinition
+// and validates assignments at the parameters layer.
+func ValidateComponentParameterAssignmentsForCluster(ctx context.Context, reader client.Reader,
+	cluster *appsv1.Cluster, componentName string, assignments parametersv1alpha1.ComponentParameters) error {
+	if len(assignments) == 0 {
+		return nil
+	}
+	compDefName, err := resolveComponentDefinitionName(ctx, reader, cluster, componentName)
+	if err != nil {
+		return err
+	}
+	compDef, err := component.GetCompDefByName(ctx, reader, compDefName)
+	if err != nil {
+		return err
+	}
+	_, paramsDefs, err := ResolveCmpdParametersDefs(ctx, reader, compDef)
+	if err != nil {
+		return err
+	}
+	if err := ValidateComponentParameterAssignments(assignments, paramsDefs); err != nil {
+		return &AssignmentValidationError{Err: err}
+	}
+	return nil
+}
 
 // ValidateComponentParameterAssignments validates parameter assignments when the component
 // has ParametersDefinition JSON schema. Components without schema keep legacy behavior.
@@ -85,4 +135,41 @@ func findParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition, 
 		}
 	}
 	return apiext.JSONSchemaProps{}, false
+}
+
+func resolveComponentDefinitionName(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, componentName string) (string, error) {
+	if compSpec := cluster.Spec.GetComponentByName(componentName); compSpec != nil {
+		if compSpec.ComponentDef != "" {
+			return compSpec.ComponentDef, nil
+		}
+		return resolveComponentDefinitionNameFromComponent(ctx, reader, cluster, componentName)
+	}
+	if shardingSpec := cluster.Spec.GetShardingByName(componentName); shardingSpec != nil {
+		if shardingSpec.Template.ComponentDef != "" {
+			return shardingSpec.Template.ComponentDef, nil
+		}
+		comps, err := sharding.ListShardingComponents(ctx, reader, cluster, componentName)
+		if err != nil {
+			return "", err
+		}
+		if len(comps) == 0 {
+			return "", fmt.Errorf("no component found for sharding %s", componentName)
+		}
+		if comps[0].Spec.CompDef == "" {
+			return "", fmt.Errorf("component definition is empty for sharding %s", componentName)
+		}
+		return comps[0].Spec.CompDef, nil
+	}
+	return "", &AssignmentTargetNotFoundError{ComponentName: componentName}
+}
+
+func resolveComponentDefinitionNameFromComponent(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, componentName string) (string, error) {
+	comp, err := component.GetComponentByName(ctx, reader, cluster.Namespace, component.FullName(cluster.Name, componentName))
+	if err != nil {
+		return "", err
+	}
+	if comp.Spec.CompDef == "" {
+		return "", fmt.Errorf("component definition is empty for component %s", componentName)
+	}
+	return comp.Spec.CompDef, nil
 }

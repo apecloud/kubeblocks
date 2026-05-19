@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: backups.dataprotection.kubeblocks.io
@@ -101,12 +101,9 @@ spec:
                   should be deleted when the backup custom resource(CR) is deleted.
                   Supported values are `Retain` and `Delete`.
 
-
                   - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
                   - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
 
-
-                  TODO: for the retain policy, we should support in the future for only deleting
                     the backup CR but retaining the backup contents in backup repository.
                     The current implementation only prevent accidental deletion of backup data.
                 type: string
@@ -146,13 +143,14 @@ spec:
                   be kept.\nController will remove all backups that are older than
                   the RetentionPeriod.\nIf not set, the backup will be kept forever.\nFor
                   example, RetentionPeriod of `30d` will keep only the backups of
-                  last 30 days.\nSample duration format:\n\n\n- years: \t2y\n- months:
-                  \t6mo\n- days: \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\n\nYou
+                  last 30 days.\nSample duration format:\n\n- years: \t2y\n- months:
+                  \t6mo\n- days: \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\nYou
                   can also combine the above durations. For example: 30d12h30m."
                 type: string
             required:
             - backupMethod
             - backupPolicyName
+            - deletionPolicy
             type: object
             x-kubernetes-validations:
             - message: forbidden to update spec.parameters
@@ -196,7 +194,6 @@ spec:
                             the event) or if no container name is specified "spec.containers[2]" (container with
                             index 2 in this pod). This syntax is chosen only to have some well-defined way of
                             referencing a part of an object.
-                            TODO: this design is not final and this field is subject to change in the future.
                           type: string
                         kind:
                           description: |-
@@ -340,7 +337,6 @@ spec:
                                   description: |-
                                     Name of the referent.
                                     More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: Specify whether the ConfigMap or its
@@ -403,7 +399,6 @@ spec:
                                   description: |-
                                     Name of the referent.
                                     More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: Specify whether the Secret or its key
@@ -436,10 +431,8 @@ spec:
                               Claims lists the names of resources, defined in spec.resourceClaims,
                               that are used by this container.
 
-
                               This is an alpha field and requires enabling the
                               DynamicResourceAllocation feature gate.
-
 
                               This field is immutable. It can only be set for containers.
                             items:
@@ -539,6 +532,9 @@ spec:
                           portName:
                             description: Specifies the port name.
                             type: string
+                        required:
+                        - containerName
+                        - portName
                         type: object
                       name:
                         description: |-
@@ -639,7 +635,6 @@ spec:
                             description: |-
                               Specifies the strategy to select the target pod when multiple pods are selected.
                               Valid values are:
-
 
                               - `Any`: select any one pod that match the labelsSelector.
                               - `All`: select all pods that match the labelsSelector. The backup data for the current pod
@@ -834,6 +829,9 @@ spec:
                             portName:
                               description: Specifies the port name.
                               type: string
+                          required:
+                          - containerName
+                          - portName
                           type: object
                         name:
                           description: |-
@@ -934,7 +932,6 @@ spec:
                               description: |-
                                 Specifies the strategy to select the target pod when multiple pods are selected.
                                 Valid values are:
-
 
                                 - `Any`: select any one pod that match the labelsSelector.
                                 - `All`: select all pods that match the labelsSelector. The backup data for the current pod
@@ -1055,7 +1052,6 @@ spec:
                     description: |-
                       Specifies the encryption algorithm. Currently supported algorithms are:
 
-
                       - AES-128-CFB
                       - AES-192-CFB
                       - AES-256-CFB
@@ -1077,7 +1073,6 @@ spec:
                         description: |-
                           Name of the referent.
                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?
                         type: string
                       optional:
                         description: Specify whether the Secret or its key must be
@@ -1190,6 +1185,9 @@ spec:
                       portName:
                         description: Specifies the port name.
                         type: string
+                    required:
+                    - containerName
+                    - portName
                     type: object
                   name:
                     description: |-
@@ -1290,7 +1288,6 @@ spec:
                         description: |-
                           Specifies the strategy to select the target pod when multiple pods are selected.
                           Valid values are:
-
 
                           - `Any`: select any one pod that match the labelsSelector.
                           - `All`: select all pods that match the labelsSelector. The backup data for the current pod
@@ -1430,6 +1427,9 @@ spec:
                         portName:
                           description: Specifies the port name.
                           type: string
+                      required:
+                      - containerName
+                      - portName
                       type: object
                     name:
                       description: |-
@@ -1530,7 +1530,6 @@ spec:
                           description: |-
                             Specifies the strategy to select the target pod when multiple pods are selected.
                             Valid values are:
-
 
                             - `Any`: select any one pod that match the labelsSelector.
                             - `All`: select all pods that match the labelsSelector. The backup data for the current pod

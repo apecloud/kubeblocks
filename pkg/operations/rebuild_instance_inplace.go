@@ -100,6 +100,7 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildInstanceWithBackup(reqCtx intc
 	getRestore := func(stage dpv1alpha1.RestoreStage) (*dpv1alpha1.Restore, string, error) {
 		restoreName := fmt.Sprintf("%s-%s-%s-%s-%d", inPlaceHelper.rebuildPrefix, strings.ToLower(string(stage)),
 			common.CutString(opsRes.OpsRequest.Name, 10), inPlaceHelper.synthesizedComp.Name, inPlaceHelper.index)
+		restoreName = constant.ShortenKubeName(restoreName, constant.KubeNameMaxLength)
 		restore := &dpv1alpha1.Restore{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreName, Namespace: opsRes.Cluster.Namespace}, restore); err != nil {
 			return nil, restoreName, client.IgnoreNotFound(err)
@@ -240,7 +241,7 @@ func (inPlaceHelper *inplaceRebuildHelper) createPrepareDataRestore(reqCtx intct
 
 func (inPlaceHelper *inplaceRebuildHelper) buildRestoreMetaObject(opsRequest *opsv1alpha1.OpsRequest, restoreName string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name:      restoreName,
+		Name:      constant.ShortenKubeName(restoreName, constant.KubeNameMaxLength),
 		Namespace: opsRequest.Namespace,
 		Labels: map[string]string{
 			constant.OpsRequestNameLabelKey:      opsRequest.Name,

@@ -71,13 +71,6 @@ var (
 	writer *zstd.Encoder
 )
 
-type imageMatchMode int
-
-const (
-	imageMatchSpecStatus imageMatchMode = iota
-	imageMatchSpecDrift
-)
-
 func init() {
 	var err error
 	reader, err = zstd.NewReader(nil)
@@ -191,114 +184,11 @@ func isImageMatched(pod *corev1.Pod) bool {
 		status := pod.Status.ContainerStatuses[index]
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		specName, specTag, specDigest := imageSplit(specImage)
-		_, _, statusDigest := imageSplit(status.ImageID)
-		if len(specDigest) != 0 {
-			if specDigest != statusDigest {
-				return false
-			}
-			continue
-		}
-		statusName, statusTag, _ := imageSplit(status.Image)
-		// if tag presents in spec, it must be same in status
-		if len(specTag) != 0 && specTag != statusTag {
+		if !intctrlutil.MatchContainerImageInStatus(specImage, status.Image, status.ImageID) {
 			return false
 		}
-		// otherwise, statusName should be same as or has suffix of specName
-		if specName != statusName {
-			specNames := strings.Split(specName, "/")
-			statusNames := strings.Split(statusName, "/")
-			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
-				return false
-			}
-		}
 	}
 	return true
-}
-
-func equalContainerImage(oldImage, newImage string) bool {
-	return matchContainerImage(oldImage, newImage, imageMatchSpecDrift)
-}
-
-func matchContainerImage(expectedImage, actualImage string, mode imageMatchMode) bool {
-	if expectedImage == actualImage {
-		return true
-	}
-
-	expectedName, expectedTag, expectedDigest := imageSplit(expectedImage)
-	actualName, actualTag, actualDigest := imageSplit(actualImage)
-	if !matchImageRef(expectedDigest, actualDigest, mode) {
-		return false
-	}
-	if !matchImageRef(expectedTag, actualTag, mode) {
-		return false
-	}
-	return imageBaseName(expectedName) == imageBaseName(actualName)
-}
-
-func matchImageRef(expected, actual string, mode imageMatchMode) bool {
-	if mode == imageMatchSpecDrift && (expected != "" || actual != "") {
-		return expected == actual
-	}
-	if expected != "" {
-		return expected == actual
-	}
-	return true
-}
-
-// imageSplit separates and returns the name and tag parts
-// from the image string using either colon `:` or at `@` separators.
-// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
-func imageSplit(imageName string) (name string, tag string, digest string) {
-	// check if image name contains a domain
-	// if domain is present, ignore domain and check for `:`
-	searchName := imageName
-	slashIndex := strings.Index(imageName, "/")
-	if slashIndex > 0 {
-		searchName = imageName[slashIndex:]
-	} else {
-		slashIndex = 0
-	}
-
-	id := strings.Index(searchName, "@")
-	ic := strings.Index(searchName, ":")
-
-	// no tag or digest
-	if ic < 0 && id < 0 {
-		return imageName, "", ""
-	}
-
-	// digest only
-	if id >= 0 && (id < ic || ic < 0) {
-		id += slashIndex
-		name = imageName[:id]
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, "", digest
-	}
-
-	// tag and digest
-	if id >= 0 && ic >= 0 {
-		id += slashIndex
-		ic += slashIndex
-		name = imageName[:ic]
-		tag = strings.TrimPrefix(imageName[ic:id], ":")
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, tag, digest
-	}
-
-	// tag only
-	ic += slashIndex
-	name = imageName[:ic]
-	tag = strings.TrimPrefix(imageName[ic:], ":")
-	return name, tag, ""
-}
-
-func imageBaseName(name string) string {
-	index := strings.LastIndex(name, "/")
-	if index < 0 {
-		return name
-	}
-	return name[index+1:]
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

@@ -38,6 +38,9 @@ const (
 	ReasonApplyResourcesSucceed = "ApplyResourcesSucceed" // ReasonApplyResourcesSucceed applies resources succeeded to create or change the cluster
 	ReasonClusterReady          = "ClusterReady"          // ReasonClusterReady the components of cluster are ready, the component phase is running
 	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
+	ReasonRestoreCompleted      = "RestoreCompleted"
+	ReasonRestoreRunning        = "RestoreRunning"
+	ReasonRestoreFailed         = "RestoreFailed"
 )
 
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {

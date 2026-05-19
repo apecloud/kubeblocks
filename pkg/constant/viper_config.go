@@ -32,6 +32,7 @@ const (
 	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"
 	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
 	CfgKeyClusterDefaultResources       = "CLUSTER_DEFAULT_RESOURCES"
+	CfgKeyEnableZeroResourceForUnset    = "ENABLE_ZERO_RESOURCE_FOR_UNSET"
 
 	// addon config keys
 	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"

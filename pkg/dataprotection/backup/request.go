@@ -449,7 +449,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		container.EnvFrom = append(container.EnvFrom, r.ActionSet.Spec.EnvFrom...)
 	}
 
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	intctrlutil.InjectZeroResourcesLimitsIfNeed(&container)
 
 	podSpec := &corev1.PodSpec{
 		Containers:         []corev1.Container{container},
@@ -575,7 +575,7 @@ func (r *Request) InjectManagerContainer(podSpec *corev1.PodSpec,
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	container.Resources = corev1.ResourceRequirements{Limits: nil, Requests: nil}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	intctrlutil.InjectZeroResourcesLimitsIfNeed(container)
 	container.Command = []string{"sh", "-c"}
 
 	// append some envs

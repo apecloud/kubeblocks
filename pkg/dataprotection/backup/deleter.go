@@ -246,7 +246,7 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
 	legacyPVCName string) error {
-	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	ctrlutil.InjectZeroResourcesLimitsIfNeed(&container)
 
 	// build pod
 	podSpec := corev1.PodSpec{

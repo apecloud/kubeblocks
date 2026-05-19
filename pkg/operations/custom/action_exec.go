@@ -168,7 +168,7 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 			"--",
 		}, execAction.Command...),
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	intctrlutil.InjectZeroResourcesLimitsIfNeed(container)
 	return &corev1.PodSpec{
 		Containers: []corev1.Container{*container},
 		// tolerate all taints

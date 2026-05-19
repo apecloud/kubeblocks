@@ -75,3 +75,234 @@ func TestDoMergeAppliesUnmanagedUpdatesAfterContentAndParameters(t *testing.T) {
 func strPtr(v string) *string {
 	return &v
 }
+
+// The following tests cover the content-path immutable guard added in
+// validateImmutableContentChanges. Each case constructs a base ConfigMap +
+// ParametersInFile content patch and asserts whether DoMerge accepts or
+// rejects the result.
+//
+// Coverage matrix:
+//   - content modifies an immutable parameter   -> reject
+//   - content adds an immutable parameter       -> reject
+//   - content removes an immutable parameter    -> reject
+//   - content only reorders / re-formats        -> accept (no false positive)
+//   - file has no immutable candidate, missing
+//     FileFormatConfig                          -> accept (no backward-compat regression)
+//   - file has immutable candidate but missing
+//     FileFormatConfig                          -> reject (fail-safe)
+
+func iniConfigDescsForMyCnf() []parametersv1alpha1.ComponentConfigDescription {
+	return []parametersv1alpha1.ComponentConfigDescription{{
+		Name:         "my.cnf",
+		TemplateName: "mysql-config",
+		FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+			},
+		},
+	}}
+}
+
+func paramsDefsWithImmutable(immutable []string) []*parametersv1alpha1.ParametersDefinition {
+	return []*parametersv1alpha1.ParametersDefinition{{
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName:            "my.cnf",
+			ImmutableParameters: immutable,
+		},
+	}}
+}
+
+func TestDoMergeRejectsContentModifyingImmutableParameter(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[mysqld]\ngtid_mode=ON\nmax_connections=1000\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter modification via content to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
+	}
+}
+
+func TestDoMergeRejectsContentAddingImmutableParameter(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[mysqld]\nmax_connections=1000\ngtid_mode=ON\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter addition via content to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
+	}
+}
+
+func TestDoMergeRejectsContentRemovingImmutableParameter(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[mysqld]\nmax_connections=1000\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter removal via content to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
+	}
+}
+
+func TestDoMergeAcceptsContentWithOnlyFormatChange(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	// Same semantic content, just reordered and with an added blank line.
+	// Must not be flagged as an immutable change because the parsed parameter
+	// map for gtid_mode is unchanged.
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[mysqld]\n\nmax_connections=1000\ngtid_mode=OFF\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	if _, err := DoMerge(base, patch, paramsDefs, configDescs); err != nil {
+		t.Fatalf("expected format-only content change to be accepted, got error %v", err)
+	}
+}
+
+func TestDoMergeAcceptsContentWithMutableChangeAndFormatNoiseWhileImmutableUnchanged(t *testing.T) {
+	// Realistic MySQL-style fixture covering the joint case the guard must
+	// accept:
+	//   1) format noise -- comment rewrites, extra blank lines, `key=value`
+	//      vs `key = value` spacing -- must NOT trip the immutable check;
+	//   2) a mutable parameter (max_connections) changes value -- that is
+	//      explicitly allowed because it is not in ImmutableParameters;
+	//   3) the immutable parameter (gtid_mode) keeps the same parsed value
+	//      across base and patch, so the guard must let the merge through.
+	//
+	// Together these confirm the guard only triggers on immutable-parameter
+	// semantic delta and ignores everything else.
+	base := map[string]string{
+		"my.cnf": "" +
+			"# header comment\n" +
+			"[mysqld]\n" +
+			"gtid_mode=OFF\n" +
+			"max_connections=1000\n" +
+			"# inline comment\n" +
+			"slow_query_log=ON\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("" +
+				"# rewritten header\n" +
+				"\n" +
+				"[mysqld]\n" +
+				"\n" +
+				"# reordered block\n" +
+				"slow_query_log = ON\n" +
+				"max_connections = 2000\n" +
+				"gtid_mode = OFF\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	if _, err := DoMerge(base, patch, paramsDefs, configDescs); err != nil {
+		t.Fatalf("expected realistic format/whitespace/comment noise without immutable-parameter change to be accepted, got error %v", err)
+	}
+}
+
+func TestDoMergeAcceptsContentOnFileWithoutImmutableCandidate(t *testing.T) {
+	// File has no ParametersDefinition entry, and the content payload uses an
+	// arbitrary format with no FileFormatConfig registered. The guard must
+	// stay out of the way: there is no immutable contract to protect on this
+	// file, so a missing parser must not block a benign content update.
+	base := map[string]string{
+		"custom.conf": "key1=value1\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"custom.conf": {
+			Content: strPtr("key1=value1\nkey2=value2\n"),
+		},
+	}
+
+	if _, err := DoMerge(base, patch, nil, nil); err != nil {
+		t.Fatalf("expected content update on file without immutable candidate to be accepted even without parser, got error %v", err)
+	}
+}
+
+func TestDoMergeRejectsContentRemovingEntireSectionContainingImmutableParameter(t *testing.T) {
+	// Regression for the nil-deref panic introduced by core.FromConfigObject
+	// returning nil when an INI sub-section is absent. The content payload
+	// drops the entire [mysqld] section that contains the immutable
+	// parameter gtid_mode; the guard must reject the change (immutable
+	// removed) instead of panicking on GetAllParameters of a nil
+	// ConfigObject.
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[other]\nfoo=bar\n"),
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter removal via whole-section deletion to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
+	}
+}
+
+func TestDoMergeRejectsContentWhenImmutableDeclaredButFormatMissing(t *testing.T) {
+	// File has an immutable parameter declared but no FileFormatConfig is
+	// available. Fail-safe: reject rather than silently allow because the
+	// guard cannot verify whether the content change touched gtid_mode.
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			Content: strPtr("[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n"),
+		},
+	}
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, nil)
+	if err == nil {
+		t.Fatalf("expected fail-safe rejection when immutable parameter declared but file format config is missing, got nil error")
+	}
+	if !strings.Contains(err.Error(), "missing file format config") {
+		t.Fatalf("expected error to mention missing file format config, got %q", err.Error())
+	}
+}

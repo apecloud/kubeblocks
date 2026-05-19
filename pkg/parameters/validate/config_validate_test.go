@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -165,4 +166,24 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 			require.Equal(t, tt.err, validator.Validate(fromTestData(tt.args.configFile)))
 		})
 	}
+}
+
+func TestSchemaValidatorUsesSchemaInJSON(t *testing.T) {
+	minimum := float64(1)
+	maximum := float64(10)
+	validator := NewConfigValidator(&parametersv1alpha1.ParametersSchema{
+		SchemaInJSON: &apiext.JSONSchemaProps{
+			Type: "object",
+			Properties: map[string]apiext.JSONSchemaProps{
+				"maxmemory-samples": {
+					Type:    "integer",
+					Minimum: &minimum,
+					Maximum: &maximum,
+				},
+			},
+		},
+	}, &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.YAML})
+
+	require.NoError(t, validator.Validate("maxmemory-samples: 5"))
+	require.ErrorContains(t, validator.Validate("maxmemory-samples: 0"), "failed to schema validate for config file")
 }

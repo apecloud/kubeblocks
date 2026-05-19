@@ -195,7 +195,7 @@ var _ = Describe("instance util test", func() {
 			By("build a pod with registry rewritten by admission")
 			podWithRewrittenRegistry := pod1.DeepCopy()
 			podWithRewrittenRegistry.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
-			policy, specPolicy, _, err = getPodUpdatePolicy(its, podWithRewrittenRegistry)
+			policy, specPolicy, err = getPodUpdatePolicy(its, podWithRewrittenRegistry)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))

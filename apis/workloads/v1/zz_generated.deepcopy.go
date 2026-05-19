@@ -288,7 +288,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {
 		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
-		*out = new(appsv1.PersistentVolumeClaimRetentionPolicy)
+		*out = new(PersistentVolumeClaimRetentionPolicy)
 		**out = **in
 	}
 	if in.ParallelPodManagementConcurrency != nil {
@@ -298,7 +298,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.InstanceUpdateStrategy != nil {
 		in, out := &in.InstanceUpdateStrategy, &out.InstanceUpdateStrategy
-		*out = new(appsv1.InstanceUpdateStrategy)
+		*out = new(InstanceUpdateStrategy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.MemberUpdateStrategy != nil {
@@ -308,7 +308,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
-		*out = make([]appsv1.ReplicaRole, len(*in))
+		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
 	if in.LifecycleActions != nil {
@@ -395,7 +395,7 @@ func (in *InstanceSetStatus) DeepCopyInto(out *InstanceSetStatus) {
 	}
 	if in.AssignedOrdinals != nil {
 		in, out := &in.AssignedOrdinals, &out.AssignedOrdinals
-		*out = make(map[string]appsv1.Ordinals, len(*in))
+		*out = make(map[string]Ordinals, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}
@@ -430,7 +430,7 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {
 		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
-		*out = new(appsv1.PersistentVolumeClaimRetentionPolicy)
+		*out = new(PersistentVolumeClaimRetentionPolicy)
 		**out = **in
 	}
 	if in.InstanceUpdateStrategyType != nil {
@@ -440,7 +440,7 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
-		*out = make([]appsv1.ReplicaRole, len(*in))
+		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
 	if in.LifecycleActions != nil {
@@ -555,7 +555,7 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 	}
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
-		*out = new(appsv1.SchedulingPolicy)
+		*out = new(SchedulingPolicy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
@@ -623,12 +623,12 @@ func (in *LifecycleActions) DeepCopyInto(out *LifecycleActions) {
 	}
 	if in.Switchover != nil {
 		in, out := &in.Switchover, &out.Switchover
-		*out = new(appsv1.Action)
+		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Reconfigure != nil {
 		in, out := &in.Reconfigure, &out.Reconfigure
-		*out = new(appsv1.Action)
+		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}
 }

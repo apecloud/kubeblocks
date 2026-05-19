@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: rollouts.apps.kubeblocks.io
@@ -107,7 +107,6 @@ spec:
                       description: |-
                         Specifies the number of instances to be rolled out.
 
-
                         For the `Create` strategy, this is the number of canary instances to create and promote, and it must be
                         in the range [0, original stable replicas]. The rollout keeps the component stable replica count unchanged.
                       x-kubernetes-int-or-string: true
@@ -122,7 +121,6 @@ spec:
                           description: |-
                             Create rollout strategy.
 
-
                             If specified, the rollout will be performed by creating new instances.
                           properties:
                             canary:
@@ -132,7 +130,6 @@ spec:
                             promotion:
                               description: |-
                                 Specifies the promotion strategy for the created instances.
-
 
                                 Promotion turns the created instances into stable instances without changing the stable replica count.
                               properties:
@@ -152,7 +149,6 @@ spec:
                                           description: |-
                                             Defines the command to run.
 
-
                                             This field cannot be updated.
                                           properties:
                                             args:
@@ -169,7 +165,6 @@ spec:
                                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                                               items:
                                                 type: string
@@ -179,15 +174,11 @@ spec:
                                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                                 The resources that can be shared are included:
 
-
                                                 - volume mounts
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -195,7 +186,6 @@ spec:
                                               description: |-
                                                 Represents a list of environment variables that will be injected into the container.
                                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                                 This field cannot be updated.
                                               items:
@@ -236,7 +226,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -310,7 +299,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -330,10 +318,8 @@ spec:
                                               description: |-
                                                 Specifies the container image to be used for running the Action.
 
-
                                                 When specified, a dedicated container will be created using this image to execute the Action.
                                                 All actions with same image will share the same container.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -342,11 +328,9 @@ spec:
                                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                                   will be selected for the Action.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -356,11 +340,9 @@ spec:
                                                 This is useful when there is no default target replica identified.
                                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                                 post-provision or pre-terminate of the component.
-
 
                                                 This field cannot be updated.
                                               enum:
@@ -373,7 +355,6 @@ spec:
                                         grpc:
                                           description: |-
                                             Defines the gRPC call to issue.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -396,7 +377,6 @@ spec:
                                                 type: string
                                               description: |-
                                                 Request payload for the gRPC method.
-
 
                                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                                 Templates are rendered with predefined action variables before the request is sent.
@@ -429,13 +409,11 @@ spec:
                                           description: |-
                                             Defines the HTTP request to perform.
 
-
                                             This field cannot be updated.
                                           properties:
                                             body:
                                               description: |-
                                                 Optional HTTP request body.
-
 
                                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                                               type: string
@@ -507,11 +485,9 @@ spec:
                                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                             The impact of this field depends on the `targetPodSelector` value:
 
-
                                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                               will be selected for the Action.
-
 
                                             This field cannot be updated.
                                           type: string
@@ -520,9 +496,7 @@ spec:
                                             Specifies the state that the cluster must reach before the Action is executed.
                                             Currently, this is only applicable to the `postProvision` action.
 
-
                                             The conditions are as follows:
-
 
                                             - `Immediately`: Executed right after the Component object is created.
                                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -533,17 +507,14 @@ spec:
                                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                                             This field cannot be updated.
                                           type: string
                                         retryPolicy:
                                           description: |-
                                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                                             It specifies the conditions under which the Action should be retried and the limits to apply,
                                             such as the maximum number of retries and backoff strategy.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -567,11 +538,9 @@ spec:
                                             This is useful when there is no default target replica identified.
                                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                             post-provision or pre-terminate of the component.
-
 
                                             This field cannot be updated.
                                           enum:
@@ -585,12 +554,10 @@ spec:
                                           description: |-
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                                             Behavior based on the value:
                                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                                             This field cannot be updated.
                                           format: int32
@@ -600,13 +567,11 @@ spec:
                                       description: |-
                                         The condition before promoting the new instances.
 
-
                                         If specified, the new instances will be promoted only when the condition is met.
                                       properties:
                                         exec:
                                           description: |-
                                             Defines the command to run.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -624,7 +589,6 @@ spec:
                                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                                               items:
                                                 type: string
@@ -634,15 +598,11 @@ spec:
                                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                                 The resources that can be shared are included:
 
-
                                                 - volume mounts
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -650,7 +610,6 @@ spec:
                                               description: |-
                                                 Represents a list of environment variables that will be injected into the container.
                                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                                 This field cannot be updated.
                                               items:
@@ -691,7 +650,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -765,7 +723,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -785,10 +742,8 @@ spec:
                                               description: |-
                                                 Specifies the container image to be used for running the Action.
 
-
                                                 When specified, a dedicated container will be created using this image to execute the Action.
                                                 All actions with same image will share the same container.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -797,11 +752,9 @@ spec:
                                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                                   will be selected for the Action.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -811,11 +764,9 @@ spec:
                                                 This is useful when there is no default target replica identified.
                                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                                 post-provision or pre-terminate of the component.
-
 
                                                 This field cannot be updated.
                                               enum:
@@ -828,7 +779,6 @@ spec:
                                         grpc:
                                           description: |-
                                             Defines the gRPC call to issue.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -851,7 +801,6 @@ spec:
                                                 type: string
                                               description: |-
                                                 Request payload for the gRPC method.
-
 
                                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                                 Templates are rendered with predefined action variables before the request is sent.
@@ -884,13 +833,11 @@ spec:
                                           description: |-
                                             Defines the HTTP request to perform.
 
-
                                             This field cannot be updated.
                                           properties:
                                             body:
                                               description: |-
                                                 Optional HTTP request body.
-
 
                                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                                               type: string
@@ -962,11 +909,9 @@ spec:
                                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                             The impact of this field depends on the `targetPodSelector` value:
 
-
                                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                               will be selected for the Action.
-
 
                                             This field cannot be updated.
                                           type: string
@@ -975,9 +920,7 @@ spec:
                                             Specifies the state that the cluster must reach before the Action is executed.
                                             Currently, this is only applicable to the `postProvision` action.
 
-
                                             The conditions are as follows:
-
 
                                             - `Immediately`: Executed right after the Component object is created.
                                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -988,17 +931,14 @@ spec:
                                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                                             This field cannot be updated.
                                           type: string
                                         retryPolicy:
                                           description: |-
                                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                                             It specifies the conditions under which the Action should be retried and the limits to apply,
                                             such as the maximum number of retries and backoff strategy.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -1022,11 +962,9 @@ spec:
                                             This is useful when there is no default target replica identified.
                                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                             post-provision or pre-terminate of the component.
-
 
                                             This field cannot be updated.
                                           enum:
@@ -1040,12 +978,10 @@ spec:
                                           description: |-
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                                             Behavior based on the value:
                                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                                             This field cannot be updated.
                                           format: int32
@@ -2020,10 +1956,8 @@ spec:
                                     Each toleration in the array allows the Pod to tolerate node taints based on
                                     specified `key`, `value`, `effect`, and `operator`.
 
-
                                     - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                                     - The `operator` determines how the toleration matches the taint.
-
 
                                     Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                                   items:
@@ -2132,7 +2066,6 @@ spec:
                                           Keys that don't exist in the incoming pod labels will
                                           be ignored. A null or empty list means only match against labelSelector.
 
-
                                           This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                         items:
                                           type: string
@@ -2172,7 +2105,6 @@ spec:
                                           Valid values are integers greater than 0.
                                           When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                           For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                           labelSelector spread as 2/2/2:
                                           | zone1 | zone2 | zone3 |
@@ -2181,7 +2113,6 @@ spec:
                                           In this situation, new pod with the same labelSelector cannot be scheduled,
                                           because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                           it will violate MaxSkew.
-
 
                                           This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                         format: int32
@@ -2193,7 +2124,6 @@ spec:
                                           - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                           - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                           If this value is nil, the behavior is equivalent to the Honor policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                         type: string
@@ -2204,7 +2134,6 @@ spec:
                                           - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                           has a toleration, are included.
                                           - Ignore: node taints are ignored. All nodes are included.
-
 
                                           If this value is nil, the behavior is equivalent to the Ignore policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -2255,13 +2184,11 @@ spec:
                           description: |-
                             In-place rollout strategy.
 
-
                             If specified, the rollout will be performed in-place (delete and then create).
                           type: object
                         replace:
                           description: |-
                             Replace rollout strategy.
-
 
                             If specified, the rollout will be performed by replacing the old instances with new instances one by one (create and then delete).
                           properties:
@@ -3231,10 +3158,8 @@ spec:
                                     Each toleration in the array allows the Pod to tolerate node taints based on
                                     specified `key`, `value`, `effect`, and `operator`.
 
-
                                     - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                                     - The `operator` determines how the toleration matches the taint.
-
 
                                     Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                                   items:
@@ -3343,7 +3268,6 @@ spec:
                                           Keys that don't exist in the incoming pod labels will
                                           be ignored. A null or empty list means only match against labelSelector.
 
-
                                           This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                         items:
                                           type: string
@@ -3383,7 +3307,6 @@ spec:
                                           Valid values are integers greater than 0.
                                           When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                           For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                           labelSelector spread as 2/2/2:
                                           | zone1 | zone2 | zone3 |
@@ -3392,7 +3315,6 @@ spec:
                                           In this situation, new pod with the same labelSelector cannot be scheduled,
                                           because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                           it will violate MaxSkew.
-
 
                                           This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                         format: int32
@@ -3404,7 +3326,6 @@ spec:
                                           - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                           - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                           If this value is nil, the behavior is equivalent to the Honor policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                         type: string
@@ -3415,7 +3336,6 @@ spec:
                                           - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                           has a toleration, are included.
                                           - Ignore: node taints are ignored. All nodes are included.
-
 
                                           If this value is nil, the behavior is equivalent to the Ignore policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -3507,7 +3427,6 @@ spec:
                       description: |-
                         Specifies the number of instances to be rolled out for each shard.
 
-
                         For the `Create` strategy, this is the number of canary instances to create and promote in each shard, and it
                         must be in the range [0, original stable replicas]. The rollout keeps the sharding stable replica count unchanged.
                       x-kubernetes-int-or-string: true
@@ -3527,7 +3446,6 @@ spec:
                           description: |-
                             Create rollout strategy.
 
-
                             If specified, the rollout will be performed by creating new instances.
                           properties:
                             canary:
@@ -3537,7 +3455,6 @@ spec:
                             promotion:
                               description: |-
                                 Specifies the promotion strategy for the created instances.
-
 
                                 Promotion turns the created instances into stable instances without changing the stable replica count.
                               properties:
@@ -3557,7 +3474,6 @@ spec:
                                           description: |-
                                             Defines the command to run.
 
-
                                             This field cannot be updated.
                                           properties:
                                             args:
@@ -3574,7 +3490,6 @@ spec:
                                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                                               items:
                                                 type: string
@@ -3584,15 +3499,11 @@ spec:
                                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                                 The resources that can be shared are included:
 
-
                                                 - volume mounts
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -3600,7 +3511,6 @@ spec:
                                               description: |-
                                                 Represents a list of environment variables that will be injected into the container.
                                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                                 This field cannot be updated.
                                               items:
@@ -3641,7 +3551,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -3715,7 +3624,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -3735,10 +3643,8 @@ spec:
                                               description: |-
                                                 Specifies the container image to be used for running the Action.
 
-
                                                 When specified, a dedicated container will be created using this image to execute the Action.
                                                 All actions with same image will share the same container.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -3747,11 +3653,9 @@ spec:
                                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                                   will be selected for the Action.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -3761,11 +3665,9 @@ spec:
                                                 This is useful when there is no default target replica identified.
                                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                                 post-provision or pre-terminate of the component.
-
 
                                                 This field cannot be updated.
                                               enum:
@@ -3778,7 +3680,6 @@ spec:
                                         grpc:
                                           description: |-
                                             Defines the gRPC call to issue.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -3801,7 +3702,6 @@ spec:
                                                 type: string
                                               description: |-
                                                 Request payload for the gRPC method.
-
 
                                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                                 Templates are rendered with predefined action variables before the request is sent.
@@ -3834,13 +3734,11 @@ spec:
                                           description: |-
                                             Defines the HTTP request to perform.
 
-
                                             This field cannot be updated.
                                           properties:
                                             body:
                                               description: |-
                                                 Optional HTTP request body.
-
 
                                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                                               type: string
@@ -3912,11 +3810,9 @@ spec:
                                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                             The impact of this field depends on the `targetPodSelector` value:
 
-
                                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                               will be selected for the Action.
-
 
                                             This field cannot be updated.
                                           type: string
@@ -3925,9 +3821,7 @@ spec:
                                             Specifies the state that the cluster must reach before the Action is executed.
                                             Currently, this is only applicable to the `postProvision` action.
 
-
                                             The conditions are as follows:
-
 
                                             - `Immediately`: Executed right after the Component object is created.
                                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -3938,17 +3832,14 @@ spec:
                                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                                             This field cannot be updated.
                                           type: string
                                         retryPolicy:
                                           description: |-
                                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                                             It specifies the conditions under which the Action should be retried and the limits to apply,
                                             such as the maximum number of retries and backoff strategy.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -3972,11 +3863,9 @@ spec:
                                             This is useful when there is no default target replica identified.
                                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                             post-provision or pre-terminate of the component.
-
 
                                             This field cannot be updated.
                                           enum:
@@ -3990,12 +3879,10 @@ spec:
                                           description: |-
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                                             Behavior based on the value:
                                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                                             This field cannot be updated.
                                           format: int32
@@ -4005,13 +3892,11 @@ spec:
                                       description: |-
                                         The condition before promoting the new instances.
 
-
                                         If specified, the new instances will be promoted only when the condition is met.
                                       properties:
                                         exec:
                                           description: |-
                                             Defines the command to run.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -4029,7 +3914,6 @@ spec:
                                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                                               items:
                                                 type: string
@@ -4039,15 +3923,11 @@ spec:
                                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                                 The resources that can be shared are included:
 
-
                                                 - volume mounts
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -4055,7 +3935,6 @@ spec:
                                               description: |-
                                                 Represents a list of environment variables that will be injected into the container.
                                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                                 This field cannot be updated.
                                               items:
@@ -4096,7 +3975,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -4170,7 +4048,6 @@ spec:
                                                             description: |-
                                                               Name of the referent.
                                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                                             type: string
                                                           optional:
                                                             description: Specify whether
@@ -4190,10 +4067,8 @@ spec:
                                               description: |-
                                                 Specifies the container image to be used for running the Action.
 
-
                                                 When specified, a dedicated container will be created using this image to execute the Action.
                                                 All actions with same image will share the same container.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -4202,11 +4077,9 @@ spec:
                                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                                   will be selected for the Action.
-
 
                                                 This field cannot be updated.
                                               type: string
@@ -4216,11 +4089,9 @@ spec:
                                                 This is useful when there is no default target replica identified.
                                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                                 post-provision or pre-terminate of the component.
-
 
                                                 This field cannot be updated.
                                               enum:
@@ -4233,7 +4104,6 @@ spec:
                                         grpc:
                                           description: |-
                                             Defines the gRPC call to issue.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -4256,7 +4126,6 @@ spec:
                                                 type: string
                                               description: |-
                                                 Request payload for the gRPC method.
-
 
                                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                                 Templates are rendered with predefined action variables before the request is sent.
@@ -4289,13 +4158,11 @@ spec:
                                           description: |-
                                             Defines the HTTP request to perform.
 
-
                                             This field cannot be updated.
                                           properties:
                                             body:
                                               description: |-
                                                 Optional HTTP request body.
-
 
                                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                                               type: string
@@ -4367,11 +4234,9 @@ spec:
                                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                             The impact of this field depends on the `targetPodSelector` value:
 
-
                                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                               will be selected for the Action.
-
 
                                             This field cannot be updated.
                                           type: string
@@ -4380,9 +4245,7 @@ spec:
                                             Specifies the state that the cluster must reach before the Action is executed.
                                             Currently, this is only applicable to the `postProvision` action.
 
-
                                             The conditions are as follows:
-
 
                                             - `Immediately`: Executed right after the Component object is created.
                                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -4393,17 +4256,14 @@ spec:
                                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                                             This field cannot be updated.
                                           type: string
                                         retryPolicy:
                                           description: |-
                                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                                             It specifies the conditions under which the Action should be retried and the limits to apply,
                                             such as the maximum number of retries and backoff strategy.
-
 
                                             This field cannot be updated.
                                           properties:
@@ -4427,11 +4287,9 @@ spec:
                                             This is useful when there is no default target replica identified.
                                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                             post-provision or pre-terminate of the component.
-
 
                                             This field cannot be updated.
                                           enum:
@@ -4445,12 +4303,10 @@ spec:
                                           description: |-
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                                             Behavior based on the value:
                                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                                             This field cannot be updated.
                                           format: int32
@@ -5425,10 +5281,8 @@ spec:
                                     Each toleration in the array allows the Pod to tolerate node taints based on
                                     specified `key`, `value`, `effect`, and `operator`.
 
-
                                     - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                                     - The `operator` determines how the toleration matches the taint.
-
 
                                     Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                                   items:
@@ -5537,7 +5391,6 @@ spec:
                                           Keys that don't exist in the incoming pod labels will
                                           be ignored. A null or empty list means only match against labelSelector.
 
-
                                           This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                         items:
                                           type: string
@@ -5577,7 +5430,6 @@ spec:
                                           Valid values are integers greater than 0.
                                           When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                           For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                           labelSelector spread as 2/2/2:
                                           | zone1 | zone2 | zone3 |
@@ -5586,7 +5438,6 @@ spec:
                                           In this situation, new pod with the same labelSelector cannot be scheduled,
                                           because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                           it will violate MaxSkew.
-
 
                                           This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                         format: int32
@@ -5598,7 +5449,6 @@ spec:
                                           - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                           - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                           If this value is nil, the behavior is equivalent to the Honor policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                         type: string
@@ -5609,7 +5459,6 @@ spec:
                                           - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                           has a toleration, are included.
                                           - Ignore: node taints are ignored. All nodes are included.
-
 
                                           If this value is nil, the behavior is equivalent to the Ignore policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -5660,13 +5509,11 @@ spec:
                           description: |-
                             In-place rollout strategy.
 
-
                             If specified, the rollout will be performed in-place (delete and then create).
                           type: object
                         replace:
                           description: |-
                             Replace rollout strategy.
-
 
                             If specified, the rollout will be performed by replacing the old instances with new instances one by one (create and then delete).
                           properties:
@@ -6636,10 +6483,8 @@ spec:
                                     Each toleration in the array allows the Pod to tolerate node taints based on
                                     specified `key`, `value`, `effect`, and `operator`.
 
-
                                     - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                                     - The `operator` determines how the toleration matches the taint.
-
 
                                     Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                                   items:
@@ -6748,7 +6593,6 @@ spec:
                                           Keys that don't exist in the incoming pod labels will
                                           be ignored. A null or empty list means only match against labelSelector.
 
-
                                           This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                         items:
                                           type: string
@@ -6788,7 +6632,6 @@ spec:
                                           Valid values are integers greater than 0.
                                           When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                           For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                           labelSelector spread as 2/2/2:
                                           | zone1 | zone2 | zone3 |
@@ -6797,7 +6640,6 @@ spec:
                                           In this situation, new pod with the same labelSelector cannot be scheduled,
                                           because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                           it will violate MaxSkew.
-
 
                                           This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                         format: int32
@@ -6809,7 +6651,6 @@ spec:
                                           - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                           - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                           If this value is nil, the behavior is equivalent to the Honor policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                         type: string
@@ -6820,7 +6661,6 @@ spec:
                                           - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                           has a toleration, are included.
                                           - Ignore: node taints are ignored. All nodes are included.
-
 
                                           If this value is nil, the behavior is equivalent to the Ignore policy.
                                           This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -6940,16 +6780,8 @@ spec:
               conditions:
                 description: Represents a list of detailed status of the Rollout object.
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -6990,12 +6822,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -7065,7 +6892,6 @@ spec:
                     shardingDef:
                       description: |-
                         The ShardingDefinition of the sharding before the rollout.
-
 
                         optional
                       type: string

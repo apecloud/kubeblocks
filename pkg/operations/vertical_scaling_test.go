@@ -402,10 +402,6 @@ var _ = Describe("verticalScalingHandler resource match contract", func() {
 		}
 	}
 
-	makeInstance := func(pod *corev1.Pod) Instance {
-		return &defaultInstance{name: podName, componentName: clusterCompName, pod: pod}
-	}
-
 	makePgRes := func(target corev1.ResourceRequirements) *progressResource {
 		return &progressResource{
 			updatedPodSet:    map[string]string{podName: constant.EmptyInsTemplateName},
@@ -431,7 +427,7 @@ var _ = Describe("verticalScalingHandler resource match contract", func() {
 			},
 		}
 		pod := makePod(target.Limits.DeepCopy(), target.Requests.DeepCopy())
-		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeTrue())
+		Expect(vs.podApplyCompOps(ops, pod, makePgRes(target))).Should(BeTrue())
 	})
 
 	It("defaults an absent request key to its limit value when comparing", func() {
@@ -450,7 +446,7 @@ var _ = Describe("verticalScalingHandler resource match contract", func() {
 			corev1.ResourceMemory: resource.MustParse("2Gi"),
 		}
 		pod := makePod(target.Limits.DeepCopy(), podRequests)
-		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeTrue())
+		Expect(vs.podApplyCompOps(ops, pod, makePgRes(target))).Should(BeTrue())
 	})
 
 	It("returns false when the Pod's actual requests differ from the target", func() {
@@ -469,6 +465,6 @@ var _ = Describe("verticalScalingHandler resource match contract", func() {
 			corev1.ResourceMemory: resource.MustParse("2Gi"),
 		}
 		pod := makePod(target.Limits.DeepCopy(), podRequests)
-		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeFalse())
+		Expect(vs.podApplyCompOps(ops, pod, makePgRes(target))).Should(BeFalse())
 	})
 })

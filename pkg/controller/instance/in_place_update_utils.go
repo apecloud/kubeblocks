@@ -208,7 +208,7 @@ func equalField(old, new any) bool {
 			if index < 0 {
 				return false
 			}
-			if nc.Image != ocs[index].Image {
+			if !intctrlutil.EqualContainerImageInSpec(ocs[index].Image, nc.Image) {
 				return false
 			}
 		}

@@ -203,3 +203,84 @@ func ReplaceImageRegistry(image string) string {
 	}
 	return fmt.Sprintf("%v/%v/%v%v", dstRegistry, *dstNamespace, repository, remainder)
 }
+
+// MatchContainerImageInStatus returns true if the status image matches the image
+// requested in PodSpec. For digest-pinned images, the status imageID digest is
+// the stable runtime contract; status image may be reported as a tag or local ID.
+func MatchContainerImageInStatus(specImage, statusImage, statusImageID string) bool {
+	specName, specTag, specDigest := splitContainerImageRef(specImage)
+	if specDigest != "" {
+		_, _, statusDigest := splitContainerImageRef(statusImageID)
+		return specDigest == statusDigest
+	}
+
+	statusName, statusTag, _ := splitContainerImageRef(statusImage)
+	if specTag != "" && specTag != statusTag {
+		return false
+	}
+	return imageBaseName(specName) == imageBaseName(statusName)
+}
+
+// EqualContainerImageInSpec returns true if two PodSpec image references point to
+// the same image after ignoring registry rewrites. Tags and digests remain strict.
+func EqualContainerImageInSpec(oldImage, newImage string) bool {
+	if oldImage == newImage {
+		return true
+	}
+
+	oldName, oldTag, oldDigest := splitContainerImageRef(oldImage)
+	newName, newTag, newDigest := splitContainerImageRef(newImage)
+	if (oldDigest != "" || newDigest != "") && oldDigest != newDigest {
+		return false
+	}
+	if (oldTag != "" || newTag != "") && oldTag != newTag {
+		return false
+	}
+	return imageBaseName(oldName) == imageBaseName(newName)
+}
+
+// splitContainerImageRef separates the name, tag, and digest parts from an
+// image reference. It is deliberately lenient because Kubernetes may surface
+// runtime-formatted status image strings that are not normalized references.
+func splitContainerImageRef(imageName string) (name string, tag string, digest string) {
+	searchName := imageName
+	slashIndex := strings.Index(imageName, "/")
+	if slashIndex > 0 {
+		searchName = imageName[slashIndex:]
+	} else {
+		slashIndex = 0
+	}
+
+	id := strings.Index(searchName, "@")
+	ic := strings.Index(searchName, ":")
+	if ic < 0 && id < 0 {
+		return imageName, "", ""
+	}
+	if id >= 0 && (id < ic || ic < 0) {
+		id += slashIndex
+		name = imageName[:id]
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, "", digest
+	}
+	if id >= 0 && ic >= 0 {
+		id += slashIndex
+		ic += slashIndex
+		name = imageName[:ic]
+		tag = strings.TrimPrefix(imageName[ic:id], ":")
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, tag, digest
+	}
+
+	ic += slashIndex
+	name = imageName[:ic]
+	tag = strings.TrimPrefix(imageName[ic:], ":")
+	return name, tag, ""
+}
+
+func imageBaseName(name string) string {
+	index := strings.LastIndex(name, "/")
+	if index < 0 {
+		return name
+	}
+	return name[index+1:]
+}

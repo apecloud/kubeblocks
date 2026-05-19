@@ -38,6 +38,9 @@ func (r *MockReader) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	for _, o := range r.Objects {
 		// ignore the GVK check
 		if client.ObjectKeyFromObject(o) == key {
+			if !reflect.TypeOf(o).Elem().AssignableTo(reflect.TypeOf(obj).Elem()) {
+				continue
+			}
 			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(o).Elem())
 			return nil
 		}

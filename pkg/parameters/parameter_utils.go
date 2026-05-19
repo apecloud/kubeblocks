@@ -95,6 +95,9 @@ func ClassifyComponentParameters(parameters parametersv1alpha1.ComponentParamete
 	if !hasValidParametersDefinition(parametersDefs) {
 		return transformDefaultParameters(parameters, configs)
 	}
+	if err := ValidateComponentParameterAssignments(parameters, parametersDefs); err != nil {
+		return nil, err
+	}
 
 	classifyParams := make(map[string]map[string]*parametersv1alpha1.ParametersInFile, len(templates))
 	parametersMap, err := resolveSchemaFromParametersDefinition(parametersDefs, templates, tpls)

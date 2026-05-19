@@ -156,10 +156,7 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 			compParam.Spec.Desired.Assignments[param.Key] = param.Value
 		}
 	}
-	if err := cli.Patch(reqCtx.Ctx, compParam, patch); err != nil {
-		return err
-	}
-	return nil
+	return cli.Patch(reqCtx.Ctx, compParam, patch)
 }
 
 func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {

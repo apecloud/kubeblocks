@@ -176,6 +176,35 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 		})
 
+		It("should fail when desired parameters violate ParametersDefinition schema", func() {
+			_, _, _, _, _ = mockReconcileResource()
+
+			cfgKey := client.ObjectKey{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
+			})).Should(Succeed())
+
+			By("write an invalid desired parameter directly to ComponentParameter")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				cfg.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+					Assignments: map[string]*string{
+						"max_connections": cfgutil.ToPointer("0"),
+					},
+				}
+			})).Should(Succeed())
+
+			By("verify ComponentParameter fails closed instead of finishing the change")
+			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cfg.Status.ObservedGeneration).Should(Equal(cfg.Generation))
+				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CMergeFailedPhase))
+				g.Expect(cfg.Status.Message).Should(ContainSubstring("max_connections"))
+				g.Expect(cfg.Status.Message).Should(ContainSubstring("invalid"))
+			})).Should(Succeed())
+		})
+
 		It("should project init first and let desired override it", func() {
 			_, _, _, _, _ = mockReconcileResource()
 

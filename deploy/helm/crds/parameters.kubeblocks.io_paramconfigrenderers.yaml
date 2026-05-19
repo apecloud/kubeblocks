@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: paramconfigrenderers.parameters.kubeblocks.io
@@ -70,10 +70,8 @@ spec:
                         Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
                         Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
 
-
                         Each format may have its own set of parameters that can be configured.
                         For instance, when using the `ini` format, you can specify the section name.
-
 
                         Example:
                         ```
@@ -87,7 +85,6 @@ spec:
                           description: |-
                             The config file format. Valid values are `ini`, `xml`, `yaml`, `json`,
                             `hcl`, `dotenv`, `properties` and `toml`. Each format has its own characteristics and use cases.
-
 
                             - ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
                             - xml: refers to wiki: https://en.wikipedia.org/wiki/XML
@@ -129,10 +126,8 @@ spec:
                       description: |-
                         Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 
-
                         In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
                         or cluster topology. Examples:
-
 
                         - Redis: adjust maxmemory after v-scale operation.
                         - MySQL: increase max connections after v-scale operation.

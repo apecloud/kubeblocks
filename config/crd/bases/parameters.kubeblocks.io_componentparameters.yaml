@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: componentparameters.parameters.kubeblocks.io
@@ -77,14 +77,11 @@ spec:
                 description: |-
                   ConfigItemDetails is an array of ConfigTemplateItemDetail objects.
 
-
                   Each ConfigTemplateItemDetail corresponds to a configuration template,
                   which is a ConfigMap that contains multiple configuration files.
                   Each configuration file is stored as a key-value pair within the ConfigMap.
 
-
                   The ConfigTemplateItemDetail includes information such as:
-
 
                   - The configuration template (a ConfigMap)
                   - The corresponding ConfigConstraint (constraints and validation rules for the configuration)
@@ -101,7 +98,6 @@ spec:
                               Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
                               Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
 
-
                               Represents the content of the configuration file.
                             type: string
                           parameters:
@@ -114,7 +110,6 @@ spec:
                       description: |-
                         Specifies the user-defined configuration parameters.
 
-
                         When provided, the parameter values in `configFileParams` override the default configuration parameters.
                         This allows users to override the default configuration according to their specific needs.
                       type: object
@@ -122,10 +117,8 @@ spec:
                       description: |-
                         Specifies the name of the configuration template (a ConfigMap), ConfigConstraint, and other miscellaneous options.
 
-
                         The configuration template is a ConfigMap that contains multiple configuration files.
                         Each configuration file is stored as a key-value pair within the ConfigMap.
-
 
                         ConfigConstraint allows defining constraints and validation rules for configuration parameters.
                         It ensures that the configuration adheres to certain requirements and limitations.
@@ -134,11 +127,9 @@ spec:
                           description: |-
                             The operator attempts to set default file permissions (0444).
 
-
                             Must be specified as an octal value between 0000 and 0777 (inclusive),
                             or as a decimal value between 0 and 511 (inclusive).
                             YAML supports both octal and decimal values for file permissions.
-
 
                             Please note that this setting only affects the permissions of the files themselves.
                             Directories within the specified path are not impacted by this setting.
@@ -190,7 +181,6 @@ spec:
                       description: |-
                         Defines the unique identifier of the configuration template.
 
-
                         It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
                         hyphens, and periods.
                         The name must start and end with an alphanumeric character.
@@ -201,7 +191,6 @@ spec:
                       description: |-
                         External controllers can trigger a configuration rerender by modifying this field.
 
-
                         Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
                         Modifying this field will cause a rerender, regardless of the specific content of this field.
                       type: object
@@ -209,7 +198,6 @@ spec:
                     userConfigTemplates:
                       description: |-
                         Specifies the user-defined configuration template.
-
 
                         When provided, the `importTemplateRef` overrides the default configuration template
                         specified in `configSpec.templateRef`.
@@ -255,16 +243,8 @@ spec:
               conditions:
                 description: Provides detailed status information for opsRequest.
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -305,12 +285,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -347,7 +322,6 @@ spec:
                     phase:
                       description: |-
                         Indicates the current status of the configuration item.
-
 
                         Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                         "Upgrading", "Deleting", "FailedAndRetry", "Finished".
@@ -420,7 +394,6 @@ spec:
               phase:
                 description: |-
                   Indicates the current status of the configuration item.
-
 
                   Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                   "Upgrading", "Deleting", "FailedAndRetry", "Finished".

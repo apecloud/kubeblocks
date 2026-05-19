@@ -7,10 +7,99 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  - pods
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps/finalizers
+  - persistentvolumeclaims/finalizers
+  - pods/finalizers
+  - pods/resize
+  - secrets/finalizers
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - nodes
   verbs:
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  - serviceaccounts/status
+  - services/status
+  verbs:
+  - get
 - apiGroups:
   - apps
   resources:
@@ -48,6 +137,12 @@ rules:
   - apps.kubeblocks.io
   resources:
   - clusterdefinitions
+  - clusters
+  - componentdefinitions
+  - componentversions
+  - servicedescriptors
+  - shardingdefinitions
+  - sidecardefinitions
   verbs:
   - create
   - delete
@@ -60,64 +155,26 @@ rules:
   - apps.kubeblocks.io
   resources:
   - clusterdefinitions/finalizers
+  - clusters/finalizers
+  - componentdefinitions/finalizers
+  - components/finalizers
+  - componentversions/finalizers
+  - servicedescriptors/finalizers
+  - shardingdefinitions/finalizers
+  - sidecardefinitions/finalizers
   verbs:
   - update
 - apiGroups:
   - apps.kubeblocks.io
   resources:
   - clusterdefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusters
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - clusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - componentdefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - componentdefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - componentdefinitions/status
+  - components/status
+  - componentversions/status
+  - servicedescriptors/status
+  - shardingdefinitions/status
+  - sidecardefinitions/status
   verbs:
   - get
   - patch
@@ -135,124 +192,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - components/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - components/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - componentversions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - componentversions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - componentversions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - servicedescriptors
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - servicedescriptors/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - servicedescriptors/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - shardingdefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - shardingdefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - shardingdefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - sidecardefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - sidecardefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - sidecardefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - batch
   resources:
@@ -276,6 +215,7 @@ rules:
   - batch
   resources:
   - cronjobs/status
+  - jobs/status
   verbs:
   - get
 - apiGroups:
@@ -298,12 +238,6 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - batch
-  resources:
-  - jobs/status
-  verbs:
-  - get
-- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -315,180 +249,15 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods/exec
-  verbs:
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - pods/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - pods/log
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ""
-  resources:
-  - pods/resize
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - pods/status
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts/status
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - services/status
-  verbs:
-  - get
-- apiGroups:
   - dataprotection.kubeblocks.io
   resources:
   - actionsets
+  - backuppolicies
+  - backuppolicytemplates
+  - backuprepos
+  - backupschedules
+  - restores
+  - storageproviders
   verbs:
   - create
   - delete
@@ -501,90 +270,26 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - actionsets/finalizers
+  - backuppolicies/finalizers
+  - backuppolicytemplates/finalizers
+  - backuprepos/finalizers
+  - backups/finalizers
+  - backupschedules/finalizers
+  - restores/finalizers
+  - storageproviders/finalizers
   verbs:
   - update
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
   - actionsets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicies
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicies/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
   - backuppolicies/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
   - backuppolicytemplates/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuprepos
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuprepos/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
   - backuprepos/status
+  - backups/status
+  - backupschedules/status
+  - restores/status
+  - storageproviders/status
   verbs:
   - get
   - patch
@@ -602,98 +307,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backups/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backups/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backupschedules
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backupschedules/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backupschedules/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - restores
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - restores/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - restores/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - storageproviders
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - storageproviders/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - storageproviders/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - experimental.kubeblocks.io
   resources:
@@ -750,31 +363,6 @@ rules:
   - operations.kubeblocks.io
   resources:
   - opsdefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - operations.kubeblocks.io
-  resources:
-  - opsdefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - operations.kubeblocks.io
-  resources:
-  - opsdefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - operations.kubeblocks.io
-  resources:
   - opsrequests
   verbs:
   - create
@@ -787,12 +375,14 @@ rules:
 - apiGroups:
   - operations.kubeblocks.io
   resources:
+  - opsdefinitions/finalizers
   - opsrequests/finalizers
   verbs:
   - update
 - apiGroups:
   - operations.kubeblocks.io
   resources:
+  - opsdefinitions/status
   - opsrequests/status
   verbs:
   - get
@@ -802,83 +392,8 @@ rules:
   - parameters.kubeblocks.io
   resources:
   - componentparameters
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
-  - componentparameters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
-  - componentparameters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
   - paramconfigrenderers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
-  - paramconfigrenderers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
-  - paramconfigrenderers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
   - parameters
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
-  - parameters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
-  - parameters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - parameters.kubeblocks.io
-  resources:
   - parametersdefinitions
   verbs:
   - create
@@ -891,12 +406,18 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
+  - componentparameters/finalizers
+  - paramconfigrenderers/finalizers
+  - parameters/finalizers
   - parametersdefinitions/finalizers
   verbs:
   - update
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
+  - componentparameters/status
+  - paramconfigrenderers/status
+  - parameters/status
   - parametersdefinitions/status
   verbs:
   - get
@@ -918,6 +439,7 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings/status
+  - roles/status
   verbs:
   - get
 - apiGroups:
@@ -929,33 +451,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles/status
-  verbs:
-  - get
-- apiGroups:
   - snapshot.storage.k8s.io
   resources:
   - volumesnapshotclasses
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - snapshot.storage.k8s.io
-  resources:
-  - volumesnapshotclasses/finalizers
-  verbs:
-  - patch
-  - update
-- apiGroups:
-  - snapshot.storage.k8s.io
-  resources:
   - volumesnapshots
   verbs:
   - create
@@ -968,6 +466,7 @@ rules:
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:
+  - volumesnapshotclasses/finalizers
   - volumesnapshots/finalizers
   verbs:
   - patch

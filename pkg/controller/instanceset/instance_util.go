@@ -65,6 +65,13 @@ var (
 	writer *zstd.Encoder
 )
 
+type imageMatchMode int
+
+const (
+	imageMatchSpecStatus imageMatchMode = iota
+	imageMatchSpecDrift
+)
+
 func init() {
 	var err error
 	reader, err = zstd.NewReader(nil)
@@ -175,24 +182,39 @@ func isImageMatched(pod *corev1.Pod) bool {
 		statusImage := pod.Status.ContainerStatuses[index].Image
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		specName, specTag, specDigest := imageSplit(specImage)
-		statusName, statusTag, statusDigest := imageSplit(statusImage)
-		// if digest presents in spec, it must be same in status
-		if len(specDigest) != 0 && specDigest != statusDigest {
+		if !matchContainerImage(specImage, statusImage, imageMatchSpecStatus) {
 			return false
 		}
-		// if tag presents in spec, it must be same in status
-		if len(specTag) != 0 && specTag != statusTag {
-			return false
-		}
-		// otherwise, statusName should be same as or has suffix of specName
-		if specName != statusName {
-			specNames := strings.Split(specName, "/")
-			statusNames := strings.Split(statusName, "/")
-			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
-				return false
-			}
-		}
+	}
+	return true
+}
+
+func equalContainerImage(oldImage, newImage string) bool {
+	return matchContainerImage(oldImage, newImage, imageMatchSpecDrift)
+}
+
+func matchContainerImage(expectedImage, actualImage string, mode imageMatchMode) bool {
+	if expectedImage == actualImage {
+		return true
+	}
+
+	expectedName, expectedTag, expectedDigest := imageSplit(expectedImage)
+	actualName, actualTag, actualDigest := imageSplit(actualImage)
+	if !matchImageRef(expectedDigest, actualDigest, mode) {
+		return false
+	}
+	if !matchImageRef(expectedTag, actualTag, mode) {
+		return false
+	}
+	return imageBaseName(expectedName) == imageBaseName(actualName)
+}
+
+func matchImageRef(expected, actual string, mode imageMatchMode) bool {
+	if mode == imageMatchSpecDrift && (expected != "" || actual != "") {
+		return expected == actual
+	}
+	if expected != "" {
+		return expected == actual
 	}
 	return true
 }
@@ -242,6 +264,14 @@ func imageSplit(imageName string) (name string, tag string, digest string) {
 	name = imageName[:ic]
 	tag = strings.TrimPrefix(imageName[ic:], ":")
 	return name, tag, ""
+}
+
+func imageBaseName(name string) string {
+	index := strings.LastIndex(name, "/")
+	if index < 0 {
+		return name
+	}
+	return name[index+1:]
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

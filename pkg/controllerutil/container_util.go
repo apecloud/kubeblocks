@@ -51,12 +51,8 @@ func InjectZeroResourceLimitIfNeed(c *corev1.Container, name corev1.ResourceName
 	if _, ok := c.Resources.Limits[name]; ok {
 		return
 	}
-	if c.Resources.Requests == nil {
-		c.Resources.Requests = corev1.ResourceList{}
-	}
 	if c.Resources.Limits == nil {
 		c.Resources.Limits = corev1.ResourceList{}
 	}
-	c.Resources.Requests[name] = resource.MustParse("0")
 	c.Resources.Limits[name] = resource.MustParse("0")
 }

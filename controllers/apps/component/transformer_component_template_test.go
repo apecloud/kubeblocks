@@ -31,12 +31,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 var _ = Describe("file templates transformer test", func() {
@@ -226,6 +229,28 @@ var _ = Describe("file templates transformer test", func() {
 		}))
 	}
 
+	claimServerConfByParametersDefinition := func() {
+		transCtx.CompDef.Spec.Configs = []appsv1.ComponentFileTemplate{
+			{
+				Name:            "serverConf",
+				Template:        serverConfCM.Name,
+				ExternalManaged: ptr.To(true),
+			},
+		}
+		reader.Objects = append(reader.Objects, &parametersv1alpha1.ParametersDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: "server-conf-params"},
+			Spec: parametersv1alpha1.ParametersDefinitionSpec{
+				ComponentDef: compDefName,
+				TemplateName: serverConfCM.Name,
+				FileName:     "server.conf",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Properties,
+				},
+			},
+			Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+		})
+	}
+
 	// checkEnvWithAction := func(action string) {
 	//	podSpec := transCtx.SynthesizeComponent.PodSpec
 	//	for _, c := range podSpec.Containers {
@@ -326,6 +351,256 @@ var _ = Describe("file templates transformer test", func() {
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed - w/o template waits when parameters controller claimed the config", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+					ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{
+						{
+							Name: "serverConf",
+							ConfigSpec: &appsv1.ComponentFileTemplate{
+								Name:            "serverConf",
+								ExternalManaged: ptr.To(true),
+							},
+						},
+					},
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("waiting for parameters controller to backfill config template: serverConf"))
+			Expect(err.Error()).ShouldNot(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed - w/o template waits when parameters definition claims the config before component parameter exists", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			claimServerConfByParametersDefinition()
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("waiting for parameters controller to backfill config template: serverConf"))
+			Expect(err.Error()).ShouldNot(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed - w/o template waits when parameter details are not filled yet but parameters definition claims the config", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			claimServerConfByParametersDefinition()
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("waiting for parameters controller to backfill config template: serverConf"))
+			Expect(err.Error()).ShouldNot(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed - w/o template still fails when parameters controller did not claim the config", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+					ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{
+						{
+							Name: "otherConf",
+							ConfigSpec: &appsv1.ComponentFileTemplate{
+								Name:            "otherConf",
+								ExternalManaged: ptr.To(true),
+							},
+						},
+					},
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeFalse())
+			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed - w/o template still fails when matched parameter config is not external managed", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+					ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{
+						{
+							Name: "serverConf",
+							ConfigSpec: &appsv1.ComponentFileTemplate{
+								Name:            "serverConf",
+								ExternalManaged: ptr.To(false),
+							},
+						},
+					},
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeFalse())
+			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed - w/o template fails loudly when claimed parameter config failed", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			message := "render failed"
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+					ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{
+						{
+							Name: "serverConf",
+							ConfigSpec: &appsv1.ComponentFileTemplate{
+								Name:            "serverConf",
+								ExternalManaged: ptr.To(true),
+							},
+						},
+					},
+				},
+				Status: parametersv1alpha1.ComponentParameterStatus{
+					ConfigurationItemStatus: []parametersv1alpha1.ConfigTemplateItemDetailStatus{
+						{
+							Name:    "serverConf",
+							Phase:   parametersv1alpha1.CMergeFailedPhase,
+							Message: &message,
+						},
+					},
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeFalse())
+			Expect(err.Error()).Should(ContainSubstring("parameters controller failed to backfill config template serverConf: render failed"))
+		})
+
+		It("external managed - w/o template fails loudly when component parameter aggregate status failed", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+					ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{
+						{
+							Name: "serverConf",
+							ConfigSpec: &appsv1.ComponentFileTemplate{
+								Name:            "serverConf",
+								ExternalManaged: ptr.To(true),
+							},
+						},
+					},
+				},
+				Status: parametersv1alpha1.ComponentParameterStatus{
+					Phase:   parametersv1alpha1.CMergeFailedPhase,
+					Message: "aggregate render failed",
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeFalse())
+			Expect(err.Error()).Should(ContainSubstring("componentParameter " + configcore.GenerateComponentConfigurationName(clusterName, compName) + " failed to backfill config template serverConf: aggregate render failed"))
+		})
+
+		It("external managed - w/o template fails loudly when component parameter aggregate status failed with partial item status", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+					ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{
+						{
+							Name: "otherConf",
+							ConfigSpec: &appsv1.ComponentFileTemplate{
+								Name:            "otherConf",
+								ExternalManaged: ptr.To(true),
+							},
+						},
+					},
+				},
+				Status: parametersv1alpha1.ComponentParameterStatus{
+					Phase:   parametersv1alpha1.CFailedAndPausePhase,
+					Message: "aggregate paused",
+					ConfigurationItemStatus: []parametersv1alpha1.ConfigTemplateItemDetailStatus{
+						{
+							Name:  "otherConf",
+							Phase: parametersv1alpha1.CFinishedPhase,
+						},
+					},
+				},
+			})
+			claimServerConfByParametersDefinition()
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeFalse())
+			Expect(err.Error()).Should(ContainSubstring("componentParameter " + configcore.GenerateComponentConfigurationName(clusterName, compName) + " failed to backfill config template serverConf: aggregate paused"))
 		})
 	})
 })

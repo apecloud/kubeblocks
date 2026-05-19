@@ -21,7 +21,6 @@ package operations
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	parameters "github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -59,9 +57,6 @@ var noRequeueAfter time.Duration = 0
 
 // ActionStartedCondition the started condition when handle the reconfiguring request.
 func (r *reconfigureAction) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
-	if err := r.validateReconfigures(reqCtx.Ctx, cli, opsRes.Cluster, opsRes.OpsRequest.Spec.Reconfigures); err != nil {
-		return nil, err
-	}
 	return opsv1alpha1.NewReconfigureCondition(opsRes.OpsRequest), nil
 }
 
@@ -149,9 +144,6 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 	if err != nil {
 		return err
 	}
-	if err := r.validateReconfigureParameters(reqCtx.Ctx, cli, cluster, reconfigure); err != nil {
-		return err
-	}
 	patch := client.MergeFrom(compParam.DeepCopy())
 	if compParam.Spec.Desired == nil {
 		compParam.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
@@ -164,41 +156,7 @@ func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.Requ
 			compParam.Spec.Desired.Assignments[param.Key] = param.Value
 		}
 	}
-	if err := cli.Patch(reqCtx.Ctx, compParam, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *reconfigureAction) validateReconfigures(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, reconfigures []opsv1alpha1.Reconfigure) error {
-	for _, reconfigure := range reconfigures {
-		if err := r.validateReconfigureParameters(ctx, cli, cluster, reconfigure); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *reconfigureAction) validateReconfigureParameters(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, reconfigure opsv1alpha1.Reconfigure) error {
-	if len(reconfigure.Parameters) == 0 {
-		return nil
-	}
-	assignments := make(parametersv1alpha1.ComponentParameters, len(reconfigure.Parameters))
-	for _, param := range reconfigure.Parameters {
-		assignments[param.Key] = param.Value
-	}
-	if err := parameters.ValidateComponentParameterAssignmentsForCluster(ctx, cli, cluster, reconfigure.ComponentName, assignments); err != nil {
-		var validationErr *parameters.AssignmentValidationError
-		if errors.As(err, &validationErr) {
-			return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request for component %s: %s", reconfigure.ComponentName, err.Error()))
-		}
-		var targetNotFoundErr *parameters.AssignmentTargetNotFoundError
-		if errors.As(err, &targetNotFoundErr) {
-			return intctrlutil.NewFatalError(fmt.Sprintf("invalid reconfigure request: %s", err.Error()))
-		}
-		return err
-	}
-	return nil
+	return cli.Patch(reqCtx.Ctx, compParam, patch)
 }
 
 func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {

@@ -120,7 +120,7 @@ func TestSafeMetadataOnlyInPlaceUpdate(t *testing.T) {
 		name   string
 		mutate func(*corev1.Pod)
 	}{{
-		name: "no diff",
+		name:   "no diff",
 		mutate: func(pod *corev1.Pod) {},
 	}, {
 		name: "restart annotation added",

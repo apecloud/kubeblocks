@@ -27,6 +27,7 @@ import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -158,6 +159,9 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			configSchema := newFakeConfigSchema(tt.args.cueFile)
+			schema, err := openapi.GenerateOpenAPISchema(configSchema.CUE, tt.args.SchemaTypeName)
+			require.NoError(t, err)
+			configSchema.SchemaInJSON = schema
 			validator := &schemaValidator{
 				typeName: tt.args.SchemaTypeName,
 				cfgType:  tt.args.format,

@@ -20,20 +20,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"strings"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+type componentVersionPatchWriter struct {
+	patchCalls  int
+	updateCalls int
+	patchData   []byte
+}
+
+func (w *componentVersionPatchWriter) Create(context.Context, client.Object, ...client.CreateOption) error {
+	return nil
+}
+
+func (w *componentVersionPatchWriter) Delete(context.Context, client.Object, ...client.DeleteOption) error {
+	return nil
+}
+
+func (w *componentVersionPatchWriter) Update(context.Context, client.Object, ...client.UpdateOption) error {
+	w.updateCalls++
+	return nil
+}
+
+func (w *componentVersionPatchWriter) Patch(_ context.Context, obj client.Object, patch client.Patch, _ ...client.PatchOption) error {
+	var err error
+	w.patchCalls++
+	w.patchData, err = patch.Data(obj)
+	return err
+}
+
+func (w *componentVersionPatchWriter) DeleteAllOf(context.Context, client.Object, ...client.DeleteAllOfOption) error {
+	return nil
+}
+
+func TestComponentVersionSupportedCompDefLabelsUsesMetadataPatch(t *testing.T) {
+	compVersion := &appsv1.ComponentVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mssql",
+			Labels: map[string]string{
+				"old-comp-def": "old-comp-def",
+				"chart-label":  "keep",
+			},
+			Annotations: map[string]string{
+				compatibleDefinitionsKey: "old-comp-def",
+			},
+		},
+		Spec: appsv1.ComponentVersionSpec{
+			Releases: []appsv1.ComponentVersionRelease{{
+				Name:           "mssql-2022",
+				ServiceVersion: "16.0.0",
+				Images: map[string]string{
+					"mssql": "mssql:old",
+				},
+			}},
+		},
+	}
+	writer := &componentVersionPatchWriter{}
+	releaseToCompDefinitions := map[string]map[string]*appsv1.ComponentDefinition{
+		"mssql-2022": {
+			"mssql-new": {ObjectMeta: metav1.ObjectMeta{Name: "mssql-new"}},
+		},
+	}
+
+	err := (&ComponentVersionReconciler{}).updateSupportedCompDefLabels(writer,
+		intctrlutil.RequestCtx{Ctx: context.Background()}, compVersion, releaseToCompDefinitions)
+	if err != nil {
+		t.Fatalf("updateSupportedCompDefLabels returned error: %v", err)
+	}
+	if writer.patchCalls != 1 {
+		t.Fatalf("expected one patch, got %d", writer.patchCalls)
+	}
+	if writer.updateCalls != 0 {
+		t.Fatalf("expected no whole-object update, got %d", writer.updateCalls)
+	}
+	if got := compVersion.Labels["mssql-new"]; got != "mssql-new" {
+		t.Fatalf("expected new compatible label, got %q", got)
+	}
+	if got := compVersion.Labels["chart-label"]; got != "keep" {
+		t.Fatalf("expected existing chart label to be preserved, got %q", got)
+	}
+	if _, ok := compVersion.Labels["old-comp-def"]; ok {
+		t.Fatalf("expected old compatible label to be removed")
+	}
+	if got := compVersion.Annotations[compatibleDefinitionsKey]; got != "mssql-new" {
+		t.Fatalf("expected compatible definitions annotation to be updated, got %q", got)
+	}
+	patchData := string(writer.patchData)
+	if !strings.Contains(patchData, `"metadata"`) {
+		t.Fatalf("expected metadata patch, got %s", patchData)
+	}
+	if strings.Contains(patchData, `"spec"`) {
+		t.Fatalf("metadata patch must not include spec, got %s", patchData)
+	}
+}
 
 var _ = Describe("ComponentVersion Controller", func() {
 	var (

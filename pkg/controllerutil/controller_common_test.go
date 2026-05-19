@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,6 +44,36 @@ import (
 )
 
 var tlog = ctrl.Log.WithName("controller_testing")
+
+type patchRecordingWriter struct {
+	patchCalls  int
+	updateCalls int
+	patchData   []byte
+}
+
+func (w *patchRecordingWriter) Create(context.Context, client.Object, ...client.CreateOption) error {
+	return nil
+}
+
+func (w *patchRecordingWriter) Delete(context.Context, client.Object, ...client.DeleteOption) error {
+	return nil
+}
+
+func (w *patchRecordingWriter) Update(context.Context, client.Object, ...client.UpdateOption) error {
+	w.updateCalls++
+	return nil
+}
+
+func (w *patchRecordingWriter) Patch(_ context.Context, obj client.Object, patch client.Patch, _ ...client.PatchOption) error {
+	var err error
+	w.patchCalls++
+	w.patchData, err = patch.Data(obj)
+	return err
+}
+
+func (w *patchRecordingWriter) DeleteAllOf(context.Context, client.Object, ...client.DeleteAllOfOption) error {
+	return nil
+}
 
 func TestRequeueWithError(t *testing.T) {
 	_, err := CheckedRequeueWithError(errors.New("test error"), tlog, "test")
@@ -113,6 +144,67 @@ func TestResultToP(t *testing.T) {
 	res, _ := ResultToP(reconcile.Result{}, nil)
 	if reflect.ValueOf(res).Kind() != reflect.Ptr {
 		t.Error("Expect to get a pointer type, got:", reflect.ValueOf(res).Kind())
+	}
+}
+
+func TestHandleCRDeletionPatchesFinalizerMetadata(t *testing.T) {
+	const finalizer = "finalizer/protection"
+	reqCtx := RequestCtx{Ctx: context.Background(), Log: tlog}
+
+	t.Run("add finalizer", func(t *testing.T) {
+		writer := &patchRecordingWriter{}
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm"}}
+
+		res, err := HandleCRDeletion(reqCtx, writer, obj, finalizer, nil)
+		if err != nil {
+			t.Fatalf("HandleCRDeletion returned error: %v", err)
+		}
+		if res != nil {
+			t.Fatalf("expected no reconcile result, got %v", res)
+		}
+		if writer.patchCalls != 1 || writer.updateCalls != 0 {
+			t.Fatalf("expected one patch and no update, got patch=%d update=%d", writer.patchCalls, writer.updateCalls)
+		}
+		assertMetadataOnlyPatch(t, writer.patchData)
+		if !controllerutil.ContainsFinalizer(obj, finalizer) {
+			t.Fatalf("expected finalizer %q to be added", finalizer)
+		}
+	})
+
+	t.Run("remove finalizer", func(t *testing.T) {
+		writer := &patchRecordingWriter{}
+		now := metav1.Now()
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Name:              "cm",
+			Finalizers:        []string{finalizer},
+			DeletionTimestamp: &now,
+		}}
+
+		res, err := HandleCRDeletion(reqCtx, writer, obj, finalizer, nil)
+		if err != nil {
+			t.Fatalf("HandleCRDeletion returned error: %v", err)
+		}
+		if res == nil {
+			t.Fatalf("expected reconciled result")
+		}
+		if writer.patchCalls != 1 || writer.updateCalls != 0 {
+			t.Fatalf("expected one patch and no update, got patch=%d update=%d", writer.patchCalls, writer.updateCalls)
+		}
+		assertMetadataOnlyPatch(t, writer.patchData)
+		if controllerutil.ContainsFinalizer(obj, finalizer) {
+			t.Fatalf("expected finalizer %q to be removed", finalizer)
+		}
+	})
+}
+
+func assertMetadataOnlyPatch(t *testing.T, data []byte) {
+	t.Helper()
+	patchData := string(data)
+	if !strings.Contains(patchData, `"metadata"`) {
+		t.Fatalf("expected metadata patch, got %s", patchData)
+	}
+	if strings.Contains(patchData, `"spec"`) {
+		t.Fatalf("metadata patch must not include spec, got %s", patchData)
 	}
 }
 

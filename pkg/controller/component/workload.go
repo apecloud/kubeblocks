@@ -218,7 +218,7 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) error {
 			setClusterDefaultResources(container, clusterResources)
 			continue
 		}
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+		intctrlutil.InjectZeroResourcesLimitsIfNeed(container)
 	}
 	for i := range its.Spec.Template.Spec.InitContainers {
 		setClusterDefaultResources(&its.Spec.Template.Spec.InitContainers[i], clusterResources)
@@ -227,7 +227,6 @@ func setDefaultResourceLimits(its *workloads.InstanceSet) error {
 }
 
 type clusterDefaultResources struct {
-	Zero     bool                `json:"zero,omitempty"`
 	Requests corev1.ResourceList `json:"requests,omitempty"`
 	Limits   corev1.ResourceList `json:"limits,omitempty"`
 }
@@ -250,9 +249,7 @@ func setClusterDefaultResources(container *corev1.Container, resources clusterDe
 			completeResource(container, resources, name)
 			continue
 		}
-		if resources.Zero {
-			intctrlutil.InjectZeroResourceLimitIfEmpty(container, name)
-		}
+		intctrlutil.InjectZeroResourceLimitIfNeed(container, name)
 	}
 }
 

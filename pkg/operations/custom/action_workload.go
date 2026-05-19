@@ -173,7 +173,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		container := &podSpec.Containers[i]
 		container.Env = append(container.Env, env...)
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+		intctrlutil.InjectZeroResourcesLimitsIfNeed(container)
 		if image, ok := actionCtx.Images[container.Name]; ok {
 			container.Image = image
 		}
@@ -181,7 +181,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	// inject extras script.
 	w.injectOpsUtils(podSpec)
 	for i := range podSpec.InitContainers {
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&podSpec.InitContainers[i])
+		intctrlutil.InjectZeroResourcesLimitsIfNeed(&podSpec.InitContainers[i])
 	}
 	if podSpec.RestartPolicy == "" {
 		podSpec.RestartPolicy = corev1.RestartPolicyNever

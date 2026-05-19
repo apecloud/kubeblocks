@@ -157,7 +157,7 @@ func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
 			AllowPrivilegeEscalation: boolptr.False(),
 		},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&initContainer)
+	intctrlutil.InjectZeroResourcesLimitsIfNeed(&initContainer)
 	podSpec.InitContainers = append(podSpec.InitContainers, initContainer)
 	injectElements(podSpec, toSlice(sharedVolume), toSlice(sharedVolumeMount), toSlice(env))
 }

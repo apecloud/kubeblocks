@@ -22,6 +22,9 @@ package controllerutil
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func GetContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
@@ -33,12 +36,15 @@ func GetContainerByName(containers []corev1.Container, name string) (int, *corev
 	return -1, nil
 }
 
-func InjectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
-	InjectZeroResourceLimitIfEmpty(c, corev1.ResourceCPU)
-	InjectZeroResourceLimitIfEmpty(c, corev1.ResourceMemory)
+func InjectZeroResourcesLimitsIfNeed(c *corev1.Container) {
+	InjectZeroResourceLimitIfNeed(c, corev1.ResourceCPU)
+	InjectZeroResourceLimitIfNeed(c, corev1.ResourceMemory)
 }
 
-func InjectZeroResourceLimitIfEmpty(c *corev1.Container, name corev1.ResourceName) {
+func InjectZeroResourceLimitIfNeed(c *corev1.Container, name corev1.ResourceName) {
+	if !viper.GetBool(constant.CfgKeyEnableZeroResourceForUnset) {
+		return
+	}
 	if _, ok := c.Resources.Requests[name]; ok {
 		return
 	}

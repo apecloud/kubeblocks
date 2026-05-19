@@ -71,6 +71,13 @@ var (
 	writer *zstd.Encoder
 )
 
+type imageMatchMode int
+
+const (
+	imageMatchSpecStatus imageMatchMode = iota
+	imageMatchSpecDrift
+)
+
 func init() {
 	var err error
 	reader, err = zstd.NewReader(nil)
@@ -209,6 +216,36 @@ func isImageMatched(pod *corev1.Pod) bool {
 	return true
 }
 
+func equalContainerImage(oldImage, newImage string) bool {
+	return matchContainerImage(oldImage, newImage, imageMatchSpecDrift)
+}
+
+func matchContainerImage(expectedImage, actualImage string, mode imageMatchMode) bool {
+	if expectedImage == actualImage {
+		return true
+	}
+
+	expectedName, expectedTag, expectedDigest := imageSplit(expectedImage)
+	actualName, actualTag, actualDigest := imageSplit(actualImage)
+	if !matchImageRef(expectedDigest, actualDigest, mode) {
+		return false
+	}
+	if !matchImageRef(expectedTag, actualTag, mode) {
+		return false
+	}
+	return imageBaseName(expectedName) == imageBaseName(actualName)
+}
+
+func matchImageRef(expected, actual string, mode imageMatchMode) bool {
+	if mode == imageMatchSpecDrift && (expected != "" || actual != "") {
+		return expected == actual
+	}
+	if expected != "" {
+		return expected == actual
+	}
+	return true
+}
+
 // imageSplit separates and returns the name and tag parts
 // from the image string using either colon `:` or at `@` separators.
 // image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
@@ -254,6 +291,14 @@ func imageSplit(imageName string) (name string, tag string, digest string) {
 	name = imageName[:ic]
 	tag = strings.TrimPrefix(imageName[ic:], ":")
 	return name, tag, ""
+}
+
+func imageBaseName(name string) string {
+	index := strings.LastIndex(name, "/")
+	if index < 0 {
+		return name
+	}
+	return name[index+1:]
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

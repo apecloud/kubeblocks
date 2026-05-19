@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +45,11 @@ import (
 type RestoreOpsHandler struct{}
 
 var _ OpsHandler = RestoreOpsHandler{}
+
+const (
+	restoreFailureGateRequeueAfter   = 30 * time.Second
+	restoreCRPreCreateFailureTimeout = 5 * time.Minute
+)
 
 func init() {
 	// register restore operation, it will create a new cluster
@@ -120,8 +126,8 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 //     - all Restore CRs Completed but cluster still Failed: terminal
 //     restore failure.
 //     - some Restore CR still in progress: keep OpsRequest Running.
-//     - empty Restore CR list: pre-create window; quiet bounded
-//     requeue with explicit log.
+//     - empty Restore CR list: short pre-create window only; after the
+//     bounded window expires it is a terminal restore failure.
 //     - Restore CR list API error: non-terminal explicit error,
 //     controller-runtime will requeue.
 //  4. otherwise -> OpsRunningPhase.
@@ -159,12 +165,15 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			return opsv1alpha1.OpsRunningPhase, 0, fmt.Errorf("list Restore CRs for restore failure gate failed: %w", listErr)
 		}
 		if len(restoreCRs) == 0 {
+			if r.restorePreCreateWindowExpired(opsRequest) {
+				return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: no Restore CRs found within %s after OpsRequest started", restoreCRPreCreateFailureTimeout)
+			}
 			// Empty list: possibly a normal pre-create window. Non-terminal
-			// quiet retry with bounded backoff plus an explicit log so the
-			// state is observable. Not silent Running, not terminal Failed.
+			// retry with bounded backoff plus an explicit log so the state is
+			// observable. Not silent Running, not terminal Failed.
 			reqCtx.Log.Info("restore failure-gate: cluster Failed but no Restore CRs found yet; requeue",
-				"cluster", cluster.Name, "namespace", cluster.Namespace)
-			return opsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+				"cluster", cluster.Name, "namespace", cluster.Namespace, "timeout", restoreCRPreCreateFailureTimeout.String())
+			return opsv1alpha1.OpsRunningPhase, restoreFailureGateRequeueAfter, nil
 		}
 		anyRestoreFailed := false
 		allRestoresCompleted := true
@@ -198,26 +207,18 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 // failure gate to distinguish "in-progress restore" from "terminal restore
 // failure" when the cluster Status.Phase is Failed.
 //
-// Lookup convention: same namespace as the cluster, label-selected by
-// `app.kubernetes.io/instance=<cluster.Name>`. This is the narrowest
-// readily-available filter that ties Restore CRs to a cluster; it can be
-// tightened later (for example with an OpsRequest-id label or an explicit
-// OwnerRef from the OpsRequest to the Restore CR) without changing the
-// failure-gate contract.
-//
-// Known caveat: historical Restore CRs from a prior restore on the same
-// cluster will also match this label. If such stale CRs are still observable
-// in the namespace and are in a terminal Failed phase, the failure gate
-// can prematurely fail a new restore OpsRequest. Operators should clean up
-// stale Restore CRs as part of cluster lifecycle, or a future change can
-// add a stronger filter.
+// Lookup convention: same namespace as the cluster, first label-selected by
+// `app.kubernetes.io/instance=<cluster.Name>`, then scoped to the current
+// restore run. Current Restore CRs generated from the restore annotation carry
+// the current cluster UID prefix as a hyphen-delimited name segment. The start
+// timestamp guard prevents older Restore CRs for the same cluster name from
+// deciding the current OpsRequest outcome.
 func (r RestoreOpsHandler) listRestoreCRsForRestoreOps(
 	ctx context.Context,
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest,
 	cluster *appsv1.Cluster,
 ) ([]dpv1alpha1.Restore, error) {
-	_ = opsRequest // reserved for future ops-id-based filtering refinement
 	restoreList := &dpv1alpha1.RestoreList{}
 	if err := cli.List(ctx, restoreList,
 		client.InNamespace(cluster.Namespace),
@@ -225,7 +226,61 @@ func (r RestoreOpsHandler) listRestoreCRsForRestoreOps(
 	); err != nil {
 		return nil, err
 	}
-	return restoreList.Items, nil
+	restoreCRs := make([]dpv1alpha1.Restore, 0, len(restoreList.Items))
+	for i := range restoreList.Items {
+		if r.restoreCRBelongsToRestoreOps(&restoreList.Items[i], opsRequest, cluster) {
+			restoreCRs = append(restoreCRs, restoreList.Items[i])
+		}
+	}
+	return restoreCRs, nil
+}
+
+func (r RestoreOpsHandler) restoreCRBelongsToRestoreOps(
+	restoreCR *dpv1alpha1.Restore,
+	opsRequest *opsv1alpha1.OpsRequest,
+	cluster *appsv1.Cluster,
+) bool {
+	if opsName := restoreCR.Labels[constant.OpsRequestNameLabelKey]; opsName != "" {
+		return opsName == opsRequest.Name
+	}
+	if !restoreNameContainsClusterUIDPrefix(restoreCR.Name, cluster) {
+		return false
+	}
+	if startTime, ok := restoreFailureGateStartTime(opsRequest); ok {
+		start := metav1.Time{Time: startTime}
+		if restoreCR.CreationTimestamp.Before(&start) {
+			return false
+		}
+	}
+	return true
+}
+
+func (r RestoreOpsHandler) restorePreCreateWindowExpired(opsRequest *opsv1alpha1.OpsRequest) bool {
+	startTime, ok := restoreFailureGateStartTime(opsRequest)
+	return ok && time.Now().After(startTime.Add(restoreCRPreCreateFailureTimeout))
+}
+
+func restoreFailureGateStartTime(opsRequest *opsv1alpha1.OpsRequest) (time.Time, bool) {
+	if !opsRequest.Status.StartTimestamp.IsZero() {
+		return opsRequest.Status.StartTimestamp.Time, true
+	}
+	if !opsRequest.CreationTimestamp.IsZero() {
+		return opsRequest.CreationTimestamp.Time, true
+	}
+	return time.Time{}, false
+}
+
+func restoreClusterUIDPrefix(cluster *appsv1.Cluster) string {
+	uid := string(cluster.UID)
+	if len(uid) > 8 {
+		return uid[:8]
+	}
+	return uid
+}
+
+func restoreNameContainsClusterUIDPrefix(restoreName string, cluster *appsv1.Cluster) bool {
+	uidPrefix := restoreClusterUIDPrefix(cluster)
+	return uidPrefix == "" || strings.Contains(restoreName, "-"+uidPrefix+"-")
 }
 
 // SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration

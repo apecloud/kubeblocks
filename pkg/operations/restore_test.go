@@ -284,20 +284,18 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 	BeforeEach(cleanEnv)
 	AfterEach(cleanEnv)
 
+	currentRestoreName := func(cluster *appsv1.Cluster, suffix string) string {
+		return cluster.Name + "-" + restoreClusterUIDPrefix(cluster) + "-" + suffix
+	}
+
 	// Helper: create a Restore CR tied to the test cluster with a given
-	// phase. The label `app.kubernetes.io/instance=<cluster-name>` is the
-	// **candidate** lookup convention D's implementation may use; this is
-	// not yet a frozen contract. Alternatives include `GetCompLabels`
-	// (already used by `plan.RestoreManager.GetRestoreObjectMeta`),
-	// OwnerReferences, or name prefix; each has trade-offs. Whatever D
-	// picks, this helper must mirror that exact choice so post-D the
-	// fixture remains discoverable. If the helper and D diverge, the post-D
-	// regression will fail to find the Restore CRs and the tests will
-	// misbehave.
-	createRestoreCRForCluster := func(clusterName, restoreName string, phase dpv1alpha1.RestorePhase) *dpv1alpha1.Restore {
+	// phase. The label is the broad first-pass lookup; the name carries the
+	// current cluster UID prefix as a hyphen-delimited segment so the failure
+	// gate can ignore stale Restore CRs left by an older restore run.
+	createRestoreCRForCluster := func(cluster *appsv1.Cluster, restoreName string, phase dpv1alpha1.RestorePhase) *dpv1alpha1.Restore {
 		r := testdp.NewRestoreFactory(testCtx.DefaultNamespace, restoreName).
 			SetLabels(map[string]string{
-				constant.AppInstanceLabelKey: clusterName,
+				constant.AppInstanceLabelKey: cluster.Name,
 			}).
 			SetBackup("any-backup-"+randomStr, testCtx.DefaultNamespace).
 			Create(&testCtx).
@@ -330,7 +328,7 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 
 		// Restore CR is still Running (preparedata or postready in progress).
-		_ = createRestoreCRForCluster(clusterName, clusterName+"-restore-d", dpv1alpha1.RestorePhaseRunning)
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-d"), dpv1alpha1.RestorePhaseRunning)
 
 		// Cluster transiently Failed during the in-progress restore.
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
@@ -360,7 +358,7 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 		opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-a-"+randomStr, "any-backup-name")
 		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 
-		_ = createRestoreCRForCluster(clusterName, clusterName+"-restore-a", dpv1alpha1.RestorePhaseFailed)
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-a"), dpv1alpha1.RestorePhaseFailed)
 
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 			opsRes.Cluster.Status.Phase = appsv1.FailedClusterPhase
@@ -439,8 +437,8 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 		opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-c-"+randomStr, "any-backup-name")
 		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 
-		_ = createRestoreCRForCluster(clusterName, clusterName+"-restore-c-preparedata", dpv1alpha1.RestorePhaseCompleted)
-		_ = createRestoreCRForCluster(clusterName, clusterName+"-restore-c-postready", dpv1alpha1.RestorePhaseCompleted)
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-c-preparedata"), dpv1alpha1.RestorePhaseCompleted)
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-c-postready"), dpv1alpha1.RestorePhaseCompleted)
 
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 			opsRes.Cluster.Status.Phase = appsv1.FailedClusterPhase
@@ -468,7 +466,7 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 
 		// postready Restore CR still Running, cluster already Running.
-		_ = createRestoreCRForCluster(clusterName, clusterName+"-restore-e-postready", dpv1alpha1.RestorePhaseRunning)
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-e-postready"), dpv1alpha1.RestorePhaseRunning)
 
 		// initOperationsResources defaults cluster to Running; explicit
 		// reaffirm here for clarity.
@@ -495,7 +493,12 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 	//         explicit retry that is neither silent Running nor terminal
 	//         Failed.
 	//
-	//   (f.2) Restore CR list API error from the K8s client. The failure
+	//   (f.2) Empty Restore CR list after the pre-create window expires.
+	//         This is no longer considered a normal short window; the
+	//         failure gate returns a terminal restore failure so the
+	//         OpsRequest cannot remain Running forever.
+	//
+	//   (f.3) Restore CR list API error from the K8s client. The failure
 	//         gate returns (OpsRunningPhase, 0, err) so controller-runtime
 	//         re-queues loudly. Injecting a list error reliably needs a
 	//         fake/intercepting client which is out of scope for the
@@ -522,12 +525,61 @@ var _ = Describe("Restore OpsRequest ReconcileAction failure-gate race", func() 
 		// Running.
 		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase),
 			"(f.1): empty Restore CR list during cluster Failed must keep OpsRequest non-terminal")
-		Expect(requeueAfter).Should(Equal(30*time.Second),
+		Expect(requeueAfter).Should(Equal(restoreFailureGateRequeueAfter),
 			"(f.1): empty Restore CR list must trigger bounded requeue (30s)")
 		Expect(err).ShouldNot(HaveOccurred(),
 			"(f.1): empty Restore CR list is not an error — it is a pre-create window")
 	})
-	PIt("(f.2) Restore CR list API error + cluster Failed → Running + err (post-D)", func() {
+	It("(f.2) empty Restore CR list past pre-create window → OpsRequest Failed", func() {
+		opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+		reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+		opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-f2-"+randomStr, "any-backup-name")
+		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+		opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now().Add(-restoreCRPreCreateFailureTimeout - time.Minute)}
+
+		// No Restore CR is created and the pre-create window has expired.
+		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+			opsRes.Cluster.Status.Phase = appsv1.FailedClusterPhase
+		})).Should(Succeed())
+
+		restoreHandler := RestoreOpsHandler{}
+		phase, requeueAfter, err := restoreHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
+
+		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase),
+			"(f.2): empty Restore CR list cannot keep OpsRequest Running forever after the pre-create window expires")
+		Expect(requeueAfter).Should(BeZero())
+		Expect(err).Should(HaveOccurred())
+		Expect(err.Error()).Should(ContainSubstring("no Restore CRs found"))
+	})
+	It("(g) stale Failed Restore CR is ignored when current Restore CR is Running", func() {
+		opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+		reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+		opsRes.OpsRequest = createRestoreOpsObj(clusterName, "restore-ops-g-"+randomStr, "any-backup-name")
+		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+
+		// Stale Restore CR: same app instance label and even the same cluster
+		// UID name prefix, but it was created before this OpsRequest started.
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-g-stale"), dpv1alpha1.RestorePhaseFailed)
+		opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
+
+		// Current Restore CR: created after the OpsRequest start timestamp and
+		// still Running, so cluster Failed must remain non-terminal.
+		_ = createRestoreCRForCluster(opsRes.Cluster, currentRestoreName(opsRes.Cluster, "restore-g-current"), dpv1alpha1.RestorePhaseRunning)
+
+		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+			opsRes.Cluster.Status.Phase = appsv1.FailedClusterPhase
+		})).Should(Succeed())
+
+		restoreHandler := RestoreOpsHandler{}
+		phase, _, err := restoreHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
+
+		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase),
+			"(g): stale Failed Restore CR must not fail the current restore OpsRequest while current Restore CR is Running")
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	PIt("(f.3) Restore CR list API error + cluster Failed → Running + err (post-D)", func() {
 		// TODO post-D: inject List error via fake client wrapper;
 		//       assert phase==OpsRunningPhase, requeueAfter==0, err!=nil
 	})

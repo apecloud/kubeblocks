@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: componentparameters.parameters.kubeblocks.io
@@ -81,7 +81,6 @@ spec:
                 description: |-
                   ConfigItemDetails is the internal execution model derived and maintained by the controller.
 
-
                   It corresponds to configuration templates, resolved files, and effective
                   parameter/template overlays used by the reconcile pipeline.
                 items:
@@ -95,7 +94,6 @@ spec:
                             description: |-
                               Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
                               Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
-
 
                               Represents the content of the configuration file.
                             type: string
@@ -146,7 +144,6 @@ spec:
                       description: |-
                         Specifies the user-defined configuration parameters.
 
-
                         When provided, the parameter values in `configFileParams` override the default configuration parameters.
                         This allows users to override the default configuration according to their specific needs.
                       type: object
@@ -154,10 +151,8 @@ spec:
                       description: |-
                         Specifies the name of the configuration template (a ConfigMap), ConfigConstraint, and other miscellaneous options.
 
-
                         The configuration template is a ConfigMap that contains multiple configuration files.
                         Each configuration file is stored as a key-value pair within the ConfigMap.
-
 
                         ConfigConstraint allows defining constraints and validation rules for configuration parameters.
                         It ensures that the configuration adheres to certain requirements and limitations.
@@ -166,11 +161,9 @@ spec:
                           description: |-
                             The operator attempts to set default file permissions (0444).
 
-
                             Must be specified as an octal value between 0000 and 0777 (inclusive),
                             or as a decimal value between 0 and 511 (inclusive).
                             YAML supports both octal and decimal values for file permissions.
-
 
                             Please note that this setting only affects the permissions of the files themselves.
                             Directories within the specified path are not impacted by this setting.
@@ -183,7 +176,6 @@ spec:
                         externalManaged:
                           description: |-
                             ExternalManaged specifies whether the file management is delegated to an external system or manual user control.
-
 
                             When set to true, the controller will ignore the management of this file.
                           type: boolean
@@ -203,25 +195,20 @@ spec:
                           description: |-
                             Defines the procedure that reloads the file when it's content changes.
 
-
                             If specified, this action overrides the global reconfigure action defined in lifecycle actions
                             for this specific file template.
 
-
                             The container executing this action has access to following variables:
-
 
                             - KB_CONFIG_FILES_CREATED: file1,file2...
                             - KB_CONFIG_FILES_REMOVED: file1,file2...
                             - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
 
                             Note: This field is immutable once it has been set.
                           properties:
                             exec:
                               description: |-
                                 Defines the command to run.
-
 
                                 This field cannot be updated.
                               properties:
@@ -238,7 +225,6 @@ spec:
                                     Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                     If the shell is required, it must be explicitly invoked in the command.
 
-
                                     A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                                   items:
                                     type: string
@@ -248,15 +234,11 @@ spec:
                                     Specifies the name of the container within the same pod whose resources will be shared with the action.
                                     This allows the action to utilize the specified container's resources without executing within it.
 
-
                                     The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                     The resources that can be shared are included:
 
-
                                     - volume mounts
-
 
                                     This field cannot be updated.
                                   type: string
@@ -264,7 +246,6 @@ spec:
                                   description: |-
                                     Represents a list of environment variables that will be injected into the container.
                                     These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                     This field cannot be updated.
                                   items:
@@ -301,7 +282,6 @@ spec:
                                                 description: |-
                                                   Name of the referent.
                                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                                 type: string
                                               optional:
                                                 description: Specify whether the ConfigMap
@@ -368,7 +348,6 @@ spec:
                                                 description: |-
                                                   Name of the referent.
                                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                                 type: string
                                               optional:
                                                 description: Specify whether the Secret
@@ -387,10 +366,8 @@ spec:
                                   description: |-
                                     Specifies the container image to be used for running the Action.
 
-
                                     When specified, a dedicated container will be created using this image to execute the Action.
                                     All actions with same image will share the same container.
-
 
                                     This field cannot be updated.
                                   type: string
@@ -399,11 +376,9 @@ spec:
                                     Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                     The impact of this field depends on the `targetPodSelector` value:
 
-
                                     - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                     - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                       will be selected for the Action.
-
 
                                     This field cannot be updated.
                                   type: string
@@ -413,11 +388,9 @@ spec:
                                     This is useful when there is no default target replica identified.
                                     It allows for precise control over which Pod(s) the Action should run in.
 
-
                                     If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                     to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                     post-provision or pre-terminate of the component.
-
 
                                     This field cannot be updated.
                                   enum:
@@ -430,7 +403,6 @@ spec:
                             grpc:
                               description: |-
                                 Defines the gRPC call to issue.
-
 
                                 This field cannot be updated.
                               properties:
@@ -453,7 +425,6 @@ spec:
                                     type: string
                                   description: |-
                                     Request payload for the gRPC method.
-
 
                                     Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                     Templates are rendered with predefined action variables before the request is sent.
@@ -486,13 +457,11 @@ spec:
                               description: |-
                                 Defines the HTTP request to perform.
 
-
                                 This field cannot be updated.
                               properties:
                                 body:
                                   description: |-
                                     Optional HTTP request body.
-
 
                                     Supports Go text/template syntax; rendered with predefined variables before sending.
                                   type: string
@@ -562,11 +531,9 @@ spec:
                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                   will be selected for the Action.
-
 
                                 This field cannot be updated.
                               type: string
@@ -575,9 +542,7 @@ spec:
                                 Specifies the state that the cluster must reach before the Action is executed.
                                 Currently, this is only applicable to the `postProvision` action.
 
-
                                 The conditions are as follows:
-
 
                                 - `Immediately`: Executed right after the Component object is created.
                                   The readiness of the Component and its resources is not guaranteed at this stage.
@@ -588,17 +553,14 @@ spec:
                                 - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                                   This execution does not alter the Component or the Cluster's state of readiness.
 
-
                                 This field cannot be updated.
                               type: string
                             retryPolicy:
                               description: |-
                                 Defines the strategy to be taken when retrying the Action after a failure.
 
-
                                 It specifies the conditions under which the Action should be retried and the limits to apply,
                                 such as the maximum number of retries and backoff strategy.
-
 
                                 This field cannot be updated.
                               properties:
@@ -622,11 +584,9 @@ spec:
                                 This is useful when there is no default target replica identified.
                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                 post-provision or pre-terminate of the component.
-
 
                                 This field cannot be updated.
                               enum:
@@ -640,12 +600,10 @@ spec:
                               description: |-
                                 Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                                 Behavior based on the value:
                                 - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                                 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                 - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                                 This field cannot be updated.
                               format: int32
@@ -664,7 +622,6 @@ spec:
                         variables:
                           description: |-
                             Declares the user-configurable variables supported by this file template.
-
 
                             This field is used for API discovery so users can inspect the ComponentDefinition and learn which
                             variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
@@ -704,7 +661,6 @@ spec:
                       description: |-
                         Defines the unique identifier of the configuration template.
 
-
                         It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
                         hyphens, and periods.
                         The name must start and end with an alphanumeric character.
@@ -718,7 +674,6 @@ spec:
                     userConfigTemplates:
                       description: |-
                         Specifies the user-defined configuration template.
-
 
                         When provided, the `importTemplateRef` overrides the default configuration template
                         specified in `configSpec.templateRef`.
@@ -999,16 +954,8 @@ spec:
               conditions:
                 description: Provides detailed status information for opsRequest.
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -1049,12 +996,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -1091,7 +1033,6 @@ spec:
                     phase:
                       description: |-
                         Indicates the current status of the configuration item.
-
 
                         Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                         "Upgrading", "Deleting", "FailedAndRetry", "Finished".
@@ -1164,7 +1105,6 @@ spec:
               phase:
                 description: |-
                   Indicates the current status of the configuration item.
-
 
                   Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                   "Upgrading", "Deleting", "FailedAndRetry", "Finished".

@@ -515,7 +515,7 @@ type FromBackup struct {
 
 	// Specifies the namespace of the Backup namespace.
 	// If not specified, the namespace of the OpsRequest will be used.
-	// +kubebuilder:validation:Required
+	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
 	// Defines container environment variables for the restore process.

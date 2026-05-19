@@ -105,9 +105,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		resetTestContext()
 	}
@@ -737,17 +735,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType) {
+	deleteCluster := func(terminationPolicy appsv1.TerminationPolicyType) {
 		By("delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
 
 		By("wait for the cluster to terminate")
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
-
-		By(fmt.Sprintf("checking backup cleanup is out of scope for apps with TerminationPolicyType=%s", terminationPolicy))
-		// Backup cleanup is owned by the dataprotection controllers and covered by
-		// dataprotection integration tests, so apps tests only verify that backup
-		// presence does not block cluster deletion here.
 
 		By("check all other resources deleted")
 		transCtx := &clusterTransformContext{
@@ -768,12 +761,12 @@ var _ = Describe("Cluster Controller", func() {
 
 	testDeleteClusterWithDelete := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.Delete)
-		deleteClusterWithBackup(appsv1.Delete)
+		deleteCluster(appsv1.Delete)
 	}
 
 	testDeleteClusterWithWipeOut := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.WipeOut)
-		deleteClusterWithBackup(appsv1.WipeOut)
+		deleteCluster(appsv1.WipeOut)
 	}
 
 	Context("cluster provisioning", func() {

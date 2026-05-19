@@ -86,10 +86,26 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	protoNameSet := sets.New(maps.Keys(secrets)...)
 
 	cond := t.provisionCond(transCtx)
+	condCopy := cond.DeepCopy()
 	provisionedNameSet := t.getProvisionedAccounts(cond)
+	hasExternallyProvisionedAccount := false
+	for name, secret := range secrets {
+		if secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] != "true" {
+			continue
+		}
+		if provisionedNameSet.Has(name) {
+			continue
+		}
+		hasExternallyProvisionedAccount = true
+		provisionedNameSet.Insert(name)
+		t.updateProvisionedAccount(&cond, name, secret.Annotations[systemAccountHashAnnotation])
+	}
 
 	createSet, deleteSet, updateSet := setDiff(provisionedNameSet, protoNameSet)
 	if len(createSet) == 0 && len(deleteSet) == 0 && len(updateSet) == 0 {
+		if hasExternallyProvisionedAccount {
+			t.provisionCondDone(transCtx, condCopy, &cond, nil)
+		}
 		return nil
 	}
 
@@ -99,7 +115,6 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	}
 
 	var err3 error
-	condCopy := cond.DeepCopy()
 	for _, name := range sets.List(createSet) {
 		if err := t.createAccount(transCtx, lfa, &cond, accounts[name], secrets[name]); err != nil {
 			if err3 == nil {
@@ -159,11 +174,7 @@ func (t *componentAccountProvisionTransformer) createAccount(transCtx *component
 	// specific account&password environment variables name supported by the engine.
 	// When the engine starts up, it will automatically load and create this account.
 	if !account.InitAccount {
-		// TODO: restore account secret from backup.
-		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
-			// provision account when the component is not recovered from backup
-			err = t.provision(transCtx, lfa, account.Statement.Create, secret)
-		}
+		err = t.provision(transCtx, lfa, account.Statement.Create, secret)
 	}
 
 	if err == nil {

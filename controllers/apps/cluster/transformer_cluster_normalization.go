@@ -79,6 +79,10 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
+	if err = applyClusterRestoreIntent(cluster, transCtx.components, transCtx.shardings); err != nil {
+		return err
+	}
+
 	// build component specs for shardings after resolving definitions
 	transCtx.shardingComps, transCtx.shardingCompsWithTpl, err = t.buildShardingComps(transCtx)
 	if err != nil {

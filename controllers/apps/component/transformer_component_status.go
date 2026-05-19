@@ -348,7 +348,126 @@ func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componen
 		t.reconcileAvailableCondition(transCtx),
 		t.reconcileProgressingCondition(transCtx),
 		t.reconcileHealthyCondition(transCtx),
+		t.reconcileRestoreCondition(transCtx),
 	)
+}
+
+func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *componentTransformContext) error {
+	if transCtx.SynthesizeComponent == nil {
+		return nil
+	}
+	restoreCond := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeRestore)
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
+		return nil
+	}
+	expectedPVCs := expectedComponentRestorePVCCount(transCtx.SynthesizeComponent)
+	if expectedPVCs == 0 {
+		return nil
+	}
+	if t.runningITS == nil {
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             workloads.ReasonRestoreRunning,
+			Message:            "Waiting for workload restore status",
+		})
+		return nil
+	}
+	workloadCond := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceRestore))
+	if workloadCond == nil {
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             workloads.ReasonRestoreRunning,
+			Message:            "Waiting for workload restore status",
+		})
+		return nil
+	}
+	switch workloadCond.Status {
+	case metav1.ConditionTrue:
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             workloads.ReasonRestoreCompleted,
+			Message:            workloadCond.Message,
+		})
+	case metav1.ConditionFalse:
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             workloads.ReasonRestoreFailed,
+			Message:            workloadCond.Message,
+		})
+	default:
+		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
+			Type:               appsv1.ConditionTypeRestore,
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: t.comp.Generation,
+			Reason:             workloads.ReasonRestoreRunning,
+			Message:            workloadCond.Message,
+		})
+	}
+	return nil
+}
+
+func expectedComponentRestorePVCCount(comp *component.SynthesizedComponent) int {
+	total := 0
+	replicasInTemplates := int32(0)
+	for i := range comp.Instances {
+		instanceReplicas := int32(1)
+		if comp.Instances[i].Replicas != nil {
+			instanceReplicas = *comp.Instances[i].Replicas
+		}
+		if instanceReplicas < 0 {
+			instanceReplicas = 0
+		}
+		replicasInTemplates += instanceReplicas
+		total += int(instanceReplicas) * mergedComponentRestoreVCTCount(comp.VolumeClaimTemplates, comp.Instances[i].VolumeClaimTemplates)
+	}
+	defaultReplicas := comp.Replicas - replicasInTemplates
+	if defaultReplicas < 0 {
+		defaultReplicas = 0
+	}
+	return total + int(defaultReplicas)*componentRestoreVCTCount(comp.VolumeClaimTemplates)
+}
+
+func mergedComponentRestoreVCTCount(base []corev1.PersistentVolumeClaimTemplate, overrides []appsv1.PersistentVolumeClaimTemplate) int {
+	restoreVCTs := map[string]bool{}
+	for i := range base {
+		restoreVCTs[base[i].Name] = coreVCTHasRestoreIntent(&base[i])
+	}
+	for i := range overrides {
+		restoreVCTs[overrides[i].Name] = appVCTHasRestoreIntent(&overrides[i])
+	}
+	total := 0
+	for _, hasRestore := range restoreVCTs {
+		if hasRestore {
+			total++
+		}
+	}
+	return total
+}
+
+func componentRestoreVCTCount(vcts []corev1.PersistentVolumeClaimTemplate) int {
+	total := 0
+	for i := range vcts {
+		if coreVCTHasRestoreIntent(&vcts[i]) {
+			total++
+		}
+	}
+	return total
+}
+
+func coreVCTHasRestoreIntent(vct *corev1.PersistentVolumeClaimTemplate) bool {
+	return vct.Annotations[constant.RestoreSourceKindAnnotationKey] != ""
+}
+
+func appVCTHasRestoreIntent(vct *appsv1.PersistentVolumeClaimTemplate) bool {
+	return vct.Annotations[constant.RestoreSourceKindAnnotationKey] != ""
 }
 
 func (t *componentStatusTransformer) checkNSetCondition(

@@ -30,10 +30,9 @@ const (
 	OpsRequestAnnotationKey              = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	ReconcileAnnotationKey               = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
 	RestartAnnotationKey                 = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
-	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
-	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
-	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
+
+	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
+	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"
 
 	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
@@ -51,6 +50,15 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
+
+	RestoreSourceAPIGroupAnnotationKey  = "apps.kubeblocks.io/restore-source-api-group"
+	RestoreSourceKindAnnotationKey      = "apps.kubeblocks.io/restore-source-kind"
+	RestoreSourceNameAnnotationKey      = "apps.kubeblocks.io/restore-source-name"
+	RestoreSourceNamespaceAnnotationKey = "apps.kubeblocks.io/restore-source-namespace"
+	RestorePITRAnnotationKey            = "apps.kubeblocks.io/restore-pitr"
+	RestoreParametersAnnotationKey      = "apps.kubeblocks.io/restore-parameters"
+	RestoreComponentAnnotationKey       = "apps.kubeblocks.io/restore-component"
+	RestoreVolumeTemplateAnnotationKey  = "apps.kubeblocks.io/restore-volume-template"
 
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.
@@ -82,8 +90,6 @@ const (
 
 func InheritedAnnotations() []string {
 	return []string{
-		RestoreFromBackupAnnotationKey,
-		BackupSourceTargetAnnotationKey,
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
 		LegacyConfigManagerRequiredAnnotationKey,

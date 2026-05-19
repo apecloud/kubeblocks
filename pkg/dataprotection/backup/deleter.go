@@ -46,6 +46,23 @@ import (
 const (
 	deleteBackupFilesJobNamePrefix = "delete-"
 	deleteContainerName            = "deleter"
+
+	// DeleteBackupFilesJobLabelKey marks backup artifact cleanup jobs. These
+	// jobs run after backup workload cleanup starts, so the controller must not
+	// delete them as ordinary backup workload jobs before they finish.
+	DeleteBackupFilesJobLabelKey = "dataprotection.kubeblocks.io/delete-backup-files-job"
+
+	// externalDeleteJobTTLSecondsAfterFinished bounds how long a completed
+	// backup-file cleanup Job created outside the Backup's own namespace
+	// lingers before kube-controller-manager's ttl-after-finished controller
+	// garbage-collects it (Job + Pod) alongside the existing best-effort
+	// BackgroundDeleteObject path. Defense in depth: the Backup CR's
+	// finalizer is removed as soon as DeleteBackupFiles returns Succeeded,
+	// so if that async delete never propagates the Job has no other
+	// cleanup signal — no cross-namespace ownerReference, no controller
+	// re-reconcile. The 300s window keeps a short audit/diagnostic
+	// inspection budget while bounding controller-namespace residue.
+	externalDeleteJobTTLSecondsAfterFinished int32 = 300
 )
 
 type DeletionStatus string
@@ -59,11 +76,56 @@ const (
 
 type Deleter struct {
 	ctrlutil.RequestCtx
-	Client               client.Client
-	Scheme               *runtime.Scheme
-	WorkerServiceAccount string
+	Client                               client.Client
+	Scheme                               *runtime.Scheme
+	WorkerServiceAccount                 string
+	WorkerServiceAccountFunc             func() (string, error)
+	WorkerServiceAccountForNamespaceFunc func(namespace string) (string, error)
+	DeleteJobNamespace                   string
+	PrepareDeleteJobBackupRepoFunc       func(repo *dpv1alpha1.BackupRepo, namespace string) error
 
 	actionSet *dpv1alpha1.ActionSet
+}
+
+func (d *Deleter) getWorkerServiceAccount(namespace string) (string, error) {
+	if d.WorkerServiceAccount != "" {
+		return d.WorkerServiceAccount, nil
+	}
+	if d.WorkerServiceAccountForNamespaceFunc != nil {
+		saName, err := d.WorkerServiceAccountForNamespaceFunc(namespace)
+		if err != nil {
+			return "", err
+		}
+		if saName == "" {
+			return "", fmt.Errorf("worker service account is empty")
+		}
+		d.WorkerServiceAccount = saName
+		return saName, nil
+	}
+	if d.WorkerServiceAccountFunc == nil {
+		return "", fmt.Errorf("worker service account is empty")
+	}
+	saName, err := d.WorkerServiceAccountFunc()
+	if err != nil {
+		return "", err
+	}
+	if saName == "" {
+		return "", fmt.Errorf("worker service account is empty")
+	}
+	d.WorkerServiceAccount = saName
+	return saName, nil
+}
+
+func (d *Deleter) buildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup, backupRepo *dpv1alpha1.BackupRepo, isPreDelete bool) client.ObjectKey {
+	jobKey := BuildDeleteBackupFilesJobKey(backup, isPreDelete)
+	if d.DeleteJobNamespace != "" && backupRepo != nil && backupRepo.AccessByTool() {
+		jobKey.Namespace = d.DeleteJobNamespace
+	}
+	return jobKey
+}
+
+func isExternalDeleteJob(jobKey types.NamespacedName, backup *dpv1alpha1.Backup) bool {
+	return jobKey.Namespace != backup.Namespace
 }
 
 // DeleteBackupFiles builds a job to delete backup files, and returns the deletion status.
@@ -75,7 +137,20 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		// if the backup is volume snapshot, ignore to delete files
 		return DeletionStatusSucceeded, nil
 	}
-	jobKey := BuildDeleteBackupFilesJobKey(backup, false)
+
+	var backupRepo *dpv1alpha1.BackupRepo
+	var err error
+	if backup.Status.BackupRepoName != "" {
+		backupRepo = &dpv1alpha1.BackupRepo{}
+		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
+			if apierrors.IsNotFound(err) {
+				return DeletionStatusSucceeded, nil
+			}
+			return DeletionStatusUnknown, err
+		}
+	}
+
+	jobKey := d.buildDeleteBackupFilesJobKey(backup, backupRepo, false)
 	job := &batchv1.Job{}
 	exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
 	if err != nil {
@@ -87,23 +162,17 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		_, finishedType, msg := utils.IsJobFinished(job)
 		switch finishedType {
 		case batchv1.JobComplete:
+			if isExternalDeleteJob(client.ObjectKeyFromObject(job), backup) {
+				if err := ctrlutil.BackgroundDeleteObject(d.Client, d.Ctx, job); err != nil {
+					return DeletionStatusUnknown, err
+				}
+			}
 			return DeletionStatusSucceeded, nil
 		case batchv1.JobFailed:
 			return DeletionStatusFailed,
 				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
 		}
 		return DeletionStatusDeleting, nil
-	}
-
-	var backupRepo *dpv1alpha1.BackupRepo
-	if backup.Status.BackupRepoName != "" {
-		backupRepo = &dpv1alpha1.BackupRepo{}
-		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
-			if apierrors.IsNotFound(err) {
-				return DeletionStatusSucceeded, nil
-			}
-			return DeletionStatusUnknown, err
-		}
 	}
 
 	// if backupRepo is nil (likely because it's a legacy backup object), check the backup PVC
@@ -247,12 +316,29 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	backupRepo *dpv1alpha1.BackupRepo,
 	legacyPVCName string) error {
 	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	externalDeleteJob := isExternalDeleteJob(jobKey, backup)
+	if externalDeleteJob {
+		if backupRepo == nil || !backupRepo.AccessByTool() {
+			return fmt.Errorf("backup file delete job in namespace %q requires a tool-access BackupRepo", jobKey.Namespace)
+		}
+		if d.PrepareDeleteJobBackupRepoFunc == nil {
+			return fmt.Errorf("backup file delete job in namespace %q requires BackupRepo preparation", jobKey.Namespace)
+		}
+		if err := d.PrepareDeleteJobBackupRepoFunc(backupRepo, jobKey.Namespace); err != nil {
+			return fmt.Errorf("failed to prepare BackupRepo %q in namespace %q for backup file deletion: %w",
+				backupRepo.Name, jobKey.Namespace, err)
+		}
+	}
+	serviceAccountName, err := d.getWorkerServiceAccount(jobKey.Namespace)
+	if err != nil {
+		return err
+	}
 
 	// build pod
 	podSpec := corev1.PodSpec{
 		Containers:         []corev1.Container{container},
 		RestartPolicy:      corev1.RestartPolicyNever,
-		ServiceAccountName: d.WorkerServiceAccount,
+		ServiceAccountName: serviceAccountName,
 	}
 	if err := utils.AddTolerations(&podSpec); err != nil {
 		return err
@@ -271,7 +357,10 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 			Namespace: jobKey.Namespace,
 			Name:      jobKey.Name,
 			Labels: map[string]string{
-				constant.AppManagedByLabelKey: dptypes.AppName,
+				constant.AppManagedByLabelKey:   dptypes.AppName,
+				dptypes.BackupNameLabelKey:      backup.Name,
+				dptypes.BackupNamespaceLabelKey: backup.Namespace,
+				DeleteBackupFilesJobLabelKey:    "true",
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -285,8 +374,21 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 			BackoffLimit: &dptypes.DefaultBackOffLimit,
 		},
 	}
-	if err := utils.SetControllerReference(backup, job, d.Scheme); err != nil {
-		return err
+	if externalDeleteJob {
+		// External Jobs live outside the Backup's namespace, so no
+		// cross-namespace ownerReference can wire them to the Backup.
+		// Set a TTL so kube-controller-manager garbage-collects the
+		// completed Job + Pod even when the existing best-effort
+		// BackgroundDeleteObject path does not propagate (e.g. the
+		// Backup CR's finalizer is removed before the async delete
+		// lands and no future reconcile is triggered).
+		ttl := externalDeleteJobTTLSecondsAfterFinished
+		job.Spec.TTLSecondsAfterFinished = &ttl
+	}
+	if !externalDeleteJob {
+		if err := utils.SetControllerReference(backup, job, d.Scheme); err != nil {
+			return err
+		}
 	}
 	d.Log.V(1).Info("create a job to delete backup files", "job", job)
 	return client.IgnoreAlreadyExists(d.Client.Create(d.Ctx, job))
@@ -310,7 +412,7 @@ func (d *Deleter) doPreDeleteAction(
 	preDeleteAction *dpv1alpha1.BaseJobActionSpec,
 	legacyPVCName string,
 	backupFilePath string) (*batchv1.Job, error) {
-	preJobKey := BuildDeleteBackupFilesJobKey(backup, true)
+	preJobKey := d.buildDeleteBackupFilesJobKey(backup, backupRepo, true)
 	preJob := &batchv1.Job{}
 	if exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, preJobKey, preJob); err != nil {
 		return nil, err

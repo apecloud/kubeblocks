@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,6 +52,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/action"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -205,6 +207,57 @@ func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Objec
 	return requests
 }
 
+func isNamespaceTerminatingForbidden(err error) bool {
+	if !apierrors.IsForbidden(err) {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "being terminated")
+}
+
+func (r *BackupReconciler) markBackupCleanupBlocked(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, err error) error {
+	failureReason := fmt.Sprintf("backup cleanup blocked: target namespace is terminating while backup artifact cleanup still needs a worker job: %v", err)
+	if backup.Status.FailureReason == failureReason {
+		return nil
+	}
+	backupPatch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.FailureReason = failureReason
+	r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesBlocked", failureReason)
+	return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
+}
+
+func (r *BackupReconciler) prepareDeleteJobBackupRepo(reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo, namespace string) error {
+	if !repo.AccessByTool() {
+		return fmt.Errorf("backup artifact cleanup outside the backup namespace only supports tool-access BackupRepo, got %q", repo.Spec.AccessMethod)
+	}
+	if repo.Status.ToolConfigSecretName == "" {
+		return fmt.Errorf("tool config secret name is empty in BackupRepo %q", repo.Name)
+	}
+	repoReconciler := &BackupRepoReconciler{
+		Client:   r.Client,
+		Scheme:   r.Scheme,
+		Recorder: r.Recorder,
+	}
+	provider := &dpv1alpha1.StorageProvider{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: repo.Spec.StorageProviderRef}, provider, multicluster.InControlContext()); err != nil {
+		return fmt.Errorf("failed to get StorageProvider %q: %w", repo.Spec.StorageProviderRef, err)
+	}
+	parameters, err := repoReconciler.collectParameters(reqCtx, repo, provider)
+	if err != nil {
+		return err
+	}
+	reconCtx := &reconcileContext{
+		RequestCtx: reqCtx,
+		repo:       repo,
+		provider:   provider,
+		Parameters: parameters,
+		renderCtx: renderContext{
+			Parameters: parameters,
+		},
+	}
+	_, err = repoReconciler.createToolConfigSecret(reconCtx, repo.Status.ToolConfigSecretName, namespace, nil, multicluster.InControlContext())
+	return err
+}
+
 // deleteBackupFiles deletes the backup files stored in backup repository.
 func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	// If the dataprotection finalizer has already been removed, the deletion has succeeded.
@@ -222,17 +275,22 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	}
 
 	deleter := &dpbackup.Deleter{
-		RequestCtx: reqCtx,
-		Client:     r.Client,
-		Scheme:     r.Scheme,
+		RequestCtx:         reqCtx,
+		Client:             r.Client,
+		Scheme:             r.Scheme,
+		DeleteJobNamespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 	}
-
-	// TODO: update the mcMgr param
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get worker service account: %w", err)
+	deleter.WorkerServiceAccountForNamespaceFunc = func(namespace string) (string, error) {
+		// TODO: update the mcMgr param
+		saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to get worker service account: %w", err)
+		}
+		return saName, nil
 	}
-	deleter.WorkerServiceAccount = saName
+	deleter.PrepareDeleteJobBackupRepoFunc = func(repo *dpv1alpha1.BackupRepo, namespace string) error {
+		return r.prepareDeleteJobBackupRepo(reqCtx, repo, namespace)
+	}
 
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
@@ -249,6 +307,9 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
+		if err != nil && isNamespaceTerminatingForbidden(err) {
+			return r.markBackupCleanupBlocked(reqCtx, backup, err)
+		}
 		// wait for the deletion job completed
 		return err
 	}
@@ -844,12 +905,37 @@ func (r *BackupReconciler) deleteExternalResources(
 	}
 
 	// delete the external jobs.
-	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels); err != nil {
+	if err := r.deleteRelatedBackupJobs(reqCtx, namespaces, labels); err != nil {
 		return err
 	}
 
 	// delete the external statefulSets.
 	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels)
+}
+
+func (r *BackupReconciler) deleteRelatedBackupJobs(
+	reqCtx intctrlutil.RequestCtx,
+	namespaces map[string]sets.Empty,
+	labels map[string]string) error {
+	for ns := range namespaces {
+		jobs := &batchv1.JobList{}
+		if err := r.Client.List(reqCtx.Ctx, jobs, client.InNamespace(ns), client.MatchingLabels(labels)); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		for i := range jobs.Items {
+			job := &jobs.Items[i]
+			if job.Labels[dpbackup.DeleteBackupFilesJobLabelKey] == "true" {
+				continue
+			}
+			if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, r.Client, job); err != nil {
+				return err
+			}
+			if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // deleteRelatedBackups deletes the related backups.

@@ -90,12 +90,58 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
+	Context("container image comparison", func() {
+		It("ignores registry rewrites but keeps tag, digest, and basename strict", func() {
+			oldPod := buildRandomPod()
+			newPod := oldPod.DeepCopy()
+			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
+			newPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0"
+			oldPod.Spec.InitContainers[0].Image = "172.31.255.3:5000/apecloud/kbagent:1.0.3-beta.5"
+			newPod.Spec.InitContainers[0].Image = "192.168.173.140:6451/apecloud/kbagent:1.0.3-beta.5"
+
+			its := builder.NewInstanceSetBuilder(namespace, name).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
+				GetObject()
+
+			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+
+			By("tag mismatch")
+			tagChangedPod := newPod.DeepCopy()
+			tagChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.1"
+			Expect(equalBasicInPlaceFields(oldPod, tagChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, tagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			By("init container tag mismatch")
+			initTagChangedPod := newPod.DeepCopy()
+			initTagChangedPod.Spec.InitContainers[0].Image = "192.168.173.140:6451/apecloud/kbagent:1.0.3-beta.6"
+			Expect(equalBasicInPlaceFields(oldPod, initTagChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, initTagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			By("digest mismatch")
+			digestChangedPod := newPod.DeepCopy()
+			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0@sha256:old"
+			digestChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0@sha256:new"
+			Expect(equalBasicInPlaceFields(oldPod, digestChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, digestChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			By("basename mismatch")
+			basenameChangedPod := newPod.DeepCopy()
+			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
+			basenameChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis-stack:8.4.0"
+			Expect(equalBasicInPlaceFields(oldPod, basenameChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, basenameChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+		})
+	})
+
 	Context("getPodUpdatePolicy", func() {
 		It("should work well", func() {
 			By("build an updated pod")
 			randStr := rand.String(16)
 			key := randStr
 			podTemplate := template.DeepCopy()
+			podTemplate.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0"
 			mergeMap(&map[string]string{key: randStr}, &podTemplate.Annotations)
 			mergeMap(&map[string]string{key: randStr}, &podTemplate.Labels)
 			its = builder.NewInstanceSetBuilder(namespace, name).
@@ -137,6 +183,14 @@ var _ = Describe("instance util test", func() {
 			pod1, ok := objects[0].(*corev1.Pod)
 			Expect(ok).Should(BeTrue())
 			policy, specPolicy, _, err := getPodUpdatePolicy(its, pod1)
+			Expect(err).Should(BeNil())
+			Expect(policy).Should(Equal(noOpsPolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
+
+			By("build a pod with registry rewritten by admission")
+			podWithRewrittenRegistry := pod1.DeepCopy()
+			podWithRewrittenRegistry.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
+			policy, specPolicy, _, err = getPodUpdatePolicy(its, podWithRewrittenRegistry)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))

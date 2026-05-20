@@ -37,7 +37,7 @@ const (
 
 	KBAppClusterUIDKey                = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
-	LastRoleEventVersionAnnotationKey = "apps.kubeblocks.io/last-role-event-version"
+	LastRoleEventVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey     = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.

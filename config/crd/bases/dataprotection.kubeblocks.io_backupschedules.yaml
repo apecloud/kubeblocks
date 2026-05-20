@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: backupschedules.dataprotection.kubeblocks.io
@@ -104,8 +104,8 @@ spec:
                         be kept.\nKubeBlocks will remove all backups that are older
                         than the RetentionPeriod.\nFor example, RetentionPeriod of
                         `30d` will keep only the backups of last 30 days.\nSample
-                        duration format:\n\n\n- years: \t2y\n- months: \t6mo\n- days:
-                        \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\n\nYou can also
+                        duration format:\n\n- years: \t2y\n- months: \t6mo\n- days:
+                        \t\t30d\n- hours: \t12h\n- minutes: \t30m\n\nYou can also
                         combine the above durations. For example: 30d12h30m"
                       type: string
                   required:

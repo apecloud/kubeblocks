@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: parameters.parameters.kubeblocks.io
@@ -105,7 +105,6 @@ spec:
                       description: |-
                         Specifies the user-defined configuration template.
 
-
                         When provided, the `importTemplateRef` overrides the default configuration template
                         specified in `configSpec.templateRef`.
                         This allows users to customize the configuration template according to their specific requirements.
@@ -150,7 +149,6 @@ spec:
                           phase:
                             description: |-
                               Indicates the current status of the configuration item.
-
 
                               Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                               "Upgrading", "Deleting", "FailedAndRetry", "Finished".
@@ -212,7 +210,6 @@ spec:
                                     Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
                                     Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
 
-
                                     Represents the content of the configuration file.
                                   type: string
                                 parameters:
@@ -227,7 +224,6 @@ spec:
                           userConfigTemplates:
                             description: |-
                               Specifies the user-defined configuration template.
-
 
                               When provided, the `importTemplateRef` overrides the default configuration template
                               specified in `configSpec.templateRef`.
@@ -268,7 +264,6 @@ spec:
                       description: |-
                         Indicates the current status of the configuration item.
 
-
                         Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                         "Upgrading", "Deleting", "FailedAndRetry", "Finished".
                       enum:
@@ -286,6 +281,7 @@ spec:
                       type: string
                   required:
                   - componentName
+                  - parameterStatus
                   type: object
                 type: array
               message:
@@ -301,7 +297,6 @@ spec:
               phase:
                 description: |-
                   Indicates the current status of the configuration item.
-
 
                   Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
                   "Upgrading", "Deleting", "FailedAndRetry", "Finished".

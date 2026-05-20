@@ -74,25 +74,18 @@ var _ = Describe("workload resource defaults", func() {
 
 		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
-		Expect(its.Spec.Template.Spec.Containers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-		Expect(its.Spec.Template.Spec.Containers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-		Expect(its.Spec.Template.Spec.Containers[1].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-		Expect(its.Spec.Template.Spec.Containers[1].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-		Expect(its.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-		Expect(its.Spec.Template.Spec.InitContainers[0].Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-	})
-
-	It("should leave init and sidecar resources empty when enableZeroResourceForUnset is false and no defaults are configured", func() {
-		viper.Set(constant.CfgKeyEnableZeroResourceForUnset, false)
-		its := newInstanceSet()
-
-		Expect(setDefaultResourceLimits(its)).Should(Succeed())
-
-		Expect(its.Spec.Template.Spec.Containers[0].Resources.Limits).Should(BeNil())
-		Expect(its.Spec.Template.Spec.Containers[1].Resources.Requests).Should(BeNil())
-		Expect(its.Spec.Template.Spec.Containers[1].Resources.Limits).Should(BeNil())
-		Expect(its.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(BeNil())
-		Expect(its.Spec.Template.Spec.InitContainers[0].Resources.Limits).Should(BeNil())
+		for _, container := range its.Spec.Template.Spec.Containers {
+			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
+			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
+			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
+			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
+		}
+		for _, container := range its.Spec.Template.Spec.InitContainers {
+			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
+			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
+			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
+			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
+		}
 	})
 
 	It("should apply configured resources to init and sidecar containers", func() {

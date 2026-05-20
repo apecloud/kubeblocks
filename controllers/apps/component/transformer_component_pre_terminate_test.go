@@ -173,11 +173,12 @@ var _ = Describe("pre-terminate transformer test", func() {
 			Expect(preTerminated).Should(BeTrue())
 		})
 
-		It("no pods error", func() {
+		It("marks pre-terminate done when owned pods are already gone", func() {
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("has no pods to running the pre-terminate action"))
+			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for pre-terminate annotation to be set"))
+			Expect(transCtx.Component.Annotations).Should(HaveKey(kbCompPreTerminateDoneKey))
 		})
 
 		It("not-defined", func() {

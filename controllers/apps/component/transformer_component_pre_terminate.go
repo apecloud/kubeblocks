@@ -145,29 +145,32 @@ func (t *componentPreTerminateTransformer) markPreTerminateDone(transCtx *compon
 }
 
 func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) error {
-	lfa, err := t.lifecycleAction4Component(transCtx, compDef)
+	lfa, hasPods, err := t.lifecycleAction4Component(transCtx, compDef)
 	if err != nil {
 		return err
+	}
+	if !hasPods {
+		return nil
 	}
 	return lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
 }
 
-func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (lifecycle.Lifecycle, error) {
+func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (lifecycle.Lifecycle, bool, error) {
 	synthesizedComp, err1 := t.synthesizedComponent(transCtx, compDef)
 	if err1 != nil {
-		return nil, err1
+		return nil, false, err1
 	}
 	pods, err2 := component.ListOwnedPods(transCtx.Context, transCtx.Client,
 		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err2 != nil {
-		return nil, err2
+		return nil, false, err2
 	}
 	if len(pods) == 0 {
-		// TODO: (good-first-issue) we should handle the case that the component has no pods
-		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
+		return nil, false, nil
 	}
-	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
 		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, nil, pods)
+	return lfa, true, err
 }
 
 func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (*component.SynthesizedComponent, error) {

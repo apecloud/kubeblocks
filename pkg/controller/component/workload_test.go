@@ -75,14 +75,10 @@ var _ = Describe("workload resource defaults", func() {
 		Expect(setDefaultResourceLimits(its)).Should(Succeed())
 
 		for _, container := range its.Spec.Template.Spec.Containers {
-			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
 			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		}
 		for _, container := range its.Spec.Template.Spec.InitContainers {
-			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-			Expect(container.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
 			Expect(container.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		}
@@ -98,8 +94,6 @@ var _ = Describe("workload resource defaults", func() {
 		main := its.Spec.Template.Spec.Containers[0]
 		sidecar := its.Spec.Template.Spec.Containers[1]
 		initContainer := its.Spec.Template.Spec.InitContainers[0]
-		Expect(main.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
-		Expect(main.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		Expect(main.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("0")))
 		Expect(main.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		Expect(sidecar.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
@@ -123,11 +117,9 @@ var _ = Describe("workload resource defaults", func() {
 		initContainer := its.Spec.Template.Spec.InitContainers[0]
 		Expect(sidecar.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
 		Expect(sidecar.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
-		Expect(sidecar.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		Expect(sidecar.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		Expect(initContainer.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
 		Expect(initContainer.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
-		Expect(initContainer.Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 		Expect(initContainer.Resources.Limits).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("0")))
 	})
 

@@ -150,7 +150,7 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
-	viper.SetDefault(constant.CfgKeyClusterDefaultResources, `{}`)
+	viper.SetDefault(constant.CfgKeyClusterDefaultResources, `{"zero":true}`)
 	viper.SetDefault(constant.CfgKeyEnableZeroResourceForUnset, true)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
@@ -286,6 +286,7 @@ func validateRequiredToParseConfigs() error {
 	}
 	if clusterDefaultResources := viper.GetString(constant.CfgKeyClusterDefaultResources); clusterDefaultResources != "" {
 		resources := struct {
+			Zero     bool                `json:"zero,omitempty"`
 			Requests corev1.ResourceList `json:"requests,omitempty"`
 			Limits   corev1.ResourceList `json:"limits,omitempty"`
 		}{}

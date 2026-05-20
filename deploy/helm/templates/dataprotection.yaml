@@ -107,7 +107,7 @@ spec:
               value: {{ toJson . | quote }}
             {{- end }}
             - name: ENABLE_ZERO_RESOURCE_FOR_UNSET
-              value: {{ .Values.enableZeroResourceForUnset | quote }}
+              value: {{ .Values.dataProtection.enableZeroResourceForUnset | quote }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.dataProtection.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE_PULL_SECRETS

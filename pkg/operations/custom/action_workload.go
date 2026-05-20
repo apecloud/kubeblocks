@@ -229,6 +229,7 @@ echo '/scripts/kubectl -n "${KB_OPS_NAMESPACE}" patch opsrequests.operations.kub
 		Command:         []string{"sh", "-c", scripts},
 		VolumeMounts:    []corev1.VolumeMount{volumeMount},
 	}
+	intctrlutil.InjectZeroResourcesLimitsIfNeed(&initContainer)
 	podSpec.InitContainers = append(podSpec.InitContainers, initContainer)
 	podSpec.Volumes = append(podSpec.Volumes, opsUtilVolume)
 	for i := range podSpec.Containers {

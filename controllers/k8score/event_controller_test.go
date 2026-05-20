@@ -20,15 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package k8score
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -64,38 +64,41 @@ var _ = Describe("Event Controller", func() {
 	const (
 		// roleChangedAnnotKey is used to mark the role change event has been handled.
 		roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
-
-		// TODO(v1.0): remove this later.
-		checkRoleOperation  = "checkRole"
-		lorryEventFieldPath = "spec.containers{lorry}"
 	)
 
 	var (
 		beforeLastTS = time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)
 		initLastTS   = time.Date(2022, time.January, 1, 12, 0, 0, 0, time.UTC)
 		afterLastTS  = time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)
+		eventSeq     = 0
 	)
 
 	createRoleChangedEvent := func(podName, role string, podUid types.UID) *corev1.Event {
-		seq, _ := password.Generate(16, 16, 0, true, true)
+		eventSeq++
+		message, err := json.Marshal(proto.ProbeEvent{
+			Probe:  "roleProbe",
+			Code:   0,
+			Output: []byte(role),
+		})
+		Expect(err).ShouldNot(HaveOccurred())
 		objectRef := corev1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
 			Namespace:  testCtx.DefaultNamespace,
 			Name:       podName,
 			UID:        podUid,
-			FieldPath:  lorryEventFieldPath,
+			FieldPath:  proto.ProbeEventFieldPath,
 		}
-		eventName := strings.Join([]string{podName, seq}, ".")
+		eventName := fmt.Sprintf("%s.%d", podName, eventSeq)
 		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
 			SetInvolvedObject(objectRef).
-			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
-			SetReason(checkRoleOperation).
+			SetMessage(string(message)).
+			SetReason("roleProbe").
 			SetType(corev1.EventTypeNormal).
 			SetFirstTimestamp(metav1.NewTime(initLastTS)).
 			SetLastTimestamp(metav1.NewTime(initLastTS)).
 			SetEventTime(metav1.NewMicroTime(initLastTS)).
-			SetReportingController("lorry").
+			SetReportingController(proto.ProbeEventReportingController).
 			SetReportingInstance(podName).
 			SetAction("mock-create-event-action").
 			GetObject()
@@ -190,7 +193,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndEvent.EventTime.UnixMicro(), 10)))
+				g.Expect(p.Annotations[constant.LastRoleEventVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndEvent.EventTime.UnixMicro(), 10)))
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
@@ -218,7 +221,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).ShouldNot(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).ShouldNot(Equal(strconv.FormatInt(sndInvalidEvent.EventTime.UnixMicro(), 10)))
+				g.Expect(p.Annotations[constant.LastRoleEventVersionAnnotationKey]).ShouldNot(Equal(strconv.FormatInt(sndInvalidEvent.EventTime.UnixMicro(), 10)))
 			})).Should(Succeed())
 
 			By("send role changed event with afterLastTS later than pod last role changes event timestamp annotation should be update successfully")
@@ -241,7 +244,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndValidEvent.LastTimestamp.UnixMicro(), 10)))
+				g.Expect(p.Annotations[constant.LastRoleEventVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndValidEvent.LastTimestamp.UnixMicro(), 10)))
 			})).Should(Succeed())
 		})
 	})

@@ -412,7 +412,7 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	// downward backup.status.extras to volumes
 	buildBackupExtrasDownward()
 
-	intctrlutil.InjectZeroResourcesLimitsIfNeed(&container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
@@ -452,7 +452,7 @@ func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) {
 		Resources:       corev1.ResourceRequirements{Limits: nil, Requests: nil},
 		Command:         []string{"sh", "-c"},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfNeed(&container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 
 	checkIntervalSeconds := int32(1)
 	volumeName := "downward-volume-sidecard"

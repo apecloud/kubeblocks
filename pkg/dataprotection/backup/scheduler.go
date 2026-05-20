@@ -231,7 +231,7 @@ EOF
 		Command:         []string{"sh", "-c"},
 		Args:            []string{createBackupCmd},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfNeed(&container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 
 	podSpec := &corev1.PodSpec{
 		ServiceAccountName: s.WorkerServiceAccount,

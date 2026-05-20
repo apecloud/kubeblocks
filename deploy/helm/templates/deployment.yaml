@@ -137,8 +137,8 @@ spec:
             - name: CM_TOLERATIONS
               value: {{ toJson . | quote }}
             {{- end }}
-            - name: ENABLE_ZERO_RESOURCE_FOR_UNSET
-              value: {{ .Values.enableZeroResourceForUnset | quote }}
+            - name: OPERATIONS_ZERO_RESOURCE_FOR_UNSET
+              value: {{ .Values.operations.zeroResourceForUnset | quote }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE_PULL_SECRETS

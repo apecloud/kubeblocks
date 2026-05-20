@@ -1032,7 +1032,7 @@ func setAddonJobResourcesOrZero(container *corev1.Container) error {
 		container.Resources = *resources
 		return nil
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfNeed(container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(container)
 	return nil
 }
 

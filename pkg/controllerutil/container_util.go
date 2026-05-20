@@ -36,8 +36,15 @@ func GetContainerByName(containers []corev1.Container, name string) (int, *corev
 	return -1, nil
 }
 
-func InjectZeroResourcesLimitsIfNeed(c *corev1.Container) {
-	if !viper.GetBool(constant.CfgKeyEnableZeroResourceForUnset) {
+func InjectZeroResourcesLimitsForDataProtection(c *corev1.Container) {
+	if !viper.GetBool(constant.CfgKeyDataProtectionZeroResourceForUnset) {
+		return
+	}
+	InjectZeroResourcesLimitsIfEmpty(c)
+}
+
+func InjectZeroResourcesLimitsForOps(c *corev1.Container) {
+	if !viper.GetBool(constant.CfgKeyOperationZeroResourceForUnset) {
 		return
 	}
 	InjectZeroResourcesLimitsIfEmpty(c)

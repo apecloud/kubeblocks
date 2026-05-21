@@ -193,7 +193,7 @@ func (t *componentWorkloadTransformer) handleWorkloadStartNStop(transCtx *compon
 		runningITSCopy.Annotations[constant.KubeBlocksGenerationKey] = (*protoITS).Annotations[constant.KubeBlocksGenerationKey]
 		*protoITS = runningITSCopy
 	}
-	if stop && checkPostProvisionDone(transCtx) {
+	if stop {
 		(*protoITS).Spec.Stop = ptr.To(true)
 	}
 	if start {

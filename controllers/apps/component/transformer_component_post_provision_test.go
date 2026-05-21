@@ -180,5 +180,16 @@ var _ = Describe("post-provision transformer test", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("has no pods to running the post-provision action"))
 		})
+
+		It("skips post-provision when component is stopping", func() {
+			comp.Spec.Stop = ptr.To(true)
+			synthesizeComponent, err := component.BuildSynthesizedComponent(ctx, reader, compDef, comp)
+			Expect(err).To(BeNil())
+			transCtx.SynthesizeComponent = synthesizeComponent
+
+			transformer := &componentPostProvisionTransformer{}
+			err = transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+		})
 	})
 })

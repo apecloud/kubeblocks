@@ -164,7 +164,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	switch {
 	case isDeleting:
 		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
-	case stopped && (hasRunningPods || !checkPostProvisionDone(transCtx)):
+	case stopped && hasRunningPods:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")

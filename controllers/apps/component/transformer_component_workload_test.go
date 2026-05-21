@@ -24,6 +24,7 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -106,6 +107,37 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 		graphCli := model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
+	})
+
+	Context("Start and Stop Operations", func() {
+		It("should stop workload before post-provision is completed", func() {
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				constant.GenerateClusterComponentName(clusterName, compName), clusterName, compName).
+				SetReplicas(1).
+				GetObject()
+			runningITS.Annotations = map[string]string{}
+			protoITS := runningITS.DeepCopy()
+			protoITS.Annotations[constant.KubeBlocksGenerationKey] = "2"
+
+			synthesizeComp.Stop = ptr.To(true)
+			synthesizeComp.Generation = "2"
+			synthesizeComp.LifecycleActions = component.SynthesizedLifecycleActions{
+				ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
+					PostProvision: testapps.NewLifecycleAction("post-provision"),
+				},
+			}
+			transCtx := &componentTransformContext{
+				Component:           comp,
+				SynthesizeComponent: synthesizeComp,
+			}
+
+			start, stop := (&componentWorkloadTransformer{}).handleWorkloadStartNStop(transCtx, synthesizeComp, runningITS, &protoITS)
+
+			Expect(start).Should(BeFalse())
+			Expect(stop).Should(BeTrue())
+			Expect(ptr.Deref(protoITS.Spec.Stop, false)).Should(BeTrue())
+			Expect(protoITS.Annotations[constant.KubeBlocksGenerationKey]).Should(Equal("2"))
+		})
 	})
 
 	Context("Member Leave Operations", func() {

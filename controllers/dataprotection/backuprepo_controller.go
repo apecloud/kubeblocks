@@ -800,7 +800,7 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 			return err
 		}
 		for i := range job.Spec.Template.Spec.Containers {
-			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+			intctrlutil.InjectZeroResourcesLimitsForDataProtection(&job.Spec.Template.Spec.Containers[i])
 		}
 		job.Labels = map[string]string{
 			dataProtectionBackupRepoKey: reconCtx.repo.Name,
@@ -882,7 +882,7 @@ datasafed rm %s`, precheckFilePath, precheckFilePath, precheckFilePath),
 			return err
 		}
 		for i := range job.Spec.Template.Spec.Containers {
-			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
+			intctrlutil.InjectZeroResourcesLimitsForDataProtection(&job.Spec.Template.Spec.Containers[i])
 		}
 		utils.InjectDatasafedWithConfig(&job.Spec.Template.Spec, secretName, "")
 		return controllerutil.SetControllerReference(reconCtx.repo, job, r.Scheme)

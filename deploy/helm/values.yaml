@@ -257,6 +257,7 @@ resources:
   cpu: 500m
   memory: 1Gi
 
+
 ## Default resources for init and sidecar containers in KubeBlocks-managed Cluster workloads.
 ## Main containers are not affected; they are controlled by Cluster/Component resources.
 ## If a resource name is specified in requests or limits, both request and limit are set for that resource name.
@@ -358,6 +359,11 @@ manager:
 ## @param dataProtection.gcFrequencySeconds - the frequency of garbage collection
 dataProtection:
   enabled: true
+  ## When enabled, if a container's resource limits and requests are both unset,
+  ## they are set to zero to prevent unbounded resource consumption.
+  ##
+  ## @param zeroResourceForUnset
+  zeroResourceForUnset: true
   leaderElectId: ""
   # customizing the encryption key is strongly recommended.
   # if you do not specify a custom key, the default key will be used.
@@ -429,6 +435,13 @@ dataProtection:
   ## @param podAnnotations
   ##
   podAnnotations: {}
+
+operations:
+  ## When enabled, if a container's resource limits and requests are both unset,
+  ## they are set to zero to prevent unbounded resource consumption.
+  ##
+  ## @param zeroResourceForUnset
+  zeroResourceForUnset: true
 
 ## BackupRepo settings
 ##

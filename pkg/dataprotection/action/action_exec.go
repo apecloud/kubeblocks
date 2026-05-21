@@ -91,7 +91,7 @@ func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
 			"--",
 		}, e.Command...),
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(container)
 	return &corev1.PodSpec{
 		RestartPolicy:      corev1.RestartPolicyNever,
 		ServiceAccountName: e.ServiceAccountName,

@@ -106,6 +106,8 @@ spec:
             - name: CM_TOLERATIONS
               value: {{ toJson . | quote }}
             {{- end }}
+            - name: DATAPROTECTION_ZERO_RESOURCE_FOR_UNSET
+              value: {{ .Values.dataProtection.zeroResourceForUnset | quote }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.dataProtection.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE_PULL_SECRETS

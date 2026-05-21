@@ -153,6 +153,7 @@ func init() {
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
 	viper.SetDefault(constant.CfgKeyClusterDefaultResources, `{"zero":true}`)
+	viper.SetDefault(constant.CfgKeyOperationZeroResourceForUnset, true)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)

@@ -21,6 +21,7 @@ package constant
 
 // config keys used in viper, DON'T refactor the value without careful inspections
 const (
+<<<<<<< HEAD
 	CfgKeyServerInfo                    = "_KUBE_SERVER_INFO"
 	CfgKeyCtrlrMgrNS                    = "CM_NAMESPACE"
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
@@ -33,6 +34,8 @@ const (
 	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"
 	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
 	CfgKeyClusterDefaultResources       = "CLUSTER_DEFAULT_RESOURCES"
+	CfgKeyDataProtectionZeroResourceForUnset = "DATAPROTECTION_ZERO_RESOURCE_FOR_UNSET"
+	CfgKeyOperationZeroResourceForUnset      = "OPERATION_ZERO_RESOURCE_FOR_UNSET"
 
 	// addon config keys
 	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"

@@ -131,10 +131,16 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, ev
 // stale role event will be ignored.
 func checkStaleLastRoleEventVersion(version string, pod *corev1.Pod) bool {
 	lastRoleEventVersion, ok := pod.Annotations[constant.LastRoleEventVersionAnnotationKey]
-	if ok {
-		if version <= lastRoleEventVersion && !strings.Contains(lastRoleEventVersion, ":") {
-			return true
-		}
+	if !ok {
+		return false
+	}
+	// Plain role events use EventTime as a numeric version. They must not
+	// supersede a non-plain version already recorded on the Pod.
+	if strings.Contains(lastRoleEventVersion, ":") && !strings.Contains(version, ":") {
+		return true
+	}
+	if version <= lastRoleEventVersion && !strings.Contains(lastRoleEventVersion, ":") {
+		return true
 	}
 	return false
 }

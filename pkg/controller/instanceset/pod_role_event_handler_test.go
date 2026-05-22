@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,15 +30,38 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 var _ = Describe("pod role label event handler test", func() {
+	newRoleProbeEvent := func(pod *corev1.Pod, eventName, role string, code int32) *corev1.Event {
+		message, err := json.Marshal(proto.ProbeEvent{
+			Probe:   "roleProbe",
+			Code:    code,
+			Output:  []byte(role),
+			Message: "mock role probe event",
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		return builder.NewEventBuilder(namespace, eventName).
+			SetInvolvedObject(corev1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  pod.Namespace,
+				Name:       pod.Name,
+				UID:        pod.UID,
+				FieldPath:  proto.ProbeEventFieldPath,
+			}).
+			SetReason("roleProbe").
+			SetMessage(string(message)).
+			SetReportingController(proto.ProbeEventReportingController).
+			GetObject()
+	}
+
 	Context("Handle function", func() {
 		It("should work well", func() {
 			cli := k8sMock
@@ -47,14 +71,6 @@ var _ = Describe("pod role label event handler test", func() {
 			}
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
 			pod.ResourceVersion = "1"
-			objectRef := corev1.ObjectReference{
-				APIVersion: "v1",
-				Kind:       "Pod",
-				Namespace:  pod.Namespace,
-				Name:       pod.Name,
-				UID:        pod.UID,
-				FieldPath:  lorryEventFieldPath,
-			}
 			role := workloads.ReplicaRole{
 				Name:                 "leader",
 				ParticipatesInQuorum: true,
@@ -62,12 +78,7 @@ var _ = Describe("pod role label event handler test", func() {
 			}
 
 			By("build an expected message")
-			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", role.Name)
-			event := builder.NewEventBuilder(namespace, "foo").
-				SetInvolvedObject(objectRef).
-				SetReason(checkRoleOperation).
-				SetMessage(message).
-				GetObject()
+			event := newRoleProbeEvent(pod, "foo", role.Name, 0)
 
 			handler := &PodRoleEventHandler{}
 			k8sMock.EXPECT().
@@ -109,12 +120,8 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
 
 			By("build an unexpected message")
-			message = "unexpected message"
-			event = builder.NewEventBuilder(namespace, "foo").
-				SetInvolvedObject(objectRef).
-				SetMessage(message).
-				SetReason(checkRoleOperation).
-				GetObject()
+			event = newRoleProbeEvent(pod, "foo", role.Name, 0)
+			event.Message = "unexpected message"
 			k8sMock.EXPECT().
 				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, evt *corev1.Event, patch client.Patch, _ ...client.PatchOption) error {
@@ -126,12 +133,7 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
 
 			By("read a stale pod")
-			message = fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", role.Name)
-			event = builder.NewEventBuilder(namespace, "foo").
-				SetInvolvedObject(objectRef).
-				SetReason(checkRoleOperation).
-				SetMessage(message).
-				GetObject()
+			event = newRoleProbeEvent(pod, "foo", role.Name, 0)
 
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
@@ -170,30 +172,6 @@ var _ = Describe("pod role label event handler test", func() {
 		})
 	})
 
-	Context("parseProbeEventMessage function", func() {
-		It("should work well", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logf.FromContext(ctx).WithValues("pod-role-event-handler", namespace),
-			}
-
-			By("build an well formatted message")
-			roleName := "leader"
-			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", roleName)
-			event := builder.NewEventBuilder(namespace, "foo").
-				SetMessage(message).
-				GetObject()
-			msg := parseProbeEventMessage(reqCtx, event)
-			Expect(msg).ShouldNot(BeNil())
-			Expect(msg.Role).Should(Equal(roleName))
-
-			By("build an error formatted message")
-			message = "Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":}"
-			event.Message = message
-			Expect(parseProbeEventMessage(reqCtx, event)).Should(BeNil())
-		})
-	})
-
 	Context("exclusive role", func() {
 		var (
 			cli     client.Client
@@ -223,20 +201,7 @@ var _ = Describe("pod role label event handler test", func() {
 			}
 
 			// Create an event for the new pod claiming the exclusive role
-			objectRef := corev1.ObjectReference{
-				APIVersion: "v1",
-				Kind:       "Pod",
-				Namespace:  pod.Namespace,
-				Name:       pod.Name,
-				UID:        pod.UID,
-				FieldPath:  lorryEventFieldPath,
-			}
-			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", exclusiveRole.Name)
-			event := builder.NewEventBuilder(namespace, "foo").
-				SetInvolvedObject(objectRef).
-				SetReason(checkRoleOperation).
-				SetMessage(message).
-				GetObject()
+			event := newRoleProbeEvent(pod, "foo", exclusiveRole.Name, 0)
 
 			// Mock other pods with the same exclusive role label
 			otherPod1 := builder.NewPodBuilder(namespace, getPodName(name, 1)).
@@ -330,20 +295,7 @@ var _ = Describe("pod role label event handler test", func() {
 			}
 
 			// Create an event for the new pod claiming the non-exclusive role
-			objectRef := corev1.ObjectReference{
-				APIVersion: "v1",
-				Kind:       "Pod",
-				Namespace:  pod.Namespace,
-				Name:       pod.Name,
-				UID:        pod.UID,
-				FieldPath:  lorryEventFieldPath,
-			}
-			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", nonExclusiveRole.Name)
-			event := builder.NewEventBuilder(namespace, "foo").
-				SetInvolvedObject(objectRef).
-				SetReason(checkRoleOperation).
-				SetMessage(message).
-				GetObject()
+			event := newRoleProbeEvent(pod, "foo", nonExclusiveRole.Name, 0)
 
 			// Expectations
 			k8sMock.EXPECT().

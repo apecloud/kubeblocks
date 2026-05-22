@@ -35,10 +35,10 @@ const (
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
 
-	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
-	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
-	LastRoleSnapshotVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
-	ComponentScaleInAnnotationKey        = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+	KBAppClusterUIDKey                = "apps.kubeblocks.io/cluster-uid"
+	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
+	LastRoleEventVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
+	ComponentScaleInAnnotationKey     = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"

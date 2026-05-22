@@ -23,17 +23,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -345,6 +350,116 @@ var _ = Describe("pod role label event handler test", func() {
 				}).Times(1)
 
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+
+		Context("Bug B stale plain per-pod role event", func() {
+			const (
+				primaryRole   = "primary"
+				secondaryRole = "secondary"
+				// A ":" event version exercises the stale-check carve-out for
+				// non-plain versions while the plain Event still uses EventTime.
+				authoritativeRoleEventVersion = "term:10:gen:20"
+				stalePlainEventTimeMicros     = int64(200)
+			)
+
+			newExclusiveRole := func() workloads.ReplicaRole {
+				return workloads.ReplicaRole{
+					Name:                 primaryRole,
+					ParticipatesInQuorum: true,
+					UpdatePriority:       5,
+					IsExclusive:          true,
+				}
+			}
+
+			newInstanceSet := func(role workloads.ReplicaRole) *workloads.InstanceSet {
+				return &workloads.InstanceSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      name,
+					},
+					Spec: workloads.InstanceSetSpec{
+						Roles: []workloads.ReplicaRole{role},
+					},
+				}
+			}
+
+			newRolefulPod := func(ordinal int, uid types.UID, role string) *corev1.Pod {
+				return builder.NewPodBuilder(namespace, getPodName(name, ordinal)).
+					SetUID(uid).
+					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+					AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+					AddLabels(WorkloadsInstanceLabelKey, name).
+					AddLabels(RoleLabelKey, role).
+					AddAnnotations(constant.LastRoleEventVersionAnnotationKey, authoritativeRoleEventVersion).
+					GetObject()
+			}
+
+			newPlainRoleProbeEvent := func(pod *corev1.Pod, roleName string) *corev1.Event {
+				message, err := json.Marshal(proto.ProbeEvent{
+					Probe:   "roleProbe",
+					Code:    0,
+					Output:  []byte(roleName),
+					Message: "mock role probe event",
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+				event := builder.NewEventBuilder(namespace, "bug-b-stale-plain-role").
+					SetInvolvedObject(corev1.ObjectReference{
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Namespace:  pod.Namespace,
+						Name:       pod.Name,
+						UID:        pod.UID,
+						FieldPath:  proto.ProbeEventFieldPath,
+					}).
+					SetReason("roleProbe").
+					SetMessage(string(message)).
+					SetReportingController(proto.ProbeEventReportingController).
+					SetEventTime(metav1.MicroTime{Time: time.Unix(0, stalePlainEventTimeMicros*int64(time.Microsecond))}).
+					GetObject()
+				event.Count = 2
+				return event
+			}
+
+			newBugBScenario := func() (client.Client, *corev1.Pod, *corev1.Pod) {
+				role := newExclusiveRole()
+				its := newInstanceSet(role)
+				candidate := newRolefulPod(0, types.UID("candidate-pod-uid"), secondaryRole)
+				holder := newRolefulPod(1, types.UID("holder-pod-uid"), primaryRole)
+				event := newPlainRoleProbeEvent(candidate, primaryRole)
+				cli := fake.NewClientBuilder().
+					WithScheme(model.GetScheme()).
+					WithObjects(its, candidate, holder, event).
+					Build()
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: ctx,
+					Log: logger,
+				}
+				handler := &PodRoleEventHandler{}
+				Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+				return cli, candidate, holder
+			}
+
+			// This RED abstracts the shared Bug B contract: a plain per-pod old fact
+			// must not acquire an exclusive role or evict the current holder by using
+			// a fresh EventTime alone. A failing Go test demonstrates a controller
+			// contract gap; it does not independently prove the live root cause final.
+			It("should not promote the event pod from a stale plain per-pod exclusive role event", func() {
+				cli, candidate, _ := newBugBScenario()
+				gotCandidate := &corev1.Pod{}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(candidate), gotCandidate)).Should(Succeed())
+				Expect(gotCandidate.Labels[RoleLabelKey]).Should(Equal(secondaryRole))
+				Expect(gotCandidate.Annotations[constant.LastRoleEventVersionAnnotationKey]).
+					Should(Equal(authoritativeRoleEventVersion))
+			})
+
+			It("should not evict the existing exclusive role holder from a stale plain per-pod event", func() {
+				cli, _, holder := newBugBScenario()
+				gotHolder := &corev1.Pod{}
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(holder), gotHolder)).Should(Succeed())
+				Expect(gotHolder.Labels[RoleLabelKey]).Should(Equal(primaryRole))
+				Expect(gotHolder.Annotations[constant.LastRoleEventVersionAnnotationKey]).
+					Should(Equal(authoritativeRoleEventVersion))
+			})
 		})
 	})
 })

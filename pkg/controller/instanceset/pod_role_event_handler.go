@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
+
+// observationVersionPrefix marks role-event versions derived from the kbagent
+// ProbeEvent.ObservationVersion field. Legacy versions (when the emitter does
+// not set ObservationVersion) are stored as plain EventTime micros.
+const observationVersionPrefix = "obs:"
 
 type PodRoleEventHandler struct{}
 
@@ -89,7 +95,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, ev
 		return "", nil
 	}
 	role := strings.ToLower(strings.TrimSpace(string(probeEvent.Output)))
-	version := roleEventVersion(event)
+	version := roleEventVersion(event, probeEvent)
 
 	podName := types.NamespacedName{
 		Namespace: event.InvolvedObject.Namespace,
@@ -127,19 +133,55 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, ev
 	return role, nil
 }
 
-// compare the version of the current role event with the last version recorded in the pod annotation,
-// stale role event will be ignored.
+// compare the version of the current role event with the last version recorded
+// in the pod annotation, stale role event will be ignored.
+//
+// Two formats are supported on the annotation:
+//   - "obs:<n>": kbagent ObservationVersion-derived, monotonic per probe runner.
+//   - "<n>":     legacy EventTime micros, used when the emitter does not set
+//     ObservationVersion on the ProbeEvent payload.
+//
+// Cross-format handling:
+//   - new=obs, last=obs: numeric compare; equal or smaller is stale.
+//   - new=obs, last=legacy: accept once so the upgrade flow can install the new
+//     format; not stale.
+//   - new=legacy, last=obs: keep the new format that is already recorded; treat
+//     the legacy event as stale rather than overwriting "obs:<n>" with a bare
+//     EventTime.
+//   - both legacy: keep the prior lexical compare to preserve existing
+//     EventTime-only behaviour.
 func checkStaleLastRoleEventVersion(version string, pod *corev1.Pod) bool {
-	lastRoleEventVersion, ok := pod.Annotations[constant.LastRoleEventVersionAnnotationKey]
-	if ok {
-		if version <= lastRoleEventVersion && !strings.Contains(lastRoleEventVersion, ":") {
-			return true
-		}
+	last, ok := pod.Annotations[constant.LastRoleEventVersionAnnotationKey]
+	if !ok {
+		return false
 	}
-	return false
+	newIsObs := strings.HasPrefix(version, observationVersionPrefix)
+	lastIsObs := strings.HasPrefix(last, observationVersionPrefix)
+	switch {
+	case newIsObs && lastIsObs:
+		newN, newErr := parseObservationVersion(version)
+		lastN, lastErr := parseObservationVersion(last)
+		if newErr != nil || lastErr != nil {
+			return false
+		}
+		return newN <= lastN
+	case newIsObs && !lastIsObs:
+		return false
+	case !newIsObs && lastIsObs:
+		return true
+	default:
+		return version <= last
+	}
 }
 
-func roleEventVersion(event *corev1.Event) string {
+func parseObservationVersion(s string) (uint64, error) {
+	return strconv.ParseUint(strings.TrimPrefix(s, observationVersionPrefix), 10, 64)
+}
+
+func roleEventVersion(event *corev1.Event, probeEvent *proto.ProbeEvent) string {
+	if probeEvent != nil && probeEvent.ObservationVersion > 0 {
+		return fmt.Sprintf("%s%d", observationVersionPrefix, probeEvent.ObservationVersion)
+	}
 	return fmt.Sprintf("%d", event.EventTime.UnixMicro())
 }
 

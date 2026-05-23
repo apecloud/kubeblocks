@@ -281,6 +281,30 @@ var _ = Describe("probe", func() {
 			Eventually(event.Output).Should(Equal([]byte("leader")))
 		})
 
+		It("keeps ObservationVersion stable when probe output does not change", func() {
+			r := &probeRunner{}
+			first := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			second := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			third := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			Expect(first.ObservationVersion).Should(Equal(uint64(1)))
+			Expect(second.ObservationVersion).Should(Equal(uint64(1)))
+			Expect(third.ObservationVersion).Should(Equal(uint64(1)))
+		})
+
+		It("bumps ObservationVersion when probe output, code, or message changes", func() {
+			r := &probeRunner{}
+			outputChange1 := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			outputChange2 := r.buildEvent("inst", probeName, 0, []byte("secondary"), "")
+			codeChange := r.buildEvent("inst", probeName, -1, []byte("secondary"), "")
+			messageChange := r.buildEvent("inst", probeName, -1, []byte("secondary"), "err: probe failed")
+			sameAgain := r.buildEvent("inst", probeName, -1, []byte("secondary"), "err: probe failed")
+			Expect(outputChange1.ObservationVersion).Should(Equal(uint64(1)))
+			Expect(outputChange2.ObservationVersion).Should(Equal(uint64(2)))
+			Expect(codeChange.ObservationVersion).Should(Equal(uint64(3)))
+			Expect(messageChange.ObservationVersion).Should(Equal(uint64(4)))
+			Expect(sameAgain.ObservationVersion).Should(Equal(uint64(4)))
+		})
+
 		// TODO: more test cases
 	})
 })

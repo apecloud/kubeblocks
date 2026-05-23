@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -115,6 +116,15 @@ type probeRunner struct {
 	latestOutput         []byte
 	latestEvent          chan proto.ProbeEvent
 	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
+	// observationVersion is a monotonic counter that only advances when the
+	// observed (code, output, message) tuple changes. Periodic refresh of the
+	// same observation re-emits the prior version, so consumers can dedupe
+	// repeated reports of the same role fact instead of treating each
+	// EventTime advance as a fresh role transition.
+	observationVersion  uint64
+	lastReportedOutput  []byte
+	lastReportedCode    int32
+	lastReportedMessage string
 }
 
 type fileChangeWatch struct {
@@ -358,12 +368,22 @@ func watchedFileChanged(event fsnotify.Event, watches []fileChangeWatch) bool {
 }
 
 func (r *probeRunner) buildEvent(instance, probe string, code int32, output []byte, message string) *proto.ProbeEvent {
+	if r.observationVersion == 0 ||
+		code != r.lastReportedCode ||
+		message != r.lastReportedMessage ||
+		!bytes.Equal(output, r.lastReportedOutput) {
+		r.observationVersion++
+		r.lastReportedOutput = append(r.lastReportedOutput[:0], output...)
+		r.lastReportedCode = code
+		r.lastReportedMessage = message
+	}
 	return &proto.ProbeEvent{
-		Instance: instance,
-		Probe:    probe,
-		Code:     code,
-		Output:   output,
-		Message:  message,
+		Instance:           instance,
+		Probe:              probe,
+		Code:               code,
+		Output:             output,
+		Message:            message,
+		ObservationVersion: r.observationVersion,
 	}
 }
 

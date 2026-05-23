@@ -411,6 +411,173 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
 		})
 
+		It("should accept the upgrade path when ObservationVersion event arrives at a Pod still annotated with a legacy bare EventTime", func() {
+			oldRole := "primary"
+			newRole := "secondary"
+			roles := []workloads.ReplicaRole{
+				{Name: oldRole, ParticipatesInQuorum: true, UpdatePriority: 5, IsExclusive: true},
+				{Name: newRole, ParticipatesInQuorum: true, UpdatePriority: 3},
+			}
+			// Pod has the previous legacy EventTime-micros annotation written by
+			// an older controller; the next event from a new kbagent carries
+			// ObservationVersion and must install the new "obs:<n>" format.
+			legacyEventTimeMicros := stableEventTimeBase.UnixMicro()
+			existingPod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetUID(uid).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+				AddLabels(WorkloadsInstanceLabelKey, name).
+				AddLabels(RoleLabelKey, oldRole).
+				AddAnnotations(constant.LastRoleEventVersionAnnotationKey, fmt.Sprintf("%d", legacyEventTimeMicros)).
+				GetObject()
+
+			postUpgradeVersion := uint64(1779550100000000)
+			event := newRoleProbeEventWithObservationVersion(existingPod, "mixed-upgrade", newRole, 0, postUpgradeVersion)
+			event.Count = 1
+			event.EventTime = nowMicroAfter(stableEventTimeBase, 120)
+			expectedVersion := fmt.Sprintf("obs:%d", postUpgradeVersion)
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
+					*p = *existingPod
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, its *workloads.InstanceSet, _ ...client.GetOption) error {
+					its.Namespace = objKey.Namespace
+					its.Name = objKey.Name
+					its.Spec.Roles = roles
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
+					Expect(pd.Labels[RoleLabelKey]).Should(Equal(newRole))
+					Expect(pd.Annotations[constant.LastRoleEventVersionAnnotationKey]).Should(Equal(expectedVersion))
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, podList *corev1.PodList, _ ...client.ListOption) error {
+					podList.Items = nil
+					return nil
+				}).AnyTimes()
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, evt *corev1.Event, _ client.Patch, _ ...client.PatchOption) error {
+					Expect(evt.Annotations[roleChangedAnnotKey]).Should(Equal(fmt.Sprintf("count-%d", evt.Count)))
+					return nil
+				}).Times(1)
+
+			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+
+		It("should reject a legacy EventTime event when the Pod annotation already records a new obs format", func() {
+			roleName := "primary"
+			// Pod already records a new "obs:<n>" annotation from a prior
+			// upgraded event. A legacy emitter (ObservationVersion=0) arrives
+			// afterwards. The new format must not be overwritten by a bare
+			// EventTime version.
+			recordedObsVersion := uint64(1779550200000000)
+			existingPod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetUID(uid).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+				AddLabels(WorkloadsInstanceLabelKey, name).
+				AddLabels(RoleLabelKey, roleName).
+				AddAnnotations(constant.LastRoleEventVersionAnnotationKey, fmt.Sprintf("obs:%d", recordedObsVersion)).
+				GetObject()
+
+			event := newRoleProbeEventWithObservationVersion(existingPod, "mixed-downgrade", roleName, 0, 0)
+			event.Count = 3
+			event.EventTime = nowMicroAfter(stableEventTimeBase, 150)
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
+					*p = *existingPod
+					return nil
+				}).Times(1)
+			// Pod must NOT be updated; the new "obs:<n>" annotation has to
+			// survive a legacy event arriving out of order.
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(0)
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, evt *corev1.Event, _ client.Patch, _ ...client.PatchOption) error {
+					Expect(evt.Annotations[roleChangedAnnotKey]).Should(Equal(fmt.Sprintf("count-%d", evt.Count)))
+					return nil
+				}).Times(1)
+
+			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+
+		It("should accept a higher ObservationVersion after kbagent restart even when the prior annotation has a small obs value", func() {
+			oldRole := "primary"
+			newRole := "secondary"
+			roles := []workloads.ReplicaRole{
+				{Name: oldRole, ParticipatesInQuorum: true, UpdatePriority: 5, IsExclusive: true},
+				{Name: newRole, ParticipatesInQuorum: true, UpdatePriority: 3},
+			}
+			// Pod still carries a small-counter obs annotation from an earlier
+			// kbagent (counter-style) build.
+			existingPod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetUID(uid).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+				AddLabels(WorkloadsInstanceLabelKey, name).
+				AddLabels(RoleLabelKey, oldRole).
+				AddAnnotations(constant.LastRoleEventVersionAnnotationKey, "obs:5").
+				GetObject()
+
+			// Restart-safe ObservationVersion (wall-clock micros) is far larger
+			// than the old counter value; controller must not treat it as stale.
+			postRestartVersion := uint64(1779550000000000)
+			event := newRoleProbeEventWithObservationVersion(existingPod, "post-restart", newRole, 0, postRestartVersion)
+			event.Count = 1
+			event.EventTime = nowMicroAfter(stableEventTimeBase, 600)
+			expectedVersion := fmt.Sprintf("obs:%d", postRestartVersion)
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
+					*p = *existingPod
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, its *workloads.InstanceSet, _ ...client.GetOption) error {
+					its.Namespace = objKey.Namespace
+					its.Name = objKey.Name
+					its.Spec.Roles = roles
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
+					Expect(pd.Labels[RoleLabelKey]).Should(Equal(newRole))
+					Expect(pd.Annotations[constant.LastRoleEventVersionAnnotationKey]).Should(Equal(expectedVersion))
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, podList *corev1.PodList, _ ...client.ListOption) error {
+					podList.Items = nil
+					return nil
+				}).AnyTimes()
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, evt *corev1.Event, _ client.Patch, _ ...client.PatchOption) error {
+					Expect(evt.Annotations[roleChangedAnnotKey]).Should(Equal(fmt.Sprintf("count-%d", evt.Count)))
+					return nil
+				}).Times(1)
+
+			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+
 		It("should fall back to EventTime-based behavior when ObservationVersion is zero", func() {
 			roleName := "primary"
 			role := workloads.ReplicaRole{

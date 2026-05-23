@@ -281,28 +281,70 @@ var _ = Describe("probe", func() {
 			Eventually(event.Output).Should(Equal([]byte("leader")))
 		})
 
-		It("keeps ObservationVersion stable when probe output does not change", func() {
-			r := &probeRunner{}
+		It("keeps ObservationVersion stable across periodic refresh of the same successful output", func() {
+			clock := int64(1779550000000000)
+			next := func() int64 {
+				clock++
+				return clock
+			}
+			r := &probeRunner{nowMicros: next}
 			first := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
 			second := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
 			third := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
-			Expect(first.ObservationVersion).Should(Equal(uint64(1)))
-			Expect(second.ObservationVersion).Should(Equal(uint64(1)))
-			Expect(third.ObservationVersion).Should(Equal(uint64(1)))
+			Expect(first.ObservationVersion).ShouldNot(BeZero())
+			Expect(second.ObservationVersion).Should(Equal(first.ObservationVersion))
+			Expect(third.ObservationVersion).Should(Equal(first.ObservationVersion))
 		})
 
-		It("bumps ObservationVersion when probe output, code, or message changes", func() {
-			r := &probeRunner{}
-			outputChange1 := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
-			outputChange2 := r.buildEvent("inst", probeName, 0, []byte("secondary"), "")
-			codeChange := r.buildEvent("inst", probeName, -1, []byte("secondary"), "")
-			messageChange := r.buildEvent("inst", probeName, -1, []byte("secondary"), "err: probe failed")
-			sameAgain := r.buildEvent("inst", probeName, -1, []byte("secondary"), "err: probe failed")
-			Expect(outputChange1.ObservationVersion).Should(Equal(uint64(1)))
-			Expect(outputChange2.ObservationVersion).Should(Equal(uint64(2)))
-			Expect(codeChange.ObservationVersion).Should(Equal(uint64(3)))
-			Expect(messageChange.ObservationVersion).Should(Equal(uint64(4)))
-			Expect(sameAgain.ObservationVersion).Should(Equal(uint64(4)))
+		It("advances ObservationVersion to a strictly larger value when successful output changes", func() {
+			clock := int64(1779550000000000)
+			next := func() int64 {
+				clock++
+				return clock
+			}
+			r := &probeRunner{nowMicros: next}
+			primary := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			secondary := r.buildEvent("inst", probeName, 0, []byte("secondary"), "")
+			Expect(secondary.ObservationVersion).Should(BeNumerically(">", primary.ObservationVersion))
+		})
+
+		It("uses a strictly larger ObservationVersion than any prior runner so kbagent restart cannot regress the recorded stamp", func() {
+			clock := int64(1779550000000000)
+			next := func() int64 {
+				clock++
+				return clock
+			}
+			oldRunner := &probeRunner{nowMicros: next}
+			oldEvent := oldRunner.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			// Wall clock advances; a brand-new runner (simulated by allocating a
+			// new struct) must stamp a strictly larger version on its very
+			// first successful observation. This documents v2a behaviour: a
+			// kbagent restart while the probe still emits the same output mints
+			// a fresh stamp instead of re-using the prior runner's stamp. The
+			// controller will therefore accept that first post-restart event
+			// once. A follow-up (v2b) that persists last-success state could
+			// flip the assertion to Equal.
+			clock += 1_000_000 // jump ahead by 1s, matching a real kbagent restart gap
+			newRunner := &probeRunner{nowMicros: next}
+			newEvent := newRunner.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			Expect(newEvent.ObservationVersion).Should(BeNumerically(">", oldEvent.ObservationVersion))
+		})
+
+		It("keeps the last successful ObservationVersion across a failure burst followed by the same stale successful output", func() {
+			clock := int64(1779550000000000)
+			next := func() int64 {
+				clock++
+				return clock
+			}
+			r := &probeRunner{nowMicros: next}
+			success := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			failure1 := r.buildEvent("inst", probeName, -1, []byte("primary"), "err: probe failed")
+			failure2 := r.buildEvent("inst", probeName, -1, nil, "err: probe failed again")
+			successAgain := r.buildEvent("inst", probeName, 0, []byte("primary"), "")
+			Expect(success.ObservationVersion).ShouldNot(BeZero())
+			Expect(failure1.ObservationVersion).Should(Equal(success.ObservationVersion))
+			Expect(failure2.ObservationVersion).Should(Equal(success.ObservationVersion))
+			Expect(successAgain.ObservationVersion).Should(Equal(success.ObservationVersion))
 		})
 
 		// TODO: more test cases

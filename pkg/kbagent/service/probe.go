@@ -116,15 +116,41 @@ type probeRunner struct {
 	latestOutput         []byte
 	latestEvent          chan proto.ProbeEvent
 	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
-	// observationVersion is a monotonic counter that only advances when the
-	// observed (code, output, message) tuple changes. Periodic refresh of the
-	// same observation re-emits the prior version, so consumers can dedupe
-	// repeated reports of the same role fact instead of treating each
-	// EventTime advance as a fresh role transition.
-	observationVersion  uint64
-	lastReportedOutput  []byte
-	lastReportedCode    int32
-	lastReportedMessage string
+	// lastSuccessVersion is a successful role observation stamp: the wall-clock
+	// micros at the moment the current successful probe output was first
+	// observed by this probeRunner. The same value is re-stamped on every
+	// periodic refresh of the same output so consumers can dedupe repeated
+	// reports of the same role fact instead of treating each EventTime advance
+	// as a fresh role transition.
+	//
+	// Wall-clock micros is used (instead of an in-process counter) so the
+	// stamp stays comparable across kbagent restarts: a fresh probeRunner
+	// always observes a later wall clock than any prior emission, which keeps
+	// the controller's staleness gate self-consistent even when the Pod
+	// annotation already records a stamp from a previous runner.
+	//
+	// Only successful (code == 0) outputs participate in stamp updates.
+	// Failure events re-emit the last successful stamp so a probe failure
+	// burst followed by the same stale successful output cannot fabricate a
+	// fresh role fact for the controller.
+	//
+	// Documented residual (v2a): the stamp is not persisted across restart.
+	// If kbagent restarts while the role probe is still returning a stale
+	// successful output (for example, during a failover window where
+	// check-role.sh has not yet caught up), the new probeRunner mints a fresh
+	// stamp for that stale output and the controller will accept it once. A
+	// follow-up (v2b) can persist last-success state so an unchanged output
+	// across restart re-uses the prior stamp instead.
+	lastSuccessVersion uint64
+	lastSuccessOutput  []byte
+	nowMicros          func() int64
+}
+
+func (r *probeRunner) now() int64 {
+	if r.nowMicros != nil {
+		return r.nowMicros()
+	}
+	return time.Now().UnixMicro()
 }
 
 type fileChangeWatch struct {
@@ -368,14 +394,9 @@ func watchedFileChanged(event fsnotify.Event, watches []fileChangeWatch) bool {
 }
 
 func (r *probeRunner) buildEvent(instance, probe string, code int32, output []byte, message string) *proto.ProbeEvent {
-	if r.observationVersion == 0 ||
-		code != r.lastReportedCode ||
-		message != r.lastReportedMessage ||
-		!bytes.Equal(output, r.lastReportedOutput) {
-		r.observationVersion++
-		r.lastReportedOutput = append(r.lastReportedOutput[:0], output...)
-		r.lastReportedCode = code
-		r.lastReportedMessage = message
+	if code == 0 && !bytes.Equal(output, r.lastSuccessOutput) {
+		r.lastSuccessVersion = uint64(r.now())
+		r.lastSuccessOutput = append(r.lastSuccessOutput[:0], output...)
 	}
 	return &proto.ProbeEvent{
 		Instance:           instance,
@@ -383,7 +404,7 @@ func (r *probeRunner) buildEvent(instance, probe string, code int32, output []by
 		Code:               code,
 		Output:             output,
 		Message:            message,
-		ObservationVersion: r.observationVersion,
+		ObservationVersion: r.lastSuccessVersion,
 	}
 }
 

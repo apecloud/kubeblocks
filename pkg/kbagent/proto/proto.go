@@ -112,6 +112,13 @@ type ProbeEvent struct {
 	Code     int32  `json:"code"`
 	Output   []byte `json:"output,omitempty"`  // output of the probe on success, or latest succeed output on failure
 	Message  string `json:"message,omitempty"` // message of the probe on failure
+	// ObservationVersion is a monotonic counter that kbagent bumps only when the
+	// observed (Code, Output, Message) tuple changes. Periodic refresh of the
+	// same observation keeps the same ObservationVersion so consumers can tell a
+	// re-emitted stale observation apart from a fresh role fact. Zero means the
+	// emitter does not provide this field (legacy kbagent); consumers must fall
+	// back to the prior EventTime-based staleness gate in that case.
+	ObservationVersion uint64 `json:"observationVersion,omitempty"`
 }
 
 type Task struct {

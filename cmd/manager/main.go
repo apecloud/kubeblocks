@@ -552,14 +552,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadscontrollers.InstanceEventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-event-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceEvent")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(operationsFlagKey.viperName()) {

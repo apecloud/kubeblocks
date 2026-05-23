@@ -411,6 +411,49 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
 		})
 
+		It("should reject a stale lower ObservationVersion event so a parallel writer cannot re-acquire an exclusive role", func() {
+			// Pod has already advanced past obs:10 via the new path; the
+			// exclusive primary label was cleared on the prior reconcile.
+			// A stale event from before that advance (obs:5, output=primary)
+			// must not let the pod re-acquire primary, regardless of which
+			// reconciler eventually delivers it. This pins the single-writer
+			// contract: PodRoleEventHandler is the gate, and any other code
+			// path that mutates the role label without going through the
+			// ObservationVersion staleness check would violate the contract.
+			roleName := "primary"
+			existingPod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetUID(uid).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(WorkloadsManagedByLabelKey, workloads.InstanceSetKind).
+				AddLabels(WorkloadsInstanceLabelKey, name).
+				AddAnnotations(constant.LastRoleEventVersionAnnotationKey, "obs:10").
+				GetObject()
+
+			event := newRoleProbeEventWithObservationVersion(existingPod, "stale-lower-obs", roleName, 0, 5)
+			event.Count = 1
+			event.EventTime = nowMicroAfter(stableEventTimeBase, 180)
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
+					*p = *existingPod
+					return nil
+				}).Times(1)
+			// Pod must NOT be updated; the stale lower obs event cannot grant
+			// primary back to a pod the new path already de-promoted.
+			k8sMock.EXPECT().
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(0)
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, evt *corev1.Event, _ client.Patch, _ ...client.PatchOption) error {
+					Expect(evt.Annotations[roleChangedAnnotKey]).Should(Equal(fmt.Sprintf("count-%d", evt.Count)))
+					return nil
+				}).Times(1)
+
+			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
+		})
+
 		It("should accept the upgrade path when ObservationVersion event arrives at a Pod still annotated with a legacy bare EventTime", func() {
 			oldRole := "primary"
 			newRole := "secondary"

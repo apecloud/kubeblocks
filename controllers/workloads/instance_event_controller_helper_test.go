@@ -171,3 +171,27 @@ func TestCheckRoleProbeStaleLegacyEventRejectsOnOlderEventTime(t *testing.T) {
 		t.Fatalf("newAnnotation = %q, want %q (unchanged)", newAnnotation, "1779550600000000")
 	}
 }
+
+// Peer pod cleanup must honour the same engine-version gate so a stale primary
+// event cannot strip the label from a peer that has already advanced past it.
+func TestCheckRoleProbeStaleRejectsPeerCleanupWhenPeerHasNewerEngineVersion(t *testing.T) {
+	parsed := roleProbeOutput{role: "primary", version: 10, mode: roleProbeVersionModeEngine}
+	decision, newAnnotation := checkRoleProbeStale(parsed, "engine:15", 0)
+	if decision != roleProbeGateRejectStale {
+		t.Fatalf("decision = %d, want RejectStale", decision)
+	}
+	if newAnnotation != "engine:15" {
+		t.Fatalf("newAnnotation = %q, want %q (unchanged)", newAnnotation, "engine:15")
+	}
+}
+
+func TestCheckRoleProbeStaleAcceptsPeerCleanupWhenPeerHasOlderEngineVersion(t *testing.T) {
+	parsed := roleProbeOutput{role: "primary", version: 20, mode: roleProbeVersionModeEngine}
+	decision, newAnnotation := checkRoleProbeStale(parsed, "engine:15", 0)
+	if decision != roleProbeGateAccept {
+		t.Fatalf("decision = %d, want Accept", decision)
+	}
+	if newAnnotation != "engine:20" {
+		t.Fatalf("newAnnotation = %q, want %q", newAnnotation, "engine:20")
+	}
+}

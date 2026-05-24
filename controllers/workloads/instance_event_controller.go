@@ -22,12 +22,14 @@ package workloads
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -36,7 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -154,7 +158,96 @@ func (r *InstanceEventReconciler) handleRoleChangedEvent(ctx context.Context, lo
 	}
 	logger.Info("handle role change event",
 		"pod", pod.Name, "role", parsed.role, "mode", parsed.mode, "version", parsed.version)
-	return r.updatePodRoleLabel(ctx, pod, parsed.role, newAnnotation)
+	if err := r.updatePodRoleLabel(ctx, pod, parsed.role, newAnnotation); err != nil {
+		return err
+	}
+	return r.cleanupExclusiveRolePeers(ctx, logger, pod, parsed, newAnnotation)
+}
+
+// cleanupExclusiveRolePeers removes the role label from any other Pod in the
+// same InstanceSet that still carries an exclusive role label this event just
+// claimed. The peer cleanup honours the same engine-version staleness gate as
+// the primary update: a peer whose annotation already records a newer engine
+// version is left alone, so a stale primary event cannot strip the label from
+// a freshly-promoted peer that has already advanced past it.
+func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context, logger logr.Logger, newPod *corev1.Pod, parsed roleProbeOutput, newAnnotation string) error {
+	if parsed.role == "" {
+		return nil
+	}
+	itsName, ok := newPod.Labels[instanceset.WorkloadsInstanceLabelKey]
+	if !ok || itsName == "" {
+		return nil
+	}
+	its := &workloadsv1.InstanceSet{}
+	itsKey := types.NamespacedName{Namespace: newPod.Namespace, Name: itsName}
+	if err := r.Client.Get(ctx, itsKey, its); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	exclusive := false
+	for _, role := range its.Spec.Roles {
+		if strings.EqualFold(role.Name, parsed.role) && role.IsExclusive {
+			exclusive = true
+			break
+		}
+	}
+	if !exclusive {
+		return nil
+	}
+
+	labels := instanceset.GetMatchLabels(its.Name)
+	labels[constant.RoleLabelKey] = parsed.role
+	var pods corev1.PodList
+	if err := r.Client.List(ctx, &pods, client.InNamespace(its.Namespace), client.MatchingLabels(labels)); err != nil {
+		return err
+	}
+	var errs []error
+	for i := range pods.Items {
+		peer := &pods.Items[i]
+		if peer.Name == newPod.Name {
+			continue
+		}
+		lastPeerAnnotation := ""
+		if peer.Annotations != nil {
+			lastPeerAnnotation = peer.Annotations[constant.LastRoleEventVersionAnnotationKey]
+		}
+		// Reuse the same gate: only strip the peer's label if this event is
+		// actually newer than what the peer already recorded. Otherwise we
+		// might race-strip a peer that has already advanced its own version.
+		decision, peerNewAnnotation := checkRoleProbeStale(parsed, lastPeerAnnotation, 0)
+		if decision != roleProbeGateAccept {
+			logger.Info("skip exclusive role label cleanup; peer annotation is not older than this event",
+				"newPod", newPod.Name, "peer", peer.Name, "lastPeerAnnotation", lastPeerAnnotation)
+			continue
+		}
+		if err := r.stripExclusiveRoleLabel(ctx, peer, peerNewAnnotation); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		logger.Info("removed exclusive role label from peer",
+			"newPod", newPod.Name, "peer", peer.Name, "role", parsed.role)
+	}
+	// newAnnotation is unused here; it is passed to keep the call-site
+	// explicit that the gate already advanced the primary pod's annotation.
+	_ = newAnnotation
+	return errors.Join(errs...)
+}
+
+func (r *InstanceEventReconciler) stripExclusiveRoleLabel(ctx context.Context, peer *corev1.Pod, peerNewAnnotation string) error {
+	newPeer := peer.DeepCopy()
+	delete(newPeer.Labels, constant.RoleLabelKey)
+	if peerNewAnnotation != "" {
+		if newPeer.Annotations == nil {
+			newPeer.Annotations = make(map[string]string)
+		}
+		newPeer.Annotations[constant.LastRoleEventVersionAnnotationKey] = peerNewAnnotation
+	}
+	if reflect.DeepEqual(newPeer.Labels, peer.Labels) && reflect.DeepEqual(newPeer.Annotations, peer.Annotations) {
+		return nil
+	}
+	return r.Client.Update(ctx, newPeer)
 }
 
 func (r *InstanceEventReconciler) updatePodRoleLabel(ctx context.Context, pod *corev1.Pod, roleName, newAnnotation string) error {

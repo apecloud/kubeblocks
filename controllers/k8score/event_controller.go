@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -74,6 +75,17 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	event := &corev1.Event{}
 	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
+	}
+
+	// kbagent roleProbe events are owned by InstanceEventReconciler in
+	// controllers/workloads, which applies the engine-authoritative
+	// kb-role-version staleness gate. EventReconciler must not handle them
+	// here. In particular it must not mark them with the shared
+	// `kubeblocks.io/event-handled` annotation, because InstanceEventReconciler
+	// checks the same annotation as its outer guard and would silently drop
+	// the event if it found it already marked.
+	if isKBAgentRoleProbeEvent(event) {
+		return intctrlutil.Reconciled()
 	}
 
 	if r.isEventHandled(event) {
@@ -123,4 +135,10 @@ func (r *EventReconciler) eventHandled(ctx context.Context, event *corev1.Event)
 	}
 	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
 	return r.Client.Patch(ctx, event, patch)
+}
+
+func isKBAgentRoleProbeEvent(event *corev1.Event) bool {
+	return event.ReportingController == proto.ProbeEventReportingController &&
+		event.Reason == "roleProbe" &&
+		event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }

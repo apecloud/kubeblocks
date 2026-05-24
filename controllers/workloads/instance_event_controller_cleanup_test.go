@@ -84,23 +84,25 @@ func newCleanupPod(namespace, name, itsName, role, annotation string) *corev1.Po
 }
 
 // Legacy event whose EventTime is strictly newer than a peer's bare-EventTime
-// annotation must strip the peer's exclusive role label and advance the peer
-// annotation to the source event's EventTime micros. The previous
-// implementation hard-coded the legacy comparison EventTime to 0, which made
-// every legacy peer cleanup look stale.
-func TestCleanupExclusiveRolePeersLegacyEventAdvancesOlderPeer(t *testing.T) {
+// annotation must strip the peer's exclusive role label but leave the peer's
+// own LastRoleEventVersionAnnotationKey untouched. The annotation belongs to
+// the peer's own kbagent stream; cleanup must not advance it on the peer's
+// behalf or the peer's next legitimate event at the same epoch would be
+// rejected as stale.
+func TestCleanupExclusiveRolePeersLegacyEventStripsLabelOfOlderPeerWithoutAdvancingAnnotation(t *testing.T) {
 	scheme := newCleanupScheme(t)
 	const (
-		ns        = "default"
-		itsName   = "redis-0"
-		newPod    = "redis-0-0"
-		peerName  = "redis-0-1"
-		roleName  = "primary"
-		newMicros = int64(1779550700000000)
+		ns          = "default"
+		itsName     = "redis-0"
+		newPod      = "redis-0-0"
+		peerName    = "redis-0-1"
+		roleName    = "primary"
+		newMicros   = int64(1779550700000000)
+		peerAnnotIn = "1779550500000000"
 	)
 	its := newCleanupInstanceSet(ns, itsName, roleName)
 	newPodObj := newCleanupPod(ns, newPod, itsName, roleName, fmt.Sprintf("%d", newMicros))
-	peer := newCleanupPod(ns, peerName, itsName, roleName, "1779550500000000") // older EventTime
+	peer := newCleanupPod(ns, peerName, itsName, roleName, peerAnnotIn) // older EventTime
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its, newPodObj, peer).Build()
 
 	r := &InstanceEventReconciler{Client: cli, Scheme: scheme}
@@ -115,9 +117,8 @@ func TestCleanupExclusiveRolePeersLegacyEventAdvancesOlderPeer(t *testing.T) {
 	if _, ok := updated.Labels[constant.RoleLabelKey]; ok {
 		t.Fatalf("peer role label still present after legacy cleanup: %v", updated.Labels)
 	}
-	want := fmt.Sprintf("%d", newMicros)
-	if got := updated.Annotations[constant.LastRoleEventVersionAnnotationKey]; got != want {
-		t.Fatalf("peer annotation = %q, want %q", got, want)
+	if got := updated.Annotations[constant.LastRoleEventVersionAnnotationKey]; got != peerAnnotIn {
+		t.Fatalf("peer annotation = %q, want %q (unchanged)", got, peerAnnotIn)
 	}
 }
 
@@ -158,22 +159,23 @@ func TestCleanupExclusiveRolePeersLegacyEventDoesNotStripNewerPeer(t *testing.T)
 }
 
 // Engine event whose version is strictly larger than a peer's engine
-// annotation must strip the peer and advance the peer annotation to the new
-// engine version.
-func TestCleanupExclusiveRolePeersEngineEventAdvancesOlderPeer(t *testing.T) {
+// annotation must strip the peer's exclusive role label without advancing
+// the peer's own annotation. The same rule as the legacy case applies: the
+// annotation belongs to the peer's own roleProbe event stream.
+func TestCleanupExclusiveRolePeersEngineEventStripsLabelOfOlderPeerWithoutAdvancingAnnotation(t *testing.T) {
 	scheme := newCleanupScheme(t)
 	const (
-		ns         = "default"
-		itsName    = "redis-0"
-		newPod     = "redis-0-0"
-		peerName   = "redis-0-1"
-		roleName   = "primary"
-		newVersion = uint64(20)
-		peerAnnot  = "engine:10"
+		ns          = "default"
+		itsName     = "redis-0"
+		newPod      = "redis-0-0"
+		peerName    = "redis-0-1"
+		roleName    = "primary"
+		newVersion  = uint64(20)
+		peerAnnotIn = "engine:10"
 	)
 	its := newCleanupInstanceSet(ns, itsName, roleName)
 	newPodObj := newCleanupPod(ns, newPod, itsName, roleName, fmt.Sprintf("engine:%d", newVersion))
-	peer := newCleanupPod(ns, peerName, itsName, roleName, peerAnnot)
+	peer := newCleanupPod(ns, peerName, itsName, roleName, peerAnnotIn)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its, newPodObj, peer).Build()
 
 	r := &InstanceEventReconciler{Client: cli, Scheme: scheme}
@@ -188,8 +190,63 @@ func TestCleanupExclusiveRolePeersEngineEventAdvancesOlderPeer(t *testing.T) {
 	if _, ok := updated.Labels[constant.RoleLabelKey]; ok {
 		t.Fatalf("peer role label still present after engine cleanup: %v", updated.Labels)
 	}
-	if got := updated.Annotations[constant.LastRoleEventVersionAnnotationKey]; got != fmt.Sprintf("engine:%d", newVersion) {
-		t.Fatalf("peer annotation = %q, want %q", got, fmt.Sprintf("engine:%d", newVersion))
+	if got := updated.Annotations[constant.LastRoleEventVersionAnnotationKey]; got != peerAnnotIn {
+		t.Fatalf("peer annotation = %q, want %q (unchanged)", got, peerAnnotIn)
+	}
+}
+
+// Regression for the bug Alice's V1 surfaced: after cleanup strips the old
+// primary's label, the old primary's own next roleProbe event at the same
+// engine epoch (e.g. "secondary 1" arriving right after a new primary was
+// claimed at version 1) must be accepted by handleRoleChangedEvent and
+// install the correct label, because the cleanup step did not silently
+// advance the peer's annotation.
+func TestCleanupExclusiveRolePeersThenDemotedPeerAcceptsItsOwnEvent(t *testing.T) {
+	scheme := newCleanupScheme(t)
+	const (
+		ns          = "default"
+		itsName     = "redis-0"
+		newPod      = "redis-0-0"
+		peerName    = "redis-0-1"
+		roleName    = "primary"
+		newVersion  = uint64(1)
+		peerAnnotIn = "engine:0" // peer's previous accepted event at the earlier epoch
+	)
+	its := newCleanupInstanceSet(ns, itsName, roleName)
+	newPodObj := newCleanupPod(ns, newPod, itsName, roleName, fmt.Sprintf("engine:%d", newVersion))
+	peer := newCleanupPod(ns, peerName, itsName, roleName, peerAnnotIn)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its, newPodObj, peer).Build()
+
+	r := &InstanceEventReconciler{Client: cli, Scheme: scheme}
+	parsed := roleProbeOutput{role: roleName, version: newVersion, mode: roleProbeVersionModeEngine}
+	if err := r.cleanupExclusiveRolePeers(context.Background(), logr.Discard(), newPodObj, parsed, 0); err != nil {
+		t.Fatalf("cleanupExclusiveRolePeers err = %v", err)
+	}
+
+	// Simulate the peer's own kbagent emitting its post-failover event
+	// "secondary 1" — same engine epoch as the cleanup-driving event, but
+	// from the peer's own roleProbe stream. Without the annotation-stamp
+	// fix this would be silently rejected as stale and the peer would stay
+	// label-less.
+	peerCurrent := &corev1.Pod{}
+	if err := cli.Get(context.Background(), types.NamespacedName{Namespace: ns, Name: peerName}, peerCurrent); err != nil {
+		t.Fatalf("get peer pod: %v", err)
+	}
+	peerLastAnnotation := ""
+	if peerCurrent.Annotations != nil {
+		peerLastAnnotation = peerCurrent.Annotations[constant.LastRoleEventVersionAnnotationKey]
+	}
+	if peerLastAnnotation != peerAnnotIn {
+		t.Fatalf("precondition: peer annotation should be unchanged after cleanup, got %q want %q", peerLastAnnotation, peerAnnotIn)
+	}
+
+	peerParsed := roleProbeOutput{role: "secondary", version: newVersion, mode: roleProbeVersionModeEngine}
+	decision, peerNewAnnotation := checkRoleProbeStale(peerParsed, peerLastAnnotation, 0)
+	if decision != roleProbeGateAccept {
+		t.Fatalf("peer's own post-failover secondary event must be accepted; decision = %d, want Accept (peer annotation was not advanced by cleanup)", decision)
+	}
+	if peerNewAnnotation != fmt.Sprintf("engine:%d", newVersion) {
+		t.Fatalf("peer's post-failover annotation should advance to engine:%d, got %q", newVersion, peerNewAnnotation)
 	}
 }
 

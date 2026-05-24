@@ -219,17 +219,18 @@ func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context,
 		if peer.Annotations != nil {
 			lastPeerAnnotation = peer.Annotations[constant.LastRoleEventVersionAnnotationKey]
 		}
-		// Reuse the same gate: only strip the peer's label if this event is
-		// actually newer than what the peer already recorded. Legacy events
-		// rely on eventTimeMicros to do the comparison; engine events use
-		// parsed.version internally and ignore the EventTime argument.
-		decision, peerNewAnnotation := checkRoleProbeStale(parsed, lastPeerAnnotation, eventTimeMicros)
+		// Reuse the same gate to decide whether the new event is newer than
+		// what the peer already recorded; the returned annotation value is
+		// intentionally discarded here (see stripExclusiveRoleLabel below).
+		// Legacy events rely on eventTimeMicros to do the comparison; engine
+		// events use parsed.version internally and ignore EventTime.
+		decision, _ := checkRoleProbeStale(parsed, lastPeerAnnotation, eventTimeMicros)
 		if decision != roleProbeGateAccept {
 			logger.Info("skip exclusive role label cleanup; peer annotation is not older than this event",
 				"newPod", newPod.Name, "peer", peer.Name, "lastPeerAnnotation", lastPeerAnnotation)
 			continue
 		}
-		if err := r.stripExclusiveRoleLabel(ctx, peer, peerNewAnnotation); err != nil {
+		if err := r.stripExclusiveRoleLabel(ctx, peer); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -239,18 +240,26 @@ func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context,
 	return errors.Join(errs...)
 }
 
-func (r *InstanceEventReconciler) stripExclusiveRoleLabel(ctx context.Context, peer *corev1.Pod, peerNewAnnotation string) error {
-	newPeer := peer.DeepCopy()
-	delete(newPeer.Labels, constant.RoleLabelKey)
-	if peerNewAnnotation != "" {
-		if newPeer.Annotations == nil {
-			newPeer.Annotations = make(map[string]string)
-		}
-		newPeer.Annotations[constant.LastRoleEventVersionAnnotationKey] = peerNewAnnotation
-	}
-	if reflect.DeepEqual(newPeer.Labels, peer.Labels) && reflect.DeepEqual(newPeer.Annotations, peer.Annotations) {
+// stripExclusiveRoleLabel deletes the exclusive role label from a peer but
+// deliberately leaves LastRoleEventVersionAnnotationKey untouched.
+//
+// That annotation represents the last roleProbe event the peer's *own*
+// kbagent emitted. Stamping it with the new primary's engine version (which
+// did not originate from this peer's kbagent) would let the strict-newer
+// gate later reject a legitimate event from the peer at the same engine
+// epoch — for example after failover the demoted pod's next event is
+// `secondary <same-epoch>`, and the gate would treat it as stale because
+// the peer's annotation was already advanced by the cleanup step.
+//
+// Strict-newer is intentionally preserved on the gate itself; loosening it
+// to "equal version, different role" would re-open the silent same-epoch
+// stale-primary write-back the gate is supposed to close.
+func (r *InstanceEventReconciler) stripExclusiveRoleLabel(ctx context.Context, peer *corev1.Pod) error {
+	if _, has := peer.Labels[constant.RoleLabelKey]; !has {
 		return nil
 	}
+	newPeer := peer.DeepCopy()
+	delete(newPeer.Labels, constant.RoleLabelKey)
 	return r.Client.Update(ctx, newPeer)
 }
 

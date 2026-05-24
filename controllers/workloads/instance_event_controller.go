@@ -135,12 +135,29 @@ func (r *InstanceEventReconciler) handleRoleChangedEvent(ctx context.Context, lo
 		return nil
 	}
 
-	role := strings.ToLower(string(probeEvent.Output))
-	logger.Info("handle role change event", "pod", pod.Name, "role", role)
-	return r.updatePodRoleLabel(ctx, pod, role)
+	parsed := parseRoleProbeOutput(probeEvent.Output)
+	lastAnnotation := ""
+	if pod.Annotations != nil {
+		lastAnnotation = pod.Annotations[constant.LastRoleEventVersionAnnotationKey]
+	}
+	decision, newAnnotation := checkRoleProbeStale(parsed, lastAnnotation, event.EventTime.UnixMicro())
+	switch decision {
+	case roleProbeGateRejectStale:
+		logger.Info("stale role probe event rejected by version gate",
+			"pod", pod.Name, "role", parsed.role, "mode", parsed.mode,
+			"newVersion", parsed.version, "lastAnnotation", lastAnnotation)
+		return nil
+	case roleProbeGateRejectMalformed:
+		logger.Info("malformed kb-role-version line rejected; addon attempted new contract but emitted an unparseable trailer",
+			"pod", pod.Name, "role", parsed.role, "rawOutput", string(probeEvent.Output))
+		return nil
+	}
+	logger.Info("handle role change event",
+		"pod", pod.Name, "role", parsed.role, "mode", parsed.mode, "version", parsed.version)
+	return r.updatePodRoleLabel(ctx, pod, parsed.role, newAnnotation)
 }
 
-func (r *InstanceEventReconciler) updatePodRoleLabel(ctx context.Context, pod *corev1.Pod, roleName string) error {
+func (r *InstanceEventReconciler) updatePodRoleLabel(ctx context.Context, pod *corev1.Pod, roleName, newAnnotation string) error {
 	newPod := pod.DeepCopy()
 	if len(roleName) == 0 {
 		delete(newPod.Labels, constant.RoleLabelKey)
@@ -150,7 +167,13 @@ func (r *InstanceEventReconciler) updatePodRoleLabel(ctx context.Context, pod *c
 		}
 		newPod.Labels[constant.RoleLabelKey] = roleName
 	}
-	if reflect.DeepEqual(newPod.Labels, pod.Labels) {
+	if newAnnotation != "" {
+		if newPod.Annotations == nil {
+			newPod.Annotations = make(map[string]string)
+		}
+		newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = newAnnotation
+	}
+	if reflect.DeepEqual(newPod.Labels, pod.Labels) && reflect.DeepEqual(newPod.Annotations, pod.Annotations) {
 		return nil
 	}
 	return r.Client.Update(ctx, newPod)

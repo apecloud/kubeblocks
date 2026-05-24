@@ -44,30 +44,16 @@ const (
 )
 
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, _ record.EventRecorder, event *corev1.Event) error {
-	if !isKBAgentRoleProbeEvent(event) {
+	// kbagent roleProbe events are owned by controllers/workloads
+	// InstanceEventReconciler since the multi-cluster Instance API refactor in
+	// #9697. PodRoleEventHandler must not race-write the Pod role label on
+	// those events; the engine-authoritative kb-role-version staleness gate
+	// lives only in InstanceEventReconciler. Other event paths (if any future
+	// non-kbagent roleProbe sources reuse this handler) are left untouched.
+	if isKBAgentRoleProbeEvent(event) {
 		return nil
 	}
-	var (
-		err         error
-		annotations = event.GetAnnotations()
-	)
-	// filter role changed event that has been handled
-	count := fmt.Sprintf("count-%d", event.Count)
-	if annotations != nil && annotations[roleChangedAnnotKey] == count {
-		return nil
-	}
-
-	if _, err = handleRoleChangedEvent(cli, reqCtx, event); err != nil {
-		return err
-	}
-
-	// event order is crucial in role probing, but it's not guaranteed when controller restarted, so we have to mark them to be filtered
-	patch := client.MergeFrom(event.DeepCopy())
-	if event.Annotations == nil {
-		event.Annotations = make(map[string]string, 0)
-	}
-	event.Annotations[roleChangedAnnotKey] = count
-	return cli.Patch(reqCtx.Ctx, event, patch)
+	return nil
 }
 
 func isKBAgentRoleProbeEvent(event *corev1.Event) bool {

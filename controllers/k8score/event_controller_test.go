@@ -22,7 +22,6 @@ package k8score
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -61,16 +60,9 @@ var _ = Describe("Event Controller", func() {
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 	}
 
-	const (
-		// roleChangedAnnotKey is used to mark the role change event has been handled.
-		roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
-	)
-
 	var (
-		beforeLastTS = time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)
-		initLastTS   = time.Date(2022, time.January, 1, 12, 0, 0, 0, time.UTC)
-		afterLastTS  = time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)
-		eventSeq     = 0
+		initLastTS = time.Date(2022, time.January, 1, 12, 0, 0, 0, time.UTC)
+		eventSeq   = 0
 	)
 
 	createRoleChangedEvent := func(podName, role string, podUid types.UID) *corev1.Event {
@@ -123,7 +115,16 @@ var _ = Describe("Event Controller", func() {
 	AfterEach(cleanEnv)
 
 	Context("When receiving role changed event", func() {
-		It("should handle it properly", func() {
+		// kbagent roleProbe events are owned by InstanceEventReconciler in
+		// controllers/workloads since the multi-cluster Instance API refactor
+		// (#9697). EventReconciler skips them at the outer guard so the
+		// shared kubeblocks.io/event-handled annotation is not stamped here;
+		// otherwise InstanceEventReconciler's outer short-circuit would see
+		// the event already handled and silently drop it. Pod role label
+		// writes for these events are now exclusively the responsibility of
+		// InstanceEventReconciler and its engine-authoritative staleness
+		// gate (covered by controllers/workloads tests).
+		It("should skip kbagent roleProbe events without writing the pod role label or marking the event handled", func() {
 			By("create cluster & compdef")
 			compDefName := "test-compdef"
 			clusterName := "test-cluster"
@@ -157,6 +158,7 @@ var _ = Describe("Event Controller", func() {
 					},
 				}
 			})()).Should(Succeed())
+
 			By("create involved pod")
 			var uid types.UID
 			podName := fmt.Sprintf("%s-%d", itsName, 0)
@@ -174,9 +176,8 @@ var _ = Describe("Event Controller", func() {
 			}).Should(Succeed())
 			Expect(uid).ShouldNot(BeNil())
 
-			By("send role changed event")
-			role := "leader"
-			sndEvent := createRoleChangedEvent(podName, role, uid)
+			By("send a kbagent roleProbe event")
+			sndEvent := createRoleChangedEvent(podName, "leader", uid)
 			Expect(testCtx.CreateObj(ctx, sndEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}
@@ -189,63 +190,24 @@ var _ = Describe("Event Controller", func() {
 				return event.InvolvedObject.Name
 			}).Should(Equal(sndEvent.InvolvedObject.Name))
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
+			By("the pod role label and last-role-snapshot-version annotation must stay untouched")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
 				g.Expect(p).ShouldNot(BeNil())
-				g.Expect(p.Labels).ShouldNot(BeNil())
-				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleEventVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndEvent.EventTime.UnixMicro(), 10)))
-			})).Should(Succeed())
+				if p.Labels != nil {
+					g.Expect(p.Labels).ShouldNot(HaveKey(constant.RoleLabelKey))
+				}
+				if p.Annotations != nil {
+					g.Expect(p.Annotations).ShouldNot(HaveKey(constant.LastRoleEventVersionAnnotationKey))
+				}
+			}), 2*time.Second, 200*time.Millisecond).Should(Succeed())
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
+			By("the event must not be stamped with the EventReconciler handled annotation")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
 				g.Expect(e).ShouldNot(BeNil())
-				g.Expect(e.Annotations).ShouldNot(BeNil())
-				g.Expect(e.Annotations[roleChangedAnnotKey]).Should(Equal("count-0"))
-			})).Should(Succeed())
-
-			By("send role changed event with beforeLastTS earlier than pod last role changes event timestamp annotation should not be update successfully")
-			role = "follower"
-			sndInvalidEvent := createRoleChangedEvent(podName, role, uid)
-			sndInvalidEvent.EventTime = metav1.NewMicroTime(beforeLastTS)
-			Expect(testCtx.CreateObj(ctx, sndInvalidEvent)).Should(Succeed())
-			Eventually(func() string {
-				event := &corev1.Event{}
-				if err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: sndInvalidEvent.Namespace,
-					Name:      sndInvalidEvent.Name,
-				}, event); err != nil {
-					return err.Error()
+				if e.Annotations != nil {
+					g.Expect(e.Annotations).ShouldNot(HaveKey(eventHandledAnnotationKey))
 				}
-				return event.InvolvedObject.Name
-			}).Should(Equal(sndInvalidEvent.InvolvedObject.Name))
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
-				g.Expect(p).ShouldNot(BeNil())
-				g.Expect(p.Labels).ShouldNot(BeNil())
-				g.Expect(p.Labels[constant.RoleLabelKey]).ShouldNot(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleEventVersionAnnotationKey]).ShouldNot(Equal(strconv.FormatInt(sndInvalidEvent.EventTime.UnixMicro(), 10)))
-			})).Should(Succeed())
-
-			By("send role changed event with afterLastTS later than pod last role changes event timestamp annotation should be update successfully")
-			role = "follower"
-			sndValidEvent := createRoleChangedEvent(podName, role, uid)
-			sndValidEvent.LastTimestamp = metav1.NewTime(afterLastTS)
-			sndValidEvent.EventTime = metav1.NewMicroTime(afterLastTS)
-			Expect(testCtx.CreateObj(ctx, sndValidEvent)).Should(Succeed())
-			Eventually(func() string {
-				event := &corev1.Event{}
-				if err := k8sClient.Get(ctx, types.NamespacedName{
-					Namespace: sndValidEvent.Namespace,
-					Name:      sndValidEvent.Name,
-				}, event); err != nil {
-					return err.Error()
-				}
-				return event.InvolvedObject.Name
-			}).Should(Equal(sndValidEvent.InvolvedObject.Name))
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
-				g.Expect(p).ShouldNot(BeNil())
-				g.Expect(p.Labels).ShouldNot(BeNil())
-				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleEventVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndValidEvent.LastTimestamp.UnixMicro(), 10)))
-			})).Should(Succeed())
+			}), 2*time.Second, 200*time.Millisecond).Should(Succeed())
 		})
 	})
 })

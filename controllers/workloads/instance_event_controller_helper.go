@@ -30,28 +30,22 @@ import (
 type roleProbeVersionMode int
 
 const (
-	// roleProbeVersionModeNone means the stdout carries only the role name on
-	// its first line, with no kb-role-version trailer. This is the legacy
-	// addon contract; the staleness gate falls back to EventTime.
+	// roleProbeVersionModeNone means the stdout carries only a single
+	// whitespace-separated token (the role name). This is the legacy addon
+	// contract; the staleness gate falls back to EventTime.
 	roleProbeVersionModeNone roleProbeVersionMode = iota
 
-	// roleProbeVersionModeEngine means the stdout carries exactly one
-	// `kb-role-version=<uint64>` trailer line and the value parses cleanly.
-	// The staleness gate uses the engine-authoritative version.
+	// roleProbeVersionModeEngine means the stdout carries exactly two
+	// whitespace-separated tokens: <role> <uint64-version>. The staleness
+	// gate uses the engine-authoritative version.
 	roleProbeVersionModeEngine
 
-	// roleProbeVersionModeMalformed means the stdout carries at least one
-	// `kb-role-version=` line but the value is empty, not a uint64, or
-	// duplicated. The event must be rejected; falling back to EventTime would
-	// let a single typo silently bypass the new staleness gate.
+	// roleProbeVersionModeMalformed means the stdout carries two tokens whose
+	// second token is not a uint64, or three or more tokens. The event must
+	// be rejected; falling back to EventTime would let a single typo silently
+	// bypass the new staleness gate.
 	roleProbeVersionModeMalformed
 )
-
-// roleProbeVersionLinePrefix marks the trailer line that carries the
-// engine-authoritative role version. The prefix is intentionally narrow
-// (instead of a bare `version=`) so it does not collide with addon-specific
-// stdout that already uses `version=...` as part of business output.
-const roleProbeVersionLinePrefix = "kb-role-version="
 
 // engineVersionAnnotationPrefix distinguishes the engine-authoritative role
 // version recorded on the Pod annotation from the legacy bare EventTime
@@ -67,60 +61,56 @@ type roleProbeOutput struct {
 }
 
 // parseRoleProbeOutput parses the kbagent roleProbe stdout into a role name
-// plus an optional engine-authoritative version. The grammar is:
+// plus an optional engine-authoritative version. The grammar is a single
+// stdout that splits on any whitespace (spaces, tabs, newlines) into
+// either:
 //
-//	<role>\n[<other-trailer-lines>\n][<role-version-line>\n]...
+//	<role>                  // legacy single-token form
+//	<role> <uint64-version> // engine-authoritative form
 //
-// where <role-version-line> is exactly `kb-role-version=<uint64>`. The first
-// line is always treated as the role name to preserve compatibility with the
-// pre-existing single-line contract; legacy addons that emit only a role name
-// still parse with mode=None and fall back to the EventTime staleness path.
+// Examples that all advance to mode=Engine version=10:
 //
-// Strictness for the version trailer is deliberate: addons that try to use
-// the new contract but emit a broken value (empty, non-uint64, or repeated)
-// are flagged Malformed so the controller can reject the event rather than
-// silently fall back. A silent fall back would let a typo or accidental
-// double-line bypass the staleness gate the addon meant to install.
+//	primary 10
+//	primary\n10
+//	primary\t10\n
+//
+// Strictness on the engine form is deliberate: any addon that emits a second
+// token but cannot make it a uint64, or that emits three or more tokens, is
+// flagged Malformed and the event is rejected. A silent fallback would let a
+// typo (`primary  10extra`, `primary 10 ok`) bypass the staleness gate the
+// addon meant to install.
 func parseRoleProbeOutput(stdout []byte) roleProbeOutput {
 	if len(stdout) == 0 {
 		return roleProbeOutput{mode: roleProbeVersionModeNone}
 	}
-	lines := strings.Split(string(stdout), "\n")
-	out := roleProbeOutput{
-		role: strings.ToLower(strings.TrimSpace(lines[0])),
-		mode: roleProbeVersionModeNone,
-	}
-
-	versionLineFound := false
-	for _, line := range lines[1:] {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, roleProbeVersionLinePrefix) {
-			continue
+	tokens := strings.Fields(string(stdout))
+	switch len(tokens) {
+	case 0:
+		return roleProbeOutput{mode: roleProbeVersionModeNone}
+	case 1:
+		return roleProbeOutput{
+			role: strings.ToLower(tokens[0]),
+			mode: roleProbeVersionModeNone,
 		}
-		if versionLineFound {
-			// Multiple kb-role-version lines: addon attempted the new contract
-			// but emitted a duplicate. Reject explicitly.
-			out.mode = roleProbeVersionModeMalformed
-			out.version = 0
-			return out
-		}
-		versionLineFound = true
-		raw := strings.TrimPrefix(trimmed, roleProbeVersionLinePrefix)
-		if raw == "" {
-			out.mode = roleProbeVersionModeMalformed
-			out.version = 0
-			continue
-		}
-		v, err := strconv.ParseUint(raw, 10, 64)
+	case 2:
+		v, err := strconv.ParseUint(tokens[1], 10, 64)
 		if err != nil {
-			out.mode = roleProbeVersionModeMalformed
-			out.version = 0
-			continue
+			return roleProbeOutput{
+				role: strings.ToLower(tokens[0]),
+				mode: roleProbeVersionModeMalformed,
+			}
 		}
-		out.mode = roleProbeVersionModeEngine
-		out.version = v
+		return roleProbeOutput{
+			role:    strings.ToLower(tokens[0]),
+			version: v,
+			mode:    roleProbeVersionModeEngine,
+		}
+	default:
+		return roleProbeOutput{
+			role: strings.ToLower(tokens[0]),
+			mode: roleProbeVersionModeMalformed,
+		}
 	}
-	return out
 }
 
 // roleProbeGateDecision is the outcome of the staleness gate that determines

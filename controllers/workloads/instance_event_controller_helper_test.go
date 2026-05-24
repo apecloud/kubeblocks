@@ -34,8 +34,8 @@ func TestParseRoleProbeOutputLegacyOnly(t *testing.T) {
 	}
 }
 
-func TestParseRoleProbeOutputEngineVersion(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary\nkb-role-version=10"))
+func TestParseRoleProbeOutputEngineVersionSpaceSeparated(t *testing.T) {
+	out := parseRoleProbeOutput([]byte("primary 10"))
 	if out.role != "primary" {
 		t.Fatalf("role = %q, want %q", out.role, "primary")
 	}
@@ -47,8 +47,21 @@ func TestParseRoleProbeOutputEngineVersion(t *testing.T) {
 	}
 }
 
-func TestParseRoleProbeOutputEngineVersionWithExtraTrailerLine(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary\nfoo=bar\nkb-role-version=42"))
+func TestParseRoleProbeOutputEngineVersionNewlineSeparated(t *testing.T) {
+	out := parseRoleProbeOutput([]byte("primary\n10"))
+	if out.role != "primary" {
+		t.Fatalf("role = %q, want %q", out.role, "primary")
+	}
+	if out.mode != roleProbeVersionModeEngine {
+		t.Fatalf("mode = %d, want Engine", out.mode)
+	}
+	if out.version != 10 {
+		t.Fatalf("version = %d, want 10", out.version)
+	}
+}
+
+func TestParseRoleProbeOutputEngineVersionToleratesSurroundingWhitespace(t *testing.T) {
+	out := parseRoleProbeOutput([]byte("\tprimary\t42\n"))
 	if out.role != "primary" {
 		t.Fatalf("role = %q, want %q", out.role, "primary")
 	}
@@ -60,24 +73,27 @@ func TestParseRoleProbeOutputEngineVersionWithExtraTrailerLine(t *testing.T) {
 	}
 }
 
-func TestParseRoleProbeOutputMalformedEmptyVersion(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary\nkb-role-version="))
+func TestParseRoleProbeOutputMalformedNonUint64SecondToken(t *testing.T) {
+	out := parseRoleProbeOutput([]byte("primary abc"))
 	if out.mode != roleProbeVersionModeMalformed {
 		t.Fatalf("mode = %d, want Malformed", out.mode)
 	}
 }
 
-func TestParseRoleProbeOutputMalformedNonUint64(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary\nkb-role-version=abc"))
+func TestParseRoleProbeOutputMalformedThreeOrMoreTokens(t *testing.T) {
+	out := parseRoleProbeOutput([]byte("primary 10 extra"))
 	if out.mode != roleProbeVersionModeMalformed {
 		t.Fatalf("mode = %d, want Malformed", out.mode)
 	}
 }
 
-func TestParseRoleProbeOutputMalformedDuplicateVersion(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary\nkb-role-version=10\nkb-role-version=20"))
-	if out.mode != roleProbeVersionModeMalformed {
-		t.Fatalf("mode = %d, want Malformed", out.mode)
+func TestParseRoleProbeOutputEmpty(t *testing.T) {
+	out := parseRoleProbeOutput([]byte(""))
+	if out.mode != roleProbeVersionModeNone {
+		t.Fatalf("mode = %d, want None", out.mode)
+	}
+	if out.role != "" {
+		t.Fatalf("role = %q, want empty", out.role)
 	}
 }
 

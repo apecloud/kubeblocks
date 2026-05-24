@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -119,6 +121,75 @@ var _ = Describe("BackupPolicy Controller test", func() {
 				func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 					g.Expect(bp.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
 				})).Should(Succeed())
+		})
+	})
+
+	Context("CRD schema validation for optional name patterns (#10232)", func() {
+		It("accepts empty string for spec.backupRepoName", func() {
+			By("creating a BackupPolicy with backupRepoName set to empty string")
+			emptyRepo := ""
+			bp := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bp-empty-repo",
+					Namespace: testCtx.DefaultNamespace,
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupRepoName: &emptyRepo,
+					Target: &dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									constant.AppInstanceLabelKey: testdp.ClusterName,
+								},
+							},
+						},
+					},
+					BackupMethods: []dpv1alpha1.BackupMethod{
+						{
+							Name:            testdp.BackupMethodName,
+							SnapshotVolumes: ptr.To(false),
+							ActionSetName:   testdp.ActionSetName,
+						},
+					},
+				},
+			}
+			Expect(testCtx.Cli.Create(testCtx.Ctx, bp)).Should(Succeed())
+		})
+
+		It("accepts empty string for spec.backupMethods[].compatibleMethod", func() {
+			By("creating a BackupPolicy with compatibleMethod literally serialized as empty string")
+			// CompatibleMethod has json:"compatibleMethod,omitempty" so a typed
+			// client would strip the empty value before it reaches the API server.
+			// Use an unstructured resource to send the field on the wire and
+			// exercise the OpenAPI pattern validator.
+			bp := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": dpv1alpha1.GroupVersion.String(),
+					"kind":       "BackupPolicy",
+					"metadata": map[string]interface{}{
+						"name":      "bp-empty-compatible",
+						"namespace": testCtx.DefaultNamespace,
+					},
+					"spec": map[string]interface{}{
+						"target": map[string]interface{}{
+							"podSelector": map[string]interface{}{
+								"matchLabels": map[string]interface{}{
+									constant.AppInstanceLabelKey: testdp.ClusterName,
+								},
+							},
+						},
+						"backupMethods": []interface{}{
+							map[string]interface{}{
+								"name":             testdp.BackupMethodName,
+								"snapshotVolumes":  false,
+								"actionSetName":    testdp.ActionSetName,
+								"compatibleMethod": "",
+							},
+						},
+					},
+				},
+			}
+			Expect(testCtx.Cli.Create(testCtx.Ctx, bp)).Should(Succeed())
 		})
 	})
 })

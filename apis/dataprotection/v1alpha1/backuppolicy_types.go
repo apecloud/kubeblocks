@@ -26,8 +26,9 @@ import (
 type BackupPolicySpec struct {
 	// Specifies the name of BackupRepo where the backup data will be stored.
 	// If not set, data will be stored in the default backup repository.
+	// An empty string is treated the same as the field being unset.
 	//
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^([a-z0-9]([a-z0-9\.\-]*[a-z0-9])?)?$`
 	// +optional
 	BackupRepoName *string `json:"backupRepoName,omitempty"`
 
@@ -232,9 +233,10 @@ type BackupMethod struct {
 	Name string `json:"name"`
 
 	// The name of the compatible full backup method, used by incremental backups.
+	// An empty string is treated the same as the field being unset.
 	//
 	// +optional
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:Pattern:=`^([a-z0-9]([a-z0-9\.\-]*[a-z0-9])?)?$`
 	CompatibleMethod string `json:"compatibleMethod,omitempty"`
 
 	// Specifies whether to take snapshots of persistent volumes. If true,

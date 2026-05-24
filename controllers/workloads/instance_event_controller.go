@@ -161,16 +161,22 @@ func (r *InstanceEventReconciler) handleRoleChangedEvent(ctx context.Context, lo
 	if err := r.updatePodRoleLabel(ctx, pod, parsed.role, newAnnotation); err != nil {
 		return err
 	}
-	return r.cleanupExclusiveRolePeers(ctx, logger, pod, parsed, newAnnotation)
+	return r.cleanupExclusiveRolePeers(ctx, logger, pod, parsed, event.EventTime.UnixMicro())
 }
 
 // cleanupExclusiveRolePeers removes the role label from any other Pod in the
 // same InstanceSet that still carries an exclusive role label this event just
 // claimed. The peer cleanup honours the same engine-version staleness gate as
 // the primary update: a peer whose annotation already records a newer engine
-// version is left alone, so a stale primary event cannot strip the label from
-// a freshly-promoted peer that has already advanced past it.
-func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context, logger logr.Logger, newPod *corev1.Pod, parsed roleProbeOutput, newAnnotation string) error {
+// version (or, in the legacy path, a later EventTime) is left alone, so a
+// stale primary event cannot strip the label from a freshly-promoted peer
+// that has already advanced past it.
+//
+// `eventTimeMicros` is the source event's EventTime in micros; the legacy
+// path uses it as the comparison key against the peer's bare-EventTime
+// annotation. Passing it through (instead of a hard-coded 0) keeps the
+// version state consistent across the primary update and the peer cleanup.
+func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context, logger logr.Logger, newPod *corev1.Pod, parsed roleProbeOutput, eventTimeMicros int64) error {
 	if parsed.role == "" {
 		return nil
 	}
@@ -214,9 +220,10 @@ func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context,
 			lastPeerAnnotation = peer.Annotations[constant.LastRoleEventVersionAnnotationKey]
 		}
 		// Reuse the same gate: only strip the peer's label if this event is
-		// actually newer than what the peer already recorded. Otherwise we
-		// might race-strip a peer that has already advanced its own version.
-		decision, peerNewAnnotation := checkRoleProbeStale(parsed, lastPeerAnnotation, 0)
+		// actually newer than what the peer already recorded. Legacy events
+		// rely on eventTimeMicros to do the comparison; engine events use
+		// parsed.version internally and ignore the EventTime argument.
+		decision, peerNewAnnotation := checkRoleProbeStale(parsed, lastPeerAnnotation, eventTimeMicros)
 		if decision != roleProbeGateAccept {
 			logger.Info("skip exclusive role label cleanup; peer annotation is not older than this event",
 				"newPod", newPod.Name, "peer", peer.Name, "lastPeerAnnotation", lastPeerAnnotation)
@@ -229,9 +236,6 @@ func (r *InstanceEventReconciler) cleanupExclusiveRolePeers(ctx context.Context,
 		logger.Info("removed exclusive role label from peer",
 			"newPod", newPod.Name, "peer", peer.Name, "role", parsed.role)
 	}
-	// newAnnotation is unused here; it is passed to keep the call-site
-	// explicit that the gate already advanced the primary pod's annotation.
-	_ = newAnnotation
 	return errors.Join(errs...)
 }
 

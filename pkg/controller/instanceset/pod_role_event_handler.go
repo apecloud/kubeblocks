@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 // PodRoleEventHandler is registered against the k8score EventReconciler
@@ -33,19 +32,12 @@ import (
 // since the multi-cluster Instance API refactor in apecloud/kubeblocks#9697,
 // controllers/workloads InstanceEventReconciler is the sole writer of the Pod
 // role label for kbagent roleProbe events and owns the engine-authoritative
-// kb-role-version staleness gate. Letting this handler also write the label
-// would re-introduce the dual-writer race the gate is supposed to close.
+// role-version staleness gate. The kbagent roleProbe events are also short-
+// circuited at the k8score EventReconciler outer guard so this handler never
+// observes them in practice; the no-op body is kept as a belt-and-braces
+// guarantee against future dispatcher changes.
 type PodRoleEventHandler struct{}
 
 func (h *PodRoleEventHandler) Handle(_ client.Client, _ intctrlutil.RequestCtx, _ record.EventRecorder, _ *corev1.Event) error {
 	return nil
-}
-
-// isKBAgentRoleProbeEvent stays exported so other packages (notably the
-// k8score EventReconciler outer guard) can identify these events without
-// reintroducing duplicate constants.
-func isKBAgentRoleProbeEvent(event *corev1.Event) bool {
-	return event.ReportingController == proto.ProbeEventReportingController &&
-		event.Reason == "roleProbe" &&
-		event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }

@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	workloadsapi "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -45,18 +45,18 @@ import (
 func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	leader := workloadsapi.ReplicaRole{Name: "leader", IsExclusive: true}
-	follower := workloadsapi.ReplicaRole{Name: "follower"}
-	its := &workloadsapi.InstanceSet{
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql"},
-		Spec:       workloadsapi.InstanceSetSpec{Roles: []workloadsapi.ReplicaRole{leader, follower}},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
 	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "mysql",
 	})
 	otherPod := roleEventPod("default", "mysql-1", "uid-1", map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
-		instanceset.WorkloadsManagedByLabelKey: workloadsapi.InstanceSetKind,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  "mysql",
 		constant.RoleLabelKey:                  "leader",
 	})
@@ -75,11 +75,11 @@ func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T
 	ctx := context.Background()
 	newer := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	older := newer.Add(-time.Hour)
-	leader := workloadsapi.ReplicaRole{Name: "leader", IsExclusive: true}
-	follower := workloadsapi.ReplicaRole{Name: "follower"}
-	inst := &workloadsapi.Instance{
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	inst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql-0"},
-		Spec:       workloadsapi.InstanceSpec{Roles: []workloadsapi.ReplicaRole{leader, follower}},
+		Spec:       workloads.InstanceSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
 	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
 		constant.KBAppInstanceNameLabelKey: "mysql-0",
@@ -119,9 +119,9 @@ func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) 
 func TestRoleEventHandlerUsesTimestampFallbackForRoleVersion(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	inst := &workloadsapi.Instance{
+	inst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql-0"},
-		Spec:       workloadsapi.InstanceSpec{Roles: []workloadsapi.ReplicaRole{{Name: "leader"}}},
+		Spec:       workloads.InstanceSpec{Roles: []workloads.ReplicaRole{{Name: "leader"}}},
 	}
 	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
 		constant.KBAppInstanceNameLabelKey: "mysql-0",
@@ -156,7 +156,7 @@ func roleEventFakeClient(t *testing.T, objects ...client.Object) client.Client {
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add core scheme: %v", err)
 	}
-	if err := workloadsapi.AddToScheme(scheme); err != nil {
+	if err := workloads.AddToScheme(scheme); err != nil {
 		t.Fatalf("add workloads scheme: %v", err)
 	}
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()

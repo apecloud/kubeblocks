@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloadsapi "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -158,7 +158,7 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 		return true, nil
 	}
 
-	its := &workloadsapi.InstanceSet{}
+	its := &workloads.InstanceSet{}
 	if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: itsName}, its); err != nil {
 		if apierrors.IsNotFound(err) {
 			result.Result = "skipped"
@@ -199,7 +199,7 @@ func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli clie
 		return true, nil
 	}
 
-	inst := &workloadsapi.Instance{}
+	inst := &workloads.Instance{}
 	if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: instName}, inst); err != nil {
 		if apierrors.IsNotFound(err) {
 			result.Result = "skipped"
@@ -252,16 +252,16 @@ func checkStaleLastRoleEventVersion(version string, pod *corev1.Pod) bool {
 	return false
 }
 
-func composeInstanceSetRoleMap(its workloadsapi.InstanceSet) map[string]workloadsapi.ReplicaRole {
-	roleMap := make(map[string]workloadsapi.ReplicaRole)
+func composeInstanceSetRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
+	roleMap := make(map[string]workloads.ReplicaRole)
 	for _, role := range its.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
 }
 
-func composeInstanceRoleMap(inst workloadsapi.Instance) map[string]workloadsapi.ReplicaRole {
-	roleMap := make(map[string]workloadsapi.ReplicaRole)
+func composeInstanceRoleMap(inst workloads.Instance) map[string]workloads.ReplicaRole {
+	roleMap := make(map[string]workloads.ReplicaRole)
 	for _, role := range inst.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
@@ -288,10 +288,10 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 	return cli.Update(ctx, newPod)
 }
 
-func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workloadsapi.InstanceSet, newPodName, roleName, version string) error {
+func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workloads.InstanceSet, newPodName, roleName, version string) error {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
-		instanceset.WorkloadsManagedByLabelKey: workloadsapi.InstanceSetKind,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  its.Name,
 		constant.RoleLabelKey:                  roleName,
 	}

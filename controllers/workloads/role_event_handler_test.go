@@ -42,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
+func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusiveCleanupDoesNotStampPeerAnnotation(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
@@ -68,7 +68,13 @@ func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	}
 
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
-	assertPodRole(t, ctx, cli, otherPod, "", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
+	// Peer's exclusive role label must be stripped, but the peer's own
+	// LastRoleEventVersionAnnotationKey must stay untouched. The annotation
+	// represents the peer's own roleProbe event stream; stamping it with the
+	// new event's version would let the strict-newer gate later reject a
+	// legitimate event from the peer at the same engine epoch.
+	assertPodRole(t, ctx, cli, otherPod, "", "")
+	assertPodLastRoleVersion(t, ctx, cli, otherPod, "")
 }
 
 func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T) {

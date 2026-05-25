@@ -183,9 +183,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
+		Client:      k8sManager.GetClient(),
+		Scheme:      k8sManager.GetScheme(),
+		Recorder:    k8sManager.GetEventRecorderFor("event-controller"),
+		AppsEnabled: true,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

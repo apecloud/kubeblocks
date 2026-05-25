@@ -433,7 +433,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	if viper.GetBool(appsFlagKey.viperName()) {
+	appsEnabled := viper.GetBool(appsFlagKey.viperName())
+	workloadsEnabled := viper.GetBool(workloadsFlagKey.viperName())
+	if appsEnabled || workloadsEnabled {
+		if err = (&k8scorecontrollers.EventReconciler{
+			Client:           mgr.GetClient(),
+			Scheme:           mgr.GetScheme(),
+			Recorder:         mgr.GetEventRecorderFor("event-controller"),
+			AppsEnabled:      appsEnabled,
+			WorkloadsEnabled: workloadsEnabled,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			os.Exit(1)
+		}
+	}
+
+	if appsEnabled {
 		if err = (&appscontrollers.ClusterDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -507,15 +522,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
 		if err = (&rollout.RolloutReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -526,7 +532,7 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(workloadsFlagKey.viperName()) {
+	if workloadsEnabled {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -554,14 +560,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadscontrollers.InstanceEventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-event-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceEvent")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(operationsFlagKey.viperName()) {

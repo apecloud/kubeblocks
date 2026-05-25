@@ -162,8 +162,9 @@ var _ = Describe("Available", func() {
 				Reason:              "roleProbe",
 				ReportingController: proto.ProbeEventReportingController,
 			}
-			err := h.Handle(k8sClient, reqCtx, reqCtx.Recorder, event)
+			handled, err := h.Handle(k8sClient, reqCtx, reqCtx.Recorder, event)
 			Expect(err).Should(Succeed())
+			Expect(handled).Should(BeFalse())
 		})
 
 		It("ok", func() {

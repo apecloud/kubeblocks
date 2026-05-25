@@ -35,13 +35,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	workloadsapi "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-func TestRoleEventReconcilerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
+func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	leader := workloadsapi.ReplicaRole{Name: "leader", IsExclusive: true}
@@ -61,7 +62,7 @@ func TestRoleEventReconcilerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	})
 	event := roleProbeEvent("default", "event-1", pod, "leader", now)
 	cli := roleEventFakeClient(t, its, pod, otherPod, event)
-	reconciler := &RoleEventReconciler{Client: cli}
+	reconciler := roleEventReconciler(cli)
 
 	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
 		t.Fatalf("reconcile failed: %v", err)
@@ -72,7 +73,7 @@ func TestRoleEventReconcilerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	assertEventHandled(t, ctx, cli, event)
 }
 
-func TestRoleEventReconcilerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T) {
+func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T) {
 	ctx := context.Background()
 	newer := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	older := newer.Add(-time.Hour)
@@ -93,7 +94,7 @@ func TestRoleEventReconcilerHandlesInstanceRoleWithoutExclusiveCleanup(t *testin
 	event := roleProbeEvent("default", "event-1", pod, "leader", newer)
 	staleEvent := roleProbeEvent("default", "event-2", pod, "follower", older)
 	cli := roleEventFakeClient(t, inst, pod, otherPod, event, staleEvent)
-	reconciler := &RoleEventReconciler{Client: cli}
+	reconciler := roleEventReconciler(cli)
 
 	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
 		t.Fatalf("reconcile failed: %v", err)
@@ -109,12 +110,12 @@ func TestRoleEventReconcilerHandlesInstanceRoleWithoutExclusiveCleanup(t *testin
 	assertEventHandled(t, ctx, cli, staleEvent)
 }
 
-func TestRoleEventReconcilerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) {
+func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) {
 	ctx := context.Background()
 	pod := roleEventPod("default", "mysql-0", "uid-0", nil)
 	event := roleProbeEvent("default", "event-1", pod, "leader", time.Now())
 	cli := roleEventFakeClient(t, pod, event)
-	reconciler := &RoleEventReconciler{Client: cli}
+	reconciler := roleEventReconciler(cli)
 
 	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
 		t.Fatalf("reconcile failed: %v", err)
@@ -124,8 +125,39 @@ func TestRoleEventReconcilerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(event), &stored); err != nil {
 		t.Fatalf("get event failed: %v", err)
 	}
-	if stored.Annotations != nil && stored.Annotations[eventHandledAnnotationKey] != "" {
+	if stored.Annotations != nil && stored.Annotations[constant.EventHandledAnnotationKey] != "" {
 		t.Fatalf("unexpected handled annotation: %v", stored.Annotations)
+	}
+}
+
+func TestRoleEventHandlerUsesTimestampFallbackForRoleVersion(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	inst := &workloadsapi.Instance{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql-0"},
+		Spec:       workloadsapi.InstanceSpec{Roles: []workloadsapi.ReplicaRole{{Name: "leader"}}},
+	}
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		constant.KBAppInstanceNameLabelKey: "mysql-0",
+	})
+	event := roleProbeEvent("default", "event-1", pod, "leader", now)
+	event.EventTime = metav1.MicroTime{}
+	event.LastTimestamp = metav1.NewTime(now)
+	cli := roleEventFakeClient(t, inst, pod, event)
+	reconciler := roleEventReconciler(cli)
+
+	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+
+	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.LastTimestamp.UnixMicro()))
+	assertEventHandled(t, ctx, cli, event)
+}
+
+func roleEventReconciler(cli client.Client) *k8score.EventReconciler {
+	return &k8score.EventReconciler{
+		Client:   cli,
+		Handlers: []k8score.EventHandler{&RoleEventHandler{}},
 	}
 }
 
@@ -199,7 +231,7 @@ func assertEventHandled(t *testing.T, ctx context.Context, cli client.Client, ev
 		t.Fatalf("get event failed: %v", err)
 	}
 	expected := fmt.Sprintf("%d", stored.Count)
-	if stored.Annotations[eventHandledAnnotationKey] != expected {
-		t.Fatalf("expected event handled annotation %q, got %q", expected, stored.Annotations[eventHandledAnnotationKey])
+	if stored.Annotations[constant.EventHandledAnnotationKey] != expected {
+		t.Fatalf("expected event handled annotation %q, got %q", expected, stored.Annotations[constant.EventHandledAnnotationKey])
 	}
 }

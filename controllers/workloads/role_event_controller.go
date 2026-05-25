@@ -30,24 +30,15 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloadsapi "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
-)
-
-const (
-	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
 )
 
 type roleEventBranch string
@@ -76,29 +67,18 @@ type roleEventResult struct {
 	ExclusiveClean bool
 }
 
-type RoleEventReconciler struct {
-	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-}
+type RoleEventHandler struct{}
 
-// events API only allows ready-only, create, patch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;patch
-
-func (r *RoleEventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("event", req.NamespacedName)
-
-	event := &corev1.Event{}
-	if err := r.Client.Get(ctx, req.NamespacedName, event); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, logger, "getEventError")
-	}
-
-	if !isKBAgentRoleProbeEvent(event) {
-		return intctrlutil.Reconciled()
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instances,verbs=get;list;watch
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch
+func (h *RoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, _ record.EventRecorder, event *corev1.Event) (bool, error) {
+	if !isRoleProbeEvent(event) {
+		return false, nil
 	}
 
 	result := &roleEventResult{
-		Event:       req.NamespacedName,
+		Event:       client.ObjectKeyFromObject(event),
 		EventUID:    event.UID,
 		EventPodUID: event.InvolvedObject.UID,
 		Pod: types.NamespacedName{
@@ -110,58 +90,13 @@ func (r *RoleEventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		Result:  "ignored",
 		Reason:  "notHandled",
 	}
-	if r.isEventHandled(event) {
-		result.Result = "skipped"
-		result.Reason = "eventAlreadyHandled"
-		result.Handled = true
-		logRoleProbeEvent(logger, result, nil)
-		return intctrlutil.Reconciled()
-	}
-
-	handled, err := r.handleRoleProbeEvent(ctx, event, result)
-	if err == nil && handled {
-		if markErr := r.markEventHandled(ctx, event); markErr != nil {
-			result.Result = "failed"
-			result.Reason = "markEventHandledError"
-			err = markErr
-		}
-	}
+	handled, err := h.handleRoleProbeEvent(reqCtx.Ctx, cli, event, result)
 	result.Handled = handled
-	logRoleProbeEvent(logger, result, err)
-	if err != nil {
-		return intctrlutil.RequeueWithError(err, logger, "handleRoleProbeEventError")
-	}
-	return intctrlutil.Reconciled()
+	logRoleProbeEvent(reqCtx.Log, result, err)
+	return handled, err
 }
 
-func (r *RoleEventReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr).
-		For(&corev1.Event{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
-		}).
-		Complete(r)
-}
-
-func (r *RoleEventReconciler) isEventHandled(event *corev1.Event) bool {
-	count := fmt.Sprintf("%d", event.Count)
-	annotations := event.GetAnnotations()
-	if annotations != nil && annotations[eventHandledAnnotationKey] == count {
-		return true
-	}
-	return false
-}
-
-func (r *RoleEventReconciler) markEventHandled(ctx context.Context, event *corev1.Event) error {
-	patch := client.MergeFrom(event.DeepCopy())
-	if event.Annotations == nil {
-		event.Annotations = make(map[string]string, 0)
-	}
-	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
-	return r.Client.Patch(ctx, event, patch)
-}
-
-func (r *RoleEventReconciler) handleRoleProbeEvent(ctx context.Context, event *corev1.Event, result *roleEventResult) (bool, error) {
+func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.Client, event *corev1.Event, result *roleEventResult) (bool, error) {
 	probeEvent := &proto.ProbeEvent{}
 	if err := json.Unmarshal([]byte(event.Message), probeEvent); err != nil {
 		result.Result = "skipped"
@@ -177,7 +112,7 @@ func (r *RoleEventReconciler) handleRoleProbeEvent(ctx context.Context, event *c
 	}
 
 	pod := &corev1.Pod{}
-	if err := r.Client.Get(ctx, result.Pod, pod); err != nil {
+	if err := cli.Get(ctx, result.Pod, pod); err != nil {
 		if apierrors.IsNotFound(err) {
 			result.Result = "skipped"
 			result.Reason = "podNotFound"
@@ -207,11 +142,11 @@ func (r *RoleEventReconciler) handleRoleProbeEvent(ctx context.Context, event *c
 	case itsName != "":
 		result.Branch = roleEventBranchInstanceSet
 		result.WorkloadName = itsName
-		return r.handleInstanceSetRoleProbe(ctx, pod, itsName, result)
+		return h.handleInstanceSetRoleProbe(ctx, cli, pod, itsName, result)
 	case instName != "":
 		result.Branch = roleEventBranchInstance
 		result.WorkloadName = instName
-		return r.handleInstanceRoleProbe(ctx, pod, instName, result)
+		return h.handleInstanceRoleProbe(ctx, cli, pod, instName, result)
 	default:
 		result.Result = "ignored"
 		result.Reason = "unknownPodOwner"
@@ -219,7 +154,7 @@ func (r *RoleEventReconciler) handleRoleProbeEvent(ctx context.Context, event *c
 	}
 }
 
-func (r *RoleEventReconciler) handleInstanceSetRoleProbe(ctx context.Context, pod *corev1.Pod, itsName string, result *roleEventResult) (bool, error) {
+func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, result *roleEventResult) (bool, error) {
 	if checkStaleLastRoleEventVersion(result.Version, pod) {
 		result.Result = "skipped"
 		result.Reason = "staleRoleEventVersion"
@@ -227,7 +162,7 @@ func (r *RoleEventReconciler) handleInstanceSetRoleProbe(ctx context.Context, po
 	}
 
 	its := &workloadsapi.InstanceSet{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: itsName}, its); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: itsName}, its); err != nil {
 		if apierrors.IsNotFound(err) {
 			result.Result = "skipped"
 			result.Reason = "instanceSetNotFound"
@@ -241,7 +176,7 @@ func (r *RoleEventReconciler) handleInstanceSetRoleProbe(ctx context.Context, po
 	roleMap := composeInstanceSetRoleMap(*its)
 	role, defined := roleMap[result.Role]
 	result.RoleDefined = defined
-	if err := updatePodRoleLabel(ctx, r.Client, pod, result.Role, result.Version, defined); err != nil {
+	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.Version, defined); err != nil {
 		result.Result = "failed"
 		result.Reason = "updatePodRoleLabelError"
 		return false, err
@@ -249,7 +184,7 @@ func (r *RoleEventReconciler) handleInstanceSetRoleProbe(ctx context.Context, po
 
 	if defined && role.IsExclusive {
 		result.ExclusiveClean = true
-		if err := removeExclusiveRoleLabels(ctx, r.Client, *its, pod.Name, result.Role, result.Version); err != nil {
+		if err := removeExclusiveRoleLabels(ctx, cli, *its, pod.Name, result.Role, result.Version); err != nil {
 			result.Result = "failed"
 			result.Reason = "removeExclusiveRoleLabelsError"
 			return false, err
@@ -260,7 +195,7 @@ func (r *RoleEventReconciler) handleInstanceSetRoleProbe(ctx context.Context, po
 	return true, nil
 }
 
-func (r *RoleEventReconciler) handleInstanceRoleProbe(ctx context.Context, pod *corev1.Pod, instName string, result *roleEventResult) (bool, error) {
+func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, instName string, result *roleEventResult) (bool, error) {
 	if checkStaleLastRoleEventVersion(result.Version, pod) {
 		result.Result = "skipped"
 		result.Reason = "staleRoleEventVersion"
@@ -268,7 +203,7 @@ func (r *RoleEventReconciler) handleInstanceRoleProbe(ctx context.Context, pod *
 	}
 
 	inst := &workloadsapi.Instance{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: instName}, inst); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: instName}, inst); err != nil {
 		if apierrors.IsNotFound(err) {
 			result.Result = "skipped"
 			result.Reason = "instanceNotFound"
@@ -281,7 +216,7 @@ func (r *RoleEventReconciler) handleInstanceRoleProbe(ctx context.Context, pod *
 
 	_, defined := composeInstanceRoleMap(*inst)[result.Role]
 	result.RoleDefined = defined
-	if err := updatePodRoleLabel(ctx, r.Client, pod, result.Role, result.Version, defined); err != nil {
+	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.Version, defined); err != nil {
 		result.Result = "failed"
 		result.Reason = "updatePodRoleLabelError"
 		return false, err
@@ -291,13 +226,22 @@ func (r *RoleEventReconciler) handleInstanceRoleProbe(ctx context.Context, pod *
 	return true, nil
 }
 
-func isKBAgentRoleProbeEvent(event *corev1.Event) bool {
+func isRoleProbeEvent(event *corev1.Event) bool {
 	return event.ReportingController == proto.ProbeEventReportingController &&
 		event.Reason == "roleProbe" &&
 		event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
 func roleEventVersion(event *corev1.Event) string {
+	if !event.EventTime.Time.IsZero() {
+		return fmt.Sprintf("%d", event.EventTime.UnixMicro())
+	}
+	if !event.LastTimestamp.Time.IsZero() {
+		return fmt.Sprintf("%d", event.LastTimestamp.UnixMicro())
+	}
+	if !event.FirstTimestamp.Time.IsZero() {
+		return fmt.Sprintf("%d", event.FirstTimestamp.UnixMicro())
+	}
 	return fmt.Sprintf("%d", event.EventTime.UnixMicro())
 }
 

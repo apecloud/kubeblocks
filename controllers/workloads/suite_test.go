@@ -42,6 +42,7 @@ import (
 	// +kubebuilder:scaffold:imports
 
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
@@ -128,10 +129,11 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&RoleEventReconciler{
+	err = (&k8score.EventReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("role-event-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
+		Handlers: []k8score.EventHandler{&RoleEventHandler{}},
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

@@ -33,16 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-const (
-	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
-)
-
-type eventHandler interface {
+type EventHandler interface {
 	Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error)
 }
 
@@ -51,6 +46,7 @@ type EventReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+	Handlers []EventHandler
 }
 
 // events API only allows ready-only, create, patch
@@ -79,12 +75,8 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.Reconciled()
 	}
 
-	handlers := []eventHandler{
-		&component.AvailableEventHandler{},
-		&component.KBAgentTaskEventHandler{},
-	}
 	handled := false
-	for _, handler := range handlers {
+	for _, handler := range r.Handlers {
 		ok, err := handler.Handle(r.Client, reqCtx, r.Recorder, event)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
@@ -115,7 +107,7 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *EventReconciler) isEventHandled(event *corev1.Event) bool {
 	count := fmt.Sprintf("%d", event.Count)
 	annotations := event.GetAnnotations()
-	if annotations != nil && annotations[eventHandledAnnotationKey] == count {
+	if annotations != nil && annotations[constant.EventHandledAnnotationKey] == count {
 		return true
 	}
 	return false
@@ -126,6 +118,6 @@ func (r *EventReconciler) eventHandled(ctx context.Context, event *corev1.Event)
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string, 0)
 	}
-	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
+	event.Annotations[constant.EventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
 	return r.Client.Patch(ctx, event, patch)
 }

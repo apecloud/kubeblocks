@@ -552,12 +552,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadscontrollers.InstanceEventReconciler{
+		if err = (&workloadscontrollers.RoleEventReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-event-controller"),
+			Recorder: mgr.GetEventRecorderFor("role-event-controller"),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceEvent")
+			setupLog.Error(err, "unable to create controller", "controller", "RoleEvent")
 			os.Exit(1)
 		}
 	}

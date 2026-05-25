@@ -34,7 +34,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -44,7 +43,7 @@ const (
 )
 
 type eventHandler interface {
-	Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error
+	Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error)
 }
 
 // EventReconciler reconciles an Event object
@@ -81,14 +80,20 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	handlers := []eventHandler{
-		&instanceset.PodRoleEventHandler{},
 		&component.AvailableEventHandler{},
 		&component.KBAgentTaskEventHandler{},
 	}
+	handled := false
 	for _, handler := range handlers {
-		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
+		ok, err := handler.Handle(r.Client, reqCtx, r.Recorder, event)
+		if err != nil && !apierrors.IsNotFound(err) {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
+		handled = handled || ok
+	}
+
+	if !handled {
+		return intctrlutil.Reconciled()
 	}
 
 	if err := r.eventHandled(ctx, event); err != nil {

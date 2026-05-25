@@ -50,14 +50,14 @@ const (
 
 type AvailableEventHandler struct{}
 
-func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error) {
 	if !h.isAvailableEvent(event) {
-		return nil
+		return false, nil
 	}
 
 	ppEvent := &proto.ProbeEvent{}
 	if err := json.Unmarshal([]byte(event.Message), ppEvent); err != nil {
-		return err
+		return true, err
 	}
 
 	compKey := types.NamespacedName{
@@ -66,13 +66,13 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 	}
 	comp := &appsv1.Component{}
 	if err := cli.Get(reqCtx.Ctx, compKey, comp); err != nil {
-		return err
+		return true, err
 	}
 	compCopy := comp.DeepCopy()
 
 	compDef, err := h.getNCheckCompDefinition(reqCtx.Ctx, cli, comp.Spec.CompDef)
 	if err != nil {
-		return err
+		return true, err
 	}
 
 	itsKey := types.NamespacedName{
@@ -81,20 +81,20 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 	}
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(reqCtx.Ctx, itsKey, its); err != nil {
-		return err
+		return true, err
 	}
 
 	available, message, err := h.handleEvent(newProbeEvent(event, ppEvent), comp, compDef, its)
 	if err != nil {
-		return err
+		return true, err
 	}
 	if available == nil {
-		return nil // w/o available probe
+		return true, nil // w/o available probe
 	}
 	if *available {
-		return h.available(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
+		return true, h.available(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
 	}
-	return h.unavailable(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
+	return true, h.unavailable(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
 }
 
 func (h *AvailableEventHandler) isAvailableEvent(event *corev1.Event) bool {

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package workloads_test
+package workloads
 
 import (
 	"context"
@@ -26,24 +26,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	workloadsapi "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
-)
-
-const (
-	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
 )
 
 func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
@@ -66,15 +62,13 @@ func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	})
 	event := roleProbeEvent("default", "event-1", pod, "leader", now)
 	cli := roleEventFakeClient(t, its, pod, otherPod, event)
-	reconciler := roleEventReconciler(cli)
 
-	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
-		t.Fatalf("reconcile failed: %v", err)
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
 	}
 
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
 	assertPodRole(t, ctx, cli, otherPod, "", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
-	assertEventHandled(t, ctx, cli, event)
 }
 
 func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T) {
@@ -98,20 +92,17 @@ func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T
 	event := roleProbeEvent("default", "event-1", pod, "leader", newer)
 	staleEvent := roleProbeEvent("default", "event-2", pod, "follower", older)
 	cli := roleEventFakeClient(t, inst, pod, otherPod, event, staleEvent)
-	reconciler := roleEventReconciler(cli)
 
-	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
-		t.Fatalf("reconcile failed: %v", err)
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
 	}
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
 	assertPodRole(t, ctx, cli, otherPod, "leader", "")
-	assertEventHandled(t, ctx, cli, event)
 
-	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(staleEvent)}); err != nil {
-		t.Fatalf("reconcile stale event failed: %v", err)
+	if handled := handleRoleEvent(t, ctx, cli, staleEvent); !handled {
+		t.Fatalf("expected stale event to be handled")
 	}
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
-	assertEventHandled(t, ctx, cli, staleEvent)
 }
 
 func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) {
@@ -119,18 +110,9 @@ func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) 
 	pod := roleEventPod("default", "mysql-0", "uid-0", nil)
 	event := roleProbeEvent("default", "event-1", pod, "leader", time.Now())
 	cli := roleEventFakeClient(t, pod, event)
-	reconciler := roleEventReconciler(cli)
 
-	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
-		t.Fatalf("reconcile failed: %v", err)
-	}
-
-	var stored corev1.Event
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(event), &stored); err != nil {
-		t.Fatalf("get event failed: %v", err)
-	}
-	if stored.Annotations != nil && stored.Annotations[eventHandledAnnotationKey] != "" {
-		t.Fatalf("unexpected handled annotation: %v", stored.Annotations)
+	if handled := handleRoleEvent(t, ctx, cli, event); handled {
+		t.Fatalf("expected event not to be handled")
 	}
 }
 
@@ -148,21 +130,24 @@ func TestRoleEventHandlerUsesTimestampFallbackForRoleVersion(t *testing.T) {
 	event.EventTime = metav1.MicroTime{}
 	event.LastTimestamp = metav1.NewTime(now)
 	cli := roleEventFakeClient(t, inst, pod, event)
-	reconciler := roleEventReconciler(cli)
 
-	if _, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(event)}); err != nil {
-		t.Fatalf("reconcile failed: %v", err)
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
 	}
 
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.LastTimestamp.UnixMicro()))
-	assertEventHandled(t, ctx, cli, event)
 }
 
-func roleEventReconciler(cli client.Client) *k8score.EventReconciler {
-	return &k8score.EventReconciler{
-		Client:           cli,
-		WorkloadsEnabled: true,
+func handleRoleEvent(t *testing.T, ctx context.Context, cli client.Client, event *corev1.Event) bool {
+	t.Helper()
+	handled, err := (&RoleEventHandler{}).Handle(cli, intctrlutil.RequestCtx{
+		Ctx: ctx,
+		Log: logr.Discard(),
+	}, nil, event)
+	if err != nil {
+		t.Fatalf("handle event failed: %v", err)
 	}
+	return handled
 }
 
 func roleEventFakeClient(t *testing.T, objects ...client.Object) client.Client {
@@ -225,17 +210,5 @@ func assertPodRole(t *testing.T, ctx context.Context, cli client.Client, pod *co
 	}
 	if version != "" && stored.Annotations[constant.LastRoleEventVersionAnnotationKey] != version {
 		t.Fatalf("expected version %q, got %q", version, stored.Annotations[constant.LastRoleEventVersionAnnotationKey])
-	}
-}
-
-func assertEventHandled(t *testing.T, ctx context.Context, cli client.Client, event *corev1.Event) {
-	t.Helper()
-	var stored corev1.Event
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(event), &stored); err != nil {
-		t.Fatalf("get event failed: %v", err)
-	}
-	expected := fmt.Sprintf("%d", stored.Count)
-	if stored.Annotations[eventHandledAnnotationKey] != expected {
-		t.Fatalf("expected event handled annotation %q, got %q", expected, stored.Annotations[eventHandledAnnotationKey])
 	}
 }

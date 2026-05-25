@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/workloads"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -120,7 +120,7 @@ func (r *EventReconciler) handlers() []eventHandler {
 		)
 	}
 	if r.WorkloadsEnabled {
-		handlers = append(handlers, &workloads.RoleEventHandler{})
+		handlers = append(handlers, &workloadscontrollers.RoleEventHandler{})
 	}
 	return handlers
 }

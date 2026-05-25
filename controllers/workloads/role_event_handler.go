@@ -69,9 +69,6 @@ type roleEventResult struct {
 
 type RoleEventHandler struct{}
 
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instances,verbs=get;list;watch
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch
 func (h *RoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, _ record.EventRecorder, event *corev1.Event) (bool, error) {
 	if !isRoleProbeEvent(event) {
 		return false, nil

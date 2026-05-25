@@ -53,9 +53,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/controllers/parameters"
-	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	controllerevent "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -224,14 +222,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
-		Handlers: []k8score.EventHandler{
-			&controllerevent.AvailableEventHandler{},
-			&controllerevent.KBAgentTaskEventHandler{},
-			&workloads.RoleEventHandler{},
-		},
+		Client:           k8sManager.GetClient(),
+		Scheme:           k8sManager.GetScheme(),
+		Recorder:         k8sManager.GetEventRecorderFor("event-controller"),
+		AppsEnabled:      true,
+		WorkloadsEnabled: true,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

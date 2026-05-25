@@ -130,10 +130,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
-		Handlers: []k8score.EventHandler{&RoleEventHandler{}},
+		Client:           k8sManager.GetClient(),
+		Scheme:           k8sManager.GetScheme(),
+		Recorder:         k8sManager.GetEventRecorderFor("event-controller"),
+		WorkloadsEnabled: true,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

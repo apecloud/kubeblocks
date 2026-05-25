@@ -64,7 +64,7 @@ import (
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
-	componentcontrollers "github.com/apecloud/kubeblocks/controllers/apps/component"
+	"github.com/apecloud/kubeblocks/controllers/apps/component"
 	"github.com/apecloud/kubeblocks/controllers/apps/rollout"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
@@ -74,7 +74,6 @@ import (
 	tracecontrollers "github.com/apecloud/kubeblocks/controllers/trace"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	controllerevent "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -432,29 +431,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventHandlers := make([]k8scorecontrollers.EventHandler, 0, 3)
-	if viper.GetBool(appsFlagKey.viperName()) {
-		eventHandlers = append(eventHandlers,
-			&controllerevent.AvailableEventHandler{},
-			&controllerevent.KBAgentTaskEventHandler{},
-		)
-	}
-	if viper.GetBool(workloadsFlagKey.viperName()) {
-		eventHandlers = append(eventHandlers, &workloadscontrollers.RoleEventHandler{})
-	}
-	if len(eventHandlers) > 0 {
+	appsEnabled := viper.GetBool(appsFlagKey.viperName())
+	workloadsEnabled := viper.GetBool(workloadsFlagKey.viperName())
+	if appsEnabled || workloadsEnabled {
 		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-			Handlers: eventHandlers,
+			Client:           mgr.GetClient(),
+			Scheme:           mgr.GetScheme(),
+			Recorder:         mgr.GetEventRecorderFor("event-controller"),
+			AppsEnabled:      appsEnabled,
+			WorkloadsEnabled: workloadsEnabled,
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
 			os.Exit(1)
 		}
 	}
 
-	if viper.GetBool(appsFlagKey.viperName()) {
+	if appsEnabled {
 		if err = (&appscontrollers.ClusterDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -510,7 +502,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&componentcontrollers.ComponentReconciler{
+		if err = (&component.ComponentReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-controller"),
@@ -538,7 +530,7 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(workloadsFlagKey.viperName()) {
+	if workloadsEnabled {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

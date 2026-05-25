@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package workloads
+package workloads_test
 
 import (
 	"context"
@@ -156,8 +156,8 @@ func TestRoleEventHandlerUsesTimestampFallbackForRoleVersion(t *testing.T) {
 
 func roleEventReconciler(cli client.Client) *k8score.EventReconciler {
 	return &k8score.EventReconciler{
-		Client:   cli,
-		Handlers: []k8score.EventHandler{&RoleEventHandler{}},
+		Client:           cli,
+		WorkloadsEnabled: true,
 	}
 }
 

@@ -33,20 +33,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	controllerevent "github.com/apecloud/kubeblocks/pkg/controller/component"
+	workloadsevent "github.com/apecloud/kubeblocks/pkg/controller/workloads"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-type EventHandler interface {
+type eventHandler interface {
 	Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error)
 }
 
 // EventReconciler reconciles an Event object
 type EventReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Handlers []EventHandler
+	Scheme           *runtime.Scheme
+	Recorder         record.EventRecorder
+	AppsEnabled      bool
+	WorkloadsEnabled bool
 }
 
 // events API only allows ready-only, create, patch
@@ -76,7 +79,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	handled := false
-	for _, handler := range r.Handlers {
+	for _, handler := range r.handlers() {
 		ok, err := handler.Handle(r.Client, reqCtx, r.Recorder, event)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
@@ -102,6 +105,20 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
 		}).
 		Complete(r)
+}
+
+func (r *EventReconciler) handlers() []eventHandler {
+	handlers := make([]eventHandler, 0, 3)
+	if r.AppsEnabled {
+		handlers = append(handlers,
+			&controllerevent.AvailableEventHandler{},
+			&controllerevent.KBAgentTaskEventHandler{},
+		)
+	}
+	if r.WorkloadsEnabled {
+		handlers = append(handlers, &workloadsevent.RoleEventHandler{})
+	}
+	return handlers
 }
 
 func (r *EventReconciler) isEventHandled(event *corev1.Event) bool {

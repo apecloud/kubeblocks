@@ -244,6 +244,168 @@ func TestRoleEventHandlerHandlesInstanceSetEngineAndExclusiveCleanupDoesNotStamp
 	assertPodLastEngineVersion(t, ctx, cli, otherPod, "0")
 }
 
+// Regression for Valkey r4 mixed-mode bug on PR #10283 head 714f684b: a
+// legacy `primary` event from a non-quorum addon fallback path must not
+// strip the exclusive role label off an engine-versioned peer. Without
+// this guard the legacy event runs exclusive cleanup against the
+// engine-held primary (the gate consults only the legacy annotation,
+// which on the engine peer is empty, so cleanup is accepted); after the
+// label is stripped the engine peer's next same-version event is
+// rejected by the strict-newer gate and the role label can never be
+// restored.
+func TestRoleEventHandlerLegacyExclusiveEventBlockedByEngineHoldingPeer(t *testing.T) {
+	ctx := context.Background()
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+	}
+	enginePeer := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  "vlk",
+		constant.RoleLabelKey:                  "leader",
+	})
+	enginePeer.Annotations = map[string]string{
+		constant.LastRoleEngineVersionAnnotationKey: "3",
+	}
+	legacyPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "vlk",
+	})
+	event := roleProbeEvent("default", "event-1", legacyPod, "leader", time.Now())
+	cli := roleEventFakeClient(t, its, enginePeer, legacyPod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled (skipped + reason=engineHeldExclusiveRole)")
+	}
+
+	// legacy pod must not have received the leader label; engine peer's
+	// label and annotations must be unchanged.
+	assertPodRole(t, ctx, cli, legacyPod, "", "")
+	assertPodLastRoleVersion(t, ctx, cli, legacyPod, "")
+	assertPodRole(t, ctx, cli, enginePeer, "leader", "")
+	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "3")
+	assertPodLastRoleVersion(t, ctx, cli, enginePeer, "")
+}
+
+// When the role being claimed is non-exclusive, the engine-held-peer
+// guard does not apply: a legacy event for a non-exclusive role still
+// goes through normally even when another peer carries an engine
+// annotation.
+func TestRoleEventHandlerLegacyNonExclusiveEventNotBlockedByEnginePeer(t *testing.T) {
+	ctx := context.Background()
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+	}
+	enginePeer := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  "vlk",
+		constant.RoleLabelKey:                  "leader",
+	})
+	enginePeer.Annotations = map[string]string{
+		constant.LastRoleEngineVersionAnnotationKey: "3",
+	}
+	legacyPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "vlk",
+	})
+	event := roleProbeEvent("default", "event-1", legacyPod, "follower", time.Now())
+	cli := roleEventFakeClient(t, its, enginePeer, legacyPod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	wantLegacy := fmt.Sprintf("%d", event.EventTime.UnixMicro())
+	assertPodRole(t, ctx, cli, legacyPod, "follower", wantLegacy)
+	// Engine peer untouched (cleanup only runs for exclusive roles).
+	assertPodRole(t, ctx, cli, enginePeer, "leader", "")
+	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "3")
+}
+
+// A legacy exclusive event still runs normally when no peer holds the
+// exclusive role with an engine annotation. This pins that the guard
+// only fires in mixed-mode coexistence.
+func TestRoleEventHandlerLegacyExclusiveEventAcceptedWhenNoEnginePeerHoldsRole(t *testing.T) {
+	ctx := context.Background()
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+	}
+	// peer holds leader but only via legacy annotation, no engine annotation
+	legacyPeer := roleEventPod("default", "vlk-1", "uid-1", map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  "vlk",
+		constant.RoleLabelKey:                  "leader",
+	})
+	legacyPeer.Annotations = map[string]string{
+		constant.LastRoleEventVersionAnnotationKey: "1000000",
+	}
+	legacyPod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "vlk",
+	})
+	now := time.Unix(0, 2000000*int64(time.Microsecond))
+	event := roleProbeEvent("default", "event-1", legacyPod, "leader", now)
+	cli := roleEventFakeClient(t, its, legacyPeer, legacyPod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	wantLegacy := fmt.Sprintf("%d", event.EventTime.UnixMicro())
+	assertPodRole(t, ctx, cli, legacyPod, "leader", wantLegacy)
+	// legacy peer stripped + legacy annotation stamped per the
+	// legacy-path one-way ratchet contract.
+	assertPodRole(t, ctx, cli, legacyPeer, "", wantLegacy)
+}
+
+// Engine events for an exclusive role are not affected by the
+// engine-held-peer guard: an engine event from one pod is allowed to
+// take the role from another engine peer (and cleanup will strip the
+// peer label as usual, gated by the engine-version comparison).
+func TestRoleEventHandlerEngineExclusiveEventNotBlockedByEnginePeerGuard(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+	}
+	enginePeer := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  "vlk",
+		constant.RoleLabelKey:                  "leader",
+	})
+	enginePeer.Annotations = map[string]string{
+		constant.LastRoleEngineVersionAnnotationKey: "3",
+	}
+	enginePod := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "vlk",
+	})
+	event := roleProbeEventWithOutput("default", "event-1", enginePod, "leader 5", now)
+	cli := roleEventFakeClient(t, its, enginePeer, enginePod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	assertPodRole(t, ctx, cli, enginePod, "leader", "")
+	assertPodLastEngineVersion(t, ctx, cli, enginePod, "5")
+	// Peer label stripped by engine-path cleanup (engine version 5 > peer's 3).
+	assertPodRole(t, ctx, cli, enginePeer, "", "")
+	// Peer engine annotation untouched per the V1 fix.
+	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "3")
+}
+
 // Regression for the prior V1 round: after engine-path cleanup strips the
 // old primary's label, the old primary's own next roleProbe event at the
 // same engine epoch must be accepted. With per-path keys this is enforced

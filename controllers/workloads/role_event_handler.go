@@ -256,6 +256,21 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 	roleMap := composeRoleMap(its.Spec.Roles)
 	role, defined := roleMap[result.Role]
 	result.RoleDefined = defined
+
+	if defined && role.IsExclusive && result.parsed.mode == roleProbeVersionModeNone {
+		held, err := engineHeldExclusiveRoleByPeer(ctx, cli, *its, pod.Name, result.Role)
+		if err != nil {
+			result.Result = "failed"
+			result.Reason = "checkEngineHeldExclusiveRoleError"
+			return false, err
+		}
+		if held {
+			result.Result = "skipped"
+			result.Reason = "engineHeldExclusiveRole"
+			return true, nil
+		}
+	}
+
 	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.parsed, event.EventTime.UnixMicro(), defined); err != nil {
 		result.Result = "failed"
 		result.Reason = "updatePodRoleLabelError"
@@ -536,6 +551,39 @@ func podAnnotation(pod *corev1.Pod, key string) string {
 		return ""
 	}
 	return pod.Annotations[key]
+}
+
+// engineHeldExclusiveRoleByPeer reports whether any peer pod in the
+// InstanceSet currently holds the exclusive role label and carries a
+// LastRoleEngineVersionAnnotationKey value. It is used to keep a legacy
+// roleProbe event (the single-token stdout form) from displacing an
+// exclusive role that an engine-versioned peer already owns: the legacy
+// gate consults only the legacy annotation, so an engine peer's
+// annotation is invisible to it; without this guard a legacy fallback
+// event from a non-quorum addon path could strip the role label off the
+// engine-authoritative primary and the engine peer's next same-version
+// event would then be rejected by the strict-newer gate and the role
+// label could not be restored.
+func engineHeldExclusiveRoleByPeer(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string) (bool, error) {
+	labels := map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  its.Name,
+		constant.RoleLabelKey:                  roleName,
+	}
+	var pods corev1.PodList
+	if err := cli.List(ctx, &pods, client.InNamespace(its.Namespace), client.MatchingLabels(labels)); err != nil {
+		return false, err
+	}
+	for _, p := range pods.Items {
+		if p.Name == selfName {
+			continue
+		}
+		if podAnnotation(&p, constant.LastRoleEngineVersionAnnotationKey) != "" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func logRoleProbeEvent(logger logr.Logger, result *roleEventResult, err error) {

@@ -42,6 +42,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
+const (
+	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
+)
+
 func TestRoleEventHandlerHandlesInstanceSetRoleAndExclusive(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -125,7 +129,7 @@ func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) 
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(event), &stored); err != nil {
 		t.Fatalf("get event failed: %v", err)
 	}
-	if stored.Annotations != nil && stored.Annotations[constant.EventHandledAnnotationKey] != "" {
+	if stored.Annotations != nil && stored.Annotations[eventHandledAnnotationKey] != "" {
 		t.Fatalf("unexpected handled annotation: %v", stored.Annotations)
 	}
 }
@@ -231,7 +235,7 @@ func assertEventHandled(t *testing.T, ctx context.Context, cli client.Client, ev
 		t.Fatalf("get event failed: %v", err)
 	}
 	expected := fmt.Sprintf("%d", stored.Count)
-	if stored.Annotations[constant.EventHandledAnnotationKey] != expected {
-		t.Fatalf("expected event handled annotation %q, got %q", expected, stored.Annotations[constant.EventHandledAnnotationKey])
+	if stored.Annotations[eventHandledAnnotationKey] != expected {
+		t.Fatalf("expected event handled annotation %q, got %q", expected, stored.Annotations[eventHandledAnnotationKey])
 	}
 }

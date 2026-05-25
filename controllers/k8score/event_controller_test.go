@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -96,7 +95,7 @@ var _ = Describe("Event Controller", func() {
 					Namespace: sndEvent.Namespace,
 					Name:      sndEvent.Name,
 				}, event)).Should(Succeed())
-				g.Expect(event.Annotations).ShouldNot(HaveKey(constant.EventHandledAnnotationKey))
+				g.Expect(event.Annotations).ShouldNot(HaveKey(eventHandledAnnotationKey))
 			}).Should(Succeed())
 		})
 	})

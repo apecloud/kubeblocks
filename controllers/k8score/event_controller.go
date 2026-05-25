@@ -33,10 +33,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	controllerevent "github.com/apecloud/kubeblocks/pkg/controller/component"
-	workloadsevent "github.com/apecloud/kubeblocks/pkg/controller/workloads"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+)
+
+const (
+	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
 )
 
 type eventHandler interface {
@@ -111,12 +115,12 @@ func (r *EventReconciler) handlers() []eventHandler {
 	handlers := make([]eventHandler, 0, 3)
 	if r.AppsEnabled {
 		handlers = append(handlers,
-			&controllerevent.AvailableEventHandler{},
-			&controllerevent.KBAgentTaskEventHandler{},
+			&component.AvailableEventHandler{},
+			&component.KBAgentTaskEventHandler{},
 		)
 	}
 	if r.WorkloadsEnabled {
-		handlers = append(handlers, &workloadsevent.RoleEventHandler{})
+		handlers = append(handlers, &workloads.RoleEventHandler{})
 	}
 	return handlers
 }
@@ -124,7 +128,7 @@ func (r *EventReconciler) handlers() []eventHandler {
 func (r *EventReconciler) isEventHandled(event *corev1.Event) bool {
 	count := fmt.Sprintf("%d", event.Count)
 	annotations := event.GetAnnotations()
-	if annotations != nil && annotations[constant.EventHandledAnnotationKey] == count {
+	if annotations != nil && annotations[eventHandledAnnotationKey] == count {
 		return true
 	}
 	return false
@@ -135,6 +139,6 @@ func (r *EventReconciler) eventHandled(ctx context.Context, event *corev1.Event)
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string, 0)
 	}
-	event.Annotations[constant.EventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
+	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
 	return r.Client.Patch(ctx, event, patch)
 }

@@ -1103,9 +1103,25 @@ type ComponentLifecycleActions struct {
 	// - KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.
 	//
 	// Expected output of this action:
-	// - On Success: The determined role of the replica, which must align with one of the roles specified
-	//   in the component definition.
-	// - On Failure: An error message, if applicable, indicating why the action failed.
+	//   - On Success: The determined role of the replica, which must align with one of the roles
+	//     specified in the component definition. Stdout MUST follow one of:
+	//
+	//       <role>                  // legacy form
+	//       <role> <roleVersion>    // engine-authoritative form
+	//
+	//     The two tokens are separated by whitespace (spaces, tabs, or newlines).
+	//     <roleVersion> is an unsigned 64-bit decimal integer. The version must
+	//     represent the complete role fact at the moment of observation
+	//     (e.g. for a primary it should encode the elected primary identity
+	//     plus its election epoch, not just the epoch number), so that
+	//     identical versions reported by different replicas cannot describe
+	//     contradictory roles. The controller accepts the event only if the
+	//     version is strictly greater than the value recorded on the Pod's
+	//     last-role-engine-version annotation; legacy single-token stdout
+	//     falls back to the event's wall-clock time against the Pod's
+	//     last-role-snapshot-version annotation. Malformed stdout (second
+	//     token not a uint64, or three or more tokens) is rejected.
+	//   - On Failure: An error message, if applicable, indicating why the action failed.
 	//
 	// Note: This field is immutable once it has been set.
 	//

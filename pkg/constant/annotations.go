@@ -37,8 +37,19 @@ const (
 
 	KBAppClusterUIDKey                = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
+	// LastRoleEventVersionAnnotationKey records the EventTime micros of the
+	// most recent legacy single-token roleProbe event the controller accepted
+	// on a Pod. It is the staleness anchor for the legacy stdout contract
+	// (`<role>`); engine-authoritative stdout (`<role> <roleVersion>`) is
+	// tracked separately via LastRoleEngineVersionAnnotationKey.
 	LastRoleEventVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
-	ComponentScaleInAnnotationKey     = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+	// LastRoleEngineVersionAnnotationKey records the engine-authoritative
+	// uint64 roleVersion from the most recent two-token roleProbe event the
+	// controller accepted on a Pod. The two annotation keys never share
+	// semantics: legacy events read/write only the legacy key and engine
+	// events read/write only the engine key.
+	LastRoleEngineVersionAnnotationKey = "apps.kubeblocks.io/last-role-engine-version"
+	ComponentScaleInAnnotationKey      = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"

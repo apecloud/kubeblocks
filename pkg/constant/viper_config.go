@@ -21,18 +21,20 @@ package constant
 
 // config keys used in viper, DON'T refactor the value without careful inspections
 const (
-	CfgKeyServerInfo                    = "_KUBE_SERVER_INFO"
-	CfgKeyCtrlrMgrNS                    = "CM_NAMESPACE"
-	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
-	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
-	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
-	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
-	CfgKeyProvider                      = "KUBE_PROVIDER"
-	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
-	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"
-	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
-	CfgKeyClusterDefaultResources       = "CLUSTER_DEFAULT_RESOURCES"
+	CfgKeyServerInfo                         = "_KUBE_SERVER_INFO"
+	CfgKeyCtrlrMgrNS                         = "CM_NAMESPACE"
+	CfgKeyCtrlrMgrAffinity                   = "CM_AFFINITY"
+	CfgKeyCtrlrMgrNodeSelector               = "CM_NODE_SELECTOR"
+	CfgKeyCtrlrMgrTolerations                = "CM_TOLERATIONS"
+	CfgKeyCtrlrReconcileRetryDurationMS      = "CM_RECON_RETRY_DURATION_MS"       // accept time
+	CfgRecoverVolumeExpansionFailure         = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
+	CfgKeyProvider                           = "KUBE_PROVIDER"
+	CfgHostPortConfigMapName                 = "HOST_PORT_CM_NAME"
+	CfgHostPortIncludeRanges                 = "HOST_PORT_INCLUDE_RANGES"
+	CfgHostPortExcludeRanges                 = "HOST_PORT_EXCLUDE_RANGES"
+	CfgKeyClusterDefaultResources            = "CLUSTER_DEFAULT_RESOURCES"
+	CfgKeyDataProtectionZeroResourceForUnset = "DATAPROTECTION_ZERO_RESOURCE_FOR_UNSET"
+	CfgKeyOperationZeroResourceForUnset      = "OPERATION_ZERO_RESOURCE_FOR_UNSET"
 
 	// addon config keys
 	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"

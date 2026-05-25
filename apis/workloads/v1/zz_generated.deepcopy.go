@@ -168,7 +168,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {
 		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
-		*out = new(appsv1.PersistentVolumeClaimRetentionPolicy)
+		*out = new(PersistentVolumeClaimRetentionPolicy)
 		**out = **in
 	}
 	if in.ParallelPodManagementConcurrency != nil {
@@ -178,7 +178,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.InstanceUpdateStrategy != nil {
 		in, out := &in.InstanceUpdateStrategy, &out.InstanceUpdateStrategy
-		*out = new(appsv1.InstanceUpdateStrategy)
+		*out = new(InstanceUpdateStrategy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.MemberUpdateStrategy != nil {
@@ -188,7 +188,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
-		*out = make([]appsv1.ReplicaRole, len(*in))
+		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
 	if in.MembershipReconfiguration != nil {
@@ -322,7 +322,7 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 	}
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
-		*out = new(appsv1.SchedulingPolicy)
+		*out = new(SchedulingPolicy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Resources != nil {
@@ -376,7 +376,7 @@ func (in *MemberStatus) DeepCopyInto(out *MemberStatus) {
 	*out = *in
 	if in.ReplicaRole != nil {
 		in, out := &in.ReplicaRole, &out.ReplicaRole
-		*out = new(appsv1.ReplicaRole)
+		*out = new(ReplicaRole)
 		**out = **in
 	}
 }

@@ -112,6 +112,7 @@ var _ = Describe("", func() {
 			actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 			testdp.MockActionSetWithSchema(&testCtx, actionSet)
 			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				SetCompDefs("test-comp-def").
 				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName1, testdp.InvalidParameters).

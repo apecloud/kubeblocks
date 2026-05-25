@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"slices"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -99,6 +100,31 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 	})
 
 	Context("expect to create a backup policy", func() {
+		It("shortens overlength backup policy and schedule names", func() {
+			clusterName := strings.Repeat("c", 41)
+			componentName := strings.Repeat("d", 9)
+
+			backupPolicyName := generateBackupPolicyName(clusterName, componentName)
+			backupScheduleName := generateBackupScheduleName(clusterName, componentName)
+
+			Expect(len(backupPolicyName)).To(BeNumerically("<=", constant.KubeNameMaxLength))
+			Expect(len(backupScheduleName)).To(BeNumerically("<=", constant.KubeNameMaxLength))
+			Expect(backupPolicyName).NotTo(Equal(backupScheduleName))
+
+			backupPolicyName2 := generateBackupPolicyName(clusterName[:40]+"e", componentName)
+			backupScheduleName2 := generateBackupScheduleName(clusterName[:40]+"e", componentName)
+			Expect(len(backupPolicyName2)).To(BeNumerically("<=", constant.KubeNameMaxLength))
+			Expect(len(backupScheduleName2)).To(BeNumerically("<=", constant.KubeNameMaxLength))
+			Expect(backupPolicyName2).NotTo(Equal(backupPolicyName))
+			Expect(backupScheduleName2).NotTo(Equal(backupScheduleName))
+		})
+
+		It("keeps existing short backup policy and schedule names", func() {
+			Expect(generateBackupPolicyName(clusterName, defaultCompName)).
+				To(Equal("test-cluster-test-backup-policy"))
+			Expect(generateBackupScheduleName(clusterName, defaultCompName)).
+				To(Equal("test-cluster-test-backup-schedule"))
+		})
 
 		It("test backup policy for a general cluster", func() {
 			By("creating a cluster")

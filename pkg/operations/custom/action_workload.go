@@ -173,7 +173,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		container := &podSpec.Containers[i]
 		container.Env = append(container.Env, env...)
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+		intctrlutil.InjectZeroResourcesLimitsForOps(container)
 		if image, ok := actionCtx.Images[container.Name]; ok {
 			container.Image = image
 		}
@@ -181,7 +181,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	// inject extras script.
 	w.injectOpsUtils(podSpec)
 	for i := range podSpec.InitContainers {
-		intctrlutil.InjectZeroResourcesLimitsIfEmpty(&podSpec.InitContainers[i])
+		intctrlutil.InjectZeroResourcesLimitsForOps(&podSpec.InitContainers[i])
 	}
 	if podSpec.RestartPolicy == "" {
 		podSpec.RestartPolicy = corev1.RestartPolicyNever
@@ -229,6 +229,7 @@ echo '/scripts/kubectl -n "${KB_OPS_NAMESPACE}" patch opsrequests.operations.kub
 		Command:         []string{"sh", "-c", scripts},
 		VolumeMounts:    []corev1.VolumeMount{volumeMount},
 	}
+	intctrlutil.InjectZeroResourcesLimitsForOps(&initContainer)
 	podSpec.InitContainers = append(podSpec.InitContainers, initContainer)
 	podSpec.Volumes = append(podSpec.Volumes, opsUtilVolume)
 	for i := range podSpec.Containers {

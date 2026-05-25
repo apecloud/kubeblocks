@@ -169,7 +169,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.24
+	$(GO) mod tidy -compat=1.25
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./pkg/... ./apis/... ./controllers/... ./cmd/...
@@ -305,7 +305,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.23
+	$(GO) mod tidy -compat=1.25
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -358,7 +358,7 @@ $(LOCALBIN):
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.1.1
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 ENVTEST_VERSION ?= release-0.21
 
 ## Tool Binaries
@@ -383,7 +383,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 envtest: $(LOCALBIN) ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-GOLANGCILINT_VERSION = v1.64.8
+GOLANGCILINT_VERSION = v2.8.0
 GOLANGCILINT = $(LOCALBIN)/golangci-lint-$(GOLANGCILINT_VERSION)
 .PHONY: golangci-lint-bin
 golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
@@ -394,10 +394,17 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 	}
 
 STATICCHECK_VERSION = v0.6.1
+STATICCHECK_GOTOOLCHAIN ?= go1.25.10
 STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
 .PHONY: staticcheck-bin
 staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.
-	$(call go-install-tool,$(STATICCHECK),honnef.co/go/tools/cmd/staticcheck,$(STATICCHECK_VERSION))
+	@[ -f $(STATICCHECK) ] || { \
+	set -e; \
+	package=honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ;\
+	echo "Installing $${package} with $(STATICCHECK_GOTOOLCHAIN)" ;\
+	GOBIN=$(LOCALBIN) GOTOOLCHAIN=$(STATICCHECK_GOTOOLCHAIN) go install $${package} ;\
+	mv "$$(echo "$(STATICCHECK)" | sed "s/-$(STATICCHECK_VERSION)$$//")" $(STATICCHECK) ;\
+	}
 
 GOIMPORTS_VERSION = v0.34.0
 GOIMPORTS = $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)

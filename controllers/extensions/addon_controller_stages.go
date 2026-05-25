@@ -503,9 +503,9 @@ func setSharedVolume(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Pod
 }
 
 // setInitContainer sets init containers to copy dependent charts to shared volume
-func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.PodSpec) {
+func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.PodSpec) error {
 	if !useLocalCharts(addon) {
-		return
+		return nil
 	}
 
 	fromPath := addon.Spec.Helm.ChartsPathInImage
@@ -515,7 +515,7 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 	copyChartsContainer := corev1.Container{
 		Name:            "copy-charts",
 		Image:           intctrlutil.ReplaceImageRegistry(addon.Spec.Helm.ChartsImage),
-		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonChartsImgPullPolicy)),
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgKeyAddonChartsImgPullPolicy)),
 		Command:         []string{"sh", "-c", fmt.Sprintf("cp %s/* /mnt/charts", fromPath)},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -524,8 +524,11 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 			},
 		},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&copyChartsContainer)
+	if err := setAddonJobResourcesOrZero(&copyChartsContainer); err != nil {
+		return err
+	}
 	helmJobPodSpec.InitContainers = append(helmJobPodSpec.InitContainers, copyChartsContainer)
+	return nil
 }
 
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
@@ -687,7 +690,10 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 		// we will copy the charts from charts image to shared volume. Addon container will use the
 		// charts from shared volume to install the addon.
 		setSharedVolume(addon, helmJobPodSpec)
-		setInitContainer(addon, helmJobPodSpec)
+		if err := setInitContainer(addon, helmJobPodSpec); err != nil {
+			r.setRequeueWithErr(err, "")
+			return
+		}
 
 		if err := r.reconciler.Create(ctx, helmInstallJob); err != nil {
 			r.setRequeueWithErr(err, "")
@@ -914,7 +920,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 	container := corev1.Container{
 		Name:            getJobMainContainerName(addon),
 		Image:           viper.GetString(constant.KBToolsImage),
-		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
+		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgKeyAddonJobImgPullPolicy)),
 		Command:         []string{"helm"},
 		Env: []corev1.EnvVar{
 			{
@@ -932,7 +938,9 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		},
 		VolumeMounts: []corev1.VolumeMount{},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	if err := setAddonJobResourcesOrZero(&container); err != nil {
+		return nil, err
+	}
 
 	helmProtoJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1001,6 +1009,31 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		}
 	}
 	return helmProtoJob, nil
+}
+
+func getAddonJobResources() (*corev1.ResourceRequirements, error) {
+	value := viper.GetString(constant.CfgKeyAddonJobResources)
+	if value == "" {
+		return nil, nil
+	}
+	resources := &corev1.ResourceRequirements{}
+	if err := json.Unmarshal([]byte(value), resources); err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
+func setAddonJobResourcesOrZero(container *corev1.Container) error {
+	resources, err := getAddonJobResources()
+	if err != nil {
+		return err
+	}
+	if resources != nil {
+		container.Resources = *resources
+		return nil
+	}
+	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	return nil
 }
 
 func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,

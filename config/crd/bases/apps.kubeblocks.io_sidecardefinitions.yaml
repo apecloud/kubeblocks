@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: sidecardefinitions.apps.kubeblocks.io
@@ -64,7 +64,6 @@ spec:
                 description: |-
                   Specifies the configuration file templates used by the Sidecar.
 
-
                   This field is immutable.
                 items:
                   properties:
@@ -72,11 +71,9 @@ spec:
                       description: |-
                         The operator attempts to set default file permissions (0444).
 
-
                         Must be specified as an octal value between 0000 and 0777 (inclusive),
                         or as a decimal value between 0 and 511 (inclusive).
                         YAML supports both octal and decimal values for file permissions.
-
 
                         Please note that this setting only affects the permissions of the files themselves.
                         Directories within the specified path are not impacted by this setting.
@@ -128,7 +125,6 @@ spec:
               containers:
                 description: |-
                   List of containers for the sidecar.
-
 
                   Cannot be updated.
                 items:
@@ -199,7 +195,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -262,7 +257,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -296,7 +290,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap must be
@@ -315,7 +308,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret must be defined
@@ -594,10 +586,10 @@ spec:
                               format: int32
                               type: integer
                             service:
+                              default: ""
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
@@ -804,10 +796,10 @@ spec:
                               format: int32
                               type: integer
                             service:
+                              default: ""
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
@@ -955,10 +947,8 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
 
                             This field is immutable. It can only be set for containers.
                           items:
@@ -1149,7 +1139,6 @@ spec:
                                 type indicates which kind of seccomp profile will be applied.
                                 Valid options are:
 
-
                                 Localhost - a profile defined in a file on the node should be used.
                                 RuntimeDefault - the container runtime default profile should be used.
                                 Unconfined - no profile should be applied.
@@ -1229,10 +1218,10 @@ spec:
                               format: int32
                               type: integer
                             service:
+                              default: ""
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
@@ -1472,18 +1461,15 @@ spec:
                 description: |-
                   Specifies the component definition that the sidecar belongs to.
 
-
                   For a specific cluster object, if there is any components provided by the component definition of @owner,
                   the sidecar will be created and injected into the components which are provided by
                   the component definition of @selectors automatically.
-
 
                   This field is immutable.
                 type: string
               scripts:
                 description: |-
                   Specifies the scripts used by the Sidecar.
-
 
                   This field is immutable.
                 items:
@@ -1492,11 +1478,9 @@ spec:
                       description: |-
                         The operator attempts to set default file permissions (0444).
 
-
                         Must be specified as an octal value between 0000 and 0777 (inclusive),
                         or as a decimal value between 0 and 511 (inclusive).
                         YAML supports both octal and decimal values for file permissions.
-
 
                         Please note that this setting only affects the permissions of the files themselves.
                         Directories within the specified path are not impacted by this setting.
@@ -1549,7 +1533,6 @@ spec:
                 description: |-
                   Specifies the component definition of components that the sidecar along with.
 
-
                   This field is immutable.
                 items:
                   type: string
@@ -1558,7 +1541,6 @@ spec:
               vars:
                 description: |-
                   Defines variables which are needed by the sidecar.
-
 
                   This field is immutable.
                 items:
@@ -1569,19 +1551,15 @@ spec:
                       description: |-
                         A Go template expression that will be applied to the resolved value of the var.
 
-
                         The expression will only be evaluated if the var is successfully resolved to a non-credential value.
-
 
                         The resolved value can be accessed by its name within the expression, system vars and other user-defined
                         non-credential vars can be used within the expression in the same way.
                         Notice that, when accessing vars by its name, you should replace all the "-" in the name with "_", because of
                         that "-" is not a valid identifier in Go.
 
-
                         All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
                         have expressions defined, be careful about the evaluation order as it may use intermediate values.
-
 
                         The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
                         the resolving of var will also be considered failed.
@@ -1593,13 +1571,10 @@ spec:
                       description: |-
                         Variable references `$(VAR_NAME)` are expanded using the previously defined variables in the current context.
 
-
                         If a variable cannot be resolved, the reference in the input string will be unchanged.
                         Double `$$` are reduced to a single `$`, which allows for escaping the `$(VAR_NAME)` syntax: i.e.
 
-
                         - `$$(VAR_NAME)` will produce the string literal `$(VAR_NAME)`.
-
 
                         Escaped references will never be expanded, regardless of whether the variable exists or not.
                         Defaults to "".
@@ -1638,7 +1613,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -1787,7 +1761,6 @@ spec:
                               description: |-
                                 Name of the referent.
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -1804,7 +1777,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -1891,7 +1863,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -1987,7 +1958,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -2104,7 +2074,6 @@ spec:
                               description: |-
                                 Name of the referent.
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -2121,7 +2090,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -2237,7 +2205,6 @@ spec:
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
 
-
                                 If not specified, the component itself will be used.
                               type: string
                             host:
@@ -2250,7 +2217,6 @@ spec:
                             loadBalancer:
                               description: |-
                                 LoadBalancer represents the LoadBalancer ingress point of the service.
-
 
                                 If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
                               enum:
@@ -2322,7 +2288,6 @@ spec:
                               description: |-
                                 Port references a port or node-port defined in the service.
 
-
                                 If the referenced service is a pod-service, there will be multiple service objects matched,
                                 and the value will be presented in the following format: service1.name:port1,service2.name:port2...
                               properties:
@@ -2351,7 +2316,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string

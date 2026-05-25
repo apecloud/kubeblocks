@@ -315,7 +315,7 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
 	legacyPVCName string) error {
-	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	ctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 	externalDeleteJob := isExternalDeleteJob(jobKey, backup)
 	if externalDeleteJob {
 		if backupRepo == nil || !backupRepo.AccessByTool() {

@@ -1086,6 +1086,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the namespace of the Backup namespace.
 If not specified, the namespace of the OpsRequest will be used.</p>
 </td>

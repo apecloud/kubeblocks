@@ -160,6 +160,8 @@ func transNumberOrBoolType(t CueType, obj reflect.Value, fn util.UpdateFn, expan
 		return processTypeTrans[int64](obj, handleK8sQuantityType, fn, trimString, true)
 	case ClassicStorageType:
 		return processTypeTrans[int64](obj, handleClassicStorageType(expand), fn, trimString, true)
+	case IECQuantityType:
+		return processTypeTrans[int64](obj, handleIECQuantityType, fn, trimString, true)
 	case ClassicTimeDurationType:
 		return processTypeTrans[int64](obj, handleClassicTimeDurationType(expand), fn, trimString, true)
 	case StringType:

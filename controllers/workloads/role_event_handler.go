@@ -30,6 +30,8 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +49,8 @@ const (
 	roleEventBranchUnknown     roleEventBranch = "unknown"
 	roleEventBranchInstanceSet roleEventBranch = "instanceset"
 	roleEventBranchInstance    roleEventBranch = "instance"
+
+	instanceKind = "Instance"
 )
 
 type roleEventResult struct {
@@ -128,8 +132,18 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 		return true, nil
 	}
 
-	itsName := pod.Labels[instanceset.WorkloadsInstanceLabelKey]
-	instName := pod.Labels[constant.KBAppInstanceNameLabelKey]
+	if branch, workloadName, ok := resolveRoleEventBranchByControllerRef(pod); ok {
+		result.Branch = branch
+		result.WorkloadName = workloadName
+		switch branch {
+		case roleEventBranchInstanceSet:
+			return h.handleInstanceSetRoleProbe(ctx, cli, pod, workloadName, result)
+		case roleEventBranchInstance:
+			return h.handleInstanceRoleProbe(ctx, cli, pod, workloadName, result)
+		}
+	}
+
+	itsName, instName := pod.Labels[instanceset.WorkloadsInstanceLabelKey], pod.Labels[constant.KBAppInstanceNameLabelKey]
 	switch {
 	case itsName != "" && instName != "":
 		result.Result = "skipped"
@@ -170,7 +184,7 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 		return false, err
 	}
 
-	roleMap := composeInstanceSetRoleMap(*its)
+	roleMap := composeRoleMap(its.Spec.Roles)
 	role, defined := roleMap[result.Role]
 	result.RoleDefined = defined
 	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.Version, defined); err != nil {
@@ -211,7 +225,7 @@ func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli clie
 		return false, err
 	}
 
-	_, defined := composeInstanceRoleMap(*inst)[result.Role]
+	_, defined := composeRoleMap(inst.Spec.Roles)[result.Role]
 	result.RoleDefined = defined
 	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.Version, defined); err != nil {
 		result.Result = "failed"
@@ -230,15 +244,6 @@ func isRoleProbeEvent(event *corev1.Event) bool {
 }
 
 func roleEventVersion(event *corev1.Event) string {
-	if !event.EventTime.Time.IsZero() {
-		return fmt.Sprintf("%d", event.EventTime.UnixMicro())
-	}
-	if !event.LastTimestamp.Time.IsZero() {
-		return fmt.Sprintf("%d", event.LastTimestamp.UnixMicro())
-	}
-	if !event.FirstTimestamp.Time.IsZero() {
-		return fmt.Sprintf("%d", event.FirstTimestamp.UnixMicro())
-	}
 	return fmt.Sprintf("%d", event.EventTime.UnixMicro())
 }
 
@@ -252,20 +257,31 @@ func checkStaleLastRoleEventVersion(version string, pod *corev1.Pod) bool {
 	return false
 }
 
-func composeInstanceSetRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
+func composeRoleMap(roles []workloads.ReplicaRole) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole)
-	for _, role := range its.Spec.Roles {
+	for _, role := range roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
 }
 
-func composeInstanceRoleMap(inst workloads.Instance) map[string]workloads.ReplicaRole {
-	roleMap := make(map[string]workloads.ReplicaRole)
-	for _, role := range inst.Spec.Roles {
-		roleMap[strings.ToLower(role.Name)] = role
+func resolveRoleEventBranchByControllerRef(pod *corev1.Pod) (roleEventBranch, string, bool) {
+	ownerRef := metav1.GetControllerOf(pod)
+	if ownerRef == nil {
+		return roleEventBranchUnknown, "", false
 	}
-	return roleMap
+	groupVersion, err := schema.ParseGroupVersion(ownerRef.APIVersion)
+	if err != nil || groupVersion.Group != workloads.GroupVersion.Group {
+		return roleEventBranchUnknown, "", false
+	}
+	switch ownerRef.Kind {
+	case workloads.InstanceSetKind:
+		return roleEventBranchInstanceSet, ownerRef.Name, true
+	case instanceKind:
+		return roleEventBranchInstance, ownerRef.Name, true
+	default:
+		return roleEventBranchUnknown, "", false
+	}
 }
 
 func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod, roleName, version string, roleDefined bool) error {

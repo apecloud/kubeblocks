@@ -105,6 +105,28 @@ func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
 }
 
+func TestRoleEventHandlerPrefersControllerRefOverLabels(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{{Name: "leader"}}},
+	}
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "mysql",
+		constant.KBAppInstanceNameLabelKey:    "mysql-0",
+	})
+	setControllerRef(pod, workloads.GroupVersion.String(), workloads.InstanceSetKind, its.Name)
+	event := roleProbeEvent("default", "event-1", pod, "leader", now)
+	cli := roleEventFakeClient(t, its, pod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
+}
+
 func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) {
 	ctx := context.Background()
 	pod := roleEventPod("default", "mysql-0", "uid-0", nil)
@@ -114,28 +136,6 @@ func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) 
 	if handled := handleRoleEvent(t, ctx, cli, event); handled {
 		t.Fatalf("expected event not to be handled")
 	}
-}
-
-func TestRoleEventHandlerUsesTimestampFallbackForRoleVersion(t *testing.T) {
-	ctx := context.Background()
-	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	inst := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql-0"},
-		Spec:       workloads.InstanceSpec{Roles: []workloads.ReplicaRole{{Name: "leader"}}},
-	}
-	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
-		constant.KBAppInstanceNameLabelKey: "mysql-0",
-	})
-	event := roleProbeEvent("default", "event-1", pod, "leader", now)
-	event.EventTime = metav1.MicroTime{}
-	event.LastTimestamp = metav1.NewTime(now)
-	cli := roleEventFakeClient(t, inst, pod, event)
-
-	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
-		t.Fatalf("expected event to be handled")
-	}
-
-	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.LastTimestamp.UnixMicro()))
 }
 
 func handleRoleEvent(t *testing.T, ctx context.Context, cli client.Client, event *corev1.Event) bool {
@@ -168,6 +168,17 @@ func roleEventPod(namespace, name, uid string, labels map[string]string) *corev1
 		pod.Labels = labels
 	}
 	return pod
+}
+
+func setControllerRef(obj client.Object, apiVersion, kind, name string) {
+	controller := true
+	obj.SetOwnerReferences([]metav1.OwnerReference{{
+		APIVersion: apiVersion,
+		Kind:       kind,
+		Name:       name,
+		UID:        types.UID(name + "-uid"),
+		Controller: &controller,
+	}})
 }
 
 func roleProbeEvent(namespace, name string, pod *corev1.Pod, role string, eventTime time.Time) *corev1.Event {

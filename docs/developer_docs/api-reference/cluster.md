@@ -6233,9 +6233,39 @@ which initiates an update of the replica&rsquo;s role.</p>
 It ensures replicas are correctly labeled with their respective roles.
 Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.</p>
 <p>Expected output of this action:
-- On Success: The determined role of the replica, which must align with one of the roles specified
-  in the component definition.
-- On Failure: An error message, if applicable, indicating why the action failed.</p>
+  - On Success: The determined role of the replica, which must align with one of the roles
+specified in the component definition. Stdout MUST follow one of:</p>
+<pre><code>  &lt;role&gt;                  // legacy form
+  &lt;role&gt; &lt;roleVersion&gt;    // engine-authoritative form
+The two tokens are separated by whitespace (spaces, tabs, or newlines).
+&lt;roleVersion&gt; is an unsigned 64-bit decimal integer. The version must
+represent the complete role fact at the moment of observation
+(e.g. for a primary it should encode the elected primary identity
+plus its election epoch, not just the epoch number), so that
+identical versions reported by different replicas cannot describe
+contradictory roles.
+</code></pre>
+<ul>
+<li>On Failure: An error message, if applicable, indicating why the action failed.</li>
+</ul>
+<p>Staleness gate:
+  - When stdout carries the engine-authoritative form, the controller
+    accepts the event only if its <roleVersion> is strictly greater
+    than the value recorded on the Pod&rsquo;s last-role-engine-version
+    annotation; the matching annotation is then advanced.
+  - When stdout carries only the legacy single-token form, the
+    controller falls back to the event&rsquo;s wall-clock time and accepts
+    only if it is strictly greater than the value recorded on the
+    Pod&rsquo;s last-role-snapshot-version annotation.
+  - A stdout that emits a second token that is not an unsigned 64-bit
+    decimal integer, or three or more whitespace-separated tokens,
+    is rejected as malformed; the Pod&rsquo;s role label and annotations
+    are not changed.
+  - The two annotation keys are independent: an engine-form event
+    does not consult the legacy annotation and a legacy-form event
+    does not consult the engine annotation. An addon MUST stay on
+    one form per pod across its lifetime; mixing forms within a
+single pod&rsquo;s emission stream is not supported by the gate.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -21306,9 +21336,26 @@ Without this, services that rely on roleSelectors might improperly direct traffi
 <li>KB_SERVICE_PASSWORD: The corresponding password for KB_SERVICE_USER to authenticate with the database service.</li>
 </ul>
 <p>Expected output of this action:
-- On Success: The determined role of the replica, which must align with one of the roles specified
-  in the component definition.
-- On Failure: An error message, if applicable, indicating why the action failed.</p>
+  - On Success: The determined role of the replica, which must align with one of the roles
+specified in the component definition. Stdout MUST follow one of:</p>
+<pre><code>  &lt;role&gt;                  // legacy form
+  &lt;role&gt; &lt;roleVersion&gt;    // engine-authoritative form
+The two tokens are separated by whitespace (spaces, tabs, or newlines).
+&lt;roleVersion&gt; is an unsigned 64-bit decimal integer. The version must
+represent the complete role fact at the moment of observation
+(e.g. for a primary it should encode the elected primary identity
+plus its election epoch, not just the epoch number), so that
+identical versions reported by different replicas cannot describe
+contradictory roles. The controller accepts the event only if the
+version is strictly greater than the value recorded on the Pod's
+last-role-engine-version annotation; legacy single-token stdout
+falls back to the event's wall-clock time against the Pod's
+last-role-snapshot-version annotation. Malformed stdout (second
+token not a uint64, or three or more tokens) is rejected.
+</code></pre>
+<ul>
+<li>On Failure: An error message, if applicable, indicating why the action failed.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

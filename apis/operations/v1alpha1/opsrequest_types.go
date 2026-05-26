@@ -801,6 +801,35 @@ type OpsService struct {
 	//
 	// +optional
 	IPFamilyPolicy *corev1.IPFamilyPolicy `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicy"`
+
+	// Specifies the external traffic policy of the Service. This controls how external traffic is routed to node-local or cluster-wide endpoints.
+	//
+	// Possible values:
+	//
+	// - `Cluster` (default for NodePort): Routes external traffic to all ready endpoints of the Service.
+	//   This preserves the original source IP and avoids a second hop for LoadBalancer and NodePort services.
+	// - `Local`: Routes external traffic only to node-local endpoints.
+	//   If no node-local endpoints exist, traffic is dropped. This ensures that the source IP is exposed.
+	//
+	// This field is only applicable to LoadBalancer and NodePort services.
+	//
+	// +optional
+	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
+
+	// Specifies the internal traffic policy of the Service. This controls how traffic from internal sources
+	// is routed.
+	//
+	// Possible values:
+	//
+	// - `Cluster` (default): Routes internal traffic to all ready endpoints of the Service.
+	//   This distributes traffic evenly across all endpoints.
+	// - `Local`: Routes internal traffic only to node-local endpoints.
+	//   If no node-local endpoints exist, traffic is dropped.
+	//
+	// This field can be specified on any Service type.
+	//
+	// +optional
+	InternalTrafficPolicy *corev1.ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty"`
 }
 
 type Backup struct {

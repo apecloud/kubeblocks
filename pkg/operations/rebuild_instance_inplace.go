@@ -48,9 +48,11 @@ import (
 const (
 	rebuildFromAnnotation           = "operations.kubeblocks.io/rebuild-from"
 	rebuildTmpPVCNameLabel          = "operations.kubeblocks.io/rebuild-tmp-pvc"
+	rebuildSourcePVCUIDAnnotation   = "operations.kubeblocks.io/rebuild-source-pvc-uid"
 	sourcePVReclaimPolicyAnnotation = "operations.kubeblocks.io/source-reclaim-policy"
 
 	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
+	waitingForDynamicPVCMessage      = "Waiting for source PVCs to be dynamically reprovisioned"
 	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
 
 	ignoreRoleCheckAnnotationKey = "operations.kubeblocks.io/ignore-role-check"
@@ -83,8 +85,10 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildInstanceWithNoBackup(reqCtx in
 		return false, err
 	}
 	if progressDetail.Message != waitingForInstanceReadyMessage {
-		// 2. rebuild source pvcs and recreate the instance by deleting it.
-		return false, inPlaceHelper.rebuildSourcePVCsAndRecreateInstance(reqCtx, cli, opsRes.OpsRequest, progressDetail)
+		// 2. no-backup rebuild only needs a fresh source PVC. Do not require a
+		// helper PV to be visible because vcluster fake-PV environments may not
+		// expose a transferable PV object to the KB controller.
+		return false, inPlaceHelper.rebuildSourcePVCsByDynamicProvision(reqCtx, cli, opsRes.OpsRequest, progressDetail)
 	}
 
 	// 3. waiting for new instance is available.
@@ -437,6 +441,80 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 	return nil
 }
 
+func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	progressDetail *opsv1alpha1.ProgressStatusDetail) error {
+	itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
+
+	targetPodDeleted := false
+	waitingForSourcePVC := false
+	for sourcePVCName, builtTmpPVC := range inPlaceHelper.pvcMap {
+		tmpPVC, err := inPlaceHelper.getLiveTmpPVCOrBuilt(reqCtx, cli, builtTmpPVC)
+		if err != nil {
+			return err
+		}
+		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, tmpPVC.Namespace)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				waitingForSourcePVC = true
+				continue
+			}
+			return err
+		}
+		if sourcePVC.DeletionTimestamp != nil {
+			waitingForSourcePVC = true
+			if err := inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC); err != nil {
+				return err
+			}
+			continue
+		}
+		oldSourcePVCUID := tmpPVC.Annotations[rebuildSourcePVCUIDAnnotation]
+		if oldSourcePVCUID == "" {
+			if err := inPlaceHelper.recordSourcePVCUIDOnTmpPVC(reqCtx, cli, tmpPVC, sourcePVC); err != nil {
+				return err
+			}
+			oldSourcePVCUID = string(sourcePVC.UID)
+		}
+		if string(sourcePVC.UID) == oldSourcePVCUID {
+			waitingForSourcePVC = true
+			if !targetPodDeleted {
+				if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
+					return err
+				}
+				if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
+					return err
+				}
+				targetPodDeleted = true
+			}
+			if err := inPlaceHelper.deleteSourcePVCForRebuild(reqCtx, cli, sourcePVC); err != nil {
+				return err
+			}
+			continue
+		}
+		if sourcePVC.Status.Phase != corev1.ClaimBound {
+			waitingForSourcePVC = true
+			continue
+		}
+	}
+	if waitingForSourcePVC {
+		progressDetail.Message = waitingForDynamicPVCMessage
+		return nil
+	}
+	for _, builtTmpPVC := range inPlaceHelper.pvcMap {
+		tmpPVC, err := inPlaceHelper.getLiveTmpPVCOrBuilt(reqCtx, cli, builtTmpPVC)
+		if err != nil {
+			return err
+		}
+		if err := inPlaceHelper.cleanupTmpPVC(reqCtx, cli, tmpPVC); err != nil {
+			return err
+		}
+	}
+
+	progressDetail.Message = waitingForInstanceReadyMessage
+	return nil
+}
+
 func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest) error {
@@ -445,6 +523,21 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intc
 		options = append(options, client.GracePeriodSeconds(0))
 	}
 	return client.IgnoreNotFound(intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...))
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCUIDOnTmpPVC(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	tmpPVC *corev1.PersistentVolumeClaim,
+	sourcePVC *corev1.PersistentVolumeClaim) error {
+	if tmpPVC.UID == "" {
+		return nil
+	}
+	patch := client.MergeFrom(tmpPVC.DeepCopy())
+	if tmpPVC.Annotations == nil {
+		tmpPVC.Annotations = map[string]string{}
+	}
+	tmpPVC.Annotations[rebuildSourcePVCUIDAnnotation] = string(sourcePVC.UID)
+	return cli.Patch(reqCtx.Ctx, tmpPVC, patch)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) setSourcePVCVolumeNameForRebuild(reqCtx intctrlutil.RequestCtx,

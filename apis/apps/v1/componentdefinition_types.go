@@ -1576,38 +1576,31 @@ type ComponentLifecycleActions struct {
 	//
 	// Expected output of this action:
 	//   - On Success: The determined role of the replica, which must align with one of the roles
-	//     specified in the component definition. Stdout MUST follow one of:
+	//     specified in the component definition. Stdout MUST be one of the two forms below:
 	//
-	//       <role>                  // legacy form
-	//       <role> <roleVersion>    // engine-authoritative form
+	//       <role>                  // single-token form
+	//       <role> <roleVersion>    // versioned form
 	//
 	//     The two tokens are separated by whitespace (spaces, tabs, or newlines).
-	//     <roleVersion> is an unsigned 64-bit decimal integer. The version must
-	//     represent the complete role fact at the moment of observation
-	//     (e.g. for a primary it should encode the elected primary identity
-	//     plus its election epoch, not just the epoch number), so that
-	//     identical versions reported by different replicas cannot describe
-	//     contradictory roles.
+	//     <roleVersion> is an unsigned 64-bit decimal integer that orders
+	//     roleProbe results on this Pod. A versioned result is accepted
+	//     only when its <roleVersion> is strictly greater than the
+	//     <roleVersion> the controller has already accepted for this
+	//     Pod, so the value must represent the complete role fact at the
+	//     moment of observation (e.g. for an exclusive primary role it
+	//     should encode the elected primary identity plus its election
+	//     epoch, not just the epoch number) — identical versions
+	//     reported by different replicas must not describe contradictory
+	//     roles. A single-token result keeps the pre-existing behavior:
+	//     it is ordered by the roleProbe event's wall-clock time and is
+	//     accepted only when strictly newer than the last single-token
+	//     result the controller accepted for this Pod. Once a Pod has
+	//     accepted any versioned result, subsequent single-token results
+	//     on that Pod are rejected. Stdout that has a second token but
+	//     it is not an unsigned 64-bit decimal integer, or that has
+	//     three or more whitespace-separated tokens, is rejected as
+	//     malformed and the Pod's role label is not updated.
 	//   - On Failure: An error message, if applicable, indicating why the action failed.
-	//
-	// Staleness gate:
-	//   - When stdout carries the engine-authoritative form, the controller
-	//     accepts the event only if its <roleVersion> is strictly greater
-	//     than the value recorded on the Pod's last-role-engine-version
-	//     annotation; the matching annotation is then advanced.
-	//   - When stdout carries only the legacy single-token form, the
-	//     controller falls back to the event's wall-clock time and accepts
-	//     only if it is strictly greater than the value recorded on the
-	//     Pod's last-role-snapshot-version annotation.
-	//   - A stdout that emits a second token that is not an unsigned 64-bit
-	//     decimal integer, or three or more whitespace-separated tokens,
-	//     is rejected as malformed; the Pod's role label and annotations
-	//     are not changed.
-	//   - The two annotation keys are independent: an engine-form event
-	//     does not consult the legacy annotation and a legacy-form event
-	//     does not consult the engine annotation. An addon MUST stay on
-	//     one form per pod across its lifetime; mixing forms within a
-	//     single pod's emission stream is not supported by the gate.
 	//
 	// Note: This field is immutable once it has been set.
 	//

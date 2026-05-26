@@ -61,9 +61,9 @@ type roleProbeVersionMode int
 
 const (
 	// roleProbeVersionModeNone means the stdout carries only a single
-	// whitespace-separated token (the role name). This is the legacy addon
-	// contract; the staleness gate uses EventTime against
-	// LastRoleEventVersionAnnotationKey.
+	// whitespace-separated token (the role name). This is the
+	// pre-existing single-token contract; the staleness gate uses
+	// EventTime against LastRoleEventVersionAnnotationKey.
 	roleProbeVersionModeNone roleProbeVersionMode = iota
 
 	// roleProbeVersionModeEngine means the stdout carries exactly two
@@ -75,7 +75,7 @@ const (
 	// roleProbeVersionModeMalformed means the stdout carries two tokens whose
 	// second token is not a uint64, or three or more tokens. The event must
 	// be rejected; falling back to EventTime would let a single typo silently
-	// bypass the engine-version gate the addon meant to install.
+	// bypass the engine-version gate the probe script meant to install.
 	roleProbeVersionModeMalformed
 )
 
@@ -340,10 +340,10 @@ func isRoleProbeEvent(event *corev1.Event) bool {
 //	<role>                  // legacy single-token form
 //	<role> <uint64-version> // engine-authoritative form
 //
-// Any addon that emits a second token but cannot make it a uint64, or that
-// emits three or more tokens, is flagged Malformed and the event is
-// rejected by the gate. A silent fallback would let a typo bypass the gate
-// the addon meant to install.
+// A probe script that emits a second token but cannot make it a uint64,
+// or that emits three or more tokens, is flagged Malformed and the
+// event is rejected by the gate. A silent fallback would let a typo
+// bypass the gate the probe script meant to install.
 func parseRoleProbeOutput(stdout []byte) roleProbeOutput {
 	if len(stdout) == 0 {
 		return roleProbeOutput{mode: roleProbeVersionModeNone}
@@ -379,22 +379,27 @@ func parseRoleProbeOutput(stdout []byte) roleProbeOutput {
 }
 
 // gateRoleProbeEvent decides whether to accept a parsed roleProbe event for
-// a particular Pod. Each output mode consults exactly one annotation key:
+// a particular Pod. Each output mode is gated by its own staleness anchor:
 //
-//   - Engine event (`<role> <uint64>`) consults
-//     LastRoleEngineVersionAnnotationKey and accepts iff the new version is
-//     strictly greater than the recorded uint64.
-//   - Legacy event (`<role>`) consults LastRoleEventVersionAnnotationKey and
-//     accepts iff the EventTime micros are strictly greater than the
-//     recorded EventTime micros.
+//   - Engine event (`<role> <uint64>`) is accepted iff its version is
+//     strictly greater than the value recorded on the Pod's engine
+//     staleness anchor.
+//   - Legacy event (`<role>`) is accepted iff its EventTime micros are
+//     strictly greater than the value recorded on the Pod's legacy
+//     staleness anchor. A legacy event is also rejected once the Pod
+//     has accepted any engine event on its own stream: the same Pod
+//     would otherwise be able to overwrite its accepted engine role
+//     with a single-token result, and a later same-version engine
+//     event would then be rejected by the strict-newer gate so the
+//     accepted role label could not be restored.
 //   - Malformed event is always rejected.
 //
-// The two keys never share semantics: an engine event is not compared
-// against the legacy annotation and vice versa. This keeps each addon
-// contract self-contained and lets a legacy-only addon coexist with an
-// engine-version addon on the same controller without cross-format
-// downgrade rules. The matching annotation key is stamped only when the
-// event is accepted by the caller via updatePodRoleLabel.
+// Engine events do not consult the legacy anchor. The two anchors are
+// independent so a component implementation that only emits legacy
+// roleProbe output can coexist with one that emits engine-versioned
+// output on the same controller without cross-format downgrade rules;
+// the only cross-anchor rule is the same-Pod commit-to-engine
+// described above.
 func gateRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicros int64) roleProbeGateDecision {
 	switch parsed.mode {
 	case roleProbeVersionModeMalformed:
@@ -410,6 +415,9 @@ func gateRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicros
 		}
 		return roleProbeGateRejectStale
 	default:
+		if podAnnotation(pod, constant.LastRoleEngineVersionAnnotationKey) != "" {
+			return roleProbeGateRejectStale
+		}
 		last := podAnnotation(pod, constant.LastRoleEventVersionAnnotationKey)
 		if last == "" {
 			return roleProbeGateAccept
@@ -454,8 +462,8 @@ func resolveRoleEventBranchByControllerRef(pod *corev1.Pod) (roleEventBranch, st
 // annotation for the accepted event. Engine events stamp
 // LastRoleEngineVersionAnnotationKey only; legacy events stamp
 // LastRoleEventVersionAnnotationKey only. The other key is left untouched
-// so that a mixed-format addon (or a migration window) does not silently
-// downgrade either stream's anchor.
+// so that a mixed-format probe script (or a migration window) does
+// not silently downgrade either stream's anchor.
 func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod, roleName string, parsed roleProbeOutput, eventTimeMicros int64, roleDefined bool) error {
 	newPod := pod.DeepCopy()
 	if newPod.Labels == nil {
@@ -555,15 +563,15 @@ func podAnnotation(pod *corev1.Pod, key string) string {
 
 // engineHeldExclusiveRoleByPeer reports whether any peer pod in the
 // InstanceSet currently holds the exclusive role label and carries a
-// LastRoleEngineVersionAnnotationKey value. It is used to keep a legacy
-// roleProbe event (the single-token stdout form) from displacing an
-// exclusive role that an engine-versioned peer already owns: the legacy
-// gate consults only the legacy annotation, so an engine peer's
-// annotation is invisible to it; without this guard a legacy fallback
-// event from a non-quorum addon path could strip the role label off the
-// engine-authoritative primary and the engine peer's next same-version
-// event would then be rejected by the strict-newer gate and the role
-// label could not be restored.
+// LastRoleEngineVersionAnnotationKey value. It is used to keep a
+// single-token roleProbe event from displacing an exclusive role that
+// an engine-versioned peer already owns: the single-token gate
+// consults only the legacy anchor, so an engine peer's anchor is
+// invisible to it; without this guard a single-token fallback event
+// from a probe script could strip the role label off the
+// engine-authoritative primary and the engine peer's next
+// same-version event would then be rejected by the strict-newer gate
+// and the role label could not be restored.
 func engineHeldExclusiveRoleByPeer(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string) (bool, error) {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,

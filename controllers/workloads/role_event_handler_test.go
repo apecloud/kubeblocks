@@ -146,14 +146,31 @@ func TestGateLegacyRejectsOlderEventTime(t *testing.T) {
 	}
 }
 
-// Legacy events do not consult the engine annotation key — a legacy event
-// on a pod that already advanced its engine annotation must still be
-// gated only by its own EventTime against the legacy annotation.
-func TestGateLegacyIgnoresEngineAnnotation(t *testing.T) {
+// A Pod that has accepted any engine-versioned event commits to engine
+// mode: subsequent legacy single-token events from the same Pod are
+// rejected. Without this guard a legacy event could overwrite an
+// engine-accepted role label and then the next same-version engine
+// event would be rejected by the strict-newer gate, leaving the role
+// label unrecoverable on that Pod.
+func TestGateLegacyRejectedOnPodAlreadyAcceptedEngineEvent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEngineVersionAnnotationKey: "10"})
 	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeNone}
-	if got := gateRoleProbeEvent(parsed, pod, 1779550600000000); got != roleProbeGateAccept {
-		t.Fatalf("got %d, want Accept (legacy key empty, engine key ignored)", got)
+	if got := gateRoleProbeEvent(parsed, pod, 1779550600000000); got != roleProbeGateRejectStale {
+		t.Fatalf("got %d, want RejectStale (same-Pod legacy must not overwrite accepted engine state)", got)
+	}
+}
+
+// The same-Pod commit-to-engine rule also blocks legacy events even if
+// the Pod has accumulated a legacy annotation alongside the engine
+// annotation (mixed history from a misbehaving probe script).
+func TestGateLegacyRejectedOnPodWithBothAnnotationsWhenEnginePresent(t *testing.T) {
+	pod := podWithAnnotations(map[string]string{
+		constant.LastRoleEngineVersionAnnotationKey: "10",
+		constant.LastRoleEventVersionAnnotationKey:  "1000000",
+	})
+	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeNone}
+	if got := gateRoleProbeEvent(parsed, pod, 2000000); got != roleProbeGateRejectStale {
+		t.Fatalf("got %d, want RejectStale", got)
 	}
 }
 
@@ -245,7 +262,7 @@ func TestRoleEventHandlerHandlesInstanceSetEngineAndExclusiveCleanupDoesNotStamp
 }
 
 // Regression for Valkey r4 mixed-mode bug on PR #10283 head 714f684b: a
-// legacy `primary` event from a non-quorum addon fallback path must not
+// legacy `primary` event from a non-quorum probe script fallback path must not
 // strip the exclusive role label off an engine-versioned peer. Without
 // this guard the legacy event runs exclusive cleanup against the
 // engine-held primary (the gate consults only the legacy annotation,

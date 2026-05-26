@@ -383,10 +383,47 @@ func TestRoleEventHandlerLegacyExclusiveEventAcceptedWhenNoEnginePeerHoldsRole(t
 	assertPodRole(t, ctx, cli, legacyPeer, "", wantLegacy)
 }
 
+func TestRoleEventHandlerEngineExclusiveEventBlockedByPeerWithNewerEngineVersion(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+	}
+	enginePeer := roleEventPod("default", "vlk-1", "uid-1", map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  "vlk",
+		constant.RoleLabelKey:                  "leader",
+	})
+	enginePeer.Annotations = map[string]string{
+		constant.LastRoleEngineVersionAnnotationKey: "5",
+	}
+	enginePod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "vlk",
+	})
+	enginePod.Annotations = map[string]string{
+		constant.LastRoleEngineVersionAnnotationKey: "3",
+	}
+	event := roleProbeEventWithOutput("default", "event-1", enginePod, "leader 4", now)
+	cli := roleEventFakeClient(t, its, enginePeer, enginePod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled (skipped + reason=stalePeerRoleEventVersion)")
+	}
+
+	assertPodRole(t, ctx, cli, enginePod, "", "")
+	assertPodLastEngineVersion(t, ctx, cli, enginePod, "3")
+	assertPodRole(t, ctx, cli, enginePeer, "leader", "")
+	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "5")
+}
+
 // Engine events for an exclusive role are not affected by the
-// engine-held-peer guard: an engine event from one pod is allowed to
-// take the role from another engine peer (and cleanup will strip the
-// peer label as usual, gated by the engine-version comparison).
+// legacy-only engine-held-peer guard: an engine event from one pod is
+// allowed to take the role from an older engine peer (and cleanup will
+// strip the peer label as usual, gated by the engine-version comparison).
 func TestRoleEventHandlerEngineExclusiveEventNotBlockedByEnginePeerGuard(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()

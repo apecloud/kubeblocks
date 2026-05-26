@@ -257,17 +257,32 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 	role, defined := roleMap[result.Role]
 	result.RoleDefined = defined
 
-	if defined && role.IsExclusive && result.parsed.mode == roleProbeVersionModeNone {
-		held, err := engineHeldExclusiveRoleByPeer(ctx, cli, *its, pod.Name, result.Role)
-		if err != nil {
-			result.Result = "failed"
-			result.Reason = "checkEngineHeldExclusiveRoleError"
-			return false, err
-		}
-		if held {
-			result.Result = "skipped"
-			result.Reason = "engineHeldExclusiveRole"
-			return true, nil
+	if defined && role.IsExclusive {
+		switch result.parsed.mode {
+		case roleProbeVersionModeNone:
+			held, err := engineHeldExclusiveRoleByPeer(ctx, cli, *its, pod.Name, result.Role)
+			if err != nil {
+				result.Result = "failed"
+				result.Reason = "checkEngineHeldExclusiveRoleError"
+				return false, err
+			}
+			if held {
+				result.Result = "skipped"
+				result.Reason = "engineHeldExclusiveRole"
+				return true, nil
+			}
+		case roleProbeVersionModeEngine:
+			stale, err := newerOrEqualEngineExclusiveRoleHeldByPeer(ctx, cli, *its, pod.Name, result.Role, result.parsed.version)
+			if err != nil {
+				result.Result = "failed"
+				result.Reason = "checkPeerEngineExclusiveRoleError"
+				return false, err
+			}
+			if stale {
+				result.Result = "skipped"
+				result.Reason = "stalePeerRoleEventVersion"
+				return true, nil
+			}
 		}
 	}
 
@@ -588,6 +603,42 @@ func engineHeldExclusiveRoleByPeer(ctx context.Context, cli client.Client, its w
 			continue
 		}
 		if podAnnotation(&p, constant.LastRoleEngineVersionAnnotationKey) != "" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// newerOrEqualEngineExclusiveRoleHeldByPeer reports whether any peer pod
+// already holds the same exclusive role with an engine version that is at
+// least as new as the incoming engine event. The caller must run this
+// before writing the current pod's role label; otherwise a stale delayed
+// engine event can label itself while peer cleanup correctly refuses to
+// strip the newer peer, leaving two pods with the exclusive role.
+func newerOrEqualEngineExclusiveRoleHeldByPeer(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string, incomingVersion uint64) (bool, error) {
+	labels := map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  its.Name,
+		constant.RoleLabelKey:                  roleName,
+	}
+	var pods corev1.PodList
+	if err := cli.List(ctx, &pods, client.InNamespace(its.Namespace), client.MatchingLabels(labels)); err != nil {
+		return false, err
+	}
+	for _, p := range pods.Items {
+		if p.Name == selfName {
+			continue
+		}
+		last := podAnnotation(&p, constant.LastRoleEngineVersionAnnotationKey)
+		if last == "" {
+			continue
+		}
+		lastV, err := strconv.ParseUint(last, 10, 64)
+		if err != nil {
+			continue
+		}
+		if lastV >= incomingVersion {
 			return true, nil
 		}
 	}

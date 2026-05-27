@@ -86,6 +86,79 @@ func TestPodIsReady(t *testing.T) {
 	}
 }
 
+func TestIsPodFailedAndTimedOut(t *testing.T) {
+	newInitWaitingPod := func(reason, message string) *corev1.Pod {
+		return &corev1.Pod{
+			Status: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:               corev1.PodInitialized,
+						Status:             corev1.ConditionFalse,
+						LastTransitionTime: metav1.NewTime(time.Now().Add(-PodContainerFailedTimeout - time.Second)),
+					},
+				},
+				InitContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name: "init",
+						State: corev1.ContainerState{
+							Waiting: &corev1.ContainerStateWaiting{
+								Reason:  reason,
+								Message: message,
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		reason       string
+		message      string
+		expectFailed bool
+		expectMsg    string
+	}{
+		{
+			name:    "transient configmap cache sync timeout",
+			reason:  "ContainerCreating",
+			message: "failed to sync configmap cache: timed out waiting for the condition",
+		},
+		{
+			name:    "transient secret cache sync timeout",
+			reason:  "CreateContainerConfigError",
+			message: "failed to sync secret cache: timed out waiting for the condition",
+		},
+		{
+			name:    "generic container creating",
+			reason:  "ContainerCreating",
+			message: "creating container",
+		},
+		{
+			name:         "terminal create container config error",
+			reason:       "CreateContainerConfigError",
+			message:      `configmap "missing" not found`,
+			expectFailed: true,
+			expectMsg:    `configmap "missing" not found`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			failed, timedOut, message := IsPodFailedAndTimedOut(newInitWaitingPod(tt.reason, tt.message))
+			if failed != tt.expectFailed {
+				t.Fatalf("failed = %v, want %v", failed, tt.expectFailed)
+			}
+			if timedOut != tt.expectFailed {
+				t.Fatalf("timedOut = %v, want %v", timedOut, tt.expectFailed)
+			}
+			if message != tt.expectMsg {
+				t.Fatalf("message = %q, want %q", message, tt.expectMsg)
+			}
+		})
+	}
+}
+
 func TestGetPodRevision(t *testing.T) {
 	pod := testk8s.NewFakePod("foo", 1)
 	if GetPodRevision(pod) != "" {

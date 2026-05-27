@@ -470,7 +470,7 @@ func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, string) {
 	for _, v := range containersStatus {
 		waitingState := v.State.Waiting
-		if waitingState != nil && waitingState.Message != "" {
+		if isFailedWaitingState(waitingState) {
 			return true, waitingState.Message
 		}
 		terminatedState := v.State.Terminated
@@ -479,6 +479,36 @@ func isAnyContainerFailed(containersStatus []corev1.ContainerStatus) (bool, stri
 		}
 	}
 	return false, ""
+}
+
+func isFailedWaitingState(waitingState *corev1.ContainerStateWaiting) bool {
+	if waitingState == nil || waitingState.Message == "" {
+		return false
+	}
+	if isTransientWaitingState(waitingState) {
+		return false
+	}
+	switch waitingState.Reason {
+	case "CrashLoopBackOff",
+		"ErrImagePull",
+		"ImagePullBackOff",
+		"InvalidImageName",
+		"CreateContainerConfigError",
+		"CreateContainerError",
+		"RunContainerError":
+		return true
+	}
+	return false
+}
+
+func isTransientWaitingState(waitingState *corev1.ContainerStateWaiting) bool {
+	switch waitingState.Reason {
+	case "ContainerCreating", "PodInitializing":
+		return true
+	}
+	msg := waitingState.Message
+	return strings.Contains(msg, "failed to sync configmap cache: timed out waiting for the condition") ||
+		strings.Contains(msg, "failed to sync secret cache: timed out waiting for the condition")
 }
 
 // IsContainerFailedAndTimedOut checks whether the failed container has timed out.

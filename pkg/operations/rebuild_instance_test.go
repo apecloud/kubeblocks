@@ -387,6 +387,13 @@ var _ = Describe("OpsUtil functions", func() {
 				sourcePVCTemplates[pvc.Name] = pvc
 				sourcePVCIdentities[pvc.Name] = rebuildSourcePVCIdentity{UID: string(pvc.UID), VolumeName: pvc.Spec.VolumeName}
 			}
+			initialSourcePVCNames := make([]string, 0, len(sourcePVCTemplates))
+			for sourcePVCName := range sourcePVCTemplates {
+				initialSourcePVCNames = append(initialSourcePVCNames, sourcePVCName)
+			}
+			slices.Sort(initialSourcePVCNames)
+			preDeletingSourcePVCName := initialSourcePVCNames[0]
+			Expect(k8sClient.Delete(ctx, sourcePVCTemplates[preDeletingSourcePVCName])).Should(Succeed())
 
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(Succeed())
@@ -402,7 +409,11 @@ var _ = Describe("OpsUtil functions", func() {
 				Eventually(func(g Gomega) {
 					pvc := &corev1.PersistentVolumeClaim{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
-					g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+					if sourcePVCName == preDeletingSourcePVCName {
+						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+					} else {
+						g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+					}
 					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
 				}).Should(Succeed())
 			}

@@ -99,6 +99,7 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 	for i, container := range protoITS.Spec.Template.Spec.InitContainers {
 		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
+	injectMySQLBinlogPathCompatInitContainer(synthesizedComp, runningITS, protoITS)
 
 	t.buildInstanceSetPlacementAnnotation(comp, protoITS)
 
@@ -107,6 +108,162 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 	}
 
 	return nil
+}
+
+const (
+	mysqlBinlogPathCompatInitContainerName = "kb-compat-mysql-binlog-path"
+	mysqlBinlogPathCompatDataRoot          = "/data/mysql"
+	mysqlBinlogPathCompatScript            = `set -eu
+
+data_root=${KB_COMPAT_MYSQL_DATA_ROOT:-/data/mysql}
+old_index="$data_root/data/mysql-bin.index"
+new_dir="$data_root/binlog"
+new_index="$new_dir/mysql-bin.index"
+marker="$new_dir/.kb-binlog-path-migrated"
+
+[ -s "$old_index" ] || exit 0
+mkdir -p "$new_dir"
+[ ! -f "$marker" ] || exit 0
+
+tmp_index="$new_index.kb-migrate.$$"
+trap 'rm -f "$tmp_index"' EXIT
+awk -v dir="$new_dir" '{
+  base=$0
+  sub(/^.*\//, "", base)
+  if (base != "") print dir "/" base
+}' "$old_index" > "$tmp_index"
+
+[ -s "$tmp_index" ] || exit 0
+all_new_binlogs_exist=true
+while IFS= read -r path || [ -n "$path" ]; do
+  [ -n "$path" ] || continue
+  if [ ! -s "$path" ]; then
+    all_new_binlogs_exist=false
+    break
+  fi
+done < "$tmp_index"
+
+if [ -s "$new_index" ] && cmp -s "$new_index" "$tmp_index" && [ "$all_new_binlogs_exist" = true ]; then
+  date > "$marker" 2>/dev/null || true
+  exit 0
+fi
+
+if [ -s "$new_index" ]; then
+  non_bootstrap=$(awk 'NF && $0 !~ /(^|\/)mysql-bin\.000001$/ { print; exit }' "$new_index")
+  if [ -n "$non_bootstrap" ]; then
+    echo "existing mysql binlog index is already beyond bootstrap; skip migration: $non_bootstrap"
+    date > "$marker" 2>/dev/null || true
+    exit 0
+  fi
+fi
+
+ts=$(date +%Y%m%d%H%M%S 2>/dev/null || echo now)
+backup="$data_root/repair-binlog-path-$ts"
+mkdir -p "$backup"
+cp -a "$old_index" "$backup/mysql-bin.index.from-data"
+cp -a "$new_index" "$backup/mysql-bin.index.from-binlog" 2>/dev/null || true
+
+while IFS= read -r entry || [ -n "$entry" ]; do
+  [ -n "$entry" ] || continue
+  base=${entry##*/}
+  src="$data_root/data/$base"
+  dst="$new_dir/$base"
+  if [ ! -s "$src" ]; then
+    echo "missing source binlog: $src" >&2
+    exit 1
+  fi
+  if [ -e "$dst" ] && ! cmp -s "$src" "$dst"; then
+    mv "$dst" "$backup/$base.existing"
+  fi
+  [ -e "$dst" ] || cp -a "$src" "$dst"
+done < "$old_index"
+
+mv "$tmp_index" "$new_index"
+chown -R mysql:mysql "$new_dir" 2>/dev/null || true
+date > "$marker" 2>/dev/null || true
+sync
+echo "migrated mysql binlog index to $new_index"`
+)
+
+func injectMySQLBinlogPathCompatInitContainer(synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) {
+	if runningITS == nil || protoITS == nil {
+		return
+	}
+	spec := &protoITS.Spec.Template.Spec
+	if _, container := intctrlutil.GetContainerByName(spec.InitContainers, mysqlBinlogPathCompatInitContainerName); container != nil {
+		return
+	}
+	mysqlContainer := findMySQLBinlogPathCompatContainer(synthesizedComp, spec.Containers)
+	if mysqlContainer == nil {
+		return
+	}
+	dataMount, ok := findMySQLBinlogPathCompatDataMount(mysqlContainer.VolumeMounts)
+	if !ok {
+		return
+	}
+	initContainer := buildMySQLBinlogPathCompatInitContainer(mysqlContainer, dataMount)
+	if _, runningContainer := intctrlutil.GetContainerByName(runningITS.Spec.Template.Spec.Containers, mysqlContainer.Name); runningContainer != nil && runningContainer.Image != "" {
+		initContainer.Image = runningContainer.Image
+		initContainer.ImagePullPolicy = runningContainer.ImagePullPolicy
+	}
+	spec.InitContainers = append(spec.InitContainers, initContainer)
+}
+
+func findMySQLBinlogPathCompatContainer(synthesizedComp *component.SynthesizedComponent, containers []corev1.Container) *corev1.Container {
+	for i := range containers {
+		if isApeCloudMySQLImage(containers[i].Image) {
+			return &containers[i]
+		}
+	}
+	if !isApeCloudMySQLComponent(synthesizedComp) {
+		return nil
+	}
+	for i := range containers {
+		if containers[i].Name == "mysql" {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
+func isApeCloudMySQLImage(image string) bool {
+	image = strings.ToLower(image)
+	return strings.Contains(image, "apecloud-mysql-server")
+}
+
+func isApeCloudMySQLComponent(synthesizedComp *component.SynthesizedComponent) bool {
+	if synthesizedComp == nil {
+		return false
+	}
+	serviceKind := strings.ToLower(synthesizedComp.ServiceKind)
+	compDefName := strings.ToLower(synthesizedComp.CompDefName)
+	return serviceKind == "wesql" || strings.Contains(compDefName, "apecloud-mysql") || strings.Contains(compDefName, "wesql")
+}
+
+func findMySQLBinlogPathCompatDataMount(mounts []corev1.VolumeMount) (corev1.VolumeMount, bool) {
+	for _, mount := range mounts {
+		if strings.TrimRight(mount.MountPath, "/") == mysqlBinlogPathCompatDataRoot {
+			return mount, true
+		}
+	}
+	return corev1.VolumeMount{}, false
+}
+
+func buildMySQLBinlogPathCompatInitContainer(mysqlContainer *corev1.Container, dataMount corev1.VolumeMount) corev1.Container {
+	dataMount.MountPath = strings.TrimRight(dataMount.MountPath, "/")
+	return corev1.Container{
+		Name:            mysqlBinlogPathCompatInitContainerName,
+		Image:           mysqlContainer.Image,
+		ImagePullPolicy: mysqlContainer.ImagePullPolicy,
+		Command:         []string{"/bin/sh", "-ec", mysqlBinlogPathCompatScript},
+		Env: []corev1.EnvVar{{
+			Name:  "KB_COMPAT_MYSQL_DATA_ROOT",
+			Value: dataMount.MountPath,
+		}},
+		Resources:       mysqlContainer.Resources,
+		SecurityContext: mysqlContainer.SecurityContext,
+		VolumeMounts:    []corev1.VolumeMount{dataMount},
+	}
 }
 
 func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {

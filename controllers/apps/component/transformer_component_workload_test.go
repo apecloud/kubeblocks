@@ -198,6 +198,74 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
 		})
 
+		It("should inject ApeCloud MySQL binlog path compatibility init container", func() {
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"running-mysql-its", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:            "mysql",
+					Image:           "mirror.local/apecloud/apecloud-mysql-server:8.0.30",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+				}).
+				GetObject()
+			protoITS := runningITS.DeepCopy()
+			protoITS.Spec.Template.Spec.Containers = []corev1.Container{{
+				Name:            "mysql",
+				Image:           testapps.ApeCloudMySQLImage,
+				ImagePullPolicy: corev1.PullAlways,
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "data",
+					MountPath: "/data/mysql/",
+				}},
+			}}
+
+			injectMySQLBinlogPathCompatInitContainer(&component.SynthesizedComponent{
+				ServiceKind:    "mysql",
+				ServiceVersion: "8.0.30",
+			}, runningITS, protoITS)
+
+			Expect(protoITS.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+			initContainer := protoITS.Spec.Template.Spec.InitContainers[0]
+			Expect(initContainer.Name).Should(Equal(mysqlBinlogPathCompatInitContainerName))
+			Expect(initContainer.Image).Should(Equal("mirror.local/apecloud/apecloud-mysql-server:8.0.30"))
+			Expect(initContainer.ImagePullPolicy).Should(Equal(corev1.PullIfNotPresent))
+			Expect(initContainer.Command).Should(Equal([]string{"/bin/sh", "-ec", mysqlBinlogPathCompatScript}))
+			Expect(initContainer.Env).Should(ContainElement(corev1.EnvVar{
+				Name:  "KB_COMPAT_MYSQL_DATA_ROOT",
+				Value: "/data/mysql",
+			}))
+			Expect(initContainer.VolumeMounts).Should(Equal([]corev1.VolumeMount{{
+				Name:      "data",
+				MountPath: "/data/mysql",
+			}}))
+			Expect(initContainer.Command[2]).Should(ContainSubstring("old_index=\"$data_root/data/mysql-bin.index\""))
+			Expect(initContainer.Command[2]).Should(ContainSubstring("new_index=\"$new_dir/mysql-bin.index\""))
+
+			injectMySQLBinlogPathCompatInitContainer(synthesizeComp, runningITS, protoITS)
+			Expect(protoITS.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
+		})
+
+		It("should skip binlog path compatibility for non ApeCloud MySQL workloads", func() {
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"running-vanilla-mysql-its", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "mysql",
+					Image: "mysql:8.0",
+				}).
+				GetObject()
+			protoITS := runningITS.DeepCopy()
+			protoITS.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{
+				Name:      "data",
+				MountPath: "/data/mysql",
+			}}
+
+			injectMySQLBinlogPathCompatInitContainer(&component.SynthesizedComponent{
+				ServiceKind:    "mysql",
+				ServiceVersion: "8.0.30",
+			}, runningITS, protoITS)
+
+			Expect(protoITS.Spec.Template.Spec.InitContainers).Should(BeEmpty())
+		})
+
 		It("should eliminate upgrade-only diff by preserving legacy config-manager", func() {
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				"old-its", clusterName, compName).

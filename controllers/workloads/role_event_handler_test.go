@@ -113,7 +113,7 @@ func TestParseRoleProbeOutputEmpty(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 9)
-	if acceptRoleProbeEvent(parsed, pod, 0) {
+	if acceptRoleProbeEvent(pod, 0, parsed) {
 		t.Fatalf("expected stale versioned result to be rejected")
 	}
 }
@@ -121,7 +121,7 @@ func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 10)
-	if acceptRoleProbeEvent(parsed, pod, 0) {
+	if acceptRoleProbeEvent(pod, 0, parsed) {
 		t.Fatalf("expected equal versioned result to be rejected")
 	}
 }
@@ -129,7 +129,7 @@ func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedAcceptsNewerVersion(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 11)
-	if !acceptRoleProbeEvent(parsed, pod, 0) {
+	if !acceptRoleProbeEvent(pod, 0, parsed) {
 		t.Fatalf("expected newer versioned result to be accepted")
 	}
 }
@@ -138,7 +138,7 @@ func TestAcceptRoleProbeEventVersionedAcceptsNewerVersion(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedIgnoresSingleTokenAnnotation(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550000000000"})
 	parsed := versionedRoleProbeOutput("primary", 1)
-	if !acceptRoleProbeEvent(parsed, pod, 1) {
+	if !acceptRoleProbeEvent(pod, 1, parsed) {
 		t.Fatalf("expected versioned result to ignore single-token EventTime anchor")
 	}
 }
@@ -146,7 +146,7 @@ func TestAcceptRoleProbeEventVersionedIgnoresSingleTokenAnnotation(t *testing.T)
 func TestAcceptRoleProbeEventSingleTokenAcceptsNewerEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550000000000"})
 	parsed := roleProbeOutput{role: "primary"}
-	if !acceptRoleProbeEvent(parsed, pod, 1779550600000000) {
+	if !acceptRoleProbeEvent(pod, 1779550600000000, parsed) {
 		t.Fatalf("expected newer single-token result to be accepted")
 	}
 }
@@ -154,7 +154,7 @@ func TestAcceptRoleProbeEventSingleTokenAcceptsNewerEventTime(t *testing.T) {
 func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550600000000"})
 	parsed := roleProbeOutput{role: "primary"}
-	if acceptRoleProbeEvent(parsed, pod, 1779550000000000) {
+	if acceptRoleProbeEvent(pod, 1779550000000000, parsed) {
 		t.Fatalf("expected stale single-token result to be rejected")
 	}
 }
@@ -165,7 +165,7 @@ func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 func TestAcceptRoleProbeEventSingleTokenRejectedOnPodAlreadyAcceptedVersionedEvent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := roleProbeOutput{role: "primary"}
-	if acceptRoleProbeEvent(parsed, pod, 1779550600000000) {
+	if acceptRoleProbeEvent(pod, 1779550600000000, parsed) {
 		t.Fatalf("expected same-Pod single-token result to be rejected after a versioned result")
 	}
 }
@@ -179,7 +179,7 @@ func TestAcceptRoleProbeEventSingleTokenRejectedOnPodWithBothAnnotationsWhenRole
 		constant.LastRoleEventVersionAnnotationKey:         "1000000",
 	})
 	parsed := roleProbeOutput{role: "primary"}
-	if acceptRoleProbeEvent(parsed, pod, 2000000) {
+	if acceptRoleProbeEvent(pod, 2000000, parsed) {
 		t.Fatalf("expected single-token result to be rejected when roleVersion anchor is present")
 	}
 }
@@ -265,11 +265,11 @@ func TestRoleEventHandlerHandlesInstanceSetVersionedAndExclusiveCleanupDoesNotSt
 
 // Regression for Valkey r4 mixed-mode bug on PR #10283 head 714f684b: a
 // single-token `primary` event from a non-quorum probe script fallback path must not
-// strip the exclusive role label off an versioned-versioned peer. Without
+// strip the exclusive role label off a versioned peer. Without
 // this guard the single-token event runs exclusive cleanup against the
 // versioned-held primary (the gate consults only the single-token annotation,
 // which on the versioned peer is empty, so cleanup is accepted); after the
-// label is stripped the versioned peer's next same-version event is
+// label is stripped the versioned peer's next same-roleVersion event is
 // rejected by the strict-newer gate and the role label can never be
 // restored.
 func TestRoleEventHandlerSingleTokenExclusiveEventBlockedByVersionedHoldingPeer(t *testing.T) {
@@ -310,7 +310,7 @@ func TestRoleEventHandlerSingleTokenExclusiveEventBlockedByVersionedHoldingPeer(
 
 // When the role being claimed is non-exclusive, the versioned-held-peer
 // guard does not apply: a single-token event for a non-exclusive role still
-// goes through normally even when another peer carries an versioned
+// goes through normally even when another peer carries a versioned
 // annotation.
 func TestRoleEventHandlerSingleTokenNonExclusiveEventNotBlockedByVersionedPeer(t *testing.T) {
 	ctx := context.Background()
@@ -347,7 +347,7 @@ func TestRoleEventHandlerSingleTokenNonExclusiveEventNotBlockedByVersionedPeer(t
 }
 
 // A single-token exclusive event still runs normally when no peer holds the
-// exclusive role with an versioned annotation. This pins that the guard
+// exclusive role with a versioned annotation. This pins that the guard
 // only fires in mixed-mode coexistence.
 func TestRoleEventHandlerSingleTokenExclusiveEventAcceptedWhenNoVersionedPeerHoldsRole(t *testing.T) {
 	ctx := context.Background()
@@ -423,7 +423,7 @@ func TestRoleEventHandlerVersionedExclusiveEventBlockedByPeerWithNewerVersionedV
 }
 
 // Versioned events for an exclusive role are not affected by the
-// single-token-only versioned-held-peer guard: an versioned event from one pod is
+// single-token-only versioned-held-peer guard: a versioned event from one pod is
 // allowed to take the role from an older versioned peer (and cleanup will
 // strip the peer label as usual, gated by the versioned-version comparison).
 func TestRoleEventHandlerVersionedExclusiveEventNotBlockedByVersionedPeerGuard(t *testing.T) {
@@ -472,7 +472,7 @@ func TestRoleEventVersionedCleanupLeavesPeerAbleToAcceptItsOwnSameEpochSecondary
 		constant.LastRoleAuthoritativeVersionAnnotationKey: "0",
 	})
 	parsed := versionedRoleProbeOutput("secondary", 1)
-	if !acceptRoleProbeEvent(parsed, pod, 0) {
+	if !acceptRoleProbeEvent(pod, 0, parsed) {
 		t.Fatalf("expected peer to accept same-epoch secondary event")
 	}
 }

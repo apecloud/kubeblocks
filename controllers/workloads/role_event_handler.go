@@ -107,6 +107,8 @@ func (h *RoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestC
 }
 
 func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.Client, event *corev1.Event, result *roleEventResult) (bool, error) {
+	eventVersion := event.EventTime.UnixMicro()
+
 	probeEvent := &proto.ProbeEvent{}
 	if err := json.Unmarshal([]byte(event.Message), probeEvent); err != nil {
 		result.Result = "skipped"
@@ -114,23 +116,20 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 		return true, nil
 	}
 
-	parsed, parseErr := parseRoleProbeOutput(probeEvent.Output)
-	result.Role = parsed.role
-	result.parsed = parsed
-	if parsed.hasAuthoritativeVersion {
-		result.Version = fmt.Sprintf("roleVersion:%d", parsed.authoritativeVersion)
-	}
-
 	if probeEvent.Code != 0 {
 		result.Result = "skipped"
 		result.Reason = fmt.Sprintf("roleProbeFailed:%s", probeEvent.Message)
 		return true, nil
 	}
+
+	parsed, parseErr := parseRoleProbeOutput(probeEvent.Output)
 	if parseErr != nil {
 		result.Result = "skipped"
 		result.Reason = "malformedRoleProbeOutput"
 		return true, nil
 	}
+	result.Role = parsed.role
+	result.parsed = parsed
 
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, result.Pod, pod); err != nil {
@@ -157,9 +156,9 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 		result.WorkloadName = workloadName
 		switch branch {
 		case roleEventBranchInstanceSet:
-			return h.handleInstanceSetRoleProbe(ctx, cli, pod, workloadName, event, result)
+			return h.handleInstanceSetRoleProbe(ctx, cli, pod, workloadName, eventVersion, result)
 		case roleEventBranchInstance:
-			return h.handleInstanceRoleProbe(ctx, cli, pod, workloadName, event, result)
+			return h.handleInstanceRoleProbe(ctx, cli, pod, workloadName, eventVersion, result)
 		}
 	}
 
@@ -173,11 +172,11 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 	case itsName != "":
 		result.Branch = roleEventBranchInstanceSet
 		result.WorkloadName = itsName
-		return h.handleInstanceSetRoleProbe(ctx, cli, pod, itsName, event, result)
+		return h.handleInstanceSetRoleProbe(ctx, cli, pod, itsName, eventVersion, result)
 	case instName != "":
 		result.Branch = roleEventBranchInstance
 		result.WorkloadName = instName
-		return h.handleInstanceRoleProbe(ctx, cli, pod, instName, event, result)
+		return h.handleInstanceRoleProbe(ctx, cli, pod, instName, eventVersion, result)
 	default:
 		result.Result = "ignored"
 		result.Reason = "unknownPodOwner"
@@ -185,8 +184,8 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 	}
 }
 
-func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, event *corev1.Event, result *roleEventResult) (bool, error) {
-	if !acceptRoleProbeEvent(result.parsed, pod, event.EventTime.UnixMicro()) {
+func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, eventVersion int64, result *roleEventResult) (bool, error) {
+	if !acceptRoleProbeEvent(pod, eventVersion, result.parsed) {
 		result.Result = "skipped"
 		result.Reason = "staleRoleEventVersion"
 		return true, nil
@@ -236,7 +235,7 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 		}
 	}
 
-	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.parsed, event.EventTime.UnixMicro(), defined); err != nil {
+	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, defined, eventVersion, result.parsed); err != nil {
 		result.Result = "failed"
 		result.Reason = "updatePodRoleLabelError"
 		return false, err
@@ -244,7 +243,7 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 
 	if defined && role.IsExclusive {
 		result.ExclusiveClean = true
-		if err := removeExclusiveRoleLabels(ctx, cli, *its, pod.Name, result.Role, result.parsed, event.EventTime.UnixMicro()); err != nil {
+		if err := removeExclusiveRoleLabels(ctx, cli, *its, pod.Name, result.Role, eventVersion, result.parsed); err != nil {
 			result.Result = "failed"
 			result.Reason = "removeExclusiveRoleLabelsError"
 			return false, err
@@ -255,8 +254,8 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 	return true, nil
 }
 
-func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, instName string, event *corev1.Event, result *roleEventResult) (bool, error) {
-	if !acceptRoleProbeEvent(result.parsed, pod, event.EventTime.UnixMicro()) {
+func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, instName string, eventVersion int64, result *roleEventResult) (bool, error) {
+	if !acceptRoleProbeEvent(pod, eventVersion, result.parsed) {
 		result.Result = "skipped"
 		result.Reason = "staleRoleEventVersion"
 		return true, nil
@@ -276,7 +275,7 @@ func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli clie
 
 	_, defined := composeRoleMap(inst.Spec.Roles)[result.Role]
 	result.RoleDefined = defined
-	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, result.parsed, event.EventTime.UnixMicro(), defined); err != nil {
+	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, defined, eventVersion, result.parsed); err != nil {
 		result.Result = "failed"
 		result.Reason = "updatePodRoleLabelError"
 		return false, err
@@ -346,7 +345,7 @@ func parseRoleProbeOutput(stdout []byte) (roleProbeOutput, error) {
 // Versioned results do not consult the single-token anchor. The two anchors
 // stay independent; the only cross-anchor rule is the same-Pod
 // versioned-to-single-token downgrade block described above.
-func acceptRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicros int64) bool {
+func acceptRoleProbeEvent(pod *corev1.Pod, eventVersion int64, parsed roleProbeOutput) bool {
 	if parsed.hasAuthoritativeVersion {
 		last := podAnnotation(pod, constant.LastRoleAuthoritativeVersionAnnotationKey)
 		if last == "" {
@@ -367,7 +366,7 @@ func acceptRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicr
 		return true
 	}
 	lastV, err := strconv.ParseUint(last, 10, 64)
-	return err != nil || uint64(eventTimeMicros) > lastV
+	return err != nil || uint64(eventVersion) > lastV
 }
 
 func composeRoleMap(roles []workloads.ReplicaRole) map[string]workloads.ReplicaRole {
@@ -403,7 +402,7 @@ func resolveRoleEventBranchByControllerRef(pod *corev1.Pod) (roleEventBranch, st
 // LastRoleAuthoritativeVersionAnnotationKey only; single-token results stamp
 // LastRoleEventVersionAnnotationKey only. The other key is left untouched so
 // that a migration window does not silently downgrade either stream's anchor.
-func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod, roleName string, parsed roleProbeOutput, eventTimeMicros int64, roleDefined bool) error {
+func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod, roleName string, roleDefined bool, eventVersion int64, parsed roleProbeOutput) error {
 	newPod := pod.DeepCopy()
 	if newPod.Labels == nil {
 		newPod.Labels = make(map[string]string)
@@ -419,7 +418,7 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 	if parsed.hasAuthoritativeVersion {
 		newPod.Annotations[constant.LastRoleAuthoritativeVersionAnnotationKey] = strconv.FormatUint(parsed.authoritativeVersion, 10)
 	} else {
-		newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = strconv.FormatInt(eventTimeMicros, 10)
+		newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = strconv.FormatInt(eventVersion, 10)
 	}
 	if reflect.DeepEqual(newPod.Labels, pod.Labels) && reflect.DeepEqual(newPod.Annotations, pod.Annotations) {
 		return nil
@@ -453,7 +452,7 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 // Whether to strip is still decided per peer by the same gate: a peer that
 // has already advanced past the new event on the matching key is left
 // alone.
-func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workloads.InstanceSet, newPodName, roleName string, parsed roleProbeOutput, eventTimeMicros int64) error {
+func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workloads.InstanceSet, newPodName, roleName string, eventVersion int64, parsed roleProbeOutput) error {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
@@ -470,7 +469,7 @@ func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workl
 		if pod.Name == newPodName {
 			continue
 		}
-		if !acceptRoleProbeEvent(parsed, &pod, eventTimeMicros) {
+		if !acceptRoleProbeEvent(&pod, eventVersion, parsed) {
 			continue
 		}
 
@@ -483,7 +482,7 @@ func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workl
 			if newPod.Annotations == nil {
 				newPod.Annotations = map[string]string{}
 			}
-			newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = strconv.FormatInt(eventTimeMicros, 10)
+			newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = strconv.FormatInt(eventVersion, 10)
 		}
 		if err := cli.Update(ctx, newPod); err != nil {
 			errs = append(errs, err)

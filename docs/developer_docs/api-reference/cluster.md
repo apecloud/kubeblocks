@@ -6250,10 +6250,10 @@ replicas must not describe contradictory primary ownership.
 versioned but whose second token is not an unsigned 64-bit decimal
 integer, or stdout with three or more whitespace-separated tokens,
 is rejected as malformed and the Pod's role label is not updated.
-A component should use one output form consistently for the same
-Pod. After a Pod has reported the versioned form, later
-single-token results from that Pod are ignored to avoid downgrading
-from authoritative role-version ordering.
+A component may migrate a Pod from the single-token form to the
+versioned form. After a Pod has reported the versioned form,
+later single-token results from that Pod are ignored to avoid
+downgrading from authoritative role-version ordering.
 </code></pre>
 <ul>
 <li>On Failure: An error message, if applicable, indicating why the action failed.</li>

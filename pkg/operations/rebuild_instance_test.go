@@ -404,16 +404,12 @@ var _ = Describe("OpsUtil functions", func() {
 					g.Expect(recordedIdentities).Should(HaveKeyWithValue(sourcePVCName, oldIdentity))
 				}
 			})).Should(Succeed())
-			By("expect source PVCs to stay active until the old target pod is gone")
+			By("expect source PVC deletion to be requested before deleting the old target pod")
 			for sourcePVCName := range sourcePVCTemplates {
 				Eventually(func(g Gomega) {
 					pvc := &corev1.PersistentVolumeClaim{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
-					if sourcePVCName == preDeletingSourcePVCName {
-						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					} else {
-						g.Expect(pvc.DeletionTimestamp).Should(BeNil())
-					}
+					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
 					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
 				}).Should(Succeed())
 			}
@@ -425,7 +421,7 @@ var _ = Describe("OpsUtil functions", func() {
 				}).Should(Succeed())
 			}
 
-			By("expect old source PVCs to be deleted only after the old target pod is absent, without clearing PVC protection")
+			By("expect old source PVCs to keep PVC protection until the workload releases them")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(Succeed())
 			for sourcePVCName := range sourcePVCTemplates {

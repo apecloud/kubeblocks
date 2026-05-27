@@ -461,6 +461,11 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 	if err != nil {
 		return err
 	}
+	if !targetPodDeleted {
+		if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
+			return err
+		}
+	}
 	for sourcePVCName, builtTmpPVC := range inPlaceHelper.pvcMap {
 		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, builtTmpPVC.Namespace)
 		if err != nil {
@@ -516,7 +521,6 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 			waitingForSourcePVC = true
 			if !targetPodDeleted {
 				needDeleteTargetPod = true
-				continue
 			}
 			if err := inPlaceHelper.deleteSourcePVCForDynamicProvision(reqCtx, cli, sourcePVC); err != nil {
 				return err
@@ -526,15 +530,17 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 		if err := inPlaceHelper.validateDynamicSourcePVC(sourcePVC, builtTmpPVC, oldIdentity); err != nil {
 			return err
 		}
+		if !targetPodDeleted {
+			waitingForSourcePVC = true
+			needDeleteTargetPod = true
+			continue
+		}
 		if sourcePVC.Status.Phase != corev1.ClaimBound {
 			waitingForSourcePVC = true
 			continue
 		}
 	}
 	if needDeleteTargetPod {
-		if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
-			return err
-		}
 		if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
 			return err
 		}

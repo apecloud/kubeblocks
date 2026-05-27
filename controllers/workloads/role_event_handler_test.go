@@ -111,7 +111,7 @@ func TestParseRoleProbeOutputEmpty(t *testing.T) {
 // --- gate tests: each path consults only its own annotation key ---
 
 func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 9)
 	if acceptRoleProbeEvent(parsed, pod, 0) {
 		t.Fatalf("expected stale versioned result to be rejected")
@@ -119,7 +119,7 @@ func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
 }
 
 func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 10)
 	if acceptRoleProbeEvent(parsed, pod, 0) {
 		t.Fatalf("expected equal versioned result to be rejected")
@@ -127,7 +127,7 @@ func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
 }
 
 func TestAcceptRoleProbeEventVersionedAcceptsNewerVersion(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 11)
 	if !acceptRoleProbeEvent(parsed, pod, 0) {
 		t.Fatalf("expected newer versioned result to be accepted")
@@ -163,7 +163,7 @@ func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 // single-token results from the same Pod, avoiding downgrade from
 // authoritative role-version ordering.
 func TestAcceptRoleProbeEventSingleTokenRejectedOnPodAlreadyAcceptedVersionedEvent(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := roleProbeOutput{role: "primary"}
 	if acceptRoleProbeEvent(parsed, pod, 1779550600000000) {
 		t.Fatalf("expected same-Pod single-token result to be rejected after a versioned result")
@@ -175,8 +175,8 @@ func TestAcceptRoleProbeEventSingleTokenRejectedOnPodAlreadyAcceptedVersionedEve
 // annotation.
 func TestAcceptRoleProbeEventSingleTokenRejectedOnPodWithBothAnnotationsWhenRoleVersionPresent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "10",
-		constant.LastRoleEventVersionAnnotationKey: "1000000",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "10",
+		constant.LastRoleEventVersionAnnotationKey:         "1000000",
 	})
 	parsed := roleProbeOutput{role: "primary"}
 	if acceptRoleProbeEvent(parsed, pod, 2000000) {
@@ -219,11 +219,11 @@ func TestRoleEventHandlerHandlesInstanceSetSingleTokenAndExclusiveCleanupStampsP
 	// primary whose EventTime is older than the cleanup but newer than the
 	// peer's own previous annotation would slip back through the gate.
 	assertPodRole(t, ctx, cli, otherPod, "", wantSingleToken)
-	assertPodLastRoleProbeVersion(t, ctx, cli, otherPod, "")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, otherPod, "")
 }
 
 // Versioned path peer cleanup must strip the label but leave the peer's
-// LastRoleProbeVersionAnnotationKey untouched. Stamping it would let the
+// LastRoleAuthoritativeVersionAnnotationKey untouched. Stamping it would let the
 // strict-newer gate later reject a legitimate event from the peer at the
 // same versioned epoch (e.g. demoted pod emitting `secondary <same-epoch>`).
 func TestRoleEventHandlerHandlesInstanceSetVersionedAndExclusiveCleanupDoesNotStampPeerVersionedAnnotation(t *testing.T) {
@@ -245,7 +245,7 @@ func TestRoleEventHandlerHandlesInstanceSetVersionedAndExclusiveCleanupDoesNotSt
 		constant.RoleLabelKey:                  "leader",
 	})
 	otherPod.Annotations = map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "0",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "0",
 	}
 	event := roleProbeEventWithOutput("default", "event-1", pod, "leader 1", now)
 	cli := roleEventFakeClient(t, its, pod, otherPod, event)
@@ -255,12 +255,12 @@ func TestRoleEventHandlerHandlesInstanceSetVersionedAndExclusiveCleanupDoesNotSt
 	}
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "1")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "1")
 	assertPodRole(t, ctx, cli, otherPod, "", "")
 	// Critical contract: peer versioned annotation is NOT advanced; otherwise
-	// the peer's own next event at versioned version 1 would be rejected as
+	// the peer's own next event at authoritative role version 1 would be rejected as
 	// stale by the strict-newer gate.
-	assertPodLastRoleProbeVersion(t, ctx, cli, otherPod, "0")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, otherPod, "0")
 }
 
 // Regression for Valkey r4 mixed-mode bug on PR #10283 head 714f684b: a
@@ -287,7 +287,7 @@ func TestRoleEventHandlerSingleTokenExclusiveEventBlockedByVersionedHoldingPeer(
 		constant.RoleLabelKey:                  "leader",
 	})
 	versionedPeer.Annotations = map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "3",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "3",
 	}
 	singleTokenPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
@@ -304,7 +304,7 @@ func TestRoleEventHandlerSingleTokenExclusiveEventBlockedByVersionedHoldingPeer(
 	assertPodRole(t, ctx, cli, singleTokenPod, "", "")
 	assertPodLastRoleVersion(t, ctx, cli, singleTokenPod, "")
 	assertPodRole(t, ctx, cli, versionedPeer, "leader", "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "3")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, versionedPeer, "3")
 	assertPodLastRoleVersion(t, ctx, cli, versionedPeer, "")
 }
 
@@ -327,7 +327,7 @@ func TestRoleEventHandlerSingleTokenNonExclusiveEventNotBlockedByVersionedPeer(t
 		constant.RoleLabelKey:                  "leader",
 	})
 	versionedPeer.Annotations = map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "3",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "3",
 	}
 	singleTokenPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
@@ -343,7 +343,7 @@ func TestRoleEventHandlerSingleTokenNonExclusiveEventNotBlockedByVersionedPeer(t
 	assertPodRole(t, ctx, cli, singleTokenPod, "follower", wantSingleToken)
 	// Versioned peer untouched (cleanup only runs for exclusive roles).
 	assertPodRole(t, ctx, cli, versionedPeer, "leader", "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "3")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, versionedPeer, "3")
 }
 
 // A single-token exclusive event still runs normally when no peer holds the
@@ -401,13 +401,13 @@ func TestRoleEventHandlerVersionedExclusiveEventBlockedByPeerWithNewerVersionedV
 		constant.RoleLabelKey:                  "leader",
 	})
 	versionedPeer.Annotations = map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "5",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "5",
 	}
 	versionedPod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
 	})
 	versionedPod.Annotations = map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "3",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "3",
 	}
 	event := roleProbeEventWithOutput("default", "event-1", versionedPod, "leader 4", now)
 	cli := roleEventFakeClient(t, its, versionedPeer, versionedPod, event)
@@ -417,9 +417,9 @@ func TestRoleEventHandlerVersionedExclusiveEventBlockedByPeerWithNewerVersionedV
 	}
 
 	assertPodRole(t, ctx, cli, versionedPod, "", "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPod, "3")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, versionedPod, "3")
 	assertPodRole(t, ctx, cli, versionedPeer, "leader", "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "5")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, versionedPeer, "5")
 }
 
 // Versioned events for an exclusive role are not affected by the
@@ -442,7 +442,7 @@ func TestRoleEventHandlerVersionedExclusiveEventNotBlockedByVersionedPeerGuard(t
 		constant.RoleLabelKey:                  "leader",
 	})
 	versionedPeer.Annotations = map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "3",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "3",
 	}
 	versionedPod := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
@@ -455,11 +455,11 @@ func TestRoleEventHandlerVersionedExclusiveEventNotBlockedByVersionedPeerGuard(t
 	}
 
 	assertPodRole(t, ctx, cli, versionedPod, "leader", "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPod, "5")
-	// Peer label stripped by versioned-path cleanup (versioned version 5 > peer's 3).
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, versionedPod, "5")
+	// Peer label stripped by versioned-path cleanup (authoritative role version 5 > peer's 3).
 	assertPodRole(t, ctx, cli, versionedPeer, "", "")
 	// Peer versioned annotation untouched per the V1 fix.
-	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "3")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, versionedPeer, "3")
 }
 
 // Regression for the prior V1 round: after versioned-path cleanup strips the
@@ -469,7 +469,7 @@ func TestRoleEventHandlerVersionedExclusiveEventNotBlockedByVersionedPeerGuard(t
 // version so a same-epoch secondary event from the peer is strictly newer.
 func TestRoleEventVersionedCleanupLeavesPeerAbleToAcceptItsOwnSameEpochSecondaryEvent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{
-		constant.LastRoleProbeVersionAnnotationKey: "0",
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "0",
 	})
 	parsed := versionedRoleProbeOutput("secondary", 1)
 	if !acceptRoleProbeEvent(parsed, pod, 0) {
@@ -591,7 +591,7 @@ func TestRoleEventHandlerConsumesInvalidProbeMessageWithoutPodUpdate(t *testing.
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerConsumesProbeFailureWithoutPodUpdate(t *testing.T) {
@@ -609,7 +609,7 @@ func TestRoleEventHandlerConsumesProbeFailureWithoutPodUpdate(t *testing.T) {
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerRejectsMalformedRoleProbeOutput(t *testing.T) {
@@ -633,7 +633,7 @@ func TestRoleEventHandlerRejectsMalformedRoleProbeOutput(t *testing.T) {
 	// malformed output is rejected before any write.
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerConsumesStalePodUIDWithoutPodUpdate(t *testing.T) {
@@ -652,7 +652,7 @@ func TestRoleEventHandlerConsumesStalePodUIDWithoutPodUpdate(t *testing.T) {
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerConsumesPodNotFound(t *testing.T) {
@@ -702,7 +702,7 @@ func TestRoleEventHandlerConsumesMissingWorkloadWithoutPodUpdate(t *testing.T) {
 
 			assertPodRole(t, ctx, cli, pod, "leader", "")
 			assertPodLastRoleVersion(t, ctx, cli, pod, "")
-			assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
+			assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
 		})
 	}
 }
@@ -859,13 +859,13 @@ func assertPodLastRoleVersion(t *testing.T, ctx context.Context, cli client.Clie
 	}
 }
 
-func assertPodLastRoleProbeVersion(t *testing.T, ctx context.Context, cli client.Client, pod *corev1.Pod, version string) {
+func assertPodLastRoleAuthoritativeVersion(t *testing.T, ctx context.Context, cli client.Client, pod *corev1.Pod, version string) {
 	t.Helper()
 	var stored corev1.Pod
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(pod), &stored); err != nil {
 		t.Fatalf("get pod failed: %v", err)
 	}
-	if stored.Annotations[constant.LastRoleProbeVersionAnnotationKey] != version {
-		t.Fatalf("expected versioned version %q, got %q", version, stored.Annotations[constant.LastRoleProbeVersionAnnotationKey])
+	if stored.Annotations[constant.LastRoleAuthoritativeVersionAnnotationKey] != version {
+		t.Fatalf("expected authoritative role version %q, got %q", version, stored.Annotations[constant.LastRoleAuthoritativeVersionAnnotationKey])
 	}
 }

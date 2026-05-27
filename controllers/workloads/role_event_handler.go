@@ -348,7 +348,7 @@ func parseRoleProbeOutput(stdout []byte) (roleProbeOutput, error) {
 // versioned-to-single-token downgrade block described above.
 func acceptRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicros int64) bool {
 	if parsed.hasAuthoritativeVersion {
-		last := podAnnotation(pod, constant.LastRoleProbeVersionAnnotationKey)
+		last := podAnnotation(pod, constant.LastRoleAuthoritativeVersionAnnotationKey)
 		if last == "" {
 			return true
 		}
@@ -359,7 +359,7 @@ func acceptRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicr
 		return false
 	}
 
-	if podAnnotation(pod, constant.LastRoleProbeVersionAnnotationKey) != "" {
+	if podAnnotation(pod, constant.LastRoleAuthoritativeVersionAnnotationKey) != "" {
 		return false
 	}
 	last := podAnnotation(pod, constant.LastRoleEventVersionAnnotationKey)
@@ -400,7 +400,7 @@ func resolveRoleEventBranchByControllerRef(pod *corev1.Pod) (roleEventBranch, st
 // updatePodRoleLabel writes the new role label (or removes it when the role
 // is not in the workload's role list) and advances the path-specific
 // annotation for the accepted event. Versioned results stamp
-// LastRoleProbeVersionAnnotationKey only; single-token results stamp
+// LastRoleAuthoritativeVersionAnnotationKey only; single-token results stamp
 // LastRoleEventVersionAnnotationKey only. The other key is left untouched so
 // that a migration window does not silently downgrade either stream's anchor.
 func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod, roleName string, parsed roleProbeOutput, eventTimeMicros int64, roleDefined bool) error {
@@ -417,7 +417,7 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 		newPod.Annotations = map[string]string{}
 	}
 	if parsed.hasAuthoritativeVersion {
-		newPod.Annotations[constant.LastRoleProbeVersionAnnotationKey] = strconv.FormatUint(parsed.authoritativeVersion, 10)
+		newPod.Annotations[constant.LastRoleAuthoritativeVersionAnnotationKey] = strconv.FormatUint(parsed.authoritativeVersion, 10)
 	} else {
 		newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = strconv.FormatInt(eventTimeMicros, 10)
 	}
@@ -439,7 +439,7 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 //     and write the exclusive role back. Stamping is the one-way ratchet
 //     the single-token stream relies on.
 //   - Versioned path: each accepted strip leaves the peer's
-//     LastRoleProbeVersionAnnotationKey untouched. The role version is
+//     LastRoleAuthoritativeVersionAnnotationKey untouched. The role version is
 //     a per-pod monotonically increasing number; stamping the peer with
 //     the new primary's role version (which originated from a different
 //     pod's kbagent) would let the strict-newer gate later reject a
@@ -501,7 +501,7 @@ func podAnnotation(pod *corev1.Pod, key string) string {
 
 // versionedPeerHoldsExclusiveRole reports whether any peer pod in the
 // InstanceSet currently holds the exclusive role label and carries a
-// LastRoleProbeVersionAnnotationKey value. It is used to keep a
+// LastRoleAuthoritativeVersionAnnotationKey value. It is used to keep a
 // single-token roleProbe event from displacing an exclusive role that
 // a versioned peer already owns: the single-token gate consults only
 // the EventTime anchor, so a versioned peer's anchor is
@@ -525,7 +525,7 @@ func versionedPeerHoldsExclusiveRole(ctx context.Context, cli client.Client, its
 		if p.Name == selfName {
 			continue
 		}
-		if podAnnotation(&p, constant.LastRoleProbeVersionAnnotationKey) != "" {
+		if podAnnotation(&p, constant.LastRoleAuthoritativeVersionAnnotationKey) != "" {
 			return true, nil
 		}
 	}
@@ -553,7 +553,7 @@ func newerOrEqualVersionedExclusiveRoleHeldByPeer(ctx context.Context, cli clien
 		if p.Name == selfName {
 			continue
 		}
-		last := podAnnotation(&p, constant.LastRoleProbeVersionAnnotationKey)
+		last := podAnnotation(&p, constant.LastRoleAuthoritativeVersionAnnotationKey)
 		if last == "" {
 			continue
 		}

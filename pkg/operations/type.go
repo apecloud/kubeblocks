@@ -111,6 +111,10 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
+	// keeps a failed instance under observation for ops types that can recover
+	// from transient workload failure signals.
+	recoverableFailureGracePeriod time.Duration
+	requeueAfter                  time.Duration
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views

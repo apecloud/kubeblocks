@@ -38,6 +38,8 @@ type restartOpsHandler struct {
 
 var _ OpsHandler = restartOpsHandler{}
 
+const restartRecoverableFailureObservationWindow = 5 * time.Minute
+
 func init() {
 	restartBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may repair it.
@@ -89,6 +91,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		pgRes.recoverableFailureGracePeriod = restartRecoverableFailureObservationWindow
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
 	}
 	return r.compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,

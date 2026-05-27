@@ -321,6 +321,10 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	instance Instance) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
 	if instance.IsFailedAndTimedOut() {
+		if pgRes.recoverableFailureGracePeriod > 0 &&
+			observeRecoverableInstanceFailure(opsRes, pgRes, compStatus, progressDetail, componentName) {
+			return 0
+		}
 		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, instance.GetName())
 		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
 		progressDetail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus, message)
@@ -332,6 +336,40 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 		&compStatus.ProgressDetails, progressDetail)
 	return completedCount
+}
+
+func observeRecoverableInstanceFailure(opsRes *OpsResource,
+	pgRes *progressResource,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus,
+	progressDetail opsv1alpha1.ProgressStatusDetail,
+	componentName string) bool {
+	now := time.Now()
+	existingProgressDetail := findStatusProgressDetail(compStatus.ProgressDetails, progressDetail.ObjectKey)
+	if existingProgressDetail != nil &&
+		existingProgressDetail.Status == opsv1alpha1.ProcessingProgressStatus &&
+		!existingProgressDetail.StartTime.IsZero() {
+		deadline := existingProgressDetail.StartTime.Add(pgRes.recoverableFailureGracePeriod)
+		if now.Before(deadline) {
+			setProgressResourceRequeueAfter(pgRes, time.Until(deadline))
+			return true
+		}
+		return false
+	}
+	progressDetail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
+		getProgressProcessingMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName))
+	setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+		&compStatus.ProgressDetails, progressDetail)
+	setProgressResourceRequeueAfter(pgRes, pgRes.recoverableFailureGracePeriod)
+	return true
+}
+
+func setProgressResourceRequeueAfter(pgRes *progressResource, requeueAfter time.Duration) {
+	if requeueAfter <= 0 {
+		return
+	}
+	if pgRes.requeueAfter == 0 || requeueAfter < pgRes.requeueAfter {
+		pgRes.requeueAfter = requeueAfter
+	}
 }
 
 // notRecreatedDuringOperation checks if instance is re-created during the component's operation.

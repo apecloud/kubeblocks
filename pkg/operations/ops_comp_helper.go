@@ -135,13 +135,14 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 	return cli.Update(ctx, opsRes.Cluster)
 }
 
-func (c componentOpsHelper) existFailure(ops *opsv1alpha1.OpsRequest, componentName string) bool {
-	for _, v := range ops.Status.Components[componentName].ProgressDetails {
+func componentStatusFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatus) int32 {
+	var count int32
+	for _, v := range compStatus.ProgressDetails {
 		if v.Status == opsv1alpha1.FailedProgressStatus {
-			return true
+			count++
 		}
 	}
-	return false
+	return count
 }
 
 func (c componentOpsHelper) getComponentOps(componentName string) (ComponentOpsInterface, bool) {
@@ -243,6 +244,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		completedProgressCount int32
 		err                    error
 		clusterDef             *appsv1.ClusterDefinition
+		requeueAfter           time.Duration
 	)
 	if opsRes.Cluster.Spec.ClusterDef != "" {
 		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDef); err != nil {
@@ -268,10 +270,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}
-		expectProgressCount += expectCount
-		completedProgressCount += completedCount
-		if c.existFailure(opsRes.OpsRequest, pgResource.compOps.GetComponentName()) {
-			existFailure = true
+		if pgResource.requeueAfter > 0 && (requeueAfter == 0 || pgResource.requeueAfter < requeueAfter) {
+			requeueAfter = pgResource.requeueAfter
 		}
 		var componentPhase appsv1.ComponentPhase
 		if pgResource.shards == nil {
@@ -279,14 +279,22 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		} else {
 			componentPhase = opsRes.Cluster.Status.Shardings[pgResource.compOps.GetComponentName()].Phase
 		}
+		componentFailureCount := componentStatusFailureCount(opsCompStatus)
+		componentHasFailure := componentFailureCount > 0
+		if componentHasFailure {
+			existFailure = true
+		}
+		expectProgressCount += expectCount
+		completedProgressCount += completedCount
 		// conditions whether ops is running:
 		//  1. completedProgressCount is not equal to expectProgressCount.
 		//  2. the component phase is not a terminal phase or no completed progress if the ops
 		//  needs to wait for the component phase to reach a terminal state.
-		if expectCount != completedCount {
+		switch {
+		case expectCount != completedCount:
 			opsIsCompleted = false
-		} else if !pgResource.noWaitComponentCompleted &&
-			(!slices.Contains(componentTerminalPhases(), componentPhase) || noAnyProgressCompleted(pgResource.clusterComponent.Replicas, completedCount)) {
+		case !pgResource.noWaitComponentCompleted &&
+			(!slices.Contains(componentTerminalPhases(), componentPhase) || noAnyProgressCompleted(pgResource.clusterComponent.Replicas, completedCount)):
 			opsIsCompleted = false
 		}
 		opsCompStatus.Phase = componentPhase
@@ -300,7 +308,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 	}
 	if !opsIsCompleted {
-		return opsRequestPhase, 0, nil
+		return opsRequestPhase, requeueAfter, nil
 	}
 	if existFailure {
 		return opsv1alpha1.OpsFailedPhase, 0, nil

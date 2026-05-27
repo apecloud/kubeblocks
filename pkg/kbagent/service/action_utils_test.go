@@ -32,6 +32,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -63,6 +64,39 @@ var _ = Describe("action utils", func() {
 		Expect(ok).Should(BeTrue())
 		return err
 	}
+
+	Context("timeout context", func() {
+		deadlineRemaining := func(timeout *int32) (time.Duration, bool) {
+			ctxWithTimeout, cancel := actionCallTimeoutContext(ctx, timeout)
+			defer cancel()
+			deadline, ok := ctxWithTimeout.Deadline()
+			if !ok {
+				return 0, false
+			}
+			return time.Until(deadline), true
+		}
+
+		It("uses the default action timeout when timeout is not specified", func() {
+			remaining, ok := deadlineRemaining(nil)
+			Expect(ok).Should(BeTrue())
+			Expect(remaining).Should(BeNumerically(">", 25*time.Second))
+			Expect(remaining).Should(BeNumerically("<=", defaultActionCallTimeout))
+		})
+
+		It("honors action timeoutSeconds above 60 seconds", func() {
+			timeout := int32(300)
+			remaining, ok := deadlineRemaining(&timeout)
+			Expect(ok).Should(BeTrue())
+			Expect(remaining).Should(BeNumerically(">", 295*time.Second))
+			Expect(remaining).Should(BeNumerically("<=", 300*time.Second))
+		})
+
+		It("does not set a deadline for negative timeout", func() {
+			timeout := int32(-1)
+			_, ok := deadlineRemaining(&timeout)
+			Expect(ok).Should(BeFalse())
+		})
+	})
 
 	Context("exec", func() {
 		It("x - ok", func() {

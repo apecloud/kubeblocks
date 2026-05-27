@@ -61,7 +61,6 @@ const (
 	defaultMaxIdleConnectionsPerHost = 20
 
 	defaultActionCallTimeout = 30 * time.Second
-	maxActionCallTimeout     = 60 * time.Second
 
 	defaultHTTPHost   = "127.0.0.1"
 	defaultHTTPScheme = "HTTP"
@@ -178,7 +177,7 @@ func actionCallTimeoutContext(ctx context.Context, timeout *int32) (context.Cont
 	case ptr.Deref(timeout, 0) == 0:
 		return context.WithTimeout(ctx, defaultActionCallTimeout)
 	case *timeout > 0:
-		return context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
+		return context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
 	default:
 		return ctx, func() {}
 	}

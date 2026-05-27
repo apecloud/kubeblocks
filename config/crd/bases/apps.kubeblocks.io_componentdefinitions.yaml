@@ -4133,7 +4133,7 @@ spec:
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
                             Behavior based on the value:
-                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                            - Positive (> 0): The action will be terminated after this many seconds.
                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -4712,7 +4712,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -5141,7 +5141,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -5562,7 +5562,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -5978,7 +5978,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -6397,7 +6397,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -6818,7 +6818,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -7229,7 +7229,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -7640,7 +7640,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -8051,7 +8051,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -8464,7 +8464,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -8869,7 +8869,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -9314,7 +9314,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -9735,7 +9735,7 @@ spec:
                           Specifies the maximum duration in seconds that the Action is allowed to run.
 
                           Behavior based on the value:
-                          - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                          - Positive (> 0): The action will be terminated after this many seconds.
                           - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                           - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -17860,7 +17860,7 @@ spec:
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
                             Behavior based on the value:
-                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                            - Positive (> 0): The action will be terminated after this many seconds.
                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
 

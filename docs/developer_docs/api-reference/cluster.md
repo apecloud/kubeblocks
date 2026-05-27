@@ -2494,7 +2494,7 @@ int32
 <em>(Optional)</em>
 <p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
 <p>Behavior based on the value:
-- Positive (&gt; 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+- Positive (&gt; 0): The action will be terminated after this many seconds.
 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
 - Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>

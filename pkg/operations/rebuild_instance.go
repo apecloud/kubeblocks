@@ -293,6 +293,13 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.Req
 	}
 	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom, instance, index)
 	if err != nil {
+		if rebuildFrom.BackupName == "" && progressDetail.Message == waitingForDynamicPVCMessage && apierrors.IsNotFound(err) {
+			inPlaceHelper, err = r.prepareNoBackupRebuildHelperWithoutTargetPod(reqCtx, cli, opsRes, rebuildFrom, instance, index)
+			if err != nil {
+				return false, err
+			}
+			return inPlaceHelper.rebuildInstanceWithNoBackup(reqCtx, cli, opsRes, progressDetail)
+		}
 		return false, err
 	}
 
@@ -622,6 +629,36 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		volumeMounts:           volumeMounts,
 		rebuildPrefix:          rebuildPrefix,
 		envForRestore:          rebuildInstance.RestoreEnv,
+	}, nil
+}
+
+func (r rebuildInstanceOpsHandler) prepareNoBackupRebuildHelperWithoutTargetPod(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	rebuildInstance opsv1alpha1.RebuildInstance,
+	instance opsv1alpha1.Instance,
+	index int) (*inplaceRebuildHelper, error) {
+	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, rebuildInstance.ComponentName)
+	if err != nil {
+		return nil, err
+	}
+	rebuildPrefix := fmt.Sprintf("rebuild-%s", opsRes.OpsRequest.UID[:8])
+	pvcMap, err := buildDynamicSourcePVCMap(opsRes, synthesizedComp, instance.Name, rebuildPrefix, index)
+	if err != nil {
+		return nil, err
+	}
+	return &inplaceRebuildHelper{
+		index:           index,
+		instance:        instance,
+		synthesizedComp: synthesizedComp,
+		pvcMap:          pvcMap,
+		targetPod: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      instance.Name,
+				Namespace: opsRes.Cluster.Namespace,
+			},
+		},
+		rebuildPrefix: rebuildPrefix,
 	}, nil
 }
 

@@ -453,6 +453,11 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 		return err
 	}
 	waitingForSourcePVC := false
+	needDeleteTargetPod := false
+	targetPodDeleted, err := inPlaceHelper.targetPodDeletedForRebuild(reqCtx, cli)
+	if err != nil {
+		return err
+	}
 	for sourcePVCName, builtTmpPVC := range inPlaceHelper.pvcMap {
 		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, builtTmpPVC.Namespace)
 		if err != nil {
@@ -464,9 +469,6 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 		}
 		if sourcePVC.DeletionTimestamp != nil {
 			waitingForSourcePVC = true
-			if err := inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC); err != nil {
-				return err
-			}
 			continue
 		}
 		oldIdentity := sourcePVCIdentities[sourcePVCName]
@@ -479,7 +481,11 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 		}
 		if string(sourcePVC.UID) == oldIdentity.UID {
 			waitingForSourcePVC = true
-			if err := inPlaceHelper.deleteSourcePVCForRebuild(reqCtx, cli, sourcePVC); err != nil {
+			if !targetPodDeleted {
+				needDeleteTargetPod = true
+				continue
+			}
+			if err := inPlaceHelper.deleteSourcePVCForDynamicProvision(reqCtx, cli, sourcePVC); err != nil {
 				return err
 			}
 			continue
@@ -492,15 +498,19 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 			continue
 		}
 	}
-	if waitingForSourcePVC {
+	if needDeleteTargetPod {
+		if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
+			return err
+		}
+		if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
+			return err
+		}
 		progressDetail.Message = waitingForDynamicPVCMessage
 		return nil
 	}
-	if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
-		return err
-	}
-	if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
-		return err
+	if waitingForSourcePVC {
+		progressDetail.Message = waitingForDynamicPVCMessage
+		return nil
 	}
 
 	progressDetail.Message = waitingForInstanceReadyMessage
@@ -577,6 +587,18 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intc
 		options = append(options, client.GracePeriodSeconds(0))
 	}
 	return client.IgnoreNotFound(intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...))
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) targetPodDeletedForRebuild(reqCtx intctrlutil.RequestCtx,
+	cli client.Client) (bool, error) {
+	targetPod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: inPlaceHelper.targetPod.Name, Namespace: inPlaceHelper.targetPod.Namespace}, targetPod); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) setSourcePVCVolumeNameForRebuild(reqCtx intctrlutil.RequestCtx,
@@ -797,6 +819,17 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteSourcePVCForRebuild(reqCtx intc
 	return inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC)
 }
 
+func (inPlaceHelper *inplaceRebuildHelper) deleteSourcePVCForDynamicProvision(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	sourcePVC *corev1.PersistentVolumeClaim) error {
+	if sourcePVC.DeletionTimestamp != nil {
+		return nil
+	}
+	// In the no-backup path, PVC protection is the signal that the old pod
+	// has not fully released the volume yet. Do not clear it here.
+	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePVC)
+}
+
 func (inPlaceHelper *inplaceRebuildHelper) revertReclaimPolicy(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, pv *corev1.PersistentVolume) error {
 	reclaimPolicy := pv.Annotations[sourcePVReclaimPolicyAnnotation]
@@ -886,6 +919,39 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 		})
 	}
 	return pvcMap, volumes, volumeMounts, nil
+}
+
+func buildDynamicSourcePVCMap(opsRes *OpsResource,
+	synthesizedComp *component.SynthesizedComponent,
+	targetPodName string,
+	rebuildPrefix string,
+	index int) (map[string]*corev1.PersistentVolumeClaim, error) {
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
+	templateName, _, err := getTemplateNameAndOrdinal(workloadName, targetPodName)
+	if err != nil {
+		return nil, err
+	}
+	pvcMap := map[string]*corev1.PersistentVolumeClaim{}
+	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+		sourcePVCName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{
+			ObjectMeta: vct.ObjectMeta,
+			Spec:       vct.Spec,
+		}, workloadName, targetPodName)
+		tmpPVC := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s-%d", rebuildPrefix, common.CutString(synthesizedComp.Name+"-"+vct.Name, 30), index),
+				Namespace: opsRes.Cluster.Namespace,
+				Labels:    getWellKnownLabels(synthesizedComp),
+				Annotations: map[string]string{
+					rebuildFromAnnotation: opsRes.OpsRequest.Name,
+				},
+			},
+			Spec: vct.Spec,
+		}
+		plan.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name, templateName)
+		pvcMap[sourcePVCName] = tmpPVC
+	}
+	return pvcMap, nil
 }
 
 func getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {

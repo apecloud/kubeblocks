@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -47,13 +46,11 @@ import (
 )
 
 const (
-	rebuildFromAnnotation                = "operations.kubeblocks.io/rebuild-from"
-	rebuildTmpPVCNameLabel               = "operations.kubeblocks.io/rebuild-tmp-pvc"
-	rebuildSourcePVCIdentitiesAnnotation = "operations.kubeblocks.io/rebuild-source-pvc-identities"
-	sourcePVReclaimPolicyAnnotation      = "operations.kubeblocks.io/source-reclaim-policy"
+	rebuildFromAnnotation           = "operations.kubeblocks.io/rebuild-from"
+	rebuildTmpPVCNameLabel          = "operations.kubeblocks.io/rebuild-tmp-pvc"
+	sourcePVReclaimPolicyAnnotation = "operations.kubeblocks.io/source-reclaim-policy"
 
 	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
-	waitingForDynamicPVCMessage      = "Waiting for source PVCs to be dynamically reprovisioned"
 	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
 
 	ignoreRoleCheckAnnotationKey = "operations.kubeblocks.io/ignore-role-check"
@@ -437,198 +434,30 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 	return nil
 }
 
-type rebuildSourcePVCIdentity struct {
-	UID        string `json:"uid,omitempty"`
-	VolumeName string `json:"volumeName,omitempty"`
-	Absent     bool   `json:"absent,omitempty"`
-}
-
 func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest,
 	progressDetail *opsv1alpha1.ProgressStatusDetail) error {
 	itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
-
-	sourcePVCIdentities, err := getRecordedSourcePVCIdentities(opsRequest)
-	if err != nil {
+	if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
 		return err
 	}
-	waitingForSourcePVC := false
-	needDeleteTargetPod := false
-	targetPodDeleted, err := inPlaceHelper.targetPodDeletedForRebuild(reqCtx, cli)
-	if err != nil {
-		return err
-	}
-	if !targetPodDeleted {
-		if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
-			return err
-		}
-	}
-	for sourcePVCName, builtTmpPVC := range inPlaceHelper.pvcMap {
-		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, builtTmpPVC.Namespace)
+	for sourcePVCName, sourcePVCTemplate := range inPlaceHelper.pvcMap {
+		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, sourcePVCTemplate.Namespace)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				waitingForSourcePVC = true
-				if sourcePVCIdentities[sourcePVCName].UID == "" && !sourcePVCIdentities[sourcePVCName].Absent {
-					if err := inPlaceHelper.recordSourcePVCAbsentOnOpsRequest(reqCtx, cli, opsRequest, sourcePVCName); err != nil {
-						return err
-					}
-					sourcePVCIdentities[sourcePVCName] = rebuildSourcePVCIdentity{Absent: true}
-				}
-				if !targetPodDeleted {
-					needDeleteTargetPod = true
-				}
 				continue
 			}
 			return err
 		}
-		oldIdentity := sourcePVCIdentities[sourcePVCName]
-		if oldIdentity.UID == "" {
-			if oldIdentity.Absent {
-				if !targetPodDeleted {
-					waitingForSourcePVC = true
-					needDeleteTargetPod = true
-					continue
-				}
-				if sourcePVC.DeletionTimestamp != nil {
-					waitingForSourcePVC = true
-					continue
-				}
-				if err := inPlaceHelper.validateDynamicSourcePVC(sourcePVC, builtTmpPVC, oldIdentity); err != nil {
-					return err
-				}
-				if sourcePVC.Status.Phase != corev1.ClaimBound {
-					waitingForSourcePVC = true
-				}
-				continue
-			}
-			if err := inPlaceHelper.recordSourcePVCIdentityOnOpsRequest(reqCtx, cli, opsRequest, sourcePVC); err != nil {
-				return err
-			}
-			oldIdentity = rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName}
-			sourcePVCIdentities[sourcePVCName] = oldIdentity
-		}
-		if sourcePVC.DeletionTimestamp != nil {
-			waitingForSourcePVC = true
-			if !targetPodDeleted {
-				needDeleteTargetPod = true
-			}
-			continue
-		}
-		if string(sourcePVC.UID) == oldIdentity.UID {
-			waitingForSourcePVC = true
-			if !targetPodDeleted {
-				needDeleteTargetPod = true
-			}
-			if err := inPlaceHelper.deleteSourcePVCForDynamicProvision(reqCtx, cli, sourcePVC); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := inPlaceHelper.validateDynamicSourcePVC(sourcePVC, builtTmpPVC, oldIdentity); err != nil {
+		if err := inPlaceHelper.deleteSourcePVCForDynamicProvision(reqCtx, cli, sourcePVC); err != nil {
 			return err
 		}
-		if !targetPodDeleted {
-			waitingForSourcePVC = true
-			needDeleteTargetPod = true
-			continue
-		}
-		if sourcePVC.Status.Phase != corev1.ClaimBound {
-			waitingForSourcePVC = true
-			continue
-		}
 	}
-	if needDeleteTargetPod {
-		if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
-			return err
-		}
-		progressDetail.Message = waitingForDynamicPVCMessage
-		return nil
+	if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
+		return err
 	}
-	if waitingForSourcePVC {
-		progressDetail.Message = waitingForDynamicPVCMessage
-		return nil
-	}
-
 	progressDetail.Message = waitingForInstanceReadyMessage
-	return nil
-}
-
-func getRecordedSourcePVCIdentities(opsRequest *opsv1alpha1.OpsRequest) (map[string]rebuildSourcePVCIdentity, error) {
-	sourcePVCIdentities := map[string]rebuildSourcePVCIdentity{}
-	if opsRequest.Annotations == nil || opsRequest.Annotations[rebuildSourcePVCIdentitiesAnnotation] == "" {
-		return sourcePVCIdentities, nil
-	}
-	if err := json.Unmarshal([]byte(opsRequest.Annotations[rebuildSourcePVCIdentitiesAnnotation]), &sourcePVCIdentities); err != nil {
-		return nil, err
-	}
-	return sourcePVCIdentities, nil
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCIdentityOnOpsRequest(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRequest *opsv1alpha1.OpsRequest,
-	sourcePVC *corev1.PersistentVolumeClaim) error {
-	return inPlaceHelper.recordSourcePVCStateOnOpsRequest(reqCtx, cli, opsRequest, sourcePVC.Name,
-		rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName})
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCAbsentOnOpsRequest(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRequest *opsv1alpha1.OpsRequest,
-	sourcePVCName string) error {
-	return inPlaceHelper.recordSourcePVCStateOnOpsRequest(reqCtx, cli, opsRequest, sourcePVCName, rebuildSourcePVCIdentity{Absent: true})
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCStateOnOpsRequest(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRequest *opsv1alpha1.OpsRequest,
-	sourcePVCName string,
-	identity rebuildSourcePVCIdentity) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		latest := &opsv1alpha1.OpsRequest{}
-		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, latest); err != nil {
-			return err
-		}
-		sourcePVCIdentities, err := getRecordedSourcePVCIdentities(latest)
-		if err != nil {
-			return err
-		}
-		if sourcePVCIdentities[sourcePVCName].UID != "" || sourcePVCIdentities[sourcePVCName].Absent {
-			opsRequest.Annotations = latest.Annotations
-			return nil
-		}
-		sourcePVCIdentities[sourcePVCName] = identity
-		data, err := json.Marshal(sourcePVCIdentities)
-		if err != nil {
-			return err
-		}
-		patch := client.MergeFrom(latest.DeepCopy())
-		if latest.Annotations == nil {
-			latest.Annotations = map[string]string{}
-		}
-		latest.Annotations[rebuildSourcePVCIdentitiesAnnotation] = string(data)
-		if err := cli.Patch(reqCtx.Ctx, latest, patch); err != nil {
-			return err
-		}
-		opsRequest.Annotations = latest.Annotations
-		return nil
-	})
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) validateDynamicSourcePVC(sourcePVC, builtTmpPVC *corev1.PersistentVolumeClaim, oldIdentity rebuildSourcePVCIdentity) error {
-	for key, expected := range builtTmpPVC.Labels {
-		if expected == "" {
-			continue
-		}
-		if sourcePVC.Labels[key] != expected {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is not rebuilt from the expected workload template: label "%s" expected "%s", got "%s"`,
-				sourcePVC.Name, key, expected, sourcePVC.Labels[key]))
-		}
-	}
-	if oldIdentity.VolumeName != "" && sourcePVC.Spec.VolumeName != "" && oldIdentity.VolumeName == sourcePVC.Spec.VolumeName {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is still bound to the old pv "%s"`, sourcePVC.Name, sourcePVC.Spec.VolumeName))
-	}
 	return nil
 }
 
@@ -640,18 +469,6 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intc
 		options = append(options, client.GracePeriodSeconds(0))
 	}
 	return client.IgnoreNotFound(intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...))
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) targetPodDeletedForRebuild(reqCtx intctrlutil.RequestCtx,
-	cli client.Client) (bool, error) {
-	targetPod := &corev1.Pod{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: inPlaceHelper.targetPod.Name, Namespace: inPlaceHelper.targetPod.Namespace}, targetPod); err != nil {
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-	return false, nil
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) setSourcePVCVolumeNameForRebuild(reqCtx intctrlutil.RequestCtx,
@@ -915,7 +732,8 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 	synthesizedComp *component.SynthesizedComponent,
 	targetPod *corev1.Pod,
 	rebuildPrefix string,
-	index int) (map[string]*corev1.PersistentVolumeClaim, []corev1.Volume, []corev1.VolumeMount, error) {
+	index int,
+	noBackup bool) (map[string]*corev1.PersistentVolumeClaim, []corev1.Volume, []corev1.VolumeMount, error) {
 	var (
 		volumes      []corev1.Volume
 		volumeMounts []corev1.VolumeMount
@@ -942,6 +760,16 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 			// which has not been backported to release-1.0. PVCNamePrefixAnnotationKey is also unset on this
 			// release line, so the helper's fallback is equivalent to the simple "<template>-<pod>" naming.
 			sourcePVCName = fmt.Sprintf("%s-%s", vct.Name, targetPod.Name)
+		}
+		if noBackup {
+			pvcMap[sourcePVCName] = &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sourcePVCName,
+					Namespace: targetPod.Namespace,
+				},
+				Spec: vct.Spec,
+			}
+			continue
 		}
 		pvcLabels := getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{
@@ -972,39 +800,6 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 		})
 	}
 	return pvcMap, volumes, volumeMounts, nil
-}
-
-func buildDynamicSourcePVCMap(opsRes *OpsResource,
-	synthesizedComp *component.SynthesizedComponent,
-	targetPodName string,
-	rebuildPrefix string,
-	index int) (map[string]*corev1.PersistentVolumeClaim, error) {
-	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
-	templateName, _, err := getTemplateNameAndOrdinal(workloadName, targetPodName)
-	if err != nil {
-		return nil, err
-	}
-	pvcMap := map[string]*corev1.PersistentVolumeClaim{}
-	for _, vct := range synthesizedComp.VolumeClaimTemplates {
-		sourcePVCName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{
-			ObjectMeta: vct.ObjectMeta,
-			Spec:       vct.Spec,
-		}, workloadName, targetPodName)
-		tmpPVC := &corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%s-%d", rebuildPrefix, common.CutString(synthesizedComp.Name+"-"+vct.Name, 30), index),
-				Namespace: opsRes.Cluster.Namespace,
-				Labels:    getWellKnownLabels(synthesizedComp),
-				Annotations: map[string]string{
-					rebuildFromAnnotation: opsRes.OpsRequest.Name,
-				},
-			},
-			Spec: vct.Spec,
-		}
-		plan.BuildPersistentVolumeClaimLabels(synthesizedComp, tmpPVC, vct.Name, templateName)
-		pvcMap[sourcePVCName] = tmpPVC
-	}
-	return pvcMap, nil
 }
 
 func getWellKnownLabels(synthesizedComp *component.SynthesizedComponent) map[string]string {

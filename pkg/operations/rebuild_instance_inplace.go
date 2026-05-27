@@ -467,17 +467,29 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 			}
 			return err
 		}
-		if sourcePVC.DeletionTimestamp != nil {
-			waitingForSourcePVC = true
-			continue
-		}
 		oldIdentity := sourcePVCIdentities[sourcePVCName]
 		if oldIdentity.UID == "" {
+			if targetPodDeleted && sourcePVC.DeletionTimestamp == nil {
+				if err := inPlaceHelper.validateDynamicSourcePVC(sourcePVC, builtTmpPVC, oldIdentity); err != nil {
+					return err
+				}
+				if sourcePVC.Status.Phase != corev1.ClaimBound {
+					waitingForSourcePVC = true
+				}
+				continue
+			}
 			if err := inPlaceHelper.recordSourcePVCIdentityOnOpsRequest(reqCtx, cli, opsRequest, sourcePVC); err != nil {
 				return err
 			}
 			oldIdentity = rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName}
 			sourcePVCIdentities[sourcePVCName] = oldIdentity
+		}
+		if sourcePVC.DeletionTimestamp != nil {
+			waitingForSourcePVC = true
+			if !targetPodDeleted {
+				needDeleteTargetPod = true
+			}
+			continue
 		}
 		if string(sourcePVC.UID) == oldIdentity.UID {
 			waitingForSourcePVC = true

@@ -44,147 +44,149 @@ import (
 
 // --- parser tests ---
 
-func TestParseRoleProbeOutputLegacySingleToken(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary"))
-	if out.role != "primary" || out.mode != roleProbeVersionModeNone || out.version != 0 {
-		t.Fatalf("got %+v, want role=primary mode=None version=0", out)
+func TestParseRoleProbeOutputSingleToken(t *testing.T) {
+	out, err := parseRoleProbeOutput([]byte("primary"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.role != "primary" || out.hasAuthoritativeVersion || out.authoritativeVersion != 0 {
+		t.Fatalf("got %+v, want role=primary without authoritative version", out)
 	}
 }
 
-func TestParseRoleProbeOutputEngineSpaceSeparated(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary 10"))
-	if out.role != "primary" || out.mode != roleProbeVersionModeEngine || out.version != 10 {
-		t.Fatalf("got %+v, want role=primary mode=Engine version=10", out)
+func TestParseRoleProbeOutputVersionedSpaceSeparated(t *testing.T) {
+	out, err := parseRoleProbeOutput([]byte("primary 10"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.role != "primary" || !out.hasAuthoritativeVersion || out.authoritativeVersion != 10 {
+		t.Fatalf("got %+v, want role=primary authoritativeVersion=10", out)
 	}
 }
 
-func TestParseRoleProbeOutputEngineNewlineSeparated(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary\n10"))
-	if out.role != "primary" || out.mode != roleProbeVersionModeEngine || out.version != 10 {
-		t.Fatalf("got %+v, want role=primary mode=Engine version=10", out)
+func TestParseRoleProbeOutputVersionedNewlineSeparated(t *testing.T) {
+	out, err := parseRoleProbeOutput([]byte("primary\n10"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.role != "primary" || !out.hasAuthoritativeVersion || out.authoritativeVersion != 10 {
+		t.Fatalf("got %+v, want role=primary authoritativeVersion=10", out)
 	}
 }
 
-func TestParseRoleProbeOutputEngineTolerantOfSurroundingWhitespace(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("\tprimary\t42\n"))
-	if out.role != "primary" || out.mode != roleProbeVersionModeEngine || out.version != 42 {
-		t.Fatalf("got %+v, want role=primary mode=Engine version=42", out)
+func TestParseRoleProbeOutputVersionedTolerantOfSurroundingWhitespace(t *testing.T) {
+	out, err := parseRoleProbeOutput([]byte("\tprimary\t42\n"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.role != "primary" || !out.hasAuthoritativeVersion || out.authoritativeVersion != 42 {
+		t.Fatalf("got %+v, want role=primary authoritativeVersion=42", out)
 	}
 }
 
 func TestParseRoleProbeOutputMalformedSecondTokenNotUint64(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary abc"))
-	if out.mode != roleProbeVersionModeMalformed {
-		t.Fatalf("got %+v, want mode=Malformed", out)
+	out, err := parseRoleProbeOutput([]byte("primary abc"))
+	if err == nil {
+		t.Fatalf("got nil error for %+v", out)
 	}
 }
 
 func TestParseRoleProbeOutputMalformedThreeOrMoreTokens(t *testing.T) {
-	out := parseRoleProbeOutput([]byte("primary 10 extra"))
-	if out.mode != roleProbeVersionModeMalformed {
-		t.Fatalf("got %+v, want mode=Malformed", out)
+	out, err := parseRoleProbeOutput([]byte("primary 10 extra"))
+	if err == nil {
+		t.Fatalf("got nil error for %+v", out)
 	}
 }
 
 func TestParseRoleProbeOutputEmpty(t *testing.T) {
-	out := parseRoleProbeOutput([]byte(""))
-	if out.mode != roleProbeVersionModeNone || out.role != "" {
-		t.Fatalf("got %+v, want mode=None role=\"\"", out)
+	out, err := parseRoleProbeOutput([]byte(""))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.hasAuthoritativeVersion || out.role != "" {
+		t.Fatalf("got %+v, want empty role without authoritative version", out)
 	}
 }
 
 // --- gate tests: each path consults only its own annotation key ---
 
-func TestGateEngineRejectsOlderVersion(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleEngineVersionAnnotationKey: "10"})
-	parsed := roleProbeOutput{role: "primary", version: 9, mode: roleProbeVersionModeEngine}
-	if got := gateRoleProbeEvent(parsed, pod, 0); got != roleProbeGateRejectStale {
-		t.Fatalf("got %d, want RejectStale", got)
+func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
+	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	parsed := versionedRoleProbeOutput("primary", 9)
+	if acceptRoleProbeEvent(parsed, pod, 0) {
+		t.Fatalf("expected stale versioned result to be rejected")
 	}
 }
 
-func TestGateEngineRejectsEqualVersion(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleEngineVersionAnnotationKey: "10"})
-	parsed := roleProbeOutput{role: "primary", version: 10, mode: roleProbeVersionModeEngine}
-	if got := gateRoleProbeEvent(parsed, pod, 0); got != roleProbeGateRejectStale {
-		t.Fatalf("got %d, want RejectStale (strict-newer)", got)
+func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
+	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	parsed := versionedRoleProbeOutput("primary", 10)
+	if acceptRoleProbeEvent(parsed, pod, 0) {
+		t.Fatalf("expected equal versioned result to be rejected")
 	}
 }
 
-func TestGateEngineAcceptsNewerVersion(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleEngineVersionAnnotationKey: "10"})
-	parsed := roleProbeOutput{role: "primary", version: 11, mode: roleProbeVersionModeEngine}
-	if got := gateRoleProbeEvent(parsed, pod, 0); got != roleProbeGateAccept {
-		t.Fatalf("got %d, want Accept", got)
+func TestAcceptRoleProbeEventVersionedAcceptsNewerVersion(t *testing.T) {
+	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	parsed := versionedRoleProbeOutput("primary", 11)
+	if !acceptRoleProbeEvent(parsed, pod, 0) {
+		t.Fatalf("expected newer versioned result to be accepted")
 	}
 }
 
-// Engine events do not consult the legacy annotation key — an engine event
-// on a pod that has only a legacy annotation must be accepted regardless of
-// EventTime.
-func TestGateEngineIgnoresLegacyAnnotation(t *testing.T) {
+// Versioned results do not consult the single-token annotation key.
+func TestAcceptRoleProbeEventVersionedIgnoresSingleTokenAnnotation(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550000000000"})
-	parsed := roleProbeOutput{role: "primary", version: 1, mode: roleProbeVersionModeEngine}
-	if got := gateRoleProbeEvent(parsed, pod, 1); got != roleProbeGateAccept {
-		t.Fatalf("got %d, want Accept (engine key empty, legacy key ignored)", got)
+	parsed := versionedRoleProbeOutput("primary", 1)
+	if !acceptRoleProbeEvent(parsed, pod, 1) {
+		t.Fatalf("expected versioned result to ignore single-token EventTime anchor")
 	}
 }
 
-func TestGateLegacyAcceptsNewerEventTime(t *testing.T) {
+func TestAcceptRoleProbeEventSingleTokenAcceptsNewerEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550000000000"})
-	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeNone}
-	if got := gateRoleProbeEvent(parsed, pod, 1779550600000000); got != roleProbeGateAccept {
-		t.Fatalf("got %d, want Accept", got)
+	parsed := roleProbeOutput{role: "primary"}
+	if !acceptRoleProbeEvent(parsed, pod, 1779550600000000) {
+		t.Fatalf("expected newer single-token result to be accepted")
 	}
 }
 
-func TestGateLegacyRejectsOlderEventTime(t *testing.T) {
+func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550600000000"})
-	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeNone}
-	if got := gateRoleProbeEvent(parsed, pod, 1779550000000000); got != roleProbeGateRejectStale {
-		t.Fatalf("got %d, want RejectStale", got)
+	parsed := roleProbeOutput{role: "primary"}
+	if acceptRoleProbeEvent(parsed, pod, 1779550000000000) {
+		t.Fatalf("expected stale single-token result to be rejected")
 	}
 }
 
-// A Pod that has accepted any engine-versioned event commits to engine
-// mode: subsequent legacy single-token events from the same Pod are
-// rejected. Without this guard a legacy event could overwrite an
-// engine-accepted role label and then the next same-version engine
-// event would be rejected by the strict-newer gate, leaving the role
-// label unrecoverable on that Pod.
-func TestGateLegacyRejectedOnPodAlreadyAcceptedEngineEvent(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleEngineVersionAnnotationKey: "10"})
-	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeNone}
-	if got := gateRoleProbeEvent(parsed, pod, 1779550600000000); got != roleProbeGateRejectStale {
-		t.Fatalf("got %d, want RejectStale (same-Pod legacy must not overwrite accepted engine state)", got)
+// A Pod that has accepted any versioned result rejects subsequent
+// single-token results from the same Pod, avoiding downgrade from
+// authoritative role-version ordering.
+func TestAcceptRoleProbeEventSingleTokenRejectedOnPodAlreadyAcceptedVersionedEvent(t *testing.T) {
+	pod := podWithAnnotations(map[string]string{constant.LastRoleProbeVersionAnnotationKey: "10"})
+	parsed := roleProbeOutput{role: "primary"}
+	if acceptRoleProbeEvent(parsed, pod, 1779550600000000) {
+		t.Fatalf("expected same-Pod single-token result to be rejected after a versioned result")
 	}
 }
 
-// The same-Pod commit-to-engine rule also blocks legacy events even if
-// the Pod has accumulated a legacy annotation alongside the engine
-// annotation (mixed history from a misbehaving probe script).
-func TestGateLegacyRejectedOnPodWithBothAnnotationsWhenEnginePresent(t *testing.T) {
+// The same-Pod downgrade rule also blocks single-token results even if the
+// Pod has accumulated a single-token annotation alongside the roleVersion
+// annotation.
+func TestAcceptRoleProbeEventSingleTokenRejectedOnPodWithBothAnnotationsWhenRoleVersionPresent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "10",
-		constant.LastRoleEventVersionAnnotationKey:  "1000000",
+		constant.LastRoleProbeVersionAnnotationKey: "10",
+		constant.LastRoleEventVersionAnnotationKey: "1000000",
 	})
-	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeNone}
-	if got := gateRoleProbeEvent(parsed, pod, 2000000); got != roleProbeGateRejectStale {
-		t.Fatalf("got %d, want RejectStale", got)
-	}
-}
-
-func TestGateMalformedRejects(t *testing.T) {
-	pod := podWithAnnotations(map[string]string{constant.LastRoleEngineVersionAnnotationKey: "10"})
-	parsed := roleProbeOutput{role: "primary", mode: roleProbeVersionModeMalformed}
-	if got := gateRoleProbeEvent(parsed, pod, 1779550600000000); got != roleProbeGateRejectMalformed {
-		t.Fatalf("got %d, want RejectMalformed", got)
+	parsed := roleProbeOutput{role: "primary"}
+	if acceptRoleProbeEvent(parsed, pod, 2000000) {
+		t.Fatalf("expected single-token result to be rejected when roleVersion anchor is present")
 	}
 }
 
 // --- end-to-end handler tests via fake client ---
 
-func TestRoleEventHandlerHandlesInstanceSetLegacyAndExclusiveCleanupStampsPeerAnnotation(t *testing.T) {
+func TestRoleEventHandlerHandlesInstanceSetSingleTokenAndExclusiveCleanupStampsPeerAnnotation(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
@@ -209,22 +211,22 @@ func TestRoleEventHandlerHandlesInstanceSetLegacyAndExclusiveCleanupStampsPeerAn
 		t.Fatalf("expected event to be handled")
 	}
 
-	wantLegacy := fmt.Sprintf("%d", event.EventTime.UnixMicro())
-	assertPodRole(t, ctx, cli, pod, "leader", wantLegacy)
-	// Peer's exclusive role label is stripped. Legacy cleanup also stamps
+	wantSingleToken := fmt.Sprintf("%d", event.EventTime.UnixMicro())
+	assertPodRole(t, ctx, cli, pod, "leader", wantSingleToken)
+	// Peer's exclusive role label is stripped. Single-token cleanup also stamps
 	// the peer's LastRoleEventVersionAnnotationKey with the cleanup event's
-	// EventTime: without this stamp a delayed legacy event from the demoted
+	// EventTime: without this stamp a delayed single-token event from the demoted
 	// primary whose EventTime is older than the cleanup but newer than the
 	// peer's own previous annotation would slip back through the gate.
-	assertPodRole(t, ctx, cli, otherPod, "", wantLegacy)
-	assertPodLastEngineVersion(t, ctx, cli, otherPod, "")
+	assertPodRole(t, ctx, cli, otherPod, "", wantSingleToken)
+	assertPodLastRoleProbeVersion(t, ctx, cli, otherPod, "")
 }
 
-// Engine path peer cleanup must strip the label but leave the peer's
-// LastRoleEngineVersionAnnotationKey untouched. Stamping it would let the
+// Versioned path peer cleanup must strip the label but leave the peer's
+// LastRoleProbeVersionAnnotationKey untouched. Stamping it would let the
 // strict-newer gate later reject a legitimate event from the peer at the
-// same engine epoch (e.g. demoted pod emitting `secondary <same-epoch>`).
-func TestRoleEventHandlerHandlesInstanceSetEngineAndExclusiveCleanupDoesNotStampPeerEngineAnnotation(t *testing.T) {
+// same versioned epoch (e.g. demoted pod emitting `secondary <same-epoch>`).
+func TestRoleEventHandlerHandlesInstanceSetVersionedAndExclusiveCleanupDoesNotStampPeerVersionedAnnotation(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
@@ -243,7 +245,7 @@ func TestRoleEventHandlerHandlesInstanceSetEngineAndExclusiveCleanupDoesNotStamp
 		constant.RoleLabelKey:                  "leader",
 	})
 	otherPod.Annotations = map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "0",
+		constant.LastRoleProbeVersionAnnotationKey: "0",
 	}
 	event := roleProbeEventWithOutput("default", "event-1", pod, "leader 1", now)
 	cli := roleEventFakeClient(t, its, pod, otherPod, event)
@@ -253,24 +255,24 @@ func TestRoleEventHandlerHandlesInstanceSetEngineAndExclusiveCleanupDoesNotStamp
 	}
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
-	assertPodLastEngineVersion(t, ctx, cli, pod, "1")
+	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "1")
 	assertPodRole(t, ctx, cli, otherPod, "", "")
-	// Critical contract: peer engine annotation is NOT advanced; otherwise
-	// the peer's own next event at engine version 1 would be rejected as
+	// Critical contract: peer versioned annotation is NOT advanced; otherwise
+	// the peer's own next event at versioned version 1 would be rejected as
 	// stale by the strict-newer gate.
-	assertPodLastEngineVersion(t, ctx, cli, otherPod, "0")
+	assertPodLastRoleProbeVersion(t, ctx, cli, otherPod, "0")
 }
 
 // Regression for Valkey r4 mixed-mode bug on PR #10283 head 714f684b: a
-// legacy `primary` event from a non-quorum probe script fallback path must not
-// strip the exclusive role label off an engine-versioned peer. Without
-// this guard the legacy event runs exclusive cleanup against the
-// engine-held primary (the gate consults only the legacy annotation,
-// which on the engine peer is empty, so cleanup is accepted); after the
-// label is stripped the engine peer's next same-version event is
+// single-token `primary` event from a non-quorum probe script fallback path must not
+// strip the exclusive role label off an versioned-versioned peer. Without
+// this guard the single-token event runs exclusive cleanup against the
+// versioned-held primary (the gate consults only the single-token annotation,
+// which on the versioned peer is empty, so cleanup is accepted); after the
+// label is stripped the versioned peer's next same-version event is
 // rejected by the strict-newer gate and the role label can never be
 // restored.
-func TestRoleEventHandlerLegacyExclusiveEventBlockedByEngineHoldingPeer(t *testing.T) {
+func TestRoleEventHandlerSingleTokenExclusiveEventBlockedByVersionedHoldingPeer(t *testing.T) {
 	ctx := context.Background()
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
 	follower := workloads.ReplicaRole{Name: "follower"}
@@ -278,39 +280,39 @@ func TestRoleEventHandlerLegacyExclusiveEventBlockedByEngineHoldingPeer(t *testi
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
 		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
-	enginePeer := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
+	versionedPeer := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  "vlk",
 		constant.RoleLabelKey:                  "leader",
 	})
-	enginePeer.Annotations = map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "3",
+	versionedPeer.Annotations = map[string]string{
+		constant.LastRoleProbeVersionAnnotationKey: "3",
 	}
-	legacyPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
+	singleTokenPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
 	})
-	event := roleProbeEvent("default", "event-1", legacyPod, "leader", time.Now())
-	cli := roleEventFakeClient(t, its, enginePeer, legacyPod, event)
+	event := roleProbeEvent("default", "event-1", singleTokenPod, "leader", time.Now())
+	cli := roleEventFakeClient(t, its, versionedPeer, singleTokenPod, event)
 
 	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
-		t.Fatalf("expected event to be handled (skipped + reason=engineHeldExclusiveRole)")
+		t.Fatalf("expected event to be handled (skipped + reason=versionedHeldExclusiveRole)")
 	}
 
-	// legacy pod must not have received the leader label; engine peer's
+	// single-token pod must not have received the leader label; versioned peer's
 	// label and annotations must be unchanged.
-	assertPodRole(t, ctx, cli, legacyPod, "", "")
-	assertPodLastRoleVersion(t, ctx, cli, legacyPod, "")
-	assertPodRole(t, ctx, cli, enginePeer, "leader", "")
-	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "3")
-	assertPodLastRoleVersion(t, ctx, cli, enginePeer, "")
+	assertPodRole(t, ctx, cli, singleTokenPod, "", "")
+	assertPodLastRoleVersion(t, ctx, cli, singleTokenPod, "")
+	assertPodRole(t, ctx, cli, versionedPeer, "leader", "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "3")
+	assertPodLastRoleVersion(t, ctx, cli, versionedPeer, "")
 }
 
-// When the role being claimed is non-exclusive, the engine-held-peer
-// guard does not apply: a legacy event for a non-exclusive role still
-// goes through normally even when another peer carries an engine
+// When the role being claimed is non-exclusive, the versioned-held-peer
+// guard does not apply: a single-token event for a non-exclusive role still
+// goes through normally even when another peer carries an versioned
 // annotation.
-func TestRoleEventHandlerLegacyNonExclusiveEventNotBlockedByEnginePeer(t *testing.T) {
+func TestRoleEventHandlerSingleTokenNonExclusiveEventNotBlockedByVersionedPeer(t *testing.T) {
 	ctx := context.Background()
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
 	follower := workloads.ReplicaRole{Name: "follower"}
@@ -318,36 +320,36 @@ func TestRoleEventHandlerLegacyNonExclusiveEventNotBlockedByEnginePeer(t *testin
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
 		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
-	enginePeer := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
+	versionedPeer := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  "vlk",
 		constant.RoleLabelKey:                  "leader",
 	})
-	enginePeer.Annotations = map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "3",
+	versionedPeer.Annotations = map[string]string{
+		constant.LastRoleProbeVersionAnnotationKey: "3",
 	}
-	legacyPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
+	singleTokenPod := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
 	})
-	event := roleProbeEvent("default", "event-1", legacyPod, "follower", time.Now())
-	cli := roleEventFakeClient(t, its, enginePeer, legacyPod, event)
+	event := roleProbeEvent("default", "event-1", singleTokenPod, "follower", time.Now())
+	cli := roleEventFakeClient(t, its, versionedPeer, singleTokenPod, event)
 
 	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
 		t.Fatalf("expected event to be handled")
 	}
 
-	wantLegacy := fmt.Sprintf("%d", event.EventTime.UnixMicro())
-	assertPodRole(t, ctx, cli, legacyPod, "follower", wantLegacy)
-	// Engine peer untouched (cleanup only runs for exclusive roles).
-	assertPodRole(t, ctx, cli, enginePeer, "leader", "")
-	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "3")
+	wantSingleToken := fmt.Sprintf("%d", event.EventTime.UnixMicro())
+	assertPodRole(t, ctx, cli, singleTokenPod, "follower", wantSingleToken)
+	// Versioned peer untouched (cleanup only runs for exclusive roles).
+	assertPodRole(t, ctx, cli, versionedPeer, "leader", "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "3")
 }
 
-// A legacy exclusive event still runs normally when no peer holds the
-// exclusive role with an engine annotation. This pins that the guard
+// A single-token exclusive event still runs normally when no peer holds the
+// exclusive role with an versioned annotation. This pins that the guard
 // only fires in mixed-mode coexistence.
-func TestRoleEventHandlerLegacyExclusiveEventAcceptedWhenNoEnginePeerHoldsRole(t *testing.T) {
+func TestRoleEventHandlerSingleTokenExclusiveEventAcceptedWhenNoVersionedPeerHoldsRole(t *testing.T) {
 	ctx := context.Background()
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
 	follower := workloads.ReplicaRole{Name: "follower"}
@@ -355,35 +357,35 @@ func TestRoleEventHandlerLegacyExclusiveEventAcceptedWhenNoEnginePeerHoldsRole(t
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
 		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
-	// peer holds leader but only via legacy annotation, no engine annotation
-	legacyPeer := roleEventPod("default", "vlk-1", "uid-1", map[string]string{
+	// peer holds leader but only via single-token annotation, no versioned annotation
+	singleTokenPeer := roleEventPod("default", "vlk-1", "uid-1", map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  "vlk",
 		constant.RoleLabelKey:                  "leader",
 	})
-	legacyPeer.Annotations = map[string]string{
+	singleTokenPeer.Annotations = map[string]string{
 		constant.LastRoleEventVersionAnnotationKey: "1000000",
 	}
-	legacyPod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
+	singleTokenPod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
 	})
 	now := time.Unix(0, 2000000*int64(time.Microsecond))
-	event := roleProbeEvent("default", "event-1", legacyPod, "leader", now)
-	cli := roleEventFakeClient(t, its, legacyPeer, legacyPod, event)
+	event := roleProbeEvent("default", "event-1", singleTokenPod, "leader", now)
+	cli := roleEventFakeClient(t, its, singleTokenPeer, singleTokenPod, event)
 
 	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
 		t.Fatalf("expected event to be handled")
 	}
 
-	wantLegacy := fmt.Sprintf("%d", event.EventTime.UnixMicro())
-	assertPodRole(t, ctx, cli, legacyPod, "leader", wantLegacy)
-	// legacy peer stripped + legacy annotation stamped per the
-	// legacy-path one-way ratchet contract.
-	assertPodRole(t, ctx, cli, legacyPeer, "", wantLegacy)
+	wantSingleToken := fmt.Sprintf("%d", event.EventTime.UnixMicro())
+	assertPodRole(t, ctx, cli, singleTokenPod, "leader", wantSingleToken)
+	// single-token peer stripped + single-token annotation stamped per the
+	// single-token-path one-way ratchet contract.
+	assertPodRole(t, ctx, cli, singleTokenPeer, "", wantSingleToken)
 }
 
-func TestRoleEventHandlerEngineExclusiveEventBlockedByPeerWithNewerEngineVersion(t *testing.T) {
+func TestRoleEventHandlerVersionedExclusiveEventBlockedByPeerWithNewerVersionedVersion(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
@@ -392,39 +394,39 @@ func TestRoleEventHandlerEngineExclusiveEventBlockedByPeerWithNewerEngineVersion
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
 		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
-	enginePeer := roleEventPod("default", "vlk-1", "uid-1", map[string]string{
+	versionedPeer := roleEventPod("default", "vlk-1", "uid-1", map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  "vlk",
 		constant.RoleLabelKey:                  "leader",
 	})
-	enginePeer.Annotations = map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "5",
+	versionedPeer.Annotations = map[string]string{
+		constant.LastRoleProbeVersionAnnotationKey: "5",
 	}
-	enginePod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
+	versionedPod := roleEventPod("default", "vlk-0", "uid-0", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
 	})
-	enginePod.Annotations = map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "3",
+	versionedPod.Annotations = map[string]string{
+		constant.LastRoleProbeVersionAnnotationKey: "3",
 	}
-	event := roleProbeEventWithOutput("default", "event-1", enginePod, "leader 4", now)
-	cli := roleEventFakeClient(t, its, enginePeer, enginePod, event)
+	event := roleProbeEventWithOutput("default", "event-1", versionedPod, "leader 4", now)
+	cli := roleEventFakeClient(t, its, versionedPeer, versionedPod, event)
 
 	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
 		t.Fatalf("expected event to be handled (skipped + reason=stalePeerRoleEventVersion)")
 	}
 
-	assertPodRole(t, ctx, cli, enginePod, "", "")
-	assertPodLastEngineVersion(t, ctx, cli, enginePod, "3")
-	assertPodRole(t, ctx, cli, enginePeer, "leader", "")
-	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "5")
+	assertPodRole(t, ctx, cli, versionedPod, "", "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPod, "3")
+	assertPodRole(t, ctx, cli, versionedPeer, "leader", "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "5")
 }
 
-// Engine events for an exclusive role are not affected by the
-// legacy-only engine-held-peer guard: an engine event from one pod is
-// allowed to take the role from an older engine peer (and cleanup will
-// strip the peer label as usual, gated by the engine-version comparison).
-func TestRoleEventHandlerEngineExclusiveEventNotBlockedByEnginePeerGuard(t *testing.T) {
+// Versioned events for an exclusive role are not affected by the
+// single-token-only versioned-held-peer guard: an versioned event from one pod is
+// allowed to take the role from an older versioned peer (and cleanup will
+// strip the peer label as usual, gated by the versioned-version comparison).
+func TestRoleEventHandlerVersionedExclusiveEventNotBlockedByVersionedPeerGuard(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	leader := workloads.ReplicaRole{Name: "leader", IsExclusive: true}
@@ -433,45 +435,45 @@ func TestRoleEventHandlerEngineExclusiveEventNotBlockedByEnginePeerGuard(t *test
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "vlk"},
 		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
 	}
-	enginePeer := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
+	versionedPeer := roleEventPod("default", "vlk-2", "uid-2", map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 		instanceset.WorkloadsInstanceLabelKey:  "vlk",
 		constant.RoleLabelKey:                  "leader",
 	})
-	enginePeer.Annotations = map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "3",
+	versionedPeer.Annotations = map[string]string{
+		constant.LastRoleProbeVersionAnnotationKey: "3",
 	}
-	enginePod := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
+	versionedPod := roleEventPod("default", "vlk-3", "uid-3", map[string]string{
 		instanceset.WorkloadsInstanceLabelKey: "vlk",
 	})
-	event := roleProbeEventWithOutput("default", "event-1", enginePod, "leader 5", now)
-	cli := roleEventFakeClient(t, its, enginePeer, enginePod, event)
+	event := roleProbeEventWithOutput("default", "event-1", versionedPod, "leader 5", now)
+	cli := roleEventFakeClient(t, its, versionedPeer, versionedPod, event)
 
 	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
 		t.Fatalf("expected event to be handled")
 	}
 
-	assertPodRole(t, ctx, cli, enginePod, "leader", "")
-	assertPodLastEngineVersion(t, ctx, cli, enginePod, "5")
-	// Peer label stripped by engine-path cleanup (engine version 5 > peer's 3).
-	assertPodRole(t, ctx, cli, enginePeer, "", "")
-	// Peer engine annotation untouched per the V1 fix.
-	assertPodLastEngineVersion(t, ctx, cli, enginePeer, "3")
+	assertPodRole(t, ctx, cli, versionedPod, "leader", "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPod, "5")
+	// Peer label stripped by versioned-path cleanup (versioned version 5 > peer's 3).
+	assertPodRole(t, ctx, cli, versionedPeer, "", "")
+	// Peer versioned annotation untouched per the V1 fix.
+	assertPodLastRoleProbeVersion(t, ctx, cli, versionedPeer, "3")
 }
 
-// Regression for the prior V1 round: after engine-path cleanup strips the
+// Regression for the prior V1 round: after versioned-path cleanup strips the
 // old primary's label, the old primary's own next roleProbe event at the
-// same engine epoch must be accepted. With per-path keys this is enforced
-// directly by gateRoleProbeEvent: the peer's annotation stays at the older
+// same versioned epoch must be accepted. With per-path keys this is enforced
+// directly by acceptRoleProbeEvent: the peer's annotation stays at the older
 // version so a same-epoch secondary event from the peer is strictly newer.
-func TestRoleEventEngineCleanupLeavesPeerAbleToAcceptItsOwnSameEpochSecondaryEvent(t *testing.T) {
+func TestRoleEventVersionedCleanupLeavesPeerAbleToAcceptItsOwnSameEpochSecondaryEvent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{
-		constant.LastRoleEngineVersionAnnotationKey: "0",
+		constant.LastRoleProbeVersionAnnotationKey: "0",
 	})
-	parsed := roleProbeOutput{role: "secondary", version: 1, mode: roleProbeVersionModeEngine}
-	if got := gateRoleProbeEvent(parsed, pod, 0); got != roleProbeGateAccept {
-		t.Fatalf("got %d, want Accept (peer engine annotation must not have been advanced by cleanup)", got)
+	parsed := versionedRoleProbeOutput("secondary", 1)
+	if !acceptRoleProbeEvent(parsed, pod, 0) {
+		t.Fatalf("expected peer to accept same-epoch secondary event")
 	}
 }
 
@@ -589,7 +591,7 @@ func TestRoleEventHandlerConsumesInvalidProbeMessageWithoutPodUpdate(t *testing.
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastEngineVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerConsumesProbeFailureWithoutPodUpdate(t *testing.T) {
@@ -607,7 +609,7 @@ func TestRoleEventHandlerConsumesProbeFailureWithoutPodUpdate(t *testing.T) {
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastEngineVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerRejectsMalformedRoleProbeOutput(t *testing.T) {
@@ -628,10 +630,10 @@ func TestRoleEventHandlerRejectsMalformedRoleProbeOutput(t *testing.T) {
 	}
 
 	// Role label must not change; both annotations must stay empty since
-	// the malformed output is rejected by the gate before any write.
+	// malformed output is rejected before any write.
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastEngineVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerConsumesStalePodUIDWithoutPodUpdate(t *testing.T) {
@@ -650,7 +652,7 @@ func TestRoleEventHandlerConsumesStalePodUIDWithoutPodUpdate(t *testing.T) {
 
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
-	assertPodLastEngineVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
 }
 
 func TestRoleEventHandlerConsumesPodNotFound(t *testing.T) {
@@ -700,7 +702,7 @@ func TestRoleEventHandlerConsumesMissingWorkloadWithoutPodUpdate(t *testing.T) {
 
 			assertPodRole(t, ctx, cli, pod, "leader", "")
 			assertPodLastRoleVersion(t, ctx, cli, pod, "")
-			assertPodLastEngineVersion(t, ctx, cli, pod, "")
+			assertPodLastRoleProbeVersion(t, ctx, cli, pod, "")
 		})
 	}
 }
@@ -820,6 +822,14 @@ func roleProbeEventWithCode(namespace, name string, pod *corev1.Pod, role string
 		GetObject()
 }
 
+func versionedRoleProbeOutput(role string, version uint64) roleProbeOutput {
+	return roleProbeOutput{
+		role:                    role,
+		authoritativeVersion:    version,
+		hasAuthoritativeVersion: true,
+	}
+}
+
 func assertPodRole(t *testing.T, ctx context.Context, cli client.Client, pod *corev1.Pod, role, version string) {
 	t.Helper()
 	var stored corev1.Pod
@@ -834,7 +844,7 @@ func assertPodRole(t *testing.T, ctx context.Context, cli client.Client, pod *co
 		t.Fatalf("expected role %q, got %q", role, stored.Labels[constant.RoleLabelKey])
 	}
 	if version != "" && stored.Annotations[constant.LastRoleEventVersionAnnotationKey] != version {
-		t.Fatalf("expected legacy version %q, got %q", version, stored.Annotations[constant.LastRoleEventVersionAnnotationKey])
+		t.Fatalf("expected single-token version %q, got %q", version, stored.Annotations[constant.LastRoleEventVersionAnnotationKey])
 	}
 }
 
@@ -845,17 +855,17 @@ func assertPodLastRoleVersion(t *testing.T, ctx context.Context, cli client.Clie
 		t.Fatalf("get pod failed: %v", err)
 	}
 	if stored.Annotations[constant.LastRoleEventVersionAnnotationKey] != version {
-		t.Fatalf("expected legacy version %q, got %q", version, stored.Annotations[constant.LastRoleEventVersionAnnotationKey])
+		t.Fatalf("expected single-token version %q, got %q", version, stored.Annotations[constant.LastRoleEventVersionAnnotationKey])
 	}
 }
 
-func assertPodLastEngineVersion(t *testing.T, ctx context.Context, cli client.Client, pod *corev1.Pod, version string) {
+func assertPodLastRoleProbeVersion(t *testing.T, ctx context.Context, cli client.Client, pod *corev1.Pod, version string) {
 	t.Helper()
 	var stored corev1.Pod
 	if err := cli.Get(ctx, client.ObjectKeyFromObject(pod), &stored); err != nil {
 		t.Fatalf("get pod failed: %v", err)
 	}
-	if stored.Annotations[constant.LastRoleEngineVersionAnnotationKey] != version {
-		t.Fatalf("expected engine version %q, got %q", version, stored.Annotations[constant.LastRoleEngineVersionAnnotationKey])
+	if stored.Annotations[constant.LastRoleProbeVersionAnnotationKey] != version {
+		t.Fatalf("expected versioned version %q, got %q", version, stored.Annotations[constant.LastRoleProbeVersionAnnotationKey])
 	}
 }

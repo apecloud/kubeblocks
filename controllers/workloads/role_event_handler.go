@@ -54,60 +54,12 @@ const (
 	instanceKind = "Instance"
 )
 
-// roleProbeVersionMode classifies how a roleProbe stdout payload encodes its
-// role version. The controller picks a different staleness anchor and a
-// different annotation key based on this mode.
-type roleProbeVersionMode int
-
-const (
-	// roleProbeVersionModeNone means the stdout carries only a single
-	// whitespace-separated token (the role name). This is the
-	// pre-existing single-token contract; the staleness gate uses
-	// EventTime against LastRoleEventVersionAnnotationKey.
-	roleProbeVersionModeNone roleProbeVersionMode = iota
-
-	// roleProbeVersionModeEngine means the stdout carries exactly two
-	// whitespace-separated tokens: <role> <uint64-version>. The staleness
-	// gate uses the engine-authoritative version against
-	// LastRoleEngineVersionAnnotationKey.
-	roleProbeVersionModeEngine
-
-	// roleProbeVersionModeMalformed means the stdout carries two tokens whose
-	// second token is not a uint64, or three or more tokens. The event must
-	// be rejected; falling back to EventTime would let a single typo silently
-	// bypass the engine-version gate the probe script meant to install.
-	roleProbeVersionModeMalformed
-)
-
 // roleProbeOutput is the parsed view of a kbagent roleProbe stdout payload.
 type roleProbeOutput struct {
-	role    string
-	version uint64
-	mode    roleProbeVersionMode
+	role                    string
+	authoritativeVersion    uint64
+	hasAuthoritativeVersion bool
 }
-
-// roleProbeGateDecision is the outcome of the staleness gate that determines
-// whether a parsed roleProbe event may write the Pod role label and advance
-// the matching annotation key.
-type roleProbeGateDecision int
-
-const (
-	// roleProbeGateAccept lets the caller write the Pod role label and
-	// advance the path-specific annotation to the newAnnotation value.
-	roleProbeGateAccept roleProbeGateDecision = iota
-
-	// roleProbeGateRejectStale rejects the event because its version is not
-	// strictly newer than the recorded version on the matching annotation
-	// key. The caller must not write the Pod role label and must not change
-	// either annotation.
-	roleProbeGateRejectStale
-
-	// roleProbeGateRejectMalformed rejects the event because its stdout
-	// carried a second token that did not parse as a uint64, or carried
-	// three or more tokens. The caller must not write the Pod role label
-	// and must not change either annotation.
-	roleProbeGateRejectMalformed
-)
 
 type roleEventResult struct {
 	Event          types.NamespacedName
@@ -162,16 +114,21 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 		return true, nil
 	}
 
-	parsed := parseRoleProbeOutput(probeEvent.Output)
+	parsed, parseErr := parseRoleProbeOutput(probeEvent.Output)
 	result.Role = parsed.role
 	result.parsed = parsed
-	if parsed.mode == roleProbeVersionModeEngine {
-		result.Version = fmt.Sprintf("engine:%d", parsed.version)
+	if parsed.hasAuthoritativeVersion {
+		result.Version = fmt.Sprintf("roleVersion:%d", parsed.authoritativeVersion)
 	}
 
 	if probeEvent.Code != 0 {
 		result.Result = "skipped"
 		result.Reason = fmt.Sprintf("roleProbeFailed:%s", probeEvent.Message)
+		return true, nil
+	}
+	if parseErr != nil {
+		result.Result = "skipped"
+		result.Reason = "malformedRoleProbeOutput"
 		return true, nil
 	}
 
@@ -229,15 +186,9 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 }
 
 func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, event *corev1.Event, result *roleEventResult) (bool, error) {
-	decision := gateRoleProbeEvent(result.parsed, pod, event.EventTime.UnixMicro())
-	if decision == roleProbeGateRejectStale {
+	if !acceptRoleProbeEvent(result.parsed, pod, event.EventTime.UnixMicro()) {
 		result.Result = "skipped"
 		result.Reason = "staleRoleEventVersion"
-		return true, nil
-	}
-	if decision == roleProbeGateRejectMalformed {
-		result.Result = "skipped"
-		result.Reason = "malformedRoleProbeOutput"
 		return true, nil
 	}
 
@@ -258,29 +209,28 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 	result.RoleDefined = defined
 
 	if defined && role.IsExclusive {
-		switch result.parsed.mode {
-		case roleProbeVersionModeNone:
-			held, err := engineHeldExclusiveRoleByPeer(ctx, cli, *its, pod.Name, result.Role)
+		if !result.parsed.hasAuthoritativeVersion {
+			held, err := versionedPeerHoldsExclusiveRole(ctx, cli, *its, pod.Name, result.Role)
 			if err != nil {
 				result.Result = "failed"
-				result.Reason = "checkEngineHeldExclusiveRoleError"
+				result.Reason = "checkVersionedExclusiveRoleError"
 				return false, err
 			}
 			if held {
 				result.Result = "skipped"
-				result.Reason = "engineHeldExclusiveRole"
+				result.Reason = "versionedPeerHeldExclusiveRole"
 				return true, nil
 			}
-		case roleProbeVersionModeEngine:
-			stale, err := newerOrEqualEngineExclusiveRoleHeldByPeer(ctx, cli, *its, pod.Name, result.Role, result.parsed.version)
+		} else {
+			stale, err := newerOrEqualVersionedExclusiveRoleHeldByPeer(ctx, cli, *its, pod.Name, result.Role, result.parsed.authoritativeVersion)
 			if err != nil {
 				result.Result = "failed"
-				result.Reason = "checkPeerEngineExclusiveRoleError"
+				result.Reason = "checkPeerRoleVersionError"
 				return false, err
 			}
 			if stale {
 				result.Result = "skipped"
-				result.Reason = "stalePeerRoleEventVersion"
+				result.Reason = "stalePeerRoleVersion"
 				return true, nil
 			}
 		}
@@ -306,15 +256,9 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 }
 
 func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, instName string, event *corev1.Event, result *roleEventResult) (bool, error) {
-	decision := gateRoleProbeEvent(result.parsed, pod, event.EventTime.UnixMicro())
-	if decision == roleProbeGateRejectStale {
+	if !acceptRoleProbeEvent(result.parsed, pod, event.EventTime.UnixMicro()) {
 		result.Result = "skipped"
 		result.Reason = "staleRoleEventVersion"
-		return true, nil
-	}
-	if decision == roleProbeGateRejectMalformed {
-		result.Result = "skipped"
-		result.Reason = "malformedRoleProbeOutput"
 		return true, nil
 	}
 
@@ -348,101 +292,82 @@ func isRoleProbeEvent(event *corev1.Event) bool {
 		event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
-// parseRoleProbeOutput parses the kbagent roleProbe stdout into a role name
-// plus an optional engine-authoritative version. The grammar splits the
-// stdout on any whitespace (spaces, tabs, newlines) into:
+// parseRoleProbeOutput parses kbagent roleProbe stdout into a role name plus
+// an optional authoritative role version. The grammar splits stdout on any
+// whitespace (spaces, tabs, newlines) into:
 //
-//	<role>                  // legacy single-token form
-//	<role> <uint64-version> // engine-authoritative form
+//	<role>                  // single-token form
+//	<role> <uint64-version> // versioned form
 //
-// A probe script that emits a second token but cannot make it a uint64,
-// or that emits three or more tokens, is flagged Malformed and the
-// event is rejected by the gate. A silent fallback would let a typo
-// bypass the gate the probe script meant to install.
-func parseRoleProbeOutput(stdout []byte) roleProbeOutput {
+// A probe script that emits a non-uint64 second token or three or more tokens
+// is a parse error. Falling back to EventTime would let a typo bypass the
+// authoritative-version ordering the probe script meant to use.
+func parseRoleProbeOutput(stdout []byte) (roleProbeOutput, error) {
 	if len(stdout) == 0 {
-		return roleProbeOutput{mode: roleProbeVersionModeNone}
+		return roleProbeOutput{}, nil
 	}
 	tokens := strings.Fields(string(stdout))
 	switch len(tokens) {
 	case 0:
-		return roleProbeOutput{mode: roleProbeVersionModeNone}
+		return roleProbeOutput{}, nil
 	case 1:
 		return roleProbeOutput{
 			role: strings.ToLower(tokens[0]),
-			mode: roleProbeVersionModeNone,
-		}
+		}, nil
 	case 2:
 		v, err := strconv.ParseUint(tokens[1], 10, 64)
 		if err != nil {
 			return roleProbeOutput{
 				role: strings.ToLower(tokens[0]),
-				mode: roleProbeVersionModeMalformed,
-			}
+			}, fmt.Errorf("invalid role version %q: %w", tokens[1], err)
 		}
 		return roleProbeOutput{
-			role:    strings.ToLower(tokens[0]),
-			version: v,
-			mode:    roleProbeVersionModeEngine,
-		}
+			role:                    strings.ToLower(tokens[0]),
+			authoritativeVersion:    v,
+			hasAuthoritativeVersion: true,
+		}, nil
 	default:
 		return roleProbeOutput{
 			role: strings.ToLower(tokens[0]),
-			mode: roleProbeVersionModeMalformed,
-		}
+		}, fmt.Errorf("invalid role probe output: expected one or two tokens, got %d", len(tokens))
 	}
 }
 
-// gateRoleProbeEvent decides whether to accept a parsed roleProbe event for
-// a particular Pod. Each output mode is gated by its own staleness anchor:
+// acceptRoleProbeEvent decides whether to accept a parsed roleProbe event for
+// a particular Pod. Each output form is gated by its own staleness anchor:
 //
-//   - Engine event (`<role> <uint64>`) is accepted iff its version is
-//     strictly greater than the value recorded on the Pod's engine
-//     staleness anchor.
-//   - Legacy event (`<role>`) is accepted iff its EventTime micros are
-//     strictly greater than the value recorded on the Pod's legacy
-//     staleness anchor. A legacy event is also rejected once the Pod
-//     has accepted any engine event on its own stream: the same Pod
-//     would otherwise be able to overwrite its accepted engine role
-//     with a single-token result, and a later same-version engine
-//     event would then be rejected by the strict-newer gate so the
-//     accepted role label could not be restored.
-//   - Malformed event is always rejected.
+//   - Versioned result (`<role> <uint64>`) is accepted iff its version is
+//     strictly greater than the Pod's recorded authoritative role version.
+//   - Single-token result (`<role>`) is accepted iff its EventTime micros are
+//     strictly greater than the recorded single-token EventTime anchor.
+//     A single-token result is also rejected once the same Pod has accepted
+//     any versioned result, avoiding downgrade from authoritative ordering.
 //
-// Engine events do not consult the legacy anchor. The two anchors are
-// independent so a component implementation that only emits legacy
-// roleProbe output can coexist with one that emits engine-versioned
-// output on the same controller without cross-format downgrade rules;
-// the only cross-anchor rule is the same-Pod commit-to-engine
-// described above.
-func gateRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicros int64) roleProbeGateDecision {
-	switch parsed.mode {
-	case roleProbeVersionModeMalformed:
-		return roleProbeGateRejectMalformed
-	case roleProbeVersionModeEngine:
-		last := podAnnotation(pod, constant.LastRoleEngineVersionAnnotationKey)
+// Versioned results do not consult the single-token anchor. The two anchors
+// stay independent; the only cross-anchor rule is the same-Pod
+// versioned-to-single-token downgrade block described above.
+func acceptRoleProbeEvent(parsed roleProbeOutput, pod *corev1.Pod, eventTimeMicros int64) bool {
+	if parsed.hasAuthoritativeVersion {
+		last := podAnnotation(pod, constant.LastRoleProbeVersionAnnotationKey)
 		if last == "" {
-			return roleProbeGateAccept
+			return true
 		}
 		lastV, err := strconv.ParseUint(last, 10, 64)
-		if err != nil || parsed.version > lastV {
-			return roleProbeGateAccept
+		if err != nil || parsed.authoritativeVersion > lastV {
+			return true
 		}
-		return roleProbeGateRejectStale
-	default:
-		if podAnnotation(pod, constant.LastRoleEngineVersionAnnotationKey) != "" {
-			return roleProbeGateRejectStale
-		}
-		last := podAnnotation(pod, constant.LastRoleEventVersionAnnotationKey)
-		if last == "" {
-			return roleProbeGateAccept
-		}
-		lastV, err := strconv.ParseUint(last, 10, 64)
-		if err != nil || uint64(eventTimeMicros) > lastV {
-			return roleProbeGateAccept
-		}
-		return roleProbeGateRejectStale
+		return false
 	}
+
+	if podAnnotation(pod, constant.LastRoleProbeVersionAnnotationKey) != "" {
+		return false
+	}
+	last := podAnnotation(pod, constant.LastRoleEventVersionAnnotationKey)
+	if last == "" {
+		return true
+	}
+	lastV, err := strconv.ParseUint(last, 10, 64)
+	return err != nil || uint64(eventTimeMicros) > lastV
 }
 
 func composeRoleMap(roles []workloads.ReplicaRole) map[string]workloads.ReplicaRole {
@@ -474,11 +399,10 @@ func resolveRoleEventBranchByControllerRef(pod *corev1.Pod) (roleEventBranch, st
 
 // updatePodRoleLabel writes the new role label (or removes it when the role
 // is not in the workload's role list) and advances the path-specific
-// annotation for the accepted event. Engine events stamp
-// LastRoleEngineVersionAnnotationKey only; legacy events stamp
-// LastRoleEventVersionAnnotationKey only. The other key is left untouched
-// so that a mixed-format probe script (or a migration window) does
-// not silently downgrade either stream's anchor.
+// annotation for the accepted event. Versioned results stamp
+// LastRoleProbeVersionAnnotationKey only; single-token results stamp
+// LastRoleEventVersionAnnotationKey only. The other key is left untouched so
+// that a migration window does not silently downgrade either stream's anchor.
 func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod, roleName string, parsed roleProbeOutput, eventTimeMicros int64, roleDefined bool) error {
 	newPod := pod.DeepCopy()
 	if newPod.Labels == nil {
@@ -492,8 +416,8 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 	if newPod.Annotations == nil {
 		newPod.Annotations = map[string]string{}
 	}
-	if parsed.mode == roleProbeVersionModeEngine {
-		newPod.Annotations[constant.LastRoleEngineVersionAnnotationKey] = strconv.FormatUint(parsed.version, 10)
+	if parsed.hasAuthoritativeVersion {
+		newPod.Annotations[constant.LastRoleProbeVersionAnnotationKey] = strconv.FormatUint(parsed.authoritativeVersion, 10)
 	} else {
 		newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = strconv.FormatInt(eventTimeMicros, 10)
 	}
@@ -507,21 +431,21 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 // a new owner of the exclusive role has been accepted. Peer-cleanup
 // behavior is path-specific:
 //
-//   - Legacy (EventTime) path: each accepted strip also stamps the peer's
+//   - Single-token (EventTime) path: each accepted strip also stamps the peer's
 //     LastRoleEventVersionAnnotationKey with the cleanup event's EventTime
-//     micros. Without this stamp, a delayed legacy event from the demoted
+//     micros. Without this stamp, a delayed single-token event from the demoted
 //     primary whose EventTime is older than the cleanup event but newer
 //     than the peer's own previous annotation would still pass the gate
 //     and write the exclusive role back. Stamping is the one-way ratchet
-//     the legacy stream relies on.
-//   - Engine path: each accepted strip leaves the peer's
-//     LastRoleEngineVersionAnnotationKey untouched. The engine version is
+//     the single-token stream relies on.
+//   - Versioned path: each accepted strip leaves the peer's
+//     LastRoleProbeVersionAnnotationKey untouched. The role version is
 //     a per-pod monotonically increasing number; stamping the peer with
-//     the new primary's engine version (which originated from a different
+//     the new primary's role version (which originated from a different
 //     pod's kbagent) would let the strict-newer gate later reject a
-//     legitimate event from the peer at the same engine epoch — for
+//     legitimate event from the peer at the same role epoch — for
 //     example after failover the demoted pod's next event is
-//     `secondary <same-epoch>`. The peer's own previous engine annotation
+//     `secondary <same-epoch>`. The peer's own previous role-version annotation
 //     is already a sufficient staleness anchor for queued events from the
 //     demoted primary, because those events' versions are <= the peer's
 //     recorded version.
@@ -546,8 +470,7 @@ func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workl
 		if pod.Name == newPodName {
 			continue
 		}
-		decision := gateRoleProbeEvent(parsed, &pod, eventTimeMicros)
-		if decision != roleProbeGateAccept {
+		if !acceptRoleProbeEvent(parsed, &pod, eventTimeMicros) {
 			continue
 		}
 
@@ -556,7 +479,7 @@ func removeExclusiveRoleLabels(ctx context.Context, cli client.Client, its workl
 			continue
 		}
 		delete(newPod.Labels, constant.RoleLabelKey)
-		if parsed.mode == roleProbeVersionModeNone {
+		if !parsed.hasAuthoritativeVersion {
 			if newPod.Annotations == nil {
 				newPod.Annotations = map[string]string{}
 			}
@@ -576,18 +499,18 @@ func podAnnotation(pod *corev1.Pod, key string) string {
 	return pod.Annotations[key]
 }
 
-// engineHeldExclusiveRoleByPeer reports whether any peer pod in the
+// versionedPeerHoldsExclusiveRole reports whether any peer pod in the
 // InstanceSet currently holds the exclusive role label and carries a
-// LastRoleEngineVersionAnnotationKey value. It is used to keep a
+// LastRoleProbeVersionAnnotationKey value. It is used to keep a
 // single-token roleProbe event from displacing an exclusive role that
-// an engine-versioned peer already owns: the single-token gate
-// consults only the legacy anchor, so an engine peer's anchor is
+// a versioned peer already owns: the single-token gate consults only
+// the EventTime anchor, so a versioned peer's anchor is
 // invisible to it; without this guard a single-token fallback event
 // from a probe script could strip the role label off the
-// engine-authoritative primary and the engine peer's next
-// same-version event would then be rejected by the strict-newer gate
-// and the role label could not be restored.
-func engineHeldExclusiveRoleByPeer(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string) (bool, error) {
+// authoritative primary and the versioned peer's next same-version event
+// would then be rejected by the strict-newer gate and the role label could
+// not be restored.
+func versionedPeerHoldsExclusiveRole(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string) (bool, error) {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
@@ -602,20 +525,20 @@ func engineHeldExclusiveRoleByPeer(ctx context.Context, cli client.Client, its w
 		if p.Name == selfName {
 			continue
 		}
-		if podAnnotation(&p, constant.LastRoleEngineVersionAnnotationKey) != "" {
+		if podAnnotation(&p, constant.LastRoleProbeVersionAnnotationKey) != "" {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-// newerOrEqualEngineExclusiveRoleHeldByPeer reports whether any peer pod
-// already holds the same exclusive role with an engine version that is at
-// least as new as the incoming engine event. The caller must run this
+// newerOrEqualVersionedExclusiveRoleHeldByPeer reports whether any peer pod
+// already holds the same exclusive role with an authoritative role version
+// that is at least as new as the incoming versioned event. The caller must run this
 // before writing the current pod's role label; otherwise a stale delayed
-// engine event can label itself while peer cleanup correctly refuses to
+// versioned event can label itself while peer cleanup correctly refuses to
 // strip the newer peer, leaving two pods with the exclusive role.
-func newerOrEqualEngineExclusiveRoleHeldByPeer(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string, incomingVersion uint64) (bool, error) {
+func newerOrEqualVersionedExclusiveRoleHeldByPeer(ctx context.Context, cli client.Client, its workloads.InstanceSet, selfName, roleName string, incomingVersion uint64) (bool, error) {
 	labels := map[string]string{
 		constant.AppManagedByLabelKey:          constant.AppName,
 		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
@@ -630,7 +553,7 @@ func newerOrEqualEngineExclusiveRoleHeldByPeer(ctx context.Context, cli client.C
 		if p.Name == selfName {
 			continue
 		}
-		last := podAnnotation(&p, constant.LastRoleEngineVersionAnnotationKey)
+		last := podAnnotation(&p, constant.LastRoleProbeVersionAnnotationKey)
 		if last == "" {
 			continue
 		}

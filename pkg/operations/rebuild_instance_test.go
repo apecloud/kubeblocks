@@ -602,6 +602,63 @@ var _ = Describe("OpsUtil functions", func() {
 			})).Should(Succeed())
 		})
 
+		It("does not accept an existing source PVC as dynamically rebuilt when the target pod is already absent", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			sourcePVCs := map[string]rebuildSourcePVCIdentity{}
+			targetSourcePVCs := map[string]bool{}
+			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
+				targetSourcePVCs[fmt.Sprintf("%s-%s", testapps.DataVolumeName, ins.Name)] = true
+				pod := &corev1.Pod{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, pod)).Should(Succeed())
+				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
+			}
+			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
+				Eventually(func(g Gomega) {
+					pod := &corev1.Pod{}
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, pod)
+					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+				}).Should(Succeed())
+			}
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			Expect(k8sClient.List(ctx, pvcList,
+				client.MatchingLabels{constant.KBAppComponentLabelKey: defaultCompName},
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			for i := range pvcList.Items {
+				pvc := pvcList.Items[i].DeepCopy()
+				if !targetSourcePVCs[pvc.Name] {
+					continue
+				}
+				Expect(testapps.ChangeObj(&testCtx, pvc, func(p *corev1.PersistentVolumeClaim) {
+					p.Finalizers = append(p.Finalizers, "kubernetes.io/pvc-protection")
+				})).Should(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pvc), pvc)).Should(Succeed())
+				sourcePVCs[pvc.Name] = rebuildSourcePVCIdentity{UID: string(pvc.UID), VolumeName: pvc.Spec.VolumeName}
+			}
+
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *opsv1alpha1.OpsRequest) {
+				recordedIdentities, err := getRecordedSourcePVCIdentities(ops)
+				g.Expect(err).Should(Succeed())
+				for sourcePVCName, oldIdentity := range sourcePVCs {
+					g.Expect(recordedIdentities).Should(HaveKeyWithValue(sourcePVCName, oldIdentity))
+				}
+				for _, detail := range ops.Status.Components[defaultCompName].ProgressDetails {
+					g.Expect(detail.Message).Should(Equal(waitingForDynamicPVCMessage))
+				}
+			})).Should(Succeed())
+			for sourcePVCName := range sourcePVCs {
+				Eventually(func(g Gomega) {
+					pvc := &corev1.PersistentVolumeClaim{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
+					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
+				}).Should(Succeed())
+			}
+		})
+
 		It("pre-binds restored PV claimRef to the source PVC", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			sourcePVCName := "data-rebuild-source-" + testCtx.GetRandomStr()

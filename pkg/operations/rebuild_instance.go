@@ -305,7 +305,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.Req
 	}
 	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom, instance, index)
 	if err != nil {
-		if rebuildFrom.BackupName == "" && progressDetail.Message == waitingForDynamicPVCMessage && apierrors.IsNotFound(err) {
+		if rebuildFrom.BackupName == "" && progressDetail.Message != waitingForInstanceReadyMessage && apierrors.IsNotFound(err) {
 			inPlaceHelper, err = r.prepareNoBackupRebuildHelperWithoutTargetPod(reqCtx, cli, opsRes, rebuildFrom, instance, index)
 			if err != nil {
 				return false, err

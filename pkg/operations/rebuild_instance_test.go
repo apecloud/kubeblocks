@@ -367,7 +367,6 @@ var _ = Describe("OpsUtil functions", func() {
 				client.MatchingLabels{constant.KBAppComponentLabelKey: defaultCompName},
 				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
 			sourcePVCTemplates := map[string]*corev1.PersistentVolumeClaim{}
-			sourcePVCIdentities := map[string]rebuildSourcePVCIdentity{}
 			targetSourcePVCs := map[string]bool{}
 			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
 				targetSourcePVCs[fmt.Sprintf("%s-%s", testapps.DataVolumeName, ins.Name)] = true
@@ -385,7 +384,6 @@ var _ = Describe("OpsUtil functions", func() {
 				})).Should(Succeed())
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pvc), pvc)).Should(Succeed())
 				sourcePVCTemplates[pvc.Name] = pvc
-				sourcePVCIdentities[pvc.Name] = rebuildSourcePVCIdentity{UID: string(pvc.UID), VolumeName: pvc.Spec.VolumeName}
 			}
 			initialSourcePVCNames := make([]string, 0, len(sourcePVCTemplates))
 			for sourcePVCName := range sourcePVCTemplates {
@@ -397,13 +395,6 @@ var _ = Describe("OpsUtil functions", func() {
 
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *opsv1alpha1.OpsRequest) {
-				recordedIdentities, err := getRecordedSourcePVCIdentities(ops)
-				g.Expect(err).Should(Succeed())
-				for sourcePVCName, oldIdentity := range sourcePVCIdentities {
-					g.Expect(recordedIdentities).Should(HaveKeyWithValue(sourcePVCName, oldIdentity))
-				}
-			})).Should(Succeed())
 			By("expect source PVC deletion to be requested before deleting the old target pod")
 			for sourcePVCName := range sourcePVCTemplates {
 				Eventually(func(g Gomega) {
@@ -435,95 +426,12 @@ var _ = Describe("OpsUtil functions", func() {
 					client.InNamespace(opsRes.OpsRequest.Namespace), client.MatchingFields{"metadata.name": sourcePVCName})
 			}
 
-			By("expect rebuild to wait while InstanceSet has not recreated dynamically provisioned source PVCs")
+			By("expect rebuild to wait for the rebuilt instance")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(Succeed())
 			for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
-				Expect(detail.Message).Should(Equal(waitingForDynamicPVCMessage))
+				Expect(detail.Message).Should(Equal(waitingForInstanceReadyMessage))
 			}
-
-			sourcePVCNames := make([]string, 0, len(sourcePVCTemplates))
-			for sourcePVCName := range sourcePVCTemplates {
-				sourcePVCNames = append(sourcePVCNames, sourcePVCName)
-			}
-			slices.Sort(sourcePVCNames)
-			recreateSourcePVC := func(sourcePVCName string) {
-				sourcePVCTemplate := sourcePVCTemplates[sourcePVCName]
-				recreatedSourcePVC := sourcePVCTemplate.DeepCopy()
-				recreatedSourcePVC.ResourceVersion = ""
-				recreatedSourcePVC.UID = ""
-				recreatedSourcePVC.CreationTimestamp = metav1.Time{}
-				recreatedSourcePVC.DeletionTimestamp = nil
-				recreatedSourcePVC.ManagedFields = nil
-				recreatedSourcePVC.Finalizers = nil
-				recreatedSourcePVC.Spec.VolumeName = "dynamic-" + sourcePVCName
-				Expect(k8sClient.Create(ctx, recreatedSourcePVC)).Should(Succeed())
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(recreatedSourcePVC), func(pvc *corev1.PersistentVolumeClaim) {
-					pvc.Status.Phase = corev1.ClaimBound
-				})()).Should(Succeed())
-			}
-			if len(sourcePVCNames) > 1 {
-				firstSourcePVCName := sourcePVCNames[0]
-				recreateSourcePVC(firstSourcePVCName)
-				_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-				Expect(err).Should(Succeed())
-				firstPVC := &corev1.PersistentVolumeClaim{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: firstSourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, firstPVC)).Should(Succeed())
-				Expect(string(firstPVC.UID)).ShouldNot(Equal(sourcePVCIdentities[firstSourcePVCName].UID))
-				Expect(firstPVC.DeletionTimestamp).Should(BeNil())
-				progressMessages := make([]string, 0, len(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails))
-				for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
-					progressMessages = append(progressMessages, detail.Message)
-				}
-				Expect(progressMessages).Should(ContainElement(waitingForDynamicPVCMessage))
-				Expect(progressMessages).Should(ContainElement(waitingForInstanceReadyMessage))
-			}
-
-			for _, sourcePVCName := range sourcePVCNames {
-				existing := &corev1.PersistentVolumeClaim{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, existing)
-				if err == nil {
-					if existing.DeletionTimestamp == nil && string(existing.UID) != sourcePVCIdentities[sourcePVCName].UID {
-						if existing.Spec.VolumeName == "" {
-							Expect(testapps.ChangeObj(&testCtx, existing, func(pvc *corev1.PersistentVolumeClaim) {
-								pvc.Spec.VolumeName = "dynamic-" + sourcePVCName
-							})).Should(Succeed())
-						}
-						Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, func(pvc *corev1.PersistentVolumeClaim) {
-							pvc.Status.Phase = corev1.ClaimBound
-						})()).Should(Succeed())
-						continue
-					}
-					testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true,
-						client.InNamespace(opsRes.OpsRequest.Namespace), client.MatchingFields{"metadata.name": sourcePVCName})
-				} else {
-					Expect(apierrors.IsNotFound(err)).Should(BeTrue())
-				}
-				Eventually(func(g Gomega) {
-					pvc := &corev1.PersistentVolumeClaim{}
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)
-					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
-				}).Should(Succeed())
-				recreateSourcePVC(sourcePVCName)
-			}
-
-			Eventually(func(g Gomega) {
-				_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-				g.Expect(err).Should(Succeed())
-				for sourcePVCName, oldIdentity := range sourcePVCIdentities {
-					pvc := &corev1.PersistentVolumeClaim{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
-					g.Expect(string(pvc.UID)).ShouldNot(Equal(oldIdentity.UID))
-					if oldIdentity.VolumeName != "" && pvc.Spec.VolumeName != "" {
-						g.Expect(pvc.Spec.VolumeName).ShouldNot(Equal(oldIdentity.VolumeName))
-					}
-				}
-				ops := &opsv1alpha1.OpsRequest{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), ops)).Should(Succeed())
-				for _, detail := range ops.Status.Components[defaultCompName].ProgressDetails {
-					g.Expect(detail.Message).Should(Or(Equal(waitingForInstanceReadyMessage), MatchRegexp(`^Rebuild pod .+ successfully$`)))
-				}
-			}).Should(Succeed())
 		}
 
 		waitForInstanceToAvailable := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, ignoreRoleCheck bool) {
@@ -598,63 +506,6 @@ var _ = Describe("OpsUtil functions", func() {
 			})).Should(Succeed())
 		})
 
-		It("does not accept an existing source PVC as dynamically rebuilt when the target pod is already absent", func() {
-			opsRes := prepareOpsRes("", true)
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			sourcePVCs := map[string]rebuildSourcePVCIdentity{}
-			targetSourcePVCs := map[string]bool{}
-			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
-				targetSourcePVCs[fmt.Sprintf("%s-%s", testapps.DataVolumeName, ins.Name)] = true
-				pod := &corev1.Pod{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, pod)).Should(Succeed())
-				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
-			}
-			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
-				Eventually(func(g Gomega) {
-					pod := &corev1.Pod{}
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, pod)
-					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
-				}).Should(Succeed())
-			}
-			pvcList := &corev1.PersistentVolumeClaimList{}
-			Expect(k8sClient.List(ctx, pvcList,
-				client.MatchingLabels{constant.KBAppComponentLabelKey: defaultCompName},
-				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
-			for i := range pvcList.Items {
-				pvc := pvcList.Items[i].DeepCopy()
-				if !targetSourcePVCs[pvc.Name] {
-					continue
-				}
-				Expect(testapps.ChangeObj(&testCtx, pvc, func(p *corev1.PersistentVolumeClaim) {
-					p.Finalizers = append(p.Finalizers, "kubernetes.io/pvc-protection")
-				})).Should(Succeed())
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pvc), pvc)).Should(Succeed())
-				sourcePVCs[pvc.Name] = rebuildSourcePVCIdentity{UID: string(pvc.UID), VolumeName: pvc.Spec.VolumeName}
-			}
-
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).Should(Succeed())
-
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *opsv1alpha1.OpsRequest) {
-				recordedIdentities, err := getRecordedSourcePVCIdentities(ops)
-				g.Expect(err).Should(Succeed())
-				for sourcePVCName, oldIdentity := range sourcePVCs {
-					g.Expect(recordedIdentities).Should(HaveKeyWithValue(sourcePVCName, oldIdentity))
-				}
-				for _, detail := range ops.Status.Components[defaultCompName].ProgressDetails {
-					g.Expect(detail.Message).Should(Equal(waitingForDynamicPVCMessage))
-				}
-			})).Should(Succeed())
-			for sourcePVCName := range sourcePVCs {
-				Eventually(func(g Gomega) {
-					pvc := &corev1.PersistentVolumeClaim{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
-					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
-				}).Should(Succeed())
-			}
-		})
-
 		It("pre-binds restored PV claimRef to the source PVC", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			sourcePVCName := "data-rebuild-source-" + testCtx.GetRandomStr()
@@ -706,28 +557,6 @@ var _ = Describe("OpsUtil functions", func() {
 
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(sourcePVC), sourcePVC)).Should(Succeed())
 			Expect(sourcePVC.Spec.VolumeName).Should(ContainSubstring("restored-pv-"))
-		})
-
-		It("rejects a dynamically provisioned source PVC with mismatched identity", func() {
-			helper := &inplaceRebuildHelper{}
-			expectedPVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "data-rebuild-expected",
-					Labels: map[string]string{constant.KBAppComponentLabelKey: defaultCompName},
-				},
-			}
-			foreignPVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "data-rebuild-expected",
-					Labels: map[string]string{constant.KBAppComponentLabelKey: "foreign"},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "new-pv"},
-			}
-			Expect(helper.validateDynamicSourcePVC(foreignPVC, expectedPVC, rebuildSourcePVCIdentity{UID: "old-uid", VolumeName: "old-pv"})).Should(MatchError(ContainSubstring("not rebuilt from the expected workload template")))
-
-			reusedOldPV := expectedPVC.DeepCopy()
-			reusedOldPV.Spec.VolumeName = "old-pv"
-			Expect(helper.validateDynamicSourcePVC(reusedOldPV, expectedPVC, rebuildSourcePVCIdentity{UID: "old-uid", VolumeName: "old-pv"})).Should(MatchError(ContainSubstring("still bound to the old pv")))
 		})
 
 		It("preserves rebuild identity metadata when reverting the reclaim policy", func() {

@@ -440,6 +440,7 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 type rebuildSourcePVCIdentity struct {
 	UID        string `json:"uid,omitempty"`
 	VolumeName string `json:"volumeName,omitempty"`
+	Absent     bool   `json:"absent,omitempty"`
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(reqCtx intctrlutil.RequestCtx,
@@ -463,13 +464,31 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				waitingForSourcePVC = true
+				if sourcePVCIdentities[sourcePVCName].UID == "" && !sourcePVCIdentities[sourcePVCName].Absent {
+					if err := inPlaceHelper.recordSourcePVCAbsentOnOpsRequest(reqCtx, cli, opsRequest, sourcePVCName); err != nil {
+						return err
+					}
+					sourcePVCIdentities[sourcePVCName] = rebuildSourcePVCIdentity{Absent: true}
+				}
+				if !targetPodDeleted {
+					needDeleteTargetPod = true
+				}
 				continue
 			}
 			return err
 		}
 		oldIdentity := sourcePVCIdentities[sourcePVCName]
 		if oldIdentity.UID == "" {
-			if targetPodDeleted && sourcePVC.DeletionTimestamp == nil {
+			if oldIdentity.Absent {
+				if !targetPodDeleted {
+					waitingForSourcePVC = true
+					needDeleteTargetPod = true
+					continue
+				}
+				if sourcePVC.DeletionTimestamp != nil {
+					waitingForSourcePVC = true
+					continue
+				}
 				if err := inPlaceHelper.validateDynamicSourcePVC(sourcePVC, builtTmpPVC, oldIdentity); err != nil {
 					return err
 				}
@@ -544,6 +563,22 @@ func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCIdentityOnOpsRequest(r
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest,
 	sourcePVC *corev1.PersistentVolumeClaim) error {
+	return inPlaceHelper.recordSourcePVCStateOnOpsRequest(reqCtx, cli, opsRequest, sourcePVC.Name,
+		rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName})
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCAbsentOnOpsRequest(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	sourcePVCName string) error {
+	return inPlaceHelper.recordSourcePVCStateOnOpsRequest(reqCtx, cli, opsRequest, sourcePVCName, rebuildSourcePVCIdentity{Absent: true})
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCStateOnOpsRequest(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	sourcePVCName string,
+	identity rebuildSourcePVCIdentity) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &opsv1alpha1.OpsRequest{}
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, latest); err != nil {
@@ -553,11 +588,11 @@ func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCIdentityOnOpsRequest(r
 		if err != nil {
 			return err
 		}
-		if sourcePVCIdentities[sourcePVC.Name].UID != "" {
+		if sourcePVCIdentities[sourcePVCName].UID != "" || sourcePVCIdentities[sourcePVCName].Absent {
 			opsRequest.Annotations = latest.Annotations
 			return nil
 		}
-		sourcePVCIdentities[sourcePVC.Name] = rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName}
+		sourcePVCIdentities[sourcePVCName] = identity
 		data, err := json.Marshal(sourcePVCIdentities)
 		if err != nil {
 			return err

@@ -380,6 +380,10 @@ var _ = Describe("OpsUtil functions", func() {
 				if !targetSourcePVCs[pvc.Name] {
 					continue
 				}
+				Expect(testapps.ChangeObj(&testCtx, pvc, func(p *corev1.PersistentVolumeClaim) {
+					p.Finalizers = append(p.Finalizers, "kubernetes.io/pvc-protection")
+				})).Should(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pvc), pvc)).Should(Succeed())
 				sourcePVCTemplates[pvc.Name] = pvc
 				sourcePVCIdentities[pvc.Name] = rebuildSourcePVCIdentity{UID: string(pvc.UID), VolumeName: pvc.Spec.VolumeName}
 			}
@@ -393,21 +397,37 @@ var _ = Describe("OpsUtil functions", func() {
 					g.Expect(recordedIdentities).Should(HaveKeyWithValue(sourcePVCName, oldIdentity))
 				}
 			})).Should(Succeed())
+			By("expect source PVCs to stay active until the old target pod is gone")
 			for sourcePVCName := range sourcePVCTemplates {
 				Eventually(func(g Gomega) {
 					pvc := &corev1.PersistentVolumeClaim{}
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)
-					if apierrors.IsNotFound(err) {
-						return
-					}
-					g.Expect(err).Should(Succeed())
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
+					g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
+				}).Should(Succeed())
+			}
+			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
+				Eventually(func(g Gomega) {
+					pod := &corev1.Pod{}
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, pod)
+					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+				}).Should(Succeed())
+			}
+
+			By("expect old source PVCs to be deleted only after the old target pod is absent, without clearing PVC protection")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(Succeed())
+			for sourcePVCName := range sourcePVCTemplates {
+				Eventually(func(g Gomega) {
+					pvc := &corev1.PersistentVolumeClaim{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
 					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
 				}).Should(Succeed())
 				testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true,
 					client.InNamespace(opsRes.OpsRequest.Namespace), client.MatchingFields{"metadata.name": sourcePVCName})
 			}
 
-			initInstanceSetPods(ctx, k8sClient, opsRes)
 			By("expect rebuild to wait while InstanceSet has not recreated dynamically provisioned source PVCs")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(Succeed())

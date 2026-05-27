@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -46,11 +47,13 @@ import (
 )
 
 const (
-	rebuildFromAnnotation           = "operations.kubeblocks.io/rebuild-from"
-	rebuildTmpPVCNameLabel          = "operations.kubeblocks.io/rebuild-tmp-pvc"
-	sourcePVReclaimPolicyAnnotation = "operations.kubeblocks.io/source-reclaim-policy"
+	rebuildFromAnnotation                = "operations.kubeblocks.io/rebuild-from"
+	rebuildTmpPVCNameLabel               = "operations.kubeblocks.io/rebuild-tmp-pvc"
+	rebuildSourcePVCIdentitiesAnnotation = "operations.kubeblocks.io/rebuild-source-pvc-identities"
+	sourcePVReclaimPolicyAnnotation      = "operations.kubeblocks.io/source-reclaim-policy"
 
 	waitingForInstanceReadyMessage   = "Waiting for the rebuilding instance to be ready"
+	waitingForDynamicPVCMessage      = "Waiting for source PVCs to be dynamically reprovisioned"
 	waitingForPostReadyRestorePrefix = "Waiting for postReady Restore"
 
 	ignoreRoleCheckAnnotationKey = "operations.kubeblocks.io/ignore-role-check"
@@ -77,17 +80,14 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildInstanceWithNoBackup(reqCtx in
 	cli client.Client,
 	opsRes *OpsResource,
 	progressDetail *opsv1alpha1.ProgressStatusDetail) (bool, error) {
-	// 1. restore the new pvs.
-	completed, err := inPlaceHelper.rebuildInstancePVByPod(reqCtx, cli, opsRes, progressDetail)
-	if err != nil || !completed {
-		return false, err
-	}
 	if progressDetail.Message != waitingForInstanceReadyMessage {
-		// 2. rebuild source pvcs and recreate the instance by deleting it.
-		return false, inPlaceHelper.rebuildSourcePVCsAndRecreateInstance(reqCtx, cli, opsRes.OpsRequest, progressDetail)
+		// no-backup rebuild has no data source to restore. Recreate the source
+		// PVC from the current workload template instead of building helper
+		// tmp PVCs/PVs that cannot carry backup data.
+		return false, inPlaceHelper.rebuildSourcePVCsByDynamicProvision(reqCtx, cli, opsRes.OpsRequest, progressDetail)
 	}
 
-	// 3. waiting for new instance is available.
+	// waiting for new instance is available.
 	return instanceIsAvailable(inPlaceHelper.synthesizedComp, inPlaceHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 }
 
@@ -434,6 +434,138 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 	}
 
 	progressDetail.Message = waitingForInstanceReadyMessage
+	return nil
+}
+
+type rebuildSourcePVCIdentity struct {
+	UID        string `json:"uid,omitempty"`
+	VolumeName string `json:"volumeName,omitempty"`
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	progressDetail *opsv1alpha1.ProgressStatusDetail) error {
+	itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
+
+	sourcePVCIdentities, err := getRecordedSourcePVCIdentities(opsRequest)
+	if err != nil {
+		return err
+	}
+	waitingForSourcePVC := false
+	for sourcePVCName, builtTmpPVC := range inPlaceHelper.pvcMap {
+		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, builtTmpPVC.Namespace)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				waitingForSourcePVC = true
+				continue
+			}
+			return err
+		}
+		if sourcePVC.DeletionTimestamp != nil {
+			waitingForSourcePVC = true
+			if err := inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC); err != nil {
+				return err
+			}
+			continue
+		}
+		oldIdentity := sourcePVCIdentities[sourcePVCName]
+		if oldIdentity.UID == "" {
+			if err := inPlaceHelper.recordSourcePVCIdentityOnOpsRequest(reqCtx, cli, opsRequest, sourcePVC); err != nil {
+				return err
+			}
+			oldIdentity = rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName}
+			sourcePVCIdentities[sourcePVCName] = oldIdentity
+		}
+		if string(sourcePVC.UID) == oldIdentity.UID {
+			waitingForSourcePVC = true
+			if err := inPlaceHelper.deleteSourcePVCForRebuild(reqCtx, cli, sourcePVC); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := inPlaceHelper.validateDynamicSourcePVC(sourcePVC, builtTmpPVC, oldIdentity); err != nil {
+			return err
+		}
+		if sourcePVC.Status.Phase != corev1.ClaimBound {
+			waitingForSourcePVC = true
+			continue
+		}
+	}
+	if waitingForSourcePVC {
+		progressDetail.Message = waitingForDynamicPVCMessage
+		return nil
+	}
+	if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
+		return err
+	}
+	if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
+		return err
+	}
+
+	progressDetail.Message = waitingForInstanceReadyMessage
+	return nil
+}
+
+func getRecordedSourcePVCIdentities(opsRequest *opsv1alpha1.OpsRequest) (map[string]rebuildSourcePVCIdentity, error) {
+	sourcePVCIdentities := map[string]rebuildSourcePVCIdentity{}
+	if opsRequest.Annotations == nil || opsRequest.Annotations[rebuildSourcePVCIdentitiesAnnotation] == "" {
+		return sourcePVCIdentities, nil
+	}
+	if err := json.Unmarshal([]byte(opsRequest.Annotations[rebuildSourcePVCIdentitiesAnnotation]), &sourcePVCIdentities); err != nil {
+		return nil, err
+	}
+	return sourcePVCIdentities, nil
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) recordSourcePVCIdentityOnOpsRequest(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	sourcePVC *corev1.PersistentVolumeClaim) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest := &opsv1alpha1.OpsRequest{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: opsRequest.Name, Namespace: opsRequest.Namespace}, latest); err != nil {
+			return err
+		}
+		sourcePVCIdentities, err := getRecordedSourcePVCIdentities(latest)
+		if err != nil {
+			return err
+		}
+		if sourcePVCIdentities[sourcePVC.Name].UID != "" {
+			opsRequest.Annotations = latest.Annotations
+			return nil
+		}
+		sourcePVCIdentities[sourcePVC.Name] = rebuildSourcePVCIdentity{UID: string(sourcePVC.UID), VolumeName: sourcePVC.Spec.VolumeName}
+		data, err := json.Marshal(sourcePVCIdentities)
+		if err != nil {
+			return err
+		}
+		patch := client.MergeFrom(latest.DeepCopy())
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[rebuildSourcePVCIdentitiesAnnotation] = string(data)
+		if err := cli.Patch(reqCtx.Ctx, latest, patch); err != nil {
+			return err
+		}
+		opsRequest.Annotations = latest.Annotations
+		return nil
+	})
+}
+
+func (inPlaceHelper *inplaceRebuildHelper) validateDynamicSourcePVC(sourcePVC, builtTmpPVC *corev1.PersistentVolumeClaim, oldIdentity rebuildSourcePVCIdentity) error {
+	for key, expected := range builtTmpPVC.Labels {
+		if expected == "" {
+			continue
+		}
+		if sourcePVC.Labels[key] != expected {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is not rebuilt from the expected workload template: label "%s" expected "%s", got "%s"`,
+				sourcePVC.Name, key, expected, sourcePVC.Labels[key]))
+		}
+	}
+	if oldIdentity.VolumeName != "" && sourcePVC.Spec.VolumeName != "" && oldIdentity.VolumeName == sourcePVC.Spec.VolumeName {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`the source pvc "%s" is still bound to the old pv "%s"`, sourcePVC.Name, sourcePVC.Spec.VolumeName))
+	}
 	return nil
 }
 

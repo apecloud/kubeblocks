@@ -405,11 +405,7 @@ var _ = Describe("OpsUtil functions", func() {
 					}
 					g.Expect(err).Should(Succeed())
 					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					if sourcePVCName == preDeletingSourcePVCName {
-						g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
-					} else {
-						g.Expect(pvc.Finalizers).Should(BeEmpty())
-					}
+					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
 				}).Should(Succeed())
 			}
 			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
@@ -418,6 +414,18 @@ var _ = Describe("OpsUtil functions", func() {
 					err := k8sClient.Get(ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.OpsRequest.Namespace}, pod)
 					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 				}).Should(Succeed())
+			}
+
+			By("expect old source PVCs to keep PVC protection until the workload releases them")
+			for sourcePVCName := range sourcePVCTemplates {
+				Eventually(func(g Gomega) {
+					pvc := &corev1.PersistentVolumeClaim{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
+					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
+					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
+				}).Should(Succeed())
+				testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true,
+					client.InNamespace(opsRes.OpsRequest.Namespace), client.MatchingFields{"metadata.name": sourcePVCName})
 			}
 
 			By("expect rebuild to wait for the rebuilt instance")

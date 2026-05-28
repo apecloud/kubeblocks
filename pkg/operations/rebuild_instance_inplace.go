@@ -772,6 +772,16 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 			}
 			continue
 		}
+		if noBackup {
+			pvcMap[sourcePVCName] = &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sourcePVCName,
+					Namespace: targetPod.Namespace,
+				},
+				Spec: vct.Spec,
+			}
+			continue
+		}
 		pvcLabels := getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{

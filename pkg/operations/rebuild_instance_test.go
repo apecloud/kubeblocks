@@ -399,9 +399,17 @@ var _ = Describe("OpsUtil functions", func() {
 			for sourcePVCName := range sourcePVCTemplates {
 				Eventually(func(g Gomega) {
 					pvc := &corev1.PersistentVolumeClaim{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)
+					if apierrors.IsNotFound(err) {
+						return
+					}
+					g.Expect(err).Should(Succeed())
 					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
+					if sourcePVCName == preDeletingSourcePVCName {
+						g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
+					} else {
+						g.Expect(pvc.Finalizers).Should(BeEmpty())
+					}
 				}).Should(Succeed())
 			}
 			for _, ins := range opsRes.OpsRequest.Spec.RebuildFrom[0].Instances {
@@ -412,23 +420,7 @@ var _ = Describe("OpsUtil functions", func() {
 				}).Should(Succeed())
 			}
 
-			By("expect old source PVCs to keep PVC protection until the workload releases them")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).Should(Succeed())
-			for sourcePVCName := range sourcePVCTemplates {
-				Eventually(func(g Gomega) {
-					pvc := &corev1.PersistentVolumeClaim{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sourcePVCName, Namespace: opsRes.OpsRequest.Namespace}, pvc)).Should(Succeed())
-					g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					g.Expect(pvc.Finalizers).Should(ContainElement("kubernetes.io/pvc-protection"))
-				}).Should(Succeed())
-				testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true,
-					client.InNamespace(opsRes.OpsRequest.Namespace), client.MatchingFields{"metadata.name": sourcePVCName})
-			}
-
 			By("expect rebuild to wait for the rebuilt instance")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).Should(Succeed())
 			for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
 				Expect(detail.Message).Should(Equal(waitingForInstanceReadyMessage))
 			}

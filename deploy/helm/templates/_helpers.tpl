@@ -234,6 +234,47 @@ Define the replica count for kubeblocks.
 {{- end }}
 {{- end }}
 
+{{/*
+Validate optional installation preconditions.
+*/}}
+{{- define "kubeblocks.installationChecks" -}}
+{{- if and .Values.installationChecks.kubeblocksCRDs.enabled (ne .Release.Name "test-release") -}}
+{{- $requiredKubeBlocksCRDs := list
+  "clusters.apps.kubeblocks.io"
+  "componentdefinitions.apps.kubeblocks.io"
+  "components.apps.kubeblocks.io"
+  "instancesets.workloads.kubeblocks.io"
+  "opsrequests.operations.kubeblocks.io"
+  "addons.extensions.kubeblocks.io"
+-}}
+{{- $missingKubeBlocksCRDs := list -}}
+{{- range $requiredKubeBlocksCRDs -}}
+{{- if not (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" .) -}}
+{{- $missingKubeBlocksCRDs = append $missingKubeBlocksCRDs . -}}
+{{- end -}}
+{{- end -}}
+{{- if $missingKubeBlocksCRDs -}}
+{{- fail (printf "\nKubeBlocks CRD check failed.\n\nMissing required CRDs:\n- %s\n\nInstall the KubeBlocks CRDs first:\n  kubectl apply -f deploy/helm/crds\n\nTo skip this check, set:\n  --set installationChecks.kubeblocksCRDs.enabled=false" (join "\n- " $missingKubeBlocksCRDs)) -}}
+{{- end -}}
+{{- end -}}
+{{- if and .Values.installationChecks.volumeSnapshotCRDs (ne .Release.Name "test-release") -}}
+{{- $requiredAPIs := list
+  (dict "api" "snapshot.storage.k8s.io/v1/VolumeSnapshotClass" "crd" "volumesnapshotclasses.snapshot.storage.k8s.io")
+  (dict "api" "snapshot.storage.k8s.io/v1/VolumeSnapshot" "crd" "volumesnapshots.snapshot.storage.k8s.io")
+  (dict "api" "snapshot.storage.k8s.io/v1/VolumeSnapshotContent" "crd" "volumesnapshotcontents.snapshot.storage.k8s.io")
+-}}
+{{- $missingCRDs := list -}}
+{{- range $requiredAPIs -}}
+{{- if not ($.Capabilities.APIVersions.Has .api) -}}
+{{- $missingCRDs = append $missingCRDs .crd -}}
+{{- end -}}
+{{- end -}}
+{{- if $missingCRDs -}}
+{{- fail (printf "\nVolumeSnapshot CRD check failed.\n\nMissing required CRDs:\n- %s\n\nInstall the CSI snapshot CRDs first:\n  kubectl apply -k https://github.com/kubernetes-csi/external-snapshotter/client/config/crd\n\nTo skip this check, set:\n  --set installationChecks.volumeSnapshotCRDs=false" (join "\n- " $missingCRDs)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "kubeblocks.i18nResourcesName" -}}
 {{ include "kubeblocks.fullname" . }}-i18n-resources
 {{- end }}

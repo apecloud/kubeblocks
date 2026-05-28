@@ -452,8 +452,10 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 			}
 			return err
 		}
-		if err := inPlaceHelper.deleteSourcePVCForRebuild(reqCtx, cli, sourcePVC); err != nil {
-			return err
+		if sourcePVC.DeletionTimestamp == nil {
+			if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePVC); err != nil {
+				return err
+			}
 		}
 	}
 	if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {

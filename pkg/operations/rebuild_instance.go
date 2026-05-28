@@ -285,12 +285,6 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.Req
 	rebuildFrom opsv1alpha1.RebuildInstance,
 	instance opsv1alpha1.Instance,
 	index int) (bool, error) {
-	if progressDetail.Message == waitingForInstanceReadyMessage {
-		targetPod := &corev1.Pod{}
-		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
-			return false, client.IgnoreNotFound(err)
-		}
-	}
 	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom, instance, index)
 	if err != nil {
 		return false, err

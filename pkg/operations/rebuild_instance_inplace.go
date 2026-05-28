@@ -450,7 +450,7 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(r
 			}
 			return err
 		}
-		if err := inPlaceHelper.deleteSourcePVCForDynamicProvision(reqCtx, cli, sourcePVC); err != nil {
+		if err := inPlaceHelper.deleteSourcePVCForRebuild(reqCtx, cli, sourcePVC); err != nil {
 			return err
 		}
 	}
@@ -687,17 +687,6 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteSourcePVCForRebuild(reqCtx intc
 		return err
 	}
 	return inPlaceHelper.removePVCFinalizer(reqCtx, cli, sourcePVC)
-}
-
-func (inPlaceHelper *inplaceRebuildHelper) deleteSourcePVCForDynamicProvision(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	sourcePVC *corev1.PersistentVolumeClaim) error {
-	if sourcePVC.DeletionTimestamp != nil {
-		return nil
-	}
-	// In the no-backup path, PVC protection is the signal that the old pod
-	// has not fully released the volume yet. Do not clear it here.
-	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePVC)
 }
 
 func (inPlaceHelper *inplaceRebuildHelper) revertReclaimPolicy(reqCtx intctrlutil.RequestCtx,

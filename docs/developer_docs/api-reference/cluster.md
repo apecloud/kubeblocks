@@ -6020,9 +6020,31 @@ which initiates an update of the replica&rsquo;s role.</p>
 It ensures replicas are correctly labeled with their respective roles.
 Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.</p>
 <p>Expected output of this action:
-- On Success: The determined role of the replica, which must align with one of the roles specified
-  in the component definition.
-- On Failure: An error message, if applicable, indicating why the action failed.</p>
+  - On Success: The determined role of the replica, which must align with one of the roles
+specified in the component definition. Stdout MUST be one of the two forms below:</p>
+<pre><code>  &lt;role&gt;                  // single-token form
+  &lt;role&gt; &lt;roleVersion&gt;    // versioned form
+The two tokens are separated by whitespace (spaces, tabs, or newlines).
+&lt;roleVersion&gt; is an optional unsigned 64-bit decimal integer that
+carries the component's authoritative role version for stale-role
+handling, especially stale exclusive-role claims. A versioned
+result is accepted only when its &lt;roleVersion&gt; is newer than the
+versioned result the controller has already accepted for this Pod.
+The version should represent the complete role fact. For an
+exclusive primary role, identical versions reported by different
+replicas must not describe contradictory primary ownership.
+&lt;role&gt; remains a valid single-token form. Stdout that looks
+versioned but whose second token is not an unsigned 64-bit decimal
+integer, or stdout with three or more whitespace-separated tokens,
+is rejected as malformed and the Pod's role label is not updated.
+A component may migrate a Pod from the single-token form to the
+versioned form. After a Pod has reported the versioned form,
+later single-token results from that Pod are ignored to avoid
+downgrading from authoritative role-version ordering.
+</code></pre>
+<ul>
+<li>On Failure: An error message, if applicable, indicating why the action failed.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

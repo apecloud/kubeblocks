@@ -599,7 +599,7 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		return nil, err
 	}
 	rebuildPrefix := fmt.Sprintf("rebuild-%s", opsRes.OpsRequest.UID[:8])
-	pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, rebuildPrefix, index)
+	pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, rebuildPrefix, index, rebuildInstance.BackupName == "")
 	if err != nil {
 		return nil, err
 	}

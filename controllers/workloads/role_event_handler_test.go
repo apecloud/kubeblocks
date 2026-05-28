@@ -113,7 +113,7 @@ func TestParseRoleProbeOutputEmpty(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 9)
-	if acceptRoleProbeEvent(pod, 0, parsed) {
+	if acceptRoleProbeEvent(pod, "0", parsed) {
 		t.Fatalf("expected stale versioned result to be rejected")
 	}
 }
@@ -121,7 +121,7 @@ func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 10)
-	if acceptRoleProbeEvent(pod, 0, parsed) {
+	if acceptRoleProbeEvent(pod, "0", parsed) {
 		t.Fatalf("expected equal versioned result to be rejected")
 	}
 }
@@ -129,7 +129,7 @@ func TestAcceptRoleProbeEventVersionedRejectsEqualVersion(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedAcceptsNewerVersion(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := versionedRoleProbeOutput("primary", 11)
-	if !acceptRoleProbeEvent(pod, 0, parsed) {
+	if !acceptRoleProbeEvent(pod, "0", parsed) {
 		t.Fatalf("expected newer versioned result to be accepted")
 	}
 }
@@ -138,7 +138,7 @@ func TestAcceptRoleProbeEventVersionedAcceptsNewerVersion(t *testing.T) {
 func TestAcceptRoleProbeEventVersionedIgnoresSingleTokenAnnotation(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550000000000"})
 	parsed := versionedRoleProbeOutput("primary", 1)
-	if !acceptRoleProbeEvent(pod, 1, parsed) {
+	if !acceptRoleProbeEvent(pod, "1", parsed) {
 		t.Fatalf("expected versioned result to ignore single-token EventTime anchor")
 	}
 }
@@ -146,7 +146,7 @@ func TestAcceptRoleProbeEventVersionedIgnoresSingleTokenAnnotation(t *testing.T)
 func TestAcceptRoleProbeEventSingleTokenAcceptsNewerEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550000000000"})
 	parsed := roleProbeOutput{role: "primary"}
-	if !acceptRoleProbeEvent(pod, 1779550600000000, parsed) {
+	if !acceptRoleProbeEvent(pod, "1779550600000000", parsed) {
 		t.Fatalf("expected newer single-token result to be accepted")
 	}
 }
@@ -154,7 +154,7 @@ func TestAcceptRoleProbeEventSingleTokenAcceptsNewerEventTime(t *testing.T) {
 func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550600000000"})
 	parsed := roleProbeOutput{role: "primary"}
-	if acceptRoleProbeEvent(pod, 1779550000000000, parsed) {
+	if acceptRoleProbeEvent(pod, "1779550000000000", parsed) {
 		t.Fatalf("expected stale single-token result to be rejected")
 	}
 }
@@ -165,7 +165,7 @@ func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 func TestAcceptRoleProbeEventSingleTokenRejectedOnPodAlreadyAcceptedVersionedEvent(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "10"})
 	parsed := roleProbeOutput{role: "primary"}
-	if acceptRoleProbeEvent(pod, 1779550600000000, parsed) {
+	if acceptRoleProbeEvent(pod, "1779550600000000", parsed) {
 		t.Fatalf("expected same-Pod single-token result to be rejected after a versioned result")
 	}
 }
@@ -179,7 +179,7 @@ func TestAcceptRoleProbeEventSingleTokenRejectedOnPodWithBothAnnotationsWhenRole
 		constant.LastRoleEventVersionAnnotationKey:         "1000000",
 	})
 	parsed := roleProbeOutput{role: "primary"}
-	if acceptRoleProbeEvent(pod, 2000000, parsed) {
+	if acceptRoleProbeEvent(pod, "2000000", parsed) {
 		t.Fatalf("expected single-token result to be rejected when roleVersion anchor is present")
 	}
 }
@@ -472,7 +472,7 @@ func TestRoleEventVersionedCleanupLeavesPeerAbleToAcceptItsOwnSameEpochSecondary
 		constant.LastRoleAuthoritativeVersionAnnotationKey: "0",
 	})
 	parsed := versionedRoleProbeOutput("secondary", 1)
-	if !acceptRoleProbeEvent(pod, 0, parsed) {
+	if !acceptRoleProbeEvent(pod, "0", parsed) {
 		t.Fatalf("expected peer to accept same-epoch secondary event")
 	}
 }

@@ -244,6 +244,8 @@ func evaluateTrigger(
 	switch reason {
 	case opsv1alpha1.ReasonClusterReconcileStuck:
 		return evaluateClusterReconcileStuck(cluster, opsRequest), nil
+	case opsv1alpha1.ReasonComponentConditionStuck:
+		return evaluateComponentConditionStuck(cluster, opsRequest), nil
 	default:
 		// remaining trigger detection bodies land per T-P0e.1-6 acceptance
 		// follow-ups (T-P0e.1 marker / T-P0e.4 role probe / T-P0e.6 chart
@@ -278,6 +280,46 @@ func evaluateClusterReconcileStuck(
 			cluster.Namespace, cluster.Name, cluster.Status.Phase,
 		),
 	}
+}
+
+// evaluateComponentConditionStuck walks Cluster.status.components and flags
+// any component that is still parked outside Running after the OpsRequest
+// reached Succeed. Cluster.status.components is the controller's own
+// reflection of per-component phase; reading it here keeps the detection on
+// the same channel the OpsRequest reconciler already trusts for completion
+// decisions.
+//
+// Component phases other than Running are all non-terminal-healthy. We pick
+// the first non-Running phase encountered (sorted for determinism) so the
+// surfaced message points at one concrete component; the orchestration's
+// per-reason threshold keeps the noise floor at 5 minutes.
+func evaluateComponentConditionStuck(
+	cluster *appsv1.Cluster,
+	opsRequest *opsv1alpha1.OpsRequest,
+) *DownstreamObservation {
+	if opsRequest.Status.CompletionTimestamp.IsZero() {
+		return nil
+	}
+	names := make([]string, 0, len(cluster.Status.Components))
+	for name := range cluster.Status.Components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		comp := cluster.Status.Components[name]
+		if comp.Phase == "" || comp.Phase == appsv1.RunningComponentPhase {
+			continue
+		}
+		return &DownstreamObservation{
+			Reason:    opsv1alpha1.ReasonComponentConditionStuck,
+			FirstSeen: opsRequest.Status.CompletionTimestamp.Time,
+			Detail: fmt.Sprintf(
+				"Cluster %s/%s component %q has been in phase %q since OpsRequest Succeed.",
+				cluster.Namespace, cluster.Name, name, comp.Phase,
+			),
+		}
+	}
+	return nil
 }
 
 // IsPhaseEligibleForDownstreamObservation returns true when the OpsRequest

@@ -198,6 +198,89 @@ func TestEvaluateClusterReconcileStuck(t *testing.T) {
 	})
 }
 
+// TestEvaluateComponentConditionStuck covers the ComponentConditionStuck
+// trigger. The detection walks Cluster.status.components and surfaces the
+// first non-Running phase it finds (deterministic by sorted component name)
+// so the message points at one concrete component. We pin: empty map returns
+// nil, all-Running returns nil, missing CompletionTimestamp returns nil, and
+// a non-Running component yields an observation that carries the component
+// name in the Detail.
+func TestEvaluateComponentConditionStuck(t *testing.T) {
+	succeed := time.Now().Add(-10 * time.Minute)
+	opsRequest := &opsv1alpha1.OpsRequest{
+		Status: opsv1alpha1.OpsRequestStatus{
+			Phase:               opsv1alpha1.OpsSucceedPhase,
+			CompletionTimestamp: metav1.Time{Time: succeed},
+		},
+	}
+
+	t.Run("empty components returns nil", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		if got := evaluateComponentConditionStuck(cluster, opsRequest); got != nil {
+			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("all running returns nil", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+			"mysql": {Phase: appsv1.RunningComponentPhase},
+			"proxy": {Phase: appsv1.RunningComponentPhase},
+		}
+		if got := evaluateComponentConditionStuck(cluster, opsRequest); got != nil {
+			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("missing completion timestamp returns nil", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+			"mysql": {Phase: appsv1.FailedComponentPhase},
+		}
+		opsNoTS := &opsv1alpha1.OpsRequest{
+			Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsSucceedPhase},
+		}
+		if got := evaluateComponentConditionStuck(cluster, opsNoTS); got != nil {
+			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("non-running component surfaces observation", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		cluster.Namespace = "ns-a"
+		cluster.Name = "demo"
+		cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+			"proxy": {Phase: appsv1.RunningComponentPhase},
+			"mysql": {Phase: appsv1.FailedComponentPhase},
+		}
+		obs := evaluateComponentConditionStuck(cluster, opsRequest)
+		if obs == nil {
+			t.Fatalf("expected observation, got nil")
+		}
+		if obs.Reason != opsv1alpha1.ReasonComponentConditionStuck {
+			t.Errorf("reason: got %q, want %q", obs.Reason, opsv1alpha1.ReasonComponentConditionStuck)
+		}
+		// "mysql" sorts before "proxy" so the deterministic walk picks mysql.
+		if !contains(obs.Detail, "mysql") {
+			t.Errorf("Detail should reference mysql, got %q", obs.Detail)
+		}
+		if !obs.FirstSeen.Equal(succeed) {
+			t.Errorf("FirstSeen: got %v, want %v", obs.FirstSeen, succeed)
+		}
+	})
+}
+
+// contains is a tiny test-local helper to keep TestEvaluateComponentConditionStuck
+// readable without pulling strings.Contains into the test imports list.
+func contains(s, substr string) bool {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 // TestIsPhaseEligibleForDownstreamObservation locks in the observation gate:
 // only OpsSucceedPhase with a non-zero CompletionTimestamp is eligible. This
 // guarantees the observation never runs against a still-running or

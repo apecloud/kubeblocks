@@ -107,6 +107,17 @@ func TestReasonConstantsStringDrift(t *testing.T) {
 		{"ReasonReconfigureFailed", ReasonReconfigureFailed, "ReconfigureFailed"},
 		{"ReasonBackupStarted", ReasonBackupStarted, "BackupStarted"},
 		{"ReasonRestoreStarted", ReasonRestoreStarted, "RestoreStarted"},
+
+		// DownstreamProgressionFailed reasons — addon observability surface.
+		// String values are part of the addon API contract and consumed by
+		// `kubectl describe` / Console / SRE tooling.
+		{"ReasonDownstreamFailClosedMarkerPersistent", ReasonDownstreamFailClosedMarkerPersistent, "DownstreamFailClosedMarkerPersistent"},
+		{"ReasonRoleProbePermanentFail", ReasonRoleProbePermanentFail, "RoleProbePermanentFail"},
+		{"ReasonClusterReconcileStuck", ReasonClusterReconcileStuck, "ClusterReconcileStuck"},
+		{"ReasonComponentConditionStuck", ReasonComponentConditionStuck, "ComponentConditionStuck"},
+		{"ReasonInstanceSetAlignmentStuck", ReasonInstanceSetAlignmentStuck, "InstanceSetAlignmentStuck"},
+		{"ReasonChartMarkerDriftPersistent", ReasonChartMarkerDriftPersistent, "ChartMarkerDriftPersistent"},
+		{"ReasonDownstreamProgressionCleared", ReasonDownstreamProgressionCleared, "DownstreamProgressionCleared"},
 	}
 	for _, tc := range cases {
 		if tc.got != tc.want {

@@ -34,6 +34,15 @@ const (
 	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
+	// DownstreamFailClosedMarkersAnnotationKey lets an addon declare on its
+	// ComponentDefinition the set of on-disk markers (or other addon-specific
+	// signals) whose persistent presence means downstream progression has
+	// failed despite the OpsRequest having reached Succeed. The OpsRequest
+	// reconciler reads this list to populate the
+	// DownstreamProgressionFailed condition without hardcoding any
+	// addon-specific marker name. The annotation value is a comma-separated
+	// list (e.g. ".replication-divergence-pending,.bootstrap-fenced").
+	DownstreamFailClosedMarkersAnnotationKey = "kubeblocks.io/downstream-fail-closed-markers"
 
 	KBAppClusterUIDKey                = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"

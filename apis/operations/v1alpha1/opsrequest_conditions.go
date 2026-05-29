@@ -47,6 +47,13 @@ const (
 	ConditionTypeBackup             = "Backup"
 	ConditionTypeInstanceRebuilding = "InstancesRebuilding"
 	ConditionTypeCustomOperation    = "CustomOperation"
+	// ConditionTypeDownstreamProgressionFailed surfaces persistent downstream
+	// progression failure observed after the OpsRequest lifecycle has already
+	// reached Succeed. It is purely observational: it does not retract Succeed,
+	// does not auto-rollback, and does not block subsequent OpsRequests.
+	// See docs/addon-api/10-day2-operations.md for the contract baseline
+	// ("OpsRequest Succeed is not equivalent to Component ready").
+	ConditionTypeDownstreamProgressionFailed = "DownstreamProgressionFailed"
 
 	// condition and event reasons
 	ReasonClusterPhaseMismatch  = "ClusterPhaseMismatch"
@@ -80,6 +87,17 @@ const (
 	ReasonReconfigureFailed               = "ReconfigureFailed"
 	ReasonBackupStarted                   = "BackupStarted"
 	ReasonRestoreStarted                  = "RestoreStarted"
+
+	// reasons for ConditionTypeDownstreamProgressionFailed. Each reason has a
+	// single, well-defined semantic and an independent persistence threshold.
+	// String values MUST remain stable — see TestReasonConstantsStringDrift.
+	ReasonDownstreamFailClosedMarkerPersistent = "DownstreamFailClosedMarkerPersistent"
+	ReasonRoleProbePermanentFail               = "RoleProbePermanentFail"
+	ReasonClusterReconcileStuck                = "ClusterReconcileStuck"
+	ReasonComponentConditionStuck              = "ComponentConditionStuck"
+	ReasonInstanceSetAlignmentStuck            = "InstanceSetAlignmentStuck"
+	ReasonChartMarkerDriftPersistent           = "ChartMarkerDriftPersistent"
+	ReasonDownstreamProgressionCleared         = "DownstreamProgressionCleared"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -385,5 +403,33 @@ func NewRestoreCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             ReasonRestoreStarted,
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to restore the Cluster: %s", ops.Spec.GetClusterName()),
+	}
+}
+
+// NewDownstreamProgressionFailedCondition creates a condition that surfaces
+// persistent downstream progression failure observed after the OpsRequest has
+// already reached Succeed. The condition is purely observational and does not
+// retract Succeed. Each reason has an independent persistence threshold; the
+// caller is responsible for threshold gating before invoking this constructor.
+func NewDownstreamProgressionFailedCondition(ops *OpsRequest, reason, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeDownstreamProgressionFailed,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
+	}
+}
+
+// NewDownstreamProgressionClearedCondition transitions
+// DownstreamProgressionFailed to status=False after every active trigger has
+// stayed cleared for the per-reason recovery window.
+func NewDownstreamProgressionClearedCondition(ops *OpsRequest, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeDownstreamProgressionFailed,
+		Status:             metav1.ConditionFalse,
+		Reason:             ReasonDownstreamProgressionCleared,
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
 	}
 }

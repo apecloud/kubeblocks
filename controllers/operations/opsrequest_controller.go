@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -197,7 +198,7 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 	case opsv1alpha1.OpsRunningPhase, opsv1alpha1.OpsCancellingPhase:
 		return r.reconcileStatusDuringRunningOrCanceling(reqCtx, opsRes)
 	case opsv1alpha1.OpsSucceedPhase:
-		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
+		return r.handleSucceedOpsRequest(reqCtx, opsRes)
 	default:
 		return r.handleUnsuccessfulCompletionOpsRequest(reqCtx, opsRes)
 	}
@@ -239,12 +240,22 @@ func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx,
 }
 
 // handleSucceedOpsRequest the opsRequest will be deleted after one hour when status.phase is Succeed
-func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.RequestCtx, opsRequest *opsv1alpha1.OpsRequest) (*ctrl.Result, error) {
+func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	opsRequest := opsRes.OpsRequest
 	if err := r.annotateRelatedOps(reqCtx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	// Post-Succeed downstream progression observation (P0e). Succeed itself
+	// is never retracted; the observation may add a
+	// DownstreamProgressionFailed condition alongside Succeed once a trigger
+	// has persisted past its per-reason threshold.
+	if requeue, err := r.observeDownstreamProgression(reqCtx, opsRes); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	} else if requeue > 0 {
+		return intctrlutil.ResultToP(intctrlutil.RequeueAfter(requeue, reqCtx.Log, ""))
 	}
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -258,6 +269,44 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+// observeDownstreamProgression runs the P0e observation hook on a Succeeded
+// OpsRequest, writing the DownstreamProgressionFailed condition when a
+// trigger has persisted past its per-reason threshold and clearing it once
+// every trigger has cleared. The returned duration is the recommended
+// requeue cadence; zero means no follow-up tick is requested by P0e (TTL
+// scheduling continues to govern the eventual delete).
+func (r *OpsRequestReconciler) observeDownstreamProgression(
+	reqCtx intctrlutil.RequestCtx,
+	opsRes *operations.OpsResource,
+) (time.Duration, error) {
+	if !operations.IsPhaseEligibleForDownstreamObservation(opsRes.OpsRequest) {
+		return 0, nil
+	}
+	if opsRes.Cluster == nil {
+		return 0, nil
+	}
+	obs, requeue, err := operations.ObserveDownstreamProgression(reqCtx.Ctx, r.Client, opsRes.Cluster, opsRes.OpsRequest)
+	if err != nil {
+		return 0, err
+	}
+	if obs == nil {
+		if err := operations.ClearDownstreamProgressionFailedCondition(
+			reqCtx.Ctx, r.Client, r.Recorder, opsRes.OpsRequest,
+			"All downstream progression triggers have cleared.",
+		); err != nil {
+			return 0, err
+		}
+		return 0, nil
+	}
+	message := fmt.Sprintf("%s (first observed at %s)", obs.Detail, obs.FirstSeen.UTC().Format(time.RFC3339))
+	if err := operations.SetDownstreamProgressionFailedCondition(
+		reqCtx.Ctx, r.Client, r.Recorder, opsRes.OpsRequest, obs.Reason, message,
+	); err != nil {
+		return 0, err
+	}
+	return requeue, nil
 }
 
 func (r *OpsRequestReconciler) handleUnsuccessfulCompletionOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {

@@ -249,11 +249,13 @@ func evaluateTrigger(
 		return evaluateComponentConditionStuck(cluster, opsRequest), nil
 	case opsv1alpha1.ReasonInstanceSetAlignmentStuck:
 		return evaluateInstanceSetAlignmentStuck(ctx, cli, cluster, opsRequest)
+	case opsv1alpha1.ReasonDownstreamFailClosedMarkerPersistent:
+		return evaluateDownstreamFailClosedMarkerPersistent(ctx, cli, cluster, opsRequest)
+	case opsv1alpha1.ReasonRoleProbePermanentFail:
+		return evaluateRoleProbePermanentFail(ctx, cli, cluster, opsRequest)
+	case opsv1alpha1.ReasonChartMarkerDriftPersistent:
+		return evaluateChartMarkerDriftPersistent(ctx, cli, cluster, opsRequest)
 	default:
-		// remaining trigger detection bodies land per T-P0e.1-6 acceptance
-		// follow-ups (T-P0e.1 marker / T-P0e.4 role probe / T-P0e.6 chart
-		// marker drift / T-P0e component condition / T-P0e instanceset
-		// alignment).
 		return nil, nil
 	}
 }
@@ -283,6 +285,64 @@ func evaluateClusterReconcileStuck(
 			cluster.Namespace, cluster.Name, cluster.Status.Phase,
 		),
 	}
+}
+
+// evaluateDownstreamFailClosedMarkerPersistent is the controller-side
+// scaffold for the addon fail-closed marker surface. The marker registry
+// lives on the ComponentDefinition annotation
+// (DownstreamFailClosedMarkersAnnotationKey); the missing piece is the
+// per-pod presence signal — the chart writes the marker to a data volume
+// today, and we need a publish path the controller can read without exec.
+// The follow-up that lands per-pod presence (a pod annotation reflected by
+// kbagent, or a Component status condition) is tracked as an alpha.111
+// candidate. Until that signal is available, this scaffold returns nil so
+// the orchestration cannot raise a false positive.
+func evaluateDownstreamFailClosedMarkerPersistent(
+	_ context.Context,
+	_ client.Client,
+	_ *appsv1.Cluster,
+	_ *opsv1alpha1.OpsRequest,
+) (*DownstreamObservation, error) {
+	return nil, nil
+}
+
+// evaluateRoleProbePermanentFail is the controller-side scaffold for the
+// kbagent role-probe non-publish surface. The probe interval is 15s and the
+// 60s threshold gates on four missed cycles per the Rocco/Lily MySQL bridge
+// reading. A meaningful detection needs to compare the most recent
+// LastRoleEventVersionAnnotationKey timestamp against the persistence
+// window per pod, which requires either listing pods owned by the cluster
+// or projecting that information through the InstanceSet status. We defer
+// the chosen surface to the follow-up that lands the per-pod publish-time
+// projection, and return nil here so the orchestration cannot raise a
+// false positive.
+func evaluateRoleProbePermanentFail(
+	_ context.Context,
+	_ client.Client,
+	_ *appsv1.Cluster,
+	_ *opsv1alpha1.OpsRequest,
+) (*DownstreamObservation, error) {
+	return nil, nil
+}
+
+// evaluateChartMarkerDriftPersistent is the controller-side scaffold for
+// the chart marker drift surface (refinement 1, NEW reason). Direction B is
+// the architectural fix for the marker state-machine itself; this
+// observation needs a publish path the controller can read for the
+// watchdog repair-loop signal. The implementation candidate (an
+// addon-registered detection-paths annotation alongside the
+// fail-closed-markers annotation) is sketched in the design review but
+// adding a new annotation key would trip Helen's scope-expansion clause,
+// so the actual annotation lands in a follow-up commit that flags scope
+// expansion. Until then this scaffold returns nil so the orchestration
+// cannot raise a false positive.
+func evaluateChartMarkerDriftPersistent(
+	_ context.Context,
+	_ client.Client,
+	_ *appsv1.Cluster,
+	_ *opsv1alpha1.OpsRequest,
+) (*DownstreamObservation, error) {
+	return nil, nil
 }
 
 // evaluateInstanceSetAlignmentStuck lists the InstanceSets owned by the

@@ -281,6 +281,46 @@ func contains(s, substr string) bool {
 	return false
 }
 
+// TestEvaluateAddonCoordinatedScaffoldsReturnNil pins the scaffold contract
+// for the three reasons whose detection bodies are deferred to follow-up
+// commits anchored to addon-side signal coordination
+// (DownstreamFailClosedMarkerPersistent, RoleProbePermanentFail,
+// ChartMarkerDriftPersistent). Until that coordination lands, each
+// scaffold must return nil so the orchestration cannot raise a false
+// positive against an addon that has not yet exposed the per-pod publish
+// path.
+func TestEvaluateAddonCoordinatedScaffoldsReturnNil(t *testing.T) {
+	cluster := &appsv1.Cluster{}
+	cluster.Namespace = "ns-a"
+	cluster.Name = "demo"
+	cluster.Status.Phase = appsv1.RunningClusterPhase
+	opsRequest := &opsv1alpha1.OpsRequest{
+		Status: opsv1alpha1.OpsRequestStatus{
+			Phase:               opsv1alpha1.OpsSucceedPhase,
+			CompletionTimestamp: metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+		},
+	}
+
+	t.Run("downstream-fail-closed-marker-persistent", func(t *testing.T) {
+		obs, err := evaluateDownstreamFailClosedMarkerPersistent(nil, nil, cluster, opsRequest)
+		if err != nil || obs != nil {
+			t.Fatalf("expected (nil, nil); got obs=%#v err=%v", obs, err)
+		}
+	})
+	t.Run("role-probe-permanent-fail", func(t *testing.T) {
+		obs, err := evaluateRoleProbePermanentFail(nil, nil, cluster, opsRequest)
+		if err != nil || obs != nil {
+			t.Fatalf("expected (nil, nil); got obs=%#v err=%v", obs, err)
+		}
+	})
+	t.Run("chart-marker-drift-persistent", func(t *testing.T) {
+		obs, err := evaluateChartMarkerDriftPersistent(nil, nil, cluster, opsRequest)
+		if err != nil || obs != nil {
+			t.Fatalf("expected (nil, nil); got obs=%#v err=%v", obs, err)
+		}
+	})
+}
+
 // TestIsPhaseEligibleForDownstreamObservation locks in the observation gate:
 // only OpsSucceedPhase with a non-zero CompletionTimestamp is eligible. This
 // guarantees the observation never runs against a still-running or

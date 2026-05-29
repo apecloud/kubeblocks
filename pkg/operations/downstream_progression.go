@@ -232,18 +232,52 @@ func orderedReasons() []string {
 // evaluateTrigger returns a non-nil DownstreamObservation when the given
 // trigger is currently active against the cluster state. Per-trigger detection
 // is intentionally separated so each can be unit-tested in isolation and
-// extended without touching the orchestration above. The first commit
-// introduces the dispatch surface only; the detection bodies land in
-// follow-up commits anchored to T-P0e.1-6 acceptance evidence.
+// extended without touching the orchestration above. Detection bodies land
+// per T-P0e.1-6 acceptance follow-ups.
 func evaluateTrigger(
-	_ context.Context,
-	_ client.Client,
-	_ *appsv1.Cluster,
-	_ *opsv1alpha1.OpsRequest,
-	_ string,
+	ctx context.Context,
+	cli client.Client,
+	cluster *appsv1.Cluster,
+	opsRequest *opsv1alpha1.OpsRequest,
+	reason string,
 ) (*DownstreamObservation, error) {
-	// trigger detection bodies land per T-P0e.1-6 acceptance follow-ups
-	return nil, nil
+	switch reason {
+	case opsv1alpha1.ReasonClusterReconcileStuck:
+		return evaluateClusterReconcileStuck(cluster, opsRequest), nil
+	default:
+		// remaining trigger detection bodies land per T-P0e.1-6 acceptance
+		// follow-ups (T-P0e.1 marker / T-P0e.4 role probe / T-P0e.6 chart
+		// marker drift / T-P0e component condition / T-P0e instanceset
+		// alignment).
+		return nil, nil
+	}
+}
+
+// evaluateClusterReconcileStuck flags an active observation when the cluster
+// has been parked in `Updating` for at least the per-reason threshold past
+// the OpsRequest's CompletionTimestamp. The post-Succeed elapsed window is
+// the relevant signal: a fresh-Succeed OpsRequest will see Updating briefly
+// while the downstream finalizes, but a healthy cluster transitions back to
+// Running well before the 5-minute threshold.
+func evaluateClusterReconcileStuck(
+	cluster *appsv1.Cluster,
+	opsRequest *opsv1alpha1.OpsRequest,
+) *DownstreamObservation {
+	if cluster.Status.Phase != appsv1.UpdatingClusterPhase {
+		return nil
+	}
+	if opsRequest.Status.CompletionTimestamp.IsZero() {
+		return nil
+	}
+	firstSeen := opsRequest.Status.CompletionTimestamp.Time
+	return &DownstreamObservation{
+		Reason:    opsv1alpha1.ReasonClusterReconcileStuck,
+		FirstSeen: firstSeen,
+		Detail: fmt.Sprintf(
+			"Cluster %s/%s has been in phase %q since OpsRequest Succeed.",
+			cluster.Namespace, cluster.Name, cluster.Status.Phase,
+		),
+	}
 }
 
 // IsPhaseEligibleForDownstreamObservation returns true when the OpsRequest

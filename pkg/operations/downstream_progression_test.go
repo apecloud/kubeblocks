@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -140,6 +141,61 @@ func TestShouldWriteCondition_Idempotent(t *testing.T) {
 	if !shouldWriteCondition(emptyOps, same) {
 		t.Errorf("absent condition should trigger initial write")
 	}
+}
+
+// TestEvaluateClusterReconcileStuck covers the ClusterReconcileStuck trigger.
+// The signal is straightforward — a Cluster parked in Updating after the
+// OpsRequest reached Succeed — but the test pins the three cases the caller
+// relies on: phase mismatch returns nil, missing CompletionTimestamp returns
+// nil, and an active observation carries the Succeed timestamp as FirstSeen
+// so the orchestration above can apply the 5-minute persistence threshold.
+func TestEvaluateClusterReconcileStuck(t *testing.T) {
+	succeed := time.Now().Add(-10 * time.Minute)
+	opsRequest := &opsv1alpha1.OpsRequest{
+		Status: opsv1alpha1.OpsRequestStatus{
+			Phase:               opsv1alpha1.OpsSucceedPhase,
+			CompletionTimestamp: metav1.Time{Time: succeed},
+		},
+	}
+
+	t.Run("not updating returns nil", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		cluster.Status.Phase = appsv1.RunningClusterPhase
+		if got := evaluateClusterReconcileStuck(cluster, opsRequest); got != nil {
+			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("missing completion timestamp returns nil", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		cluster.Status.Phase = appsv1.UpdatingClusterPhase
+		opsNoTS := &opsv1alpha1.OpsRequest{
+			Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsSucceedPhase},
+		}
+		if got := evaluateClusterReconcileStuck(cluster, opsNoTS); got != nil {
+			t.Fatalf("expected nil, got %#v", got)
+		}
+	})
+
+	t.Run("updating with completion returns observation", func(t *testing.T) {
+		cluster := &appsv1.Cluster{}
+		cluster.Namespace = "ns-a"
+		cluster.Name = "demo"
+		cluster.Status.Phase = appsv1.UpdatingClusterPhase
+		obs := evaluateClusterReconcileStuck(cluster, opsRequest)
+		if obs == nil {
+			t.Fatalf("expected observation, got nil")
+		}
+		if obs.Reason != opsv1alpha1.ReasonClusterReconcileStuck {
+			t.Errorf("reason: got %q, want %q", obs.Reason, opsv1alpha1.ReasonClusterReconcileStuck)
+		}
+		if !obs.FirstSeen.Equal(succeed) {
+			t.Errorf("FirstSeen: got %v, want %v", obs.FirstSeen, succeed)
+		}
+		if obs.Detail == "" {
+			t.Errorf("Detail should be non-empty")
+		}
+	})
 }
 
 // TestIsPhaseEligibleForDownstreamObservation locks in the observation gate:

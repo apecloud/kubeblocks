@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -246,6 +247,8 @@ func evaluateTrigger(
 		return evaluateClusterReconcileStuck(cluster, opsRequest), nil
 	case opsv1alpha1.ReasonComponentConditionStuck:
 		return evaluateComponentConditionStuck(cluster, opsRequest), nil
+	case opsv1alpha1.ReasonInstanceSetAlignmentStuck:
+		return evaluateInstanceSetAlignmentStuck(ctx, cli, cluster, opsRequest)
 	default:
 		// remaining trigger detection bodies land per T-P0e.1-6 acceptance
 		// follow-ups (T-P0e.1 marker / T-P0e.4 role probe / T-P0e.6 chart
@@ -280,6 +283,56 @@ func evaluateClusterReconcileStuck(
 			cluster.Namespace, cluster.Name, cluster.Status.Phase,
 		),
 	}
+}
+
+// evaluateInstanceSetAlignmentStuck lists the InstanceSets owned by the
+// cluster and flags one whose rolling update has not converged: the
+// signal is `UpdatedReplicas != Replicas` past Succeed, which means the
+// controller has not finished rotating instances to the desired revision.
+// We pick the first non-converged InstanceSet (sorted for determinism) so
+// the observation message points at one concrete InstanceSet; the
+// orchestration's 5-minute threshold keeps the noise floor in line with
+// normal rolling-update windows.
+func evaluateInstanceSetAlignmentStuck(
+	ctx context.Context,
+	cli client.Client,
+	cluster *appsv1.Cluster,
+	opsRequest *opsv1alpha1.OpsRequest,
+) (*DownstreamObservation, error) {
+	if opsRequest.Status.CompletionTimestamp.IsZero() {
+		return nil, nil
+	}
+	var list workloads.InstanceSetList
+	if err := cli.List(ctx, &list,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name},
+	); err != nil {
+		return nil, fmt.Errorf("list InstanceSets for cluster %s/%s: %w",
+			cluster.Namespace, cluster.Name, err)
+	}
+	names := make([]string, 0, len(list.Items))
+	byName := make(map[string]*workloads.InstanceSet, len(list.Items))
+	for i := range list.Items {
+		is := &list.Items[i]
+		names = append(names, is.Name)
+		byName[is.Name] = is
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		is := byName[name]
+		if is.Status.UpdatedReplicas == is.Status.Replicas {
+			continue
+		}
+		return &DownstreamObservation{
+			Reason:    opsv1alpha1.ReasonInstanceSetAlignmentStuck,
+			FirstSeen: opsRequest.Status.CompletionTimestamp.Time,
+			Detail: fmt.Sprintf(
+				"InstanceSet %s/%s rolling update has not converged: updatedReplicas=%d replicas=%d.",
+				is.Namespace, is.Name, is.Status.UpdatedReplicas, is.Status.Replicas,
+			),
+		}, nil
+	}
+	return nil, nil
 }
 
 // evaluateComponentConditionStuck walks Cluster.status.components and flags

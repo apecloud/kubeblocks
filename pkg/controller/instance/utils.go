@@ -374,7 +374,11 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func newLifecycleAction(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+// newLifecycleAction is a package-level variable so tests can substitute a
+// spy implementation to assert call-site behavior (e.g., that switchover is
+// not invoked when an in-place update is metadata-only). Production behavior
+// is unchanged.
+var newLifecycleAction = func(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = inst.Labels[constant.AppInstanceLabelKey]
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]

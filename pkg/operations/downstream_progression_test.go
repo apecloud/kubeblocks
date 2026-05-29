@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -302,19 +303,19 @@ func TestEvaluateAddonCoordinatedScaffoldsReturnNil(t *testing.T) {
 	}
 
 	t.Run("downstream-fail-closed-marker-persistent", func(t *testing.T) {
-		obs, err := evaluateDownstreamFailClosedMarkerPersistent(nil, nil, cluster, opsRequest)
+		obs, err := evaluateDownstreamFailClosedMarkerPersistent(context.TODO(), nil, cluster, opsRequest)
 		if err != nil || obs != nil {
 			t.Fatalf("expected (nil, nil); got obs=%#v err=%v", obs, err)
 		}
 	})
 	t.Run("role-probe-permanent-fail", func(t *testing.T) {
-		obs, err := evaluateRoleProbePermanentFail(nil, nil, cluster, opsRequest)
+		obs, err := evaluateRoleProbePermanentFail(context.TODO(), nil, cluster, opsRequest)
 		if err != nil || obs != nil {
 			t.Fatalf("expected (nil, nil); got obs=%#v err=%v", obs, err)
 		}
 	})
 	t.Run("chart-marker-drift-persistent", func(t *testing.T) {
-		obs, err := evaluateChartMarkerDriftPersistent(nil, nil, cluster, opsRequest)
+		obs, err := evaluateChartMarkerDriftPersistent(context.TODO(), nil, cluster, opsRequest)
 		if err != nil || obs != nil {
 			t.Fatalf("expected (nil, nil); got obs=%#v err=%v", obs, err)
 		}

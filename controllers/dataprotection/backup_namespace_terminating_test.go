@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -148,7 +149,7 @@ func TestHandleDeletingPhase_NamespaceTerminating_GateFiresBeforeWorkloadCreate(
 		WithObjects(terminatingNS, preExistingSA, preExistingRB, backup).
 		Build()
 
-	recorder := record.NewFakeRecorder(8)
+	recorder := record.NewFakeRecorder(1)
 	reconciler := &BackupReconciler{
 		Client:   cli,
 		Scheme:   s,
@@ -183,20 +184,11 @@ func TestHandleDeletingPhase_NamespaceTerminating_GateFiresBeforeWorkloadCreate(
 	t.Run("warning event was recorded", func(t *testing.T) {
 		select {
 		case event := <-recorder.Events:
-			if !contains(event, "NamespaceTerminating") {
+			if !strings.Contains(event, "NamespaceTerminating") {
 				t.Fatalf("expected event to mention NamespaceTerminating; got: %q", event)
 			}
 		default:
 			t.Fatalf("expected a NamespaceTerminating event to be recorded, none observed")
 		}
 	})
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i+len(substr) <= len(s); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

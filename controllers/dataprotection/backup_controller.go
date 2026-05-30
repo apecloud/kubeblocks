@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,6 +79,7 @@ type BackupReconciler struct {
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;list;watch
 
+// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
@@ -257,6 +259,22 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR
 // and the backup workload(job).
 func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	// Invariant gate: if the backup's namespace is already Terminating, downstream
+	// cleanup steps that create new K8s objects (worker RoleBinding, predelete Job)
+	// will be permanently rejected by the API server admission controller, leaving
+	// the backup finalizer stuck and the namespace unable to finish termination.
+	// In that state the only correct action is to release our finalizer so the
+	// namespace garbage collection can complete. Backup files in the remote storage
+	// may become orphan; that trade-off is documented via a Warning Event so the
+	// user can clean up storage out-of-band.
+	terminating, err := isNamespaceTerminating(reqCtx.Ctx, r.Client, backup.Namespace)
+	if err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	if terminating {
+		return r.releaseFinalizerForTerminatingNamespace(reqCtx, backup)
+	}
+
 	// delete related backups
 	if err := r.deleteRelatedBackups(reqCtx, backup); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
@@ -1108,6 +1126,44 @@ func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
 		return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
 	}
 	return request, nil
+}
+
+// isNamespaceTerminating reports whether the given namespace is in the process of
+// being deleted. A namespace that no longer exists is treated as terminating — the
+// only sensible follow-up is to release any leftover finalizers on objects that
+// were scoped to it. A transient API error is returned to the caller so that the
+// reconciler requeues instead of misinterpreting a network blip as "namespace is
+// alive".
+func isNamespaceTerminating(ctx context.Context, cli client.Client, namespace string) (bool, error) {
+	ns := &corev1.Namespace{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	return !ns.DeletionTimestamp.IsZero(), nil
+}
+
+// releaseFinalizerForTerminatingNamespace removes the data-protection finalizer
+// from the backup when its namespace is being deleted. It records a Warning event
+// so the user is informed that backup files in the remote storage may be left as
+// orphans and must be cleaned up out-of-band.
+func (r *BackupReconciler) releaseFinalizerForTerminatingNamespace(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	r.Recorder.Eventf(backup, corev1.EventTypeWarning, "NamespaceTerminating",
+		"namespace %q is being terminated; skipping backup files cleanup and releasing the data-protection finalizer. "+
+			"Backup files in the remote storage may be left as orphans and must be cleaned up out-of-band.",
+		backup.Namespace)
+	if controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
+		patch := client.MergeFrom(backup.DeepCopy())
+		controllerutil.RemoveFinalizer(backup, dptypes.DataProtectionFinalizerName)
+		if err := r.Patch(reqCtx.Ctx, backup, patch); err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+	return intctrlutil.Reconciled()
 }
 
 // clusterIsCreating will return true when the backup is Continuous backup and the cluster is creating

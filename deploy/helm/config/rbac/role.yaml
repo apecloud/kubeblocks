@@ -45,6 +45,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
+  - pods/status
+  - services/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - nodes
   verbs:
   - list
@@ -93,13 +101,6 @@ rules:
   verbs:
   - get
   - list
-- apiGroups:
-  - ""
-  resources:
-  - pods/status
-  - services/status
-  verbs:
-  - get
 - apiGroups:
   - apps
   resources:

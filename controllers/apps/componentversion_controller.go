@@ -267,7 +267,7 @@ func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv
 
 func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Writer, rctx intctrlutil.RequestCtx,
 	compVersion *appsv1.ComponentVersion, releaseToCompDefinitions map[string]map[string]*appsv1.ComponentDefinition) error {
-	patch := client.MergeFrom(compVersion.DeepCopy())
+	patch := client.MergeFromWithOptions(compVersion.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	if compVersion.Annotations == nil {
 		compVersion.Annotations = make(map[string]string)
 	}

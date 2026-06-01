@@ -72,7 +72,8 @@ func (w *componentVersionPatchWriter) DeleteAllOf(context.Context, client.Object
 func TestComponentVersionSupportedCompDefLabelsUsesMetadataPatch(t *testing.T) {
 	compVersion := &appsv1.ComponentVersion{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "mssql",
+			Name:            "mssql",
+			ResourceVersion: "7",
 			Labels: map[string]string{
 				"old-comp-def": "old-comp-def",
 				"chart-label":  "keep",
@@ -127,6 +128,9 @@ func TestComponentVersionSupportedCompDefLabelsUsesMetadataPatch(t *testing.T) {
 	}
 	if strings.Contains(patchData, `"spec"`) {
 		t.Fatalf("metadata patch must not include spec, got %s", patchData)
+	}
+	if !strings.Contains(patchData, `"resourceVersion":"7"`) {
+		t.Fatalf("metadata patch must preserve optimistic-locking resourceVersion, got %s", patchData)
 	}
 }
 

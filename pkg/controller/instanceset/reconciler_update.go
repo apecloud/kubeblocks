@@ -181,8 +181,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if !equalResourcesInPlaceFields(pod, newInstance.pod) && supportResizeSubResource {
 				err = tree.Update(newPod, kubebuilderx.WithSubResource("resize"))
 			} else {
-				if err = r.switchover(tree, its, newPod.(*corev1.Pod)); err != nil {
-					return kubebuilderx.Continue, err
+				if !safeMetadataOnlyInPlaceUpdate(pod, newInstance.pod) {
+					if err = r.switchover(tree, its, newPod.(*corev1.Pod)); err != nil {
+						return kubebuilderx.Continue, err
+					}
 				}
 				err = tree.Update(newPod)
 			}
@@ -274,6 +276,8 @@ func (r *updateReconciler) isPodCanBeUpdated(tree *kubebuilderx.ObjectTree, its 
 	return true, false
 }
 
+var newLifecycleAction = lifecycle.New
+
 func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
 	if its.Spec.MembershipReconfiguration == nil || its.Spec.MembershipReconfiguration.Switchover == nil {
 		return nil
@@ -296,7 +300,7 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		}
 		return m
 	}()
-	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod)
+	lfa, err := newLifecycleAction(its.Namespace, clusterName, its.Labels[constant.KBAppComponentLabelKey], lifecycleActions, templateVars, pod)
 	if err != nil {
 		return err
 	}

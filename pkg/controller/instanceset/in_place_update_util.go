@@ -258,6 +258,79 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
+// safeMetadataOnlyInPlaceUpdate returns true when the only difference between
+// old and new is a Pod metadata patch (annotations and/or labels) that has no
+// effect on the running database process or availability. In that case the
+// caller can skip the lifecycle switchover that is normally invoked before an
+// in-place pod update.
+//
+// Specifically, it returns true if and only if:
+//   - old and new are otherwise equal when annotations and labels are ignored
+//     (basic spec fields + container resources match)
+//   - metadata has actually changed (do not vacuously skip switchover when
+//     there is no real diff)
+//   - the annotation diff does not include constant.RestartAnnotationKey, the
+//     explicit restart trigger which always implies a process restart
+//   - the annotation diff does not touch any key prefixed with
+//     constant.UpgradeRestartAnnotationKey ("config.kubeblocks.io/restart"),
+//     which the parameters controller writes via GenerateUniqKeyWithConfig to
+//     signal a restart-required config change. filterInPlaceFields keeps these
+//     keys alongside RestartAnnotationKey, so a diff on any of them must fall
+//     through to switchover to honor the restart contract.
+//
+// Label changes are allowed because pure label patches do not restart the
+// container, do not change the spec, and do not touch the database process.
+// Service-selector routing impact is a network-layer concern and is not
+// resolved by invoking lifecycle switchover. Role-label patches are likewise
+// state synchronization, not a trigger for additional switchover.
+func safeMetadataOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
+	oldCopy := old.DeepCopy()
+	newCopy := new.DeepCopy()
+	oldCopy.Annotations = nil
+	newCopy.Annotations = nil
+	oldCopy.Labels = nil
+	newCopy.Labels = nil
+	if !equalBasicInPlaceFields(oldCopy, newCopy) || !equalResourcesInPlaceFields(oldCopy, newCopy) {
+		return false
+	}
+	if equalField(old.Annotations, new.Annotations) && equalField(old.Labels, new.Labels) {
+		return false
+	}
+	if !equalField(old.Annotations[constant.RestartAnnotationKey], new.Annotations[constant.RestartAnnotationKey]) {
+		return false
+	}
+	if !equalUpgradeRestartAnnotations(old.Annotations, new.Annotations) {
+		return false
+	}
+	return true
+}
+
+// equalUpgradeRestartAnnotations returns true when old and new agree on every
+// annotation whose key is prefixed with constant.UpgradeRestartAnnotationKey
+// ("config.kubeblocks.io/restart"). The parameters controller writes these via
+// GenerateUniqKeyWithConfig to signal that a config change requires a pod
+// restart; filterInPlaceFields keeps them in the in-place template diff, so
+// any add/change/remove on these keys must invoke switchover.
+func equalUpgradeRestartAnnotations(old, new map[string]string) bool {
+	keys := make(map[string]struct{})
+	for k := range old {
+		if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
+			keys[k] = struct{}{}
+		}
+	}
+	for k := range new {
+		if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
+			keys[k] = struct{}{}
+		}
+	}
+	for k := range keys {
+		if old[k] != new[k] {
+			return false
+		}
+	}
+	return true
+}
+
 // equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
 // If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
 // will not participate in the comparison.

@@ -87,9 +87,10 @@ const (
 	ReasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
-	ReasonPopulatingFailed     = "Failed"
-	ReasonPopulatingProcessing = "Processing"
-	ReasonPopulatingSucceed    = "Succeed"
+	ReasonPopulatingFailed      = "Failed"
+	ReasonPopulatingProcessing  = "Processing"
+	ReasonPopulatingSucceed     = "Succeed"
+	ReasonPopulatingProvisioned = "Provisioned"
 
 	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
 )

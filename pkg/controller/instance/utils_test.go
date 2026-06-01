@@ -100,6 +100,22 @@ func TestSafeMetadataOnlyInPlaceUpdate(t *testing.T) {
 			pod.Annotations[constant.RestartAnnotationKey] = "next"
 		},
 	}, {
+		name: "upgrade-restart prefixed annotation added (config.kubeblocks.io/restart-mysql-config)",
+		mutate: func(pod *corev1.Pod) {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			pod.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-1"
+		},
+	}, {
+		name: "exact UpgradeRestartAnnotationKey annotation added (no suffix)",
+		mutate: func(pod *corev1.Pod) {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			pod.Annotations[constant.UpgradeRestartAnnotationKey] = "trigger"
+		},
+	}, {
 		name: "container image changed",
 		mutate: func(pod *corev1.Pod) {
 			pod.Spec.Containers[0].Image = "valkey:10"
@@ -126,4 +142,34 @@ func TestSafeMetadataOnlyInPlaceUpdate(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("invoke switchover when an existing upgrade-restart prefixed annotation value changes", func(t *testing.T) {
+		podWithUpgradeRestart := basePod.DeepCopy()
+		podWithUpgradeRestart.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-1"
+		mutated := podWithUpgradeRestart.DeepCopy()
+		mutated.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-2"
+		if safeMetadataOnlyInPlaceUpdate(podWithUpgradeRestart, mutated) {
+			t.Fatalf("expected upgrade-restart prefixed annotation value change to invoke switchover")
+		}
+	})
+
+	t.Run("invoke switchover when an existing upgrade-restart prefixed annotation is removed", func(t *testing.T) {
+		podWithUpgradeRestart := basePod.DeepCopy()
+		podWithUpgradeRestart.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-1"
+		removed := podWithUpgradeRestart.DeepCopy()
+		delete(removed.Annotations, constant.UpgradeRestartAnnotationKey+"-mysql-config")
+		if safeMetadataOnlyInPlaceUpdate(podWithUpgradeRestart, removed) {
+			t.Fatalf("expected upgrade-restart prefixed annotation removal to invoke switchover")
+		}
+	})
+
+	t.Run("skip switchover when a non-restart config.kubeblocks.io annotation changes (prefix does not match)", func(t *testing.T) {
+		base := basePod.DeepCopy()
+		base.Annotations["config.kubeblocks.io/non-restart-key"] = "value-1"
+		mutated := base.DeepCopy()
+		mutated.Annotations["config.kubeblocks.io/non-restart-key"] = "value-2"
+		if !safeMetadataOnlyInPlaceUpdate(base, mutated) {
+			t.Fatalf("expected non-restart config.kubeblocks.io/* annotation change to be a safe metadata-only update")
+		}
+	})
 }

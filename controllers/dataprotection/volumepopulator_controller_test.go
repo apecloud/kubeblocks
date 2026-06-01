@@ -719,6 +719,28 @@ func TestBackupNamespaceFromPVC(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestHandleSyncPVCErrorKeepsInternalRequeueWhenPVCIsPopulating(t *testing.T) {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   PersistentVolumeClaimPopulating,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{Recorder: record.NewFakeRecorder(10)}
+
+	result, err := reconciler.handleSyncPVCError(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		intctrlutil.NewRequeueError(reconcileInterval, "waiting for postReady restore"),
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, reconcileInterval, result.RequeueAfter)
+}
+
 func TestDecidePVCRestoreAssignsShardingTargetsByStableComponentOrder(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

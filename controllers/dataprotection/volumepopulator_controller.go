@@ -115,21 +115,27 @@ func (r *VolumePopulatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if err := r.syncPVC(reqCtx, pvc); err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-			r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonVolumePopulateFailed, err.Error())
-			if patchErr := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed, err.Error()); patchErr != nil {
-				return intctrlutil.RequeueWithError(patchErr, reqCtx.Log, "")
-			}
-			return intctrlutil.Reconciled()
-		} else if r.ContainPopulatingCondition(pvc) {
-			// Ignore the error if an external controller handles this PVC.
-			return intctrlutil.Reconciled()
-		} else if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
-			return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
-		}
-		return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
+		return r.handleSyncPVCError(reqCtx, pvc, err)
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, err error) (ctrl.Result, error) {
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonVolumePopulateFailed, err.Error())
+		if patchErr := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed, err.Error()); patchErr != nil {
+			return intctrlutil.RequeueWithError(patchErr, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
+	}
+	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
+		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
+	}
+	if r.ContainPopulatingCondition(pvc) {
+		// Ignore the error if an external controller handles this PVC.
+		return intctrlutil.Reconciled()
+	}
+	return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
 }
 
 // SetupWithManager sets up the controller with the Manager.

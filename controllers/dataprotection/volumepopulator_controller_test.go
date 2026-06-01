@@ -691,6 +691,34 @@ func TestMatchToPopulateSupportsRestoreAndBackupDataSources(t *testing.T) {
 	}
 }
 
+func TestBackupNamespaceFromPVC(t *testing.T) {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "target", Name: "data"},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{Name: "backup"},
+		},
+	}
+
+	namespace, err := backupNamespaceFromPVC(pvc)
+	require.NoError(t, err)
+	require.Equal(t, "target", namespace)
+
+	pvc.Annotations = map[string]string{constant.RestoreSourceNamespaceAnnotationKey: "annotated"}
+	namespace, err = backupNamespaceFromPVC(pvc)
+	require.NoError(t, err)
+	require.Equal(t, "annotated", namespace)
+
+	pvc.Spec.DataSourceRef.Namespace = ptr.To("source")
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "source"
+	namespace, err = backupNamespaceFromPVC(pvc)
+	require.NoError(t, err)
+	require.Equal(t, "source", namespace)
+
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "other"
+	_, err = backupNamespaceFromPVC(pvc)
+	require.Error(t, err)
+}
+
 func TestDecidePVCRestoreAssignsShardingTargetsByStableComponentOrder(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

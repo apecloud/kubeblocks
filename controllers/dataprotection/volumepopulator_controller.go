@@ -235,12 +235,12 @@ func (r *VolumePopulatorReconciler) validateRestoreRefAndBuildMGR(reqCtx intctrl
 }
 
 func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*pvcRestoreContext, error) {
-	backupNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
-	if backupNamespace == "" {
-		backupNamespace = pvc.Namespace
+	backupNamespace, err := backupNamespaceFromPVC(pvc)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 	backup := &dpv1alpha1.Backup{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
 		return nil, err
 	}
 	if backup.Status.BackupMethod == nil {
@@ -1048,12 +1048,12 @@ func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.Reque
 	if pvc.Spec.DataSourceRef == nil {
 		return false, nil
 	}
-	backupNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
-	if backupNamespace == "" {
-		backupNamespace = pvc.Namespace
+	backupNamespace, err := backupNamespaceFromPVC(pvc)
+	if err != nil {
+		return false, intctrlutil.NewFatalError(err.Error())
 	}
 	backup := &dpv1alpha1.Backup{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
 		return false, err
 	}
 	if backup.Status.BackupMethod == nil {
@@ -1160,9 +1160,9 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	comp *appsv1.Component) (*dpv1alpha1.Restore, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	componentName := restoreComponentName(pvc)
-	backupNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
-	if backupNamespace == "" {
-		backupNamespace = pvc.Namespace
+	backupNamespace, err := backupNamespaceFromPVC(pvc)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 	parameters, err := restoreParametersMapFromPVC(pvc)
 	if err != nil {
@@ -1301,7 +1301,10 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 		return nil, err
 	}
 	var result []corev1.PersistentVolumeClaim
-	sourceNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
+	sourceNamespace, err := backupNamespaceFromPVC(pvc)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
 	for i := range pvcList.Items {
 		item := pvcList.Items[i]
 		if item.Spec.DataSourceRef == nil || item.Spec.DataSourceRef.Name != pvc.Spec.DataSourceRef.Name {
@@ -1310,7 +1313,11 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 		if item.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
 			continue
 		}
-		if item.Annotations[constant.RestoreSourceNamespaceAnnotationKey] != sourceNamespace {
+		itemSourceNamespace, err := backupNamespaceFromPVC(&item)
+		if err != nil {
+			return nil, intctrlutil.NewFatalError(err.Error())
+		}
+		if itemSourceNamespace != sourceNamespace {
 			continue
 		}
 		result = append(result, item)
@@ -1698,6 +1705,25 @@ func (r *VolumePopulatorReconciler) ContainPopulatingCondition(pvc *corev1.Persi
 		}
 	}
 	return false
+}
+
+func backupNamespaceFromPVC(pvc *corev1.PersistentVolumeClaim) (string, error) {
+	refNamespace := ""
+	if pvc.Spec.DataSourceRef != nil && pvc.Spec.DataSourceRef.Namespace != nil {
+		refNamespace = *pvc.Spec.DataSourceRef.Namespace
+	}
+	annotationNamespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
+	if refNamespace != "" && annotationNamespace != "" && refNamespace != annotationNamespace {
+		return "", fmt.Errorf("PVC %s/%s restore source namespace mismatch: dataSourceRef.namespace=%q, annotation=%q",
+			pvc.Namespace, pvc.Name, refNamespace, annotationNamespace)
+	}
+	if refNamespace != "" {
+		return refNamespace, nil
+	}
+	if annotationNamespace != "" {
+		return annotationNamespace, nil
+	}
+	return pvc.Namespace, nil
 }
 
 func pvcConditionMatches(conditions []corev1.PersistentVolumeClaimCondition, condition corev1.PersistentVolumeClaimCondition) bool {

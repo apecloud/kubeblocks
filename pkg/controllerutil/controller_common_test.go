@@ -75,6 +75,23 @@ func (w *patchRecordingWriter) DeleteAllOf(context.Context, client.Object, ...cl
 	return nil
 }
 
+type concurrentFinalizerWriter struct {
+	patchRecordingWriter
+	currentResourceVersion string
+}
+
+func (w *concurrentFinalizerWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	if err := w.patchRecordingWriter.Patch(ctx, obj, patch, opts...); err != nil {
+		return err
+	}
+	staleResourceVersion := fmt.Sprintf(`"resourceVersion":"%s"`, obj.GetResourceVersion())
+	if strings.Contains(string(w.patchData), staleResourceVersion) && obj.GetResourceVersion() != w.currentResourceVersion {
+		return apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, obj.GetName(),
+			fmt.Errorf("object resourceVersion changed to %s", w.currentResourceVersion))
+	}
+	return nil
+}
+
 func TestRequeueWithError(t *testing.T) {
 	_, err := CheckedRequeueWithError(errors.New("test error"), tlog, "test")
 	if err == nil {
@@ -153,7 +170,7 @@ func TestHandleCRDeletionPatchesFinalizerMetadata(t *testing.T) {
 
 	t.Run("add finalizer", func(t *testing.T) {
 		writer := &patchRecordingWriter{}
-		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm"}}
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm", ResourceVersion: "1"}}
 
 		res, err := HandleCRDeletion(reqCtx, writer, obj, finalizer, nil)
 		if err != nil {
@@ -166,6 +183,7 @@ func TestHandleCRDeletionPatchesFinalizerMetadata(t *testing.T) {
 			t.Fatalf("expected one patch and no update, got patch=%d update=%d", writer.patchCalls, writer.updateCalls)
 		}
 		assertMetadataOnlyPatch(t, writer.patchData)
+		assertOptimisticLockPatch(t, writer.patchData, obj.GetResourceVersion())
 		if !controllerutil.ContainsFinalizer(obj, finalizer) {
 			t.Fatalf("expected finalizer %q to be added", finalizer)
 		}
@@ -176,6 +194,7 @@ func TestHandleCRDeletionPatchesFinalizerMetadata(t *testing.T) {
 		now := metav1.Now()
 		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 			Name:              "cm",
+			ResourceVersion:   "2",
 			Finalizers:        []string{finalizer},
 			DeletionTimestamp: &now,
 		}}
@@ -191,9 +210,29 @@ func TestHandleCRDeletionPatchesFinalizerMetadata(t *testing.T) {
 			t.Fatalf("expected one patch and no update, got patch=%d update=%d", writer.patchCalls, writer.updateCalls)
 		}
 		assertMetadataOnlyPatch(t, writer.patchData)
+		assertOptimisticLockPatch(t, writer.patchData, obj.GetResourceVersion())
 		if controllerutil.ContainsFinalizer(obj, finalizer) {
 			t.Fatalf("expected finalizer %q to be removed", finalizer)
 		}
+	})
+
+	t.Run("returns conflict on concurrent finalizer update", func(t *testing.T) {
+		writer := &concurrentFinalizerWriter{currentResourceVersion: "2"}
+		obj := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Name:            "cm",
+			ResourceVersion: "1",
+			Finalizers:      []string{"other/finalizer"},
+		}}
+
+		res, err := HandleCRDeletion(reqCtx, writer, obj, finalizer, nil)
+		if !apierrors.IsConflict(err) {
+			t.Fatalf("expected conflict from stale finalizer patch, got res=%v err=%v patch=%s", res, err, writer.patchData)
+		}
+		if writer.patchCalls != 1 || writer.updateCalls != 0 {
+			t.Fatalf("expected one patch and no update, got patch=%d update=%d", writer.patchCalls, writer.updateCalls)
+		}
+		assertMetadataOnlyPatch(t, writer.patchData)
+		assertOptimisticLockPatch(t, writer.patchData, "1")
 	})
 }
 
@@ -205,6 +244,14 @@ func assertMetadataOnlyPatch(t *testing.T, data []byte) {
 	}
 	if strings.Contains(patchData, `"spec"`) {
 		t.Fatalf("metadata patch must not include spec, got %s", patchData)
+	}
+}
+
+func assertOptimisticLockPatch(t *testing.T, data []byte, resourceVersion string) {
+	t.Helper()
+	expected := fmt.Sprintf(`"resourceVersion":"%s"`, resourceVersion)
+	if !strings.Contains(string(data), expected) {
+		t.Fatalf("expected optimistic-locking resourceVersion %s in patch, got %s", resourceVersion, data)
 	}
 }
 

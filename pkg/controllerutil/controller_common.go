@@ -119,7 +119,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		// then add the finalizer and update the object. This is equivalent to
 		// registering our finalizer.
 		if !controllerutil.ContainsFinalizer(cr, finalizer) {
-			patch := client.MergeFrom(cr.DeepCopyObject().(client.Object))
+			patch := client.MergeFromWithOptions(cr.DeepCopyObject().(client.Object), client.MergeFromWithOptimisticLock{})
 			controllerutil.AddFinalizer(cr, finalizer)
 			if err := r.Patch(reqCtx.Ctx, cr, patch); err != nil {
 				return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
@@ -158,7 +158,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				}
 			}
 			// remove our finalizer from the list and update it.
-			patch := client.MergeFrom(cr.DeepCopyObject().(client.Object))
+			patch := client.MergeFromWithOptions(cr.DeepCopyObject().(client.Object), client.MergeFromWithOptimisticLock{})
 			if controllerutil.RemoveFinalizer(cr, finalizer) {
 				if err := r.Patch(reqCtx.Ctx, cr, patch); err != nil {
 					return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))

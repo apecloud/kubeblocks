@@ -82,6 +82,136 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
+	Context("safeMetadataOnlyInPlaceUpdate", func() {
+		It("identifies safe metadata-only in-place updates per process-impact semantic", func() {
+			basePod := builder.NewPodBuilder(namespace, name+"-0").
+				AddAnnotations("kept", "value", constant.CMInsConfigurationHashLabelKey, "old-hash").
+				AddLabels("app", "valkey").
+				SetContainers(template.Spec.Containers).
+				GetObject()
+
+			positiveCases := []struct {
+				name   string
+				mutate func(*corev1.Pod)
+			}{{
+				name: "config-hash annotation patch",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations[constant.CMInsConfigurationHashLabelKey] = "new-hash"
+				},
+			}, {
+				name: "non-restart annotation added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations["custom"] = "value"
+				},
+			}, {
+				name: "non-restart annotation value changed",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations["kept"] = "changed"
+				},
+			}, {
+				name: "label added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels["extra"] = "value"
+				},
+			}, {
+				name: "label value changed",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels["app"] = "valkey-renamed"
+				},
+			}, {
+				name: "role label state synchronization",
+				mutate: func(pod *corev1.Pod) {
+					pod.Labels[constant.RoleLabelKey] = "primary"
+				},
+			}}
+			for _, tc := range positiveCases {
+				By("skipping switchover when " + tc.name)
+				newPod := basePod.DeepCopy()
+				tc.mutate(newPod)
+				Expect(safeMetadataOnlyInPlaceUpdate(basePod, newPod)).Should(BeTrue())
+			}
+
+			negativeCases := []struct {
+				name   string
+				mutate func(*corev1.Pod)
+			}{{
+				name:   "no diff",
+				mutate: func(pod *corev1.Pod) {},
+			}, {
+				name: "restart annotation added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Annotations[constant.RestartAnnotationKey] = "2026-05-19T14:00:00Z"
+				},
+			}, {
+				name: "restart annotation value changed",
+				mutate: func(pod *corev1.Pod) {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[constant.RestartAnnotationKey] = "next"
+				},
+			}, {
+				name: "upgrade-restart prefixed annotation added (config.kubeblocks.io/restart-mysql-config)",
+				mutate: func(pod *corev1.Pod) {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-1"
+				},
+			}, {
+				name: "exact UpgradeRestartAnnotationKey annotation added (no suffix)",
+				mutate: func(pod *corev1.Pod) {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[constant.UpgradeRestartAnnotationKey] = "trigger"
+				},
+			}, {
+				name: "container image changed",
+				mutate: func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Image = "valkey:10"
+				},
+			}, {
+				name: "container resources changed",
+				mutate: func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("1"),
+					}
+				},
+			}, {
+				name: "container env added",
+				mutate: func(pod *corev1.Pod) {
+					pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{Name: "EXTRA", Value: "v"})
+				},
+			}}
+			for _, tc := range negativeCases {
+				By("invoking switchover when " + tc.name)
+				newPod := basePod.DeepCopy()
+				tc.mutate(newPod)
+				Expect(safeMetadataOnlyInPlaceUpdate(basePod, newPod)).Should(BeFalse())
+			}
+
+			By("invoking switchover when an existing upgrade-restart prefixed annotation value changes")
+			podWithUpgradeRestart := basePod.DeepCopy()
+			podWithUpgradeRestart.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-1"
+			mutatedUpgradeRestart := podWithUpgradeRestart.DeepCopy()
+			mutatedUpgradeRestart.Annotations[constant.UpgradeRestartAnnotationKey+"-mysql-config"] = "hash-2"
+			Expect(safeMetadataOnlyInPlaceUpdate(podWithUpgradeRestart, mutatedUpgradeRestart)).Should(BeFalse())
+
+			By("invoking switchover when an existing upgrade-restart prefixed annotation is removed")
+			removedUpgradeRestart := podWithUpgradeRestart.DeepCopy()
+			delete(removedUpgradeRestart.Annotations, constant.UpgradeRestartAnnotationKey+"-mysql-config")
+			Expect(safeMetadataOnlyInPlaceUpdate(podWithUpgradeRestart, removedUpgradeRestart)).Should(BeFalse())
+
+			By("skipping switchover when a non-restart config.kubeblocks.io/* annotation changes (prefix does not match)")
+			nonRestartConfig := basePod.DeepCopy()
+			nonRestartConfig.Annotations["config.kubeblocks.io/non-restart-key"] = "value-1"
+			mutatedNonRestart := nonRestartConfig.DeepCopy()
+			mutatedNonRestart.Annotations["config.kubeblocks.io/non-restart-key"] = "value-2"
+			Expect(safeMetadataOnlyInPlaceUpdate(nonRestartConfig, mutatedNonRestart)).Should(BeTrue())
+		})
+	})
+
 	Context("buildInstancePodByTemplate", func() {
 		It("should work well", func() {
 			itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)

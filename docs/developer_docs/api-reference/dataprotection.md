@@ -3697,6 +3697,23 @@ When the base backup is deleted, the backup will also be deleted.</p>
 <p>Records any additional information for the backup.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>cleanupJobNamespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the namespace where the artifact cleanup Job (DeleteBackupFiles
+or preDelete external job) was created. After the BackupRepo has been
+removed, this is used as the authoritative location to look up the
+cleanup Job and decide deletion outcome. An empty value only indicates
+a legacy backup created before this field existed; it does NOT mean
+&ldquo;no cleanup is needed&rdquo;.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupStatusTarget">BackupStatusTarget

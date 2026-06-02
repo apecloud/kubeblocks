@@ -233,7 +233,7 @@ func (r *VolumePopulatorReconciler) validateRestoreRefAndBuildMGR(reqCtx intctrl
 }
 
 func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*pvcRestoreContext, error) {
-	backupNamespace, err := backupNamespaceFromPVC(pvc)
+	backupNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
@@ -1053,7 +1053,7 @@ func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.Reque
 	if pvc.Spec.DataSourceRef == nil {
 		return false, nil
 	}
-	backupNamespace, err := backupNamespaceFromPVC(pvc)
+	backupNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
 	if err != nil {
 		return false, intctrlutil.NewFatalError(err.Error())
 	}
@@ -1170,6 +1170,9 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	componentName := restoreComponentName(pvc)
 	backupNamespace, err := backupNamespaceFromPVC(pvc)
 	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
+	if err = r.validateBackupNamespaceAuthorized(reqCtx, pvc, backupNamespace); err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
 	parameters, err := restoreParametersMapFromPVC(pvc)
@@ -1330,7 +1333,7 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 		return nil, err
 	}
 	var result []corev1.PersistentVolumeClaim
-	sourceNamespace, err := backupNamespaceFromPVC(pvc)
+	sourceNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
@@ -1342,7 +1345,7 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 		if item.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
 			continue
 		}
-		itemSourceNamespace, err := backupNamespaceFromPVC(&item)
+		itemSourceNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, &item)
 		if err != nil {
 			return nil, intctrlutil.NewFatalError(err.Error())
 		}
@@ -1768,12 +1771,6 @@ func backupNamespaceFromPVC(pvc *corev1.PersistentVolumeClaim) (string, error) {
 		return "", fmt.Errorf("PVC %s/%s restore source namespace mismatch: dataSourceRef.namespace=%q, annotation=%q",
 			pvc.Namespace, pvc.Name, refNamespace, annotationNamespace)
 	}
-	if refNamespace != "" && refNamespace != pvc.Namespace {
-		return "", fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q", pvc.Namespace, pvc.Name, refNamespace)
-	}
-	if annotationNamespace != "" && annotationNamespace != pvc.Namespace {
-		return "", fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q", pvc.Namespace, pvc.Name, annotationNamespace)
-	}
 	if refNamespace != "" {
 		return refNamespace, nil
 	}
@@ -1781,6 +1778,55 @@ func backupNamespaceFromPVC(pvc *corev1.PersistentVolumeClaim) (string, error) {
 		return annotationNamespace, nil
 	}
 	return pvc.Namespace, nil
+}
+
+func (r *VolumePopulatorReconciler) authorizedBackupNamespaceFromPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (string, error) {
+	backupNamespace, err := backupNamespaceFromPVC(pvc)
+	if err != nil {
+		return "", err
+	}
+	if err = r.validateBackupNamespaceAuthorized(reqCtx, pvc, backupNamespace); err != nil {
+		return "", err
+	}
+	return backupNamespace, nil
+}
+
+func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	backupNamespace string) error {
+	if backupNamespace == pvc.Namespace {
+		return nil
+	}
+	if pvc.Spec.DataSourceRef == nil {
+		return fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q without dataSourceRef",
+			pvc.Namespace, pvc.Name, backupNamespace)
+	}
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		return fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q without cluster label",
+			pvc.Namespace, pvc.Name, backupNamespace)
+	}
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
+		return err
+	}
+	if cluster.Spec.Restore == nil {
+		return fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q without cluster restore intent",
+			pvc.Namespace, pvc.Name, backupNamespace)
+	}
+	source := cluster.Spec.Restore.Source
+	sourceNamespace := source.Namespace
+	if sourceNamespace == "" {
+		sourceNamespace = cluster.Namespace
+	}
+	if source.APIGroup != dptypes.DataprotectionAPIGroup ||
+		source.Kind != dptypes.BackupKind ||
+		source.Name != pvc.Spec.DataSourceRef.Name ||
+		sourceNamespace != backupNamespace {
+		return fmt.Errorf("PVC %s/%s can not restore Backup %s/%s without matching cluster restore intent",
+			pvc.Namespace, pvc.Name, backupNamespace, pvc.Spec.DataSourceRef.Name)
+	}
+	return nil
 }
 
 func pvcConditionMatches(conditions []corev1.PersistentVolumeClaimCondition, condition corev1.PersistentVolumeClaimCondition) bool {

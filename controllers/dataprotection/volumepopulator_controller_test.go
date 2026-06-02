@@ -714,14 +714,78 @@ func TestBackupNamespaceFromPVC(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "target", namespace)
 
+	pvc.Spec.DataSourceRef.Namespace = nil
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "other"
-	_, err = backupNamespaceFromPVC(pvc)
-	require.Error(t, err)
+	namespace, err = backupNamespaceFromPVC(pvc)
+	require.NoError(t, err)
+	require.Equal(t, "other", namespace)
+
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "other"
+	pvc.Spec.DataSourceRef.Namespace = ptr.To("other")
+	namespace, err = backupNamespaceFromPVC(pvc)
+	require.NoError(t, err)
+	require.Equal(t, "other", namespace)
 
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "target"
-	pvc.Spec.DataSourceRef.Namespace = ptr.To("other")
 	_, err = backupNamespaceFromPVC(pvc)
 	require.Error(t, err)
+}
+
+func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "target",
+			Name:      "data",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: "cluster",
+			},
+			Annotations: map[string]string{
+				constant.RestoreSourceNamespaceAnnotationKey: "source",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+	}
+
+	namespace, err := reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.Empty(t, namespace)
+
+	cluster := &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "cluster",
+		},
+		Spec: kbappsv1.ClusterSpec{
+			Restore: &kbappsv1.ClusterRestore{
+				Source: kbappsv1.ClusterRestoreSource{
+					APIGroup:  dptypes.DataprotectionAPIGroup,
+					Kind:      dptypes.BackupKind,
+					Name:      "backup",
+					Namespace: "source",
+				},
+			},
+		},
+	}
+	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+
+	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.NoError(t, err)
+	require.Equal(t, "source", namespace)
 }
 
 func TestHandleSyncPVCErrorKeepsInternalRequeueWhenPVCIsPopulating(t *testing.T) {

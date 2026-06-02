@@ -160,7 +160,7 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if cluster.Spec.Restore == nil {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: target cluster %s/%s has no restore intent", cluster.Namespace, cluster.Name)
 	}
-	if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
+	if cluster.IsDeleting() {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
 	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
@@ -169,6 +169,9 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	if restoreCond.Status == metav1.ConditionFalse {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: %s", restoreCond.Message)
+	}
+	if cluster.Status.Phase == appsv1.FailedClusterPhase {
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
 	if cluster.Status.Phase != appsv1.RunningClusterPhase {
 		return opsv1alpha1.OpsRunningPhase, 0, nil

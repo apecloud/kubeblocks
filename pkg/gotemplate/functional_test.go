@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -90,7 +90,7 @@ func Test_fromYAML(t *testing.T) {
 	}, {
 		name: "test",
 		args: args{
-			str: `a: 
+			str: `a:
                     b: "c"
                     c: "d"
 `,

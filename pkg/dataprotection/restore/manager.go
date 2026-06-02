@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -607,6 +608,74 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 	return job, nil
 }
 
+// GetExistingActionJobs returns jobs already recorded in Restore status for an in-flight action.
+// If any recorded Processing Job is missing, it returns an empty list so callers can follow
+// the original build/create path.
+func (r *RestoreManager) GetExistingActionJobs(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	stage dpv1alpha1.RestoreStage,
+	backupName string,
+	actionName string) ([]*batchv1.Job, error) {
+	restoreActions := r.Restore.Status.Actions.PrepareData
+	if stage == dpv1alpha1.PostReady {
+		restoreActions = r.Restore.Status.Actions.PostReady
+	}
+	namespaces := []string{r.Restore.Namespace}
+	if controllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS); controllerNamespace != "" && controllerNamespace != r.Restore.Namespace {
+		namespaces = append(namespaces, controllerNamespace)
+	}
+
+	var jobs []*batchv1.Job
+	missingActionJob := false
+	jobKeyPrefix := fmt.Sprintf("%s/", constant.JobKind)
+	for i := range restoreActions {
+		action := restoreActions[i]
+		if action.BackupName != backupName ||
+			action.Name != actionName ||
+			action.Status != dpv1alpha1.RestoreActionProcessing ||
+			!strings.HasPrefix(action.ObjectKey, jobKeyPrefix) {
+			continue
+		}
+		jobName := strings.TrimPrefix(action.ObjectKey, jobKeyPrefix)
+		found := false
+		for _, namespace := range namespaces {
+			job := &batchv1.Job{}
+			err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: jobName, Namespace: namespace}, job)
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			if !r.isJobForRestoreAction(job) {
+				continue
+			}
+			jobs = append(jobs, job)
+			found = true
+			break
+		}
+		if !found {
+			missingActionJob = true
+		}
+	}
+	if missingActionJob {
+		return nil, nil
+	}
+	return jobs, nil
+}
+
+func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
+	if job.Labels[DataProtectionRestoreLabelKey] != r.Restore.Name {
+		return false
+	}
+	restoreNamespace := job.Labels[DataProtectionRestoreNamespaceLabelKey]
+	if job.Namespace != r.Restore.Namespace {
+		return restoreNamespace == r.Restore.Namespace
+	}
+	return restoreNamespace == "" || restoreNamespace == r.Restore.Namespace
+}
+
 // BuildPostReadyActionJobs builds the post ready jobs.
 func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, target *dpv1alpha1.BackupStatusTarget, step int) ([]*batchv1.Job, error) {
 	readyConfig := r.Restore.Spec.ReadyConfig
@@ -789,6 +858,11 @@ func (r *RestoreManager) CreateJobsIfNotExist(reqCtx intctrlutil.RequestCtx,
 			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, reasonCreateRestoreJob, msg)
 			fetchedJobs = append(fetchedJobs, objs[i])
 		} else {
+			if !r.isJobForRestoreAction(fetchedJob) {
+				err := fmt.Sprintf("restore job name collision: existing job %s/%s does not belong to restore %s/%s",
+					fetchedJob.Namespace, fetchedJob.Name, r.Restore.Namespace, r.Restore.Name)
+				return nil, intctrlutil.NewFatalError(err)
+			}
 			fetchedJobs = append(fetchedJobs, fetchedJob)
 		}
 	}

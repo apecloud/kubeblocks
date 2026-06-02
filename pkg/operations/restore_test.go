@@ -221,10 +221,12 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 	})
 
-	It("fails when target Cluster failed before restore condition is reported", func() {
+	It("fails when target Cluster is deleting", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		targetCluster := newRestoreTargetClusterWithoutRestoreCondition(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase)
+		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase, metav1.ConditionUnknown)
 		markRestoreClusterWithOps(targetCluster, opsRequest)
+		targetCluster.Finalizers = []string{"test-finalizer"}
+		targetCluster.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
@@ -233,7 +235,19 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 	})
 
-	It("fails when target Cluster failed while restore condition is unknown", func() {
+	It("keeps running when target Cluster failed before restore condition is reported", func() {
+		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
+		targetCluster := newRestoreTargetClusterWithoutRestoreCondition(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase)
+		markRestoreClusterWithOps(targetCluster, opsRequest)
+		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
+
+		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
+
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+	})
+
+	It("keeps running when target Cluster failed while restore condition is unknown", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
 		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase, metav1.ConditionUnknown)
 		markRestoreClusterWithOps(targetCluster, opsRequest)
@@ -241,8 +255,8 @@ var _ = Describe("Restore OpsRequest", func() {
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
 
-		Expect(err).Should(HaveOccurred())
-		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 	})
 
 	It("fails when target Cluster is not visible", func() {

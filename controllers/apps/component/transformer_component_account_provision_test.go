@@ -46,9 +46,4 @@ func TestAccountAlreadyProvisioned(t *testing.T) {
 			},
 		},
 	}))
-
-	transCtx.SynthesizeComponent.Annotations = map[string]string{
-		constant.RestoreFromBackupAnnotationKey: "{}",
-	}
-	require.True(t, transformer.accountAlreadyProvisioned(transCtx, &corev1.Secret{}))
 }

@@ -192,6 +192,28 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 	})
 
+	It("fails when target Cluster failed before restore condition is reported", func() {
+		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
+		targetCluster := newRestoreTargetClusterWithoutRestoreCondition(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase)
+		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
+
+		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
+
+		Expect(err).Should(HaveOccurred())
+		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+	})
+
+	It("fails when target Cluster failed while restore condition is unknown", func() {
+		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
+		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase, metav1.ConditionUnknown)
+		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
+
+		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
+
+		Expect(err).Should(HaveOccurred())
+		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+	})
+
 	It("fails when target Cluster is not visible", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
 		cli := newRestoreOpsFakeClient(opsRequest)
@@ -276,6 +298,18 @@ func newRestoreTargetCluster(namespace, name string, phase appsv1.ClusterPhase, 
 				Reason:  "test",
 				Message: "test",
 			}},
+		},
+	}
+}
+
+func newRestoreTargetClusterWithoutRestoreCondition(namespace, name string, phase appsv1.ClusterPhase) *appsv1.Cluster {
+	return &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Status: appsv1.ClusterStatus{
+			Phase: phase,
 		},
 	}
 }

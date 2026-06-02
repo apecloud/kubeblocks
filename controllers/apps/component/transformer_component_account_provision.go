@@ -173,10 +173,7 @@ func (t *componentAccountProvisionTransformer) createAccount(transCtx *component
 }
 
 func (t *componentAccountProvisionTransformer) accountAlreadyProvisioned(transCtx *componentTransformContext, secret *corev1.Secret) bool {
-	if secret != nil && secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] == "true" {
-		return true
-	}
-	return transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] != ""
+	return secret != nil && secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] == "true"
 }
 
 func (t *componentAccountProvisionTransformer) deleteAccount(transCtx *componentTransformContext,

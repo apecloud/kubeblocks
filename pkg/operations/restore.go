@@ -127,7 +127,6 @@ func validateRestoreClusterForOps(existing, desired *appsv1.Cluster, opsRequest 
 }
 
 // ReconcileAction implements the restore action.
-// It waits for the Cluster restore condition before checking the target Cluster phase.
 func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	opsRequest := opsRes.OpsRequest
 	cluster := &appsv1.Cluster{}
@@ -144,15 +143,15 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	opsRes.Cluster = cluster
 
+	if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
+	}
 	restoreCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
 	if restoreCond == nil || restoreCond.Status == metav1.ConditionUnknown {
 		return opsv1alpha1.OpsRunningPhase, 0, nil
 	}
 	if restoreCond.Status == metav1.ConditionFalse {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: %s", restoreCond.Message)
-	}
-	if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
-		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}
 	if cluster.Status.Phase != appsv1.RunningClusterPhase {
 		return opsv1alpha1.OpsRunningPhase, 0, nil

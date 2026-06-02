@@ -16238,7 +16238,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -23223,7 +23223,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -31003,7 +31003,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -31296,7 +31296,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>

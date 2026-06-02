@@ -139,7 +139,7 @@ type ConfigConstraintSpec struct {
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
 	// Lists the parameters that cannot be modified once set.
-	// Attempting to change any of these parameters will be ignored.
+	// Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.
 	//
 	// +listType=set
 	// +optional

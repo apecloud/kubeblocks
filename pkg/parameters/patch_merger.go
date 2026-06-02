@@ -21,7 +21,6 @@ package parameters
 
 import (
 	"fmt"
-	"slices"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -109,7 +108,7 @@ func mergeUnmanagedUpdates(base map[string]string,
 			if err != nil {
 				return nil, err
 			}
-			if err := rejectImmutableUnmanagedUpdates(file, sectionUpdate.Updates, paramsDefs); err != nil {
+			if err := rejectImmutableUnmanagedUpdates(file, fileFormat, sectionUpdate, paramsDefs); err != nil {
 				return nil, err
 			}
 			normalizedUpdates, err := normalizeUnmanagedParameterUpdates(sectionUpdate.Updates)
@@ -135,19 +134,41 @@ func mergeUnmanagedUpdates(base map[string]string,
 
 func rejectImmutableUnmanagedUpdates(
 	fileName string,
-	updates []parametersv1alpha1.ParameterUpdate,
+	fileFormat *parametersv1alpha1.FileFormatConfig,
+	sectionUpdate parametersv1alpha1.UnmanagedParameterSectionUpdate,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 ) error {
 	paramsDef := resolveParametersDef(paramsDefs, fileName)
 	if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
 		return nil
 	}
-	for _, update := range updates {
-		if slices.Contains(paramsDef.Spec.ImmutableParameters, update.Key) {
+	if !unmanagedUpdateTargetsManagedScope(fileFormat, sectionUpdate.Section) {
+		return nil
+	}
+	immutableParams := make(map[string]struct{}, len(paramsDef.Spec.ImmutableParameters))
+	for _, immutableParam := range paramsDef.Spec.ImmutableParameters {
+		immutableParams[immutableParam] = struct{}{}
+	}
+	for _, update := range sectionUpdate.Updates {
+		if _, ok := immutableParams[update.Key]; ok {
 			return fmt.Errorf("immutable parameter %s cannot be modified (file %q)", update.Key, fileName)
 		}
 	}
 	return nil
+}
+
+func unmanagedUpdateTargetsManagedScope(fileFormat *parametersv1alpha1.FileFormatConfig, section *string) bool {
+	if fileFormat == nil || fileFormat.Format != parametersv1alpha1.Ini {
+		return true
+	}
+	managedSection := ""
+	if fileFormat.IniConfig != nil {
+		managedSection = fileFormat.IniConfig.SectionName
+	}
+	if section == nil {
+		return true
+	}
+	return *section == managedSection
 }
 
 func resolveUnmanagedFormatConfig(base *parametersv1alpha1.FileFormatConfig, section *string) (*parametersv1alpha1.FileFormatConfig, error) {

@@ -126,6 +126,36 @@ func TestDoMergeRejectsUnmanagedUpdateRemovingImmutableParameter(t *testing.T) {
 	}
 }
 
+func TestDoMergeAcceptsUnmanagedUpdateWithImmutableKeyInDifferentSection(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n\n[client]\ngtid_mode=OFF\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterSectionUpdate{{
+				Section: strPtr("client"),
+				Updates: []parametersv1alpha1.ParameterUpdate{
+					{Type: parametersv1alpha1.ParameterUpdateSet, Key: "gtid_mode", Value: strPtr("ON")},
+				},
+			}},
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	got, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err != nil {
+		t.Fatalf("expected unmanaged update in a different INI section to be accepted, got error %v", err)
+	}
+	content := got["my.cnf"]
+	if !strings.Contains(content, "[mysqld]\ngtid_mode=OFF") {
+		t.Fatalf("expected managed mysqld gtid_mode to stay unchanged, got %q", content)
+	}
+	if !strings.Contains(content, "[client]\ngtid_mode=ON") {
+		t.Fatalf("expected client section gtid_mode to be updated, got %q", content)
+	}
+}
+
 func strPtr(v string) *string {
 	return &v
 }

@@ -1224,7 +1224,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      postReadyRestoreName(clusterName, componentName, pvc.Spec.DataSourceRef.Name),
+			Name:      postReadyRestoreName(pvc.UID),
 			Namespace: pvc.Namespace,
 			Labels:    internalRestoreLabels(pvc),
 		},
@@ -1420,8 +1420,8 @@ func postReadyRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1a
 	}
 }
 
-func postReadyRestoreName(clusterName, componentName, backupName string) string {
-	return constant.ShortenKubeName(fmt.Sprintf("%s-%s-%s-post-ready", clusterName, componentName, backupName), constant.KubeNameMaxLength)
+func postReadyRestoreName(pvcUID types.UID) string {
+	return constant.ShortenKubeName(fmt.Sprintf("%s-post-ready", getPopulatePVCName(pvcUID)), constant.KubeNameMaxLength)
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {

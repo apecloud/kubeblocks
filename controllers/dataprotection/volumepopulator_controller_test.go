@@ -931,6 +931,71 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 	require.Equal(t, constant.GenerateAccountSecretName("cluster", "mysql", "root"), restore.Spec.ReadyConfig.ConnectionCredential.SecretName)
 }
 
+func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = types.UID("current-pvc")
+	pvc.Spec.VolumeName = "target-pv"
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+		},
+		Status: kbappsv1.ComponentStatus{
+			Phase: kbappsv1.RunningComponentPhase,
+		},
+	}
+	staleRestore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.ShortenKubeName("cluster-mysql-backup-post-ready", constant.KubeNameMaxLength),
+		},
+		Status: dpv1alpha1.RestoreStatus{
+			Phase: dpv1alpha1.RestorePhaseCompleted,
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc).
+			WithObjects(backup, pvc, comp, staleRestore).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	completed, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData},
+	)
+
+	require.NoError(t, err)
+	require.False(t, completed)
+	currentRestore := &dpv1alpha1.Restore{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(pvc.UID),
+	}, currentRestore))
+	require.NotEqual(t, staleRestore.Name, currentRestore.Name)
+	require.Equal(t, backup.Name, currentRestore.Spec.Backup.Name)
+}
+
 func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

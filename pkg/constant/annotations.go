@@ -51,6 +51,9 @@ const (
 	LastRoleAuthoritativeVersionAnnotationKey = "apps.kubeblocks.io/last-role-authoritative-version"
 	ComponentScaleInAnnotationKey             = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
+	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
+	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"
+
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"
 
@@ -62,6 +65,15 @@ const (
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
+
+	RestoreSourceAPIGroupAnnotationKey  = "apps.kubeblocks.io/restore-source-api-group"
+	RestoreSourceKindAnnotationKey      = "apps.kubeblocks.io/restore-source-kind"
+	RestoreSourceNameAnnotationKey      = "apps.kubeblocks.io/restore-source-name"
+	RestoreSourceNamespaceAnnotationKey = "apps.kubeblocks.io/restore-source-namespace"
+	RestorePITRAnnotationKey            = "apps.kubeblocks.io/restore-pitr"
+	RestoreParametersAnnotationKey      = "apps.kubeblocks.io/restore-parameters"
+	RestoreComponentAnnotationKey       = "apps.kubeblocks.io/restore-component"
+	RestoreVolumeTemplateAnnotationKey  = "apps.kubeblocks.io/restore-volume-template"
 
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.

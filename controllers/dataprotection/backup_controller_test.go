@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -79,7 +80,6 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
-
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
@@ -1065,14 +1065,31 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		It("delays backup job when restore is in progress", func() {
-			By("setting restore annotation on cluster")
-			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *kbappsv1.Cluster) {
-				if cluster.Annotations == nil {
-					cluster.Annotations = make(map[string]string)
-				}
-				cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = "any-value"
-			})).Should(Succeed())
+		It("delays backup job when Backup dataSource PVC restore is in progress", func() {
+			By("creating an in-progress Backup dataSource PVC")
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "restore-pvc",
+					Namespace: testCtx.DefaultNamespace,
+					Annotations: map[string]string{
+						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: pointer.String(dptypes.DataprotectionAPIGroup),
+						Kind:     dptypes.BackupKind,
+						Name:     testdp.BackupName,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, pvc)).Should(Succeed())
 
 			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 			backup := testdp.NewFakeBackup(&testCtx, nil)
@@ -1089,23 +1106,88 @@ var _ = Describe("Backup Controller test", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
 
-			By("check event fired")
-			Eventually(func() bool {
-				eventList := &corev1.EventList{}
-				err := k8sClient.List(ctx, eventList, client.InNamespace(clusterInfo.Cluster.Namespace))
-				if err != nil {
-					return false
-				}
-				for _, e := range eventList.Items {
-					if e.Reason == "RestoreInProgress" && e.InvolvedObject.Name == backup.Name {
-						return true
-					}
-				}
-				return false
-			}).Should(BeTrue())
+			By("mark PVC restore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+					Type:   corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore),
+					Status: corev1.ConditionTrue,
+					Reason: ReasonPopulatingSucceed,
+				}}
+			})).Should(Succeed())
 
-			By("delete restore annotation")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
+			By("check job is created")
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
+		})
+
+		It("delays backup job when target Cluster restore is in progress", func() {
+			By("patching the target cluster with a restore intent from another backup")
+			clusterKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: testdp.ClusterName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Spec.Restore = &kbappsv1.ClusterRestore{
+					Source: kbappsv1.ClusterRestoreSource{
+						APIGroup:  dptypes.DataprotectionAPIGroup,
+						Kind:      dptypes.BackupKind,
+						Name:      "source-backup",
+						Namespace: testCtx.DefaultNamespace,
+					},
+				}
+			})).Should(Succeed())
+
+			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			backupKey := client.ObjectKeyFromObject(backup)
+			jobKey := client.ObjectKey{
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
+				Namespace: backup.Namespace,
+			}
+
+			By("check backup is delayed before restore condition completes")
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
+
+			By("mark cluster restore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               kbappsv1.ConditionTypeRestore,
+					Status:             metav1.ConditionTrue,
+					Reason:             "RestoreCompleted",
+					LastTransitionTime: metav1.Now(),
+				}}
+			})).Should(Succeed())
+
+			By("check job is created")
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
+		})
+
+		It("delays backup job when legacy restore annotation is in progress", func() {
+			By("patching cluster with legacy restore annotation")
+			clusterKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: testdp.ClusterName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				if cluster.Annotations == nil {
+					cluster.Annotations = map[string]string{}
+				}
+				cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = fmt.Sprintf(`{"%s":{"name":"%s","namespace":"%s"}}`,
+					testdp.ComponentName, testdp.BackupName, testCtx.DefaultNamespace)
+			})).Should(Succeed())
+
+			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			backupKey := client.ObjectKeyFromObject(backup)
+			jobKey := client.ObjectKey{
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
+				Namespace: backup.Namespace,
+			}
+
+			By("check backup is delayed")
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
+
+			By("remove legacy restore annotation")
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
 				delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
 			})).Should(Succeed())
 

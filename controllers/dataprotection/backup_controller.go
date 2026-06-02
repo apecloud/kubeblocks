@@ -695,9 +695,6 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if backup.Annotations[dptypes.SkipRestorationCheckAnnotationKey] == trueVal {
 		return false, nil
 	}
-	if restoreInProgress, err = r.legacyRestoreAnnotationInProgress(reqCtx, backup); err != nil || restoreInProgress {
-		return restoreInProgress, err
-	}
 	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
 	if !ok {
 		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
@@ -710,21 +707,6 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 		return false, err
 	}
 	return clusterRestoreInProgress(cluster), nil
-}
-
-func (r *BackupReconciler) legacyRestoreAnnotationInProgress(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
-	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
-	if !ok {
-		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
-		return false, nil
-	}
-	cluster := &kbappsv1.Cluster{}
-	backupTargetExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
-		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
-	if err != nil || !backupTargetExists {
-		return false, err
-	}
-	return cluster.Annotations[constant.RestoreFromBackupAnnotationKey] != "", nil
 }
 
 func clusterRestoreInProgress(cluster *kbappsv1.Cluster) bool {

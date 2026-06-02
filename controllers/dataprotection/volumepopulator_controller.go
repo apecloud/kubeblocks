@@ -429,11 +429,14 @@ func (r *VolumePopulatorReconciler) resolveSourceTargetFromBackup(reqCtx intctrl
 		}
 		return target, false, nil
 	}
-	if backup.Status.Target != nil || len(backup.Status.Targets) == 0 {
+	if backup.Status.Target != nil {
+		return resolveSingleSourceTargetForPVC(backup.Status.Target, pvc)
+	}
+	if len(backup.Status.Targets) == 0 {
 		return backup.Status.Target, false, nil
 	}
 	if len(backup.Status.Targets) == 1 {
-		return &backup.Status.Targets[0], false, nil
+		return resolveSingleSourceTargetForPVC(&backup.Status.Targets[0], pvc)
 	}
 	if pvc.Labels[constant.KBAppShardingNameLabelKey] != "" {
 		return r.resolveShardingSourceTarget(reqCtx, pvc, backup)
@@ -456,6 +459,13 @@ func (r *VolumePopulatorReconciler) resolveSourceTargetFromBackup(reqCtx intctrl
 		return nil, false, intctrlutil.NewFatalError(fmt.Sprintf("multiple backup targets match PVC %s/%s: %v", pvc.Namespace, pvc.Name, names))
 	}
 	return nil, false, intctrlutil.NewFatalError(fmt.Sprintf("no backup target matches PVC %s/%s", pvc.Namespace, pvc.Name))
+}
+
+func resolveSingleSourceTargetForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) (*dpv1alpha1.BackupStatusTarget, bool, error) {
+	if backupTargetHasEffectivePVCSelector(target) && !backupTargetMatchesPVC(target, pvc) {
+		return nil, true, nil
+	}
+	return target, false, nil
 }
 
 func (r *VolumePopulatorReconciler) resolveShardingSourceTarget(reqCtx intctrlutil.RequestCtx,
@@ -536,6 +546,24 @@ func componentLogicalName(component *appsv1.Component) string {
 		}
 	}
 	return component.Name
+}
+
+func backupTargetHasEffectivePVCSelector(target *dpv1alpha1.BackupStatusTarget) bool {
+	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return false
+	}
+	selector := target.PodSelector.LabelSelector
+	for k := range selector.MatchLabels {
+		if k != constant.AppInstanceLabelKey {
+			return true
+		}
+	}
+	for _, expression := range selector.MatchExpressions {
+		if expression.Key != constant.AppInstanceLabelKey {
+			return true
+		}
+	}
+	return false
 }
 
 func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) bool {

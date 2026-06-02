@@ -264,6 +264,7 @@ rules:
   - backuppolicies
   - backuppolicytemplates
   - backuprepos
+  - backups
   - backupschedules
   - restores
   - storageproviders
@@ -303,19 +304,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backups
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - experimental.kubeblocks.io
   resources:

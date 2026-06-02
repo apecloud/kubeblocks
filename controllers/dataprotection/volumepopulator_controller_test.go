@@ -604,6 +604,37 @@ func TestDecidePVCRestoreUsesTargetVolumes(t *testing.T) {
 	require.NotNil(t, decision.sourceTarget)
 }
 
+func TestDecidePVCRestoreKeepsSingleBackupTargetScopedToMatchingComponent(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision([]string{"data"}, []string{"redis"})
+	backup.Status.Targets[0].PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey:    "source-cluster",
+				constant.KBAppComponentLabelKey: "redis",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	pvc := newPVCForRestoreDecision("data", "redis", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeRestoreData, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+	require.Equal(t, "redis", decision.sourceTarget.Name)
+
+	pvc = newPVCForRestoreDecision("data", "redis-sentinel", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady)
+	require.Nil(t, decision.sourceTarget)
+}
+
 func TestDecidePVCRestoreTreatsNilTargetVolumesAsProvisionOnly(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{}
 	backup := newBackupForRestoreDecision(nil, nil)

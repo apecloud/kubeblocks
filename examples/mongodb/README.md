@@ -368,13 +368,13 @@ Alternatively, you can update the `BackupSchedule` to enable the method `xtrabac
 
 Restore a new cluster from a backup
 
-1. Get the list of accounts and their passwords from the backup:
+1. Update `examples/mongodb/restore.yaml` and make sure `spec.restore.source` points to the Backup you want to restore from.
 
-```bash
-kubectl get backup -n demo mongo-cluster-backup -ojsonpath='{.metadata.annotations.kubeblocks\.io/encrypted-system-accounts}'
-```
+1. Adjust `spec.restore.parameters` if you need to customize the restore behavior, for example `dataprotection.kubeblocks.io/volume-restore-policy`.
 
-1. Update `examples/mongodb/restore.yaml` and set placeholder `<ENCRYPTED-SYSTEM-ACCOUNTS>` with your own settings and apply it.
+1. System account secrets are restored automatically from the Backup. No manual encrypted account placeholder replacement is required.
+
+1. Apply the restore cluster manifest.
 
 ```bash
 kubectl apply -f examples/mongodb/restore.yaml

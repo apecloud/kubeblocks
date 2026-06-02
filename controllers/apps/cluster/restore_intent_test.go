@@ -21,6 +21,8 @@ package cluster
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/yaml"
 
 	"github.com/stretchr/testify/require"
 
@@ -69,6 +72,22 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	require.Equal(t, "backup", vct.Spec.DataSourceRef.Name)
 	require.NotNil(t, vct.Spec.DataSourceRef.Namespace)
 	require.Equal(t, "backup-ns", *vct.Spec.DataSourceRef.Namespace)
+}
+
+func TestClusterRestoreSourceAPIGroupIsRequiredByCRD(t *testing.T) {
+	data, err := os.ReadFile("../../../config/crd/bases/apps.kubeblocks.io_clusters.yaml")
+	require.NoError(t, err)
+
+	var crd map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(data, &crd))
+
+	versionSchema := nestedMap(t, crd, "spec", "versions", "0", "schema", "openAPIV3Schema")
+	sourceSchema := nestedMap(t, versionSchema, "properties", "spec", "properties", "restore", "properties", "source")
+	required, ok := sourceSchema["required"].([]interface{})
+	require.True(t, ok)
+	require.Contains(t, required, "apiGroup")
+	require.Contains(t, required, "kind")
+	require.Contains(t, required, "name")
 }
 
 func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testing.T) {
@@ -505,4 +524,27 @@ func TestSetRestoreConditionKeepsTerminalRestoreCondition(t *testing.T) {
 	require.NotNil(t, cond)
 	require.Equal(t, metav1.ConditionTrue, cond.Status)
 	require.Equal(t, ReasonRestoreCompleted, cond.Reason)
+}
+
+func nestedMap(t *testing.T, value interface{}, path ...string) map[string]interface{} {
+	t.Helper()
+	current := value
+	for _, segment := range path {
+		switch typed := current.(type) {
+		case map[string]interface{}:
+			next, ok := typed[segment]
+			require.Truef(t, ok, "missing path segment %q", segment)
+			current = next
+		case []interface{}:
+			index, err := strconv.Atoi(segment)
+			require.NoError(t, err)
+			require.Less(t, index, len(typed))
+			current = typed[index]
+		default:
+			require.Failf(t, "unexpected schema node", "segment %q on %T", segment, current)
+		}
+	}
+	result, ok := current.(map[string]interface{})
+	require.Truef(t, ok, "expected map at path %v, got %T", path, current)
+	return result
 }

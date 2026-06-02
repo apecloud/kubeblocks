@@ -3952,8 +3952,8 @@ string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the API group of the restore source.</p>
+<p>Specifies the API group of the restore source. For example, use &ldquo;dataprotection.kubeblocks.io&rdquo; for KubeBlocks
+data protection Backup sources.</p>
 </td>
 </tr>
 <tr>

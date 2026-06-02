@@ -1901,16 +1901,33 @@ func validateRestorePVCWorkloadLabels(pvc *corev1.PersistentVolumeClaim, workloa
 }
 
 func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, its *workloads.InstanceSet) error {
+	if its.Spec.Replicas == nil {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup because InstanceSet %s/%s has no replicas",
+			pvc.Namespace, pvc.Name, its.Namespace, its.Name)
+	}
+	podName := pvc.Labels[constant.KBAppPodNameLabelKey]
+	if podName == "" {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup without pod identity",
+			pvc.Namespace, pvc.Name)
+	}
+	instanceNames, err := instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instanceTemplatesForNameGeneration(its), its.Spec.OfflineInstances, its.Spec.Ordinals)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(instanceNames, podName) {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup because pod %q is not an expected InstanceSet member",
+			pvc.Namespace, pvc.Name, podName)
+	}
 	volumeName := restoreVolumeTemplateName(pvc)
 	for _, template := range its.Spec.VolumeClaimTemplates {
 		if template.Name == volumeName {
-			return validatePVCNameForTemplate(pvc, template, its.Name)
+			return validatePVCNameForTemplate(pvc, template, its.Name, podName)
 		}
 	}
 	for _, instanceTemplate := range its.Spec.Instances {
 		for _, template := range instanceTemplate.VolumeClaimTemplates {
 			if template.Name == volumeName {
-				return validatePVCNameForTemplate(pvc, template, its.Name)
+				return validatePVCNameForTemplate(pvc, template, its.Name, podName)
 			}
 		}
 	}
@@ -1918,24 +1935,36 @@ func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, it
 		pvc.Namespace, pvc.Name, volumeName)
 }
 
-func validatePVCMatchesInstanceTemplate(pvc *corev1.PersistentVolumeClaim, inst *workloads.Instance) error {
-	volumeName := restoreVolumeTemplateName(pvc)
-	for _, template := range inst.Spec.VolumeClaimTemplates {
-		if template.Name != volumeName {
-			continue
-		}
-		return validatePVCNameForTemplate(pvc, corev1.PersistentVolumeClaim{ObjectMeta: template.ObjectMeta}, inst.Spec.InstanceSetName)
+func instanceTemplatesForNameGeneration(its *workloads.InstanceSet) []instanceset.InstanceTemplate {
+	templates := make([]instanceset.InstanceTemplate, 0, len(its.Spec.Instances))
+	for i := range its.Spec.Instances {
+		templates = append(templates, &its.Spec.Instances[i])
 	}
-	return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unknown volume template %q",
-		pvc.Namespace, pvc.Name, volumeName)
+	return templates
 }
 
-func validatePVCNameForTemplate(pvc *corev1.PersistentVolumeClaim, template corev1.PersistentVolumeClaim, instanceSetName string) error {
+func validatePVCMatchesInstanceTemplate(pvc *corev1.PersistentVolumeClaim, inst *workloads.Instance) error {
 	podName := pvc.Labels[constant.KBAppPodNameLabelKey]
 	if podName == "" {
 		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup without pod identity",
 			pvc.Namespace, pvc.Name)
 	}
+	if podName != inst.Name {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup because pod %q does not match Instance %q",
+			pvc.Namespace, pvc.Name, podName, inst.Name)
+	}
+	volumeName := restoreVolumeTemplateName(pvc)
+	for _, template := range inst.Spec.VolumeClaimTemplates {
+		if template.Name != volumeName {
+			continue
+		}
+		return validatePVCNameForTemplate(pvc, corev1.PersistentVolumeClaim{ObjectMeta: template.ObjectMeta}, inst.Spec.InstanceSetName, podName)
+	}
+	return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unknown volume template %q",
+		pvc.Namespace, pvc.Name, volumeName)
+}
+
+func validatePVCNameForTemplate(pvc *corev1.PersistentVolumeClaim, template corev1.PersistentVolumeClaim, instanceSetName, podName string) error {
 	expectedName := intctrlutil.ComposePVCName(template, instanceSetName, podName)
 	if pvc.Name != expectedName {
 		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup because expected workload PVC name is %q",

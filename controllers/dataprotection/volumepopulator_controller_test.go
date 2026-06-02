@@ -807,6 +807,7 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 			},
 		},
 		Spec: workloadsv1.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
 				ObjectMeta: metav1.ObjectMeta{Name: "data"},
 			}},
@@ -822,6 +823,15 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 	}}
 	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, its).Build()
 
+	pvc.Name = "data-cluster-mysql-9"
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-9"
+	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.Empty(t, namespace)
+
+	pvc.Name = "data-cluster-mysql-0"
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-0"
 	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
 
 	require.NoError(t, err)

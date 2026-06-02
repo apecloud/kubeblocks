@@ -380,6 +380,25 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(jobs).Should(BeNil())
 		})
 
+		It("should reject an existing same-name job with non-matching Restore labels during create-if-exists", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			jobName := "restore-postready-existing"
+
+			By("create an unrelated same-name job in the desired namespace")
+			Expect(k8sClient.Create(ctx, newRestoreJob(testCtx.DefaultNamespace, jobName, map[string]string{
+				DataProtectionRestoreLabelKey: "another-restore",
+			}))).Should(Succeed())
+
+			By("try to create the desired restore job with the same name")
+			desiredJob := newRestoreJob(testCtx.DefaultNamespace, jobName, map[string]string{
+				DataProtectionRestoreLabelKey: restoreMGR.Restore.Name,
+			})
+			jobs, err := restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, []*batchv1.Job{desiredJob})
+			Expect(err).Should(MatchError(ContainSubstring("restore job name collision")))
+			Expect(jobs).Should(BeNil())
+		})
+
 		It("test with BuildPrepareDataJobs function and Serial volumeRestorePolicy", func() {
 			reqCtx := getReqCtx()
 			startingIndex := 1

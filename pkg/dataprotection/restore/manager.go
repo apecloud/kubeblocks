@@ -858,6 +858,11 @@ func (r *RestoreManager) CreateJobsIfNotExist(reqCtx intctrlutil.RequestCtx,
 			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, reasonCreateRestoreJob, msg)
 			fetchedJobs = append(fetchedJobs, objs[i])
 		} else {
+			if !r.isJobForRestoreAction(fetchedJob) {
+				err := fmt.Sprintf("restore job name collision: existing job %s/%s does not belong to restore %s/%s",
+					fetchedJob.Namespace, fetchedJob.Name, r.Restore.Namespace, r.Restore.Name)
+				return nil, intctrlutil.NewFatalError(err)
+			}
 			fetchedJobs = append(fetchedJobs, fetchedJob)
 		}
 	}

@@ -952,6 +952,7 @@ func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
 		},
 		Status: kbappsv1.ComponentStatus{
 			Phase: kbappsv1.RunningComponentPhase,
@@ -990,10 +991,136 @@ func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
 	currentRestore := &dpv1alpha1.Restore{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
 		Namespace: pvc.Namespace,
-		Name:      postReadyRestoreName(pvc.UID),
+		Name:      postReadyRestoreName(comp.UID),
 	}, currentRestore))
 	require.NotEqual(t, staleRestore.Name, currentRestore.Name)
 	require.Equal(t, backup.Name, currentRestore.Spec.Backup.Name)
+}
+
+func TestEnsurePostReadyRestoreCompletedUsesOneRestorePerComponent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc1 := newPVCForRestoreDecision("data", "mysql", "")
+	pvc1.UID = types.UID("data-pvc")
+	pvc1.Spec.VolumeName = "data-pv"
+	pvc1.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc1.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc1.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	pvc2 := newPVCForRestoreDecision("logs", "mysql", "")
+	pvc2.UID = types.UID("logs-pvc")
+	pvc2.Spec.VolumeName = "logs-pv"
+	pvc2.Spec.DataSourceRef = pvc1.Spec.DataSourceRef.DeepCopy()
+	pvc2.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc2.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc1, pvc2).
+			WithObjects(backup, pvc1, pvc2, comp).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	restoreCtx := &pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData}
+
+	completed, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc1, restoreCtx)
+	require.NoError(t, err)
+	require.False(t, completed)
+	completed, err = reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc2, restoreCtx)
+	require.NoError(t, err)
+	require.False(t, completed)
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
+	require.Len(t, restoreList.Items, 1)
+	require.Equal(t, postReadyRestoreName(comp.UID), restoreList.Items[0].Name)
+	require.Equal(t, backup.Name, restoreList.Items[0].Spec.Backup.Name)
+}
+
+func TestEnsurePostReadyRestoreCompletedRejectsMismatchedExistingRestore(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = types.UID("data-pvc")
+	pvc.Spec.VolumeName = "data-pv"
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	existing := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      postReadyRestoreName(comp.UID),
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: "apps.kubeblocks.io/v1",
+				Kind:       "Component",
+				Name:       comp.Name,
+				UID:        comp.UID,
+			}},
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: "other"},
+		},
+		Status: dpv1alpha1.RestoreStatus{Phase: dpv1alpha1.RestorePhaseCompleted},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc).
+			WithObjects(backup, pvc, comp, existing).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	completed, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData},
+	)
+
+	require.Error(t, err)
+	require.False(t, completed)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
 }
 
 func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {

@@ -1147,6 +1147,9 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
+	if err = validatePostReadyRestore(existing, postReadyRestore, comp); err != nil {
+		return false, err
+	}
 	switch existing.Status.Phase {
 	case dpv1alpha1.RestorePhaseCompleted:
 		return true, nil
@@ -1224,9 +1227,9 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      postReadyRestoreName(pvc.UID),
+			Name:      postReadyRestoreName(comp.UID),
 			Namespace: pvc.Namespace,
-			Labels:    internalRestoreLabels(pvc),
+			Labels:    postReadyRestoreLabels(pvc, comp),
 		},
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
@@ -1246,6 +1249,27 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 		return nil, err
 	}
 	return restore, nil
+}
+
+func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
+	if !hasOwnerReference(existing.OwnerReferences, comp.UID) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s is not owned by component %s/%s",
+			existing.Namespace, existing.Name, comp.Namespace, comp.Name))
+	}
+	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s spec does not match current restore intent",
+			existing.Namespace, existing.Name))
+	}
+	return nil
+}
+
+func hasOwnerReference(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.UID == uid {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *VolumePopulatorReconciler) highestPriorityRoleName(reqCtx intctrlutil.RequestCtx, comp *appsv1.Component) (string, error) {
@@ -1420,8 +1444,29 @@ func postReadyRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1a
 	}
 }
 
-func postReadyRestoreName(pvcUID types.UID) string {
-	return constant.ShortenKubeName(fmt.Sprintf("%s-post-ready", getPopulatePVCName(pvcUID)), constant.KubeNameMaxLength)
+func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Component) map[string]string {
+	restoreName := postReadyRestoreName(comp.UID)
+	labels := map[string]string{
+		dprestore.DataProtectionRestoreLabelKey:          restoreName,
+		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
+	}
+	for _, key := range []string{
+		constant.AppInstanceLabelKey,
+		constant.KBAppComponentLabelKey,
+		constant.KBAppShardingNameLabelKey,
+	} {
+		if value := pvc.Labels[key]; value != "" {
+			labels[key] = value
+		}
+	}
+	if pvc.Spec.DataSourceRef != nil {
+		labels[dptypes.BackupNameLabelKey] = pvc.Spec.DataSourceRef.Name
+	}
+	return labels
+}
+
+func postReadyRestoreName(componentUID types.UID) string {
+	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {

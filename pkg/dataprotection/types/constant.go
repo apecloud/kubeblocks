@@ -77,7 +77,7 @@ const (
 	// VolumeRestorePolicyParameterKey records the volume restore policy for Backup dataSource PVC restores.
 	VolumeRestorePolicyParameterKey = "dataprotection.kubeblocks.io/volume-restore-policy"
 	// RestoreEnvParameterKey records restore env for Backup dataSource PVC restores.
-	RestoreEnvParameterKey = "dataprotection.kubeblocks.io/env"
+	RestoreEnvParameterKey = "dataprotection.kubeblocks.io/restore-env"
 	// DeferPostReadyUntilClusterRunningParameterKey records whether post-ready restore should wait for Cluster running.
 	DeferPostReadyUntilClusterRunningParameterKey = "dataprotection.kubeblocks.io/defer-post-ready-until-cluster-running"
 )

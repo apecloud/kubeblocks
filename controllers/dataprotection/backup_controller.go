@@ -291,6 +291,9 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	deleter.PrepareDeleteJobBackupRepoFunc = func(repo *dpv1alpha1.BackupRepo, namespace string) error {
 		return r.prepareDeleteJobBackupRepo(reqCtx, repo, namespace)
 	}
+	deleter.RecordCleanupJobNamespaceFunc = func(b *dpv1alpha1.Backup, namespace string) error {
+		return r.recordBackupCleanupJobNamespace(reqCtx, b, namespace)
+	}
 
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
@@ -314,6 +317,32 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return err
 	}
 	return err
+}
+
+// recordBackupCleanupJobNamespace persists the cleanup-job namespace on Backup
+// status before an external cleanup Job is created. It is idempotent when the
+// recorded namespace already equals namespace and refuses to overwrite a
+// previously recorded different namespace; the caller converts that refusal
+// into a non-finalizer-removing deletion status.
+func (r *BackupReconciler) recordBackupCleanupJobNamespace(
+	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, namespace string) error {
+	if backup.Status.CleanupJobNamespace == namespace {
+		return nil
+	}
+	if backup.Status.CleanupJobNamespace != "" {
+		return fmt.Errorf("cleanup job namespace already recorded as %q, refuses to overwrite with %q",
+			backup.Status.CleanupJobNamespace, namespace)
+	}
+	patch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.CleanupJobNamespace = namespace
+	if err := r.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
+		// Revert the in-memory mutation so the next reconcile re-attempts
+		// the patch from a clean baseline.
+		backup.Status.CleanupJobNamespace = ""
+		return fmt.Errorf("failed to persist cleanup job namespace %q on Backup %s/%s: %w",
+			namespace, backup.Namespace, backup.Name, err)
+	}
+	return nil
 }
 
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR

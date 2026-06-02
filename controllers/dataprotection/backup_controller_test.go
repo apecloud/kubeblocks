@@ -286,6 +286,99 @@ var _ = Describe("Backup Controller test", func() {
 				Consistently(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(deleteJob), &batchv1.Job{}, true)).Should(Succeed())
 			})
 
+			It("should persist cleanup job namespace on Backup status via callback", func() {
+				bp := testdp.NewFakeBackup(&testCtx, func(b *dpv1alpha1.Backup) {
+					b.Name = "rec-cleanup-ns-backup"
+				})
+				reconciler := &BackupReconciler{
+					Client: k8sClient,
+					Scheme: k8sManager.GetScheme(),
+				}
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: testCtx.Ctx,
+					Log: ctrl.Log.WithName("test"),
+				}
+				bpKey := client.ObjectKeyFromObject(bp)
+
+				By("first call records the namespace")
+				const externalNS = "ctrl-cleanup-ns"
+				Expect(reconciler.recordBackupCleanupJobNamespace(reqCtx, bp, externalNS)).Should(Succeed())
+				Expect(bp.Status.CleanupJobNamespace).Should(Equal(externalNS))
+				Eventually(testapps.CheckObj(&testCtx, bpKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.CleanupJobNamespace).Should(Equal(externalNS))
+				})).Should(Succeed())
+
+				By("second call with the same namespace is a no-op")
+				Expect(reconciler.recordBackupCleanupJobNamespace(reqCtx, bp, externalNS)).Should(Succeed())
+				Expect(bp.Status.CleanupJobNamespace).Should(Equal(externalNS))
+
+				By("call with a different namespace is rejected")
+				err := reconciler.recordBackupCleanupJobNamespace(reqCtx, bp, "different-ns")
+				Expect(err).Should(MatchError(ContainSubstring("already recorded as \"ctrl-cleanup-ns\"")))
+				Expect(bp.Status.CleanupJobNamespace).Should(Equal(externalNS))
+			})
+
+			It("should not remove finalizer when external delete job has Failed in recorded namespace", func() {
+				deleteJobNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+
+				By("create a Backup with finalizer + status recording the cleanup namespace + a missing BackupRepo reference")
+				bp := testdp.NewBackupFactory(testCtx.DefaultNamespace, "finalizer-non-release-backup").
+					SetBackupPolicyName(testdp.BackupPolicyName).
+					SetBackupMethod(testdp.BackupMethodName).
+					Create(&testCtx).GetObject()
+				bpKey := client.ObjectKeyFromObject(bp)
+				Eventually(testapps.CheckObj(&testCtx, bpKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(slices.Contains(fetched.Finalizers, dptypes.DataProtectionFinalizerName)).Should(BeTrue())
+				})).Should(Succeed())
+				Expect(testapps.ChangeObjStatus(&testCtx, bp, func() {
+					bp.Status.BackupRepoName = "missing-repo-finalizer-non-release"
+					bp.Status.Path = "/backup/finalizer-non-release"
+					bp.Status.CleanupJobNamespace = deleteJobNS
+				})).Should(Succeed())
+
+				By("create a Failed external delete Job in the recorded namespace")
+				jobKey := dpbackup.BuildDeleteBackupFilesJobKey(bp, false)
+				jobKey.Namespace = deleteJobNS
+				Expect(testCtx.CreateObj(testCtx.Ctx, &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: jobKey.Namespace,
+						Name:      jobKey.Name,
+						Labels: map[string]string{
+							dpbackup.DeleteBackupFilesJobLabelKey: "true",
+						},
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers:    []corev1.Container{{Name: "deleter", Image: testdp.KBToolImage}},
+								RestartPolicy: corev1.RestartPolicyNever,
+							},
+						},
+					},
+				})).Should(Succeed())
+				testdp.PatchK8sJobStatus(&testCtx, jobKey, batchv1.JobFailed)
+
+				By("invoke controller deleteBackupFiles")
+				reconciler := &BackupReconciler{
+					Client:   k8sClient,
+					Scheme:   k8sManager.GetScheme(),
+					Recorder: k8sManager.GetEventRecorderFor("backup-mock-controller"),
+				}
+				reqCtx := intctrlutil.RequestCtx{
+					Ctx: testCtx.Ctx,
+					Log: ctrl.Log.WithName("test"),
+				}
+				Eventually(testapps.CheckObj(&testCtx, bpKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(reconciler.deleteBackupFiles(reqCtx, fetched)).Should(Succeed())
+				})).Should(Succeed())
+
+				By("verify FailureReason is recorded and the finalizer is NOT removed")
+				Eventually(testapps.CheckObj(&testCtx, bpKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.FailureReason).Should(ContainSubstring("deletion backup files job"))
+					g.Expect(slices.Contains(fetched.Finalizers, dptypes.DataProtectionFinalizerName)).Should(BeTrue())
+				})).Should(Succeed())
+			})
+
 			It("should prepare tool config secret for backup file delete job namespace", func() {
 				repo := testdp.NewBackupRepoFactory("", "delete-job-tool-repo").
 					SetStorageProviderRef(testdp.StorageProviderName).

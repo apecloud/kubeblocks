@@ -83,6 +83,23 @@ type Deleter struct {
 	WorkerServiceAccountForNamespaceFunc func(namespace string) (string, error)
 	DeleteJobNamespace                   string
 	PrepareDeleteJobBackupRepoFunc       func(repo *dpv1alpha1.BackupRepo, namespace string) error
+	// RecordCleanupJobNamespaceFunc persists the namespace where the artifact
+	// cleanup Job (delete or preDelete) is created onto the Backup status.
+	// It is only called when the cleanup Job will run in a namespace different
+	// from the Backup's own namespace (i.e. an external delete-job namespace
+	// derived from the BackupRepo). The implementation must:
+	//   - return nil and do nothing if backup.Status.CleanupJobNamespace
+	//     already equals namespace (idempotent no-op),
+	//   - return an error if backup.Status.CleanupJobNamespace is already
+	//     non-empty and different from namespace (the caller must convert
+	//     that into DeletionStatusUnknown and not proceed to create a job),
+	//   - persist namespace via Status().Patch and also update the in-memory
+	//     backup object so subsequent reads in the same reconcile see the
+	//     recorded value.
+	// When this field is nil the deleter degrades to legacy behavior where
+	// the cleanup-job namespace is not persisted; this is intended only for
+	// callers that never create external cleanup jobs.
+	RecordCleanupJobNamespaceFunc func(backup *dpv1alpha1.Backup, namespace string) error
 
 	actionSet *dpv1alpha1.ActionSet
 }
@@ -144,7 +161,11 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		backupRepo = &dpv1alpha1.BackupRepo{}
 		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
 			if apierrors.IsNotFound(err) {
-				return d.checkExistingDeleteBackupFilesJobs(backup, false)
+				// The BackupRepo is gone but an external cleanup Job may
+				// still exist in a namespace recorded on the Backup status.
+				// We must not return Succeeded just because we cannot
+				// rebuild the BackupRepo-derived job key here.
+				return d.checkExistingCleanupJobsAfterRepoGone(backup)
 			}
 			return DeletionStatusUnknown, err
 		}
@@ -229,42 +250,200 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		}
 	}
 	// do delete action
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+	if err := d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName); err != nil {
+		// Anything that prevents the Job from being created — including
+		// failure to persist the cleanup-job namespace via the callback —
+		// is reported as Unknown so the controller does not advance the
+		// deletion state machine and the finalizer is not removed.
+		return DeletionStatusUnknown, err
+	}
+	return DeletionStatusDeleting, nil
 }
 
-func (d *Deleter) checkExistingDeleteBackupFilesJobs(backup *dpv1alpha1.Backup, isPreDelete bool) (DeletionStatus, error) {
-	jobKeys := []client.ObjectKey{BuildDeleteBackupFilesJobKey(backup, isPreDelete)}
-	if d.DeleteJobNamespace != "" && d.DeleteJobNamespace != backup.Namespace {
-		externalJobKey := jobKeys[0]
-		externalJobKey.Namespace = d.DeleteJobNamespace
-		jobKeys = append(jobKeys, externalJobKey)
+// checkExistingCleanupJobsAfterRepoGone resolves the deletion status when
+// BackupRepo has already been removed. It looks up both the delete-backup-files
+// Job and the preDelete Job, aggregates their states, and never returns
+// Succeeded based on a preDelete-only success — only an actual delete-backup-files
+// Job completion proves the backup artifact was removed.
+//
+// Authoritative-lookup rule:
+//   - When backup.Status.CleanupJobNamespace is non-empty the recorded
+//     namespace is the authoritative location. If no cleanup Job is found in
+//     it (or in any legacy fallback namespace) the function returns Unknown
+//     rather than Succeeded. The recorded namespace records the system's
+//     prior intent to create an external cleanup Job; a missing Job in that
+//     case is "evidence is gone", not "no cleanup needed".
+//   - When backup.Status.CleanupJobNamespace is empty the backup predates
+//     namespace persistence. The function falls back to scanning the Backup's
+//     own namespace plus the Deleter's d.DeleteJobNamespace default. If no
+//     Job is found there either, the legacy Succeeded semantic is preserved.
+func (d *Deleter) checkExistingCleanupJobsAfterRepoGone(backup *dpv1alpha1.Backup) (DeletionStatus, error) {
+	recorded := backup.Status.CleanupJobNamespace
+	namespaces := d.candidateCleanupNamespaces(backup, recorded)
+
+	deleteState, err := d.aggregateJobState(backup, namespaces, false /* isPreDelete */)
+	if err != nil {
+		return DeletionStatusUnknown, err
 	}
-	for _, jobKey := range jobKeys {
+	preDeleteState, err := d.aggregateJobState(backup, namespaces, true /* isPreDelete */)
+	if err != nil {
+		return DeletionStatusUnknown, err
+	}
+
+	// Failure on either Job blocks finalizer removal.
+	if deleteState.status == DeletionStatusFailed {
+		return DeletionStatusFailed, deleteState.err
+	}
+	if preDeleteState.status == DeletionStatusFailed {
+		return DeletionStatusFailed, preDeleteState.err
+	}
+
+	// Any unfinished Job means cleanup is still in progress.
+	if deleteState.status == DeletionStatusDeleting || preDeleteState.status == DeletionStatusDeleting {
+		return DeletionStatusDeleting, nil
+	}
+
+	// Only the delete-backup-files Job's completion implies the backup
+	// artifact has actually been removed; a preDelete completion alone is
+	// not sufficient.
+	if deleteState.completedJob != nil {
+		if isExternalDeleteJob(client.ObjectKeyFromObject(deleteState.completedJob), backup) {
+			if err := ctrlutil.BackgroundDeleteObject(d.Client, d.Ctx, deleteState.completedJob); err != nil {
+				return DeletionStatusUnknown, err
+			}
+		}
+		if preDeleteState.completedJob != nil &&
+			isExternalDeleteJob(client.ObjectKeyFromObject(preDeleteState.completedJob), backup) {
+			if err := ctrlutil.BackgroundDeleteObject(d.Client, d.Ctx, preDeleteState.completedJob); err != nil {
+				return DeletionStatusUnknown, err
+			}
+		}
+		return DeletionStatusSucceeded, nil
+	}
+
+	// No Job was found anywhere.
+	if recorded != "" {
+		// The system previously committed to an external cleanup Job in a
+		// known namespace. The Job is no longer observable, but we have no
+		// proof that the backup artifact was deleted. Refuse to release
+		// the finalizer.
+		return DeletionStatusUnknown,
+			fmt.Errorf("recorded cleanup job namespace %q has no cleanup job, "+
+				"cannot confirm backup artifact deletion; manual intervention may be required",
+				recorded)
+	}
+
+	// Only a preDelete Job completed, no delete Job exists anywhere, and we
+	// have no recorded namespace to fall back to: preDelete success alone
+	// must not be treated as artifact-cleanup success.
+	if preDeleteState.completedJob != nil {
+		return DeletionStatusUnknown,
+			fmt.Errorf("pre-delete job %q completed but no delete-backup-files job exists; "+
+				"cannot confirm backup artifact deletion",
+				preDeleteState.completedJob.Name)
+	}
+
+	// Legacy backup: no recorded namespace and no Job in any candidate
+	// namespace. Preserve the prior Succeeded semantic.
+	return DeletionStatusSucceeded, nil
+}
+
+// candidateCleanupNamespaces returns the ordered list of namespaces to scan
+// for an existing cleanup Job after BackupRepo is gone. The recorded
+// namespace, when non-empty, is the authoritative first lookup; the Backup's
+// own namespace and the Deleter's d.DeleteJobNamespace are added only as
+// best-effort legacy fallbacks. Duplicates are removed in-order to keep the
+// authoritative slot first.
+func (d *Deleter) candidateCleanupNamespaces(backup *dpv1alpha1.Backup, recorded string) []string {
+	candidates := make([]string, 0, 3)
+	seen := map[string]struct{}{}
+	add := func(ns string) {
+		if ns == "" {
+			return
+		}
+		if _, ok := seen[ns]; ok {
+			return
+		}
+		seen[ns] = struct{}{}
+		candidates = append(candidates, ns)
+	}
+	add(recorded)
+	add(backup.Namespace)
+	add(d.DeleteJobNamespace)
+	return candidates
+}
+
+// cleanupJobState summarizes a single Job-kind lookup across candidate
+// namespaces. Failed wins over Deleting wins over Completed wins over absent.
+type cleanupJobState struct {
+	status       DeletionStatus // Failed | Deleting | Succeeded (= completed) | "" (= absent)
+	err          error          // populated when status == Failed
+	completedJob *batchv1.Job   // populated when status == Succeeded
+}
+
+// aggregateJobState scans candidate namespaces for a cleanup Job of the
+// requested kind and folds the results: Failed if any failed, else Deleting
+// if any is running, else Succeeded if any completed, else absent.
+func (d *Deleter) aggregateJobState(
+	backup *dpv1alpha1.Backup,
+	namespaces []string,
+	isPreDelete bool,
+) (cleanupJobState, error) {
+	baseKey := BuildDeleteBackupFilesJobKey(backup, isPreDelete)
+	state := cleanupJobState{}
+	for _, ns := range namespaces {
+		key := baseKey
+		key.Namespace = ns
 		job := &batchv1.Job{}
-		exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
+		exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, key, job)
 		if err != nil {
-			return DeletionStatusUnknown, err
+			return cleanupJobState{}, err
 		}
 		if !exists {
 			continue
 		}
 		_, finishedType, msg := utils.IsJobFinished(job)
 		switch finishedType {
-		case batchv1.JobComplete:
-			if isExternalDeleteJob(client.ObjectKeyFromObject(job), backup) {
-				if err := ctrlutil.BackgroundDeleteObject(d.Client, d.Ctx, job); err != nil {
-					return DeletionStatusUnknown, err
-				}
-			}
-			return DeletionStatusSucceeded, nil
 		case batchv1.JobFailed:
-			return DeletionStatusFailed,
-				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
+			return cleanupJobState{
+				status: DeletionStatusFailed,
+				err: fmt.Errorf("deletion backup files job %q failed, you can delete it to re-delete the backup files, %s",
+					job.Name, msg),
+			}, nil
+		case batchv1.JobComplete:
+			if state.status != DeletionStatusDeleting && state.completedJob == nil {
+				state.status = DeletionStatusSucceeded
+				state.completedJob = job.DeepCopy()
+			}
 		default:
-			return DeletionStatusDeleting, nil
+			state.status = DeletionStatusDeleting
+			state.completedJob = nil
 		}
 	}
-	return DeletionStatusSucceeded, nil
+	return state, nil
+}
+
+// recordCleanupJobNamespace persists the namespace of an external cleanup Job
+// onto Backup status via the configured callback. It must be invoked before
+// creating the Job. When the recorded namespace already equals namespace the
+// callback is a no-op; when it is non-empty and differs the callback returns
+// an error and the caller must convert that to DeletionStatusUnknown.
+//
+// Returns nil if the cleanup Job will run in the Backup's own namespace
+// (legacy in-namespace path) — no external namespace to persist in that case.
+func (d *Deleter) recordCleanupJobNamespace(backup *dpv1alpha1.Backup, jobKey client.ObjectKey) error {
+	if !isExternalDeleteJob(jobKey, backup) {
+		return nil
+	}
+	if d.RecordCleanupJobNamespaceFunc == nil {
+		// Callers that create external cleanup jobs must wire the
+		// callback. Refuse rather than silently leaving the namespace
+		// unrecorded — silence here re-introduces the very orphan-Job
+		// risk this field was added to close.
+		return fmt.Errorf("cannot create external cleanup job in namespace %q: "+
+			"RecordCleanupJobNamespaceFunc is not set", jobKey.Namespace)
+	}
+	return d.RecordCleanupJobNamespaceFunc(backup, jobKey.Namespace)
 }
 
 func (d *Deleter) buildDeleteBackupFilesScript(backupPath string) string {
@@ -358,6 +537,15 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 		}
 		if d.PrepareDeleteJobBackupRepoFunc == nil {
 			return fmt.Errorf("backup file delete job in namespace %q requires BackupRepo preparation", jobKey.Namespace)
+		}
+		// Persist the cleanup-job namespace on Backup status BEFORE any
+		// side effects that create the Job. This closes the window where
+		// the Job exists but its namespace was never recorded; if the
+		// BackupRepo is later deleted we can still find the Job via the
+		// recorded namespace.
+		if err := d.recordCleanupJobNamespace(backup, jobKey); err != nil {
+			return fmt.Errorf("failed to record cleanup job namespace %q for backup %q: %w",
+				jobKey.Namespace, backup.Name, err)
 		}
 		if err := d.PrepareDeleteJobBackupRepoFunc(backupRepo, jobKey.Namespace); err != nil {
 			return fmt.Errorf("failed to prepare BackupRepo %q in namespace %q for backup file deletion: %w",

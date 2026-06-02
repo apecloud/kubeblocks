@@ -245,7 +245,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			backup.Status.Path = backupPath
 			deleter.WorkerServiceAccount = ""
 			deleter.DeleteJobNamespace = deleteJobNamespace
-			var workerNamespace, preparedNamespace string
+			var workerNamespace, preparedNamespace, recordedNamespace string
 			deleter.WorkerServiceAccountForNamespaceFunc = func(namespace string) (string, error) {
 				workerNamespace = namespace
 				return workerSAName, nil
@@ -254,11 +254,18 @@ var _ = Describe("Backup Deleter Test", func() {
 				preparedNamespace = namespace
 				return nil
 			}
+			deleter.RecordCleanupJobNamespaceFunc = func(b *dpv1alpha1.Backup, namespace string) error {
+				recordedNamespace = namespace
+				b.Status.CleanupJobNamespace = namespace
+				return nil
+			}
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusDeleting))
 			Expect(workerNamespace).Should(Equal(deleteJobNamespace))
 			Expect(preparedNamespace).Should(Equal(deleteJobNamespace))
+			Expect(recordedNamespace).Should(Equal(deleteJobNamespace))
+			Expect(backup.Status.CleanupJobNamespace).Should(Equal(deleteJobNamespace))
 
 			By("check external delete job contract")
 			key := BuildDeleteBackupFilesJobKey(backup, false)
@@ -331,6 +338,199 @@ var _ = Describe("Backup Deleter Test", func() {
 			status, err = deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusSucceeded))
+		})
+
+		Context("when BackupRepo is deleted before cleanup completes", func() {
+			const (
+				externalNS    = deleteJobNamespace
+				wrongDefault  = "wrong-default-ns"
+				missingRepo   = "missing-repo"
+				cleanupLabel  = DeleteBackupFilesJobLabelKey
+			)
+
+			ensureNS := func(ns string) {
+				Expect(client.IgnoreAlreadyExists(testCtx.CreateObj(testCtx.Ctx, &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: ns},
+				}))).Should(Succeed())
+			}
+
+			makeCleanupJob := func(key client.ObjectKey) {
+				Expect(testCtx.CreateObj(testCtx.Ctx, &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: key.Namespace,
+						Name:      key.Name,
+						Labels:    map[string]string{cleanupLabel: "true"},
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers:    []corev1.Container{{Name: deleteContainerName, Image: testdp.KBToolImage}},
+								RestartPolicy: corev1.RestartPolicyNever,
+							},
+						},
+					},
+				})).Should(Succeed())
+			}
+
+			BeforeEach(func() {
+				ensureNS(externalNS)
+				ensureNS(wrongDefault)
+				backup.Status.BackupRepoName = missingRepo
+				backup.Status.Path = backupPath
+				backup.Status.CleanupJobNamespace = externalNS
+			})
+
+			// Case 1: recorded namespace + delete Job Running → Deleting.
+			It("returns Deleting when recorded namespace holds a Running delete Job", func() {
+				key := BuildDeleteBackupFilesJobKey(backup, false)
+				key.Namespace = externalNS
+				makeCleanupJob(key)
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusDeleting))
+			})
+
+			// Case 2: recorded namespace + delete Job Failed → Failed. The
+			// finalizer-non-release contract is asserted at controller level;
+			// here we assert the returned status which the controller's
+			// switch maps onto a non-finalizer-removing branch.
+			It("returns Failed when recorded namespace holds a Failed delete Job", func() {
+				key := BuildDeleteBackupFilesJobKey(backup, false)
+				key.Namespace = externalNS
+				makeCleanupJob(key)
+				testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobFailed)
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).Should(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusFailed))
+			})
+
+			// Case 3: recorded namespace + delete Job Complete → Succeeded
+			// and the external Job is best-effort cleaned up.
+			It("returns Succeeded and cleans up when recorded namespace holds a Completed delete Job", func() {
+				key := BuildDeleteBackupFilesJobKey(backup, false)
+				key.Namespace = externalNS
+				makeCleanupJob(key)
+				testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobComplete)
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusSucceeded))
+				Eventually(testapps.CheckObjExists(&testCtx, key, &batchv1.Job{}, false)).Should(Succeed())
+			})
+
+			// Case 4: recorded namespace authoritative even when d.DeleteJobNamespace
+			// is set to a wrong default. The lookup must find the Job in the
+			// recorded namespace and must not fall back to the wrong default.
+			It("uses recorded namespace as authoritative and does not fall back to a wrong default", func() {
+				deleter.DeleteJobNamespace = wrongDefault
+				key := BuildDeleteBackupFilesJobKey(backup, false)
+				key.Namespace = externalNS
+				makeCleanupJob(key)
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusDeleting))
+			})
+
+			// Case 5: recorded namespace + preDelete Running, no delete Job →
+			// Deleting. The BackupRepo-NotFound early return must not skip the
+			// preDelete Job lookup.
+			It("returns Deleting when recorded namespace holds a Running preDelete Job", func() {
+				preKey := BuildDeleteBackupFilesJobKey(backup, true)
+				preKey.Namespace = externalNS
+				makeCleanupJob(preKey)
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusDeleting))
+			})
+
+			// Case 6: empty recorded namespace + BackupRepo NotFound +
+			// no Job in any candidate namespace → legacy Succeeded
+			// semantic is preserved.
+			It("preserves legacy Succeeded for backups without a recorded namespace", func() {
+				backup.Status.CleanupJobNamespace = ""
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusSucceeded))
+			})
+
+			// Case 7: recorded namespace + preDelete Complete + delete Job
+			// absent → Unknown. A successful preDelete alone is not enough
+			// to prove the backup artifact was deleted.
+			It("returns Unknown when only the preDelete Job is Complete and the delete Job is absent", func() {
+				preKey := BuildDeleteBackupFilesJobKey(backup, true)
+				preKey.Namespace = externalNS
+				makeCleanupJob(preKey)
+				testdp.ReplaceK8sJobStatus(&testCtx, preKey, batchv1.JobComplete)
+
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).Should(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusUnknown))
+			})
+
+			// Case 8: recorded namespace non-empty + no cleanup Job in any
+			// candidate namespace → Unknown rather than Succeeded.
+			It("returns Unknown when recorded namespace is set but no cleanup Job exists anywhere", func() {
+				status, err := deleter.DeleteBackupFiles(backup)
+				Expect(err).Should(HaveOccurred())
+				Expect(status).Should(Equal(DeletionStatusUnknown))
+			})
+		})
+
+		Context("RecordCleanupJobNamespaceFunc callback contract", func() {
+			It("is a no-op when invoked with the already-recorded namespace", func() {
+				called := 0
+				deleter.RecordCleanupJobNamespaceFunc = func(b *dpv1alpha1.Backup, ns string) error {
+					called++
+					if b.Status.CleanupJobNamespace == ns {
+						return nil
+					}
+					return errors.New("unexpected overwrite")
+				}
+				backup.Status.CleanupJobNamespace = deleteJobNamespace
+				Expect(deleter.recordCleanupJobNamespace(backup, client.ObjectKey{
+					Namespace: deleteJobNamespace, Name: "any-cleanup-job",
+				})).Should(Succeed())
+				Expect(called).Should(Equal(1))
+			})
+
+			It("propagates callback error when namespace already differs", func() {
+				deleter.RecordCleanupJobNamespaceFunc = func(b *dpv1alpha1.Backup, ns string) error {
+					if b.Status.CleanupJobNamespace == "" || b.Status.CleanupJobNamespace == ns {
+						return nil
+					}
+					return errors.New("namespace already recorded as " + b.Status.CleanupJobNamespace)
+				}
+				backup.Status.CleanupJobNamespace = "previously-recorded-ns"
+				err := deleter.recordCleanupJobNamespace(backup, client.ObjectKey{
+					Namespace: deleteJobNamespace, Name: "any-cleanup-job",
+				})
+				Expect(err).Should(MatchError(ContainSubstring("previously-recorded-ns")))
+			})
+
+			It("refuses to create an external cleanup Job when no callback is wired", func() {
+				deleter.RecordCleanupJobNamespaceFunc = nil
+				err := deleter.recordCleanupJobNamespace(backup, client.ObjectKey{
+					Namespace: deleteJobNamespace, Name: "any-cleanup-job",
+				})
+				Expect(err).Should(MatchError(ContainSubstring("RecordCleanupJobNamespaceFunc is not set")))
+			})
+
+			It("is a no-op for in-namespace cleanup Jobs", func() {
+				called := false
+				deleter.RecordCleanupJobNamespaceFunc = func(_ *dpv1alpha1.Backup, _ string) error {
+					called = true
+					return nil
+				}
+				Expect(deleter.recordCleanupJobNamespace(backup, client.ObjectKey{
+					Namespace: backup.Namespace, Name: "in-namespace-cleanup-job",
+				})).Should(Succeed())
+				Expect(called).Should(BeFalse())
+			})
 		})
 
 		It("should reject an external delete job for non-tool BackupRepo", func() {

@@ -210,6 +210,16 @@ type BackupStatus struct {
 	//
 	// +optional
 	Extras []map[string]string `json:"extras,omitempty"`
+
+	// Records the namespace where the artifact cleanup Job (DeleteBackupFiles
+	// or preDelete external job) was created. After the BackupRepo has been
+	// removed, this is used as the authoritative location to look up the
+	// cleanup Job and decide deletion outcome. An empty value only indicates
+	// a legacy backup created before this field existed; it does NOT mean
+	// "no cleanup is needed".
+	//
+	// +optional
+	CleanupJobNamespace string `json:"cleanupJobNamespace,omitempty"`
 }
 
 // BackupTimeRange records the time range of backed up data, for PITR, this is the

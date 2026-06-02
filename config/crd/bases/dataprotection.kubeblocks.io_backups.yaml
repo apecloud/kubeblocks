@@ -1032,6 +1032,15 @@ spec:
                   Records the base full backup name for incremental backup or differential backup.
                   When the base backup is deleted, the backup will also be deleted.
                 type: string
+              cleanupJobNamespace:
+                description: |-
+                  Records the namespace where the artifact cleanup Job (DeleteBackupFiles
+                  or preDelete external job) was created. After the BackupRepo has been
+                  removed, this is used as the authoritative location to look up the
+                  cleanup Job and decide deletion outcome. An empty value only indicates
+                  a legacy backup created before this field existed; it does NOT mean
+                  "no cleanup is needed".
+                type: string
               completionTimestamp:
                 description: |-
                   Records the time when the backup operation was completed.

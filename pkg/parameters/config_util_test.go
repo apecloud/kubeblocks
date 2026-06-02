@@ -762,9 +762,10 @@ func Test_filterImmutableParameters(t *testing.T) {
 		immutableParams []string
 	}
 	tests := []struct {
-		name string
-		args args
-		want map[string]any
+		name    string
+		args    args
+		want    map[string]any
+		wantErr bool
 	}{{
 		name: "test",
 		args: args{
@@ -786,9 +787,7 @@ func Test_filterImmutableParameters(t *testing.T) {
 			},
 			immutableParams: []string{"a", "d"},
 		},
-		want: map[string]any{
-			"c": "d",
-		},
+		wantErr: true,
 	}, {
 		name: "test",
 		args: args{
@@ -806,7 +805,15 @@ func Test_filterImmutableParameters(t *testing.T) {
 					ImmutableParameters: tt.args.immutableParams,
 				},
 			}}
-			if got := filterImmutableParameters(tt.args.parameters, "test", paramsDefs); !reflect.DeepEqual(got, tt.want) {
+			got, err := filterImmutableParameters(tt.args.parameters, "test", paramsDefs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("filterImmutableParameters() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterImmutableParameters() = %v, want %v", got, tt.want)
 			}
 		})

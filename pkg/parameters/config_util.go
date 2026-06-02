@@ -80,7 +80,10 @@ func MergeAndValidateConfigs(baseConfigs map[string]string,
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		validUpdatedParameters := filterImmutableParameters(params.UpdatedParams, params.Key, paramsDefs)
+		validUpdatedParameters, err := filterImmutableParameters(params.UpdatedParams, params.Key, paramsDefs)
+		if err != nil {
+			return nil, err
+		}
 		if len(validUpdatedParameters) == 0 {
 			continue
 		}
@@ -192,20 +195,98 @@ func resolveParametersDef(paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	return nil
 }
 
-func filterImmutableParameters(parameters map[string]any, fileName string, paramsDefs []*parametersv1alpha1.ParametersDefinition) map[string]any {
+func filterImmutableParameters(parameters map[string]any, fileName string, paramsDefs []*parametersv1alpha1.ParametersDefinition) (map[string]any, error) {
 	paramsDef := resolveParametersDef(paramsDefs, fileName)
 	if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
-		return parameters
+		return parameters, nil
 	}
 
 	immutableParams := paramsDef.Spec.ImmutableParameters
 	validParameters := make(map[string]any, len(parameters))
 	for key, val := range parameters {
-		if !slices.Contains(immutableParams, key) {
-			validParameters[key] = val
+		if slices.Contains(immutableParams, key) {
+			return nil, fmt.Errorf("immutable parameter %s cannot be modified", key)
+		}
+		validParameters[key] = val
+	}
+	return validParameters, nil
+}
+
+// validateImmutableContentChanges rejects raw-content updates that would
+// modify (add, remove, or change) any immutable parameter declared on the
+// file's ParametersDefinition.
+//
+// Scope: only files present in updatedFiles are inspected. Files outside that
+// set are untouched by this call.
+//
+// Skip rule: if a file has no ParametersDefinition match, or its
+// ParametersDefinition declares no immutable parameters, the file is skipped
+// entirely. This preserves backward-compatible behavior for content updates on
+// files that have no immutable-parameter contract.
+//
+// Diff is computed on parsed parameter maps via the file's FileFormatConfig,
+// not on raw text. Pure format changes (whitespace, comment order, blank
+// lines) therefore do not trip the check; only a semantic parameter delta
+// will.
+//
+// Fail-safe: when a file *does* have immutable-parameter candidates but the
+// parser cannot be applied -- missing FileFormatConfig in configDescs, or
+// parse error on base/merged content -- the operation is rejected rather
+// than silently allowed. Otherwise an unknown-format file would let
+// immutable parameter changes leak through this guard.
+func validateImmutableContentChanges(
+	base map[string]string,
+	merged map[string]string,
+	updatedFiles map[string]string,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription,
+) error {
+	for fileName := range updatedFiles {
+		paramsDef := resolveParametersDef(paramsDefs, fileName)
+		if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
+			continue
+		}
+		formatConfig := core.ResolveConfigFormat(configDescs, fileName)
+		if formatConfig == nil {
+			return fmt.Errorf("cannot validate immutable parameters for file %q: missing file format config", fileName)
+		}
+		baseParams, err := parseFileParameters(fileName, base[fileName], formatConfig)
+		if err != nil {
+			return fmt.Errorf("failed to parse base content of file %q for immutable validation: %w", fileName, err)
+		}
+		mergedParams, err := parseFileParameters(fileName, merged[fileName], formatConfig)
+		if err != nil {
+			return fmt.Errorf("failed to parse merged content of file %q for immutable validation: %w", fileName, err)
+		}
+		for _, immutableKey := range paramsDef.Spec.ImmutableParameters {
+			baseVal, baseOK := baseParams[immutableKey]
+			mergedVal, mergedOK := mergedParams[immutableKey]
+			if baseOK != mergedOK {
+				return fmt.Errorf("immutable parameter %s cannot be modified (file %q)", immutableKey, fileName)
+			}
+			if baseOK && !reflect.DeepEqual(baseVal, mergedVal) {
+				return fmt.Errorf("immutable parameter %s cannot be modified (file %q)", immutableKey, fileName)
+			}
 		}
 	}
-	return validParameters
+	return nil
+}
+
+func parseFileParameters(name, content string, formatConfig *parametersv1alpha1.FileFormatConfig) (map[string]interface{}, error) {
+	configObject, err := core.FromConfigObject(name, content, formatConfig)
+	if err != nil {
+		return nil, err
+	}
+	if configObject == nil {
+		// core.FromConfigObject returns nil when the requested sub-section is
+		// absent (e.g., the INI [section] header is missing or has been
+		// removed in the content payload). Treat as an empty parameter map
+		// so the caller's diff sees this as "all keys in that section
+		// removed" and rejects immutable removals, instead of nil-deref
+		// panicking on GetAllParameters below.
+		return map[string]interface{}{}, nil
+	}
+	return configObject.GetAllParameters(), nil
 }
 
 func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) ([]parametersv1alpha1.ComponentConfigDescription, []*parametersv1alpha1.ParametersDefinition, error) {

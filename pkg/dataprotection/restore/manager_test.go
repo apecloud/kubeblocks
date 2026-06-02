@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -205,6 +206,35 @@ var _ = Describe("RestoreManager Test", func() {
 			}
 		}
 
+		ensureNamespace := func(name string) {
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+			err := k8sClient.Create(ctx, ns)
+			if err != nil {
+				Expect(apierrors.IsAlreadyExists(err)).Should(BeTrue())
+			}
+		}
+
+		newRestoreJob := func(namespace, name string, labels map[string]string) *batchv1.Job {
+			return &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+					Labels:    labels,
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyNever,
+							Containers: []corev1.Container{{
+								Name:  Restore,
+								Image: "busybox",
+							}},
+						},
+					},
+				},
+			}
+		}
+
 		checkVolumes := func(job *batchv1.Job, volumeName string, exist bool) {
 			var volumeExist bool
 			for _, v := range job.Spec.Template.Spec.Volumes {
@@ -281,6 +311,73 @@ var _ = Describe("RestoreManager Test", func() {
 			}
 
 			checkPVC(startingIndex, false, constant.AppName)
+		})
+
+		It("should select the labeled controller-namespace action job instead of an unrelated same-name restore-namespace job", func() {
+			controllerNamespace := "kb-system-existing-action"
+			viper.Set(constant.CfgKeyCtrlrMgrNS, controllerNamespace)
+			DeferCleanup(func() {
+				viper.Set(constant.CfgKeyCtrlrMgrNS, "")
+			})
+			ensureNamespace(controllerNamespace)
+
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := "postready-0"
+			jobName := "restore-postready-existing"
+			restoreMGR.Restore.Status.Actions.PostReady = []dpv1alpha1.RestoreStatusAction{{
+				Name:       actionName,
+				ObjectKey:  BuildJobKeyForActionStatus(jobName),
+				BackupName: backupSet.Backup.Name,
+				Status:     dpv1alpha1.RestoreActionProcessing,
+			}}
+
+			By("create an unrelated same-name job in the Restore namespace")
+			Expect(k8sClient.Create(ctx, newRestoreJob(testCtx.DefaultNamespace, jobName, map[string]string{
+				DataProtectionRestoreLabelKey: "another-restore",
+			}))).Should(Succeed())
+
+			By("create the real recorded exec job in the controller namespace")
+			Expect(k8sClient.Create(ctx, newRestoreJob(controllerNamespace, jobName, map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}))).Should(Succeed())
+
+			jobs, err := restoreMGR.GetExistingActionJobs(reqCtx, k8sClient, dpv1alpha1.PostReady, backupSet.Backup.Name, actionName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(jobs).Should(HaveLen(1))
+			Expect(jobs[0].Namespace).Should(Equal(controllerNamespace))
+			Expect(jobs[0].Name).Should(Equal(jobName))
+		})
+
+		It("should not use a controller-namespace action job without the Restore namespace label", func() {
+			controllerNamespace := "kb-system-wrong-restore-ns"
+			viper.Set(constant.CfgKeyCtrlrMgrNS, controllerNamespace)
+			DeferCleanup(func() {
+				viper.Set(constant.CfgKeyCtrlrMgrNS, "")
+			})
+			ensureNamespace(controllerNamespace)
+
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := "postready-0"
+			jobName := "restore-postready-existing"
+			restoreMGR.Restore.Status.Actions.PostReady = []dpv1alpha1.RestoreStatusAction{{
+				Name:       actionName,
+				ObjectKey:  BuildJobKeyForActionStatus(jobName),
+				BackupName: backupSet.Backup.Name,
+				Status:     dpv1alpha1.RestoreActionProcessing,
+			}}
+
+			By("create a same-name controller-namespace job that belongs to a different Restore namespace")
+			Expect(k8sClient.Create(ctx, newRestoreJob(controllerNamespace, jobName, map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: "another-namespace",
+			}))).Should(Succeed())
+
+			jobs, err := restoreMGR.GetExistingActionJobs(reqCtx, k8sClient, dpv1alpha1.PostReady, backupSet.Backup.Name, actionName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(jobs).Should(BeNil())
 		})
 
 		It("test with BuildPrepareDataJobs function and Serial volumeRestorePolicy", func() {

@@ -648,6 +648,9 @@ func (r *RestoreManager) GetExistingActionJobs(
 			if err != nil {
 				return nil, err
 			}
+			if !r.isJobForRestoreAction(job) {
+				continue
+			}
 			jobs = append(jobs, job)
 			found = true
 			break
@@ -660,6 +663,17 @@ func (r *RestoreManager) GetExistingActionJobs(
 		return nil, nil
 	}
 	return jobs, nil
+}
+
+func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
+	if job.Labels[DataProtectionRestoreLabelKey] != r.Restore.Name {
+		return false
+	}
+	restoreNamespace := job.Labels[DataProtectionRestoreNamespaceLabelKey]
+	if job.Namespace != r.Restore.Namespace {
+		return restoreNamespace == r.Restore.Namespace
+	}
+	return restoreNamespace == "" || restoreNamespace == r.Restore.Namespace
 }
 
 // BuildPostReadyActionJobs builds the post ready jobs.

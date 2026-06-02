@@ -22,6 +22,7 @@ package component
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,6 +31,52 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+var _ = Describe("workload PVC templates", func() {
+	It("preserves PVC dataSourceRef and template annotations", func() {
+		apiGroup := "example.kubeblocks.io"
+		ref := &corev1.TypedObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     "ExampleSource",
+			Name:     "example-source",
+		}
+		templateAnnotationKey := "example.kubeblocks.io/template"
+		pvcs := toPersistentVolumeClaims(&SynthesizedComponent{
+			StaticAnnotations:  map[string]string{"static": "true"},
+			DynamicAnnotations: map[string]string{"dynamic": "true"},
+		}, []corev1.PersistentVolumeClaimTemplate{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+					Annotations: map[string]string{
+						templateAnnotationKey: "data",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					DataSourceRef: ref,
+				},
+			},
+		})
+
+		Expect(pvcs).Should(HaveLen(1))
+		Expect(pvcs[0].Spec.DataSourceRef).Should(Equal(ref))
+		Expect(pvcs[0].Annotations[templateAnnotationKey]).Should(Equal("data"))
+		Expect(pvcs[0].Annotations["static"]).Should(Equal("true"))
+		Expect(pvcs[0].Annotations["dynamic"]).Should(Equal("true"))
+	})
+
+	It("propagates dataSourceRef cleanup", func() {
+		pvcs := toPersistentVolumeClaims(&SynthesizedComponent{}, []corev1.PersistentVolumeClaimTemplate{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "data"},
+				Spec:       corev1.PersistentVolumeClaimSpec{},
+			},
+		})
+
+		Expect(pvcs).Should(HaveLen(1))
+		Expect(pvcs[0].Spec.DataSourceRef).Should(BeNil())
+	})
+})
 
 var _ = Describe("workload resource defaults", func() {
 	AfterEach(func() {

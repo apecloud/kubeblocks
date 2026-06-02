@@ -185,6 +185,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
+	if err = r.reconcileRestoreCondition(tree, its); err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
@@ -216,6 +220,125 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
+	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
+		return nil
+	}
+	condition, err := buildRestoreCondition(tree, its)
+	if err != nil {
+		return err
+	}
+	if condition == nil {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceRestore))
+		return nil
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *condition)
+	return nil
+}
+
+func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (*metav1.Condition, error) {
+	expectedPVCNames, err := expectedRestorePVCNames(tree, its)
+	if err != nil {
+		return nil, err
+	}
+	if expectedPVCNames.Len() == 0 {
+		return nil, nil
+	}
+
+	completedPVCNames := sets.New[string]()
+	missingPVCNames := expectedPVCNames.Clone()
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		if !expectedPVCNames.Has(pvc.Name) {
+			continue
+		}
+		missingPVCNames.Delete(pvc.Name)
+		cond := findPVCRestoreCondition(pvc)
+		if cond == nil {
+			continue
+		}
+		switch cond.Status {
+		case corev1.ConditionTrue:
+			completedPVCNames.Insert(pvc.Name)
+		case corev1.ConditionFalse:
+			return &metav1.Condition{
+				Type:               string(workloads.InstanceRestore),
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: its.Generation,
+				Reason:             workloads.ReasonRestoreFailed,
+				Message:            fmt.Sprintf("PVC %s restore failed: %s", pvc.Name, cond.Message),
+			}, nil
+		}
+	}
+	if missingPVCNames.Len() > 0 {
+		return &metav1.Condition{
+			Type:               string(workloads.InstanceRestore),
+			Status:             metav1.ConditionUnknown,
+			ObservedGeneration: its.Generation,
+			Reason:             workloads.ReasonRestoreRunning,
+			Message:            fmt.Sprintf("Waiting for restore PVCs to be created: %s", restoreConditionNamesMessage(missingPVCNames)),
+		}, nil
+	}
+	if completedPVCNames.Len() == expectedPVCNames.Len() {
+		return &metav1.Condition{
+			Type:               string(workloads.InstanceRestore),
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: its.Generation,
+			Reason:             workloads.ReasonRestoreCompleted,
+			Message:            "All initial restore PVCs have completed",
+		}, nil
+	}
+	return &metav1.Condition{
+		Type:               string(workloads.InstanceRestore),
+		Status:             metav1.ConditionUnknown,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonRestoreRunning,
+		Message:            "Waiting for initial restore PVCs to complete",
+	}, nil
+}
+
+func expectedRestorePVCNames(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (sets.Set[string], error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	pvcNames := sets.New[string]()
+	for instanceName, template := range nameToTemplateMap {
+		for i := range template.VolumeClaimTemplates {
+			vct := &template.VolumeClaimTemplates[i]
+			if vct.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+				continue
+			}
+			pvcNames.Insert(intctrlutil.ComposePVCName(*vct, its.Name, instanceName))
+		}
+	}
+	return pvcNames, nil
+}
+
+func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {
+	for i := range pvc.Status.Conditions {
+		if string(pvc.Status.Conditions[i].Type) == string(workloads.InstanceRestore) {
+			return &pvc.Status.Conditions[i]
+		}
+	}
+	return nil
+}
+
+func restoreConditionNamesMessage(names sets.Set[string]) string {
+	sortedNames := sets.List(names)
+	sort.Strings(sortedNames)
+	return strings.Join(sortedNames, ",")
 }
 
 func buildConditionMessageWithNames(podNames []string) ([]byte, error) {

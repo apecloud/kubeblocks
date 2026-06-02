@@ -893,10 +893,11 @@ type ClusterRestore struct {
 
 // ClusterRestoreSource describes the source object used by a Cluster restore.
 type ClusterRestoreSource struct {
-	// Specifies the API group of the restore source.
+	// Specifies the API group of the restore source. For example, use "dataprotection.kubeblocks.io" for KubeBlocks
+	// data protection Backup sources.
 	//
-	// +optional
-	APIGroup string `json:"apiGroup,omitempty"`
+	// +kubebuilder:validation:Required
+	APIGroup string `json:"apiGroup"`
 
 	// Specifies the kind of the restore source.
 	//

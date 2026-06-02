@@ -6352,7 +6352,9 @@ spec:
                     description: Specifies the restore source.
                     properties:
                       apiGroup:
-                        description: Specifies the API group of the restore source.
+                        description: |-
+                          Specifies the API group of the restore source. For example, use "dataprotection.kubeblocks.io" for KubeBlocks
+                          data protection Backup sources.
                         type: string
                       kind:
                         description: Specifies the kind of the restore source.
@@ -6365,6 +6367,7 @@ spec:
                           If empty, the Cluster namespace is used.
                         type: string
                     required:
+                    - apiGroup
                     - kind
                     - name
                     type: object

@@ -863,6 +863,19 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "source", namespace)
+
+	flatITS := its.DeepCopy()
+	flatITS.Spec.FlatInstanceOrdinal = true
+	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, flatITS).Build()
+
+	pvc.Name = "logs-cluster-mysql-1"
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-1"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = "special"
+	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.NoError(t, err)
+	require.Equal(t, "source", namespace)
 }
 
 func TestHandleSyncPVCErrorKeepsInternalRequeueWhenPVCIsPopulating(t *testing.T) {

@@ -49,6 +49,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -1918,63 +1919,26 @@ func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, it
 }
 
 func instanceSetPVCtemplateForPod(its *workloads.InstanceSet, podName, templateName, volumeName string) (corev1.PersistentVolumeClaim, error) {
-	var replicasInTemplates int32
-	for i := range its.Spec.Instances {
-		template := &its.Spec.Instances[i]
-		replicas := template.GetReplicas()
-		replicasInTemplates += replicas
-		if template.Name != templateName {
-			continue
-		}
-		ordinalList, err := instanceset.ConvertOrdinalsToSortedList(template.GetOrdinals())
-		if err != nil {
-			return corev1.PersistentVolumeClaim{}, err
-		}
-		names, err := instanceset.GenerateInstanceNamesFromTemplate(its.Name, template.Name, replicas, its.Spec.OfflineInstances, ordinalList)
-		if err != nil {
-			return corev1.PersistentVolumeClaim{}, err
-		}
-		if slices.Contains(names, podName) {
-			return pvcTemplateFromEffectiveTemplates(mergeInstanceSetPVCtemplates(its.Spec.VolumeClaimTemplates, template.VolumeClaimTemplates), volumeName)
-		}
-		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected member of InstanceSet template %q", podName, templateName)
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return corev1.PersistentVolumeClaim{}, err
 	}
-	if templateName == "" && replicasInTemplates < *its.Spec.Replicas {
-		ordinalList, err := instanceset.ConvertOrdinalsToSortedList(its.Spec.Ordinals)
-		if err != nil {
-			return corev1.PersistentVolumeClaim{}, err
-		}
-		names, err := instanceset.GenerateInstanceNamesFromTemplate(its.Name, "", *its.Spec.Replicas-replicasInTemplates, its.Spec.OfflineInstances, ordinalList)
-		if err != nil {
-			return corev1.PersistentVolumeClaim{}, err
-		}
-		if slices.Contains(names, podName) {
-			return pvcTemplateFromEffectiveTemplates(its.Spec.VolumeClaimTemplates, volumeName)
-		}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return corev1.PersistentVolumeClaim{}, err
 	}
-	if templateName == "" {
-		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected default InstanceSet member", podName)
+	nameTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return corev1.PersistentVolumeClaim{}, err
 	}
-	return corev1.PersistentVolumeClaim{}, fmt.Errorf("InstanceSet template %q is not defined", templateName)
-}
-
-func mergeInstanceSetPVCtemplates(base, overrides []corev1.PersistentVolumeClaim) []corev1.PersistentVolumeClaim {
-	templates := make([]corev1.PersistentVolumeClaim, len(base))
-	copy(templates, base)
-	for _, override := range overrides {
-		found := false
-		for i := range templates {
-			if templates[i].Name == override.Name {
-				templates[i] = override
-				found = true
-				break
-			}
-		}
-		if !found {
-			templates = append(templates, override)
-		}
+	template, ok := nameTemplateMap[podName]
+	if !ok {
+		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected InstanceSet member", podName)
 	}
-	return templates
+	if template.Name != templateName {
+		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q resolves to InstanceSet template %q, not %q", podName, template.Name, templateName)
+	}
+	return pvcTemplateFromEffectiveTemplates(template.VolumeClaimTemplates, volumeName)
 }
 
 func pvcTemplateFromEffectiveTemplates(templates []corev1.PersistentVolumeClaim, volumeName string) (corev1.PersistentVolumeClaim, error) {

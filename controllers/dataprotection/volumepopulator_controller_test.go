@@ -807,9 +807,16 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 			},
 		},
 		Spec: workloadsv1.InstanceSetSpec{
-			Replicas: ptr.To[int32](1),
+			Replicas: ptr.To[int32](2),
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
 				ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			}},
+			Instances: []workloadsv1.InstanceTemplate{{
+				Name:     "special",
+				Replicas: ptr.To[int32](1),
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+					ObjectMeta: metav1.ObjectMeta{Name: "logs"},
+				}},
 			}},
 		},
 	}
@@ -830,8 +837,28 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 	require.Error(t, err)
 	require.Empty(t, namespace)
 
+	pvc.Name = "logs-cluster-mysql-0"
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-0"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = "special"
+	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.Empty(t, namespace)
+
 	pvc.Name = "data-cluster-mysql-0"
 	pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-0"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "data"
+	delete(pvc.Labels, constant.KBAppInstanceTemplateLabelKey)
+	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.NoError(t, err)
+	require.Equal(t, "source", namespace)
+
+	pvc.Name = "logs-cluster-mysql-special-0"
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-special-0"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = "special"
 	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
 
 	require.NoError(t, err)

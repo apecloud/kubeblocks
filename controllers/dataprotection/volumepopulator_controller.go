@@ -1910,37 +1910,80 @@ func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, it
 		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup without pod identity",
 			pvc.Namespace, pvc.Name)
 	}
-	instanceNames, err := instanceset.GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instanceTemplatesForNameGeneration(its), its.Spec.OfflineInstances, its.Spec.Ordinals)
+	template, err := instanceSetPVCtemplateForPod(its, podName, pvc.Labels[constant.KBAppInstanceTemplateLabelKey], restoreVolumeTemplateName(pvc))
 	if err != nil {
 		return err
 	}
-	if !slices.Contains(instanceNames, podName) {
-		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup because pod %q is not an expected InstanceSet member",
-			pvc.Namespace, pvc.Name, podName)
-	}
-	volumeName := restoreVolumeTemplateName(pvc)
-	for _, template := range its.Spec.VolumeClaimTemplates {
-		if template.Name == volumeName {
-			return validatePVCNameForTemplate(pvc, template, its.Name, podName)
-		}
-	}
-	for _, instanceTemplate := range its.Spec.Instances {
-		for _, template := range instanceTemplate.VolumeClaimTemplates {
-			if template.Name == volumeName {
-				return validatePVCNameForTemplate(pvc, template, its.Name, podName)
-			}
-		}
-	}
-	return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unknown volume template %q",
-		pvc.Namespace, pvc.Name, volumeName)
+	return validatePVCNameForTemplate(pvc, template, its.Name, podName)
 }
 
-func instanceTemplatesForNameGeneration(its *workloads.InstanceSet) []instanceset.InstanceTemplate {
-	templates := make([]instanceset.InstanceTemplate, 0, len(its.Spec.Instances))
+func instanceSetPVCtemplateForPod(its *workloads.InstanceSet, podName, templateName, volumeName string) (corev1.PersistentVolumeClaim, error) {
+	var replicasInTemplates int32
 	for i := range its.Spec.Instances {
-		templates = append(templates, &its.Spec.Instances[i])
+		template := &its.Spec.Instances[i]
+		replicas := template.GetReplicas()
+		replicasInTemplates += replicas
+		if template.Name != templateName {
+			continue
+		}
+		ordinalList, err := instanceset.ConvertOrdinalsToSortedList(template.GetOrdinals())
+		if err != nil {
+			return corev1.PersistentVolumeClaim{}, err
+		}
+		names, err := instanceset.GenerateInstanceNamesFromTemplate(its.Name, template.Name, replicas, its.Spec.OfflineInstances, ordinalList)
+		if err != nil {
+			return corev1.PersistentVolumeClaim{}, err
+		}
+		if slices.Contains(names, podName) {
+			return pvcTemplateFromEffectiveTemplates(mergeInstanceSetPVCtemplates(its.Spec.VolumeClaimTemplates, template.VolumeClaimTemplates), volumeName)
+		}
+		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected member of InstanceSet template %q", podName, templateName)
+	}
+	if templateName == "" && replicasInTemplates < *its.Spec.Replicas {
+		ordinalList, err := instanceset.ConvertOrdinalsToSortedList(its.Spec.Ordinals)
+		if err != nil {
+			return corev1.PersistentVolumeClaim{}, err
+		}
+		names, err := instanceset.GenerateInstanceNamesFromTemplate(its.Name, "", *its.Spec.Replicas-replicasInTemplates, its.Spec.OfflineInstances, ordinalList)
+		if err != nil {
+			return corev1.PersistentVolumeClaim{}, err
+		}
+		if slices.Contains(names, podName) {
+			return pvcTemplateFromEffectiveTemplates(its.Spec.VolumeClaimTemplates, volumeName)
+		}
+	}
+	if templateName == "" {
+		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected default InstanceSet member", podName)
+	}
+	return corev1.PersistentVolumeClaim{}, fmt.Errorf("InstanceSet template %q is not defined", templateName)
+}
+
+func mergeInstanceSetPVCtemplates(base, overrides []corev1.PersistentVolumeClaim) []corev1.PersistentVolumeClaim {
+	templates := make([]corev1.PersistentVolumeClaim, len(base))
+	copy(templates, base)
+	for _, override := range overrides {
+		found := false
+		for i := range templates {
+			if templates[i].Name == override.Name {
+				templates[i] = override
+				found = true
+				break
+			}
+		}
+		if !found {
+			templates = append(templates, override)
+		}
 	}
 	return templates
+}
+
+func pvcTemplateFromEffectiveTemplates(templates []corev1.PersistentVolumeClaim, volumeName string) (corev1.PersistentVolumeClaim, error) {
+	for _, template := range templates {
+		if template.Name == volumeName {
+			return template, nil
+		}
+	}
+	return corev1.PersistentVolumeClaim{}, fmt.Errorf("volume template %q is not valid for resolved InstanceSet member", volumeName)
 }
 
 func validatePVCMatchesInstanceTemplate(pvc *corev1.PersistentVolumeClaim, inst *workloads.Instance) error {

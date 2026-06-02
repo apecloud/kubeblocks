@@ -43,6 +43,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -735,13 +736,17 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, workloadsv1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "target",
-			Name:      "data",
+			Name:      "data-cluster-mysql-0",
 			Labels: map[string]string{
-				constant.AppInstanceLabelKey: "cluster",
+				constant.AppInstanceLabelKey:             "cluster",
+				constant.KBAppComponentLabelKey:          "mysql",
+				constant.KBAppPodNameLabelKey:            "cluster-mysql-0",
+				constant.VolumeClaimTemplateNameLabelKey: "data",
 			},
 			Annotations: map[string]string{
 				constant.RestoreSourceNamespaceAnnotationKey: "source",
@@ -781,6 +786,41 @@ func TestAuthorizedBackupNamespaceFromPVC(t *testing.T) {
 		},
 	}
 	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+
+	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.Empty(t, namespace)
+
+	its := &workloadsv1.InstanceSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: workloadsv1.GroupVersion.String(),
+			Kind:       workloadsv1.InstanceSetKind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "cluster-mysql",
+			UID:       types.UID("its-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    "cluster",
+				constant.KBAppComponentLabelKey: "mysql",
+			},
+		},
+		Spec: workloadsv1.InstanceSetSpec{
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+				ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			}},
+		},
+	}
+	pvc.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion:         workloadsv1.GroupVersion.String(),
+		Kind:               workloadsv1.InstanceSetKind,
+		Name:               its.Name,
+		UID:                its.UID,
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
+	}}
+	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, its).Build()
 
 	namespace, err = reconciler.authorizedBackupNamespaceFromPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
 

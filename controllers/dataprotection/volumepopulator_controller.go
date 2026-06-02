@@ -46,6 +46,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -1825,6 +1826,120 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 		sourceNamespace != backupNamespace {
 		return fmt.Errorf("PVC %s/%s can not restore Backup %s/%s without matching cluster restore intent",
 			pvc.Namespace, pvc.Name, backupNamespace, pvc.Spec.DataSourceRef.Name)
+	}
+	if err := r.validateBackupRestorePVCWorkload(reqCtx, pvc, clusterName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *VolumePopulatorReconciler) validateBackupRestorePVCWorkload(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim, clusterName string) error {
+	ownerRef := metav1.GetControllerOf(pvc)
+	if ownerRef == nil {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup without controller workload owner",
+			pvc.Namespace, pvc.Name)
+	}
+	if ownerRef.APIVersion != workloads.GroupVersion.String() {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unsupported owner %s/%s",
+			pvc.Namespace, pvc.Name, ownerRef.APIVersion, ownerRef.Kind)
+	}
+	switch ownerRef.Kind {
+	case workloads.InstanceSetKind:
+		its := &workloads.InstanceSet{}
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: ownerRef.Name}, its); err != nil {
+			return err
+		}
+		if err := validatePVCControllerRef(pvc, ownerRef, its); err != nil {
+			return err
+		}
+		if err := validateRestorePVCWorkloadLabels(pvc, its, clusterName); err != nil {
+			return err
+		}
+		return validatePVCMatchesInstanceSetTemplate(pvc, its)
+	case "Instance":
+		inst := &workloads.Instance{}
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: ownerRef.Name}, inst); err != nil {
+			return err
+		}
+		if err := validatePVCControllerRef(pvc, ownerRef, inst); err != nil {
+			return err
+		}
+		if err := validateRestorePVCWorkloadLabels(pvc, inst, clusterName); err != nil {
+			return err
+		}
+		return validatePVCMatchesInstanceTemplate(pvc, inst)
+	default:
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unsupported owner kind %s",
+			pvc.Namespace, pvc.Name, ownerRef.Kind)
+	}
+}
+
+func validatePVCControllerRef(pvc *corev1.PersistentVolumeClaim, ownerRef *metav1.OwnerReference, owner client.Object) error {
+	if ownerRef.Name != owner.GetName() || ownerRef.UID != owner.GetUID() {
+		return fmt.Errorf("PVC %s/%s controller owner does not match workload %s/%s",
+			pvc.Namespace, pvc.Name, owner.GetNamespace(), owner.GetName())
+	}
+	return nil
+}
+
+func validateRestorePVCWorkloadLabels(pvc *corev1.PersistentVolumeClaim, workload client.Object, clusterName string) error {
+	if workload.GetLabels()[constant.AppInstanceLabelKey] != clusterName {
+		return fmt.Errorf("PVC %s/%s controller workload does not belong to Cluster %s",
+			pvc.Namespace, pvc.Name, clusterName)
+	}
+	componentName := restoreComponentName(pvc)
+	if componentName == "" {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup without component identity",
+			pvc.Namespace, pvc.Name)
+	}
+	if workload.GetLabels()[constant.KBAppComponentLabelKey] != componentName {
+		return fmt.Errorf("PVC %s/%s controller workload does not belong to component %s",
+			pvc.Namespace, pvc.Name, componentName)
+	}
+	return nil
+}
+
+func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, its *workloads.InstanceSet) error {
+	volumeName := restoreVolumeTemplateName(pvc)
+	for _, template := range its.Spec.VolumeClaimTemplates {
+		if template.Name == volumeName {
+			return validatePVCNameForTemplate(pvc, template, its.Name)
+		}
+	}
+	for _, instanceTemplate := range its.Spec.Instances {
+		for _, template := range instanceTemplate.VolumeClaimTemplates {
+			if template.Name == volumeName {
+				return validatePVCNameForTemplate(pvc, template, its.Name)
+			}
+		}
+	}
+	return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unknown volume template %q",
+		pvc.Namespace, pvc.Name, volumeName)
+}
+
+func validatePVCMatchesInstanceTemplate(pvc *corev1.PersistentVolumeClaim, inst *workloads.Instance) error {
+	volumeName := restoreVolumeTemplateName(pvc)
+	for _, template := range inst.Spec.VolumeClaimTemplates {
+		if template.Name != volumeName {
+			continue
+		}
+		return validatePVCNameForTemplate(pvc, corev1.PersistentVolumeClaim{ObjectMeta: template.ObjectMeta}, inst.Spec.InstanceSetName)
+	}
+	return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unknown volume template %q",
+		pvc.Namespace, pvc.Name, volumeName)
+}
+
+func validatePVCNameForTemplate(pvc *corev1.PersistentVolumeClaim, template corev1.PersistentVolumeClaim, instanceSetName string) error {
+	podName := pvc.Labels[constant.KBAppPodNameLabelKey]
+	if podName == "" {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup without pod identity",
+			pvc.Namespace, pvc.Name)
+	}
+	expectedName := intctrlutil.ComposePVCName(template, instanceSetName, podName)
+	if pvc.Name != expectedName {
+		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup because expected workload PVC name is %q",
+			pvc.Namespace, pvc.Name, expectedName)
 	}
 	return nil
 }

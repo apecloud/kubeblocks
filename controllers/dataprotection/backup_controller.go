@@ -698,22 +698,18 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if restoreInProgress, err = r.legacyRestoreAnnotationInProgress(reqCtx, backup); err != nil || restoreInProgress {
 		return restoreInProgress, err
 	}
-	clusters := &kbappsv1.ClusterList{}
-	if err := r.Client.List(reqCtx.Ctx, clusters); err != nil {
+	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
+	if !ok {
+		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
+		return false, nil
+	}
+	cluster := &kbappsv1.Cluster{}
+	clusterExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
+	if err != nil || !clusterExists {
 		return false, err
 	}
-	for i := range clusters.Items {
-		cluster := &clusters.Items[i]
-		if !clusterRestoreReferencesBackup(cluster, backup) {
-			continue
-		}
-		cond := meta.FindStatusCondition(cluster.Status.Conditions, kbappsv1.ConditionTypeRestore)
-		if cond != nil && (cond.Status == metav1.ConditionTrue || cond.Status == metav1.ConditionFalse) {
-			continue
-		}
-		return true, nil
-	}
-	return false, nil
+	return clusterRestoreInProgress(cluster), nil
 }
 
 func (r *BackupReconciler) legacyRestoreAnnotationInProgress(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
@@ -731,19 +727,12 @@ func (r *BackupReconciler) legacyRestoreAnnotationInProgress(reqCtx intctrlutil.
 	return cluster.Annotations[constant.RestoreFromBackupAnnotationKey] != "", nil
 }
 
-func clusterRestoreReferencesBackup(cluster *kbappsv1.Cluster, backup *dpv1alpha1.Backup) bool {
+func clusterRestoreInProgress(cluster *kbappsv1.Cluster) bool {
 	if cluster.Spec.Restore == nil {
 		return false
 	}
-	source := cluster.Spec.Restore.Source
-	if source.APIGroup != dptypes.DataprotectionAPIGroup || source.Kind != dptypes.BackupKind || source.Name != backup.Name {
-		return false
-	}
-	sourceNamespace := source.Namespace
-	if sourceNamespace == "" {
-		sourceNamespace = cluster.Namespace
-	}
-	return sourceNamespace == backup.Namespace
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, kbappsv1.ConditionTypeRestore)
+	return cond == nil || (cond.Status != metav1.ConditionTrue && cond.Status != metav1.ConditionFalse)
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

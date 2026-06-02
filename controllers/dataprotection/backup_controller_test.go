@@ -1119,27 +1119,19 @@ var _ = Describe("Backup Controller test", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
 		})
 
-		It("delays backup job when Cluster restore references the Backup before PVCs exist", func() {
-			By("creating a cluster restore intent that references the backup")
-			cluster := &kbappsv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      "restore-cluster",
-					Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
-				},
-				Spec: kbappsv1.ClusterSpec{
-					TerminationPolicy: kbappsv1.Delete,
-					Restore: &kbappsv1.ClusterRestore{
-						Source: kbappsv1.ClusterRestoreSource{
-							APIGroup:  dptypes.DataprotectionAPIGroup,
-							Kind:      dptypes.BackupKind,
-							Name:      testdp.BackupName,
-							Namespace: testCtx.DefaultNamespace,
-						},
+		It("delays backup job when target Cluster restore is in progress", func() {
+			By("patching the target cluster with a restore intent from another backup")
+			clusterKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: testdp.ClusterName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Spec.Restore = &kbappsv1.ClusterRestore{
+					Source: kbappsv1.ClusterRestoreSource{
+						APIGroup:  dptypes.DataprotectionAPIGroup,
+						Kind:      dptypes.BackupKind,
+						Name:      "source-backup",
+						Namespace: testCtx.DefaultNamespace,
 					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
+				}
+			})).Should(Succeed())
 
 			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 			backup := testdp.NewFakeBackup(&testCtx, nil)
@@ -1156,7 +1148,7 @@ var _ = Describe("Backup Controller test", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
 
 			By("mark cluster restore completed")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(cluster *kbappsv1.Cluster) {
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
 				cluster.Status.Conditions = []metav1.Condition{{
 					Type:               kbappsv1.ConditionTypeRestore,
 					Status:             metav1.ConditionTrue,

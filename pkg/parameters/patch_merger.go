@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"fmt"
+	"slices"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
@@ -82,11 +83,12 @@ func mergeUpdatedParams(base map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	return mergeUnmanagedUpdates(updatedConfig, unmanagedUpdatedByFiles, configDescs)
+	return mergeUnmanagedUpdates(updatedConfig, unmanagedUpdatedByFiles, paramsDefs, configDescs)
 }
 
 func mergeUnmanagedUpdates(base map[string]string,
 	unmanagedUpdatedByFiles map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	if len(unmanagedUpdatedByFiles) == 0 {
 		return base, nil
@@ -107,6 +109,9 @@ func mergeUnmanagedUpdates(base map[string]string,
 			if err != nil {
 				return nil, err
 			}
+			if err := rejectImmutableUnmanagedUpdates(file, sectionUpdate.Updates, paramsDefs); err != nil {
+				return nil, err
+			}
 			normalizedUpdates, err := normalizeUnmanagedParameterUpdates(sectionUpdate.Updates)
 			if err != nil {
 				return nil, err
@@ -118,7 +123,31 @@ func mergeUnmanagedUpdates(base map[string]string,
 		}
 		updatedConfig[file] = next
 	}
+	updatedFiles := make(map[string]string, len(unmanagedUpdatedByFiles))
+	for file := range unmanagedUpdatedByFiles {
+		updatedFiles[file] = updatedConfig[file]
+	}
+	if err := validateImmutableContentChanges(base, updatedConfig, updatedFiles, paramsDefs, configDescs); err != nil {
+		return nil, err
+	}
 	return updatedConfig, nil
+}
+
+func rejectImmutableUnmanagedUpdates(
+	fileName string,
+	updates []parametersv1alpha1.ParameterUpdate,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+) error {
+	paramsDef := resolveParametersDef(paramsDefs, fileName)
+	if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
+		return nil
+	}
+	for _, update := range updates {
+		if slices.Contains(paramsDef.Spec.ImmutableParameters, update.Key) {
+			return fmt.Errorf("immutable parameter %s cannot be modified (file %q)", update.Key, fileName)
+		}
+	}
+	return nil
 }
 
 func resolveUnmanagedFormatConfig(base *parametersv1alpha1.FileFormatConfig, section *string) (*parametersv1alpha1.FileFormatConfig, error) {

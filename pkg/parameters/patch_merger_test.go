@@ -56,7 +56,9 @@ func TestDoMergeAppliesUnmanagedUpdatesAfterContentAndParameters(t *testing.T) {
 		},
 	}}
 
-	got, err := DoMerge(base, patch, nil, configDescs)
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	got, err := DoMerge(base, patch, paramsDefs, configDescs)
 	if err != nil {
 		t.Fatalf("DoMerge() error = %v", err)
 	}
@@ -69,6 +71,58 @@ func TestDoMergeAppliesUnmanagedUpdatesAfterContentAndParameters(t *testing.T) {
 	}
 	if !strings.Contains(content, "gtid_mode=OFF") {
 		t.Fatalf("expected unrelated config to remain after merge, got %q", content)
+	}
+}
+
+func TestDoMergeRejectsUnmanagedUpdateSettingImmutableParameter(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterSectionUpdate{{
+				Section: strPtr("mysqld"),
+				Updates: []parametersv1alpha1.ParameterUpdate{
+					{Type: parametersv1alpha1.ParameterUpdateSet, Key: "gtid_mode", Value: strPtr("ON")},
+				},
+			}},
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter modification via unmanaged update to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
+	}
+}
+
+func TestDoMergeRejectsUnmanagedUpdateRemovingImmutableParameter(t *testing.T) {
+	base := map[string]string{
+		"my.cnf": "[mysqld]\ngtid_mode=OFF\nmax_connections=1000\n",
+	}
+	patch := map[string]parametersv1alpha1.ParametersInFile{
+		"my.cnf": {
+			UnmanagedUpdates: []parametersv1alpha1.UnmanagedParameterSectionUpdate{{
+				Section: strPtr("mysqld"),
+				Updates: []parametersv1alpha1.ParameterUpdate{
+					{Type: parametersv1alpha1.ParameterUpdateRemove, Key: "gtid_mode"},
+				},
+			}},
+		},
+	}
+	configDescs := iniConfigDescsForMyCnf()
+	paramsDefs := paramsDefsWithImmutable([]string{"gtid_mode"})
+
+	_, err := DoMerge(base, patch, paramsDefs, configDescs)
+	if err == nil {
+		t.Fatalf("expected immutable parameter removal via unmanaged update to be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "gtid_mode") {
+		t.Fatalf("expected error to mention immutable parameter gtid_mode, got %q", err.Error())
 	}
 }
 

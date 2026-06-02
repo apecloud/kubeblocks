@@ -78,17 +78,14 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildInstanceWithNoBackup(reqCtx in
 	cli client.Client,
 	opsRes *OpsResource,
 	progressDetail *opsv1alpha1.ProgressStatusDetail) (bool, error) {
-	// 1. restore the new pvs.
-	completed, err := inPlaceHelper.rebuildInstancePVByPod(reqCtx, cli, opsRes, progressDetail)
-	if err != nil || !completed {
-		return false, err
-	}
 	if progressDetail.Message != waitingForInstanceReadyMessage {
-		// 2. rebuild source pvcs and recreate the instance by deleting it.
-		return false, inPlaceHelper.rebuildSourcePVCsAndRecreateInstance(reqCtx, cli, opsRes.OpsRequest, progressDetail)
+		// no-backup rebuild has no data source to restore. Recreate the source
+		// PVC from the current workload template instead of building helper
+		// tmp PVCs/PVs that cannot carry backup data.
+		return false, inPlaceHelper.rebuildSourcePVCsByDynamicProvision(reqCtx, cli, opsRes.OpsRequest, progressDetail)
 	}
 
-	// 3. waiting for new instance is available.
+	// waiting for new instance is available.
 	return instanceIsAvailable(inPlaceHelper.synthesizedComp, inPlaceHelper.targetPod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 }
 
@@ -439,6 +436,35 @@ func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsAndRecreateInstance(
 	return nil
 }
 
+func (inPlaceHelper *inplaceRebuildHelper) rebuildSourcePVCsByDynamicProvision(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRequest *opsv1alpha1.OpsRequest,
+	progressDetail *opsv1alpha1.ProgressStatusDetail) error {
+	itsName := constant.GenerateWorkloadNamePattern(inPlaceHelper.synthesizedComp.ClusterName, inPlaceHelper.synthesizedComp.Name)
+	if err := inPlaceHelper.setInstanceNodeSelectorForRebuild(reqCtx, cli, itsName); err != nil {
+		return err
+	}
+	for sourcePVCName, sourcePVCTemplate := range inPlaceHelper.pvcMap {
+		sourcePVC, err := inPlaceHelper.getSourcePVC(reqCtx, cli, sourcePVCName, sourcePVCTemplate.Namespace)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if sourcePVC.DeletionTimestamp == nil {
+			if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, sourcePVC); err != nil {
+				return err
+			}
+		}
+	}
+	if err := inPlaceHelper.deleteTargetPodForRebuild(reqCtx, cli, opsRequest); err != nil {
+		return err
+	}
+	progressDetail.Message = waitingForInstanceReadyMessage
+	return nil
+}
+
 func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest) error {
@@ -699,7 +725,8 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 	synthesizedComp *component.SynthesizedComponent,
 	targetPod *corev1.Pod,
 	rebuildPrefix string,
-	index int) (map[string]*corev1.PersistentVolumeClaim, []corev1.Volume, []corev1.VolumeMount, error) {
+	index int,
+	noBackup bool) (map[string]*corev1.PersistentVolumeClaim, []corev1.Volume, []corev1.VolumeMount, error) {
 	var (
 		volumes      []corev1.Volume
 		volumeMounts []corev1.VolumeMount
@@ -726,6 +753,16 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 				ObjectMeta: vct.ObjectMeta,
 				Spec:       vct.Spec,
 			}, workloadName, targetPod.Name)
+		}
+		if noBackup {
+			pvcMap[sourcePVCName] = &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sourcePVCName,
+					Namespace: targetPod.Namespace,
+				},
+				Spec: vct.Spec,
+			}
+			continue
 		}
 		pvcLabels := getWellKnownLabels(synthesizedComp)
 		tmpPVC := &corev1.PersistentVolumeClaim{

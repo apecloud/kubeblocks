@@ -6,12 +6,101 @@ on:
 
 env:
   GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  GO_VERSION: "1.25"
 
 jobs:
-  cherry-pick:
+  trigger-mode:
     if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/cherry-pick')
     runs-on: ubuntu-latest
+    outputs:
+      trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ env.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Simulation Cherry Pick
+        uses: apecloud-inc/gha-cherry-pick@v2
+        env:
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
+
+      - name: Get trigger mode
+        id: get_trigger_mode
+        run: |
+          TARGET_BRANCH=$(jq -r ".comment.body" "$GITHUB_EVENT_PATH" | awk '{ print $2 }'  | tr -d '[:space:]')
+          echo "TARGET_BRANCH:$TARGET_BRANCH"
+          
+          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+              --branch-name "${TARGET_BRANCH}" \
+              --base-branch "origin/${TARGET_BRANCH}"`
+
+          echo "TRIGGER_MODE:$TRIGGER_MODE"
+          echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+
+  cherry-pick-pre-check:
+    needs: [ trigger-mode ]
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ (matrix.ops == 'lint' && 6) || (matrix.ops == 'manifests' && 5) || 2 }}
+    strategy:
+      fail-fast: true
+      matrix:
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint' ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ env.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Simulation Cherry Pick
+        uses: apecloud-inc/gha-cherry-pick@v2
+        env:
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
+
+      - name: install lib
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Install golangci-lint
+        if: matrix.ops == 'lint'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.8.0
+
+      - name: make ${{ matrix.ops }}
+        run: |
+          BEFORE_PICK=$(git rev-parse HEAD)
+          make ${{ matrix.ops }}
+          FILE_CHANGES=`git diff --name-only ${BEFORE_PICK}`
+          if [[ ("${{ matrix.ops }}" == 'generate' || "${{ matrix.ops }}" == 'manifests') && -n "$FILE_CHANGES" ]]; then
+              echo $FILE_CHANGES
+              echo "make "${{ matrix.ops }}" causes inconsistent files"
+              exit 1
+          fi
+
+  cherry-pick:
+    needs: [ trigger-mode, cherry-pick-pre-check ]
+    if: always() && github.event.issue.pull_request != '' 
+      && contains(github.event.comment.body, '/cherry-pick') 
+      && needs.trigger-mode.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: cherry-pick pre check
+        run: |
+          if [[ "${{ needs.cherry-pick-pre-check.result }}" == "failure" || "${{ needs.cherry-pick-pre-check.result }}" == "cancelled" ]]; then
+              echo "cherry pick pre check fail"
+              exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           token: ${{ env.GH_TOKEN }}

@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -694,6 +695,24 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if backup.Annotations[dptypes.SkipRestorationCheckAnnotationKey] == trueVal {
 		return false, nil
 	}
+	if restoreInProgress, err = r.legacyRestoreAnnotationInProgress(reqCtx, backup); err != nil || restoreInProgress {
+		return restoreInProgress, err
+	}
+	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
+	if !ok {
+		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
+		return false, nil
+	}
+	cluster := &kbappsv1.Cluster{}
+	clusterExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
+	if err != nil || !clusterExists {
+		return false, err
+	}
+	return clusterRestoreInProgress(cluster), nil
+}
+
+func (r *BackupReconciler) legacyRestoreAnnotationInProgress(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
 	clusterName, ok := backup.Labels[constant.AppInstanceLabelKey]
 	if !ok {
 		reqCtx.Log.V(2).Info("AppInstanceLabel not found")
@@ -705,11 +724,15 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 	if err != nil || !backupTargetExists {
 		return false, err
 	}
-	if cluster.Annotations == nil {
-		return false, nil
+	return cluster.Annotations[constant.RestoreFromBackupAnnotationKey] != "", nil
+}
+
+func clusterRestoreInProgress(cluster *kbappsv1.Cluster) bool {
+	if cluster.Spec.Restore == nil {
+		return false
 	}
-	_, ok = cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-	return ok, nil
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, kbappsv1.ConditionTypeRestore)
+	return cond == nil || (cond.Status != metav1.ConditionTrue && cond.Status != metav1.ConditionFalse)
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,

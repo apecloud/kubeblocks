@@ -686,15 +686,17 @@ func (r *VolumePopulatorReconciler) ensureInternalRestore(reqCtx intctrlutil.Req
 		}
 		return desired, nil
 	}
+	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("internal restore %s/%s spec does not match current PVC restore intent",
+			existing.Namespace, existing.Name))
+	}
 	original := existing.DeepCopy()
 	existing.Labels = desired.Labels
 	existing.Annotations = desired.Annotations
 	existing.OwnerReferences = desired.OwnerReferences
-	existing.Spec = desired.Spec
 	if !reflect.DeepEqual(original.Labels, existing.Labels) ||
 		!reflect.DeepEqual(original.Annotations, existing.Annotations) ||
-		!reflect.DeepEqual(original.OwnerReferences, existing.OwnerReferences) ||
-		!reflect.DeepEqual(original.Spec, existing.Spec) {
+		!reflect.DeepEqual(original.OwnerReferences, existing.OwnerReferences) {
 		if err := r.Client.Patch(reqCtx.Ctx, existing, client.MergeFrom(original)); err != nil {
 			return nil, err
 		}
@@ -1765,6 +1767,12 @@ func backupNamespaceFromPVC(pvc *corev1.PersistentVolumeClaim) (string, error) {
 	if refNamespace != "" && annotationNamespace != "" && refNamespace != annotationNamespace {
 		return "", fmt.Errorf("PVC %s/%s restore source namespace mismatch: dataSourceRef.namespace=%q, annotation=%q",
 			pvc.Namespace, pvc.Name, refNamespace, annotationNamespace)
+	}
+	if refNamespace != "" && refNamespace != pvc.Namespace {
+		return "", fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q", pvc.Namespace, pvc.Name, refNamespace)
+	}
+	if annotationNamespace != "" && annotationNamespace != pvc.Namespace {
+		return "", fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q", pvc.Namespace, pvc.Name, annotationNamespace)
 	}
 	if refNamespace != "" {
 		return refNamespace, nil

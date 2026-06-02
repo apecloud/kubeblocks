@@ -703,18 +703,23 @@ func TestBackupNamespaceFromPVC(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "target", namespace)
 
-	pvc.Annotations = map[string]string{constant.RestoreSourceNamespaceAnnotationKey: "annotated"}
+	pvc.Annotations = map[string]string{constant.RestoreSourceNamespaceAnnotationKey: "target"}
 	namespace, err = backupNamespaceFromPVC(pvc)
 	require.NoError(t, err)
-	require.Equal(t, "annotated", namespace)
+	require.Equal(t, "target", namespace)
 
-	pvc.Spec.DataSourceRef.Namespace = ptr.To("source")
-	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "source"
+	pvc.Spec.DataSourceRef.Namespace = ptr.To("target")
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "target"
 	namespace, err = backupNamespaceFromPVC(pvc)
 	require.NoError(t, err)
-	require.Equal(t, "source", namespace)
+	require.Equal(t, "target", namespace)
 
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "other"
+	_, err = backupNamespaceFromPVC(pvc)
+	require.Error(t, err)
+
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = "target"
+	pvc.Spec.DataSourceRef.Namespace = ptr.To("other")
 	_, err = backupNamespaceFromPVC(pvc)
 	require.Error(t, err)
 }
@@ -1135,6 +1140,41 @@ func TestRestoreParametersToPairsSortsKeys(t *testing.T) {
 		{Name: "dataprotection.kubeblocks.io/parallel", Value: "4"},
 		{Name: "mysql.kubeblocks.io/skip-binlog", Value: "true"},
 	}, pairs)
+}
+
+func TestEnsureInternalRestoreRejectsSpecMutation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "data-mysql-0",
+			UID:       "pvc-uid",
+		},
+	}
+	existing := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      getPopulatePVCName(pvc.UID),
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup:      dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+			RestoreTime: "2026-05-01T00:00:00Z",
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build(),
+		Scheme: scheme,
+	}
+	desired := existing.DeepCopy()
+	desired.Spec.RestoreTime = "2026-05-02T00:00:00Z"
+
+	restore, err := reconciler.ensureInternalRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, desired)
+
+	require.Error(t, err)
+	require.Nil(t, restore)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
 }
 
 func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {

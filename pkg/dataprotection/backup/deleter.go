@@ -144,7 +144,7 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		backupRepo = &dpv1alpha1.BackupRepo{}
 		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
 			if apierrors.IsNotFound(err) {
-				return DeletionStatusSucceeded, nil
+				return d.checkExistingDeleteBackupFilesJobs(backup, false)
 			}
 			return DeletionStatusUnknown, err
 		}
@@ -230,6 +230,41 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 	}
 	// do delete action
 	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+}
+
+func (d *Deleter) checkExistingDeleteBackupFilesJobs(backup *dpv1alpha1.Backup, isPreDelete bool) (DeletionStatus, error) {
+	jobKeys := []client.ObjectKey{BuildDeleteBackupFilesJobKey(backup, isPreDelete)}
+	if d.DeleteJobNamespace != "" && d.DeleteJobNamespace != backup.Namespace {
+		externalJobKey := jobKeys[0]
+		externalJobKey.Namespace = d.DeleteJobNamespace
+		jobKeys = append(jobKeys, externalJobKey)
+	}
+	for _, jobKey := range jobKeys {
+		job := &batchv1.Job{}
+		exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
+		if err != nil {
+			return DeletionStatusUnknown, err
+		}
+		if !exists {
+			continue
+		}
+		_, finishedType, msg := utils.IsJobFinished(job)
+		switch finishedType {
+		case batchv1.JobComplete:
+			if isExternalDeleteJob(client.ObjectKeyFromObject(job), backup) {
+				if err := ctrlutil.BackgroundDeleteObject(d.Client, d.Ctx, job); err != nil {
+					return DeletionStatusUnknown, err
+				}
+			}
+			return DeletionStatusSucceeded, nil
+		case batchv1.JobFailed:
+			return DeletionStatusFailed,
+				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
+		default:
+			return DeletionStatusDeleting, nil
+		}
+	}
+	return DeletionStatusSucceeded, nil
 }
 
 func (d *Deleter) buildDeleteBackupFilesScript(backupPath string) string {

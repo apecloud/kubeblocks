@@ -293,6 +293,46 @@ var _ = Describe("Backup Deleter Test", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, key, &batchv1.Job{}, false)).Should(Succeed())
 		})
 
+		It("should wait for existing external delete job when BackupRepo is missing", func() {
+			By("mock delete job namespace and existing external delete job")
+			Expect(client.IgnoreAlreadyExists(testCtx.CreateObj(testCtx.Ctx, &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: deleteJobNamespace},
+			}))).Should(Succeed())
+			backup.Status.BackupRepoName = "missing-repo"
+			backup.Status.Path = backupPath
+			deleter.DeleteJobNamespace = deleteJobNamespace
+			key := BuildDeleteBackupFilesJobKey(backup, false)
+			key.Namespace = deleteJobNamespace
+			Expect(testCtx.CreateObj(testCtx.Ctx, &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: key.Namespace,
+					Name:      key.Name,
+					Labels: map[string]string{
+						DeleteBackupFilesJobLabelKey: "true",
+					},
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers:    []corev1.Container{{Name: deleteContainerName, Image: testdp.KBToolImage}},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
+			})).Should(Succeed())
+
+			By("delete backup with external job still running")
+			status, err := deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusDeleting))
+
+			By("delete backup after external job succeeds")
+			testdp.ReplaceK8sJobStatus(&testCtx, key, batchv1.JobComplete)
+			status, err = deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusSucceeded))
+		})
+
 		It("should reject an external delete job for non-tool BackupRepo", func() {
 			mountRepo := &dpv1alpha1.BackupRepo{
 				ObjectMeta: metav1.ObjectMeta{Name: "mount-repo"},

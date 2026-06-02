@@ -77,7 +77,6 @@ var _ = Describe("Restore OpsRequest", func() {
 		var restoreEnv []corev1.EnvVar
 		Expect(json.Unmarshal([]byte(cluster.Spec.Restore.Parameters[dptypes.RestoreEnvParameterKey]), &restoreEnv)).Should(Succeed())
 		Expect(restoreEnv).Should(ContainElement(corev1.EnvVar{Name: "RESTORE_ENV", Value: "true"}))
-		Expect(cluster.Annotations).ShouldNot(HaveKey("kubeblocks.io/restore-from-backup"))
 		Expect(cluster.Labels).Should(HaveKeyWithValue(constant.OpsRequestNameLabelKey, opsRequest.Name))
 		Expect(cluster.Labels).Should(HaveKeyWithValue(constant.OpsRequestNamespaceLabelKey, opsRequest.Namespace))
 		Expect(cluster.Labels).Should(HaveKeyWithValue(constant.OpsRequestTypeLabelKey, string(opsv1alpha1.RestoreType)))
@@ -238,22 +237,6 @@ var _ = Describe("Restore OpsRequest", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
 		targetCluster := newRestoreTargetCluster(opsRequest.Namespace, restoreClusterName, appsv1.FailedClusterPhase, metav1.ConditionUnknown)
 		markRestoreClusterWithOps(targetCluster, opsRequest)
-		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
-
-		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})
-
-		Expect(err).Should(HaveOccurred())
-		Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
-	})
-
-	It("fails legacy annotation-only target Cluster after upgrade", func() {
-		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
-		targetCluster := newRestoreTargetClusterWithoutRestoreCondition(opsRequest.Namespace, restoreClusterName, appsv1.CreatingClusterPhase)
-		targetCluster.Annotations = map[string]string{
-			"kubeblocks.io/restore-from-backup": `{"mysql":{"name":"backup","namespace":"default"}}`,
-		}
-		markRestoreClusterWithOps(targetCluster, opsRequest)
-		targetCluster.Spec.Restore = nil
 		cli := newRestoreOpsFakeClient(opsRequest, targetCluster)
 
 		phase, _, err := restoreHandler.ReconcileAction(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})

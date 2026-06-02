@@ -299,6 +299,26 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
 		})
 
+		It("caps recoverable failure requeue by ops timeout", func() {
+			timeoutSeconds := int32(60)
+			opsRes := &OpsResource{
+				OpsRequest: &opsv1alpha1.OpsRequest{
+					Spec: opsv1alpha1.OpsRequestSpec{
+						TimeoutSeconds: &timeoutSeconds,
+					},
+					Status: opsv1alpha1.OpsRequestStatus{
+						StartTimestamp: metav1.NewTime(time.Now().Add(-30 * time.Second)),
+					},
+				},
+			}
+
+			requeueAfter, err := GetOpsManager().checkAndHandleOpsTimeout(intctrlutil.RequestCtx{Ctx: ctx},
+				k8sClient, opsRes, restartRecoverableFailureObservationWindow)
+			Expect(err).Should(BeNil())
+			Expect(requeueAfter).Should(BeNumerically(">", 0))
+			Expect(requeueAfter).Should(BeNumerically("<", time.Minute))
+		})
+
 		It("Test opsRequest with disable ha", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)

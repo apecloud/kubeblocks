@@ -1123,6 +1123,20 @@ func TestEnsurePostReadyRestoreCompletedRejectsMismatchedExistingRestore(t *test
 	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
 }
 
+func TestRestoreParametersToPairsSortsKeys(t *testing.T) {
+	pairs := restoreParametersToPairs(map[string]string{
+		"mysql.kubeblocks.io/skip-binlog":       "true",
+		"dataprotection.kubeblocks.io/parallel": "4",
+		"apps.kubeblocks.io/foo":                "bar",
+	})
+
+	require.Equal(t, []dpv1alpha1.ParameterPair{
+		{Name: "apps.kubeblocks.io/foo", Value: "bar"},
+		{Name: "dataprotection.kubeblocks.io/parallel", Value: "4"},
+		{Name: "mysql.kubeblocks.io/skip-binlog", Value: "true"},
+	}, pairs)
+}
+
 func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

@@ -719,8 +719,13 @@ func restoreParametersToPairs(parameters map[string]string) []dpv1alpha1.Paramet
 		return nil
 	}
 	result := make([]dpv1alpha1.ParameterPair, 0, len(parameters))
-	for k, v := range parameters {
-		result = append(result, dpv1alpha1.ParameterPair{Name: k, Value: v})
+	keys := make([]string, 0, len(parameters))
+	for k := range parameters {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		result = append(result, dpv1alpha1.ParameterPair{Name: k, Value: parameters[k]})
 	}
 	return result
 }
@@ -1458,6 +1463,7 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 }
 
 func postReadyRestoreName(componentUID types.UID) string {
+	// Backup dataSource restore is an initial, single-attempt restore for a Component UID.
 	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
 }
 

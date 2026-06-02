@@ -13,15 +13,27 @@ spec:
       kind: Backup
       name: pg-cluster-pg-basebackup
       namespace: demo
+    parameters:
+      dataprotection.kubeblocks.io/volume-restore-policy: Parallel
   componentSpecs:
     - name: postgresql
       serviceVersion: "14.7.2"
+      disableExporter: true
       labels:
+        # NOTE: update the label accordingly
         apps.kubeblocks.postgres.patroni/scope: pg-restore-postgresql
       replicas: 2
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
       volumeClaimTemplates:
         - name: data
           spec:
+            storageClassName: ""
             accessModes:
               - ReadWriteOnce
             resources:

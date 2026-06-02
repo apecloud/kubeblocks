@@ -108,10 +108,14 @@ func markRestoreClusterWithOps(cluster *appsv1.Cluster, opsRequest *opsv1alpha1.
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
 	}
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
 	cluster.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	cluster.Labels[constant.OpsRequestNameLabelKey] = opsRequest.Name
 	cluster.Labels[constant.OpsRequestNamespaceLabelKey] = opsRequest.Namespace
 	cluster.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
+	cluster.Annotations[constant.OpsRequestUIDAnnotationKey] = string(opsRequest.UID)
 }
 
 func validateRestoreClusterForOps(existing, desired *appsv1.Cluster, opsRequest *opsv1alpha1.OpsRequest) error {
@@ -122,6 +126,13 @@ func validateRestoreClusterForOps(existing, desired *appsv1.Cluster, opsRequest 
 	}
 	if !reflect.DeepEqual(existing.Spec.Restore, desired.Spec.Restore) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("target cluster %s/%s restore intent does not match OpsRequest %s/%s", existing.Namespace, existing.Name, opsRequest.Namespace, opsRequest.Name))
+	}
+	return validateRestoreClusterOpsUID(existing, opsRequest)
+}
+
+func validateRestoreClusterOpsUID(cluster *appsv1.Cluster, opsRequest *opsv1alpha1.OpsRequest) error {
+	if cluster.Annotations[constant.OpsRequestUIDAnnotationKey] != string(opsRequest.UID) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("target cluster %s/%s is not created by current OpsRequest %s/%s", cluster.Namespace, cluster.Name, opsRequest.Namespace, opsRequest.Name))
 	}
 	return nil
 }
@@ -143,6 +154,12 @@ func (r RestoreOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	opsRes.Cluster = cluster
 
+	if err := validateRestoreClusterOpsUID(cluster, opsRequest); err != nil {
+		return opsv1alpha1.OpsFailedPhase, 0, err
+	}
+	if cluster.Spec.Restore == nil {
+		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed: target cluster %s/%s has no restore intent", cluster.Namespace, cluster.Name)
+	}
 	if cluster.Status.Phase == appsv1.FailedClusterPhase || cluster.IsDeleting() {
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("restore failed")
 	}

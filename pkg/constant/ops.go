@@ -24,6 +24,7 @@ const (
 	OpsRequestTypeLabelKey      = "operations.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey      = "operations.kubeblocks.io/ops-name"
 	OpsRequestNamespaceLabelKey = "operations.kubeblocks.io/ops-namespace"
+	OpsRequestUIDAnnotationKey  = "operations.kubeblocks.io/ops-uid"
 )
 
 // annotations

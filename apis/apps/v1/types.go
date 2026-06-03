@@ -530,12 +530,12 @@ type ClusterComponentConfig struct {
 	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
 
-	// ExternalManaged specifies whether the configuration management is delegated to an external system
-	// or manual user control.
+	// ExternalManaged specifies whether the configuration management is delegated to an external system.
 	//
-	// When set to true, the controller will exclusively utilize the user-provided configuration source
-	// and the 'reconfigure' action defined in this config, bypassing the default templates and
-	// update behaviors specified in the ComponentDefinition.
+	// When set to true, the apps controller does not render or manage the configuration from the
+	// default templates and update behaviors specified in the ComponentDefinition. A ConfigMap source
+	// for an external-managed configuration is accepted only when the referenced ConfigMap carries
+	// the common KubeBlocks component labels.
 	//
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`

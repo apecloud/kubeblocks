@@ -2867,11 +2867,11 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>ExternalManaged specifies whether the configuration management is delegated to an external system
-or manual user control.</p>
-<p>When set to true, the controller will exclusively utilize the user-provided configuration source
-and the &lsquo;reconfigure&rsquo; action defined in this config, bypassing the default templates and
-update behaviors specified in the ComponentDefinition.</p>
+<p>ExternalManaged specifies whether the configuration management is delegated to an external system.</p>
+<p>When set to true, the apps controller does not render or manage the configuration from the
+default templates and update behaviors specified in the ComponentDefinition. A ConfigMap source
+for an external-managed configuration is accepted only when the referenced ConfigMap carries
+the common KubeBlocks component labels.</p>
 </td>
 </tr>
 <tr>
@@ -6134,8 +6134,10 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>ExternalManaged specifies whether the file management is delegated to an external system or manual user control.</p>
-<p>When set to true, the controller will ignore the management of this file.</p>
+<p>ExternalManaged specifies whether the file management is delegated to an external system.</p>
+<p>When set to true, the apps controller will ignore the rendering and lifecycle management of
+this file. A ConfigMap source for this template is accepted only when the referenced ConfigMap
+carries the common KubeBlocks component labels.</p>
 </td>
 </tr>
 <tr>

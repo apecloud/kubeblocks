@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -40,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
@@ -99,7 +101,11 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if backupObj.Status.BackupMethod == nil {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed, `status.backupMethod of backup "%s" can not be empty`, backupObj.Name)
 	}
-	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
+	prepareDataBackupObj, err := r.resolvePrepareDataBackup(backupObj)
+	if err != nil {
+		return err
+	}
+	if err = r.DoPrepareData(comp, compObj, prepareDataBackupObj); err != nil {
 		return err
 	}
 	if compObj.Status.Phase != appsv1.RunningComponentPhase {
@@ -122,6 +128,44 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	}
 	// do clean up
 	return r.cleanupRestoreAnnotations(comp.Name)
+}
+
+func (r *RestoreManager) resolvePrepareDataBackup(backupObj *dpv1alpha1.Backup) (*dpv1alpha1.Backup, error) {
+	if backupObj.Status.BackupMethod.TargetVolumes != nil {
+		return backupObj, nil
+	}
+	restore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.Cluster.Name + "-annotation-restore-preview",
+			Namespace: r.Cluster.Namespace,
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{
+				Name:      backupObj.Name,
+				Namespace: r.namespace,
+			},
+			RestoreTime: r.RestoreTime,
+		},
+	}
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      r.Ctx,
+		Recorder: record.NewFakeRecorder(16),
+	}
+	restoreMGR := dprestore.NewRestoreManager(restore, reqCtx.Recorder, r.Scheme, r.Client)
+	backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, r.Client, backupObj.Name, r.namespace)
+	if err != nil {
+		return nil, err
+	}
+	if backupSet.ActionSet == nil || backupSet.ActionSet.Spec.BackupType != dpv1alpha1.BackupTypeContinuous {
+		return backupObj, nil
+	}
+	if err := restoreMGR.BuildContinuousRestoreManager(reqCtx, r.Client, *backupSet); err != nil {
+		return nil, err
+	}
+	if len(restoreMGR.PrepareDataBackupSets) == 0 {
+		return backupObj, nil
+	}
+	return restoreMGR.PrepareDataBackupSets[0].Backup, nil
 }
 
 func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,

@@ -115,7 +115,6 @@ type progressResource struct {
 	// workload/component reaches a terminal failure state.
 	deferInstanceFailureToWorkloadPhase bool
 	componentPhase                      appsv1.ComponentPhase
-	requeueAfter                        time.Duration
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views

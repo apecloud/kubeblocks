@@ -244,7 +244,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		completedProgressCount int32
 		err                    error
 		clusterDef             *appsv1.ClusterDefinition
-		requeueAfter           time.Duration
 	)
 	if opsRes.Cluster.Spec.ClusterDef != "" {
 		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDef); err != nil {
@@ -277,9 +276,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}
-		if pgResource.requeueAfter > 0 && (requeueAfter == 0 || pgResource.requeueAfter < requeueAfter) {
-			requeueAfter = pgResource.requeueAfter
-		}
 		componentFailureCount := componentStatusFailureCount(opsCompStatus)
 		componentHasFailure := componentFailureCount > 0
 		if componentHasFailure {
@@ -309,7 +305,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 	}
 	if !opsIsCompleted {
-		return opsRequestPhase, requeueAfter, nil
+		return opsRequestPhase, 0, nil
 	}
 	if existFailure {
 		return opsv1alpha1.OpsFailedPhase, 0, nil

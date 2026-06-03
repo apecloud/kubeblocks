@@ -75,8 +75,8 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ComponentConditionProvisioningStarted,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  getConditionReasonWithError(reasonPreCheckFailed, err),
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(reasonPreCheckFailed, err)),
 	}
 }
 

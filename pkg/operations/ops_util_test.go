@@ -173,7 +173,7 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes *OpsResource,
 				pgRes *progressResource,
 				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-				pgRes.recoverableFailureGracePeriod = restartRecoverableFailureObservationWindow
+				pgRes.deferInstanceFailureToWorkloadPhase = true
 				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
 					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
 						creationTimestamp := instance.GetCreationTimestamp()
@@ -197,7 +197,7 @@ var _ = Describe("OpsUtil functions", func() {
 				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
-			Expect(requeueAfter).Should(BeNumerically(">", 0))
+			Expect(requeueAfter).Should(BeZero())
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/3"))
 			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
 				getProgressObjectKey(constant.PodKind, pods[2].Name))
@@ -234,7 +234,7 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
 		})
 
-		It("fails restart ops after a recoverable failure observation window expires", func() {
+		It("fails restart ops when component reaches terminal failed phase", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
@@ -256,7 +256,7 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes *OpsResource,
 				pgRes *progressResource,
 				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-				pgRes.recoverableFailureGracePeriod = restartRecoverableFailureObservationWindow
+				pgRes.deferInstanceFailureToWorkloadPhase = true
 				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
 					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
 						creationTimestamp := instance.GetCreationTimestamp()
@@ -280,12 +280,12 @@ var _ = Describe("OpsUtil functions", func() {
 				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
-			Expect(requeueAfter).Should(BeNumerically(">", 0))
+			Expect(requeueAfter).Should(BeZero())
 
-			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
-				getProgressObjectKey(constant.PodKind, pods[2].Name))
-			Expect(progressDetail).ShouldNot(BeNil())
-			progressDetail.StartTime = metav1.NewTime(time.Now().Add(-restartRecoverableFailureObservationWindow - time.Second))
+			By("mock component reaches terminal Failed phase")
+			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
+			clusterComp.Phase = appsv1.FailedComponentPhase
+			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			opsPhase, requeueAfter, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
 				"test", handleRestartProgress)
@@ -293,30 +293,10 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(requeueAfter).Should(BeZero())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
-			progressDetail = findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
+			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
 				getProgressObjectKey(constant.PodKind, pods[2].Name))
 			Expect(progressDetail).ShouldNot(BeNil())
 			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
-		})
-
-		It("caps recoverable failure requeue by ops timeout", func() {
-			timeoutSeconds := int32(60)
-			opsRes := &OpsResource{
-				OpsRequest: &opsv1alpha1.OpsRequest{
-					Spec: opsv1alpha1.OpsRequestSpec{
-						TimeoutSeconds: &timeoutSeconds,
-					},
-					Status: opsv1alpha1.OpsRequestStatus{
-						StartTimestamp: metav1.NewTime(time.Now().Add(-30 * time.Second)),
-					},
-				},
-			}
-
-			requeueAfter, err := GetOpsManager().checkAndHandleOpsTimeout(intctrlutil.RequestCtx{Ctx: ctx},
-				k8sClient, opsRes, restartRecoverableFailureObservationWindow)
-			Expect(err).Should(BeNil())
-			Expect(requeueAfter).Should(BeNumerically(">", 0))
-			Expect(requeueAfter).Should(BeNumerically("<", time.Minute))
 		})
 
 		It("Test opsRequest with disable ha", func() {

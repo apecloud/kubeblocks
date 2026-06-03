@@ -265,6 +265,13 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	existFailure := false
 	for i := range progressResources {
 		pgResource := progressResources[i]
+		var componentPhase appsv1.ComponentPhase
+		if pgResource.shards == nil {
+			componentPhase = opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
+		} else {
+			componentPhase = opsRes.Cluster.Status.Shardings[pgResource.compOps.GetComponentName()].Phase
+		}
+		pgResource.componentPhase = componentPhase
 		opsCompStatus := opsRequest.Status.Components[pgResource.compOps.GetComponentName()]
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, &pgResource, &opsCompStatus)
 		if err != nil {
@@ -272,12 +279,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 		if pgResource.requeueAfter > 0 && (requeueAfter == 0 || pgResource.requeueAfter < requeueAfter) {
 			requeueAfter = pgResource.requeueAfter
-		}
-		var componentPhase appsv1.ComponentPhase
-		if pgResource.shards == nil {
-			componentPhase = opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
-		} else {
-			componentPhase = opsRes.Cluster.Status.Shardings[pgResource.compOps.GetComponentName()].Phase
 		}
 		componentFailureCount := componentStatusFailureCount(opsCompStatus)
 		componentHasFailure := componentFailureCount > 0

@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -255,6 +256,97 @@ var _ = Describe("Restore", func() {
 			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
+			})).Should(Succeed())
+		})
+
+		It("creates prepareData from the base backup when annotation restore references a continuous backup", func() {
+			continuousActionSetName := "continuous-actionset-" + randomStr
+			continuousActionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.WithName(continuousActionSetName), func(actionSet *dpv1alpha1.ActionSet) {
+					actionSet.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
+				})
+			Expect(continuousActionSet.Name).Should(Equal(continuousActionSetName))
+
+			baseStatus := backup.Status
+			baseStatus.BackupMethod.ActionSetName = fullBackupActionSetName
+			baseStatus.TimeRange = &dpv1alpha1.BackupTimeRange{
+				Start: baseStatus.StartTimestamp,
+				End:   baseStatus.CompletionTimestamp,
+			}
+			patchBackupStatus(baseStatus, client.ObjectKeyFromObject(backup))
+			Expect(testapps.ChangeObj(&testCtx, backup, func(baseBackup *dpv1alpha1.Backup) {
+				baseBackup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeFull)
+				baseBackup.Labels[dptypes.BackupPolicyLabelKey] = testdp.BackupPolicyName
+			})).Should(Succeed())
+
+			restoreTime := now.Add(time.Minute * 30)
+			continuousBackupName := "continuous-backup-" + randomStr
+			continuousBackup := testdp.NewBackupFactory(testCtx.DefaultNamespace, continuousBackupName).
+				SetLabels(map[string]string{
+					constant.AppInstanceLabelKey:    sourceCluster,
+					constant.KBAppComponentLabelKey: defaultCompName,
+					dptypes.BackupTypeLabelKey:      string(dpv1alpha1.BackupTypeContinuous),
+					dptypes.BackupPolicyLabelKey:    testdp.BackupPolicyName,
+				}).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.ContinuousMethodName).
+				Create(&testCtx).GetObject()
+			continuousStart := &metav1.Time{Time: now.Time}
+			continuousStop := &metav1.Time{Time: now.Add(time.Hour)}
+			continuousStatus := dpv1alpha1.BackupStatus{
+				Phase:               dpv1alpha1.BackupPhaseCompleted,
+				StartTimestamp:      continuousStart,
+				CompletionTimestamp: continuousStop,
+				TimeRange: &dpv1alpha1.BackupTimeRange{
+					Start: continuousStart,
+					End:   continuousStop,
+				},
+				BackupMethod: &dpv1alpha1.BackupMethod{
+					Name:          testdp.ContinuousMethodName,
+					ActionSetName: continuousActionSetName,
+				},
+			}
+			patchBackupStatus(continuousStatus, client.ObjectKeyFromObject(continuousBackup))
+
+			By("restore from a continuous backup annotation")
+			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s", "restoreTime":"%s"}}`,
+				defaultCompName, continuousBackup.Name, restoreTime.UTC().Format(time.RFC3339))
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
+				tmpCluster.Annotations = map[string]string{
+					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
+				}
+			})).Should(Succeed())
+
+			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
+			By("checking prepareData is created from the resolved base backup")
+			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
+			Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}, func(g Gomega, restore *dpv1alpha1.Restore) {
+				g.Expect(restore.Spec.Backup.Name).Should(Equal(backup.Name))
+			})).Should(Succeed())
+
+			By("checking postReady still replays from the continuous backup")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}, func(restore *dpv1alpha1.Restore) {
+				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+			})()).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.Phase = appsv1.RunningClusterPhase
+				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+					defaultCompName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
+				compObj.Status.Phase = appsv1.RunningComponentPhase
+			})).Should(Succeed())
+
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
+			Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}, func(g Gomega, restore *dpv1alpha1.Restore) {
+				g.Expect(restore.Spec.Backup.Name).Should(Equal(continuousBackup.Name))
 			})).Should(Succeed())
 		})
 	})

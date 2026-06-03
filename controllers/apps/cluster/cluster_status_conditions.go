@@ -80,8 +80,8 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  getConditionReasonWithError(ReasonPreCheckFailed, err),
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonPreCheckFailed, err)),
 	}
 }
 
@@ -108,8 +108,8 @@ func newFailedApplyResourcesCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeApplyResources,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  getConditionReasonWithError(ReasonApplyResourcesFailed, err),
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonApplyResourcesFailed, err)),
 	}
 }
 

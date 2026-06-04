@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -488,6 +489,37 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 		return rolePods
 	}
 
+	podsWithOrdinal := func() ([]*corev1.Pod, error) {
+		ordinal, err := strconv.Atoi(matchingKey)
+		if err != nil || ordinal < 0 {
+			return nil, fmt.Errorf("invalid ordinal matchingKey: %s", matchingKey)
+		}
+
+		var ordinalPods []*corev1.Pod
+		for i, pod := range pods {
+			idx := strings.LastIndex(pod.Name, "-")
+			if idx < 0 || idx == len(pod.Name)-1 {
+				continue
+			}
+			podOrdinal, err := strconv.Atoi(pod.Name[idx+1:])
+			if err != nil {
+				continue
+			}
+			if podOrdinal == ordinal {
+				ordinalPods = append(ordinalPods, pods[i])
+			}
+		}
+		if len(ordinalPods) > 1 {
+			var podNames []string
+			for _, pod := range ordinalPods {
+				podNames = append(podNames, pod.Name)
+			}
+			return nil, fmt.Errorf("ambiguous ordinal selector matchingKey %s matches multiple pods: %s",
+				matchingKey, strings.Join(podNames, ","))
+		}
+		return ordinalPods, nil
+	}
+
 	switch selector {
 	case appsv1.AnyReplica:
 		return anyPod(), nil
@@ -496,7 +528,7 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 	case appsv1.RoleSelector:
 		return podsWithRole(), nil
 	case appsv1.OrdinalSelector:
-		return nil, fmt.Errorf("ordinal selector is not supported")
+		return podsWithOrdinal()
 	default:
 		return nil, fmt.Errorf("unknown pod selector: %s", selector)
 	}

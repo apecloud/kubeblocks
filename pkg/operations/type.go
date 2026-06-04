@@ -111,6 +111,10 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
+	// lets ops types such as restart defer pod-level failure signals until the
+	// workload/component reaches a terminal failure state.
+	deferInstanceFailureToWorkloadPhase bool
+	componentPhase                      appsv1.ComponentPhase
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views

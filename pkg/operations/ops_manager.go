@@ -274,10 +274,14 @@ func (opsMgr *OpsManager) checkAndHandleOpsTimeout(reqCtx intctrlutil.RequestCtx
 		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsv1alpha1.OpsAbortedPhase,
 			opsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
 	}
+	timeoutRequeueAfter := time.Until(timeoutPoint)
 	if requeueAfter != 0 {
+		if timeoutRequeueAfter < requeueAfter {
+			return timeoutRequeueAfter, nil
+		}
 		return requeueAfter, nil
 	}
-	return time.Until(timeoutPoint), nil
+	return timeoutRequeueAfter, nil
 }
 
 func GetOpsManager() *OpsManager {

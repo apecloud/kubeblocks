@@ -320,7 +320,8 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	progressDetail opsv1alpha1.ProgressStatusDetail,
 	instance Instance) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
-	if instance.IsFailedAndTimedOut() {
+	if pgRes.componentPhase == appsv1.FailedComponentPhase ||
+		(instance.IsFailedAndTimedOut() && !pgRes.deferInstanceFailureToWorkloadPhase) {
 		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, instance.GetName())
 		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
 		progressDetail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus, message)

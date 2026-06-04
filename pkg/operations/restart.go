@@ -89,6 +89,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		pgRes.deferInstanceFailureToWorkloadPhase = true
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
 	}
 	return r.compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,

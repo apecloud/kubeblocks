@@ -1703,7 +1703,7 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	// Examine the claimref for the PV and see if it's bound to the correct PVC
 	claimRef := pv.Spec.ClaimRef
 	if claimRef != nil && claimRef.Name == pvc.Name && claimRef.Namespace == pvc.Namespace && claimRef.UID == pvc.UID {
-		return true, nil
+		return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
 	}
 	// Make new PV with strategic patch values to perform the PV rebind
 	patchPV := client.MergeFrom(pv.DeepCopy())
@@ -1717,7 +1717,23 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 		pv.Annotations = map[string]string{}
 	}
 	pv.Annotations[AnnPopulateFrom] = pvc.Spec.DataSourceRef.Name
-	return true, r.Client.Patch(reqCtx.Ctx, pv, patchPV)
+	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
+		return false, err
+	}
+	return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
+}
+
+func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, pvName string) error {
+	if pvc.Spec.VolumeName == pvName {
+		return nil
+	}
+	if pvc.Spec.VolumeName != "" {
+		return intctrlutil.NewFatalError(fmt.Sprintf("target PVC %s/%s is already bound to PV %s, expected %s",
+			pvc.Namespace, pvc.Name, pvc.Spec.VolumeName, pvName))
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	pvc.Spec.VolumeName = pvName
+	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
 }
 
 func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {

@@ -31,6 +31,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,7 +39,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -46,6 +49,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	parameters "github.com/apecloud/kubeblocks/pkg/parameters"
+	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 const (
@@ -113,10 +118,98 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		if len(tpl.Template) == 0 {
+			waiting, err := t.waitingForParameterBackfill(transCtx, tpl)
+			if err != nil {
+				return err
+			}
+			if waiting {
+				return intctrlutil.NewRequeueError(appsutil.RequeueDuration,
+					fmt.Sprintf("waiting for parameters controller to backfill config template: %s", tpl.Name))
+			}
 			return fmt.Errorf("config/script template has no template specified: %s", tpl.Name)
 		}
 	}
 	return nil
+}
+
+func (t *componentFileTemplateTransformer) waitingForParameterBackfill(
+	transCtx *componentTransformContext,
+	tpl component.SynthesizedFileTemplate) (bool, error) {
+	if !isExternalManaged(tpl) {
+		return false, nil
+	}
+
+	clusterName, err := component.GetClusterName(transCtx.Component)
+	if err != nil {
+		return false, err
+	}
+	componentName, err := component.ShortName(clusterName, transCtx.Component.Name)
+	if err != nil {
+		return false, err
+	}
+
+	parameter := &parametersv1alpha1.ComponentParameter{}
+	parameterKey := types.NamespacedName{
+		Namespace: transCtx.Component.Namespace,
+		Name:      configcore.GenerateComponentConfigurationName(clusterName, componentName),
+	}
+	if err := transCtx.Client.Get(transCtx.Context, parameterKey, parameter); err != nil {
+		if apierrors.IsNotFound(err) {
+			return t.parameterBackfillExpected(transCtx, tpl)
+		}
+		return false, err
+	}
+
+	for _, item := range parameter.Spec.ConfigItemDetails {
+		if item.ConfigSpec == nil || item.ConfigSpec.Name != tpl.Name {
+			continue
+		}
+		if !ptr.Deref(item.ConfigSpec.ExternalManaged, false) {
+			return false, nil
+		}
+		if status := parameters.GetItemStatus(&parameter.Status, tpl.Name); status != nil {
+			if parameters.IsFailedPhase(status.Phase) {
+				return false, fmt.Errorf("parameters controller failed to backfill config template %s: %s",
+					tpl.Name, ptr.Deref(status.Message, ""))
+			}
+		}
+		if parameters.IsFailedPhase(parameter.Status.Phase) {
+			return false, fmt.Errorf("componentParameter %s failed to backfill config template %s: %s",
+				parameter.Name, tpl.Name, parameter.Status.Message)
+		}
+		return true, nil
+	}
+
+	if parameters.IsFailedPhase(parameter.Status.Phase) {
+		expected, err := t.parameterBackfillExpected(transCtx, tpl)
+		if err != nil {
+			return false, err
+		}
+		if expected {
+			return false, fmt.Errorf("componentParameter %s failed to backfill config template %s: %s",
+				parameter.Name, tpl.Name, parameter.Status.Message)
+		}
+		return false, nil
+	}
+	return t.parameterBackfillExpected(transCtx, tpl)
+}
+
+func (t *componentFileTemplateTransformer) parameterBackfillExpected(
+	transCtx *componentTransformContext,
+	tpl component.SynthesizedFileTemplate) (bool, error) {
+	if transCtx.CompDef == nil {
+		return false, nil
+	}
+	configs, _, err := parameters.ResolveCmpdParametersDefs(transCtx.Context, transCtx.Client, transCtx.CompDef)
+	if err != nil {
+		return false, err
+	}
+	for _, config := range parameters.ResolveParameterTemplate(transCtx.CompDef.Spec, configs) {
+		if config.Name == tpl.Name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx *componentTransformContext,

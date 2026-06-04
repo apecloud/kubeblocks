@@ -74,6 +74,47 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	require.Equal(t, "backup-ns", *vct.Spec.DataSourceRef.Namespace)
 }
 
+func TestInjectRestoreIntentOmitsDataSourceRefNamespaceForSameNamespaceSource(t *testing.T) {
+	cluster := &appsv1.Cluster{}
+	cluster.Name = "test-cluster"
+	cluster.Namespace = "test-ns"
+	cluster.Spec.Restore = &appsv1.ClusterRestore{
+		Source: appsv1.ClusterRestoreSource{
+			APIGroup:  testRestoreSourceAPIGroup,
+			Kind:      testRestoreSourceKind,
+			Name:      "backup",
+			Namespace: "test-ns",
+		},
+	}
+	vct := &appsv1.PersistentVolumeClaimTemplate{Name: "data"}
+
+	injectRestoreIntentToVCT(cluster, "redis", vct)
+
+	require.Equal(t, "test-ns", vct.Annotations[constant.RestoreSourceNamespaceAnnotationKey])
+	require.NotNil(t, vct.Spec.DataSourceRef)
+	require.Nil(t, vct.Spec.DataSourceRef.Namespace)
+}
+
+func TestInjectRestoreIntentOmitsDataSourceRefNamespaceForDefaultNamespaceSource(t *testing.T) {
+	cluster := &appsv1.Cluster{}
+	cluster.Name = "test-cluster"
+	cluster.Namespace = "test-ns"
+	cluster.Spec.Restore = &appsv1.ClusterRestore{
+		Source: appsv1.ClusterRestoreSource{
+			APIGroup: testRestoreSourceAPIGroup,
+			Kind:     testRestoreSourceKind,
+			Name:     "backup",
+		},
+	}
+	vct := &appsv1.PersistentVolumeClaimTemplate{Name: "data"}
+
+	injectRestoreIntentToVCT(cluster, "redis", vct)
+
+	require.Equal(t, "test-ns", vct.Annotations[constant.RestoreSourceNamespaceAnnotationKey])
+	require.NotNil(t, vct.Spec.DataSourceRef)
+	require.Nil(t, vct.Spec.DataSourceRef.Namespace)
+}
+
 func TestClusterRestoreSourceAPIGroupIsRequiredByCRD(t *testing.T) {
 	data, err := os.ReadFile("../../../config/crd/bases/apps.kubeblocks.io_clusters.yaml")
 	require.NoError(t, err)

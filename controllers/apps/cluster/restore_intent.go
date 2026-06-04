@@ -98,7 +98,7 @@ func injectRestoreIntentToVCT(cluster *appsv1.Cluster, componentName string, vct
 	}
 	apiGroup := restore.Source.APIGroup
 	var namespace *string
-	if restore.Source.Namespace != "" {
+	if restore.Source.Namespace != "" && restore.Source.Namespace != cluster.Namespace {
 		namespace = &restore.Source.Namespace
 	}
 	vct.Spec.DataSourceRef = &corev1.TypedObjectReference{

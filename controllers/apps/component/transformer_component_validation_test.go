@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
@@ -57,6 +58,7 @@ func TestValidateExternalManagedConfigSources(t *testing.T) {
 		config                 appsv1.ClusterComponentConfig
 		compDefExternalManaged bool
 		sidecarExternalManaged bool
+		runningWorkload        *workloads.InstanceSet
 		cm                     *corev1.ConfigMap
 		wantErr                bool
 	}{
@@ -72,6 +74,23 @@ func TestValidateExternalManagedConfigSources(t *testing.T) {
 			generation:             1,
 			config:                 externalManagedConfig(configName, cmName),
 			compDefExternalManaged: true,
+			cm:                     configMap(namespace, cmName, nil),
+			wantErr:                true,
+		},
+		{
+			name:                   "accepts existing external-managed configmap source already mounted by workload",
+			generation:             2,
+			config:                 externalManagedConfig(configName, cmName),
+			compDefExternalManaged: true,
+			runningWorkload:        workloadWithConfigVolume(configName+"-volume", cmName),
+			cm:                     configMap(namespace, cmName, nil),
+		},
+		{
+			name:                   "rejects changed external-managed configmap source without kb component labels",
+			generation:             2,
+			config:                 externalManagedConfig(configName, cmName),
+			compDefExternalManaged: true,
+			runningWorkload:        workloadWithConfigVolume(configName+"-volume", "old-"+cmName),
 			cm:                     configMap(namespace, cmName, nil),
 			wantErr:                true,
 		},
@@ -150,6 +169,7 @@ func TestValidateExternalManagedConfigSources(t *testing.T) {
 				SynthesizeComponent: synthesizedComponentWithFileTemplates(
 					configName, tt.compDefExternalManaged,
 					sidecarName, tt.sidecarExternalManaged),
+				RunningWorkload: tt.runningWorkload,
 			})
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -185,6 +205,7 @@ func synthesizedComponentWithFileTemplates(configName string, compDefExternalMan
 			{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
 					Name:            configName,
+					VolumeName:      configName + "-volume",
 					ExternalManaged: ptr.To(compDefExternalManaged),
 				},
 				Config: true,
@@ -192,9 +213,29 @@ func synthesizedComponentWithFileTemplates(configName string, compDefExternalMan
 			{
 				ComponentFileTemplate: appsv1.ComponentFileTemplate{
 					Name:            sidecarName,
+					VolumeName:      sidecarName + "-volume",
 					ExternalManaged: ptr.To(sidecarExternalManaged),
 				},
 				Config: true,
+			},
+		},
+	}
+}
+
+func workloadWithConfigVolume(volumeName, cmName string) *workloads.InstanceSet {
+	return &workloads.InstanceSet{
+		Spec: workloads.InstanceSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{{
+						Name: volumeName,
+						VolumeSource: corev1.VolumeSource{
+							ConfigMap: &corev1.ConfigMapVolumeSource{
+								LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+							},
+						},
+					}},
+				},
 			},
 		},
 	}

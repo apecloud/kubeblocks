@@ -92,22 +92,27 @@ func validateExternalManagedConfigSources(transCtx *componentTransformContext) e
 		return nil
 	}
 
-	externalManagedTemplates := map[string]bool{}
+	externalManagedTemplates := map[string]component.SynthesizedFileTemplate{}
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		if tpl.Config && ptr.Deref(tpl.ExternalManaged, false) {
-			externalManagedTemplates[tpl.Name] = true
+			externalManagedTemplates[tpl.Name] = tpl
 		}
 	}
 
 	var externalManagedConfigs []appsv1.ClusterComponentConfig
+	externalManagedConfigTemplates := map[string]component.SynthesizedFileTemplate{}
 	for _, config := range comp.Spec.Configs {
 		if config.Name == nil || config.ConfigMap == nil || config.ConfigMap.Name == "" {
 			continue
 		}
-		if !externalManagedTemplates[*config.Name] && !ptr.Deref(config.ExternalManaged, false) {
+		tpl, externalManagedTemplate := externalManagedTemplates[*config.Name]
+		if !externalManagedTemplate && !ptr.Deref(config.ExternalManaged, false) {
 			continue
 		}
 		externalManagedConfigs = append(externalManagedConfigs, config)
+		if externalManagedTemplate {
+			externalManagedConfigTemplates[*config.Name] = tpl
+		}
 	}
 	if len(externalManagedConfigs) == 0 {
 		return nil
@@ -123,11 +128,27 @@ func validateExternalManagedConfigSources(transCtx *componentTransformContext) e
 	}
 
 	for _, config := range externalManagedConfigs {
+		tpl := externalManagedConfigTemplates[*config.Name]
+		if isExistingExternalManagedConfigSource(transCtx, config, tpl) {
+			continue
+		}
 		if err := validateManagedConfigMapLabels(transCtx, config.ConfigMap.Name, clusterName, compName); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func isExistingExternalManagedConfigSource(transCtx *componentTransformContext, config appsv1.ClusterComponentConfig, tpl component.SynthesizedFileTemplate) bool {
+	if transCtx.RunningWorkload == nil || config.ConfigMap == nil || tpl.VolumeName == "" {
+		return false
+	}
+	for _, volume := range transCtx.RunningWorkload.Spec.Template.Spec.Volumes {
+		if volume.Name == tpl.VolumeName && volume.ConfigMap != nil && volume.ConfigMap.Name == config.ConfigMap.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func validateManagedConfigMapLabels(transCtx *componentTransformContext, cmName, clusterName, compName string) error {

@@ -1008,6 +1008,12 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		}
 		break
 	}
+	// Release the target PVC after prepareData and PV rebind. PostReady actions
+	// may need the workload pod to start, which cannot happen while the populate
+	// PVC still owns the restored PV.
+	if err := r.Cleanup(reqCtx, pvc); err != nil {
+		return err
+	}
 	postReadyCompleted, err := r.ensurePostReadyRestoreCompleted(reqCtx, pvc, restoreCtx)
 	if err != nil {
 		return err

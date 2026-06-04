@@ -276,10 +276,8 @@ var _ = Describe("Volume Populator Controller test", func() {
 				g.Expect(tmpPV.Spec.ClaimRef.Name).Should(Equal(pvc.Name))
 				g.Expect(tmpPV.Spec.ClaimRef.UID).Should(Equal(pvc.UID))
 			})).Should(Succeed())
-
-			// mock pvc.spec.volumeName
-			Expect(testapps.ChangeObj(&testCtx, pvc, func(claim *corev1.PersistentVolumeClaim) {
-				claim.Spec.VolumeName = pv.Name
+			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+				g.Expect(tmpPVC.Spec.VolumeName).Should(Equal(pv.Name))
 			})).Should(Succeed())
 
 			By("expect for resources are cleaned up")
@@ -1571,7 +1569,7 @@ func TestRebindPVCAndPVWaitsUntilPopulatePVCIsBound(t *testing.T) {
 	require.False(t, rebound)
 
 	pv := &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: "pv"}}
-	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(pv).Build()
+	reconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(pv, pvc).Build()
 	populatePVC.Spec.VolumeName = pv.Name
 
 	rebound, err = reconciler.rebindPVCAndPV(reqCtx, populatePVC, pvc)
@@ -1583,6 +1581,10 @@ func TestRebindPVCAndPVWaitsUntilPopulatePVCIsBound(t *testing.T) {
 	require.NotNil(t, patchedPV.Spec.ClaimRef)
 	require.Equal(t, pvc.Name, patchedPV.Spec.ClaimRef.Name)
 	require.Equal(t, pvc.UID, patchedPV.Spec.ClaimRef.UID)
+
+	patchedPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvc), patchedPVC))
+	require.Equal(t, pv.Name, patchedPVC.Spec.VolumeName)
 }
 
 func TestRestoreSystemAccountSecretsUsesShardingSecretName(t *testing.T) {

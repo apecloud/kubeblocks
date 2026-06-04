@@ -995,23 +995,42 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) error {
 	restoreMgr := restoreCtx.restoreMgr
+	populateReleased := pvcPopulateReleased(pvc)
 	for i := range pvc.Status.Conditions {
 		condition := pvc.Status.Conditions[i]
 		if string(condition.Type) != appsv1.ConditionTypeRestore {
 			continue
 		}
-		switch condition.Status {
-		case corev1.ConditionTrue:
-			return nil
-		case corev1.ConditionFalse:
+		if condition.Status == corev1.ConditionFalse {
 			return nil
 		}
 		break
 	}
-	// Release the target PVC after prepareData and PV rebind. PostReady actions
-	// may need the workload pod to start, which cannot happen while the populate
-	// PVC still owns the restored PV.
-	if err := r.Cleanup(reqCtx, pvc); err != nil {
+	if !populateReleased {
+		// Release the target PVC after prepareData and PV rebind. PostReady
+		// actions may need the workload pod to start, which cannot happen while
+		// the populate PVC still owns the restored PV or while the target PVC is
+		// still marked as being populated.
+		if err := r.Cleanup(reqCtx, pvc); err != nil {
+			return err
+		}
+		reason := ReasonPopulatingSucceed
+		message := "Populator finished"
+		if restoreCtx.mode == pvcRestoreModeProvisionOnly {
+			reason = ReasonPopulatingProvisioned
+			message = "PVC provisioned without data restore"
+		}
+		if err := r.updatePVCPopulatingCondition(reqCtx, pvc, reason, message); err != nil {
+			return err
+		}
+		if restoreCtx.mode == pvcRestoreModeRestoreData {
+			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")
+			if err := r.patchInternalRestoreStatus(reqCtx, restoreMgr); err != nil {
+				return err
+			}
+		}
+	}
+	if err := r.syncTargetPVCBoundStatusIfReady(reqCtx, pvc); err != nil {
 		return err
 	}
 	postReadyCompleted, err := r.ensurePostReadyRestoreCompleted(reqCtx, pvc, restoreCtx)
@@ -1027,14 +1046,7 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		reason = ReasonPopulatingProvisioned
 		message = "PVC provisioned without data restore"
 	}
-	if err := r.UpdatePVCConditions(reqCtx, pvc, reason, message); err != nil {
-		return err
-	}
-	if restoreCtx.mode == pvcRestoreModeProvisionOnly {
-		return nil
-	}
-	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")
-	return r.patchInternalRestoreStatus(reqCtx, restoreMgr)
+	return r.UpdatePVCConditions(reqCtx, pvc, reason, message)
 }
 
 func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil.RequestCtx,
@@ -1127,7 +1139,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	allBound, err := r.allRestorePVCsForComponentBound(reqCtx, pvc)
 	if err != nil || !allBound {
 		if err == nil {
-			err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Waiting for all restore PVCs to finish prepareData")
+			err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for all restore PVCs to finish prepareData")
 		}
 		return false, err
 	}
@@ -1144,7 +1156,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		return false, err
 	}
 	if comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
-		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Waiting for component to finish post-provision"); err != nil {
+		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for component to finish post-provision"); err != nil {
 			return false, err
 		}
 		return false, nil
@@ -1159,7 +1171,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 			return false, err
 		}
 		if cluster.Status.Phase != appsv1.RunningClusterPhase {
-			if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Waiting for cluster to run before postReady restore"); err != nil {
+			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for cluster to run before postReady restore"); err != nil {
 				return false, err
 			}
 			return false, nil
@@ -1177,7 +1189,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
 			return false, err
 		}
-		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Waiting for postReady restore to complete"); err != nil {
+		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
 			return false, err
 		}
 		return false, nil
@@ -1191,11 +1203,20 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	case dpv1alpha1.RestorePhaseFailed:
 		return false, intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s failed", existing.Namespace, existing.Name))
 	default:
-		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Waiting for postReady restore to complete"); err != nil {
+		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
 			return false, err
 		}
 		return false, nil
 	}
+}
+
+func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	message string) error {
+	if pvcPopulateReleased(pvc) {
+		return nil
+	}
+	return r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message)
 }
 
 func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.RequestCtx,
@@ -1355,6 +1376,12 @@ func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType str
 		}
 	}
 	return nil
+}
+
+func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
+	cond := findPVCConditionByType(pvc, string(PersistentVolumeClaimPopulating))
+	return cond != nil && cond.Status == corev1.ConditionTrue &&
+		(cond.Reason == ReasonPopulatingSucceed || cond.Reason == ReasonPopulatingProvisioned)
 }
 
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {
@@ -1742,6 +1769,48 @@ func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.Request
 	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
 }
 
+func pvClaimRefMatchesPVC(claimRef *corev1.ObjectReference, pvc *corev1.PersistentVolumeClaim) bool {
+	return claimRef != nil &&
+		claimRef.Name == pvc.Name &&
+		claimRef.Namespace == pvc.Namespace &&
+		claimRef.UID == pvc.UID
+}
+
+func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatusIfReady(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim) error {
+	if pvc.Spec.VolumeName == "" {
+		return nil
+	}
+	pv := &corev1.PersistentVolume{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, pv); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if !pvClaimRefMatchesPVC(pv.Spec.ClaimRef, pvc) {
+		return nil
+	}
+	return r.syncTargetPVCBoundStatus(reqCtx, pvc, pv)
+}
+
+func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatus(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	pv *corev1.PersistentVolume) error {
+	capacity := pv.Spec.Capacity.DeepCopy()
+	accessModes := slices.Clone(pv.Spec.AccessModes)
+	if pvc.Status.Phase == corev1.ClaimBound &&
+		reflect.DeepEqual(pvc.Status.Capacity, capacity) &&
+		slices.Equal(pvc.Status.AccessModes, accessModes) {
+		return nil
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	pvc.Status.Phase = corev1.ClaimBound
+	pvc.Status.Capacity = capacity
+	pvc.Status.AccessModes = accessModes
+	return r.Client.Status().Patch(reqCtx.Ctx, pvc, patch)
+}
+
 func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {
 	progressCondition := corev1.PersistentVolumeClaimCondition{
 		Type:               PersistentVolumeClaimPopulating,
@@ -1795,6 +1864,26 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 	switch reason {
 	case ReasonPopulatingProcessing:
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonStartToVolumePopulate, message)
+	case ReasonPopulatingSucceed, ReasonPopulatingProvisioned:
+		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)
+	}
+	return r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch)
+}
+
+func (r *VolumePopulatorReconciler) updatePVCPopulatingCondition(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	reason,
+	message string) error {
+	progressCondition := corev1.PersistentVolumeClaimCondition{
+		Type:               PersistentVolumeClaimPopulating,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+	pvcPatch := client.MergeFrom(pvc.DeepCopy())
+	upsertPVCCondition(&pvc.Status.Conditions, progressCondition)
+	switch reason {
 	case ReasonPopulatingSucceed, ReasonPopulatingProvisioned:
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)
 	}

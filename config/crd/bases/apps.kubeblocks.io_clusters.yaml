@@ -266,9 +266,12 @@ spec:
                             x-kubernetes-map-type: atomic
                           externalManaged:
                             description: |-
-                              ExternalManaged indicates whether the configuration is managed by an external system.
-                              When set to true, the controller will use the user-provided template and reconfigure action,
-                              ignoring the default template and update behavior.
+                              ExternalManaged specifies whether the configuration management is delegated to an external system.
+
+                              When set to true, the apps controller does not render or manage the configuration from the
+                              default templates and update behaviors specified in the ComponentDefinition. A ConfigMap source
+                              for an external-managed configuration is accepted only when the referenced ConfigMap carries
+                              the common KubeBlocks component labels.
                             type: boolean
                           name:
                             description: The name of the config.
@@ -7609,9 +7612,12 @@ spec:
                                 x-kubernetes-map-type: atomic
                               externalManaged:
                                 description: |-
-                                  ExternalManaged indicates whether the configuration is managed by an external system.
-                                  When set to true, the controller will use the user-provided template and reconfigure action,
-                                  ignoring the default template and update behavior.
+                                  ExternalManaged specifies whether the configuration management is delegated to an external system.
+
+                                  When set to true, the apps controller does not render or manage the configuration from the
+                                  default templates and update behaviors specified in the ComponentDefinition. A ConfigMap source
+                                  for an external-managed configuration is accepted only when the referenced ConfigMap carries
+                                  the common KubeBlocks component labels.
                                 type: boolean
                               name:
                                 description: The name of the config.

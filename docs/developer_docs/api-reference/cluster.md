@@ -2479,6 +2479,9 @@ The impact of this field depends on the <code>targetPodSelector</code> value:</p
 <li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
 <li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
 will be selected for the Action.</li>
+<li>When <code>targetPodSelector</code> is set to <code>Ordinal</code>, <code>matchingKey</code> must be a non-negative integer
+and only the replica whose Pod name ends with <code>-&lt;matchingKey&gt;</code> will be selected for the Action.
+The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.</li>
 </ul>
 <p>This field cannot be updated.</p>
 </td>
@@ -8395,6 +8398,9 @@ The impact of this field depends on the <code>targetPodSelector</code> value:</p
 <li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
 <li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
 will be selected for the Action.</li>
+<li>When <code>targetPodSelector</code> is set to <code>Ordinal</code>, <code>matchingKey</code> must be a non-negative integer
+and only the replica whose Pod name ends with <code>-&lt;matchingKey&gt;</code> will be selected for the Action.
+The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.</li>
 </ul>
 <p>This field cannot be updated.</p>
 </td>

@@ -717,6 +717,97 @@ var _ = Describe("lifecycle", func() {
 			Expect(err.Error()).Should(ContainSubstring("pod pod-1 has no ip"))
 		})
 
+		It("pod selector - ordinal", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.OrdinalSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "1"
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("pod pod-1 has no ip"))
+		})
+
+		It("pod selector - ordinal invalid matching key", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.OrdinalSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "invalid"
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("invalid ordinal matchingKey: invalid"))
+		})
+
+		It("pod selector - ordinal ambiguous", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.OrdinalSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "0"
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-template-0",
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("ambiguous ordinal selector matchingKey 0 matches multiple pods: pod-0,pod-template-0"))
+		})
+
 		It("pod selector - has no matched", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"

@@ -240,10 +240,9 @@ var _ = Describe("file templates transformer test", func() {
 		reader.Objects = append(reader.Objects, &parametersv1alpha1.ParametersDefinition{
 			ObjectMeta: metav1.ObjectMeta{Name: "server-conf-params"},
 			Spec: parametersv1alpha1.ParametersDefinitionSpec{
-				ComponentDef:   compDefName,
-				TemplateName:   "serverConf",
-				FileName:       "server.conf",
-				ServiceVersion: "*",
+				ComponentDef: compDefName,
+				TemplateName: "serverConf",
+				FileName:     "server.conf",
 				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
 					Format: parametersv1alpha1.Properties,
 				},

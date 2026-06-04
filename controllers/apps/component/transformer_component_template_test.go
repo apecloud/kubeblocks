@@ -400,6 +400,30 @@ var _ = Describe("file templates transformer test", func() {
 			Expect(err.Error()).ShouldNot(ContainSubstring("config/script template has no template specified"))
 		})
 
+		It("external managed - w/o template waits when component parameter exists before config details are filled", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			claimServerConfByParametersDefinition()
+			reader.Objects = append(reader.Objects, &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      configcore.GenerateComponentConfigurationName(clusterName, compName),
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName:   clusterName,
+					ComponentName: compName,
+				},
+			})
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("waiting for parameters controller to backfill config template: serverConf"))
+			Expect(err.Error()).ShouldNot(ContainSubstring("config/script template has no template specified"))
+		})
+
 		It("external managed - w/o template still fails when parameters controller did not claim the config", func() {
 			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
 			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""

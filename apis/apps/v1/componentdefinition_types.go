@@ -1870,6 +1870,9 @@ type Action struct {
 	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
 	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
 	//   will be selected for the Action.
+	// - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+	//   and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+	//   The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 	//
 	// This field cannot be updated.
 	//
@@ -1979,6 +1982,9 @@ type ExecAction struct {
 	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
 	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
 	//   will be selected for the Action.
+	// - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+	//   and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+	//   The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 	//
 	// This field cannot be updated.
 	//

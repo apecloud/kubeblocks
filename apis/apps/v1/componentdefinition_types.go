@@ -1106,8 +1106,11 @@ type ComponentFileTemplate struct {
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 
-	// ExternalManaged indicates whether the configuration is managed by an external system.
-	// When set to true, the controller will ignore the management of this configuration.
+	// ExternalManaged specifies whether the file management is delegated to an external system.
+	//
+	// When set to true, the apps controller will ignore the rendering and lifecycle management of
+	// this file. A ConfigMap source for this template is accepted only when the referenced ConfigMap
+	// carries the common KubeBlocks component labels.
 	//
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`

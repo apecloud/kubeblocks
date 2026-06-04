@@ -1274,6 +1274,23 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 			VolumeName: "data-pv",
 		},
 	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "data-pv"},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			ClaimRef: &corev1.ObjectReference{
+				Namespace: pvc.Namespace,
+				Name:      pvc.Name,
+				UID:       pvc.UID,
+			},
+		},
+		Status: corev1.PersistentVolumeStatus{
+			Phase: corev1.VolumeBound,
+		},
+	}
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
@@ -1289,10 +1306,84 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 			}},
 		},
 	}
+	restore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "prepare-data-restore",
+		},
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc, restore).
+			WithObjects(backup, pvc, populatePVC, pv, comp, restore).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	err := reconciler.completeBoundPVCIfNeeded(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData},
+	)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.NotContains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+	require.Equal(t, corev1.ClaimBound, currentPVC.Status.Phase)
+	require.Equal(t, resource.MustParse("1Gi"), currentPVC.Status.Capacity[corev1.ResourceStorage])
+	require.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, currentPVC.Status.AccessModes)
+	populatingCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
+	require.NotNil(t, populatingCondition)
+	require.Equal(t, ReasonPopulatingSucceed, populatingCondition.Reason)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.Nil(t, restoreCondition)
+	currentPopulatePVC := &corev1.PersistentVolumeClaim{}
+	require.Error(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), currentPopulatePVC))
+}
+
+func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = types.UID("target-pvc")
+	pvc.Spec.VolumeName = "data-pv"
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{
+		{
+			Type:   PersistentVolumeClaimPopulating,
+			Status: corev1.ConditionTrue,
+			Reason: ReasonPopulatingSucceed,
+		},
+	}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, populatePVC, comp).
+			WithObjects(backup, pvc, comp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -1310,11 +1401,88 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 
 	require.Error(t, err)
 	require.True(t, intctrlutil.IsRequeueError(err), err)
+	restoreList := &dpv1alpha1.RestoreList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
+	require.Len(t, restoreList.Items, 1)
+	require.Equal(t, postReadyRestoreName(comp.UID), restoreList.Items[0].Name)
 	currentPVC := &corev1.PersistentVolumeClaim{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
-	require.NotContains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
-	currentPopulatePVC := &corev1.PersistentVolumeClaim{}
-	require.Error(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), currentPopulatePVC))
+	populatingCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
+	require.NotNil(t, populatingCondition)
+	require.Equal(t, ReasonPopulatingSucceed, populatingCondition.Reason)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.Nil(t, restoreCondition)
+}
+
+func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = types.UID("target-pvc")
+	pvc.Spec.VolumeName = "data-pv"
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   PersistentVolumeClaimPopulating,
+		Status: corev1.ConditionTrue,
+		Reason: ReasonPopulatingSucceed,
+	}}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc).
+			WithObjects(backup, pvc, comp).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	postReadyRestore, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		restoreMgr,
+		comp,
+	)
+	require.NoError(t, err)
+	postReadyRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+	require.NoError(t, reconciler.Client.Create(context.Background(), postReadyRestore))
+
+	err = reconciler.completeBoundPVCIfNeeded(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData},
+	)
+
+	require.NoError(t, err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	populatingCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
+	require.NotNil(t, populatingCondition)
+	require.Equal(t, ReasonPopulatingSucceed, populatingCondition.Reason)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionTrue, restoreCondition.Status)
+	require.Equal(t, ReasonPopulatingSucceed, restoreCondition.Reason)
 }
 
 func TestEnsurePostReadyRestoreCompletedRejectsMismatchedExistingRestore(t *testing.T) {

@@ -222,6 +222,33 @@ func TestRoleEventHandlerHandlesInstanceSetSingleTokenAndExclusiveCleanupStampsP
 	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, otherPod, "")
 }
 
+func TestRoleEventHandlerProjectsInstanceSetRoleStatusAfterPodRoleUpdate(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	leader := workloads.ReplicaRole{Name: "leader"}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql"},
+		Spec:       workloads.InstanceSetSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+		Status: workloads.InstanceSetStatus{
+			InstanceStatus: []workloads.InstanceStatus{{PodName: "mysql-0"}},
+		},
+	}
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "mysql",
+	})
+	markPodReady(pod)
+	event := roleProbeEvent("default", "event-1", pod, "leader", now)
+	cli := roleEventFakeClient(t, its, pod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
+	assertInstanceSetRoleStatus(t, ctx, cli, "default", "mysql", "mysql-0", "leader")
+}
+
 // Versioned path peer cleanup must strip the label but leave the peer's
 // LastRoleAuthoritativeVersionAnnotationKey untouched. Stamping it would let the
 // strict-newer gate later reject a legitimate event from the peer at the
@@ -511,6 +538,30 @@ func TestRoleEventHandlerHandlesInstanceRoleWithoutExclusiveCleanup(t *testing.T
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
 }
 
+func TestRoleEventHandlerProjectsInstanceRoleStatusAfterPodRoleUpdate(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	leader := workloads.ReplicaRole{Name: "leader"}
+	follower := workloads.ReplicaRole{Name: "follower"}
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql-0"},
+		Spec:       workloads.InstanceSpec{Roles: []workloads.ReplicaRole{leader, follower}},
+	}
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		constant.KBAppInstanceNameLabelKey: "mysql-0",
+	})
+	markPodReady(pod)
+	event := roleProbeEvent("default", "event-1", pod, "leader", now)
+	cli := roleEventFakeClient(t, inst, pod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
+	assertInstanceRoleStatus(t, ctx, cli, "default", "mysql-0", "leader")
+}
+
 func TestRoleEventHandlerDeletesUndefinedInstanceSetRole(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -739,7 +790,11 @@ func roleEventFakeClient(t *testing.T, objects ...client.Object) client.Client {
 	if err := workloads.AddToScheme(scheme); err != nil {
 		t.Fatalf("add workloads scheme: %v", err)
 	}
-	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&workloads.InstanceSet{}, &workloads.Instance{}).
+		WithObjects(objects...).
+		Build()
 }
 
 func roleEventPod(namespace, name, uid string, labels map[string]string) *corev1.Pod {
@@ -748,6 +803,13 @@ func roleEventPod(namespace, name, uid string, labels map[string]string) *corev1
 		pod.Labels = labels
 	}
 	return pod
+}
+
+func markPodReady(pod *corev1.Pod) {
+	pod.Status.Conditions = []corev1.PodCondition{{
+		Type:   corev1.PodReady,
+		Status: corev1.ConditionTrue,
+	}}
 }
 
 func podWithAnnotations(annotations map[string]string) *corev1.Pod {
@@ -867,5 +929,34 @@ func assertPodLastRoleAuthoritativeVersion(t *testing.T, ctx context.Context, cl
 	}
 	if stored.Annotations[constant.LastRoleAuthoritativeVersionAnnotationKey] != version {
 		t.Fatalf("expected authoritative role version %q, got %q", version, stored.Annotations[constant.LastRoleAuthoritativeVersionAnnotationKey])
+	}
+}
+
+func assertInstanceSetRoleStatus(t *testing.T, ctx context.Context, cli client.Client, namespace, name, podName, role string) {
+	t.Helper()
+	var stored workloads.InstanceSet
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &stored); err != nil {
+		t.Fatalf("get instanceset failed: %v", err)
+	}
+	for _, status := range stored.Status.InstanceStatus {
+		if status.PodName != podName {
+			continue
+		}
+		if status.Role != role {
+			t.Fatalf("expected instanceset status role %q for pod %q, got %q", role, podName, status.Role)
+		}
+		return
+	}
+	t.Fatalf("expected instanceset status entry for pod %q", podName)
+}
+
+func assertInstanceRoleStatus(t *testing.T, ctx context.Context, cli client.Client, namespace, name, role string) {
+	t.Helper()
+	var stored workloads.Instance
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &stored); err != nil {
+		t.Fatalf("get instance failed: %v", err)
+	}
+	if stored.Status.Role != role {
+		t.Fatalf("expected instance status role %q, got %q", role, stored.Status.Role)
 	}
 }

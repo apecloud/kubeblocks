@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -238,6 +239,11 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 		result.Reason = "updatePodRoleLabelError"
 		return false, err
 	}
+	if err := updateInstanceSetRoleStatus(ctx, cli, pod, itsName, role.Name, defined); err != nil {
+		result.Result = "failed"
+		result.Reason = "updateInstanceSetRoleStatusError"
+		return false, err
+	}
 
 	if defined && role.IsExclusive {
 		result.ExclusiveClean = true
@@ -271,16 +277,69 @@ func (h *RoleEventHandler) handleInstanceRoleProbe(ctx context.Context, cli clie
 		return false, err
 	}
 
-	_, defined := composeRoleMap(inst.Spec.Roles)[result.Role]
+	role, defined := composeRoleMap(inst.Spec.Roles)[result.Role]
 	result.RoleDefined = defined
 	if err := updatePodRoleLabel(ctx, cli, pod, result.Role, defined, result.Version, result.parsed); err != nil {
 		result.Result = "failed"
 		result.Reason = "updatePodRoleLabelError"
 		return false, err
 	}
+	roleName := ""
+	if defined {
+		roleName = role.Name
+	}
+	if err := updateInstanceRoleStatus(ctx, cli, pod, instName, roleName); err != nil {
+		result.Result = "failed"
+		result.Reason = "updateInstanceRoleStatusError"
+		return false, err
+	}
 	result.Result = "handled"
 	result.Reason = "updated"
 	return true, nil
+}
+
+func updateInstanceSetRoleStatus(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName, roleName string, roleDefined bool) error {
+	if !intctrlutil.IsPodReady(pod) {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		its := &workloads.InstanceSet{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: itsName}, its); err != nil {
+			return err
+		}
+		nextRole := ""
+		if roleDefined {
+			nextRole = roleName
+		}
+		for i := range its.Status.InstanceStatus {
+			if its.Status.InstanceStatus[i].PodName != pod.Name {
+				continue
+			}
+			if its.Status.InstanceStatus[i].Role == nextRole {
+				return nil
+			}
+			its.Status.InstanceStatus[i].Role = nextRole
+			return cli.Status().Update(ctx, its)
+		}
+		return nil
+	})
+}
+
+func updateInstanceRoleStatus(ctx context.Context, cli client.Client, pod *corev1.Pod, instName, roleName string) error {
+	if !intctrlutil.IsPodReady(pod) {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		inst := &workloads.Instance{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: instName}, inst); err != nil {
+			return err
+		}
+		if inst.Status.Role == roleName {
+			return nil
+		}
+		inst.Status.Role = roleName
+		return cli.Status().Update(ctx, inst)
+	})
 }
 
 func isRoleProbeEvent(event *corev1.Event) bool {

@@ -225,14 +225,10 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		RequestCtx: reqCtx,
 		Client:     r.Client,
 		Scheme:     r.Scheme,
+		EnsureWorkerServiceAccount: func() (string, error) {
+			return r.ensureWorkerServiceAccountForBackupDeletion(reqCtx, backup.Namespace)
+		},
 	}
-
-	// TODO: update the mcMgr param
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get worker service account: %w", err)
-	}
-	deleter.WorkerServiceAccount = saName
 
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
@@ -253,6 +249,18 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return err
 	}
 	return err
+}
+
+func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx intctrlutil.RequestCtx, namespace string) (string, error) {
+	ns := &corev1.Namespace{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
+	}
+	if !ns.DeletionTimestamp.IsZero() {
+		return "", fmt.Errorf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", namespace)
+	}
+	// TODO: update the mcMgr param
+	return EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)
 }
 
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR

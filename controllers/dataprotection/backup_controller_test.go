@@ -32,9 +32,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -788,6 +790,48 @@ var _ = Describe("Backup Controller test", func() {
 					&dpv1alpha1.Backup{}, false)).Should(Succeed())
 
 				// TODO: add delete backup test case with the pvc not exists
+			})
+
+			It("should not create worker resources when backup namespace is terminating", func() {
+				nsName := "backup-delete-terminating"
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: nsName,
+					},
+				}
+				Expect(client.IgnoreAlreadyExists(testCtx.Cli.Create(testCtx.Ctx, ns))).Should(Succeed())
+
+				finalizeNamespace := func() {
+					Eventually(func(g Gomega) {
+						current := &corev1.Namespace{}
+						err := testCtx.Cli.Get(testCtx.Ctx, types.NamespacedName{Name: nsName}, current)
+						if apierrors.IsNotFound(err) {
+							return
+						}
+						g.Expect(err).ShouldNot(HaveOccurred())
+						current.Spec.Finalizers = []corev1.FinalizerName{}
+						clientGo, err := kubernetes.NewForConfig(testEnv.Config)
+						g.Expect(err).ShouldNot(HaveOccurred())
+						_, err = clientGo.CoreV1().Namespaces().Finalize(testCtx.Ctx, current, metav1.UpdateOptions{})
+						g.Expect(err).ShouldNot(HaveOccurred())
+					}).Should(Succeed())
+				}
+				DeferCleanup(finalizeNamespace)
+
+				By("marking the namespace terminating")
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, ns)).Should(Succeed())
+				Eventually(func(g Gomega) {
+					current := &corev1.Namespace{}
+					g.Expect(testCtx.Cli.Get(testCtx.Ctx, types.NamespacedName{Name: nsName}, current)).Should(Succeed())
+					g.Expect(current.DeletionTimestamp.IsZero()).Should(BeFalse())
+				}).Should(Succeed())
+
+				reconciler := &BackupReconciler{Client: testCtx.Cli}
+				_, err := reconciler.ensureWorkerServiceAccountForBackupDeletion(
+					intctrlutil.RequestCtx{Ctx: testCtx.Ctx},
+					nsName)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("is terminating; cannot create worker resources to delete backup files"))
 			})
 		})
 

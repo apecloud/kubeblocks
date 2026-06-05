@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -60,6 +61,7 @@ var _ = Describe("Backup Deleter Test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
 	}
 
@@ -105,6 +107,38 @@ var _ = Describe("Backup Deleter Test", func() {
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusSucceeded))
+		})
+
+		It("should ensure worker service account only when creating a deletion job", func() {
+			ensureWorkerServiceAccountCalls := 0
+			deleter.EnsureWorkerServiceAccount = func() (string, error) {
+				ensureWorkerServiceAccountCalls++
+				return "worker-sa", nil
+			}
+
+			By("skipping worker service account creation for snapshot backups")
+			backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
+				SnapshotVolumes: pointer.Bool(true),
+			}
+			status, err := deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(ensureWorkerServiceAccountCalls).Should(Equal(0))
+
+			By("creating worker service account when a deletion job is needed")
+			backup.Status.BackupMethod = nil
+			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
+			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
+			backup.Status.Path = backupPath
+			status, err = deleter.DeleteBackupFiles(backup)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(status).Should(Equal(DeletionStatusDeleting))
+			Expect(ensureWorkerServiceAccountCalls).Should(Equal(1))
+
+			key := BuildDeleteBackupFilesJobKey(backup, false)
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, fetched *batchv1.Job) {
+				g.Expect(fetched.Spec.Template.Spec.ServiceAccountName).Should(Equal("worker-sa"))
+			})).Should(Succeed())
 		})
 
 		It("should create job to delete backup file", func() {

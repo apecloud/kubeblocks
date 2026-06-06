@@ -169,17 +169,23 @@ func buildEnvVars(reqCtx intctrlutil.RequestCtx,
 
 	for i := range vars {
 		var envVar *corev1.EnvVar
+		if vars[i].ValueFrom == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`opsEnvVar %q has nil valueFrom; addon OpsDefinition must set valueFrom.envRef or valueFrom.fieldPath`, vars[i].Name))
+		}
 		envVarRef := vars[i].ValueFrom.EnvVarRef
 		if envVarRef != nil {
 			envVar, err = buildEnvVarByEnvRef(envVarRef)
 		} else if vars[i].ValueFrom.FieldRef != nil {
 			envVar, err = buildVarWithFieldPath(targetPod, vars[i].ValueFrom.FieldRef.FieldPath)
 		}
+		if err != nil {
+			return nil, err
+		}
 		if envVar == nil {
 			if vars[i].Optional != nil && *vars[i].Optional {
 				continue
 			}
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not find the env "%s" in the container "%s"`, envVarRef.EnvName, envVarRef.TargetContainerName))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not resolve opsEnvVar %q for pod %q`, vars[i].Name, targetPod.Name))
 		}
 		envVar.Name = vars[i].Name
 		envVars = append(envVars, *envVar)

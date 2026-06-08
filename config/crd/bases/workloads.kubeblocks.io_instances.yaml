@@ -78,7 +78,8 @@ spec:
                     parameters:
                       additionalProperties:
                         type: string
-                      description: The parameters to call the reconfigure action.
+                      description: The env/template parameters to call the reconfigure
+                        action.
                       type: object
                     reconfigure:
                       description: The custom reconfigure action.
@@ -496,6 +497,14 @@ spec:
 
                         An empty name indicates that the reconfigure action is the default one defined by lifecycle actions.
                       type: string
+                    reconfigureArgs:
+                      description: ReconfigureArgs is the runtime argv payload for
+                        the reconfigure action.
+                      items:
+                        items:
+                          type: string
+                        type: array
+                      type: array
                     restart:
                       description: Specifies whether to restart instances.
                       type: boolean

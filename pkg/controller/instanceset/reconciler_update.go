@@ -325,10 +325,11 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 		return err
 	}
 
+	opts := reconfigureOptions(config)
 	if len(config.ReconfigureActionName) == 0 {
-		err = lfa.Reconfigure(tree.Context, nil, nil, config.Parameters)
+		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
 	} else {
-		err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
+		err = lfa.UserDefined(tree.Context, nil, opts, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
 	}
 	if err != nil {
 		if errors.Is(err, lifecycle.ErrActionNotDefined) {
@@ -342,6 +343,13 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 	}
 	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
 	return nil
+}
+
+func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {
+	if len(config.ReconfigureArgs) == 0 {
+		return nil
+	}
+	return &lifecycle.Options{Arguments: config.ReconfigureArgs}
 }
 
 func (r *updateReconciler) isInstUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {

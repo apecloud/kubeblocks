@@ -58,7 +58,7 @@ func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
 		return nil, err
 	}
 
-	return nonBlockingCallActionX(ctx, action, s.task.Parameters, &action.TimeoutSeconds, conn, nil, nil)
+	return nonBlockingCallActionX(ctx, action, s.task.Parameters, nil, &action.TimeoutSeconds, conn, nil, nil)
 }
 
 func (s *newReplicaTask) status(ctx context.Context, event *proto.TaskEvent) {

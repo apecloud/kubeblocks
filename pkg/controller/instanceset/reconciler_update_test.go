@@ -48,6 +48,19 @@ import (
 var _ = Describe("update reconciler test", func() {
 	var replicas int32
 
+	Context("reconfigure options", func() {
+		It("passes workload reconfigure args as lifecycle arguments", func() {
+			args := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+			opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
+			Expect(opts).ShouldNot(BeNil())
+			Expect(opts.Arguments).Should(Equal(args))
+		})
+
+		It("uses nil options when reconfigure args are empty", func() {
+			Expect(reconfigureOptions(workloads.ConfigTemplate{})).Should(BeNil())
+		})
+	})
+
 	BeforeEach(func() {
 		replicas = 3
 		its = builder.NewInstanceSetBuilder(namespace, name).

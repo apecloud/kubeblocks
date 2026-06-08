@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -127,7 +128,7 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	}
 	timeout := resolveTimeout(&action.TimeoutSeconds, req.TimeoutSeconds)
 	if req.NonBlocking == nil || !*req.NonBlocking {
-		return callActionWithRetry(ctx, action, req.Parameters, timeout, req.RetryPolicy)
+		return callActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, req.RetryPolicy)
 	}
 	return s.handleRequestNonBlocking(ctx, req, action, timeout)
 }
@@ -138,7 +139,7 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 
 	running, ok := s.runningActions[req.Action]
 	if !ok {
-		resultChan, err := nonBlockingCallAction(ctx, action, req.Parameters, timeout)
+		resultChan, err := nonBlockingCallActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, req.RetryPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -165,8 +166,47 @@ func resolveTimeout(actionTimeout *int32, requestTimeout *int32) *int32 {
 	return actionTimeout
 }
 
-func callActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
-	output, err := blockingCallAction(ctx, action, parameters, timeout)
+func callActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
+	if len(arguments) == 0 {
+		return callActionWithRetryOnce(ctx, action, parameters, nil, timeout, retryPolicy)
+	}
+	if action.Exec == nil {
+		return nil, errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
+	}
+	output := bytes.NewBuffer(nil)
+	for _, args := range arguments {
+		out, err := callActionWithRetryOnce(ctx, action, parameters, args, timeout, retryPolicy)
+		if err != nil {
+			return output.Bytes(), err
+		}
+		if out != nil {
+			output.Write(out)
+		}
+	}
+	return output.Bytes(), nil
+}
+
+func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
+	if len(arguments) == 0 {
+		return nonBlockingCallAction(ctx, action, parameters, nil, timeout)
+	}
+	if action.Exec == nil {
+		return nil, errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
+	}
+	resultChan := make(chan *asyncResult, 1)
+	go func() {
+		stdout, err := callActionWithRetry(ctx, action, parameters, arguments, timeout, retryPolicy)
+		resultChan <- &asyncResult{
+			err:    err,
+			stdout: bytes.NewBuffer(stdout),
+			stderr: bytes.NewBuffer(nil),
+		}
+	}()
+	return resultChan, nil
+}
+
+func callActionWithRetryOnce(ctx context.Context, action *proto.Action, parameters map[string]string, arguments []string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
+	output, err := blockingCallAction(ctx, action, parameters, arguments, timeout)
 	if err == nil || retryPolicy == nil || retryPolicy.MaxRetries <= 0 {
 		return output, err
 	}
@@ -180,7 +220,7 @@ func callActionWithRetry(ctx context.Context, action *proto.Action, parameters m
 			case <-time.After(interval):
 			}
 		}
-		output, err = blockingCallAction(ctx, action, parameters, timeout)
+		output, err = blockingCallAction(ctx, action, parameters, arguments, timeout)
 		if err == nil {
 			return output, nil
 		}

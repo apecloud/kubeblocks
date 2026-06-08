@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,21 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
+
+func TestReconfigureOptions(t *testing.T) {
+	if opts := reconfigureOptions(workloads.ConfigTemplate{}); opts != nil {
+		t.Fatalf("expected nil options for empty reconfigure args, got %v", opts)
+	}
+
+	args := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+	opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
+	if opts == nil {
+		t.Fatalf("expected options for non-empty reconfigure args")
+	}
+	if !reflect.DeepEqual(opts.Arguments, args) {
+		t.Fatalf("expected arguments %v, got %v", args, opts.Arguments)
+	}
+}
 
 func TestConfigsToUpdateTreatsNilAndEmptyConfigHashAsEqual(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "valkey-0").

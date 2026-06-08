@@ -147,6 +147,10 @@ type ParametersDefinitionSpec struct {
 
 	// List dynamic parameters.
 	// Modifications to these parameters trigger a configuration reload without requiring a process restart.
+	// When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
+	// the controller invokes the action once for each updated
+	// parameter and appends the parameter name and value as the last arguments.
+	// HTTP and gRPC reconfigure actions are not currently supported for parameter updates.
 	//
 	// +listType=set
 	// +optional

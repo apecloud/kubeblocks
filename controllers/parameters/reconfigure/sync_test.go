@@ -22,6 +22,7 @@ package reconfigure
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -119,7 +120,7 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
 
 			Expect(*rctx.ClusterComponent.Configs[0].ConfigHash).Should(Equal(*rctx.getTargetConfigHash()))
-			Expect(rctx.ClusterComponent.Configs[0].Variables).Should(HaveKeyWithValue("a", "c b e f"))
+			Expect(rctx.ClusterComponent.Configs[0].Variables).ShouldNot(HaveKey("a"))
 		})
 
 		ginkgo.It("status replicas - partially updated", func() {
@@ -608,6 +609,13 @@ func TestApplyChangesToClusterTemplateReconfigure(t *testing.T) {
 	if config.ReconfigureAction != nil {
 		t.Fatalf("expected template reconfigure to use default action instead of override")
 	}
+	if len(config.ReconfigureArgs) != 1 || len(config.ReconfigureArgs[0]) != 2 ||
+		config.ReconfigureArgs[0][0] != "binlog_expire_logs_seconds" || config.ReconfigureArgs[0][1] != "432000" {
+		t.Fatalf("unexpected reconfigure args: %v", config.ReconfigureArgs)
+	}
+	if _, ok := config.Variables["binlog_expire_logs_seconds"]; ok {
+		t.Fatalf("expected updated params not to be written into variables, got %v", config.Variables)
+	}
 	if ctx.ConfigTemplate.Reconfigure == nil || ctx.ConfigTemplate.Reconfigure.Exec == nil {
 		t.Fatalf("expected template reconfigure action to be propagated")
 	}
@@ -658,6 +666,48 @@ func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
 	}
 	if config.ReconfigureAction != nil {
 		t.Fatalf("expected no override action for template-level reconfigure")
+	}
+	if len(config.ReconfigureArgs) != 1 || config.ReconfigureArgs[0][0] != "binlog_expire_logs_seconds" || config.ReconfigureArgs[0][1] != "259200" {
+		t.Fatalf("unexpected reconfigure args: %v", config.ReconfigureArgs)
+	}
+}
+
+func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name: "my.cnf",
+			Reconfigure: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+			},
+		},
+		ConfigHash:       ptr.To("hash"),
+		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+		ParametersDef:    &parametersv1alpha1.ParametersDefinitionSpec{},
+	}
+	config := &appsv1.ClusterComponentConfig{
+		Name: ptr.To("my.cnf"),
+		Variables: map[string]string{
+			"template_var": "kept",
+		},
+	}
+
+	applyChangesToCluster(ctx, config, map[string]string{
+		"timeout":   "30",
+		"maxmemory": "1gb",
+	}, false)
+
+	if config.Reconfigure == nil || !*config.Reconfigure {
+		t.Fatalf("expected reconfigure intent to be true")
+	}
+	want := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+	if !reflect.DeepEqual(config.ReconfigureArgs, want) {
+		t.Fatalf("expected sorted key-value args %v, got %v", want, config.ReconfigureArgs)
+	}
+	if config.Variables["template_var"] != "kept" {
+		t.Fatalf("expected existing variables to be preserved, got %v", config.Variables)
+	}
+	if _, ok := config.Variables["timeout"]; ok {
+		t.Fatalf("expected updated params not to be written into variables, got %v", config.Variables)
 	}
 }
 
@@ -717,6 +767,9 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		if config.ReconfigureAction != nil {
 			t.Fatalf("expected template reconfigure to use default action")
 		}
+		if len(config.ReconfigureArgs) != 1 || config.ReconfigureArgs[0][0] != "performance_schema" || config.ReconfigureArgs[0][1] != "ON" {
+			t.Fatalf("unexpected reconfigure args: %v", config.ReconfigureArgs)
+		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")
 		}
@@ -738,6 +791,9 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		if config.ReconfigureAction != nil {
 			t.Fatalf("expected template reconfigure to use default action")
 		}
+		if len(config.ReconfigureArgs) != 1 || config.ReconfigureArgs[0][0] != "binlog_expire_logs_seconds" || config.ReconfigureArgs[0][1] != "432000" {
+			t.Fatalf("unexpected reconfigure args: %v", config.ReconfigureArgs)
+		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")
 		}
@@ -758,6 +814,96 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		if config.ReconfigureAction != nil {
 			t.Fatalf("expected reconfigure action to be nil when restart absorbs mixed update")
+		}
+		if config.Restart == nil || !*config.Restart {
+			t.Fatalf("expected restart to remain true")
+		}
+	})
+}
+
+func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T) {
+	newContext := func() Context {
+		return Context{
+			ConfigTemplate: appsv1.ComponentFileTemplate{
+				Name: "my.cnf",
+				Reconfigure: &appsv1.Action{
+					HTTP: &appsv1.HTTPAction{Port: "8080", Path: "/reload"},
+				},
+			},
+			ConfigHash:       ptr.To("hash"),
+			ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+			ParametersDef: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"maxmemory"},
+			},
+		}
+	}
+
+	t.Run("rejects direct reload", func(t *testing.T) {
+		originalHash := "old-hash"
+		ctx := newContext()
+		config := &appsv1.ClusterComponentConfig{
+			Name:       ptr.To("my.cnf"),
+			ConfigHash: ptr.To(originalHash),
+		}
+
+		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, false)
+
+		if status.Status != StatusFailed {
+			t.Fatalf("expected status %q, got %q", StatusFailed, status.Status)
+		}
+		if status.Reason != "parameter update reconfigure currently supports only exec actions" {
+			t.Fatalf("unexpected status reason: %s", status.Reason)
+		}
+		if config.ConfigHash == nil || *config.ConfigHash != originalHash {
+			t.Fatalf("expected config hash to stay unchanged, got %v", config.ConfigHash)
+		}
+		if config.Reconfigure != nil {
+			t.Fatalf("expected reconfigure intent not to be written, got %v", config.Reconfigure)
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected reconfigure action to stay nil")
+		}
+		if config.ReconfigureArgs != nil {
+			t.Fatalf("expected reconfigure args not to be written, got %v", config.ReconfigureArgs)
+		}
+	})
+
+	t.Run("rejects reload-before-restart", func(t *testing.T) {
+		ctx := newContext()
+		ctx.ParametersDef.ReloadStaticParamsBeforeRestart = ptr.To(true)
+		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
+
+		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
+
+		if status.Status != StatusFailed {
+			t.Fatalf("expected status %q, got %q", StatusFailed, status.Status)
+		}
+		if config.Reconfigure != nil {
+			t.Fatalf("expected reconfigure intent not to be written, got %v", config.Reconfigure)
+		}
+		if config.ReconfigureArgs != nil {
+			t.Fatalf("expected reconfigure args not to be written, got %v", config.ReconfigureArgs)
+		}
+	})
+
+	t.Run("allows restart to absorb reload", func(t *testing.T) {
+		ctx := newContext()
+		ctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
+		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
+
+		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
+
+		if status.Status != StatusRetry {
+			t.Fatalf("expected status %q, got %q", StatusRetry, status.Status)
+		}
+		if config.Reconfigure == nil || *config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be false when restart absorbs reload")
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected reconfigure action to stay nil")
+		}
+		if config.ReconfigureArgs != nil {
+			t.Fatalf("expected reconfigure args not to be written, got %v", config.ReconfigureArgs)
 		}
 		if config.Restart == nil || !*config.Restart {
 			t.Fatalf("expected restart to remain true")

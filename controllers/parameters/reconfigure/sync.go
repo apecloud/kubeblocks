@@ -22,6 +22,7 @@ package reconfigure
 import (
 	"encoding/json"
 	"slices"
+	"sort"
 	"strconv"
 
 	"k8s.io/utils/ptr"
@@ -112,11 +113,14 @@ func submit(ctx Context, parameters map[string]string, restart bool) (Status, er
 }
 
 func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
-	config.Variables = params
+	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, params, restart) {
+		return makeStatus(StatusFailed, withReason("parameter update reconfigure currently supports only exec actions"))
+	}
 	config.ConfigHash = ctx.getTargetConfigHash()
 	// Keep restart explicit so an old persisted `restart: true` is actively cleared.
 	config.Restart = ptr.To(restart)
 	config.Reconfigure = ptr.To(false)
+	config.ReconfigureArgs = nil
 	switch {
 	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
 		config.Reconfigure = ptr.To(true)
@@ -124,10 +128,27 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	case shouldUseTemplateReconfigureAction(ctx, params, restart):
 		config.Reconfigure = ptr.To(true)
 		config.ReconfigureAction = nil
+		config.ReconfigureArgs = buildReconfigureArgs(params)
 	default:
 		config.ReconfigureAction = nil
 	}
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+}
+
+func buildReconfigureArgs(params map[string]string) [][]string {
+	if len(params) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	args := make([][]string, 0, len(keys))
+	for _, key := range keys {
+		args = append(args, []string{key, params[key]})
+	}
+	return args
 }
 
 // shouldBuildLegacyReconfigureAction returns true only when this change should be translated
@@ -157,6 +178,14 @@ func shouldBuildLegacyReconfigureAction(ctx Context, params map[string]string, r
 }
 
 func shouldUseTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
+	return shouldInvokeTemplateReconfigureAction(ctx, params, restart) && ctx.ConfigTemplate.Reconfigure.Exec != nil
+}
+
+func shouldRejectTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
+	return shouldInvokeTemplateReconfigureAction(ctx, params, restart) && ctx.ConfigTemplate.Reconfigure.Exec == nil
+}
+
+func shouldInvokeTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
 	if len(params) == 0 || ctx.ConfigTemplate.Reconfigure == nil {
 		return false
 	}

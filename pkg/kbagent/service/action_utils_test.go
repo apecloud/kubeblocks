@@ -71,7 +71,7 @@ var _ = Describe("action utils", func() {
 					Commands: []string{"/bin/bash", "-c", "echo -n simple"},
 				},
 			}
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -84,7 +84,7 @@ var _ = Describe("action utils", func() {
 				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -99,7 +99,7 @@ var _ = Describe("action utils", func() {
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, stderrBuf)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stdoutBuf, stderrBuf)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -115,7 +115,7 @@ var _ = Describe("action utils", func() {
 			}
 			stdinBuf := bytes.NewBuffer([]byte{'s', 't', 'd', 'i', 'n'})
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, stdinBuf, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdinBuf, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -133,7 +133,7 @@ var _ = Describe("action utils", func() {
 				"useless": "useless",
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(execErrorChan)
@@ -147,7 +147,7 @@ var _ = Describe("action utils", func() {
 				},
 			}
 			timeout := int32(1)
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, &timeout, nil, nil, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, &timeout, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -163,7 +163,7 @@ var _ = Describe("action utils", func() {
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			timeout := int32(1)
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, &timeout, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -180,7 +180,7 @@ var _ = Describe("action utils", func() {
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			timeout := int32(1)
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, &timeout, nil, stdoutBuf, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, &timeout, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -195,7 +195,7 @@ var _ = Describe("action utils", func() {
 					Commands: []string{"/bin/bash", "-c", "command-not-exist"},
 				},
 			}
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -211,7 +211,7 @@ var _ = Describe("action utils", func() {
 				},
 			}
 			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stderrBuf)
+			execErrorChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, stderrBuf)
 			Expect(err).Should(BeNil())
 
 			err = waitError(execErrorChan)
@@ -227,7 +227,7 @@ var _ = Describe("action utils", func() {
 					Commands: []string{"/bin/bash", "-c", "echo -n ok"},
 				},
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -245,7 +245,7 @@ var _ = Describe("action utils", func() {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -260,7 +260,7 @@ var _ = Describe("action utils", func() {
 					Commands: []string{"/bin/bash", "-c", "command-not-found"},
 				},
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -278,7 +278,7 @@ var _ = Describe("action utils", func() {
 				},
 			}
 			timeout := int32(1)
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, &timeout)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, &timeout)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -294,7 +294,7 @@ var _ = Describe("action utils", func() {
 					Commands: []string{"/bin/bash", "-c", "echo -n ok"},
 				},
 			}
-			output, err := blockingCallAction(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("ok")))
 		})
@@ -308,9 +308,53 @@ var _ = Describe("action utils", func() {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			output, err := blockingCallAction(ctx, action, parameters, nil)
+			output, err := blockingCallAction(ctx, action, parameters, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("parameters")))
+		})
+
+		It("blocking - runtime arguments are appended after static args and not injected as env", func() {
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `printf "%s:%s:%s:%s" "$0" "$1" "$2" "${ARG_ONLY:-unset}"`},
+					Args:     []string{"static"},
+				},
+			}
+			output, err := blockingCallAction(ctx, action, nil, []string{"ARG_ONLY", "value"}, nil)
+			Expect(err).Should(BeNil())
+			Expect(output).Should(Equal([]byte("static:ARG_ONLY:value:unset")))
+		})
+
+		It("blocking - runtime argument groups execute once per group", func() {
+			f, err := os.CreateTemp("", "kbagent-args-*")
+			Expect(err).Should(BeNil())
+			path := f.Name()
+			Expect(f.Close()).Should(Succeed())
+			defer os.Remove(path)
+
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `printf "%s:%s=%s\n" "$1" "$2" "$3" >> "$0"`, path},
+					Args:     []string{"static"},
+				},
+			}
+			_, err = callActionWithRetry(ctx, action, nil, [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}, nil, nil)
+			Expect(err).Should(BeNil())
+
+			content, err := os.ReadFile(path)
+			Expect(err).Should(BeNil())
+			Expect(string(content)).Should(Equal("static:maxmemory=1gb\nstatic:timeout=30\n"))
+		})
+
+		It("blocking - runtime argument group output is aggregated in order", func() {
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `printf "%s=%s\n" "$1" "$2"`, "--"},
+				},
+			}
+			output, err := callActionWithRetry(ctx, action, nil, [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}, nil, nil)
+			Expect(err).Should(BeNil())
+			Expect(output).Should(Equal([]byte("maxmemory=1gb\ntimeout=30\n")))
 		})
 
 		It("blocking - fail", func() {
@@ -319,7 +363,7 @@ var _ = Describe("action utils", func() {
 					Commands: []string{"/bin/bash", "-c", "command-not-found"},
 				},
 			}
-			output, err := blockingCallAction(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("command not found"))
@@ -333,7 +377,7 @@ var _ = Describe("action utils", func() {
 				},
 			}
 			timeout := int32(1)
-			output, err := blockingCallAction(ctx, action, nil, &timeout)
+			output, err := blockingCallAction(ctx, action, nil, nil, &timeout)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 			Expect(output).Should(BeNil())
@@ -372,7 +416,7 @@ var _ = Describe("action utils", func() {
 					Path: "/echo",
 				},
 			}
-			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
@@ -387,7 +431,7 @@ var _ = Describe("action utils", func() {
 				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, nil)
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
@@ -410,7 +454,7 @@ var _ = Describe("action utils", func() {
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, stderrBuf)
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stdoutBuf, stderrBuf)
 			Expect(err).Should(BeNil())
 
 			err = waitError(errChan)
@@ -433,7 +477,7 @@ var _ = Describe("action utils", func() {
 				"useless": "useless",
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			errChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, stdoutBuf, nil)
+			errChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
@@ -448,7 +492,7 @@ var _ = Describe("action utils", func() {
 					Body: "ok",
 				},
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -468,7 +512,7 @@ var _ = Describe("action utils", func() {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -491,7 +535,7 @@ var _ = Describe("action utils", func() {
 					},
 				},
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -509,9 +553,21 @@ var _ = Describe("action utils", func() {
 					Body: "ok",
 				},
 			}
-			output, err := blockingCallAction(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("ok")))
+		})
+
+		It("rejects runtime arguments", func() {
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+				},
+			}
+			_, err := nonBlockingCallActionX(ctx, action, nil, []string{"a", "b"}, nil, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
 		It("blocking - parameters", func() {
@@ -525,7 +581,7 @@ var _ = Describe("action utils", func() {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			output, err := blockingCallAction(ctx, action, parameters, nil)
+			output, err := blockingCallAction(ctx, action, parameters, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("parameters")))
 		})
@@ -544,7 +600,7 @@ var _ = Describe("action utils", func() {
 					},
 				},
 			}
-			output, err := blockingCallAction(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("internal server error"))
@@ -671,7 +727,7 @@ message EchoResponse {
 			reflection.Register(s)
 
 			go func() {
-				if err := s.Serve(l); err != nil {
+				if err := s.Serve(l); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 					panic(err)
 				}
 			}()
@@ -709,7 +765,7 @@ message EchoResponse {
 					},
 				},
 			}
-			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil)
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
@@ -733,7 +789,7 @@ message EchoResponse {
 				},
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, nil)
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
@@ -759,7 +815,7 @@ message EchoResponse {
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 			stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, stdoutBuf, stderrBuf)
+			errChan, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, stdoutBuf, stderrBuf)
 			Expect(err).Should(BeNil())
 
 			err = waitError(errChan)
@@ -791,7 +847,7 @@ message EchoResponse {
 				"useless": "useless",
 			}
 			stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-			errChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, stdoutBuf, nil)
+			errChan, err := nonBlockingCallActionX(ctx, action, parameters, nil, nil, nil, stdoutBuf, nil)
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
@@ -815,7 +871,7 @@ message EchoResponse {
 					},
 				},
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -844,7 +900,7 @@ message EchoResponse {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, parameters, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -870,7 +926,7 @@ message EchoResponse {
 					},
 				},
 			}
-			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil)
+			resultChan, err := nonBlockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 
 			result := <-resultChan
@@ -897,9 +953,23 @@ message EchoResponse {
 					},
 				},
 			}
-			output, err := blockingCallAction(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("ok")))
+		})
+
+		It("rejects runtime arguments", func() {
+			action := &proto.Action{
+				GRPC: &proto.GRPCAction{
+					Port:    port,
+					Host:    host,
+					Service: "test.EchoService",
+					Method:  "Echo",
+				},
+			}
+			_, err := nonBlockingCallActionX(ctx, action, nil, []string{"a", "b"}, nil, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
 		It("blocking - parameters", func() {
@@ -922,7 +992,7 @@ message EchoResponse {
 			parameters := map[string]string{
 				"PARAM": "parameters",
 			}
-			output, err := blockingCallAction(ctx, action, parameters, nil)
+			output, err := blockingCallAction(ctx, action, parameters, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("parameters")))
 		})
@@ -944,7 +1014,7 @@ message EchoResponse {
 					},
 				},
 			}
-			output, err := blockingCallAction(ctx, action, nil, nil)
+			output, err := blockingCallAction(ctx, action, nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("error"))

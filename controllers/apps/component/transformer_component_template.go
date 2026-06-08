@@ -406,6 +406,7 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 				Reconfigure:           action(tpl),
 				ReconfigureActionName: actionName(tpl),
 				Parameters:            parameters(tpl),
+				ReconfigureArgs:       tpl.ReconfigureArgs,
 			}
 			synthesizedComp.Configs = append(synthesizedComp.Configs, config)
 		}

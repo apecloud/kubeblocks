@@ -556,10 +556,15 @@ type ConfigTemplate struct {
 	// +optional
 	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`
 
-	// The parameters to call the reconfigure action.
+	// The env/template parameters to call the reconfigure action.
 	//
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// ReconfigureArgs is the runtime argv payload for the reconfigure action.
+	//
+	// +optional
+	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
 }
 
 type InstanceStatus struct {

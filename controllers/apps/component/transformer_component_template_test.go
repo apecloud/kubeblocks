@@ -297,6 +297,28 @@ var _ = Describe("file templates transformer test", func() {
 			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[0]))
 		})
 
+		It("reconfigure args", func() {
+			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureRequired = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction = &appsv1.Action{
+				HTTP: &appsv1.HTTPAction{
+					Port: "8080",
+					Path: "/reload",
+				},
+			}
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureArgs = [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			Expect(transCtx.SynthesizeComponent.Configs).Should(HaveLen(1))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Name).Should(Equal("logConf"))
+			Expect(transCtx.SynthesizeComponent.Configs[0].ReconfigureActionName).Should(Equal(component.UserReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[0])))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Reconfigure).Should(Equal(transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction))
+			Expect(transCtx.SynthesizeComponent.Configs[0].ReconfigureArgs).Should(Equal(transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureArgs))
+		})
+
 		It("external managed", func() {
 			transCtx.SynthesizeComponent.FileTemplates[1].ReconfigureRequired = ptr.To(true)
 			transCtx.SynthesizeComponent.FileTemplates[1].ReconfigureAction = &appsv1.Action{

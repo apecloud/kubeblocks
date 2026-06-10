@@ -522,7 +522,7 @@ type ClusterComponentConfig struct {
 	// +optional
 	Name *string `json:"name,omitempty"`
 
-	// Variables are key-value pairs for dynamic configuration values that can be provided by the user.
+	// Variables are template variables used to render managed configuration templates.
 	//
 	// +optional
 	Variables map[string]string `json:"variables,omitempty"`
@@ -571,6 +571,11 @@ type ClusterComponentConfig struct {
 	//
 	// +optional
 	ReconfigureAction *Action `json:"reconfigureAction,omitempty"`
+
+	// ReconfigureArgs is a list of runtime argument groups for the reconfigure action.
+	//
+	// +optional
+	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

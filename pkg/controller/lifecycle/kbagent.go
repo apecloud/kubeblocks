@@ -285,6 +285,9 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 				RetryInterval: opts.RetryPolicy.RetryInterval,
 			}
 		}
+		if len(opts.Arguments) > 0 {
+			req.Arguments = opts.Arguments
+		}
 	}
 	return req, nil
 }

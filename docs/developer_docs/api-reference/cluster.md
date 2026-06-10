@@ -2842,7 +2842,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Variables are key-value pairs for dynamic configuration values that can be provided by the user.</p>
+<p>Variables are template variables used to render managed configuration templates.</p>
 </td>
 </tr>
 <tr>
@@ -2935,6 +2935,18 @@ Action
 <li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureArgs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReconfigureArgs is a list of runtime argument groups for the reconfigure action.</p>
 </td>
 </tr>
 </tbody>
@@ -6118,7 +6130,8 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure that reloads the file when it&rsquo;s content changes.</p>
 <p>If specified, this action overrides the global reconfigure action defined in lifecycle actions
-for this specific file template.</p>
+for this specific file template.
+External-managed systems may define different behavior for this action entry.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
@@ -33207,7 +33220,19 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The parameters to call the reconfigure action.</p>
+<p>The env/template parameters to call the reconfigure action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureArgs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReconfigureArgs is the runtime argv payload for the reconfigure action.</p>
 </td>
 </tr>
 </tbody>

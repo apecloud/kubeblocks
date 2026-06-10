@@ -713,6 +713,14 @@ spec:
                                 format: int32
                                 type: integer
                             type: object
+                          reconfigureArgs:
+                            description: ReconfigureArgs is a list of runtime argument
+                              groups for the reconfigure action.
+                            items:
+                              items:
+                                type: string
+                              type: array
+                            type: array
                           restart:
                             description: Specifies whether to restart the component
                               to reload the updated configuration.
@@ -720,8 +728,8 @@ spec:
                           variables:
                             additionalProperties:
                               type: string
-                            description: Variables are key-value pairs for dynamic
-                              configuration values that can be provided by the user.
+                            description: Variables are template variables used to
+                              render managed configuration templates.
                             type: object
                         type: object
                       type: array
@@ -11927,6 +11935,14 @@ spec:
                                     format: int32
                                     type: integer
                                 type: object
+                              reconfigureArgs:
+                                description: ReconfigureArgs is a list of runtime
+                                  argument groups for the reconfigure action.
+                                items:
+                                  items:
+                                    type: string
+                                  type: array
+                                type: array
                               restart:
                                 description: Specifies whether to restart the component
                                   to reload the updated configuration.
@@ -11934,9 +11950,8 @@ spec:
                               variables:
                                 additionalProperties:
                                   type: string
-                                description: Variables are key-value pairs for dynamic
-                                  configuration values that can be provided by the
-                                  user.
+                                description: Variables are template variables used
+                                  to render managed configuration templates.
                                 type: object
                             type: object
                           type: array

@@ -238,6 +238,25 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("action request arguments", func() {
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			arguments := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("postProvision"))
+					Expect(req.Arguments).Should(Equal(arguments))
+					Expect(req.Parameters).Should(BeEmpty())
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{Arguments: arguments})
+			Expect(err).Should(BeNil())
+		})
+
 		It("succeed", func() {
 			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())

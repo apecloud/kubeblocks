@@ -562,6 +562,9 @@ func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.P
 		}
 		pvcValue, exists := pvc.Labels[k]
 		if !exists {
+			if backupTargetSelectorKeyScopesPVC(k) {
+				return false, true
+			}
 			continue
 		}
 		effective = true
@@ -575,6 +578,9 @@ func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.P
 		}
 		value, exists := pvc.Labels[expression.Key]
 		if !exists {
+			if backupTargetSelectorKeyScopesPVC(expression.Key) {
+				return false, true
+			}
 			continue
 		}
 		effective = true
@@ -600,6 +606,15 @@ func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.P
 		}
 	}
 	return true, effective
+}
+
+func backupTargetSelectorKeyScopesPVC(key string) bool {
+	switch key {
+	case constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey, constant.VolumeClaimTemplateNameLabelKey:
+		return true
+	default:
+		return false
+	}
 }
 
 func requiredPolicyForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) (*dpv1alpha1.RequiredPolicyForAllPodSelection, error) {

@@ -122,6 +122,8 @@ Look for:
 * removed shards limited to the names listed in `offline`;
 * remaining shards untouched (no pod restarts or PVC changes).
 
+For release validation, record the full component names and pod UIDs before scale-in. The target shard named in `offline` should be the only removed shard; all non-target shard component names and pod UIDs should remain stable.
+
 ## Notes
 
 * Shard names are generated; always read the actual component names before filling `offline`. `offline` entries are full component names (`<cluster>-<sharding>-<id>`).

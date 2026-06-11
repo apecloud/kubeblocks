@@ -121,12 +121,6 @@ spec:
 
 The placement annotation value is a comma-separated list of kubeconfig context names. In this example, KubeBlocks can place Redis instances in `data-a` and `data-b`.
 
-Placement semantics:
-
-* Instances are distributed round-robin by ordinal across the listed contexts (`contexts[ordinal % N]`). Each distributed object carries its assigned context in its own `apps.kubeblocks.io/multi-cluster-placement` annotation, which you can use to verify placement.
-* If the annotation is present but empty, KubeBlocks automatically assigns a subset of the configured contexts (sized by the largest component replica count) and writes it back to the cluster annotation.
-* Every component and sharding template in a placement-enabled cluster must set `enableInstanceAPI: true`; otherwise reconciliation fails with `the multi-cluster object is only supported for components that enable the instance API`.
-
 Placement details:
 
 * Instances are distributed across the listed contexts by ordinal (`contexts[ordinal % len(contexts)]`), and each placed object carries the `apps.kubeblocks.io/multi-cluster-placement` annotation with its assigned context, so placement is directly observable.
@@ -151,6 +145,15 @@ kubectl --context data-b get pod,pvc -n demo
 ```
 
 The control cluster should show the unified KubeBlocks status, while each data cluster should contain the runtime resources assigned to it.
+
+### Validate failover and disabled contexts
+
+For release validation, do not stop at object creation. Also verify that the control plane can keep managing the data-cluster resources after the initial placement:
+
+1. Delete one database pod in a data cluster and confirm it is recreated in the same context.
+2. Add a context to `multiCluster.contextsDisabled`, restart the KubeBlocks manager, then scale out the cluster.
+3. Confirm the new instance is assigned only to an enabled context and no new pod or PVC appears in the disabled data cluster.
+4. Check manager logs for repeated discovery, authentication, or status aggregation errors.
 
 ## Sharded Clusters
 
@@ -199,3 +202,4 @@ Existing single-cluster databases can continue running without placement annotat
 * Data clusters must have the required CRDs, RBAC, storage classes, network access, and controllers.
 * For production workloads, specify placement explicitly instead of relying on automatic placement.
 * Temporarily disable a data cluster by adding its context to `multiCluster.contextsDisabled`.
+* Multi-cluster support is experimental in 1.1. Validate storage, service discovery, backup, and operational runbooks in your own environment before production use.

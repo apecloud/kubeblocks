@@ -11,7 +11,7 @@ This document defines end-to-end test cases for the key KubeBlocks 1.1 features:
 7. Volume sharing among instances
 8. KubeBlocks upgrade from 1.0.x to 1.1
 
-Each case is written so it can be executed manually first and later converted into automated e2e tests.
+Each case is written so it can be executed manually first and later converted into automated e2e tests. For release sign-off, each executed case must record the exact KubeBlocks chart/image version, Kubernetes version, cloud/provider or local environment, commands, relevant object YAML or JSON snippets, and the final pass/fail result.
 
 ## Shared Test Environment
 
@@ -20,6 +20,7 @@ Each case is written so it can be executed manually first and later converted in
 * `kubectl`
 * `helm`
 * `jq`
+* `yq`, recommended for YAML snapshots
 * `grpcurl`, only for optional config-manager checks
 * `kbcli`, if addon installation or database-specific checks use kbcli workflows
 
@@ -43,8 +44,47 @@ export DATA_CONTEXT_B=data-b
 Create the test namespace:
 
 ```bash
-kubectl create namespace ${TEST_NAMESPACE}
+kubectl create namespace ${TEST_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+For multi-cluster tests, create the namespace in every data cluster:
+
+```bash
+kubectl --context ${DATA_CONTEXT_A} create namespace ${TEST_NAMESPACE} --dry-run=client -o yaml | kubectl --context ${DATA_CONTEXT_A} apply -f -
+kubectl --context ${DATA_CONTEXT_B} create namespace ${TEST_NAMESPACE} --dry-run=client -o yaml | kubectl --context ${DATA_CONTEXT_B} apply -f -
+```
+
+### Execution Order
+
+Run the upgrade test (E2E-8) in a clean cluster because it starts from KubeBlocks 1.0.x. Run the feature tests (E2E-1 to E2E-7) against the final KubeBlocks 1.1.0 chart, CRDs, and images.
+
+Recommended order:
+
+1. E2E-8 upgrade validation on a dedicated cluster.
+2. E2E-1 multi-cluster validation on one control cluster and two data clusters.
+3. E2E-2 to E2E-7 on the primary single-cluster e2e environment.
+4. Repeat the high-risk cases (E2E-1, E2E-2, E2E-5, E2E-8) on the release-blocking Kubernetes versions if the release matrix includes more than one version.
+
+### Evidence to Capture
+
+Before each case:
+
+```bash
+kubectl version
+helm -n ${KB_NAMESPACE} list
+kubectl -n ${KB_NAMESPACE} get deploy,pod -o wide
+kubectl get crd | grep kubeblocks
+```
+
+During and after each case, capture the objects that prove behavior instead of relying only on visual observation:
+
+```bash
+kubectl get clusters.apps.kubeblocks.io,components.apps.kubeblocks.io,instancesets.workloads.kubeblocks.io,instances.workloads.kubeblocks.io,rollouts.apps.kubeblocks.io -n ${TEST_NAMESPACE} -o yaml
+kubectl get pod,pvc -n ${TEST_NAMESPACE} -o wide
+kubectl -n ${KB_NAMESPACE} logs deploy/kubeblocks --tail=300
+```
+
+If a case fails, keep the namespace until `kubectl describe` output, controller logs, and the relevant CR YAML have been saved. Do not reuse a failed namespace for another case unless the failure has been triaged and cleanup is complete.
 
 ### Shared Cleanup
 
@@ -135,7 +175,7 @@ spec:
 4. List pods and PVCs in each data cluster.
 5. Delete one database pod in data cluster A.
 6. Confirm the pod is recreated in data cluster A.
-7. Patch the cluster annotation to disable data cluster B by updating Helm `contextsDisabled` to `data-b`, then restart the manager.
+7. Disable data cluster B by updating Helm `multiCluster.contextsDisabled` to `data-b`, then restart the manager.
 8. Scale the component from 2 replicas to 3 replicas.
 9. Confirm the new instance is not placed into disabled data cluster B.
 
@@ -145,6 +185,7 @@ spec:
 kubectl --context ${CONTROL_CONTEXT} apply -f redis-mc.yaml
 kubectl --context ${CONTROL_CONTEXT} wait --for=jsonpath='{.status.phase}'=Running cluster/redis-mc -n ${TEST_NAMESPACE} --timeout=20m
 kubectl --context ${CONTROL_CONTEXT} get instances.workloads.kubeblocks.io -n ${TEST_NAMESPACE} -o wide
+kubectl --context ${CONTROL_CONTEXT} get instances.workloads.kubeblocks.io -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, placement: .metadata.annotations["apps.kubeblocks.io/multi-cluster-placement"]}'
 kubectl --context ${DATA_CONTEXT_A} get pod,pvc -n ${TEST_NAMESPACE}
 kubectl --context ${DATA_CONTEXT_B} get pod,pvc -n ${TEST_NAMESPACE}
 ```
@@ -157,6 +198,7 @@ kubectl --context ${DATA_CONTEXT_B} get pod,pvc -n ${TEST_NAMESPACE}
 * Runtime pods and PVCs exist in the data clusters, not only in the control cluster.
 * Pod deletion in a data cluster is repaired by KubeBlocks.
 * After `data-b` is disabled, new instances are not scheduled to data cluster B.
+* Existing instances in `data-b` are not moved merely because the context is disabled; disabling affects new placement.
 * Cluster status in the control cluster reflects the aggregate status of instances in data clusters.
 
 ### E2E-1B: Placement Validation and Auto-Assignment
@@ -248,6 +290,18 @@ Steps:
 5. During rollout, verify old and new instances overlap temporarily.
 6. Wait until rollout reaches `Succeed`.
 7. Confirm all stable pods use the target service version.
+
+Commands:
+
+```bash
+kubectl apply -f rollout-demo.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Running cluster/rollout-demo -n ${TEST_NAMESPACE} --timeout=20m
+kubectl get pod -n ${TEST_NAMESPACE} -l app.kubernetes.io/instance=rollout-demo -o json | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, template: .metadata.labels["apps.kubeblocks.io/instance-template"]}'
+kubectl apply -f redis-replace.yaml
+kubectl get rollout redis-replace -n ${TEST_NAMESPACE} -w
+kubectl get cluster rollout-demo -n ${TEST_NAMESPACE} -o yaml
+kubectl get rollout redis-replace -n ${TEST_NAMESPACE} -o yaml
+```
 
 Expected results:
 
@@ -441,7 +495,7 @@ Expected results:
 * Conflicting host port allocation is rejected, rescheduled, or reported with a clear error.
 * Deleting the first cluster releases the port for later use.
 
-Negative check: set `hostPorts` with `hostNetwork: false`. Expected: the entries have no effect on port mapping (this combination is not supported in 1.1).
+Runtime-port check: set `hostPorts` with `hostNetwork: false` and a port name declared in `ComponentDefinition.spec.runtime.containers[*].ports`. Expected: the pod keeps pod networking, but the matching runtime container port gets the requested `hostPort`; unknown runtime port names are ignored.
 
 ### E2E-3C: Host Aliases and DNS Config
 
@@ -490,6 +544,7 @@ Expected results:
 ```bash
 kubectl get pod -n ${TEST_NAMESPACE} -o wide
 kubectl get pod <pod-name> -n ${TEST_NAMESPACE} -o json | jq '.spec.hostNetwork,.spec.hostAliases,.spec.dnsPolicy,.spec.dnsConfig'
+kubectl get pod <pod-name> -n ${TEST_NAMESPACE} -o json | jq '.spec.containers[].ports'
 kubectl exec -n ${TEST_NAMESPACE} <pod-name> -- getent hosts legacy-db.internal
 ```
 
@@ -575,6 +630,17 @@ Steps:
 3. Patch the cluster to add `instances[0].name=highperf` with ordinal `2`.
 4. Wait for reconciliation.
 5. Inspect pod `foo-2`.
+
+Commands:
+
+```bash
+kubectl apply -f adopt-demo.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Running cluster/adopt-demo -n ${TEST_NAMESPACE} --timeout=20m
+kubectl get pod,pvc -n ${TEST_NAMESPACE} -o json | jq '.items[] | {kind: .kind, name: .metadata.name, uid: .metadata.uid}'
+kubectl patch cluster adopt-demo -n ${TEST_NAMESPACE} --type merge --patch-file adopt-highperf-patch.yaml
+kubectl get instanceset -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, assignedOrdinals: .status.assignedOrdinals}'
+kubectl get pod foo-2 -n ${TEST_NAMESPACE} -o json | jq '{name: .metadata.name, uid: .metadata.uid, template: .metadata.labels["apps.kubeblocks.io/instance-template"], resources: .spec.containers[].resources}'
+```
 
 Expected results:
 
@@ -759,6 +825,15 @@ Steps:
 2. Wait for the new shard component to be created and ready.
 3. Inspect action logs and cluster status.
 
+Commands:
+
+```bash
+kubectl patch cluster shard-life -n ${TEST_NAMESPACE} --type merge -p '{"spec":{"shardings":[{"name":"shard","shards":3}]}}'
+kubectl get components -n ${TEST_NAMESPACE} -l apps.kubeblocks.io/sharding-name=shard -w
+kubectl get components -n ${TEST_NAMESPACE} -l apps.kubeblocks.io/sharding-name=shard -o json | jq '.items[] | {name: .metadata.name, add: .metadata.annotations["kubeblocks.io/sharding-add-shard"]}'
+kubectl get cluster shard-life -n ${TEST_NAMESPACE} -o yaml
+```
+
 Expected results:
 
 * Exactly one new shard component is created, named `<cluster>-<sharding>-<id>` with a generated 3-character shard ID.
@@ -881,6 +956,15 @@ Steps:
 2. Patch the sharding: set `shards: 2` and `offline: ["<victim>"]`.
 3. Watch component deletion and action logs.
 
+Commands:
+
+```bash
+kubectl get components -n ${TEST_NAMESPACE} -l apps.kubeblocks.io/sharding-name=shard -o wide
+kubectl get pod -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, component: .metadata.labels["apps.kubeblocks.io/component-name"]}'
+kubectl patch cluster shard-hetero -n ${TEST_NAMESPACE} --type merge --patch-file shard-offline-patch.yaml
+kubectl get components -n ${TEST_NAMESPACE} -l apps.kubeblocks.io/sharding-name=shard -w
+```
+
 Expected results:
 
 * Exactly `<victim>` is removed; the other shards keep running with unchanged pod UIDs.
@@ -962,9 +1046,22 @@ Expected results:
 
 Steps:
 
-1. Write a marker file to the `data` volume of `foo-2`.
-2. Adopt ordinal `2` into a named template that declares the same `persistentVolumeClaimName: e2edata` (and higher resources), following the E2E-4 adoption flow.
-3. Wait for reconciliation.
+1. Discover the mount path used by the `data` volume in pod `foo-2`.
+2. Write a marker file to that mount path.
+3. Adopt ordinal `2` into a named template that declares the same `persistentVolumeClaimName: e2edata` (and higher resources), following the E2E-4 adoption flow.
+4. Wait for reconciliation.
+
+Commands:
+
+```bash
+export DATA_MOUNT_PATH=$(kubectl get pod foo-2 -n ${TEST_NAMESPACE} -o json | jq -r '.spec.containers[].volumeMounts[] | select(.name=="data") | .mountPath' | head -n1)
+test -n "${DATA_MOUNT_PATH}"
+kubectl exec -n ${TEST_NAMESPACE} foo-2 -- sh -c "date > ${DATA_MOUNT_PATH}/kb11-marker"
+kubectl get pvc e2edata-2 -n ${TEST_NAMESPACE} -o json | jq '{name: .metadata.name, uid: .metadata.uid}'
+kubectl patch cluster vol-share -n ${TEST_NAMESPACE} --type merge --patch-file vol-share-adopt-patch.yaml
+kubectl exec -n ${TEST_NAMESPACE} foo-2 -- cat "${DATA_MOUNT_PATH}/kb11-marker"
+kubectl get pvc -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, uid: .metadata.uid}'
+```
 
 Expected results:
 
@@ -1015,11 +1112,26 @@ helm -n ${KB_NAMESPACE} upgrade kubeblocks kubeblocks/kubeblocks --version 1.1.0
 6. Wait for the KubeBlocks manager pods to roll to the 1.1.0 image and become Ready.
 7. Compare pod/PVC UIDs and cluster status against the baseline; read the marker data back.
 
+Baseline and comparison commands:
+
+```bash
+kubectl get clusters -A -o yaml > /tmp/kb11-before-clusters.yaml
+kubectl get components -A -o yaml > /tmp/kb11-before-components.yaml
+kubectl get pod -A -l app.kubernetes.io/managed-by=kubeblocks -o json | jq '[.items[] | {namespace: .metadata.namespace, name: .metadata.name, uid: .metadata.uid}] | sort_by(.namespace, .name)' > /tmp/kb11-before-pods.json
+kubectl get pvc -A -o json | jq '[.items[] | {namespace: .metadata.namespace, name: .metadata.name, uid: .metadata.uid}] | sort_by(.namespace, .name)' > /tmp/kb11-before-pvcs.json
+
+kubectl -n ${KB_NAMESPACE} rollout status deploy/kubeblocks --timeout=10m
+kubectl get pod -A -l app.kubernetes.io/managed-by=kubeblocks -o json | jq '[.items[] | {namespace: .metadata.namespace, name: .metadata.name, uid: .metadata.uid}] | sort_by(.namespace, .name)' > /tmp/kb11-after-pods.json
+kubectl get pvc -A -o json | jq '[.items[] | {namespace: .metadata.namespace, name: .metadata.name, uid: .metadata.uid}] | sort_by(.namespace, .name)' > /tmp/kb11-after-pvcs.json
+diff -u /tmp/kb11-before-pods.json /tmp/kb11-after-pods.json
+diff -u /tmp/kb11-before-pvcs.json /tmp/kb11-after-pvcs.json
+```
+
 Expected results:
 
 * All existing clusters stay `Running` throughout the upgrade; no database pod is restarted or recreated (pod UIDs unchanged).
 * PVCs are untouched (UIDs unchanged) and the marker data is readable after the upgrade.
-* New CRDs are installed: `rollouts.apps.kubeblocks.io`, `instances.workloads.kubeblocks.io`, `parameterviews.parameters.kubeblocks.io`.
+* New CRDs are installed: `rollouts.apps.kubeblocks.io`, `instances.workloads.kubeblocks.io`.
 * No CRDs are removed; existing CRs (including `apps.kubeblocks.io/v1alpha1` resources) are still readable.
 * The manager logs show no conversion or schema errors after the upgrade.
 

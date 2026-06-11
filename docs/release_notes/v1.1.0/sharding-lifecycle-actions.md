@@ -168,6 +168,8 @@ kubectl get pod -n demo
 kubectl logs <action-or-target-pod> -n demo
 ```
 
+For release validation, capture one successful run for each action and one retry path. `postProvision` and `preTerminate` should be visible in `status.shardings`; `shardAdd` and `shardRemove` should be verified through shard annotations, action logs, and whether the shard creation or deletion is blocked until the action succeeds.
+
 ## Common Use Cases
 
 ### Register a new shard in a router

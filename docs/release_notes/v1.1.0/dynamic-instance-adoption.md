@@ -245,11 +245,13 @@ Look for:
 * expected ordinals in template status;
 * expected resource, scheduling, image, or storage changes on adopted pods.
 
+For release validation, record pod UIDs and PVC UIDs before and after adoption. Pod recreation may be required for immutable pod-template changes, but the logical pod name, ordinal assignment, and PVC identity must stay attached to the intended instance.
+
 ## Notes
 
 * `flatInstanceOrdinal: true` is required.
 * Ordinals must be unique across the default template and all named templates.
 * Pod names remain stable, but pods may be recreated when the new template changes immutable pod fields.
 * PVC data is preserved according to the component's PVC retention policy and storage behavior.
-* To keep PVC identity stable when an instance moves between templates, set the same `persistentVolumeClaimName` prefix in both templates. See [Volume Sharing Among Instances](./volume-sharing.md).
+* To keep PVC identity stable when an instance moves between templates, set the same `persistentVolumeClaimName` prefix in both templates.
 * For sharded clusters, use `shardTemplates[*].shardIDs` to adopt specific shards. See [Heterogeneous Shards and Shard-Specific Scale-In](./heterogeneous-shards.md).

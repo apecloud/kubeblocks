@@ -204,6 +204,14 @@ Important status fields:
 * `rolledOutReplicas`: number of instances already rolled out
 * `canaryReplicas`: number of canary instances
 
+For release validation, record the following evidence for each rollout strategy:
+
+* the initial cluster spec, pod names, pod UIDs, PVC names, and PVC UIDs;
+* `Rollout.status.state`, `status.components` or `status.shardings`, and `status.message` during the rollout;
+* the rollout-managed instance template and pod labels while the rollout is active;
+* the final cluster spec after the rollout succeeds or is aborted;
+* manager logs for validation errors, selector mistakes, or repeated retries.
+
 ## Roll Back or Abort
 
 To stop an in-progress rollout, delete the `Rollout` object:

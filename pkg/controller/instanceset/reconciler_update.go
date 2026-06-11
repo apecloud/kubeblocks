@@ -22,6 +22,7 @@ package instanceset
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -181,7 +182,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			newMergedPod := copyAndMerge(pod, newPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {
 				tree.Logger.Error(err, "check support resize sub resource error")
@@ -191,9 +191,25 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
 			// Another reconciliation will be triggered since pod status will be updated.
 			if !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource {
-				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
+				if !equalBasicInPlaceFields(pod, newPod) {
+					newBasicPod := newPod.DeepCopy()
+					keepCurrentResourceFields(pod, newBasicPod)
+					skipSwitchover := safeMetadataOnlyInPlaceUpdate(pod, newBasicPod)
+					newMergedPod := copyAndMerge(pod, newBasicPod)
+					if !skipSwitchover {
+						if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
+							return kubebuilderx.Continue, err
+						}
+					}
+					err = tree.Update(newMergedPod)
+				} else {
+					newMergedPod := copyAndMerge(pod, newPod)
+					err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
+				}
 			} else {
-				if !safeMetadataOnlyInPlaceUpdate(pod, newPod) {
+				skipSwitchover := safeMetadataOnlyInPlaceUpdate(pod, newPod)
+				newMergedPod := copyAndMerge(pod, newPod)
+				if !skipSwitchover {
 					if err = r.switchover(tree, its, newMergedPod.(*corev1.Pod)); err != nil {
 						return kubebuilderx.Continue, err
 					}
@@ -308,6 +324,21 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		}
 	}
 	return len(toUpdate) == 0, nil
+}
+
+func keepCurrentResourceFields(current, desired *corev1.Pod) {
+	copyResourceFields := func(currentContainers []corev1.Container, desiredContainers []corev1.Container) {
+		for i := range desiredContainers {
+			idx := slices.IndexFunc(currentContainers, func(container corev1.Container) bool {
+				return container.Name == desiredContainers[i].Name
+			})
+			if idx >= 0 {
+				desiredContainers[i].Resources = currentContainers[idx].Resources
+			}
+		}
+	}
+	copyResourceFields(current.Spec.InitContainers, desired.Spec.InitContainers)
+	copyResourceFields(current.Spec.Containers, desired.Spec.Containers)
 }
 
 func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {

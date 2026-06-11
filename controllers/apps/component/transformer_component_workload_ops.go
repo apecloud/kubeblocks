@@ -367,6 +367,14 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			if err := r.joinMemberForPod(pod, pods); err != nil {
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
+				key := types.NamespacedName{Namespace: r.protoITS.Namespace, Name: r.protoITS.Name}
+				if err := component.UpdateReplicaStatusWithRetry(r.transCtx.Context, r.cli, key, pod.Name, func(status *component.ReplicaStatus) error {
+					status.MemberJoined = ptr.To(true)
+					return nil
+				}); err != nil {
+					joinErrors = append(joinErrors, fmt.Errorf("pod %s: persist member joined status: %w", pod.Name, err))
+					continue
+				}
 				replicas.Status[i].MemberJoined = ptr.To(true)
 			}
 		}

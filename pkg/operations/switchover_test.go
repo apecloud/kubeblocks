@@ -246,5 +246,112 @@ var _ = Describe("", func() {
 		It("Test switchover OpsRequest with candidate and specified a component object name", func() {
 			testSwitchoverWithCandidate(true)
 		})
+
+		It("Test switchover OpsRequest with sharding component name", func() {
+			const (
+				shardingName       = "shard"
+				shardingTemplate   = "redis"
+				shardComponentName = "shard-abc"
+			)
+
+			By("creating a sharding cluster whose template name differs from the sharding name")
+			shardingCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				WithRandomName().
+				AddSharding(shardingName, "", compDefObj.Name).
+				SetShardingReplicas(2).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObj(&testCtx, shardingCluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.Shardings[0].Template.Name = shardingTemplate
+			})).Should(Succeed())
+
+			By("creating the concrete shard component")
+			testapps.NewComponentFactory(testCtx.DefaultNamespace, shardingCluster.Name+"-"+shardComponentName, compDefObj.Name).
+				AddAppManagedByLabel().
+				AddAppInstanceLabel(shardingCluster.Name).
+				AddAppComponentLabel(shardComponentName).
+				AddLabels(constant.KBAppShardingNameLabelKey, shardingName).
+				AddAnnotations(constant.KBAppClusterUIDKey, string(shardingCluster.UID)).
+				SetReplicas(2).
+				Create(&testCtx).
+				GetObject()
+
+			By("creating an instanceset and pods for the concrete shard")
+			container := corev1.Container{
+				Name:            "mock-container-name",
+				Image:           testapps.ApeCloudMySQLImage,
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}
+			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				shardingCluster.Name+"-"+shardComponentName, shardingCluster.Name, shardComponentName).
+				AddFinalizers([]string{constant.DBClusterFinalizerName}).
+				AddContainer(container).
+				AddAppInstanceLabel(shardingCluster.Name).
+				AddAppComponentLabel(shardComponentName).
+				AddLabels(constant.KBAppShardingNameLabelKey, shardingName).
+				AddAppManagedByLabel().
+				SetReplicas(2).
+				Create(&testCtx).GetObject()
+
+			for i := int32(0); i < *its.Spec.Replicas; i++ {
+				_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
+					AddContainer(container).
+					AddLabelsInMap(its.Labels).
+					AddRoleLabel(defaultRole(i)).
+					Create(&testCtx).GetObject()
+			}
+
+			By("mocking the sharding cluster status as Running")
+			Expect(testapps.ChangeObjStatus(&testCtx, shardingCluster, func() {
+				shardingCluster.Status.Phase = appsv1.RunningClusterPhase
+				shardingCluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+					shardingName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+				shardingCluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					shardingName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+			})).Should(Succeed())
+
+			opsRes.Cluster = shardingCluster
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				shardingCluster.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%d", its.Name, 1)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentName: shardingName,
+					InstanceName:  instanceName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			By("mock switchover OpsRequest phase is Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("do switchover action")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, opsv1alpha1.ConditionTypeFailed)).Should(BeNil())
+			Expect(opsRes.OpsRequest.Status.Components).Should(HaveKey(shardingName))
+			Expect(opsRes.OpsRequest.Status.Components).ShouldNot(HaveKey(shardingTemplate))
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
+					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
+					rsp := kbagentproto.ActionResponse{Message: "mock success"}
+					return rsp, nil
+				})
+			})
+
+			By("do reconcile switchover action")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
 	})
 })

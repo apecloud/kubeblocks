@@ -61,7 +61,7 @@ const (
 	defaultMaxIdleConnectionsPerHost = 20
 
 	defaultActionCallTimeout = 30 * time.Second
-	maxActionCallTimeout     = 60 * time.Second
+	maxActionCallTimeout     = 120 * time.Second
 
 	defaultHTTPHost   = "127.0.0.1"
 	defaultHTTPScheme = "HTTP"

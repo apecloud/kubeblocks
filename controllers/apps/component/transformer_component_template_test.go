@@ -280,6 +280,22 @@ var _ = Describe("file templates transformer test", func() {
 			})
 		})
 
+		It("keeps empty template file content empty", func() {
+			logConfCM.Data["member_leave.sh"] = "member_leave"
+			logConfCM.Data["role_probe.sh"] = "role_probe"
+			logConfCM.Data["switchover.sh"] = ""
+
+			transformer := &componentFileTemplateTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Labels).Should(HaveKeyWithValue(kubeBlockFileTemplateLabelKey, "true"))
+				Expect(obj.Data).Should(HaveKeyWithValue("member_leave.sh", "member_leave"))
+				Expect(obj.Data).Should(HaveKeyWithValue("role_probe.sh", "role_probe"))
+				Expect(obj.Data).Should(HaveKeyWithValue("switchover.sh", ""))
+			})
+		})
+
 		It("udf reconfigure", func() {
 			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureRequired = ptr.To(true)
 			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction = &appsv1.Action{

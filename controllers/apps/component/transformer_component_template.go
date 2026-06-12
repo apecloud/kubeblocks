@@ -313,8 +313,12 @@ func (t *componentFileTemplateTransformer) renderFileTemplateData(transCtx *comp
 	}
 
 	tpl := template.New(fileTemplate.Name).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
-	for key, val := range data {
-		ptpl, err := tpl.Parse(val)
+	for _, key := range slices.Sorted(maps.Keys(data)) {
+		ptpl, err := tpl.Clone()
+		if err != nil {
+			return nil, err
+		}
+		ptpl, err = ptpl.Parse(data[key])
 		if err != nil {
 			return nil, err
 		}

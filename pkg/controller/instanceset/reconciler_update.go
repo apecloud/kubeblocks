@@ -168,9 +168,19 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		// Always call reconfigure to execute reconfigure actions
-		allUpdated, err1 := r.reconfigure(tree, its, pod)
+		allUpdated, configUpdated, err1 := r.reconfigure(tree, its, pod)
 		if err1 != nil {
 			return kubebuilderx.Continue, err1
+		}
+		if configUpdated && updatePolicy != recreatePolicy {
+			if err = configsToPod(its.Spec.Configs, pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if err = tree.Update(pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			updatingPods++
+			continue
 		}
 		if !allUpdated && updatePolicy == noOpsPolicy {
 			updatingPods++
@@ -313,17 +323,17 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, bool, error) {
 	toUpdate, err := configsToUpdate(its, pod)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	for _, config := range toUpdate {
 		if err = r.reconfigureInst(tree, its, pod, config); err != nil {
-			return false, err
+			return false, false, err
 		}
 	}
-	return len(toUpdate) == 0, nil
+	return len(toUpdate) == 0, len(toUpdate) > 0, nil
 }
 
 func keepCurrentResourceFields(current, desired *corev1.Pod) {

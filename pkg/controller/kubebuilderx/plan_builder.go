@@ -188,10 +188,14 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 					return
 				}
 				var v *model.ObjectVertex
-				subResource := desiredTree.childrenOptions[*name].SubResource
-				if subResource != "" {
+				options := desiredTree.childrenOptions[*name]
+				subResource := options.SubResource
+				switch {
+				case subResource != "":
 					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource(subResource))
-				} else {
+				case options.Patch:
+					v = model.NewObjectVertex(oldObj, newObj, model.ActionPatchPtr(), inDataContext4G())
+				default:
 					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
 				}
 				findAndAppend(v)

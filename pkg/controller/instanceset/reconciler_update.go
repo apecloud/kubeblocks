@@ -176,7 +176,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if err = configsToPod(its.Spec.Configs, pod); err != nil {
 				return kubebuilderx.Continue, err
 			}
-			if err = tree.Update(pod); err != nil {
+			if err = tree.Update(pod, kubebuilderx.WithPatch(true)); err != nil {
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++

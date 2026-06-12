@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,11 +297,31 @@ func getCompSpecBySwitchover(ctx context.Context, cli client.Client, cluster *ap
 }
 
 func getSwitchoverClusterComponentName(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchover opsv1alpha1.Switchover) (string, error) {
-	compSpec, err := getCompSpecBySwitchover(ctx, cli, cluster, switchover)
-	if err != nil {
+	if len(switchover.ComponentName) > 0 {
+		if cluster.Spec.GetComponentByName(switchover.ComponentName) != nil ||
+			cluster.Spec.GetShardingByName(switchover.ComponentName) != nil {
+			return switchover.ComponentName, nil
+		}
+		return "", fmt.Errorf(`component "%s" not found`, switchover.ComponentName)
+	}
+
+	compObj := &appsv1.Component{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      switchover.ComponentObjectName,
+	}, compObj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", fmt.Errorf(`component object "%s" not found`, switchover.ComponentObjectName)
+		}
 		return "", err
 	}
-	return compSpec.Name, nil
+	if shardingName := compObj.Labels[constant.KBAppShardingNameLabelKey]; len(shardingName) > 0 {
+		return shardingName, nil
+	}
+	if compName := compObj.Labels[constant.KBAppComponentLabelKey]; len(compName) > 0 {
+		return compName, nil
+	}
+	return "", fmt.Errorf(`component object "%s" has no component label`, switchover.ComponentObjectName)
 }
 
 func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsResource, switchover opsv1alpha1.Switchover) (*component.SynthesizedComponent, error) {
@@ -311,12 +332,35 @@ func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsRes
 	componentObjectName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, clusterCompSpec.Name)
 	if len(switchover.ComponentObjectName) > 0 {
 		componentObjectName = switchover.ComponentObjectName
+	} else if opsRes.Cluster.Spec.GetShardingByName(switchover.ComponentName) != nil {
+		componentObjectName, err = getShardingComponentObjectNameByInstance(ctx, cli, opsRes.Cluster, switchover.ComponentName, switchover.InstanceName)
+		if err != nil {
+			return nil, err
+		}
 	}
 	compObj, compDefObj, err := component.GetCompNCompDefByName(ctx, cli, opsRes.Cluster.Namespace, componentObjectName)
 	if err != nil {
 		return nil, err
 	}
 	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj)
+}
+
+func getShardingComponentObjectNameByInstance(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, shardingName, instanceName string) (string, error) {
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: instanceName}, pod); err != nil {
+		return "", err
+	}
+	if pod.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to cluster "%s"`, instanceName, cluster.Name))
+	}
+	if pod.Labels[constant.KBAppShardingNameLabelKey] != shardingName {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to sharding "%s"`, instanceName, shardingName))
+	}
+	componentName := pod.Labels[constant.KBAppComponentLabelKey]
+	if componentName == "" {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not have component label`, instanceName))
+	}
+	return constant.GenerateClusterComponentName(cluster.Name, componentName), nil
 }
 
 func handleProgressDetail(

@@ -20,16 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestReconfigureOptions(t *testing.T) {
@@ -205,4 +214,138 @@ func TestConfigsToUpdateStillReportsRealConfigHashMismatch(t *testing.T) {
 	if toUpdate[0].Name != "valkey-replication-config" {
 		t.Fatalf("unexpected config name %q", toUpdate[0].Name)
 	}
+}
+
+func TestUpdateReconcilerCommitsConfigMetadataBeforeResizeSubresource(t *testing.T) {
+	oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
+	defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
+	viper.Set(constant.FeatureGateInPlacePodVerticalScaling, true)
+
+	origSupportResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+	spy := &instanceLifecycleCallSpy{}
+	origNewLifecycleAction := newLifecycleAction
+	newLifecycleAction = func(_ *workloads.Instance, _ []*corev1.Pod, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+		return spy, nil
+	}
+	defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+	inst := builder.NewInstanceBuilder("default", "valkey-0").
+		SetContainers([]corev1.Container{{
+			Name:  "valkey",
+			Image: "valkey:8",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			},
+		}}).
+		SetPodUpdatePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
+		SetConfigs([]workloads.ConfigTemplate{{
+			Name:       "valkey-replication-config",
+			ConfigHash: ptr.To("old-hash"),
+			Reconfigure: &kbappsv1.Action{
+				Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+			},
+		}}).
+		GetObject()
+
+	pod, err := buildInstancePod(inst, "old-revision")
+	if err != nil {
+		t.Fatalf("buildInstancePod() error = %v", err)
+	}
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{
+		Type:               corev1.PodReady,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Minute)),
+	}}
+	inst.Status.UpdateRevision = getPodRevision(pod)
+	inst.Spec.Configs[0].ConfigHash = ptr.To("new-hash")
+	inst.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1")
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if err = tree.Add(pod); err != nil {
+		t.Fatalf("tree.Add() error = %v", err)
+	}
+
+	res, err := NewUpdateReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	if res != kubebuilderx.Continue {
+		t.Fatalf("expected Continue result, got %v", res)
+	}
+
+	pods := tree.List(&corev1.Pod{})
+	if len(pods) != 1 {
+		t.Fatalf("expected one pod, got %d", len(pods))
+	}
+	updatedPod := pods[0].(*corev1.Pod)
+	if got := updatedPod.Annotations[constant.CMInsConfigurationHashLabelKey]; got != `{"valkey-replication-config":"new-hash"}` {
+		t.Fatalf("expected config hash annotation to be committed first, got %q", got)
+	}
+	if got := updatedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]; !got.Equal(resource.MustParse("500m")) {
+		t.Fatalf("expected resize to be deferred, got CPU limit %s", got.String())
+	}
+	_, option, err := tree.GetWithOption(updatedPod)
+	if err != nil {
+		t.Fatalf("GetWithOption() error = %v", err)
+	}
+	if option.SubResource != "" {
+		t.Fatalf("expected normal pod patch before resize, got subresource %q", option.SubResource)
+	}
+	if !option.Patch {
+		t.Fatalf("expected metadata commit to use patch option")
+	}
+	if spy.reconfigureCalls != 1 {
+		t.Fatalf("expected one reconfigure call, got %d", spy.reconfigureCalls)
+	}
+	if spy.switchoverCalls != 0 {
+		t.Fatalf("expected no switchover for config metadata patch, got %d", spy.switchoverCalls)
+	}
+}
+
+type instanceLifecycleCallSpy struct {
+	switchoverCalls  int
+	reconfigureCalls int
+}
+
+func (s *instanceLifecycleCallSpy) PostProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) PreTerminate(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) RoleProbe(_ context.Context, _ client.Reader, _ *lifecycle.Options) ([]byte, error) {
+	return nil, nil
+}
+
+func (s *instanceLifecycleCallSpy) Switchover(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string) error {
+	s.switchoverCalls++
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) MemberJoin(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) MemberLeave(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ map[string]string) error {
+	s.reconfigureCalls++
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) AccountProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options, _, _, _ string) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) UserDefined(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string, _ *kbappsv1.Action, _ map[string]string) error {
+	return nil
 }

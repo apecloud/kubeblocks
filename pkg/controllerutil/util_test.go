@@ -98,6 +98,37 @@ func TestGetUncachedObjects(t *testing.T) {
 	GetUncachedObjects()
 }
 
+func TestMergeMetadataMaps(t *testing.T) {
+	original := map[string]string{"a": "1"}
+	got := MergeMetadataMaps(original, map[string]string{"a": "override", "b": "2"}, map[string]string{"c": "3"})
+	assert.Equal(t, map[string]string{"a": "1", "b": "2", "c": "3"}, got)
+	assert.Equal(t, map[string]string{"a": "1"}, original)
+}
+
+func TestMergeMetadataMapInplace(t *testing.T) {
+	var target map[string]string
+	MergeMetadataMapInplace(map[string]string{"a": "1"}, &target)
+	assert.Equal(t, map[string]string{"a": "1"}, target)
+	MergeMetadataMapInplace(map[string]string{"a": "2", "b": "3"}, &target)
+	assert.Equal(t, map[string]string{"a": "2", "b": "3"}, target)
+	MergeMetadataMapInplace(nil, &target)
+	assert.Equal(t, map[string]string{"a": "2", "b": "3"}, target)
+}
+
+func TestSupportResizeSubResourceImpl(t *testing.T) {
+	defer viper.Set(constant.CfgKeyServerInfo, nil)
+
+	viper.Set(constant.CfgKeyServerInfo, version.Info{GitVersion: "v1.31.0"})
+	supported, err := supportResizeSubResourceImpl()
+	assert.NoError(t, err)
+	assert.False(t, supported)
+
+	viper.Set(constant.CfgKeyServerInfo, version.Info{GitVersion: "v1.32.0"})
+	supported, err = supportResizeSubResourceImpl()
+	assert.NoError(t, err)
+	assert.True(t, supported)
+}
+
 func TestRequestCtxMisc(t *testing.T) {
 	itFuncs := func(reqCtx *RequestCtx) {
 		reqCtx.Event(nil, "type", "reason", "msg")

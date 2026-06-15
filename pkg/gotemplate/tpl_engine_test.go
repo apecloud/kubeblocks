@@ -83,6 +83,26 @@ my friend name is test2
 			Expect(err).NotTo(HaveOccurred())
 			Expect(context).To(Equal(expectString))
 		})
+
+		It("Should render empty template content as empty", func() {
+			engine := NewTplEngine(&TplValues{}, nil, "for_test", nil, nil)
+
+			rendered, err := engine.Render("member-leave")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal("member-leave"))
+
+			rendered, err = engine.Render("")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal(""))
+
+			rendered, err = engine.Render("role-probe")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal("role-probe"))
+
+			rendered, err = engine.Render("")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal(""))
+		})
 	})
 
 	// A call funcB.1 in B module

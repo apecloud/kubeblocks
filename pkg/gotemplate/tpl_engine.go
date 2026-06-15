@@ -113,7 +113,11 @@ func (t *TplEngine) GetTplEngine() *template.Template {
 
 func (t *TplEngine) Render(context string) (string, error) {
 	var buf strings.Builder
-	tpl, err := t.tpl.Parse(context)
+	tpl, err := t.tpl.Clone()
+	if err != nil {
+		return "", err
+	}
+	tpl, err = tpl.Parse(context)
 	if err != nil {
 		return "", err
 	}

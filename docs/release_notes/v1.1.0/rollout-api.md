@@ -37,6 +37,8 @@ For each target, you can update:
 * rollout replica count, for create/canary style rollout
 * metadata for newly created canary instances
 
+When the addon provides more than one compatible `ComponentDefinition`, set `compDef` explicitly in the rollout target. Otherwise KubeBlocks resolves the target definition from the requested service and version, and a rollout may match a different definition than the one the cluster is currently using. For example, if both `mysql-8.0-1.0.3` and `mysql-orc-8.0-1.0.3` can serve the target version, an unqualified MySQL rollout can select the wrong definition for the test intent.
+
 The API supports three strategies:
 
 | Strategy | Behavior | Best For |
@@ -61,17 +63,20 @@ spec:
   clusterName: mysql-cluster
   components:
     - name: mysql
+      compDef: mysql-8.0-1.0.3
       serviceVersion: "8.0.36"
       strategy:
         inplace: {}
 ```
 
-Apply it:
+Create it:
 
 ```bash
-kubectl apply -f mysql-inplace-rollout.yaml
+kubectl create -f mysql-inplace-rollout.yaml
 kubectl get rollout mysql-inplace -n demo -w
 ```
+
+Observed behavior in the MySQL release validation: an `inplace` rollout from `8.0.35` to `8.0.36` kept the same pod objects and UIDs, updated the `mysql` and `kbagent` container images to `8.0.36`, and restarted those containers in place.
 
 ### Replace rollout
 
@@ -95,6 +100,7 @@ spec:
   clusterName: mysql-cluster
   components:
     - name: mysql
+      compDef: mysql-8.0-1.0.3
       serviceVersion: "8.0.36"
       strategy:
         replace:
@@ -111,6 +117,8 @@ The important knobs are:
 * `scaleDownDelaySeconds`: wait time before scaling down the old instance after the new one becomes ready.
 * `schedulingPolicy`: optional placement rule for replacement instances.
 
+Observed behavior in the MySQL release validation: a `replace` rollout from `8.0.36` to `8.0.37` temporarily created a rollout-managed instance template and new pods, then removed the old pods. The original pods `mysql-cluster-mysql-0` and `mysql-cluster-mysql-1` were replaced by new pods with later ordinals. The component kept `compDef: mysql-8.0-1.0.3` because the rollout target specified it explicitly.
+
 ### Create/canary rollout
 
 Use `create` when you want to create new instances beside stable instances and validate them before promotion.
@@ -125,6 +133,7 @@ spec:
   clusterName: mysql-cluster
   components:
     - name: mysql
+      compDef: mysql-8.0-1.0.3
       serviceVersion: "8.0.36"
       replicas: 1
       strategy:
@@ -153,6 +162,8 @@ In this example:
 To promote, either create the rollout with `promotion.auto: true` (promotion happens automatically after `delaySeconds`), or edit the rollout and set `promotion.auto` to `true` once the canary has been validated. During promotion, KubeBlocks clears the canary flag, scales the old instances down, and finally merges the target version into the component spec.
 
 Note: `promotion.condition` (`prev`/`post` hook actions) is not supported in KubeBlocks 1.1; rollouts that set it fail with a "not supported" error.
+
+Observed behavior in the MySQL release validation: a `create` rollout with `replicas: 1` from `8.0.37` to `8.0.38` created one new instance template and one `8.0.38` canary pod, then promoted it by clearing the canary flag. Because the rollout covered only one replica, the cluster intentionally remained heterogeneous after success: the default component stayed on `8.0.37`, and the rollout-managed template kept one stable `8.0.38` instance.
 
 ### Sharding rollout
 
@@ -232,4 +243,6 @@ To roll back after a rollout, create another `Rollout` with the previous `servic
 * `replace` and `create` need temporary extra capacity.
 * `replace` requires `flatInstanceOrdinal` on the component (KubeBlocks enables it automatically when the component has no named instance templates yet).
 * Canary traffic routing is not automatic. Use canary labels and annotations with your service, gateway, or database routing layer.
+* After a successful rollout, delete or archive the finished `Rollout` object before creating another rollout for the same cluster. A cluster can only be bound to one rollout at a time, and the binding label is released when the rollout is deleted.
+* If a rollout is followed by manual edits to `spec.componentSpecs[*].instances`, verify both pod images and pod labels. In release validation, the hot instance created from a promoted create-rollout template ran the expected `8.0.38` image, while the inherited `apps.kubeblocks.io/service-version` pod label still showed the component default `8.0.37`.
 * Always validate backup and recovery behavior before using rollout for major database version changes.

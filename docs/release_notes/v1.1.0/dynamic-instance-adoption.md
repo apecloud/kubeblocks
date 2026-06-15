@@ -189,6 +189,31 @@ instances:
 
 When all pods should use the new version, move the version to the component-level spec and remove the temporary template.
 
+### Tune a promoted rollout instance
+
+`Rollout` create/canary can leave a promoted instance template when only part of the component is promoted. You can later edit that named template directly to keep the promoted instance as a long-running heterogeneous instance.
+
+For example, after promoting one MySQL instance to `8.0.38`, make that instance the hot replica:
+
+```yaml
+instances:
+  - name: <rollout-template-name>
+    compDef: mysql-8.0-1.0.3
+    serviceVersion: "8.0.38"
+    replicas: 1
+    labels:
+      workload-tier: hot
+    resources:
+      requests:
+        cpu: 750m
+        memory: 768Mi
+      limits:
+        cpu: 750m
+        memory: 768Mi
+```
+
+Use `kubectl replace` for the updated `Cluster` object. In release validation, this update kept the logical template assignment, applied the `workload-tier=hot` label, and changed the first container's resource requests and limits. The affected pod was recreated because the pod template changed.
+
 ### Move one replica to another zone
 
 ```yaml
@@ -244,6 +269,8 @@ Look for:
 * stable pod names;
 * expected ordinals in template status;
 * expected resource, scheduling, image, or storage changes on adopted pods.
+* pod labels that match the template assignment, especially `apps.kubeblocks.io/instance-template` and `workloads.kubeblocks.io/template-name`;
+* service version evidence from both pod images and pod labels.
 
 For release validation, record pod UIDs and PVC UIDs before and after adoption. Pod recreation may be required for immutable pod-template changes, but the logical pod name, ordinal assignment, and PVC identity must stay attached to the intended instance.
 
@@ -254,4 +281,5 @@ For release validation, record pod UIDs and PVC UIDs before and after adoption. 
 * Pod names remain stable, but pods may be recreated when the new template changes immutable pod fields.
 * PVC data is preserved according to the component's PVC retention policy and storage behavior.
 * To keep PVC identity stable when an instance moves between templates, set the same `persistentVolumeClaimName` prefix in both templates.
+* If a template changes `serviceVersion`, verify the actual container images in addition to `apps.kubeblocks.io/service-version`. Release validation found that a promoted MySQL instance could run the expected image while the inherited service-version label still reflected the component default.
 * For sharded clusters, use `shardTemplates[*].shardIDs` to adopt specific shards. See [Heterogeneous Shards and Shard-Specific Scale-In](./heterogeneous-shards.md).

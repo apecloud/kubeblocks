@@ -8,8 +8,7 @@ This document defines end-to-end test cases for the key KubeBlocks 1.1 features:
 4. Dynamic InstanceSet template adoption
 5. Sharding lifecycle actions
 6. Heterogeneous shards and shard-specific scale-in
-7. Volume sharing among instances
-8. KubeBlocks upgrade from 1.0.x to 1.1
+7. KubeBlocks upgrade from 1.0.x to 1.1
 
 Each case is written so it can be executed manually first and later converted into automated e2e tests. For release sign-off, each executed case must record the exact KubeBlocks chart/image version, Kubernetes version, cloud/provider or local environment, commands, relevant object YAML or JSON snippets, and the final pass/fail result.
 
@@ -56,14 +55,14 @@ kubectl --context ${DATA_CONTEXT_B} create namespace ${TEST_NAMESPACE} --dry-run
 
 ### Execution Order
 
-Run the upgrade test (E2E-8) in a clean cluster because it starts from KubeBlocks 1.0.x. Run the feature tests (E2E-1 to E2E-7) against the final KubeBlocks 1.1.0 chart, CRDs, and images.
+Run the upgrade test (E2E-7) in a clean cluster because it starts from KubeBlocks 1.0.x. Run the feature tests (E2E-1 to E2E-6) against the final KubeBlocks 1.1.0 chart, CRDs, and images.
 
 Recommended order:
 
-1. E2E-8 upgrade validation on a dedicated cluster.
+1. E2E-7 upgrade validation on a dedicated cluster.
 2. E2E-1 multi-cluster validation on one control cluster and two data clusters.
-3. E2E-2 to E2E-7 on the primary single-cluster e2e environment.
-4. Repeat the high-risk cases (E2E-1, E2E-2, E2E-5, E2E-8) on the release-blocking Kubernetes versions if the release matrix includes more than one version.
+3. E2E-2 to E2E-6 on the primary single-cluster e2e environment.
+4. Repeat the high-risk cases (E2E-1, E2E-2, E2E-5, E2E-7) on the release-blocking Kubernetes versions if the release matrix includes more than one version.
 
 ### Evidence to Capture
 
@@ -216,39 +215,38 @@ kubectl --context ${DATA_CONTEXT_B} get pod,pvc -n ${TEST_NAMESPACE}
 
 ### Purpose
 
-Verify that `Rollout` can update component instances with replace and create/canary strategies, report status, and roll out sharded clusters.
+Verify that `Rollout` can update component instances with `inplace`, `replace`, and `create` strategies, report status, preserve the intended `ComponentDefinition`, and roll out sharded clusters.
 
 ### Prerequisites
 
 * KubeBlocks 1.1 is installed.
-* A test database cluster can be created with at least 3 replicas.
+* A test database cluster can be created with at least 2 replicas.
 * The selected addon has at least two valid `serviceVersion` values or two compatible `ComponentDefinition` revisions.
+* When multiple `ComponentDefinition` objects can match the same service and version, every rollout target must specify `compDef` explicitly.
 
 ### Test Data
 
-Base cluster:
+Base MySQL cluster:
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: rollout-demo
+  name: mysql-cluster
   namespace: kb-11-e2e
 spec:
   terminationPolicy: Delete
-  clusterDef: redis
-  topology: replication
   componentSpecs:
-    - name: redis
-      componentDef: redis
-      serviceVersion: "7.2.4"
-      replicas: 3
+    - name: mysql
+      componentDef: mysql-8.0-1.0.3
+      serviceVersion: "8.0.35"
+      replicas: 2
       resources:
         requests:
-          cpu: "500m"
+          cpu: 500m
           memory: 512Mi
         limits:
-          cpu: "500m"
+          cpu: 500m
           memory: 512Mi
       volumeClaimTemplates:
         - name: data
@@ -257,10 +255,26 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 10Gi
+                storage: 1Gi
 ```
 
-### E2E-2A: Replace Rollout
+Create the base cluster and record the baseline:
+
+```bash
+kubectl create -f mysql-rollout-base.yaml
+kubectl wait --for=jsonpath='{.status.phase}'=Running cluster/mysql-cluster -n ${TEST_NAMESPACE} --timeout=20m
+kubectl get cluster mysql-cluster -n ${TEST_NAMESPACE} -o jsonpath='{.spec.componentSpecs[0].componentDef}{"\t"}{.spec.componentSpecs[0].serviceVersion}{"\n"}'
+kubectl get pod -n ${TEST_NAMESPACE} -l app.kubernetes.io/instance=mysql-cluster -o json \
+  | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, created: .metadata.creationTimestamp, images: [.spec.containers[] | {name, image}]}'
+```
+
+Expected baseline:
+
+* `Cluster.status.phase` is `Running`.
+* `Component` is `mysql-8.0-1.0.3` and `serviceVersion` is `8.0.35`.
+* Two MySQL pods are `4/4 Running`.
+
+### E2E-2A: In-place Rollout
 
 Create the rollout:
 
@@ -268,54 +282,46 @@ Create the rollout:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Rollout
 metadata:
-  name: redis-replace
+  name: mysql-inplace-8036
   namespace: kb-11-e2e
 spec:
-  clusterName: rollout-demo
+  clusterName: mysql-cluster
   components:
-    - name: redis
-      serviceVersion: "7.2.5"
+    - name: mysql
+      compDef: mysql-8.0-1.0.3
+      serviceVersion: "8.0.36"
       strategy:
-        replace:
-          perInstanceIntervalSeconds: 10
-          scaleDownDelaySeconds: 10
+        inplace: {}
 ```
 
 Steps:
 
-1. Apply the base cluster and wait for `Running`.
-2. Record original pod names, pod UIDs, and service version.
-3. Apply `redis-replace` rollout.
-4. Watch `Rollout.status.state` and the cluster spec.
-5. During rollout, verify old and new instances overlap temporarily.
-6. Wait until rollout reaches `Succeed`.
-7. Confirm all stable pods use the target service version.
+1. Create `mysql-inplace-8036`.
+2. Wait until `Rollout.status.state` is `Succeed`.
+3. Compare pod UIDs before and after.
+4. Verify the `mysql` and `kbagent` container images are `8.0.36`.
+5. Delete the finished rollout before starting the next strategy test.
 
 Commands:
 
 ```bash
-kubectl apply -f rollout-demo.yaml
-kubectl wait --for=jsonpath='{.status.phase}'=Running cluster/rollout-demo -n ${TEST_NAMESPACE} --timeout=20m
-kubectl get pod -n ${TEST_NAMESPACE} -l app.kubernetes.io/instance=rollout-demo -o json | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, template: .metadata.labels["apps.kubeblocks.io/instance-template"]}'
-kubectl apply -f redis-replace.yaml
-kubectl get rollout redis-replace -n ${TEST_NAMESPACE} -w
-kubectl get cluster rollout-demo -n ${TEST_NAMESPACE} -o yaml
-kubectl get rollout redis-replace -n ${TEST_NAMESPACE} -o yaml
+kubectl create -f mysql-inplace-8036.yaml
+kubectl wait rollout/mysql-inplace-8036 -n ${TEST_NAMESPACE} --for=jsonpath='{.status.state}'=Succeed --timeout=20m
+kubectl get rollout mysql-inplace-8036 -n ${TEST_NAMESPACE} -o yaml
+kubectl get cluster mysql-cluster -n ${TEST_NAMESPACE} -o jsonpath='{.spec.componentSpecs[0].componentDef}{"\t"}{.spec.componentSpecs[0].serviceVersion}{"\n"}'
+kubectl get pod -n ${TEST_NAMESPACE} -l app.kubernetes.io/instance=mysql-cluster -o json \
+  | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, restarts: [.status.containerStatuses[] | {name, restartCount}], images: [.spec.containers[] | {name, image}]}'
+kubectl delete rollout mysql-inplace-8036 -n ${TEST_NAMESPACE}
 ```
 
 Expected results:
 
-* The cluster is labeled `apps.kubeblocks.io/rollout-name: redis-replace` while the rollout is active.
-* The component spec temporarily contains a rollout-managed instance template (name derived from the rollout UID, annotated `apps.kubeblocks.io/instance-template-created-by-rollout`), and `flatInstanceOrdinal` is enabled.
-* New pods carry the pod label `apps.kubeblocks.io/instance-template: <rollout-template-name>`; old pods do not.
-* Replacement proceeds one instance at a time: scale up one new instance, wait for the component to become Running, then take one old instance (highest ordinal first) offline via `offlineInstances`.
-* `Rollout.status.state` moves from `Pending` to `Rolling` to `Succeed`.
-* `status.components[*].newReplicas` and `rolledOutReplicas` advance to 3; scaled-down instances are recorded in `status.components[*].scaleDownInstances`.
-* On success, the component spec is cleaned up: `serviceVersion` is updated to the target, the temporary instance template and the rollout-added `offlineInstances` entries are removed.
-* The cluster returns to `Running`.
-* No PVC is accidentally deleted unless the workload policy requires it.
+* `Rollout.status.state` is `Succeed`.
+* `spec.componentSpecs[0].componentDef` remains `mysql-8.0-1.0.3`.
+* Pod names and UIDs do not change.
+* `mysql` and `kbagent` containers are restarted and use the `8.0.36` image.
 
-### E2E-2B: Create/Canary Rollout
+### E2E-2B: Replace Rollout
 
 Create the rollout:
 
@@ -323,53 +329,126 @@ Create the rollout:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Rollout
 metadata:
-  name: redis-canary
+  name: mysql-replace-8037
   namespace: kb-11-e2e
 spec:
-  clusterName: rollout-demo
+  clusterName: mysql-cluster
   components:
-    - name: redis
-      serviceVersion: "7.2.6"
+    - name: mysql
+      compDef: mysql-8.0-1.0.3
+      serviceVersion: "8.0.37"
+      strategy:
+        replace:
+          perInstanceIntervalSeconds: 0
+          scaleDownDelaySeconds: 0
+```
+
+Steps:
+
+1. Create `mysql-replace-8037`.
+2. Watch `Rollout.status.state`, `status.components[*].newReplicas`, and `rolledOutReplicas`.
+3. During rollout, verify old and new pods overlap temporarily.
+4. Wait until rollout reaches `Succeed`.
+5. Confirm all running pods use `8.0.37`.
+6. Delete the finished rollout before starting the next strategy test.
+
+Commands:
+
+```bash
+kubectl create -f mysql-replace-8037.yaml
+kubectl get rollout mysql-replace-8037 -n ${TEST_NAMESPACE} -w
+kubectl get cluster mysql-cluster -n ${TEST_NAMESPACE} -o jsonpath='{.spec.componentSpecs[0].componentDef}{"\t"}{.spec.componentSpecs[0].serviceVersion}{"\treplicas="}{.spec.componentSpecs[0].replicas}{"\tinstances="}{range .spec.componentSpecs[0].instances[*]}{.name}:{.compDef}:{.serviceVersion}:{.replicas}{" "}{end}{"\n"}'
+kubectl get pod -n ${TEST_NAMESPACE} -l app.kubernetes.io/instance=mysql-cluster -o wide
+kubectl wait rollout/mysql-replace-8037 -n ${TEST_NAMESPACE} --for=jsonpath='{.status.state}'=Succeed --timeout=25m
+kubectl get rollout mysql-replace-8037 -n ${TEST_NAMESPACE} -o yaml
+kubectl delete rollout mysql-replace-8037 -n ${TEST_NAMESPACE}
+```
+
+Expected results:
+
+* The cluster is labeled `apps.kubeblocks.io/rollout-name: mysql-replace-8037` while the rollout is active.
+* The component spec temporarily contains a rollout-managed instance template (name derived from the rollout UID, annotated `apps.kubeblocks.io/instance-template-created-by-rollout`), and `flatInstanceOrdinal` is enabled.
+* New pods carry the pod label `apps.kubeblocks.io/instance-template: <rollout-template-name>`; old pods do not.
+* Replacement proceeds one instance at a time: scale up one new instance, wait for the component to become Running, then take one old instance offline.
+* `Rollout.status.state` moves from `Pending` to `Rolling` to `Succeed`.
+* `status.components[*].newReplicas` and `rolledOutReplicas` advance to the original replica count; scaled-down instances are recorded in `status.components[*].scaleDownInstances`.
+* On success, stable pods are newly created pods using the target image.
+* The cluster returns to `Running`.
+* `componentDef` remains `mysql-8.0-1.0.3`; it must not drift to another matching definition.
+* No PVC is accidentally deleted unless the workload policy requires it.
+
+### E2E-2C: Create/Canary Rollout
+
+Create the rollout:
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Rollout
+metadata:
+  name: mysql-create-8038
+  namespace: kb-11-e2e
+spec:
+  clusterName: mysql-cluster
+  components:
+    - name: mysql
+      compDef: mysql-8.0-1.0.3
+      serviceVersion: "8.0.38"
       replicas: 1
       strategy:
         create:
           canary: true
           promotion:
             auto: true
-            delaySeconds: 30
-            scaleDownDelaySeconds: 10
+            delaySeconds: 0
+            scaleDownDelaySeconds: 0
       instanceMeta:
         canary:
           labels:
             traffic: canary
           annotations:
-            rollout.apps.kubeblocks.io/version: "7.2.6"
+            rollout.apps.kubeblocks.io/version: "8.0.38"
 ```
 
 Steps:
 
-1. Apply `redis-canary` rollout.
+1. Create `mysql-create-8038`.
 2. Verify one canary instance is created.
 3. Confirm canary labels and annotations are present on the canary pod or instance.
 4. Wait for automatic promotion.
-5. Confirm stable replica count returns to the original count.
-6. Confirm rollout reaches `Succeed`.
+5. Confirm the rollout reaches `Succeed`.
+6. Confirm the cluster returns to `Running`.
+7. Record the final component default version and named instance templates.
+
+Commands:
+
+```bash
+kubectl create -f mysql-create-8038.yaml
+kubectl get rollout mysql-create-8038 -n ${TEST_NAMESPACE} -w
+kubectl get cluster mysql-cluster -n ${TEST_NAMESPACE} -o jsonpath='{.spec.componentSpecs[0].componentDef}{"\t"}{.spec.componentSpecs[0].serviceVersion}{"\treplicas="}{.spec.componentSpecs[0].replicas}{"\tinstances="}{range .spec.componentSpecs[0].instances[*]}{.name}:{.compDef}:{.serviceVersion}:{.replicas}:{.canary}{" "}{end}{"\n"}'
+kubectl wait rollout/mysql-create-8038 -n ${TEST_NAMESPACE} --for=jsonpath='{.status.state}'=Succeed --timeout=25m
+kubectl wait cluster/mysql-cluster -n ${TEST_NAMESPACE} --for=jsonpath='{.status.phase}'=Running --timeout=15m
+kubectl get rollout mysql-create-8038 -n ${TEST_NAMESPACE} -o yaml
+kubectl get pod -n ${TEST_NAMESPACE} -l app.kubernetes.io/instance=mysql-cluster -o json \
+  | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, template: .metadata.labels["apps.kubeblocks.io/instance-template"], serviceVersionLabel: .metadata.labels["apps.kubeblocks.io/service-version"], images: [.spec.containers[] | {name, image}]}'
+kubectl delete rollout mysql-create-8038 -n ${TEST_NAMESPACE}
+```
 
 Expected results:
 
 * Exactly one canary instance is created before promotion, identified by the pod label `apps.kubeblocks.io/instance-template: <rollout-template-name>`.
 * Canary metadata from `instanceMeta.canary` (labels/annotations) is applied to the canary pod.
-* The rollout stays in `Rolling` while the canary template's `canary` flag is set; after `delaySeconds`, promotion clears the flag and scales down the old instances.
-* After promotion, the cluster has the original stable replica count and the component `serviceVersion` is updated to the target.
+* The rollout stays in `Rolling` while the canary template's `canary` flag is set; after `delaySeconds`, promotion clears the flag and scales down old instances according to `scaleDownDelaySeconds`.
+* When `replicas` is smaller than the stable replica count, success can leave the component intentionally heterogeneous: the component-level `serviceVersion` remains on the previous stable version, and the promoted rollout-managed instance template keeps the new version for only the promoted replicas.
 * `status.components[*].canaryReplicas` and `rolledOutReplicas` reflect progress.
+* `componentDef` remains `mysql-8.0-1.0.3`; it must not drift to another matching definition.
 
-Variation, manual promotion: apply the same rollout with `promotion.auto: false`. Expected: the canary is created and the rollout stays in `Rolling` indefinitely; after validating the canary, edit the rollout to set `promotion.auto: true` and verify promotion completes as above.
+Variation, manual promotion: create the same rollout with `promotion.auto: false`. Expected: the canary is created and the rollout stays in `Rolling` indefinitely; after validating the canary, edit the rollout to set `promotion.auto: true` and verify promotion completes as above.
 
 Constraint check: a rollout with `promotion.condition` set must fail with a "not supported" error (`promotion.condition` is not supported in 1.1).
 
-### E2E-2C: Sharding Rollout
+### E2E-2D: Sharding Rollout
 
-Create a sharded cluster with two shards, then apply:
+Create a sharded cluster with two shards, then create:
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -381,6 +460,7 @@ spec:
   clusterName: redis-sharding
   shardings:
     - name: shard
+      compDef: redis
       serviceVersion: "7.2.5"
       strategy:
         replace:
@@ -395,17 +475,18 @@ Expected results:
 * No shard remains in stale `Updating` or `Failed` state.
 * The sharded cluster returns to `Running`.
 
-### E2E-2D: Concurrency and Abort Semantics
+### E2E-2E: Concurrency and Abort Semantics
 
-1. While `redis-replace` is `Rolling`, create a second rollout against the same cluster. Expected: the second rollout enters `Error` with message `the cluster rollout-demo is already bound to rollout redis-replace`; the first rollout is unaffected.
+1. While a rollout is `Rolling`, create a second rollout against the same cluster. Expected: the second rollout enters `Error` with message `the cluster mysql-cluster is already bound to rollout <active-rollout>`; the first rollout is unaffected.
 2. Delete a rollout while it is `Rolling`. Expected: the `apps.kubeblocks.io/rollout-name` label is removed from the cluster; changes already applied to the cluster spec are **not** reverted (document the resulting spec); the cluster eventually converges to `Running`.
-3. After a rollout reaches `Succeed`, create a new rollout targeting the previous version. Expected: the new rollout is accepted (the old binding is released) and rolls the cluster back.
+3. After a rollout reaches `Succeed`, delete the finished rollout and then create another rollout targeting a new or previous version. Expected: the new rollout is accepted because the binding is released.
 
 ### Failure Checks
 
 * A rollout that defines no strategy, more than one strategy, or neither `serviceVersion` nor `compDef` for a target must fail with a clear error.
 * A `replace`/`inplace` rollout with `replicas` set to less than the full replica count must fail (partial rollout is not supported).
 * A rollout with an invalid target component or sharding should enter `Error` with a clear message.
+* A rollout that omits `compDef` in an addon with several compatible definitions should be treated as unsafe for release validation, even if it is accepted by the API. Record the selected `spec.componentSpecs[*].componentDef` before and after the rollout.
 * Manager restart during rollout should not lose rollout progress (progress is derived from the cluster spec and `status.components`).
 
 ## E2E-3: ComponentNetwork API
@@ -662,7 +743,56 @@ Expected results:
 * PVC data remains attached to ordinal `2`.
 * No extra pods or PVCs remain.
 
-### E2E-4C: Adopt a Shard by Shard ID
+### E2E-4C: Dynamically Change a MySQL Hot Instance Template
+
+This case validates the same behavior on a real addon and can be run after E2E-2C, where a `create` rollout leaves a promoted MySQL instance template.
+
+Steps:
+
+1. Pick one named MySQL instance template, for example the template created by a successful `create` rollout.
+2. Record the pod UID, service-version label, container images, and container resource requests.
+3. Replace the `Cluster` object and add a hot-instance override to that template:
+
+```yaml
+instances:
+  - name: <rollout-template-name>
+    compDef: mysql-8.0-1.0.3
+    serviceVersion: "8.0.38"
+    replicas: 1
+    labels:
+      workload-tier: hot
+    resources:
+      requests:
+        cpu: 750m
+        memory: 768Mi
+      limits:
+        cpu: 750m
+        memory: 768Mi
+```
+
+Commands:
+
+```bash
+kubectl get cluster mysql-cluster -n ${TEST_NAMESPACE} -o yaml > /tmp/mysql-hot-before.yaml
+kubectl get cluster mysql-cluster -n ${TEST_NAMESPACE} -o json \
+  | jq '(.spec.componentSpecs[0].instances[] | select(.name=="<rollout-template-name>").labels) = {"workload-tier":"hot"}
+        | (.spec.componentSpecs[0].instances[] | select(.name=="<rollout-template-name>").resources) = {"requests":{"cpu":"750m","memory":"768Mi"},"limits":{"cpu":"750m","memory":"768Mi"}}' \
+  | kubectl replace -f -
+kubectl wait cluster/mysql-cluster -n ${TEST_NAMESPACE} --for=jsonpath='{.status.phase}'=Running --timeout=15m
+kubectl get pod -n ${TEST_NAMESPACE} -l workload-tier=hot --show-labels -o wide
+kubectl get pod -n ${TEST_NAMESPACE} -l workload-tier=hot -o json \
+  | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, serviceVersionLabel: .metadata.labels["apps.kubeblocks.io/service-version"], template: .metadata.labels["workloads.kubeblocks.io/template-name"], images: [.spec.containers[] | {name, image, resources}]}'
+```
+
+Expected results:
+
+* The selected pod carries `workload-tier=hot`.
+* The first workload container uses the hot resource requests and limits.
+* The pod may be recreated because resource changes affect the pod template; record old and new UIDs.
+* The pod image should match the instance template's `serviceVersion`.
+* Also verify the pod's `apps.kubeblocks.io/service-version` label. A mismatch between the label and the actual image should be recorded as a release issue.
+
+### E2E-4D: Adopt a Shard by Shard ID
 
 For a sharded cluster, discover an existing shard ID and adopt only that shard:
 
@@ -990,91 +1120,7 @@ Expected results:
 * A sharding where the sum of `shardTemplates[*].shards` exceeds `shards` must fail with `the sum of shards in shard templates is greater than the total shards`.
 * Duplicate shard template names or duplicate `shardIDs` must be rejected.
 
-## E2E-7: Volume Sharing Among Instances
-
-### Purpose
-
-Verify that `volumeClaimTemplates[*].persistentVolumeClaimName` produces `<prefix>-<ordinal>` PVC names and preserves PVC identity when an instance moves between templates.
-
-### Prerequisites
-
-* A ComponentDefinition with a `data` volume.
-* `flatInstanceOrdinal: true` on the test component.
-
-### Test Cluster
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
-metadata:
-  name: vol-share
-  namespace: kb-11-e2e
-spec:
-  terminationPolicy: Delete
-  clusterDef: foo
-  topology: cluster
-  componentSpecs:
-    - name: foo
-      componentDef: foo
-      replicas: 3
-      flatInstanceOrdinal: true
-      ordinals:
-        discrete: [0, 1, 2]
-      volumeClaimTemplates:
-        - name: data
-          persistentVolumeClaimName: e2edata
-          spec:
-            accessModes: [ReadWriteOnce]
-            resources:
-              requests:
-                storage: 5Gi
-```
-
-### E2E-7A: PVC Names Follow the Declared Prefix
-
-Steps:
-
-1. Apply the cluster and wait for `Running`.
-2. List PVCs in the namespace.
-
-Expected results:
-
-* PVCs are named `e2edata-0`, `e2edata-1`, `e2edata-2`.
-* Each pod `foo-<n>` mounts `e2edata-<n>`.
-
-### E2E-7B: PVC Identity Survives Template Adoption
-
-Steps:
-
-1. Discover the mount path used by the `data` volume in pod `foo-2`.
-2. Write a marker file to that mount path.
-3. Adopt ordinal `2` into a named template that declares the same `persistentVolumeClaimName: e2edata` (and higher resources), following the E2E-4 adoption flow.
-4. Wait for reconciliation.
-
-Commands:
-
-```bash
-export DATA_MOUNT_PATH=$(kubectl get pod foo-2 -n ${TEST_NAMESPACE} -o json | jq -r '.spec.containers[].volumeMounts[] | select(.name=="data") | .mountPath' | head -n1)
-test -n "${DATA_MOUNT_PATH}"
-kubectl exec -n ${TEST_NAMESPACE} foo-2 -- sh -c "date > ${DATA_MOUNT_PATH}/kb11-marker"
-kubectl get pvc e2edata-2 -n ${TEST_NAMESPACE} -o json | jq '{name: .metadata.name, uid: .metadata.uid}'
-kubectl patch cluster vol-share -n ${TEST_NAMESPACE} --type merge --patch-file vol-share-adopt-patch.yaml
-kubectl exec -n ${TEST_NAMESPACE} foo-2 -- cat "${DATA_MOUNT_PATH}/kb11-marker"
-kubectl get pvc -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, uid: .metadata.uid}'
-```
-
-Expected results:
-
-* `foo-2` still mounts `e2edata-2` (same PVC UID as before adoption).
-* The marker file is still present.
-* No new PVC is created and no PVC is deleted.
-
-### Failure Checks
-
-* Conflicting PVC specs between templates that share a prefix should be rejected or reported, not silently reprovisioned.
-* Deleting the cluster should respect the PVC retention policy for the shared-prefix PVCs.
-
-## E2E-8: KubeBlocks Upgrade From 1.0.x to 1.1
+## E2E-7: KubeBlocks Upgrade From 1.0.x to 1.1
 
 ### Purpose
 
@@ -1082,35 +1128,60 @@ Verify that upgrading the KubeBlocks operator from the latest 1.0.x GA release t
 
 ### Prerequisites
 
-* A clean Kubernetes cluster with at least 3 schedulable worker nodes.
-* The latest 1.0.x GA chart and images available (for example `v1.0.2`).
-* The 1.1.0 chart, images, and `kubeblocks_crds.yaml` release asset available.
+* A clean Kubernetes cluster with enough CPU, memory, and storage for the selected workload set.
+* The source chart and CRD release asset are available, for example `v1.0.3-beta.9`.
+* The target chart, images, and `kubeblocks_crds.yaml` release asset are available, for example `v1.1.0-beta.6`.
+* Snapshot CRDs and KubeBlocks CRDs can be installed before the Helm release.
+* The test cluster can pull the selected registry images. For kind-based validation, make sure the node container does not inherit an invalid local proxy such as `127.0.0.1:<port>`.
 
-### E2E-8A: Operator Upgrade Is Non-Disruptive
+### E2E-7A: Operator Upgrade Is Non-Disruptive
 
 Steps:
 
-1. Install KubeBlocks 1.0.x:
+1. Install Snapshot CRDs and source-version KubeBlocks CRDs before installing the Helm release:
 
 ```bash
-helm install kubeblocks kubeblocks/kubeblocks --version <1.0.x> -n ${KB_NAMESPACE} --create-namespace
+kubectl get crd volumesnapshots.snapshot.storage.k8s.io || kubectl create -f deploy/helm/crds/snapshot/
+kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v<source-version>/kubeblocks_crds.yaml
+kubectl get crd clusters.apps.kubeblocks.io rollouts.apps.kubeblocks.io instances.workloads.kubeblocks.io instancesets.workloads.kubeblocks.io volumesnapshots.snapshot.storage.k8s.io
 ```
 
-2. Create a representative workload set under 1.0.x and wait for `Running`:
+2. Install KubeBlocks source version with Helm, skipping CRDs because they were installed explicitly:
+
+```bash
+helm install kubeblocks kubeblocks/kubeblocks \
+  --version <source-version> \
+  -n ${KB_NAMESPACE} \
+  --create-namespace \
+  --skip-crds \
+  --set-json autoInstalledAddons='[]'
+kubectl -n ${KB_NAMESPACE} rollout status deploy/kubeblocks --timeout=10m
+kubectl -n ${KB_NAMESPACE} rollout status deploy/kubeblocks-dataprotection --timeout=10m
+```
+
+3. Install the MySQL addon and create a representative workload under the source version:
+   * MySQL component `mysql-8.0-1.0.3`, service version `8.0.35`, 2 replicas;
    * a replication cluster (3 replicas, with PVCs);
    * a sharded cluster (2 shards);
    * a cluster with a configured backup schedule, if data protection is in scope.
-3. Record baseline state: pod names and UIDs, PVC names and UIDs, cluster/component status, CRD list (`kubectl get crd | grep kubeblocks`).
-4. Write a marker row/file into each database.
-5. Upgrade CRDs, then the operator:
+4. Record baseline state: pod names and UIDs, PVC names and UIDs, cluster/component status, Helm release list, and CRD list.
+5. Write a marker row/file into each database.
+6. Upgrade CRDs, then the operator. Use `kubectl create` for CRDs that do not exist in the source version and `kubectl replace` for existing CRDs; do not use `kubectl apply` for CRD upgrade validation:
 
 ```bash
-kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v1.1.0/kubeblocks_crds.yaml
-helm -n ${KB_NAMESPACE} upgrade kubeblocks kubeblocks/kubeblocks --version 1.1.0
+kubectl get crd rollouts.apps.kubeblocks.io || kubectl create -f deploy/helm/crds/apps.kubeblocks.io_rollouts.yaml
+kubectl get crd instances.workloads.kubeblocks.io || kubectl create -f deploy/helm/crds/workloads.kubeblocks.io_instances.yaml
+kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v<target-version>/kubeblocks_crds.yaml
+helm -n ${KB_NAMESPACE} upgrade kubeblocks kubeblocks/kubeblocks \
+  --version <target-version> \
+  --skip-crds \
+  --reuse-values \
+  --set-json autoInstalledAddons='[]'
 ```
 
-6. Wait for the KubeBlocks manager pods to roll to the 1.1.0 image and become Ready.
-7. Compare pod/PVC UIDs and cluster status against the baseline; read the marker data back.
+7. Wait for the KubeBlocks manager pods to roll to the target image and become Ready.
+8. Compare pod/PVC UIDs and cluster status against the baseline; read the marker data back.
+9. Run a post-upgrade Rollout API smoke test against the existing MySQL cluster: create a rollout with `compDef: mysql-8.0-1.0.3`, `serviceVersion: "8.0.36"`, and `strategy.inplace: {}`. Verify it reaches `Succeed` and the component remains on the intended `compDef`.
 
 Baseline and comparison commands:
 
@@ -1135,9 +1206,9 @@ Expected results:
 * No CRDs are removed; existing CRs (including `apps.kubeblocks.io/v1alpha1` resources) are still readable.
 * The manager logs show no conversion or schema errors after the upgrade.
 
-### E2E-8B: 1.1 Features Work on Upgraded Clusters
+### E2E-7B: 1.1 Features Work on Upgraded Clusters
 
-Steps (after E2E-8A, on the same installation):
+Steps (after E2E-7A, on the same installation):
 
 1. Run a day-2 operation on a pre-upgrade cluster (restart or vertical scaling via OpsRequest) and confirm it completes.
 2. Apply an `inplace` or `replace` `Rollout` against the pre-upgrade replication cluster and confirm it reaches `Succeed` (see E2E-2).
@@ -1150,7 +1221,7 @@ Expected results:
 * The `Rollout` API is usable against clusters created under 1.0.x.
 * New 1.1 API fields are accepted and reconciled on the upgraded control plane.
 
-### E2E-8C: Helm Values Compatibility
+### E2E-7C: Helm Values Compatibility
 
 Steps:
 
@@ -1177,10 +1248,9 @@ The KubeBlocks 1.1 release is not ready until:
 * all seven feature areas pass on the primary Kubernetes version;
 * the 1.0.x → 1.1 upgrade tests prove the operator upgrade is non-disruptive, new CRDs are installed, and 1.1 features work on upgraded clusters;
 * multi-cluster tests pass with two real data clusters;
-* rollout tests cover replace, create/canary, and sharding targets;
+* rollout tests cover inplace, replace, create/canary, and sharding targets;
 * ComponentNetwork tests cover host ports, host aliases, and DNS config;
 * dynamic adoption tests prove pod/PVC identity is preserved;
 * sharding lifecycle tests prove add/remove hooks run with the expected shard variables;
 * heterogeneous shard tests prove per-group configuration and shard-specific scale-in via `offline`;
-* volume sharing tests prove `<prefix>-<ordinal>` PVC naming and identity preservation across template adoption;
 * no P0/P1 bugs remain open for these feature areas.

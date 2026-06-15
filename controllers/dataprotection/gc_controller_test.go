@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,14 +28,18 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Data Protection Garbage Collection Controller", func() {
@@ -79,6 +84,102 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 	AfterEach(cleanEnv)
 
 	Context("garbage collection", func() {
+		It("uses configured GC frequency only when positive", func() {
+			oldFrequency := viper.GetInt(dptypes.CfgKeyGCFrequencySeconds)
+			defer viper.Set(dptypes.CfgKeyGCFrequencySeconds, oldFrequency)
+
+			viper.Set(dptypes.CfgKeyGCFrequencySeconds, 7)
+			Expect(getGCFrequency()).To(Equal(7 * time.Second))
+
+			viper.Set(dptypes.CfgKeyGCFrequencySeconds, 0)
+			Expect(getGCFrequency()).To(Equal(time.Duration(dptypes.DefaultGCFrequencySeconds)))
+		})
+
+		It("evaluates deterministic backup deletion decisions", func() {
+			scheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(scheme)).Should(Succeed())
+
+			completedAt := metav1.Time{Time: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}
+			laterCompletedAt := metav1.Time{Time: completedAt.Add(time.Hour)}
+			backupPolicy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "policy",
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					RetentionPolicy: dpv1alpha1.BackupPolicyRetentionPolicyRetainLatestBackup,
+				},
+			}
+			olderBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "older",
+					Labels: map[string]string{
+						dptypes.ClusterUIDLabelKey:   "cluster-uid",
+						dptypes.BackupPolicyLabelKey: backupPolicy.Name,
+					},
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					BackupPolicyName: backupPolicy.Name,
+					BackupMethod:     "full",
+				},
+				Status: dpv1alpha1.BackupStatus{
+					Phase:               dpv1alpha1.BackupPhaseCompleted,
+					CompletionTimestamp: &completedAt,
+				},
+			}
+			latestBackup := olderBackup.DeepCopy()
+			latestBackup.Name = "latest"
+			latestBackup.Status.CompletionTimestamp = &laterCompletedAt
+			incrementalBackup := olderBackup.DeepCopy()
+			incrementalBackup.Name = "incremental"
+			incrementalBackup.Labels[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeIncremental)
+			runningBackup := olderBackup.DeepCopy()
+			runningBackup.Name = "running"
+			runningBackup.Status.Phase = dpv1alpha1.BackupPhaseRunning
+			failedBackup := olderBackup.DeepCopy()
+			failedBackup.Name = "failed"
+			failedBackup.Status.Phase = dpv1alpha1.BackupPhaseFailed
+
+			reconciler := &GCReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(backupPolicy, olderBackup, latestBackup, incrementalBackup, runningBackup, failedBackup).
+					Build(),
+			}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+			deletable, err := reconciler.isBackupDeletable(reqCtx, runningBackup)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletable).To(BeFalse())
+
+			deletable, err = reconciler.isBackupDeletable(reqCtx, failedBackup)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletable).To(BeTrue())
+
+			deletable, err = reconciler.isBackupDeletable(reqCtx, incrementalBackup)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletable).To(BeFalse())
+
+			deletable, err = reconciler.isBackupDeletable(reqCtx, latestBackup)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletable).To(BeFalse())
+
+			deletable, err = reconciler.isBackupDeletable(reqCtx, olderBackup)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletable).To(BeTrue())
+
+			isLatest, err := reconciler.isLatestCompletedBackup(context.Background(), &dpv1alpha1.Backup{
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseRunning},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(isLatest).To(BeFalse())
+
+			related, err := reconciler.getRelatedBackups(context.Background(), &dpv1alpha1.Backup{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(related).To(BeNil())
+		})
+
 		var (
 			backupNamePrefix = "schedule-test-backup-"
 			backupPolicy     *dpv1alpha1.BackupPolicy

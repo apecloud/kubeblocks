@@ -147,6 +147,30 @@ var _ = Describe("StorageProvider controller", func() {
 			}).Should(Succeed())
 		})
 
+		It("tracks and removes CSI driver dependencies deterministically", func() {
+			provider1 := &dpv1alpha1.StorageProvider{
+				ObjectMeta: metav1.ObjectMeta{Name: "provider1"},
+				Spec: dpv1alpha1.StorageProviderSpec{
+					CSIDriverName: "csi-dependency",
+				},
+			}
+			provider2 := provider1.DeepCopy()
+			provider2.Name = "provider2"
+
+			reconclier.ensureDependency(provider1)
+			reconclier.ensureDependency(provider1)
+			reconclier.ensureDependency(provider2)
+			reconclier.ensureDependency(&dpv1alpha1.StorageProvider{ObjectMeta: metav1.ObjectMeta{Name: "ignored"}})
+
+			Expect(reconclier.driverDependencies["csi-dependency"]).To(ConsistOf("provider1", "provider2"))
+
+			reconclier.removeDependency("provider1")
+			Expect(reconclier.driverDependencies["csi-dependency"]).To(ConsistOf("provider2"))
+
+			reconclier.removeDependency("missing")
+			Expect(reconclier.driverDependencies["csi-dependency"]).To(ConsistOf("provider2"))
+		})
+
 		It("should reconcile a StorageProvider to Ready status if the specified csiDriverName is present", func() {
 			By("creating a StorageProvider with csi1")
 			createCSIDriverObjectSpec("csi1")

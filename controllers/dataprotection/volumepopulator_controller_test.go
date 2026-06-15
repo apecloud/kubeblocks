@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -38,8 +39,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/stretchr/testify/require"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -94,6 +93,220 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	Context("backup target selector helpers", func() {
+		It("detects effective PVC selectors beyond the app instance label", func() {
+			Expect(backupTargetHasEffectivePVCSelector(nil)).To(BeFalse())
+			Expect(backupTargetHasEffectivePVCSelector(&dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								constant.AppInstanceLabelKey: "cluster",
+							},
+						},
+					},
+				},
+			})).To(BeFalse())
+			Expect(backupTargetHasEffectivePVCSelector(&dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{{
+								Key:      constant.VolumeClaimTemplateNameLabelKey,
+								Operator: metav1.LabelSelectorOpExists,
+							}},
+						},
+					},
+				},
+			})).To(BeTrue())
+		})
+
+		It("matches PVCs with label selector operators", func() {
+			target := &dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								constant.AppInstanceLabelKey:             "cluster",
+								constant.VolumeClaimTemplateNameLabelKey: "data",
+							},
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{Key: "tier", Operator: metav1.LabelSelectorOpIn, Values: []string{"hot", "warm"}},
+								{Key: "archived", Operator: metav1.LabelSelectorOpDoesNotExist},
+							},
+						},
+					},
+				},
+			}
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey:             "cluster",
+						constant.VolumeClaimTemplateNameLabelKey: "data",
+						"tier":                                   "hot",
+					},
+				},
+			}
+
+			Expect(backupTargetMatchesPVC(&dpv1alpha1.BackupStatusTarget{}, pvc)).To(BeFalse())
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeTrue())
+
+			target.PodSelector.MatchExpressions[0].Values = []string{"cold"}
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeFalse())
+
+			target.PodSelector.MatchExpressions[0] = metav1.LabelSelectorRequirement{
+				Key:      "tier",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"cold"},
+			}
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeTrue())
+
+			target.PodSelector.MatchExpressions[0].Values = []string{"hot"}
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeFalse())
+
+			target.PodSelector.MatchExpressions[0] = metav1.LabelSelectorRequirement{
+				Key:      "tier",
+				Operator: metav1.LabelSelectorOpExists,
+			}
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeTrue())
+
+			target.PodSelector.MatchExpressions[0] = metav1.LabelSelectorRequirement{
+				Key:      "tier",
+				Operator: metav1.LabelSelectorOpDoesNotExist,
+			}
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeFalse())
+
+			target.PodSelector.MatchExpressions[0] = metav1.LabelSelectorRequirement{
+				Key:      "tier",
+				Operator: metav1.LabelSelectorOperator("Unknown"),
+			}
+			Expect(backupTargetMatchesPVC(target, pvc)).To(BeFalse())
+		})
+	})
+
+	Context("system account secret helpers", func() {
+		It("patches existing mutable secrets and recreates changed immutable secrets", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+
+			component := &kbappsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+					UID:       types.UID("component-uid"),
+				},
+			}
+			mutableSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
+				},
+				Data: map[string][]byte{},
+			}
+			immutable := true
+			immutableSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      constant.GenerateAccountSecretName("cluster", "mysql", "root"),
+				},
+				Immutable: &immutable,
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("root"),
+					constant.AccountPasswdForSecret: []byte("old-password"),
+				},
+			}
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "data-target-0",
+				},
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(component, mutableSecret, immutableSecret).
+					Build(),
+				Scheme: scheme,
+			}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+			Expect(reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("new-password"), map[string]string{"role": "admin"})).Should(Succeed())
+			patched := &corev1.Secret{}
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      mutableSecret.Name,
+			}, patched)).Should(Succeed())
+			Expect(patched.Labels["role"]).To(Equal("admin"))
+			Expect(patched.Annotations[constant.SystemAccountProvisionedAnnotationKey]).To(Equal("true"))
+			Expect(patched.Data[constant.AccountNameForSecret]).To(Equal([]byte("admin")))
+			Expect(patched.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-password")))
+			Expect(patched.OwnerReferences).To(HaveLen(1))
+			Expect(patched.OwnerReferences[0].Kind).To(Equal("Component"))
+
+			Expect(reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "root", []byte("new-root-password"), map[string]string{"role": "root"})).Should(Succeed())
+			recreated := &corev1.Secret{}
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      immutableSecret.Name,
+			}, recreated)).Should(Succeed())
+			Expect(recreated.Immutable).To(BeNil())
+			Expect(recreated.Labels["role"]).To(Equal("root"))
+			Expect(recreated.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-root-password")))
+			Expect(systemAccountSecretMatches(recreated, "root", []byte("new-root-password"))).To(BeTrue())
+			Expect(systemAccountSecretMatches(recreated, "root", []byte("old-password"))).To(BeFalse())
+		})
+
+		It("validates PVC names against instance volume templates", func() {
+			instance := &workloadsv1.Instance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "cluster-mysql-0",
+				},
+				Spec: workloadsv1.InstanceSpec{
+					InstanceSetName: "cluster-mysql",
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+						ObjectMeta: metav1.ObjectMeta{Name: "data"},
+					}},
+				},
+			}
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "data-cluster-mysql-0",
+					Labels: map[string]string{
+						constant.KBAppPodNameLabelKey: "cluster-mysql-0",
+					},
+					Annotations: map[string]string{
+						constant.RestoreVolumeTemplateAnnotationKey: "data",
+					},
+				},
+			}
+
+			Expect(validatePVCMatchesInstanceTemplate(pvc, instance)).Should(Succeed())
+			Expect(pvcConditionMatches([]corev1.PersistentVolumeClaimCondition{{
+				Type:   "Restore",
+				Status: corev1.ConditionTrue,
+				Reason: "Ready",
+			}}, corev1.PersistentVolumeClaimCondition{
+				Type:   "Restore",
+				Status: corev1.ConditionTrue,
+				Reason: "Ready",
+			})).To(BeTrue())
+			Expect(pvcConditionMatches(nil, corev1.PersistentVolumeClaimCondition{Type: "Restore"})).To(BeFalse())
+
+			pvc.Labels[constant.KBAppPodNameLabelKey] = ""
+			Expect(validatePVCMatchesInstanceTemplate(pvc, instance)).ShouldNot(Succeed())
+			pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-1"
+			Expect(validatePVCMatchesInstanceTemplate(pvc, instance)).ShouldNot(Succeed())
+			pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-0"
+			pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
+			Expect(validatePVCMatchesInstanceTemplate(pvc, instance)).ShouldNot(Succeed())
+		})
 	})
 
 	When("volume populator controller test", func() {

@@ -56,6 +56,7 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentDefinitionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentVersionSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ShardingDefinitionSignature, true, ml)
 
 		// namespaced
 	}
@@ -455,6 +456,178 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 			Expect(compDef.Name).Should(Equal(testapps.CompDefName("v4.0")))
 			Expect(resolvedServiceVersion).Should(Equal(testapps.ServiceVersion("v4")))
 			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r6", "") // app is r6 and another one is ""
+		})
+
+		It("resolves topology cluster instance template within topology compDef pattern", func() {
+			const (
+				mysqlCompDef    = "mysql-8.0-1.0.5"
+				mysqlOrcCompDef = "mysql-orc-8.0-1.0.5"
+				compName        = "mysql"
+				serviceVersion  = "8.0.37"
+			)
+			topologyCompDef := `^mysql-\d+\.\d+.*$`
+
+			By("creating mysql and mysql-orc definitions with the same supported service version")
+			for _, name := range []string{mysqlCompDef, mysqlOrcCompDef} {
+				compDef := testapps.NewComponentDefinitionFactory(name).
+					SetServiceVersion("8.0.33").
+					SetRuntime(&corev1.Container{Name: compName, Image: testapps.AppImage(compName, "8.0.33")}).
+					Create(&testCtx).
+					GetObject()
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDef),
+					func(g Gomega, compDef *appsv1.ComponentDefinition) {
+						g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
+					})).Should(Succeed())
+			}
+
+			for _, item := range []struct {
+				name    string
+				compDef string
+			}{
+				{name: "mysql", compDef: mysqlCompDef},
+				{name: "mysql-orc", compDef: mysqlOrcCompDef},
+			} {
+				compVersion := testapps.NewComponentVersionFactory(item.name).
+					AddCompatibilityRule([]string{item.compDef}, []string{serviceVersion}).
+					AddRelease(serviceVersion, "", serviceVersion, map[string]string{
+						compName: testapps.AppImage(compName, serviceVersion),
+					}).
+					Create(&testCtx).
+					GetObject()
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersion),
+					func(g Gomega, compVersion *appsv1.ComponentVersion) {
+						g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
+						g.Expect(compVersion.Status.Phase).Should(Equal(appsv1.AvailablePhase))
+					})).Should(Succeed())
+			}
+
+			By("resolving a topology cluster with a serviceVersion-matched instance template")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "topology-instance-template", "mysql").
+				SetTopology("semisync").
+				AddComponent(compName, "").
+				GetObject()
+			clusterObj.Spec.ComponentSpecs[0].ServiceVersion = serviceVersion
+			clusterObj.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{
+				Name:           "canary",
+				ServiceVersion: serviceVersion,
+			}}
+
+			transformer := &clusterNormalizationTransformer{}
+			comps, err := transformer.resolveCompsFromTopology(appsv1.ClusterTopology{
+				Name: "semisync",
+				Components: []appsv1.ClusterTopologyComponent{{
+					Name:    compName,
+					CompDef: topologyCompDef,
+				}},
+			}, clusterObj)
+			Expect(err).Should(Succeed())
+			Expect(comps).Should(HaveLen(1))
+			Expect(comps[0].ComponentDef).Should(Equal(topologyCompDef))
+
+			_, err = transformer.resolveDefinitions4ComponentWithObj(&clusterTransformContext{
+				Context: testCtx.Ctx,
+				Client:  testCtx.Cli,
+				Cluster: clusterObj,
+			}, comps[0], nil)
+			Expect(err).Should(Succeed())
+
+			Expect(comps[0].ComponentDef).Should(Equal(mysqlCompDef))
+			Expect(comps[0].ServiceVersion).Should(Equal(serviceVersion))
+			Expect(comps[0].Instances).Should(HaveLen(1))
+			Expect(comps[0].Instances[0].CompDef).Should(Equal(mysqlCompDef))
+			Expect(comps[0].Instances[0].ServiceVersion).Should(Equal(serviceVersion))
+		})
+
+		It("resolves topology sharding instance template within sharding template compDef pattern", func() {
+			const (
+				mysqlCompDef    = "mysql-8.0-1.0.5"
+				mysqlOrcCompDef = "mysql-orc-8.0-1.0.5"
+				shardingDefName = "mysql-sharding-1.0.5"
+				shardingName    = "mysql"
+				compName        = "mysql"
+				serviceVersion  = "8.0.37"
+			)
+			topologyCompDef := `^mysql-\d+\.\d+.*$`
+
+			By("creating mysql and mysql-orc definitions with the same supported service version")
+			for _, name := range []string{mysqlCompDef, mysqlOrcCompDef} {
+				compDef := testapps.NewComponentDefinitionFactory(name).
+					SetServiceVersion("8.0.33").
+					SetRuntime(&corev1.Container{Name: compName, Image: testapps.AppImage(compName, "8.0.33")}).
+					Create(&testCtx).
+					GetObject()
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDef),
+					func(g Gomega, compDef *appsv1.ComponentDefinition) {
+						g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
+					})).Should(Succeed())
+			}
+
+			for _, item := range []struct {
+				name    string
+				compDef string
+			}{
+				{name: "mysql", compDef: mysqlCompDef},
+				{name: "mysql-orc", compDef: mysqlOrcCompDef},
+			} {
+				compVersion := testapps.NewComponentVersionFactory(item.name).
+					AddCompatibilityRule([]string{item.compDef}, []string{serviceVersion}).
+					AddRelease(serviceVersion, "", serviceVersion, map[string]string{
+						compName: testapps.AppImage(compName, serviceVersion),
+					}).
+					Create(&testCtx).
+					GetObject()
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersion),
+					func(g Gomega, compVersion *appsv1.ComponentVersion) {
+						g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
+						g.Expect(compVersion.Status.Phase).Should(Equal(appsv1.AvailablePhase))
+					})).Should(Succeed())
+			}
+
+			By("creating a sharding definition that constrains its component definition family")
+			shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, topologyCompDef).
+				Create(&testCtx).
+				GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(shardingDef),
+				func(g Gomega, shardingDef *appsv1.ShardingDefinition) {
+					g.Expect(shardingDef.Status.ObservedGeneration).Should(Equal(shardingDef.Generation))
+				})).Should(Succeed())
+
+			By("resolving a topology sharding with a serviceVersion-matched instance template")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "topology-sharding-template", "mysql").
+				SetTopology("semisync").
+				AddSharding(shardingName, "", "").
+				SetShardingServiceVersion(serviceVersion).
+				AddShardingInstances(appsv1.InstanceTemplate{
+					Name:           "canary",
+					ServiceVersion: serviceVersion,
+				}).
+				GetObject()
+
+			transformer := &clusterNormalizationTransformer{}
+			shardings, err := transformer.resolveShardingsFromTopology(appsv1.ClusterTopology{
+				Name: "semisync",
+				Shardings: []appsv1.ClusterTopologySharding{{
+					Name:        shardingName,
+					ShardingDef: shardingDefName,
+				}},
+			}, clusterObj)
+			Expect(err).Should(Succeed())
+			Expect(shardings).Should(HaveLen(1))
+			Expect(shardings[0].ShardingDef).Should(Equal(shardingDefName))
+
+			_, _, err = transformer.resolveDefinitions4Sharding(&clusterTransformContext{
+				Context: testCtx.Ctx,
+				Client:  testCtx.Cli,
+				Cluster: clusterObj,
+			}, shardings[0])
+			Expect(err).Should(Succeed())
+
+			Expect(shardings[0].ShardingDef).Should(Equal(shardingDefName))
+			Expect(shardings[0].Template.ComponentDef).Should(Equal(mysqlCompDef))
+			Expect(shardings[0].Template.ServiceVersion).Should(Equal(serviceVersion))
+			Expect(shardings[0].Template.Instances).Should(HaveLen(1))
+			Expect(shardings[0].Template.Instances[0].CompDef).Should(Equal(mysqlCompDef))
+			Expect(shardings[0].Template.Instances[0].ServiceVersion).Should(Equal(serviceVersion))
 		})
 	})
 

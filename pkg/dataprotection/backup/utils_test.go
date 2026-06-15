@@ -20,13 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backup
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -229,4 +235,121 @@ func TestSetExpirationTime(t *testing.T) {
 			tt.verify(t, tt.backup)
 		})
 	}
+}
+
+func TestBackupNameAndPathHelpers(t *testing.T) {
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup-name",
+			Namespace: "ns",
+			UID:       types.UID("1234567890abcdef"),
+			Labels: map[string]string{
+				constant.KBAppComponentLabelKey: "excluded",
+				"keep":                          "value",
+			},
+		},
+	}
+	target := &dpv1alpha1.BackupTarget{Name: "target", PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll}}
+
+	labels := BuildBackupWorkloadLabels(backup)
+	assert.Equal(t, "value", labels["keep"])
+	assert.NotContains(t, labels, constant.KBAppComponentLabelKey)
+	assert.Equal(t, backup.Name, labels[dptypes.BackupNameLabelKey])
+
+	assert.Equal(t, "dp-backup-backup-name-12345678", GenerateBackupJobName(backup, "dp-backup"))
+	longName := GenerateBackupJobName(&dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "very-long-backup-name-that-should-be-trimmed-for-job-label-limits", UID: types.UID("1234567890abcdef")}}, "prefix")
+	assert.LessOrEqual(t, len(longName), 63)
+	assert.False(t, longName[len(longName)-1:] == "-")
+
+	assert.Equal(t, "dp-target-backup-name", GenerateBackupStatefulSetName(backup, "target", "dp"))
+	assert.Equal(t, "backup-name", GenerateBackupStatefulSetName(backup, "", "dp"))
+	assert.Equal(t, "/repo/ns/path/backup-name", BuildBaseBackupPath(backup, "/repo/", "/path/"))
+	assert.Equal(t, "/repo/ns/path/backup-name/target/pod-0", BuildBackupPathByTarget(backup, target, "/repo/", "/path/", "pod-0"))
+	assert.Equal(t, "target/pod-0", BuildTargetRelativePath(target, "pod-0"))
+	assert.Equal(t, "/repo/ns/path/kopia", BuildKopiaRepoPath(backup, "/repo/", "/path/"))
+}
+
+func TestBackupScheduleNameHelpers(t *testing.T) {
+	schedule := &dpv1alpha1.BackupSchedule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "schedule",
+			Namespace: "namespace",
+			UID:       types.UID("schedule-uid"),
+			OwnerReferences: []metav1.OwnerReference{{
+				UID: types.UID("owneruid-123456"),
+			}},
+		},
+		Spec: dpv1alpha1.BackupScheduleSpec{Schedules: []dpv1alpha1.SchedulePolicy{{Name: "daily", BackupMethod: "full"}, {BackupMethod: "log"}}},
+	}
+	assert.Equal(t, "owneruid-schedule-namespace-full", GenerateCRNameByBackupSchedule(schedule, "full"))
+	assert.Equal(t, "owneruid-schedule-namespace-cron", GenerateCRNameByScheduleNameAndMethod(schedule, "full", "cron"))
+	assert.Equal(t, "owneruid-schedule-namespace-full", GenerateCRNameByScheduleNameAndMethod(schedule, "full", ""))
+	assert.Equal(t, "schedule-schedule-namespace-full", GenerateLegacyCRNameByBackupSchedule(schedule, "full"))
+	assert.Equal(t, "daily", GetSchedulePolicyByMethod(schedule, "full").Name)
+	assert.Nil(t, GetSchedulePolicyByMethod(schedule, "missing"))
+}
+
+func TestBackupVolumeHelpers(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data-pvc"}}},
+				{Name: "config", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}}},
+			},
+		},
+	}
+	info := &dpv1alpha1.TargetVolumeInfo{Volumes: []string{"data", "missing"}}
+	assert.Equal(t, []corev1.Volume{pod.Spec.Volumes[0]}, getVolumesByVolumeInfo(pod, info))
+	assert.Nil(t, getVolumesByVolumeInfo(pod, nil))
+
+	mountInfo := &dpv1alpha1.TargetVolumeInfo{VolumeMounts: []corev1.VolumeMount{{Name: "config", MountPath: "/cfg"}, {Name: "missing", MountPath: "/missing"}}}
+	assert.Equal(t, []corev1.Volume{pod.Spec.Volumes[1]}, getVolumesByVolumeInfo(pod, mountInfo))
+	assert.Equal(t, []corev1.VolumeMount{{Name: "config", MountPath: "/cfg"}}, getVolumeMountsByVolumeInfo(pod, mountInfo))
+	assert.Nil(t, getVolumeMountsByVolumeInfo(pod, nil))
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data-pvc", Namespace: "ns"}}).Build()
+	pvcs, err := getPVCsByVolumeNames(cli, pod, []string{"data"})
+	assert.NoError(t, err)
+	assert.Len(t, pvcs, 1)
+	assert.Equal(t, "data", pvcs[0].VolumeName)
+	_, err = getPVCsByVolumeNames(cli, pod, []string{"missing-pvc"})
+	assert.NoError(t, err)
+}
+
+func TestStopStatefulSetsWhenFailed(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, appsv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	backup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns"}, Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseFailed}}
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: GenerateBackupStatefulSetName(backup, "target", BackupDataJobNamePrefix), Namespace: "ns"},
+		Spec:       appsv1.StatefulSetSpec{Replicas: pointer.Int32(1)},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sts).Build()
+	assert.NoError(t, StopStatefulSetsWhenFailed(context.Background(), cli, backup, "target"))
+
+	got := &appsv1.StatefulSet{}
+	assert.NoError(t, cli.Get(context.Background(), types.NamespacedName{Name: sts.Name, Namespace: sts.Namespace}, got))
+	assert.Equal(t, int32(0), *got.Spec.Replicas)
+
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	got.Spec.Replicas = pointer.Int32(2)
+	assert.NoError(t, cli.Update(context.Background(), got))
+	assert.NoError(t, StopStatefulSetsWhenFailed(context.Background(), cli, backup, "target"))
+	assert.NoError(t, cli.Get(context.Background(), types.NamespacedName{Name: sts.Name, Namespace: sts.Namespace}, got))
+	assert.Equal(t, int32(2), *got.Spec.Replicas)
+}
+
+func TestBuildParametersManifest(t *testing.T) {
+	manifest, err := BuildParametersManifest(nil)
+	assert.NoError(t, err)
+	assert.Empty(t, manifest)
+
+	manifest, err = BuildParametersManifest([]dpv1alpha1.ParameterPair{{Name: "p", Value: "v"}})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `[{"name":"p","value":"v"}]`, manifest[len("\n  parameters: "):])
 }

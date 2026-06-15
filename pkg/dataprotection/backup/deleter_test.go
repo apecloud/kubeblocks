@@ -20,21 +20,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package backup
 
 import (
+	"context"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns", UID: types.UID("backup-uid")},
+		Status:     dpv1alpha1.BackupStatus{BackupMethod: &dpv1alpha1.BackupMethod{Env: []corev1.EnvVar{{Name: "IMAGE_TAG", Value: "1.0"}}}},
+	}
+	repo := &dpv1alpha1.BackupRepo{Spec: dpv1alpha1.BackupRepoSpec{}, Status: dpv1alpha1.BackupRepoStatus{BackupPVCName: "repo-pvc"}}
+	deleter := &Deleter{
+		RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+		Client:               cli,
+		Scheme:               scheme,
+		WorkerServiceAccount: "worker",
+		actionSet:            &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{Env: []corev1.EnvVar{{Name: "ACTION_ENV", Value: "set"}}}},
+	}
+
+	job, err := deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
+	assert.NoError(t, err)
+	assert.Empty(t, job.Name)
+
+	got := &batchv1.Job{}
+	assert.NoError(t, cli.Get(context.Background(), BuildDeleteBackupFilesJobKey(backup, true), got))
+	assert.Contains(t, got.Spec.Template.Spec.Containers[0].Image, "deleter:1.0")
+	assert.Equal(t, "worker", got.Spec.Template.Spec.ServiceAccountName)
+	envMap := map[string]string{}
+	for _, env := range got.Spec.Template.Spec.Containers[0].Env {
+		envMap[env.Name] = env.Value
+	}
+	assert.Equal(t, "/backup/path", envMap[dptypes.DPBackupBasePath])
+	assert.Equal(t, "set", envMap["ACTION_ENV"])
+
+	job, err = deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
+	assert.NoError(t, err)
+	assert.Equal(t, got.Name, job.Name)
+}
 
 var _ = Describe("Backup Deleter Test", func() {
 	const (

@@ -1776,6 +1776,48 @@ var _ = Describe("ParameterView Controller", func() {
 	BeforeEach(cleanEnv)
 	AfterEach(cleanEnv)
 
+	It("resolves helper state for parameter value maps and failure messages", func() {
+		By("cloning parameter value maps without sharing value pointers")
+		Expect(cloneParameterValueMap(nil)).Should(BeNil())
+		source := map[string]*string{
+			"keep":   ptr.To("1"),
+			"delete": nil,
+		}
+		cloned := cloneParameterValueMap(source)
+		Expect(cloned).Should(Equal(source))
+		Expect(cloned["keep"]).ShouldNot(BeIdenticalTo(source["keep"]))
+
+		By("comparing desired parameter maps with nil-aware semantics")
+		Expect(equalParameterValueMap(source, cloned)).Should(BeTrue())
+		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("1")})).Should(BeFalse())
+		Expect(equalParameterValueMap(source, map[string]*string{"keep": ptr.To("2"), "delete": nil})).Should(BeFalse())
+		Expect(equalParameterValueMap(source, map[string]*string{"keep": nil, "delete": nil})).Should(BeFalse())
+
+		By("checking desired parameter containment")
+		Expect(desiredParametersContain(nil, source)).Should(BeFalse())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{}, source)).Should(BeFalse())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, nil)).Should(BeFalse())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, cloned)).Should(BeTrue())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, map[string]*string{"keep": ptr.To("2")})).Should(BeFalse())
+		Expect(desiredParametersContain(&parametersv1alpha1.ParameterInputs{Assignments: source}, map[string]*string{"missing": ptr.To("1")})).Should(BeFalse())
+
+		By("choosing the most specific config item failure message")
+		Expect(configItemFailureMessage(nil, "")).Should(Equal("component parameter reconfigure failed"))
+		Expect(configItemFailureMessage(nil, "fallback")).Should(Equal("fallback"))
+		Expect(configItemFailureMessage(&parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			ReconcileDetail: &parametersv1alpha1.ReconcileDetail{ErrMessage: "err-message", ExecResult: "exec-result"},
+		}, "fallback")).Should(Equal("err-message"))
+		Expect(configItemFailureMessage(&parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			ReconcileDetail: &parametersv1alpha1.ReconcileDetail{ExecResult: "exec-result"},
+		}, "fallback")).Should(Equal("exec-result"))
+		Expect(configItemFailureMessage(&parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			Message: ptr.To("status-message"),
+		}, "fallback")).Should(Equal("status-message"))
+		Expect(configItemFailureMessage(&parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			Message: ptr.To(""),
+		}, "fallback")).Should(Equal("fallback"))
+	})
+
 	It("writes PlainText content back to ComponentParameter desired parameters", func() {
 		_, _, _, _, _ = mockReconcileResource()
 

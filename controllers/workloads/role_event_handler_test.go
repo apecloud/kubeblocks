@@ -108,6 +108,16 @@ func TestParseRoleProbeOutputEmpty(t *testing.T) {
 	}
 }
 
+func TestParseRoleProbeOutputWhitespaceOnly(t *testing.T) {
+	out, err := parseRoleProbeOutput([]byte(" \n\t "))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.hasAuthoritativeVersion || out.role != "" {
+		t.Fatalf("got %+v, want empty role without authoritative version", out)
+	}
+}
+
 // --- gate tests: each path consults only its own annotation key ---
 
 func TestAcceptRoleProbeEventVersionedRejectsOlderVersion(t *testing.T) {
@@ -184,7 +194,43 @@ func TestAcceptRoleProbeEventSingleTokenRejectedOnPodWithBothAnnotationsWhenRole
 	}
 }
 
+func TestAcceptRoleProbeEventAcceptsUnparseableStoredOrIncomingVersions(t *testing.T) {
+	parsed := versionedRoleProbeOutput("primary", 1)
+	pod := podWithAnnotations(map[string]string{constant.LastRoleAuthoritativeVersionAnnotationKey: "bad"})
+	if !acceptRoleProbeEvent(pod, "0", parsed) {
+		t.Fatalf("expected bad stored authoritative version to be accepted")
+	}
+
+	parsed = roleProbeOutput{role: "primary"}
+	pod = podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "bad"})
+	if !acceptRoleProbeEvent(pod, "1", parsed) {
+		t.Fatalf("expected bad stored event version to be accepted")
+	}
+	pod = podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1"})
+	if !acceptRoleProbeEvent(pod, "bad", parsed) {
+		t.Fatalf("expected bad incoming event version to be accepted")
+	}
+}
+
 // --- end-to-end handler tests via fake client ---
+
+func TestRoleEventHandlerIgnoresNonRoleProbeEvent(t *testing.T) {
+	event := builder.NewEventBuilder("default", "event-1").
+		SetReason("not-role-probe").
+		SetReportingController(proto.ProbeEventReportingController).
+		GetObject()
+
+	handled, err := (&RoleEventHandler{}).Handle(roleEventFakeClient(t, event), intctrlutil.RequestCtx{
+		Ctx: context.Background(),
+		Log: logr.Discard(),
+	}, nil, event)
+	if err != nil {
+		t.Fatalf("handle event failed: %v", err)
+	}
+	if handled {
+		t.Fatalf("expected non-role probe event to be ignored")
+	}
+}
 
 func TestRoleEventHandlerHandlesInstanceSetSingleTokenAndExclusiveCleanupStampsPeerAnnotation(t *testing.T) {
 	ctx := context.Background()
@@ -575,6 +621,28 @@ func TestRoleEventHandlerPrefersControllerRefOverLabels(t *testing.T) {
 	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
 }
 
+func TestRoleEventHandlerPrefersInstanceControllerRefOverLabels(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql-0"},
+		Spec:       workloads.InstanceSpec{Roles: []workloads.ReplicaRole{{Name: "leader"}}},
+	}
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "mysql",
+		constant.KBAppInstanceNameLabelKey:    "mysql-0",
+	})
+	setControllerRef(pod, workloads.GroupVersion.String(), instanceKind, inst.Name)
+	event := roleProbeEvent("default", "event-1", pod, "leader", now)
+	cli := roleEventFakeClient(t, inst, pod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected event to be handled")
+	}
+
+	assertPodRole(t, ctx, cli, pod, "leader", fmt.Sprintf("%d", event.EventTime.UnixMicro()))
+}
+
 func TestRoleEventHandlerConsumesInvalidProbeMessageWithoutPodUpdate(t *testing.T) {
 	ctx := context.Background()
 	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
@@ -631,6 +699,25 @@ func TestRoleEventHandlerRejectsMalformedRoleProbeOutput(t *testing.T) {
 
 	// Role label must not change; both annotations must stay empty since
 	// malformed output is rejected before any write.
+	assertPodRole(t, ctx, cli, pod, "leader", "")
+	assertPodLastRoleVersion(t, ctx, cli, pod, "")
+	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
+}
+
+func TestRoleEventHandlerConsumesAmbiguousPodOwnerWithoutPodUpdate(t *testing.T) {
+	ctx := context.Background()
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		instanceset.WorkloadsInstanceLabelKey: "mysql",
+		constant.KBAppInstanceNameLabelKey:    "mysql-0",
+		constant.RoleLabelKey:                 "leader",
+	})
+	event := roleProbeEvent("default", "event-1", pod, "follower", time.Now())
+	cli := roleEventFakeClient(t, pod, event)
+
+	if handled := handleRoleEvent(t, ctx, cli, event); !handled {
+		t.Fatalf("expected ambiguous owner event to be consumed")
+	}
+
 	assertPodRole(t, ctx, cli, pod, "leader", "")
 	assertPodLastRoleVersion(t, ctx, cli, pod, "")
 	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
@@ -718,6 +805,158 @@ func TestRoleEventHandlerIgnoresUnknownOwnerWithoutMarkingHandled(t *testing.T) 
 	}
 }
 
+func TestResolveRoleEventBranchByControllerRefRejectsUnknownRefs(t *testing.T) {
+	pod := roleEventPod("default", "mysql-0", "uid-0", nil)
+	setControllerRef(pod, ":", workloads.InstanceSetKind, "mysql")
+	if _, _, ok := resolveRoleEventBranchByControllerRef(pod); ok {
+		t.Fatalf("expected malformed apiVersion to be rejected")
+	}
+
+	setControllerRef(pod, "apps/v1", workloads.InstanceSetKind, "mysql")
+	if _, _, ok := resolveRoleEventBranchByControllerRef(pod); ok {
+		t.Fatalf("expected foreign api group to be rejected")
+	}
+
+	setControllerRef(pod, workloads.GroupVersion.String(), "Other", "mysql")
+	if _, _, ok := resolveRoleEventBranchByControllerRef(pod); ok {
+		t.Fatalf("expected unknown kind to be rejected")
+	}
+}
+
+func TestUpdatePodRoleLabelNoopsWhenRoleAndAnnotationUnchanged(t *testing.T) {
+	ctx := context.Background()
+	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
+		constant.RoleLabelKey: "leader",
+	})
+	pod.Annotations = map[string]string{
+		constant.LastRoleEventVersionAnnotationKey: "1000",
+	}
+	cli := roleEventFakeClient(t, pod)
+
+	if err := updatePodRoleLabel(ctx, cli, pod, "leader", true, "1000", roleProbeOutput{role: "leader"}); err != nil {
+		t.Fatalf("update pod role label failed: %v", err)
+	}
+
+	assertPodRole(t, ctx, cli, pod, "leader", "1000")
+}
+
+func TestRemoveExclusiveRoleLabelsSkipsSelfAndStalePeers(t *testing.T) {
+	ctx := context.Background()
+	its := workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql"}}
+	self := roleEventPod("default", "mysql-0", "uid-0", instanceSetRoleLabels("mysql", "leader"))
+	stalePeer := roleEventPod("default", "mysql-1", "uid-1", instanceSetRoleLabels("mysql", "leader"))
+	stalePeer.Annotations = map[string]string{
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "5",
+	}
+	cli := roleEventFakeClient(t, self, stalePeer)
+
+	err := removeExclusiveRoleLabels(ctx, cli, its, self.Name, "leader", "0", versionedRoleProbeOutput("leader", 4))
+	if err != nil {
+		t.Fatalf("remove exclusive role labels failed: %v", err)
+	}
+
+	assertPodRole(t, ctx, cli, self, "leader", "")
+	assertPodRole(t, ctx, cli, stalePeer, "leader", "")
+}
+
+func TestExclusiveRolePeerHelpersSkipSelfAndMalformedVersions(t *testing.T) {
+	ctx := context.Background()
+	its := workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql"}}
+	self := roleEventPod("default", "mysql-0", "uid-0", instanceSetRoleLabels("mysql", "leader"))
+	self.Annotations = map[string]string{
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "5",
+	}
+	peerWithoutVersion := roleEventPod("default", "mysql-1", "uid-1", instanceSetRoleLabels("mysql", "leader"))
+	peerWithBadVersion := roleEventPod("default", "mysql-2", "uid-2", instanceSetRoleLabels("mysql", "leader"))
+	peerWithBadVersion.Annotations = map[string]string{
+		constant.LastRoleAuthoritativeVersionAnnotationKey: "bad",
+	}
+	cli := roleEventFakeClient(t, self, peerWithoutVersion, peerWithBadVersion)
+
+	held, err := versionedPeerHoldsExclusiveRole(ctx, cli, its, self.Name, "leader")
+	if err != nil {
+		t.Fatalf("check versioned peer failed: %v", err)
+	}
+	if !held {
+		t.Fatalf("expected peer with malformed authoritative version annotation to count as held")
+	}
+
+	stale, err := newerOrEqualVersionedExclusiveRoleHeldByPeer(ctx, cli, its, self.Name, "leader", 1)
+	if err != nil {
+		t.Fatalf("check newer versioned peer failed: %v", err)
+	}
+	if stale {
+		t.Fatalf("expected peers with missing or malformed versions to be ignored")
+	}
+}
+
+func TestInstanceSetReconciler2InstanceFilter(t *testing.T) {
+	ctx := context.Background()
+	r := &InstanceSetReconciler2{}
+	testCases := []struct {
+		name      string
+		labels    map[string]string
+		wantCount int
+		wantName  string
+	}{
+		{
+			name:      "missing managed by",
+			labels:    map[string]string{},
+			wantCount: 0,
+		},
+		{
+			name: "missing cluster",
+			labels: map[string]string{
+				constant.AppManagedByLabelKey: constant.AppName,
+			},
+			wantCount: 0,
+		},
+		{
+			name: "missing component",
+			labels: map[string]string{
+				constant.AppManagedByLabelKey: constant.AppName,
+				constant.AppInstanceLabelKey:  "mysql",
+			},
+			wantCount: 0,
+		},
+		{
+			name: "valid instance labels",
+			labels: map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppInstanceLabelKey:    "mysql",
+				constant.KBAppComponentLabelKey: "proxy",
+			},
+			wantCount: 1,
+			wantName:  constant.GenerateWorkloadNamePattern("mysql", "proxy"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "mysql-proxy-0",
+					Labels:    tc.labels,
+				},
+			}
+			requests := r.instanceFilter(ctx, pod)
+			if len(requests) != tc.wantCount {
+				t.Fatalf("got %d requests, want %d", len(requests), tc.wantCount)
+			}
+			if tc.wantCount == 1 {
+				if requests[0].NamespacedName.Namespace != pod.Namespace || requests[0].NamespacedName.Name != tc.wantName {
+					t.Fatalf("got request %s, want default/%s", requests[0].NamespacedName.String(), tc.wantName)
+				}
+			}
+		})
+	}
+}
+
+func TestLogRoleProbeEventErrorPath(t *testing.T) {
+	logRoleProbeEvent(logr.Discard(), &roleEventResult{}, fmt.Errorf("boom"))
+}
+
 func handleRoleEvent(t *testing.T, ctx context.Context, cli client.Client, event *corev1.Event) bool {
 	t.Helper()
 	handled, err := (&RoleEventHandler{}).Handle(cli, intctrlutil.RequestCtx{
@@ -748,6 +987,15 @@ func roleEventPod(namespace, name, uid string, labels map[string]string) *corev1
 		pod.Labels = labels
 	}
 	return pod
+}
+
+func instanceSetRoleLabels(name, role string) map[string]string {
+	return map[string]string{
+		constant.AppManagedByLabelKey:          constant.AppName,
+		instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
+		instanceset.WorkloadsInstanceLabelKey:  name,
+		constant.RoleLabelKey:                  role,
+	}
 }
 
 func podWithAnnotations(annotations map[string]string) *corev1.Pod {

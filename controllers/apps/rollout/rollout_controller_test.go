@@ -368,6 +368,9 @@ var _ = Describe("rollout controller", func() {
 		if processor != nil {
 			processor(f)
 		}
+		if f.Get().Spec.Components[0].ServiceVersion != nil && f.Get().Spec.Components[0].CompDef == nil {
+			f.SetCompCompDef(compDefName)
+		}
 		rolloutObj = f.Create(&testCtx).GetObject()
 		rolloutKey = client.ObjectKeyFromObject(rolloutObj)
 	}
@@ -380,6 +383,9 @@ var _ = Describe("rollout controller", func() {
 			AddSharding(shardingName)
 		if processor != nil {
 			processor(f)
+		}
+		if f.Get().Spec.Shardings[0].ServiceVersion != nil && f.Get().Spec.Shardings[0].CompDef == nil {
+			f.SetShardingCompDef(compDefName)
 		}
 		rolloutObj = f.Create(&testCtx).GetObject()
 		rolloutKey = client.ObjectKeyFromObject(rolloutObj)

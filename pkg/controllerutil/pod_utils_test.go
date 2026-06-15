@@ -100,6 +100,147 @@ func TestGetPodRevision(t *testing.T) {
 	}
 }
 
+func TestPodUtilitySmallHelpers(t *testing.T) {
+	pod := corev1.Pod{
+		Spec: corev1.PodSpec{
+			Hostname:  "mysql-0",
+			Subdomain: "mysql-headless",
+			Containers: []corev1.Container{{
+				Name:  "mysql",
+				Ports: []corev1.ContainerPort{{Name: "mysql", ContainerPort: 3306}},
+			}},
+		},
+		Status: corev1.PodStatus{PodIP: "10.0.0.1"},
+	}
+	if got := BuildPodHostDNS(&pod); got != "mysql-0.mysql-headless" {
+		t.Fatalf("expected host dns, got %q", got)
+	}
+	pod.Spec.Subdomain = ""
+	if got := BuildPodHostDNS(&pod); got != "10.0.0.1" {
+		t.Fatalf("expected pod ip dns fallback, got %q", got)
+	}
+	if got := BuildPodHostDNS(nil); got != "" {
+		t.Fatalf("expected empty dns for nil pod, got %q", got)
+	}
+
+	port, err := GetPortByName(pod, "mysql", "mysql")
+	if err != nil || port != 3306 {
+		t.Fatalf("expected mysql port 3306, got %d %v", port, err)
+	}
+	if _, err = GetPortByName(pod, "mysql", "missing"); err == nil {
+		t.Fatalf("expected missing port error")
+	}
+	if vm := GetVolumeMountByVolume(&corev1.Container{VolumeMounts: []corev1.VolumeMount{{Name: "config"}}}, "config"); vm == nil || vm.Name != "config" {
+		t.Fatalf("expected config volume mount")
+	}
+	if vm := GetVolumeMountByVolume(&corev1.Container{}, "missing"); vm != nil {
+		t.Fatalf("expected nil volume mount")
+	}
+
+	if container := GetPodContainer(&pod, ""); container == nil || container.Name != "mysql" {
+		t.Fatalf("expected first container")
+	}
+	if container := GetPodContainer(&pod, "missing"); container != nil {
+		t.Fatalf("expected nil for missing container")
+	}
+}
+
+func TestPodFailureAndDefaultResolution(t *testing.T) {
+	oldMode := int32(0644)
+	newSpec := corev1.PodSpec{
+		Volumes: []corev1.Volume{{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{
+				DefaultMode: &oldMode,
+			}},
+		}},
+		Containers: []corev1.Container{{
+			Name:                     "mysql",
+			ImagePullPolicy:          corev1.PullIfNotPresent,
+			TerminationMessagePath:   "/dev/termination-log",
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+			LivenessProbe: &corev1.Probe{
+				TimeoutSeconds:   3,
+				PeriodSeconds:    4,
+				SuccessThreshold: 1,
+				FailureThreshold: 5,
+				ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{
+					Scheme: corev1.URISchemeHTTP,
+				}},
+			},
+		}},
+		RestartPolicy:                 corev1.RestartPolicyAlways,
+		DNSPolicy:                     corev1.DNSClusterFirst,
+		TerminationGracePeriodSeconds: ptrInt64(30),
+	}
+	proto := corev1.PodSpec{
+		Volumes: []corev1.Volume{{
+			Name:         "config",
+			VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{}},
+		}},
+		Containers: []corev1.Container{{
+			Name:          "mysql",
+			LivenessProbe: &corev1.Probe{ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{}}},
+		}},
+	}
+
+	ResolvePodSpecDefaultFields(newSpec, &proto)
+	if proto.RestartPolicy != corev1.RestartPolicyAlways ||
+		proto.DNSPolicy != corev1.DNSClusterFirst ||
+		*proto.TerminationGracePeriodSeconds != 30 ||
+		*proto.Volumes[0].ConfigMap.DefaultMode != oldMode {
+		t.Fatalf("expected pod defaults to be copied")
+	}
+	if proto.Containers[0].ImagePullPolicy != corev1.PullIfNotPresent ||
+		proto.Containers[0].LivenessProbe.TimeoutSeconds != 3 ||
+		proto.Containers[0].LivenessProbe.HTTPGet.Scheme != corev1.URISchemeHTTP {
+		t.Fatalf("expected container defaults to be copied")
+	}
+
+	pod := &corev1.Pod{Status: corev1.PodStatus{
+		InitContainerStatuses: []corev1.ContainerStatus{{
+			Name: "init",
+			State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+				Message: "init failed",
+			}},
+		}},
+		Conditions: []corev1.PodCondition{{
+			Type:               corev1.PodInitialized,
+			LastTransitionTime: metav1.NewTime(time.Now().Add(-PodContainerFailedTimeout - time.Second)),
+		}},
+	}}
+	failed, timedOut, message := IsPodFailedAndTimedOut(pod)
+	if !failed || !timedOut || message != "init failed" {
+		t.Fatalf("expected timed out init failure, got failed=%v timedOut=%v message=%q", failed, timedOut, message)
+	}
+}
+
+func TestBuildImagePullSecrets(t *testing.T) {
+	defer viper.Set(constant.KBImagePullSecrets, "")
+	viper.Set(constant.KBImagePullSecrets, `[{"name":"regcred"}]`)
+	secrets := BuildImagePullSecrets()
+	if len(secrets) != 1 || secrets[0].Name != "regcred" {
+		t.Fatalf("expected regcred image pull secret, got %#v", secrets)
+	}
+}
+
+func TestIsMatchConfigVersion(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"config-hash": "v1"}}}
+	if !IsMatchConfigVersion(pod, "config-hash", "v1") {
+		t.Fatalf("expected matching config version")
+	}
+	if IsMatchConfigVersion(pod, "config-hash", "v2") {
+		t.Fatalf("expected mismatched config version")
+	}
+	if IsMatchConfigVersion(&corev1.Pod{}, "config-hash", "v1") {
+		t.Fatalf("expected missing labels not to match")
+	}
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
+}
+
 var _ = Describe("pod utils", func() {
 	var (
 		statefulSet     *appsv1.StatefulSet

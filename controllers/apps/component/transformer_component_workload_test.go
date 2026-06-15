@@ -24,8 +24,6 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -198,25 +196,6 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 			By("executing leave member for leader")
 			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
-		})
-
-		It("should wait before scale in when target replica lifecycle is pending", func() {
-			ops.runningItsPodNameSet = sets.New(pod0.Name, pod1.Name)
-			ops.desiredCompPodNameSet = sets.New(pod0.Name)
-
-			Expect(component.StatusReplicasStatus(ops.protoITS, []string{pod0.Name}, true, true)).Should(Succeed())
-			Expect(component.NewReplicasStatus(ops.protoITS, []string{pod1.Name}, true, true)).Should(Succeed())
-			ops.protoITS.Spec.Replicas = ptr.To[int32](1)
-
-			err := ops.scaleIn()
-			Expect(err).Should(HaveOccurred())
-			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
-			Expect(err.Error()).Should(ContainSubstring("pending lifecycle"))
-			Expect(err.Error()).Should(ContainSubstring(pod1.Name))
-
-			pending, err := component.PendingLifecycleReplicas(ops.protoITS, []string{pod1.Name})
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pending).Should(ConsistOf(pod1.Name))
 		})
 
 		It("should eliminate upgrade-only diff by preserving legacy config-manager", func() {

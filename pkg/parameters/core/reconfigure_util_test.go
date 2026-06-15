@@ -244,3 +244,165 @@ func TestHasDynamicParameterUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateConfigPatch(t *testing.T) {
+	configs := []parametersv1alpha1.ComponentConfigDescription{{
+		Name: "mysql.cnf",
+		FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+			},
+		},
+	}}
+
+	require.NoError(t, ValidateConfigPatch(&ConfigPatchInfo{}, configs))
+	require.NoError(t, ValidateConfigPatch(&ConfigPatchInfo{
+		IsModify:     true,
+		UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+	}, configs))
+
+	err := ValidateConfigPatch(&ConfigPatchInfo{
+		IsModify:     true,
+		UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":null}}`)},
+	}, configs)
+	require.ErrorContains(t, err, "delete config parameter [max_connections] is not support")
+}
+
+func TestIsUpdateDynamicParameters(t *testing.T) {
+	config := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		def     *parametersv1alpha1.ParametersDefinitionSpec
+		patch   *ConfigPatchInfo
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "delete config requires restart",
+			def:  &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: &ConfigPatchInfo{
+				DeleteConfig: map[string]interface{}{"mysql.cnf": map[string]interface{}{"max_connections": "200"}},
+			},
+			want: false,
+		},
+		{
+			name:  "empty update is dynamic",
+			def:   &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: &ConfigPatchInfo{},
+			want:  true,
+		},
+		{
+			name: "invalid update patch",
+			def:  &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{`)},
+			},
+			wantErr: true,
+		},
+		{
+			name: "dynamic parameter only",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"max_connections"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: true,
+		},
+		{
+			name: "static parameter is not dynamic",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				StaticParameters: []string{"max_connections"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: false,
+		},
+		{
+			name: "unknown parameter with dynamic list is not dynamic",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"innodb_buffer_pool_size"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: false,
+		},
+		{
+			name: "static list without dynamic list defaults to reload for non-static update",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				StaticParameters: []string{"innodb_buffer_pool_size"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := IsUpdateDynamicParameters(config, tt.def, tt.patch)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCheckUpdateDynamicParameters(t *testing.T) {
+	config := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		def     *parametersv1alpha1.ParametersDefinitionSpec
+		patch   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "empty patch", def: &parametersv1alpha1.ParametersDefinitionSpec{}, want: true},
+		{name: "invalid patch", def: &parametersv1alpha1.ParametersDefinitionSpec{}, patch: `{`, wantErr: true},
+		{
+			name: "dynamic parameter",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"max_connections"},
+			},
+			patch: `{"mysqld":{"max_connections":"200"}}`,
+			want:  true,
+		},
+		{
+			name:  "no parameter lists defaults to restart",
+			def:   &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: `{"mysqld":{"max_connections":"200"}}`,
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckUpdateDynamicParameters(config, tt.def, tt.patch)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}

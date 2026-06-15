@@ -137,6 +137,16 @@ func DeleteReplicasStatus(its *workloads.InstanceSet, replicas []string, f func(
 	})
 }
 
+func PendingLifecycleReplicas(its *workloads.InstanceSet, replicas []string) ([]string, error) {
+	return GetReplicasStatusFunc(its, func(s ReplicaStatus) bool {
+		if !slices.Contains(replicas, s.Name) {
+			return false
+		}
+		return (s.DataLoaded != nil && !*s.DataLoaded) ||
+			(s.MemberJoined != nil && !*s.MemberJoined)
+	})
+}
+
 func StatusReplicasStatus(its *workloads.InstanceSet, replicas []string, hasMemberJoin, hasDataAction bool) error {
 	loaded := func() *bool {
 		if hasDataAction {

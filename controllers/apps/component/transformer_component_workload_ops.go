@@ -121,8 +121,17 @@ func (r *componentWorkloadOps) scaleIn() error {
 	}
 
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
+	pendingReplicas, err := component.PendingLifecycleReplicas(r.protoITS, deleteReplicas)
+	if err != nil {
+		return err
+	}
+	if len(pendingReplicas) > 0 {
+		return intctrlutil.NewRequeueError(time.Second,
+			fmt.Sprintf("replicas still have pending lifecycle before scale-in: %v", pendingReplicas))
+	}
+
 	joinedReplicas := make([]string, 0)
-	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
+	err = component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
 		// has no member join defined or has joined successfully
 		if s.Provisioned && (s.MemberJoined == nil || *s.MemberJoined) {
 			joinedReplicas = append(joinedReplicas, s.Name)

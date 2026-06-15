@@ -23,11 +23,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
@@ -119,6 +124,77 @@ var _ = Describe("Backup OpsRequest", func() {
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("builds backup specs from default policy, retention, and parent backup", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			parentBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parent-backup",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy, parentBackup).Build()
+
+			ops := createBackupOpsObj(clusterName, "backup-build-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{
+				BackupName:       "explicit-backup",
+				RetentionPeriod:  "1d",
+				DeletionPolicy:   string(dpv1alpha1.BackupDeletionPolicyRetain),
+				ParentBackupName: parentBackup.Name,
+			}
+			backup, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(backup.Name).Should(Equal("explicit-backup"))
+			Expect(backup.Spec.BackupPolicyName).Should(Equal(policy.Name))
+			Expect(backup.Spec.BackupMethod).Should(Equal("snapshot"))
+			Expect(backup.Spec.RetentionPeriod).Should(Equal(dpv1alpha1.RetentionPeriod("1d")))
+			Expect(backup.Spec.DeletionPolicy).Should(Equal(dpv1alpha1.BackupDeletionPolicyRetain))
+			Expect(backup.Spec.ParentBackupName).Should(Equal(parentBackup.Name))
+
+			ops.Spec.Backup.RetentionPeriod = "not-a-duration"
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).Should(HaveOccurred())
+		})
+
+		It("reports backup policy and method validation errors", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			ops := createBackupOpsObj(clusterName, "backup-errors-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: "missing", BackupMethod: "snapshot"}
+			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("backup method snapshot is not supported"))
+
+			ops.Spec.Backup = nil
+			_, err = getDefaultBackupPolicy(reqCtx, fakeClient, opsRes.Cluster, "")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("not found any default backup policy"))
 		})
 	})
 })

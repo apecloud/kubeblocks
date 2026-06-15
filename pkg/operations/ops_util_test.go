@@ -95,6 +95,56 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(PatchClusterNotFound(ctx, k8sClient, opsRes)).Should(Succeed())
 		})
 
+		It("handles timeout and precondition deadline timing branches", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+
+			ops := testops.NewOpsRequestObj("timeout-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.RestartType)
+			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
+			timeoutSeconds := int32(1)
+			ops.Spec.TimeoutSeconds = &timeoutSeconds
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Second))
+
+			requeueAfter, err := GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Minute)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(BeZero())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
+			opsRes.OpsRequest.Spec.TimeoutSeconds = &timeoutSeconds
+			requeueAfter, err = GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Minute)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(BeNumerically(">", 0))
+			Expect(requeueAfter).Should(BeNumerically("<", time.Minute))
+
+			requeueAfter, err = GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Millisecond)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(Equal(time.Millisecond))
+
+			opsRes.OpsRequest.Spec.TimeoutSeconds = nil
+			requeueAfter, err = GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Second)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(Equal(time.Second))
+
+			Expect(preConditionDeadlineSecondsIsSet(opsRes.OpsRequest)).Should(BeFalse())
+			preConditionDeadlineSeconds := int32(60)
+			opsRes.OpsRequest.Spec.PreConditionDeadlineSeconds = &preConditionDeadlineSeconds
+			opsRes.OpsRequest.CreationTimestamp = metav1.Now()
+			Expect(preConditionDeadlineSecondsIsSet(opsRes.OpsRequest)).Should(BeTrue())
+			Expect(needWaitPreConditionDeadline(opsRes.OpsRequest)).Should(BeTrue())
+			opsRes.OpsRequest.Annotations = map[string]string{
+				constant.QueueEndTimeAnnotationKey: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
+			}
+			Expect(needWaitPreConditionDeadline(opsRes.OpsRequest)).Should(BeFalse())
+			opsRes.OpsRequest.Annotations[constant.QueueEndTimeAnnotationKey] = time.Now().Format(time.RFC3339)
+			Expect(needWaitPreConditionDeadline(opsRes.OpsRequest)).Should(BeTrue())
+		})
+
 		It("Test opsRequest failed cases", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)

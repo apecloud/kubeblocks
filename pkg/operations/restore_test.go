@@ -84,6 +84,76 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(cluster.OwnerReferences).Should(BeEmpty())
 	})
 
+	It("normalizes restored scheduling labels and clears sharding account secret refs", func() {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: restoreClusterName},
+			Spec: appsv1.ClusterSpec{
+				Shardings: []appsv1.ClusterSharding{{
+					Name: "shard",
+					Template: appsv1.ClusterComponentSpec{
+						SystemAccounts: []appsv1.ComponentSystemAccount{{
+							Name:      "root",
+							SecretRef: &appsv1.ProvisionSecretRef{Name: "old-secret"},
+						}},
+					},
+				}},
+			},
+		}
+		oldClusterName := "source-cluster"
+		schedulePolicy := &appsv1.SchedulingPolicy{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{constant.AppInstanceLabelKey: oldClusterName},
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
+						Key:      constant.AppInstanceLabelKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{oldClusterName},
+					}},
+				},
+			}},
+			Affinity: &corev1.Affinity{
+				PodAffinity: &corev1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{constant.AppInstanceLabelKey: oldClusterName},
+						},
+					}},
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
+						Weight: 1,
+						PodAffinityTerm: corev1.PodAffinityTerm{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{{
+									Key:      constant.AppInstanceLabelKey,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{oldClusterName},
+								}},
+							},
+						},
+					}},
+				},
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{constant.AppInstanceLabelKey: oldClusterName},
+						},
+					}},
+				},
+			},
+		}
+
+		restoreHandler.normalizeSchedulePolicy(cluster, nil)
+		restoreHandler.normalizeSchedulePolicy(cluster, schedulePolicy)
+		Expect(schedulePolicy.TopologySpreadConstraints[0].LabelSelector.MatchLabels[constant.AppInstanceLabelKey]).Should(Equal(restoreClusterName))
+		Expect(schedulePolicy.TopologySpreadConstraints[0].LabelSelector.MatchExpressions[0].Values).Should(Equal([]string{restoreClusterName}))
+		Expect(schedulePolicy.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[constant.AppInstanceLabelKey]).Should(Equal(restoreClusterName))
+		Expect(schedulePolicy.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.LabelSelector.MatchExpressions[0].Values).Should(Equal([]string{restoreClusterName}))
+		Expect(schedulePolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[constant.AppInstanceLabelKey]).Should(Equal(restoreClusterName))
+
+		restoreHandler.rebuildShardAccountSecrets(&appsv1.Cluster{})
+		restoreHandler.rebuildShardAccountSecrets(cluster)
+		Expect(cluster.Spec.Shardings[0].Template.SystemAccounts[0].SecretRef).Should(BeNil())
+	})
+
 	It("re-enters when target Cluster already belongs to the same restore OpsRequest", func() {
 		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
 		opsRequest.Labels = nil

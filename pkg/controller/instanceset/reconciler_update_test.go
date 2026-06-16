@@ -426,6 +426,113 @@ var _ = Describe("update reconciler test", func() {
 			testInplacePodVerticalScaling(true)
 		})
 
+		It("converges resize when desired CPU/memory request is omitted", func() {
+			oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
+			defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
+			viper.Set(constant.FeatureGateInPlacePodVerticalScaling, true)
+
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			spy := &lifecycleCallSpy{}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = ptr.To[int32](1)
+			its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				Switchover: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+				},
+			}
+			its.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			}
+			its.Spec.Configs = []workloads.ConfigTemplate{
+				{
+					Name:       "redis-replication-config",
+					ConfigHash: ptr.To("old-hash"),
+					Reconfigure: &kbappsv1.Action{
+						Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+					},
+				},
+			}
+			tree.SetRoot(its)
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			pod := pods[0].(*corev1.Pod)
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			})
+			pod.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			}
+			pod.Annotations[constant.CMInsConfigurationHashLabelKey] = `{"redis-replication-config":"old-hash"}`
+
+			its.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			}
+			its.Spec.Configs[0].ConfigHash = ptr.To("new-hash")
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			postPods := tree.List(&corev1.Pod{})
+			Expect(postPods).Should(HaveLen(1))
+			updatedPod := postPods[0].(*corev1.Pod)
+			Expect(updatedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resource.MustParse("1")),
+				"resize subresource should update the desired limit")
+			Expect(updatedPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(resource.MustParse("500m")),
+				"omitted desired request must not be forced to the desired limit during resize")
+			_, option, err := tree.GetWithOption(updatedPod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(option.SubResource).Should(Equal("resize"))
+			Expect(spy.reconfigureCalls).Should(Equal(1))
+
+			// Simulate real API behavior: resize subresource does not persist
+			// metadata changes (like config-hash annotation). Restore the old
+			// annotation before the second reconcile.
+			updatedPod.Annotations[constant.CMInsConfigurationHashLabelKey] = `{"redis-replication-config":"old-hash"}`
+			Expect(tree.Update(updatedPod)).Should(Succeed())
+
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			postPods = tree.List(&corev1.Pod{})
+			Expect(postPods).Should(HaveLen(1))
+			patchedPod := postPods[0].(*corev1.Pod)
+			Expect(patchedPod.Annotations).Should(HaveKeyWithValue(
+				constant.CMInsConfigurationHashLabelKey,
+				`{"redis-replication-config":"new-hash"}`))
+			Expect(patchedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resource.MustParse("1")))
+			Expect(patchedPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(resource.MustParse("500m")),
+				"the second reconcile must treat the omitted desired request as converged instead of issuing resize again")
+			_, option, err = tree.GetWithOption(patchedPod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(option.SubResource).Should(BeEmpty(),
+				"second reconcile should use normal pod patch, not resize subresource")
+
+			updatePolicy, _, _, err := getPodUpdatePolicy(its, patchedPod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updatePolicy).Should(Equal(noOpsPolicy),
+				"after resize updates the desired limit, the omitted desired request must not keep resourceUpdate true")
+		})
+
 		It("patches pod without calling switchover for metadata-only in-place updates", func() {
 			// This test exercises the Reconcile call site (not just the
 			// safeMetadataOnlyInPlaceUpdate helper) to assert the contract

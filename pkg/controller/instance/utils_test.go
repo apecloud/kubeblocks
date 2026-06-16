@@ -20,18 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestReconfigureOptions(t *testing.T) {
@@ -562,4 +570,194 @@ func TestCopyAndMergeObjects(t *testing.T) {
 		mergedPod.Spec.Containers[0].Resources.Requests.Cpu().String() != "1" {
 		t.Fatalf("unexpected merged pod: %#v", mergedPod)
 	}
+}
+
+func TestUpdateReconcilerConvergesResizeAfterConfigMetadataWithOmittedRequest(t *testing.T) {
+	oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
+	defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
+	viper.Set(constant.FeatureGateInPlacePodVerticalScaling, true)
+
+	origSupportResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+	spy := &instanceLifecycleCallSpy{}
+	origNewLifecycleAction := newLifecycleAction
+	newLifecycleAction = func(_ *workloads.Instance, _ []*corev1.Pod, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+		return spy, nil
+	}
+	defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+	inst := builder.NewInstanceBuilder("default", "valkey-0").
+		SetPodUpdatePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
+		SetConfigs([]workloads.ConfigTemplate{{
+			Name:       "valkey-replication-config",
+			ConfigHash: ptr.To("old-hash"),
+			Reconfigure: &kbappsv1.Action{
+				Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+			},
+		}}).
+		SetLifecycleActions(&workloads.LifecycleActions{
+			Switchover: &kbappsv1.Action{
+				Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+			},
+		}).
+		AddContainer(corev1.Container{
+			Name:  "valkey",
+			Image: "valkey:8",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			},
+		}).
+		GetObject()
+
+	revision, err := buildInstancePodRevision(&inst.Spec.Template, inst)
+	if err != nil {
+		t.Fatalf("buildInstancePodRevision() error = %v", err)
+	}
+	inst.Status.UpdateRevision = revision
+
+	pod, err := buildInstancePod(inst, revision)
+	if err != nil {
+		t.Fatalf("buildInstancePod() error = %v", err)
+	}
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+		Type:               corev1.PodReady,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-10 * time.Second)),
+	})
+	pod.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+	}
+	if err = configsToPod(inst.Spec.Configs, pod); err != nil {
+		t.Fatalf("configsToPod() error = %v", err)
+	}
+
+	inst.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+	}
+	inst.Spec.Configs[0].ConfigHash = ptr.To("new-hash")
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if err = tree.Add(pod); err != nil {
+		t.Fatalf("tree.Add() error = %v", err)
+	}
+
+	res, err := NewUpdateReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("first Reconcile() error = %v", err)
+	}
+	if res != kubebuilderx.Continue {
+		t.Fatalf("expected Continue, got %v", res)
+	}
+
+	pods := tree.List(&corev1.Pod{})
+	if len(pods) != 1 {
+		t.Fatalf("expected one pod, got %d", len(pods))
+	}
+	updatedPod := pods[0].(*corev1.Pod)
+	if got := updatedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]; !got.Equal(resource.MustParse("1")) {
+		t.Fatalf("expected resize to update CPU limit, got %s", got.String())
+	}
+	if got := updatedPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]; !got.Equal(resource.MustParse("500m")) {
+		t.Fatalf("expected resize to preserve omitted CPU request, got %s", got.String())
+	}
+	_, option, err := tree.GetWithOption(updatedPod)
+	if err != nil {
+		t.Fatalf("GetWithOption() error = %v", err)
+	}
+	if option.SubResource != "resize" {
+		t.Fatalf("expected resize subresource, got %q", option.SubResource)
+	}
+	if spy.reconfigureCalls != 1 {
+		t.Fatalf("expected one reconfigure call, got %d", spy.reconfigureCalls)
+	}
+
+	// Simulate real API behavior: resize subresource does not persist
+	// metadata changes. Restore the old annotation.
+	updatedPod.Annotations[constant.CMInsConfigurationHashLabelKey] = `{"valkey-replication-config":"old-hash"}`
+	if err = tree.Update(updatedPod); err != nil {
+		t.Fatalf("tree.Update() to simulate resize metadata drop error = %v", err)
+	}
+
+	res, err = NewUpdateReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("second Reconcile() error = %v", err)
+	}
+	if res != kubebuilderx.Continue {
+		t.Fatalf("expected Continue after second reconcile, got %v", res)
+	}
+
+	pods = tree.List(&corev1.Pod{})
+	if len(pods) != 1 {
+		t.Fatalf("expected one pod after metadata patch, got %d", len(pods))
+	}
+	patchedPod := pods[0].(*corev1.Pod)
+	if got := patchedPod.Annotations[constant.CMInsConfigurationHashLabelKey]; got != `{"valkey-replication-config":"new-hash"}` {
+		t.Fatalf("expected config hash annotation to be committed, got %q", got)
+	}
+	if got := patchedPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]; !got.Equal(resource.MustParse("500m")) {
+		t.Fatalf("expected omitted CPU request to be treated as converged, got %s", got.String())
+	}
+	_, option, err = tree.GetWithOption(patchedPod)
+	if err != nil {
+		t.Fatalf("GetWithOption() after metadata patch error = %v", err)
+	}
+	if option.SubResource != "" {
+		t.Fatalf("expected normal metadata patch after resize converged, got subresource %q", option.SubResource)
+	}
+
+	policy, _, err := getPodUpdatePolicy(inst, patchedPod)
+	if err != nil {
+		t.Fatalf("getPodUpdatePolicy() after resize error = %v", err)
+	}
+	if policy != noOpsPolicy {
+		t.Fatalf("expected omitted desired request to be converged after resize, got policy %q", policy)
+	}
+}
+
+type instanceLifecycleCallSpy struct {
+	switchoverCalls  int
+	reconfigureCalls int
+}
+
+func (s *instanceLifecycleCallSpy) PostProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) PreTerminate(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) RoleProbe(_ context.Context, _ client.Reader, _ *lifecycle.Options) ([]byte, error) {
+	return nil, nil
+}
+
+func (s *instanceLifecycleCallSpy) Switchover(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string) error {
+	s.switchoverCalls++
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) MemberJoin(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) MemberLeave(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ map[string]string) error {
+	s.reconfigureCalls++
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) AccountProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options, _, _, _ string) error {
+	return nil
+}
+
+func (s *instanceLifecycleCallSpy) UserDefined(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string, _ *kbappsv1.Action, _ map[string]string) error {
+	return nil
 }

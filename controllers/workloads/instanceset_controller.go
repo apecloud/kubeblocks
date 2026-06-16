@@ -87,7 +87,7 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewRevisionUpdateReconciler()).
 		Do(instanceset.NewAssistantObjectReconciler()).
 		Do(instanceset.NewReplicasAlignmentReconciler()).
-		Do(instanceset.NewUpdateReconciler()).
+		Do(instanceset.NewUpdateReconciler(r.Client)).
 		Commit()
 
 	// TODO(free6om): handle error based on ErrorCode (after defined)

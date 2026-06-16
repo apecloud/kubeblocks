@@ -619,6 +619,25 @@ func configsToPod(configs []workloads.ConfigTemplate, pod *corev1.Pod) error {
 	return nil
 }
 
+func BuildConfigHashPatch(configs []workloads.ConfigTemplate) ([]byte, error) {
+	m := make(map[string]string)
+	for _, config := range configs {
+		m[config.Name] = ptr.Deref(config.ConfigHash, "")
+	}
+	hashJSON, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	patch := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]string{
+				constant.CMInsConfigurationHashLabelKey: string(hashJSON),
+			},
+		},
+	}
+	return json.Marshal(patch)
+}
+
 func configsFromPod(pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
 	str := pod.Annotations[constant.CMInsConfigurationHashLabelKey]
 	if str == "" {

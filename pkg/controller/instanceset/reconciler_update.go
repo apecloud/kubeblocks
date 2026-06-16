@@ -27,9 +27,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -42,12 +44,14 @@ import (
 
 // updateReconciler handles the updates of instances based on the UpdateStrategy.
 // Currently, two update strategies are supported: 'OnDelete' and 'RollingUpdate'.
-type updateReconciler struct{}
+type updateReconciler struct {
+	cli client.Client
+}
 
 var _ kubebuilderx.Reconciler = &updateReconciler{}
 
-func NewUpdateReconciler() kubebuilderx.Reconciler {
-	return &updateReconciler{}
+func NewUpdateReconciler(cli client.Client) kubebuilderx.Reconciler {
+	return &updateReconciler{cli: cli}
 }
 
 func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -171,8 +175,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err1 != nil {
 			return kubebuilderx.Continue, err1
 		}
-		if !allUpdated && updatePolicy == noOpsPolicy {
-			updatingPods++
+		if !allUpdated {
+			patchData, err := BuildConfigHashPatch(its.Spec.Configs)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if err := r.cli.Patch(tree.Context, pod, client.RawPatch(types.MergePatchType, patchData)); err != nil {
+				return kubebuilderx.Continue, err
+			}
 		}
 
 		switch updatePolicy {

@@ -24,6 +24,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -124,7 +125,7 @@ var _ = Describe("update reconciler test", func() {
 			its.Generation = 1
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
 			By("prepare current tree")
@@ -174,7 +175,7 @@ var _ = Describe("update reconciler test", func() {
 				Expect(err).Should(BeNil())
 				labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
 			}
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 
 			By("reconcile with default UpdateStrategy(RollingUpdate, no partition, MaxUnavailable=1)")
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
@@ -306,7 +307,7 @@ var _ = Describe("update reconciler test", func() {
 				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 			}
 
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -332,7 +333,7 @@ var _ = Describe("update reconciler test", func() {
 				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 			}
 
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -355,7 +356,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(tree.Update(pod2)).Should(BeNil())
 
 			// no pods updated
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -365,7 +366,7 @@ var _ = Describe("update reconciler test", func() {
 			pod2.Status.Phase = corev1.PodRunning
 			pod2.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -401,7 +402,7 @@ var _ = Describe("update reconciler test", func() {
 			pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 
 			its.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1")
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -484,7 +485,7 @@ var _ = Describe("update reconciler test", func() {
 			}
 			its.Spec.Template.ObjectMeta.Annotations[constant.CMInsConfigurationHashLabelKey] = "new-hash"
 
-			reconciler = NewUpdateReconciler()
+			reconciler = NewUpdateReconciler(k8sMock)
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -497,6 +498,65 @@ var _ = Describe("update reconciler test", func() {
 				"pod should be patched with the new config-hash annotation even though switchover is skipped")
 			Expect(spy.switchoverCalls).Should(Equal(0),
 				"switchover must not be invoked when only the config-hash annotation differs")
+		})
+
+		It("directly patches pod configHash annotation after successful reconfigure", func() {
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			spy := &lifecycleCallSpy{}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.Context = context.Background()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Configs = []workloads.ConfigTemplate{
+				{
+					Name:       "my-config",
+					ConfigHash: ptr.To("new-hash-abc"),
+					Reconfigure: &kbappsv1.Action{
+						Exec: &kbappsv1.ExecAction{Command: []string{"reload"}},
+					},
+				},
+			}
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(int(replicas)))
+			for _, object := range pods {
+				pod := object.(*corev1.Pod)
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				pod.Annotations[constant.CMInsConfigurationHashLabelKey] = `{"my-config":"old-hash-xyz"}`
+			}
+
+			patchCallCount := 0
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.AssignableToTypeOf(&corev1.Pod{}), gomock.Any()).
+				DoAndReturn(func(_ context.Context, obj client.Object, patch client.Patch, _ ...client.PatchOption) error {
+					patchCallCount++
+					return nil
+				}).AnyTimes()
+
+			reconciler = NewUpdateReconciler(k8sMock)
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			Expect(patchCallCount).Should(BeNumerically(">=", 1),
+				"at least one pod should be patched with configHash annotation via direct API merge patch")
+			Expect(spy.reconfigureCalls).Should(BeNumerically(">=", 1),
+				"reconfigure lifecycle action should have been called")
 		})
 	})
 })

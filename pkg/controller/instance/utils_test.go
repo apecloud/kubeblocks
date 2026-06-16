@@ -719,6 +719,92 @@ func TestUpdateReconcilerConvergesResizeAfterConfigMetadataWithOmittedRequest(t 
 	}
 }
 
+func TestLimitOnlyScaleDownConvergesWithOmittedRequest(t *testing.T) {
+	oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
+	defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
+	viper.Set(constant.FeatureGateInPlacePodVerticalScaling, true)
+
+	origSupportResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+	defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+	spy := &instanceLifecycleCallSpy{}
+	origNewLifecycleAction := newLifecycleAction
+	newLifecycleAction = func(_ *workloads.Instance, _ []*corev1.Pod, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+		return spy, nil
+	}
+	defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+	// Start with limits=1, requests omitted (K8s defaults requests=1)
+	inst := builder.NewInstanceBuilder("default", "valkey-0").
+		SetPodUpdatePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
+		SetLifecycleActions(&workloads.LifecycleActions{
+			Switchover: &kbappsv1.Action{
+				Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+			},
+		}).
+		AddContainer(corev1.Container{
+			Name:  "valkey",
+			Image: "valkey:8",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			},
+		}).
+		GetObject()
+
+	revision, err := buildInstancePodRevision(&inst.Spec.Template, inst)
+	if err != nil {
+		t.Fatalf("buildInstancePodRevision() error = %v", err)
+	}
+	inst.Status.UpdateRevision = revision
+
+	pod, err := buildInstancePod(inst, revision)
+	if err != nil {
+		t.Fatalf("buildInstancePod() error = %v", err)
+	}
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+		Type:               corev1.PodReady,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-10 * time.Second)),
+	})
+	// Simulate K8s defaulting: live pod has requests = old limits
+	pod.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+	}
+
+	// Scale down: desired limits=500m, requests omitted
+	inst.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+	}
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if err = tree.Add(pod); err != nil {
+		t.Fatalf("tree.Add() error = %v", err)
+	}
+
+	res, err := NewUpdateReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	if res != kubebuilderx.Continue {
+		t.Fatalf("expected Continue, got %v", res)
+	}
+
+	pods := tree.List(&corev1.Pod{})
+	if len(pods) != 1 {
+		t.Fatalf("expected one pod, got %d", len(pods))
+	}
+	updatedPod := pods[0].(*corev1.Pod)
+	limit := updatedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]
+	req := updatedPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+	if req.Cmp(limit) > 0 {
+		t.Fatalf("preserved request must not exceed new limit after scale-down; got request=%s limit=%s", req.String(), limit.String())
+	}
+}
+
 type instanceLifecycleCallSpy struct {
 	switchoverCalls  int
 	reconfigureCalls int

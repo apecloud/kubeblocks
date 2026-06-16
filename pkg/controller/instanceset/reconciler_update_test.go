@@ -533,6 +533,72 @@ var _ = Describe("update reconciler test", func() {
 				"after resize updates the desired limit, the omitted desired request must not keep resourceUpdate true")
 		})
 
+		It("converges limit-only scale-down when desired request is omitted", func() {
+			oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
+			defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
+			viper.Set(constant.FeatureGateInPlacePodVerticalScaling, true)
+
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return true, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			spy := &lifecycleCallSpy{}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = ptr.To[int32](1)
+			its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				Switchover: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+				},
+			}
+			// Live pod: limits=1, requests=1 (K8s defaulted requests to limits)
+			its.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			}
+			tree.SetRoot(its)
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			pod := pods[0].(*corev1.Pod)
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			})
+			// Simulate K8s defaulting: live pod has requests = old limits
+			pod.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			}
+
+			// Scale down: new desired limits=500m, requests omitted
+			its.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			postPods := tree.List(&corev1.Pod{})
+			Expect(postPods).Should(HaveLen(1))
+			updatedPod := postPods[0].(*corev1.Pod)
+			Expect(updatedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resource.MustParse("500m")))
+			req := updatedPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+			Expect(req.Cmp(updatedPod.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU])).Should(BeNumerically("<=", 0),
+				"preserved request must not exceed new limit after scale-down; got request=%s limit=%s", req.String(), "500m")
+		})
+
 		It("patches pod without calling switchover for metadata-only in-place updates", func() {
 			// This test exercises the Reconcile call site (not just the
 			// safeMetadataOnlyInPlaceUpdate helper) to assert the contract

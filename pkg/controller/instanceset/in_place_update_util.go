@@ -151,9 +151,34 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 					requests, limits := copyRequestsNLimitsFields(&container)
 					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
 					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
+					capOmittedRequestsToLimits(&container, &dst.Spec.Containers[i])
 				}
 				break
 			}
+		}
+	}
+}
+
+// capOmittedRequestsToLimits ensures that when the desired template omits a
+// CPU or memory request, the preserved live request does not exceed the new
+// limit. Kubernetes defaults omitted requests to limits, so after a
+// limit-only scale-down the live request (defaulted from the old higher
+// limit) would violate the request ≤ limit invariant and be rejected.
+func capOmittedRequestsToLimits(desired, merged *corev1.Container) {
+	for _, rn := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+		if _, specified := desired.Resources.Requests[rn]; specified {
+			continue
+		}
+		limit, hasLimit := merged.Resources.Limits[rn]
+		if !hasLimit {
+			continue
+		}
+		req, hasReq := merged.Resources.Requests[rn]
+		if !hasReq {
+			continue
+		}
+		if req.Cmp(limit) > 0 {
+			merged.Resources.Requests[rn] = limit.DeepCopy()
 		}
 	}
 }

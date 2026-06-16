@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Rollout
+metadata:
+  name: mysql-replace-8037
+  namespace: ${TEST_NAMESPACE}
+spec:
+  clusterName: ${MYSQL_CLUSTER}
+  components:
+    - name: mysql
+      compDef: ${MYSQL_COMPDEF}
+      serviceVersion: "${MYSQL_VERSION_REPLACE}"
+      strategy:
+        replace:
+          perInstanceIntervalSeconds: ${ROLLOUT_INSTANCE_INTERVAL_SECONDS}
+          scaleDownDelaySeconds: ${ROLLOUT_SCALE_DOWN_DELAY_SECONDS}

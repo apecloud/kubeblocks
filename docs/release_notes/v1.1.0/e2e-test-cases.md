@@ -106,10 +106,11 @@ Verify that one KubeBlocks control plane can create and manage database instance
 
 ### Prerequisites
 
-* KubeBlocks 1.1 is installed in the control cluster.
+* KubeBlocks 1.1 is installed in the control cluster with multi-cluster enabled.
+* The control cluster has the test addon and `ComponentDefinition`, for example the etcd addon with `componentDef: etcd-3-1.1.0-alpha.0`.
 * Data clusters are reachable from the control cluster through kubeconfig contexts.
-* Data clusters have the required KubeBlocks CRDs, RBAC, storage class, and controllers.
-* The test addon or ComponentDefinition supports `enableInstanceAPI`.
+* Data clusters run KubeBlocks with `autoInstalledAddons=[]`; they only need the `Instance` CRD, required RBAC, storage class, network access, and the controller path that reconciles distributed instances.
+* The test `ComponentDefinition` in the control cluster supports `enableInstanceAPI`.
 
 ### Test Data
 
@@ -120,14 +121,22 @@ kubectl --context ${CONTROL_CONTEXT} -n ${KB_NAMESPACE} create secret generic ku
   --from-file=kubeconfig=/path/to/multicluster.kubeconfig
 ```
 
-Install or upgrade KubeBlocks with:
+Install or upgrade KubeBlocks in the control cluster with:
 
 ```yaml
+autoInstalledAddons:
+  - etcd
 multiCluster:
   kubeConfig: kubeblocks-multicluster-kubeconfig
   mountPath: /var/run/secrets/kubeblocks.io/multicluster
   contexts: data-a,data-b
   contextsDisabled: ""
+```
+
+Install or upgrade KubeBlocks in each data cluster with addons disabled:
+
+```yaml
+autoInstalledAddons: []
 ```
 
 Create a cluster:
@@ -136,17 +145,16 @@ Create a cluster:
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: redis-mc
+  name: etcd-mc
   namespace: kb-11-e2e
   annotations:
     apps.kubeblocks.io/multi-cluster-placement: data-a,data-b
 spec:
   terminationPolicy: Delete
-  clusterDef: redis
-  topology: replication
   componentSpecs:
-    - name: redis
-      serviceVersion: "7.2.4"
+    - name: etcd
+      componentDef: etcd-3-1.1.0-alpha.0
+      serviceVersion: "3.6.1"
       enableInstanceAPI: true
       replicas: 2
       resources:
@@ -168,7 +176,7 @@ spec:
 
 ### Steps
 
-1. Apply the cluster in the control cluster.
+1. Create the cluster in the control cluster.
 2. Wait until the KubeBlocks `Cluster` reaches `Running`.
 3. List `Instance` objects in the control cluster.
 4. List pods and PVCs in each data cluster.
@@ -181,8 +189,8 @@ spec:
 ### Commands
 
 ```bash
-kubectl --context ${CONTROL_CONTEXT} apply -f redis-mc.yaml
-kubectl --context ${CONTROL_CONTEXT} wait --for=jsonpath='{.status.phase}'=Running cluster/redis-mc -n ${TEST_NAMESPACE} --timeout=20m
+kubectl --context ${CONTROL_CONTEXT} create -f etcd-mc.yaml
+kubectl --context ${CONTROL_CONTEXT} wait --for=jsonpath='{.status.phase}'=Running cluster/etcd-mc -n ${TEST_NAMESPACE} --timeout=20m
 kubectl --context ${CONTROL_CONTEXT} get instances.workloads.kubeblocks.io -n ${TEST_NAMESPACE} -o wide
 kubectl --context ${CONTROL_CONTEXT} get instances.workloads.kubeblocks.io -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, placement: .metadata.annotations["apps.kubeblocks.io/multi-cluster-placement"]}'
 kubectl --context ${DATA_CONTEXT_A} get pod,pvc -n ${TEST_NAMESPACE}
@@ -191,10 +199,11 @@ kubectl --context ${DATA_CONTEXT_B} get pod,pvc -n ${TEST_NAMESPACE}
 
 ### Expected Results
 
-* `Cluster/redis-mc` reaches `Running` in the control cluster.
+* `Cluster/etcd-mc` reaches `Running` in the control cluster.
 * Two `Instance` objects exist in the control cluster.
 * Each distributed object carries the annotation `apps.kubeblocks.io/multi-cluster-placement: <context>`; instances are assigned round-robin by ordinal across the listed contexts (ordinal 0 → `data-a`, ordinal 1 → `data-b`).
 * Runtime pods and PVCs exist in the data clusters, not only in the control cluster.
+* Data clusters do not require the etcd addon or etcd `ComponentDefinition`; absence of addon resources in data clusters must not block runtime placement.
 * Pod deletion in a data cluster is repaired by KubeBlocks.
 * After `data-b` is disabled, new instances are not scheduled to data cluster B.
 * Existing instances in `data-b` are not moved merely because the context is disabled; disabling affects new placement.
@@ -339,8 +348,8 @@ spec:
       serviceVersion: "8.0.37"
       strategy:
         replace:
-          perInstanceIntervalSeconds: 0
-          scaleDownDelaySeconds: 0
+          perInstanceIntervalSeconds: 30
+          scaleDownDelaySeconds: 30
 ```
 
 Steps:
@@ -348,9 +357,10 @@ Steps:
 1. Create `mysql-replace-8037`.
 2. Watch `Rollout.status.state`, `status.components[*].newReplicas`, and `rolledOutReplicas`.
 3. During rollout, verify old and new pods overlap temporarily.
-4. Wait until rollout reaches `Succeed`.
-5. Confirm all running pods use `8.0.37`.
-6. Delete the finished rollout before starting the next strategy test.
+4. Verify the next pod is not updated until at least 30 seconds after the previous new pod becomes Ready. Compare pod `Ready` condition `lastTransitionTime` values from the post-rollout pod snapshot.
+5. Wait until rollout reaches `Succeed`.
+6. Confirm all running pods use `8.0.37`.
+7. Delete the finished rollout before starting the next strategy test.
 
 Commands:
 
@@ -369,7 +379,7 @@ Expected results:
 * The cluster is labeled `apps.kubeblocks.io/rollout-name: mysql-replace-8037` while the rollout is active.
 * The component spec temporarily contains a rollout-managed instance template (name derived from the rollout UID, annotated `apps.kubeblocks.io/instance-template-created-by-rollout`), and `flatInstanceOrdinal` is enabled.
 * New pods carry the pod label `apps.kubeblocks.io/instance-template: <rollout-template-name>`; old pods do not.
-* Replacement proceeds one instance at a time: scale up one new instance, wait for the component to become Running, then take one old instance offline.
+* Replacement proceeds one instance at a time: scale up one new instance, wait for the component to become Running, wait the configured `perInstanceIntervalSeconds` (`30s` in this test), then proceed to the next instance.
 * `Rollout.status.state` moves from `Pending` to `Rolling` to `Succeed`.
 * `status.components[*].newReplicas` and `rolledOutReplicas` advance to the original replica count; scaled-down instances are recorded in `status.components[*].scaleDownInstances`.
 * On success, stable pods are newly created pods using the target image.
@@ -464,14 +474,15 @@ spec:
       serviceVersion: "7.2.5"
       strategy:
         replace:
-          perInstanceIntervalSeconds: 10
-          scaleDownDelaySeconds: 10
+          perInstanceIntervalSeconds: 30
+          scaleDownDelaySeconds: 30
 ```
 
 Expected results:
 
 * `status.shardings` is populated.
 * Each shard is rolled out.
+* Shard instances are rolled one at a time with at least 30 seconds between successive instance updates.
 * No shard remains in stale `Updating` or `Failed` state.
 * The sharded cluster returns to `Running`.
 

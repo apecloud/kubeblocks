@@ -199,7 +199,7 @@ Existing single-cluster databases can continue running without placement annotat
 
 * Multi-cluster support requires `enableInstanceAPI: true` on target components.
 * Placement selects Kubernetes clusters, not nodes. Node scheduling is still handled by the target data cluster.
-* Data clusters must have the required CRDs, RBAC, storage classes, network access, and controllers.
+* The control cluster owns addon resources such as `ComponentDefinition`; data clusters do not need database addons installed. Data clusters only need the KubeBlocks runtime that can reconcile `Instance` objects, plus the required CRDs, RBAC, storage classes, and network access.
 * For production workloads, specify placement explicitly instead of relying on automatic placement.
 * Temporarily disable a data cluster by adding its context to `multiCluster.contextsDisabled`.
 * Multi-cluster support is experimental in 1.1. Validate storage, service discovery, backup, and operational runbooks in your own environment before production use.

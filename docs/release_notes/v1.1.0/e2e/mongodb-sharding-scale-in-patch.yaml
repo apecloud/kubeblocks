@@ -1,0 +1,3 @@
+- op: replace
+  path: /spec/shardings/0/shards
+  value: 3

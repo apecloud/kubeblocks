@@ -1,0 +1,89 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  annotations:
+    kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+  creationTimestamp: "2026-06-15T10:13:19Z"
+  finalizers:
+  - cluster.kubeblocks.io/finalizer
+  generation: 11
+  labels:
+    apps.kubeblocks.io/rollout-name: mysql-create-8038
+  name: mysql-cluster
+  namespace: kb-11-e2e
+  resourceVersion: "232448422"
+  uid: 16536772-e5d6-4b9a-bccd-3ba1d4574a48
+spec:
+  componentSpecs:
+  - componentDef: mysql-8.0-1.0.5
+    flatInstanceOrdinal: true
+    instances:
+    - annotations:
+        apps.kubeblocks.io/instance-template-created-by-rollout: "yes"
+      compDef: mysql-8.0-1.0.5
+      name: f2b1cb7a
+      ordinals: {}
+      replicas: 1
+      serviceVersion: 8.0.37
+    - annotations:
+        rollout.apps.kubeblocks.io/version: 8.0.38
+      canary: false
+      compDef: mysql-8.0-1.0.5
+      labels:
+        traffic: canary
+      name: af4e8a25
+      ordinals: {}
+      replicas: 1
+      serviceVersion: 8.0.38
+    name: mysql
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 3
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 8.0.37
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  terminationPolicy: Delete
+status:
+  components:
+    mysql:
+      observedGeneration: 11
+      phase: Running
+      upToDate: true
+  conditions:
+  - lastTransitionTime: "2026-06-15T10:13:19Z"
+    message: 'The operator has started the provisioning of Cluster: mysql-cluster'
+    observedGeneration: 11
+    reason: PreCheckSucceed
+    status: "True"
+    type: ProvisioningStarted
+  - lastTransitionTime: "2026-06-15T10:22:07Z"
+    message: All components are available
+    reason: Available
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-06-15T10:13:19Z"
+    message: Successfully applied for resources
+    observedGeneration: 11
+    reason: ApplyResourcesSucceed
+    status: "True"
+    type: ApplyResources
+  - lastTransitionTime: "2026-06-15T10:14:59Z"
+    message: cluster mysql-cluster is ready
+    reason: ClusterReady
+    status: "True"
+    type: Ready
+  observedGeneration: 11
+  phase: Running

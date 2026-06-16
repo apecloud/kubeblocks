@@ -1,0 +1,55 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: mongodb-sharding
+  namespace: ${TEST_NAMESPACE}
+spec:
+  clusterDef: mongodb
+  terminationPolicy: Delete
+  topology: sharding
+  componentSpecs:
+    - name: mongos
+      replicas: 1
+      resources:
+        limits: { cpu: 500m, memory: 512Mi }
+        requests: { cpu: 500m, memory: 512Mi }
+      serviceVersion: ${MONGO_VERSION}
+    - name: config-server
+      replicas: 1
+      resources:
+        limits: { cpu: 500m, memory: 512Mi }
+        requests: { cpu: 500m, memory: 512Mi }
+      serviceVersion: ${MONGO_VERSION}
+      systemAccounts:
+        - disabled: false
+          name: root
+          passwordConfig:
+            length: 16
+            letterCase: MixedCases
+            numDigits: 8
+            numSymbols: 0
+            seed: mongo
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 10Gi
+  shardings:
+    - name: shard
+      shards: 3
+      template:
+        name: shard
+        replicas: 1
+        resources:
+          limits: { cpu: 500m, memory: 512Mi }
+          requests: { cpu: 500m, memory: 512Mi }
+        serviceVersion: ${MONGO_VERSION}
+        volumeClaimTemplates:
+          - name: data
+            spec:
+              accessModes: [ReadWriteOnce]
+              resources:
+                requests:
+                  storage: ${MONGO_SHARD_STORAGE}

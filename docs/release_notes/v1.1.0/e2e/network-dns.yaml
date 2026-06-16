@@ -1,0 +1,41 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: network-dns
+  namespace: ${TEST_NAMESPACE}
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: mysql
+      componentDef: ${MYSQL_COMPDEF}
+      serviceVersion: "${MYSQL_VERSION_BASE}"
+      replicas: 1
+      network:
+        hostAliases:
+          - ip: "10.10.0.12"
+            hostnames:
+              - legacy-db.internal
+        dnsPolicy: None
+        dnsConfig:
+          nameservers:
+            - ${DNS_IP}
+          searches:
+            - ${TEST_NAMESPACE}.svc.cluster.local
+            - svc.cluster.local
+          options:
+            - name: ndots
+              value: "2"
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 10Gi

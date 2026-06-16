@@ -1,0 +1,13 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Rollout
+metadata:
+  name: mysql-inplace-8036
+  namespace: ${TEST_NAMESPACE}
+spec:
+  clusterName: ${MYSQL_CLUSTER}
+  components:
+    - name: mysql
+      compDef: ${MYSQL_COMPDEF}
+      serviceVersion: "${MYSQL_VERSION_INPLACE}"
+      strategy:
+        inplace: {}

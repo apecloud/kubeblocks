@@ -1,0 +1,25 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Rollout
+metadata:
+  name: mysql-create-8038
+  namespace: ${TEST_NAMESPACE}
+spec:
+  clusterName: ${MYSQL_CLUSTER}
+  components:
+    - name: mysql
+      compDef: ${MYSQL_COMPDEF}
+      serviceVersion: "${MYSQL_VERSION_CANARY}"
+      replicas: 1
+      strategy:
+        create:
+          canary: true
+          promotion:
+            auto: true
+            delaySeconds: 0
+            scaleDownDelaySeconds: 0
+      instanceMeta:
+        canary:
+          labels:
+            traffic: canary
+          annotations:
+            rollout.apps.kubeblocks.io/version: "${MYSQL_VERSION_CANARY}"

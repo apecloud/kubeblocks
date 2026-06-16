@@ -73,6 +73,8 @@ var _ = Describe("probe", func() {
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
 			Expect(service.Kind()).Should(Equal(proto.ServiceProbe.Kind))
+			Expect(service.URI()).Should(Equal(proto.ServiceProbe.URI))
+			Expect(service.HandleConn(ctx, nil)).Should(Succeed())
 		})
 
 		It("start", func() {

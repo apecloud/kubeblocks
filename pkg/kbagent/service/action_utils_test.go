@@ -606,6 +606,31 @@ var _ = Describe("action utils", func() {
 			Expect(err.Error()).Should(ContainSubstring("internal server error"))
 			Expect(output).Should(BeNil())
 		})
+
+		It("returns template and URL construction errors before issuing requests", func() {
+			method, url := httpActionMethodNURL(&proto.HTTPAction{Port: "3501"})
+			Expect(method).Should(Equal(defaultHTTPMethod))
+			Expect(url).Should(Equal("HTTP://127.0.0.1:3501/"))
+
+			action := &proto.Action{
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Body: "{{ .missing }}",
+				},
+			}
+			_, err := nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+
+			action.HTTP.Body = ""
+			action.HTTP.Headers = []proto.HTTPHeader{{Name: "x-test", Value: "{{ .missing }}"}}
+			_, err = nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+
+			action.HTTP.Headers = nil
+			action.HTTP.Method = " bad method"
+			_, err = nonBlockingCallActionX(ctx, action, nil, nil, nil, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+		})
 	})
 
 	Context("grpc", func() {
@@ -1020,5 +1045,74 @@ message EchoResponse {
 			Expect(err.Error()).Should(ContainSubstring("error"))
 			Expect(output).Should(BeNil())
 		})
+
+		It("sets and gets dynamic grpc message fields", func() {
+			fd := dynamicGRPCFieldFile()
+			msgDesc := fd.Messages().ByName("Dynamic")
+			msg := dynamicpb.NewMessage(msgDesc)
+
+			Expect(setGRPCMessageField(msg, "name", "redis")).Should(Succeed())
+			Expect(setGRPCMessageField(msg, "count", "3")).Should(Succeed())
+			Expect(setGRPCMessageField(msg, "enabled", "true")).Should(Succeed())
+			Expect(setGRPCMessageField(msg, "labels", `{"role":"primary"}`)).Should(Succeed())
+
+			name, err := getGRPCMessageField(msg, "name")
+			Expect(err).Should(BeNil())
+			Expect(name).Should(Equal("redis"))
+			count, err := getGRPCMessageField(msg, "count")
+			Expect(err).Should(BeNil())
+			Expect(count).Should(Equal("3"))
+			enabled, err := getGRPCMessageField(msg, "enabled")
+			Expect(err).Should(BeNil())
+			Expect(enabled).Should(Equal("true"))
+
+			Expect(setGRPCMessageField(msg, "missing", "value")).Should(MatchError(ContainSubstring("field missing not found")))
+			Expect(setGRPCMessageField(msg, "count", "bad")).ShouldNot(Succeed())
+			Expect(setGRPCMessageField(msg, "enabled", "bad")).ShouldNot(Succeed())
+			Expect(setGRPCMessageField(msg, "labels", "{")).ShouldNot(Succeed())
+
+			_, err = getGRPCMessageField(msg, "missing")
+			Expect(err).Should(MatchError(ContainSubstring("field missing not found")))
+			_, err = getGRPCMessageField(msg, "labels")
+			Expect(err).Should(MatchError(ContainSubstring("unsupported field type")))
+		})
 	})
 })
+
+func dynamicGRPCFieldFile() protoreflect.FileDescriptor {
+	str := func(v string) *string { return &v }
+	i32 := func(v int32) *int32 { return &v }
+	boolp := func(v bool) *bool { return &v }
+
+	labelOptional := descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
+	labelRepeated := descriptorpb.FieldDescriptorProto_LABEL_REPEATED
+	typeString := descriptorpb.FieldDescriptorProto_TYPE_STRING
+	typeInt32 := descriptorpb.FieldDescriptorProto_TYPE_INT32
+	typeBool := descriptorpb.FieldDescriptorProto_TYPE_BOOL
+	typeMessage := descriptorpb.FieldDescriptorProto_TYPE_MESSAGE
+
+	fd, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
+		Name:    str("dynamic.proto"),
+		Package: str("test"),
+		Syntax:  str("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{{
+			Name: str("Dynamic"),
+			Field: []*descriptorpb.FieldDescriptorProto{
+				{Name: str("name"), Number: i32(1), Label: &labelOptional, Type: &typeString, JsonName: str("name")},
+				{Name: str("count"), Number: i32(2), Label: &labelOptional, Type: &typeInt32, JsonName: str("count")},
+				{Name: str("enabled"), Number: i32(3), Label: &labelOptional, Type: &typeBool, JsonName: str("enabled")},
+				{Name: str("labels"), Number: i32(4), Label: &labelRepeated, Type: &typeMessage, TypeName: str(".test.Dynamic.LabelsEntry"), JsonName: str("labels")},
+			},
+			NestedType: []*descriptorpb.DescriptorProto{{
+				Name: str("LabelsEntry"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{Name: str("key"), Number: i32(1), Label: &labelOptional, Type: &typeString, JsonName: str("key")},
+					{Name: str("value"), Number: i32(2), Label: &labelOptional, Type: &typeString, JsonName: str("value")},
+				},
+				Options: &descriptorpb.MessageOptions{MapEntry: boolp(true)},
+			}},
+		}},
+	}, nil)
+	Expect(err).Should(BeNil())
+	return fd
+}

@@ -83,6 +83,38 @@ var _ = Describe("reconfigure", func() {
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
+		It("checks created and removed files", func() {
+			file, _ := createFile()
+			defer removeFile()
+
+			req := &proto.ActionRequest{
+				Action: "udf-reconfigure",
+				Parameters: map[string]string{
+					configFilesCreated: file,
+				},
+			}
+			Expect(checkReconfigure(ctx, req)).Should(Succeed())
+
+			req.Parameters = map[string]string{
+				configFilesCreated: file + ".missing",
+			}
+			err := checkReconfigure(ctx, req)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
+
+			req.Parameters = map[string]string{
+				configFilesRemoved: file + ".missing",
+			}
+			Expect(checkReconfigure(ctx, req)).Should(Succeed())
+
+			req.Parameters = map[string]string{
+				configFilesRemoved: file,
+			}
+			err = checkReconfigure(ctx, req)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
+		})
+
 		It("check failed", func() {
 			file, checksum := createFile()
 			defer removeFile()

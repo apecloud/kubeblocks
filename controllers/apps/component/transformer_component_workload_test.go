@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -1025,6 +1026,184 @@ var _ = Describe("Component Workload Operations Test", func() {
 					},
 				},
 			})).Should(Equal(legacyConfigManagerPolicyKeep))
+		})
+	})
+
+	Context("workload helper edge cases", func() {
+		It("detects pod resource and metadata-only template changes", func() {
+			emptySpec := corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "main"}},
+			}
+			Expect(hasPodResourceChanges(emptySpec, emptySpec)).Should(BeFalse())
+
+			resourceSpec := corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name: "main",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				}},
+			}
+			Expect(hasPodResourceChanges(emptySpec, resourceSpec)).Should(BeTrue())
+
+			oldTemplate := corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "old"},
+				},
+				Spec: emptySpec,
+			}
+			newTemplate := *oldTemplate.DeepCopy()
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeFalse())
+
+			newTemplate.Labels = map[string]string{"app": "new"}
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+
+			newTemplate = *oldTemplate.DeepCopy()
+			newTemplate.Annotations = map[string]string{"rollout": "yes"}
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+
+			newTemplate = *oldTemplate.DeepCopy()
+			deadline := int64(30)
+			newTemplate.Spec.ActiveDeadlineSeconds = &deadline
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+
+			newTemplate = *oldTemplate.DeepCopy()
+			newTemplate.Spec.Tolerations = []corev1.Toleration{{Key: "dedicated", Value: "db"}}
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+		})
+
+		It("preserves legacy volume and mount order without synthesizing missing business entries", func() {
+			oldVolumes := []corev1.Volume{
+				{Name: "data"},
+				{Name: "kb-tools"},
+				{Name: "logs"},
+			}
+			newVolumes := []corev1.Volume{
+				{Name: "logs"},
+				{Name: "data"},
+				{Name: "cache"},
+			}
+			mergedVolumes := preserveLegacyVolumeOrder(oldVolumes, newVolumes, map[string]struct{}{"kb-tools": {}})
+			Expect([]string{mergedVolumes[0].Name, mergedVolumes[1].Name, mergedVolumes[2].Name, mergedVolumes[3].Name}).
+				Should(Equal([]string{"data", "kb-tools", "logs", "cache"}))
+			Expect(preserveLegacyVolumeOrder(oldVolumes, newVolumes, nil)).Should(Equal(newVolumes))
+			Expect(hasVolumeByNameMap(map[string]corev1.Volume{"data": {Name: "data"}}, "data")).Should(BeTrue())
+			Expect(hasVolumeByNameMap(map[string]corev1.Volume{"data": {Name: "data"}}, "logs")).Should(BeFalse())
+
+			oldMounts := []corev1.VolumeMount{
+				{Name: "data", MountPath: "/data"},
+				{Name: "kb-tools", MountPath: "/opt/kb-tools"},
+				{Name: "logs", MountPath: "/logs"},
+			}
+			newMounts := []corev1.VolumeMount{
+				{Name: "logs", MountPath: "/logs"},
+				{Name: "cache", MountPath: "/cache"},
+				{Name: "data", MountPath: "/data"},
+			}
+			mergedMounts := preserveLegacyVolumeMountOrder(oldMounts, newMounts, "kb-tools")
+			Expect([]string{mergedMounts[0].Name, mergedMounts[1].Name, mergedMounts[2].Name, mergedMounts[3].Name}).
+				Should(Equal([]string{"data", "kb-tools", "logs", "cache"}))
+			Expect(volumeMountKey(corev1.VolumeMount{Name: "data", MountPath: "/data", SubPath: "main"})).
+				Should(Equal("data|/data|main"))
+			Expect(preserveLegacyVolumeMountOrder(oldMounts, append(newMounts, corev1.VolumeMount{Name: "kb-tools"}), "kb-tools")).
+				Should(HaveLen(4))
+			Expect(preserveLegacyVolumeMountOrder(newMounts, newMounts, "kb-tools")).Should(Equal(newMounts))
+		})
+
+		It("collects and restores container resource and volume mount helpers", func() {
+			containers := []corev1.Container{
+				{
+					Name: "main",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{{Name: "data"}},
+				},
+				{
+					Name:         "sidecar",
+					VolumeMounts: []corev1.VolumeMount{{Name: "logs"}},
+				},
+			}
+
+			resources := getContainerResources(containers)
+			Expect(resources).Should(HaveKey("main"))
+			memory := resources["main"].Requests[corev1.ResourceMemory]
+			Expect(memory.String()).Should(Equal("128Mi"))
+
+			names := collectVolumeNamesFromContainers(&containers[0], nil, &containers[1])
+			Expect(names).Should(HaveKey("data"))
+			Expect(names).Should(HaveKey("logs"))
+			Expect(hasVolumeMount(containers[0].VolumeMounts, "data")).Should(BeTrue())
+			Expect(hasVolumeMount(containers[0].VolumeMounts, "logs")).Should(BeFalse())
+		})
+
+		It("decides legacy config-manager cleanup from concrete pod template change classes", func() {
+			baseTemplate := corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "mysql"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "main", Image: "mysql:1"}},
+				},
+			}
+			newInstanceSet := func() *workloads.InstanceSet {
+				return &workloads.InstanceSet{
+					Spec: workloads.InstanceSetSpec{
+						Template:         *baseTemplate.DeepCopy(),
+						PodUpgradePolicy: appsv1.PreferInPlacePodUpdatePolicyType,
+						PodUpdatePolicy:  appsv1.PreferInPlacePodUpdatePolicyType,
+					},
+				}
+			}
+
+			oldITS := newInstanceSet()
+			Expect(shouldCleanupLegacyConfigManager(oldITS, newInstanceSet())).Should(BeFalse())
+
+			upgradeITS := newInstanceSet()
+			upgradeITS.Spec.Template.Spec.Containers[0].Image = "mysql:2"
+			Expect(shouldCleanupLegacyConfigManager(oldITS, upgradeITS)).Should(BeFalse())
+			upgradeITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			Expect(shouldCleanupLegacyConfigManager(oldITS, upgradeITS)).Should(BeTrue())
+
+			resourceITS := newInstanceSet()
+			resourceITS.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				},
+			}
+			Expect(shouldCleanupLegacyConfigManager(oldITS, resourceITS)).Should(BeTrue())
+
+			updateITS := newInstanceSet()
+			updateITS.Spec.Template.Labels = map[string]string{"app": "mysql", "rollout": "yes"}
+			Expect(shouldCleanupLegacyConfigManager(oldITS, updateITS)).Should(BeFalse())
+			updateITS.Spec.PodUpdatePolicy = appsv1.ReCreatePodUpdatePolicyType
+			Expect(shouldCleanupLegacyConfigManager(oldITS, updateITS)).Should(BeTrue())
+		})
+
+		It("copies multi-cluster placement annotation to generated InstanceSet only when present", func() {
+			transformer := &componentWorkloadTransformer{}
+			its := &workloads.InstanceSet{}
+
+			transformer.buildInstanceSetPlacementAnnotation(&appsv1.Component{}, its)
+			Expect(its.Annotations).Should(BeNil())
+
+			transformer.buildInstanceSetPlacementAnnotation(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: ""},
+				},
+			}, its)
+			Expect(its.Annotations).Should(BeNil())
+
+			transformer.buildInstanceSetPlacementAnnotation(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "ctx-a,ctx-b"},
+				},
+			}, its)
+			Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppMultiClusterPlacementKey, "ctx-a,ctx-b"))
 		})
 	})
 })

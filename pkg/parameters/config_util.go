@@ -313,7 +313,7 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 	coveredFiles := make(map[string]string)
 	for i := range paramsDefList.Items {
 		paramsDef := &paramsDefList.Items[i]
-		matched, err := matchParametersDefinition(cmpd, paramsDef)
+		matched, err := MatchParametersDefinition(cmpd, paramsDef)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -385,7 +385,8 @@ func resolveCmpdParametersDefsByConfigRender(ctx context.Context, reader client.
 	return slices.Clone(configRender.Spec.Configs), paramsDefs, nil
 }
 
-func matchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {
+// MatchParametersDefinition reports whether a ParametersDefinition applies to the ComponentDefinition.
+func MatchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {
 	if cmpd == nil || paramsDef == nil {
 		return false, nil
 	}

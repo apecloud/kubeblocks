@@ -88,6 +88,43 @@ var _ = Describe("instance util test", func() {
 			mergeInPlaceFields(newPod, oldPod)
 			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
 		})
+
+		It("skips omitted CPU and memory requests in resource comparison", func() {
+			oldPod := builder.NewPodBuilder(namespace, "foo-0").
+				SetContainers([]corev1.Container{{
+					Name: "foo",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				}}).
+				GetObject()
+
+			omittedRequests := oldPod.DeepCopy()
+			omittedRequests.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+			}
+			Expect(equalResourcesInPlaceFields(oldPod, omittedRequests)).Should(BeTrue())
+
+			explicitRequestChanged := omittedRequests.DeepCopy()
+			explicitRequestChanged.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			}
+			Expect(equalResourcesInPlaceFields(oldPod, explicitRequestChanged)).Should(BeFalse())
+
+			limitChanged := omittedRequests.DeepCopy()
+			limitChanged.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory] = resource.MustParse("3Gi")
+			Expect(equalResourcesInPlaceFields(oldPod, limitChanged)).Should(BeFalse())
+		})
 	})
 
 	Context("container image comparison", func() {

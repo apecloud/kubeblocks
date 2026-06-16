@@ -29,8 +29,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -215,6 +217,187 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
+		It("covers in-place rebuild pvc and pv metadata helpers", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			fakeScheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(fakeScheme)).Should(Succeed())
+			Expect(opsv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+
+			targetPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(clusterName, defaultCompName) + "-0", Namespace: testCtx.DefaultNamespace},
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{{
+						Name: "data",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "source-pvc"},
+						},
+					}},
+				},
+			}
+			synthesizedComp := &component.SynthesizedComponent{
+				Namespace:   testCtx.DefaultNamespace,
+				ClusterName: clusterName,
+				Name:        defaultCompName,
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+					ObjectMeta: metav1.ObjectMeta{Name: "data"},
+					Spec:       corev1.PersistentVolumeClaimSpec{},
+				}},
+			}
+			opsRequest := &opsv1alpha1.OpsRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: opsv1alpha1.GroupVersion.String(),
+					Kind:       "OpsRequest",
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "rebuild-ops", Namespace: testCtx.DefaultNamespace, UID: types.UID("12345678abcd")},
+			}
+			opsRes := &OpsResource{
+				Cluster:    &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: testCtx.DefaultNamespace}},
+				OpsRequest: opsRequest,
+			}
+
+			pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "rebuild", 0, false)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(pvcMap).Should(HaveKey("source-pvc"))
+			Expect(volumes).Should(HaveLen(1))
+			Expect(volumeMounts).Should(ContainElement(corev1.VolumeMount{Name: "data", MountPath: "/kb-tmp/0"}))
+			Expect(pvcMap["source-pvc"].Annotations).Should(HaveKeyWithValue(rebuildFromAnnotation, opsRequest.Name))
+
+			pvcMap, volumes, volumeMounts, err = getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "rebuild", 0, true)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(pvcMap["source-pvc"].Name).Should(Equal("source-pvc"))
+			Expect(volumes).Should(BeEmpty())
+			Expect(volumeMounts).Should(BeEmpty())
+
+			templateName, ordinal, err := getTemplateNameAndOrdinal(constant.GenerateWorkloadNamePattern(clusterName, defaultCompName), targetPod.Name)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(templateName).Should(BeEmpty())
+			Expect(ordinal).Should(Equal(int32(0)))
+			templateName, ordinal, err = getTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-3")
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(templateName).Should(Equal("template"))
+			Expect(ordinal).Should(Equal(int32(3)))
+			_, _, err = getTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-")
+			Expect(err).Should(HaveOccurred())
+			_, _, err = getTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-x")
+			Expect(err).Should(HaveOccurred())
+
+			helper := &inplaceRebuildHelper{synthesizedComp: synthesizedComp, targetPod: targetPod}
+			tmpPVCForPod := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "tmp-pod-pvc", Namespace: testCtx.DefaultNamespace},
+			}
+			helper.pvcMap = map[string]*corev1.PersistentVolumeClaim{"source-pvc": tmpPVCForPod}
+			helper.volumes = []corev1.Volume{{
+				Name: "data",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: tmpPVCForPod.Name},
+				},
+			}}
+			helper.volumeMounts = []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
+			helper.instance = opsv1alpha1.Instance{TargetNodeName: targetNodeName}
+			cli := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			Expect(helper.createTmpPVCsAndPod(reqCtx, cli, opsRequest, "tmp-rebuild-pod")).Should(Succeed())
+			Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: tmpPVCForPod.Name, Namespace: tmpPVCForPod.Namespace}, &corev1.PersistentVolumeClaim{})).Should(Succeed())
+			createdPod := &corev1.Pod{}
+			Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: "tmp-rebuild-pod", Namespace: targetPod.Namespace}, createdPod)).Should(Succeed())
+			Expect(createdPod.Spec.RestartPolicy).Should(Equal(corev1.RestartPolicyNever))
+			Expect(createdPod.Spec.NodeSelector).Should(HaveKeyWithValue(corev1.LabelHostname, targetNodeName))
+
+			builtTmpPVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "tmp-pvc", Namespace: testCtx.DefaultNamespace}}
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			liveTmpPVC, err := helper.getLiveTmpPVCOrBuilt(reqCtx, cli, builtTmpPVC)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(liveTmpPVC).Should(Equal(builtTmpPVC))
+
+			existingTmpPVC := builtTmpPVC.DeepCopy()
+			existingTmpPVC.Labels = map[string]string{"live": "true"}
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(existingTmpPVC).Build()
+			liveTmpPVC, err = helper.getLiveTmpPVCOrBuilt(reqCtx, cli, builtTmpPVC)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(liveTmpPVC.Labels).Should(HaveKeyWithValue("live", "true"))
+			_, err = helper.getSourcePVC(reqCtx, cli, "missing", testCtx.DefaultNamespace)
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+
+			sourcePV := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "source-pv"},
+				Spec:       corev1.PersistentVolumeSpec{PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete},
+			}
+			sourcePVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "source-pvc", Namespace: testCtx.DefaultNamespace, UID: types.UID("source-uid")},
+				Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: sourcePV.Name},
+			}
+			restoredPV := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "restored-pv"},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
+					ClaimRef: &corev1.ObjectReference{
+						Name:      builtTmpPVC.Name,
+						Namespace: builtTmpPVC.Namespace,
+					},
+				},
+			}
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(sourcePV, sourcePVC, restoredPV, builtTmpPVC).Build()
+
+			foundPV, err := helper.getRestoredPV(reqCtx, cli, &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "tmp-by-volume", Namespace: testCtx.DefaultNamespace},
+				Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: restoredPV.Name},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(foundPV.Name).Should(Equal(restoredPV.Name))
+
+			Expect(helper.retainAndAnnotatePV(reqCtx, cli, opsRequest.Name, restoredPV, builtTmpPVC, sourcePVC)).Should(Succeed())
+			Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoredPV.Name}, restoredPV)).Should(Succeed())
+			Expect(restoredPV.Spec.PersistentVolumeReclaimPolicy).Should(Equal(corev1.PersistentVolumeReclaimRetain))
+			Expect(restoredPV.Labels).Should(HaveKeyWithValue(rebuildTmpPVCNameLabel, builtTmpPVC.Name))
+			Expect(restoredPV.Annotations).Should(HaveKeyWithValue(rebuildFromAnnotation, opsRequest.Name))
+			Expect(restoredPV.Annotations).Should(HaveKeyWithValue(sourcePVReclaimPolicyAnnotation, string(corev1.PersistentVolumeReclaimDelete)))
+
+			Expect(helper.preBindPVToSourcePVC(reqCtx, cli, restoredPV, builtTmpPVC, sourcePVC.Name, sourcePVC)).Should(Succeed())
+			Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoredPV.Name}, restoredPV)).Should(Succeed())
+			Expect(restoredPV.Spec.ClaimRef.Name).Should(Equal(sourcePVC.Name))
+			Expect(restoredPV.Spec.ClaimRef.UID).Should(BeEmpty())
+
+			activeOwner := &opsv1alpha1.OpsRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "other-rebuild", Namespace: testCtx.DefaultNamespace},
+				Status:     opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase},
+			}
+			activeSourcePV := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "active-source-pv",
+					Annotations: map[string]string{rebuildFromAnnotation: activeOwner.Name},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					ClaimRef: &corev1.ObjectReference{Name: sourcePVC.Name, Namespace: sourcePVC.Namespace},
+				},
+			}
+			activeSourcePVC := sourcePVC.DeepCopy()
+			activeSourcePVC.Spec.VolumeName = activeSourcePV.Name
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(activeOwner, activeSourcePV, activeSourcePVC).Build()
+			err = helper.failIfSourcePVCBoundToOtherActiveRebuildPV(reqCtx, cli, opsRequest, activeSourcePVC, restoredPV)
+			Expect(err).Should(HaveOccurred())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			activeOwner.Status.Phase = opsv1alpha1.OpsSucceedPhase
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(activeOwner, activeSourcePV, activeSourcePVC).Build()
+			Expect(helper.failIfSourcePVCBoundToOtherActiveRebuildPV(reqCtx, cli, opsRequest, activeSourcePVC, restoredPV)).Should(Succeed())
+
+			activeSourcePV.Annotations = nil
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(activeSourcePV, activeSourcePVC).Build()
+			Expect(helper.failIfSourcePVCBoundToOtherActiveRebuildPV(reqCtx, cli, opsRequest, activeSourcePVC, restoredPV)).Should(Succeed())
+
+			restoredByLabel := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "restored-by-label", Labels: map[string]string{rebuildTmpPVCNameLabel: builtTmpPVC.Name}},
+			}
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(restoredByLabel).Build()
+			foundPV, err = helper.getRestoredPV(reqCtx, cli, builtTmpPVC)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(foundPV.Name).Should(Equal(restoredByLabel.Name))
+
+			cli = fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			_, err = helper.getRestoredPV(reqCtx, cli, builtTmpPVC)
+			Expect(err).Should(HaveOccurred())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
 		})
 
 		sourcePVCsShouldRebindPVs := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pvcList *corev1.PersistentVolumeClaimList) {

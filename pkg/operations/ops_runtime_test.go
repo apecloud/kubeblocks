@@ -102,6 +102,11 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			Affinity: &corev1.Affinity{
 				NodeAffinity: &corev1.NodeAffinity{},
 			},
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{
+				MaxSkew:           1,
+				TopologyKey:       corev1.LabelHostname,
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+			}},
 		},
 		Status: corev1.PodStatus{
 			Phase: corev1.PodRunning,
@@ -203,6 +208,50 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if instance.GetStatusImage("mysql") != "mysql@sha256:abc" {
 		t.Fatalf("unexpected status image: %s", instance.GetStatusImage("mysql"))
 	}
+	if instance.GetStatusImage("") != "mysql@sha256:abc" {
+		t.Fatalf("unexpected default status image: %s", instance.GetStatusImage(""))
+	}
+	if instance.GetStatusImage("missing") != "" {
+		t.Fatalf("expected empty missing status image")
+	}
+	if instance.GetImage("") != "mysql:8.0.36" {
+		t.Fatalf("unexpected default image: %s", instance.GetImage(""))
+	}
+	if instance.GetImage("missing") != "mysql:8.0.36" {
+		t.Fatalf("expected missing image lookup to fall back to first container")
+	}
+	if instance.GetNodeName() != "node-a" {
+		t.Fatalf("unexpected node name: %s", instance.GetNodeName())
+	}
+	if len(instance.GetTolerations()) != 1 {
+		t.Fatalf("expected tolerations")
+	}
+	if instance.GetAffinity() == nil {
+		t.Fatalf("expected affinity")
+	}
+	if len(instance.GetTopologySpreadConstraints()) != 1 {
+		t.Fatalf("expected topology spread constraints")
+	}
+	if len(instance.GetPodVolumes()) != 1 {
+		t.Fatalf("expected pod volumes")
+	}
+	if len(instance.GetVolumeMounts("mysql")) != 1 {
+		t.Fatalf("expected mysql volume mounts")
+	}
+	if len(instance.GetVolumeMounts("missing")) != 1 {
+		t.Fatalf("expected missing container volume mounts to fall back to first container")
+	}
+	resources := instance.GetResources("mysql")
+	if resources.Requests.Cpu().String() != "100m" {
+		t.Fatalf("unexpected resources")
+	}
+	if len(instance.GetResources("missing").Requests) == 0 {
+		t.Fatalf("expected missing container resources to fall back to first container")
+	}
+	creationTimestamp := instance.GetCreationTimestamp()
+	if creationTimestamp.IsZero() {
+		t.Fatalf("expected creation timestamp")
+	}
 	if !instance.IsAvailable(15, true) {
 		t.Fatalf("expected instance to be available")
 	}
@@ -212,5 +261,115 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if volume.GetClaimName() != "data-"+instanceName {
 		t.Fatalf("unexpected pvc name: %s", volume.GetClaimName())
+	}
+	requestedStorage := volume.GetRequestedStorage()
+	if requestedStorage.String() != "2Gi" {
+		t.Fatalf("unexpected requested storage: %s", requestedStorage.String())
+	}
+	capacity := volume.GetCapacity()
+	if capacity.String() != "2Gi" {
+		t.Fatalf("unexpected capacity: %s", capacity.String())
+	}
+	if !volume.IsBound() {
+		t.Fatalf("expected volume to be bound")
+	}
+	if volume.IsExpanding() {
+		t.Fatalf("did not expect volume to be expanding")
+	}
+}
+
+func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
+	instance := &defaultInstance{name: "missing", componentName: "mysql"}
+	if instance.GetComponentName() != "mysql" {
+		t.Fatalf("unexpected component name: %s", instance.GetComponentName())
+	}
+	if instance.GetName() != "missing" {
+		t.Fatalf("unexpected instance name: %s", instance.GetName())
+	}
+	creationTimestamp := instance.GetCreationTimestamp()
+	if !creationTimestamp.IsZero() {
+		t.Fatalf("expected zero creation timestamp")
+	}
+	if instance.IsDeleting() {
+		t.Fatalf("nil pod should not be deleting")
+	}
+	if instance.GetRole() != "" {
+		t.Fatalf("expected empty role")
+	}
+	if instance.IsAvailable(0, false) {
+		t.Fatalf("nil pod should not be available")
+	}
+	if instance.IsFailedAndTimedOut() {
+		t.Fatalf("nil pod should not be failed and timed out")
+	}
+	if instance.GetNodeName() != "" {
+		t.Fatalf("expected empty node name")
+	}
+	if instance.GetTolerations() != nil {
+		t.Fatalf("expected nil tolerations")
+	}
+	if instance.GetAffinity() != nil {
+		t.Fatalf("expected nil affinity")
+	}
+	if instance.GetTopologySpreadConstraints() != nil {
+		t.Fatalf("expected nil topology constraints")
+	}
+	if instance.GetPodVolumes() != nil {
+		t.Fatalf("expected nil pod volumes")
+	}
+	if instance.GetVolumeMounts("") != nil {
+		t.Fatalf("expected nil volume mounts")
+	}
+
+	now := metav1.Now()
+	deleting := &defaultInstance{pod: &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "deleting",
+			DeletionTimestamp: &now,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}}
+	if !deleting.IsDeleting() {
+		t.Fatalf("expected deleting pod")
+	}
+	if deleting.IsAvailable(0, false) {
+		t.Fatalf("deleting pod should not be available")
+	}
+
+	volume := &instanceVolume{}
+	if volume.GetClaimName() != "" {
+		t.Fatalf("expected empty claim name")
+	}
+	requestedStorage := volume.GetRequestedStorage()
+	if !requestedStorage.IsZero() {
+		t.Fatalf("expected zero requested storage")
+	}
+	capacity := volume.GetCapacity()
+	if !capacity.IsZero() {
+		t.Fatalf("expected zero capacity")
+	}
+	if volume.IsBound() {
+		t.Fatalf("nil pvc should not be bound")
+	}
+	if volume.IsExpanding() {
+		t.Fatalf("nil pvc should not be expanding")
+	}
+
+	expanding := &instanceVolume{pvc: &corev1.PersistentVolumeClaim{
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   corev1.PersistentVolumeClaimResizing,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}}
+	if !expanding.IsExpanding() {
+		t.Fatalf("expected resizing pvc to be expanding")
 	}
 }

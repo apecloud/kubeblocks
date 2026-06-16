@@ -89,12 +89,12 @@ func TestHandleTemplateObjectChangesPreservesExternalAnnotations(t *testing.T) {
 			Name:      objName,
 			Labels:    compLabels,
 			Annotations: map[string]string{
-				constant.CMInsConfigurationHashLabelKey:              "old-hash",
-				constant.LastAppliedConfigAnnotationKey:              `{"my.cnf":"key=old-value"}`,
-				constant.ConfigurationRevision:                      "5",
-				constant.ConfigAppliedVersionAnnotationKey:           `{"name":"sysconf"}`,
-				constant.ParametersAppliedComponentGenerationKey:     "3",
-				"config.kubeblocks.io/revision-reconcile-phase-5":   `{"phase":"Upgrading","revision":"5","policy":"syncReload","execResult":"Retry","succeedCount":0,"expectedCount":3}`,
+				constant.CMInsConfigurationHashLabelKey:           "old-hash",
+				constant.LastAppliedConfigAnnotationKey:           `{"my.cnf":"key=old-value"}`,
+				constant.ConfigurationRevision:                    "5",
+				constant.ConfigAppliedVersionAnnotationKey:        `{"name":"sysconf"}`,
+				constant.ParametersAppliedComponentGenerationKey:  "3",
+				"config.kubeblocks.io/revision-reconcile-phase-5": `{"phase":"Upgrading","revision":"5","policy":"syncReload","execResult":"Retry","succeedCount":0,"expectedCount":3}`,
 			},
 		},
 		Data: map[string]string{
@@ -129,12 +129,12 @@ func TestHandleTemplateObjectChangesPreservesExternalAnnotations(t *testing.T) {
 	graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
 
 	transCtx := &componentTransformContext{
-		Context:       context.Background(),
-		Client:        graphCli,
-		Logger:        log.Log.WithName("test"),
-		CompDef:       &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: compDefName}},
-		Component:     comp,
-		ComponentOrig: comp.DeepCopy(),
+		Context:             context.Background(),
+		Client:              graphCli,
+		Logger:              log.Log.WithName("test"),
+		CompDef:             &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: compDefName}},
+		Component:           comp,
+		ComponentOrig:       comp.DeepCopy(),
 		SynthesizeComponent: synthComp,
 	}
 

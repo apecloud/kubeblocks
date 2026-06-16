@@ -77,6 +77,18 @@ func TestNewErrors(t *testing.T) {
 	if !intctrlutil.IsTargetError(jobFailed, ErrorTypeBackupJobFailed) {
 		t.Error("should be error of BackupJobFailed")
 	}
+	invalidLogfileName := NewInvalidLogfileBackupName("policy")
+	if !intctrlutil.IsTargetError(invalidLogfileName, ErrorTypeInvalidLogfileBackupName) {
+		t.Error("should be error of InvalidLogfileBackupName")
+	}
+	scheduleDisabled := NewBackupScheduleDisabled("logfile", "policy")
+	if !intctrlutil.IsTargetError(scheduleDisabled, ErrorTypeBackupScheduleDisabled) {
+		t.Error("should be error of BackupScheduleDisabled")
+	}
+	logfileScheduleDisabled := NewBackupLogfileScheduleDisabled("tool")
+	if !intctrlutil.IsTargetError(logfileScheduleDisabled, ErrorTypeLogfileScheduleDisabled) {
+		t.Error("should be error of LogfileScheduleDisabled")
+	}
 }
 
 func TestUnwrapControllerError(t *testing.T) {

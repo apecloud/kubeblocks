@@ -25,6 +25,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -204,5 +206,360 @@ func TestConfigsToUpdateStillReportsRealConfigHashMismatch(t *testing.T) {
 	}
 	if toUpdate[0].Name != "valkey-replication-config" {
 		t.Fatalf("unexpected config name %q", toUpdate[0].Name)
+	}
+}
+
+func TestInstanceObjectHelpers(t *testing.T) {
+	inst := builder.NewInstanceBuilder("default", "mysql-0").
+		SetRoles([]workloads.ReplicaRole{
+			{Name: "Leader", UpdatePriority: 10},
+			{Name: "Follower", UpdatePriority: 1},
+		}).
+		GetObject()
+
+	if got := podName(inst); got != "mysql-0" {
+		t.Fatalf("podName() = %q, want mysql-0", got)
+	}
+	pod := podObj(inst)
+	if pod.Namespace != "default" || pod.Name != "mysql-0" {
+		t.Fatalf("unexpected pod object key: %s/%s", pod.Namespace, pod.Name)
+	}
+
+	roleMap := composeRoleMap(inst)
+	if roleMap["leader"].UpdatePriority != 10 || roleMap["follower"].UpdatePriority != 1 {
+		t.Fatalf("unexpected role map: %#v", roleMap)
+	}
+
+	pod.Labels = map[string]string{constant.RoleLabelKey: "Leader"}
+	if got := getRoleName(pod); got != "leader" {
+		t.Fatalf("getRoleName() = %q, want leader", got)
+	}
+	if !isRoleReady(pod, inst.Spec.Roles) {
+		t.Fatal("pod with role label should be role-ready")
+	}
+	delete(pod.Labels, constant.RoleLabelKey)
+	if isRoleReady(pod, inst.Spec.Roles) {
+		t.Fatal("pod without role label should not be role-ready when roles are configured")
+	}
+	if !isRoleReady(pod, nil) {
+		t.Fatal("pod should be role-ready when roles are not configured")
+	}
+}
+
+func TestPodStateHelpers(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		name        string
+		pod         *corev1.Pod
+		created     bool
+		terminating bool
+		pending     bool
+	}{
+		{
+			name:    "empty pod",
+			pod:     &corev1.Pod{},
+			created: false,
+		},
+		{
+			name: "pending pod",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{Phase: corev1.PodPending},
+			},
+			created: true,
+			pending: true,
+		},
+		{
+			name: "terminating pod",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &now},
+				Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			created:     true,
+			terminating: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isCreated(tt.pod); got != tt.created {
+				t.Fatalf("isCreated() = %v, want %v", got, tt.created)
+			}
+			if got := isTerminating(tt.pod); got != tt.terminating {
+				t.Fatalf("isTerminating() = %v, want %v", got, tt.terminating)
+			}
+			if got := isPodPending(tt.pod); got != tt.pending {
+				t.Fatalf("isPodPending() = %v, want %v", got, tt.pending)
+			}
+		})
+	}
+}
+
+func TestIsImageMatched(t *testing.T) {
+	if !isImageMatched(&corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{Name: "sidecar", Image: "sidecar:1.0"}},
+		},
+	}) {
+		t.Fatal("missing matching status should be ignored")
+	}
+
+	if !isImageMatched(&corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "mysql", Image: "docker.io/library/mysql:8.0"}},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:  "mysql",
+				Image: "mysql:8.0",
+			}},
+		},
+	}) {
+		t.Fatal("equivalent image references should match")
+	}
+
+	if isImageMatched(&corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:  "mysql",
+				Image: "mysql:8.4",
+			}},
+		},
+	}) {
+		t.Fatal("different image references should not match")
+	}
+}
+
+func TestBuildInstancePodAndPVCs(t *testing.T) {
+	inst := builder.NewInstanceBuilder("default", "mysql-0").
+		SetUID(types.UID("12345678-1234-1234-1234-1234567890ab")).
+		AddAnnotations("instance-annotation", "true").
+		SetPodTemplate(corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      map[string]string{"template-label": "true"},
+				Annotations: map[string]string{"template-annotation": "true"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}},
+				Volumes:    []corev1.Volume{{Name: "config"}},
+			},
+		}).
+		SetInstanceSetName("mysql").
+		SetInstanceTemplateName("az-a").
+		SetConfigs([]workloads.ConfigTemplate{{Name: "mysql-conf", ConfigHash: ptr.To("hash")}}).
+		AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "data",
+				Labels:      map[string]string{"pvc-label": "true"},
+				Annotations: map[string]string{"pvc-annotation": "true"},
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		}).
+		GetObject()
+
+	pod, err := buildInstancePod(inst, "revision")
+	if err != nil {
+		t.Fatalf("buildInstancePod() error = %v", err)
+	}
+	if pod.Name != "mysql-0" || pod.Namespace != "default" {
+		t.Fatalf("unexpected pod key: %s/%s", pod.Namespace, pod.Name)
+	}
+	if pod.Labels[constant.KBAppInstanceNameLabelKey] != "mysql-0" ||
+		pod.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
+		pod.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
+		pod.Labels["template-label"] != "true" {
+		t.Fatalf("unexpected pod labels: %#v", pod.Labels)
+	}
+	if pod.Annotations["template-annotation"] != "true" ||
+		pod.Annotations[constant.CMInsConfigurationHashLabelKey] == "" {
+		t.Fatalf("unexpected pod annotations: %#v", pod.Annotations)
+	}
+	if len(pod.Spec.Volumes) != 2 {
+		t.Fatalf("pod volumes = %d, want 2: %#v", len(pod.Spec.Volumes), pod.Spec.Volumes)
+	}
+	if len(pod.OwnerReferences) != 1 || pod.OwnerReferences[0].Name != "mysql-0" {
+		t.Fatalf("unexpected pod owner references: %#v", pod.OwnerReferences)
+	}
+
+	pvcs, err := buildInstancePVCs(inst)
+	if err != nil {
+		t.Fatalf("buildInstancePVCs() error = %v", err)
+	}
+	if len(pvcs) != 1 {
+		t.Fatalf("pvcs = %d, want 1", len(pvcs))
+	}
+	pvc := pvcs[0]
+	if pvc.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
+		pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] != "data" ||
+		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
+		pvc.Labels["pvc-label"] != "true" {
+		t.Fatalf("unexpected pvc labels: %#v", pvc.Labels)
+	}
+	if pvc.Annotations["pvc-annotation"] != "true" {
+		t.Fatalf("unexpected pvc annotations: %#v", pvc.Annotations)
+	}
+	if len(pvc.OwnerReferences) != 1 || pvc.OwnerReferences[0].Name != "mysql-0" {
+		t.Fatalf("unexpected pvc owner references: %#v", pvc.OwnerReferences)
+	}
+}
+
+func TestConfigsFromPod(t *testing.T) {
+	pod := builder.NewPodBuilder("default", "mysql-0").GetObject()
+	if got, err := configsFromPod(pod); err != nil || got != nil {
+		t.Fatalf("empty configsFromPod() = %#v, %v; want nil, nil", got, err)
+	}
+
+	if err := configsToPod([]workloads.ConfigTemplate{
+		{Name: "z-config", ConfigHash: ptr.To("z")},
+		{Name: "a-config", ConfigHash: ptr.To("a")},
+	}, pod); err != nil {
+		t.Fatalf("configsToPod() error = %v", err)
+	}
+	got, err := configsFromPod(pod)
+	if err != nil {
+		t.Fatalf("configsFromPod() error = %v", err)
+	}
+	want := []workloads.ConfigTemplate{
+		{Name: "a-config", ConfigHash: ptr.To("a")},
+		{Name: "z-config", ConfigHash: ptr.To("z")},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("configsFromPod() = %#v, want %#v", got, want)
+	}
+
+	pod.Annotations[constant.CMInsConfigurationHashLabelKey] = "not-json"
+	if _, err := configsFromPod(pod); err == nil {
+		t.Fatal("expected invalid config hash annotation error")
+	}
+}
+
+func TestHasConfigRestart(t *testing.T) {
+	inst := builder.NewInstanceBuilder("default", "mysql-0").
+		SetConfigs([]workloads.ConfigTemplate{
+			{Name: "restart-conf", ConfigHash: ptr.To("new"), Restart: ptr.To(true)},
+			{Name: "reload-conf", ConfigHash: ptr.To("new"), Restart: ptr.To(false)},
+		}).
+		GetObject()
+	pod := builder.NewPodBuilder("default", "mysql-0").GetObject()
+	if err := configsToPod([]workloads.ConfigTemplate{
+		{Name: "restart-conf", ConfigHash: ptr.To("old")},
+		{Name: "reload-conf", ConfigHash: ptr.To("old")},
+	}, pod); err != nil {
+		t.Fatalf("configsToPod() error = %v", err)
+	}
+
+	needRestart, names, err := hasConfigRestart(inst, pod)
+	if err != nil {
+		t.Fatalf("hasConfigRestart() error = %v", err)
+	}
+	if !needRestart || !reflect.DeepEqual(names, []string{"restart-conf"}) {
+		t.Fatalf("hasConfigRestart() = %v, %v; want true, [restart-conf]", needRestart, names)
+	}
+
+	pod.Annotations[constant.CMInsConfigurationHashLabelKey] = "not-json"
+	if _, _, err := hasConfigRestart(inst, pod); err == nil {
+		t.Fatal("expected invalid config annotation error")
+	}
+}
+
+func TestCopyAndMergeObjects(t *testing.T) {
+	if got := copyAndMerge(&corev1.Service{}, &corev1.ConfigMap{}); got != nil {
+		t.Fatalf("type mismatch should return nil, got %T", got)
+	}
+
+	oldCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "conf",
+			Finalizers: []string{"old"},
+			OwnerReferences: []metav1.OwnerReference{{
+				UID:  types.UID("old"),
+				Name: "old",
+			}},
+		},
+		Data:       map[string]string{"old": "value"},
+		BinaryData: map[string][]byte{"old": []byte("value")},
+	}
+	newCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "conf",
+			Finalizers: []string{"new"},
+			OwnerReferences: []metav1.OwnerReference{{
+				UID:  types.UID("new"),
+				Name: "new",
+			}},
+		},
+		Data:       map[string]string{"new": "value"},
+		BinaryData: map[string][]byte{"new": []byte("value")},
+	}
+	mergedCM := copyAndMerge(oldCM, newCM).(*corev1.ConfigMap)
+	if !reflect.DeepEqual(mergedCM.Finalizers, []string{"old", "new"}) ||
+		len(mergedCM.OwnerReferences) != 2 ||
+		!reflect.DeepEqual(mergedCM.Data, newCM.Data) ||
+		!reflect.DeepEqual(mergedCM.BinaryData, newCM.BinaryData) {
+		t.Fatalf("unexpected merged configmap: %#v", mergedCM)
+	}
+
+	oldPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "data",
+			Labels: map[string]string{"old": "kept"},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			},
+		},
+	}
+	newPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "data",
+			Labels: map[string]string{"new": "added"},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")},
+			},
+		},
+	}
+	mergedPVC := copyAndMerge(oldPVC, newPVC).(*corev1.PersistentVolumeClaim)
+	if !reflect.DeepEqual(mergedPVC.Labels, map[string]string{"old": "kept", "new": "added"}) ||
+		mergedPVC.Spec.Resources.Requests.Storage().String() != "2Gi" {
+		t.Fatalf("unexpected merged pvc: %#v", mergedPVC)
+	}
+
+	newPod := builder.NewPodBuilder("default", "mysql-0").
+		AddAnnotations("new", "added").
+		AddLabels("new", "added").
+		SetContainers([]corev1.Container{{
+			Name:  "mysql",
+			Image: "mysql:8.4",
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			},
+		}}).
+		GetObject()
+	oldPod := builder.NewPodBuilder("default", "mysql-0").
+		SetContainers([]corev1.Container{{Name: "mysql", Image: "mysql:8.0"}}).
+		GetObject()
+	mergedPod := copyAndMerge(oldPod, newPod).(*corev1.Pod)
+	if mergedPod.Labels["new"] != "added" ||
+		mergedPod.Annotations["new"] != "added" ||
+		mergedPod.Spec.Containers[0].Image != "mysql:8.4" ||
+		mergedPod.Spec.Containers[0].Resources.Requests.Cpu().String() != "1" {
+		t.Fatalf("unexpected merged pod: %#v", mergedPod)
 	}
 }

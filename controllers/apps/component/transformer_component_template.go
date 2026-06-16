@@ -130,6 +130,7 @@ func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx 
 	}
 	for name := range toUpdate {
 		runningObj, protoObj := runningObjs[name], protoObjs[name]
+		preserveExternalMetadata(runningObj, protoObj)
 		if !reflect.DeepEqual(runningObj.Data, protoObj.Data) ||
 			!reflect.DeepEqual(runningObj.Labels, protoObj.Labels) ||
 			!reflect.DeepEqual(runningObj.Annotations, protoObj.Annotations) {
@@ -342,6 +343,25 @@ func fileTemplateNameFromObject(synthesizedComp *component.SynthesizedComponent,
 
 func isExternalManaged(tpl component.SynthesizedFileTemplate) bool {
 	return ptr.Deref(tpl.ExternalManaged, false)
+}
+
+func preserveExternalMetadata(running, proto *corev1.ConfigMap) {
+	for k, v := range running.Annotations {
+		if _, exists := proto.Annotations[k]; !exists {
+			if proto.Annotations == nil {
+				proto.Annotations = make(map[string]string)
+			}
+			proto.Annotations[k] = v
+		}
+	}
+	for k, v := range running.Labels {
+		if _, exists := proto.Labels[k]; !exists {
+			if proto.Labels == nil {
+				proto.Labels = make(map[string]string)
+			}
+			proto.Labels[k] = v
+		}
+	}
 }
 
 func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *componentTransformContext,

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -50,7 +51,200 @@ var _ = Describe("Reconfigure Controller", func() {
 	AfterEach(cleanEnv)
 
 	Context("reconfigure policy", func() {
-		// TODO: impl
+		It("classifies reload action predicates", func() {
+			Expect(isValidReloadPolicy(parametersv1alpha1.ReloadAction{})).Should(BeFalse())
+			Expect(isValidReloadPolicy(parametersv1alpha1.ReloadAction{
+				AutoTrigger: &parametersv1alpha1.AutoTrigger{ProcessName: "mysql"},
+			})).Should(BeTrue())
+			Expect(isValidReloadPolicy(parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"reload"}},
+			})).Should(BeTrue())
+
+			Expect(isAutoReload(nil)).Should(BeFalse())
+			Expect(isAutoReload(&parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"reload"}},
+			})).Should(BeFalse())
+			Expect(isAutoReload(&parametersv1alpha1.ReloadAction{
+				AutoTrigger: &parametersv1alpha1.AutoTrigger{ProcessName: "mysql"},
+			})).Should(BeTrue())
+		})
+
+		It("enables sync shell triggers only for synchronous shell actions", func() {
+			reconciler := &ReconfigureReconciler{}
+			Expect(reconciler.enableSyncTrigger(nil)).Should(BeFalse())
+			Expect(reconciler.enableSyncTrigger(&parametersv1alpha1.ReloadAction{
+				AutoTrigger: &parametersv1alpha1.AutoTrigger{ProcessName: "mysql"},
+			})).Should(BeFalse())
+			Expect(reconciler.enableSyncTrigger(&parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"reload"}},
+			})).Should(BeFalse())
+			Expect(reconciler.enableSyncTrigger(&parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"reload"}, Sync: ptr.To(false)},
+			})).Should(BeFalse())
+			Expect(reconciler.enableSyncTrigger(&parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{Command: []string{"reload"}, Sync: ptr.To(true)},
+			})).Should(BeTrue())
+		})
+
+		It("builds reload tasks with resolved config context", func() {
+			configHashData := map[string]string{
+				testparameters.MysqlConfigFile: "max_connections=100",
+			}
+			configMap := &corev1.ConfigMap{
+				Data: configHashData,
+			}
+			cluster := &appsv1.Cluster{}
+			componentSpec := &appsv1.ClusterComponentSpec{Name: defaultCompName}
+			its := &workloads.InstanceSet{}
+			templateSpec := &appsv1.ComponentFileTemplate{
+				Name: configSpecName,
+			}
+			configDesc := &parametersv1alpha1.ComponentConfigDescription{
+				Name: testparameters.MysqlConfigFile,
+			}
+			pd := &parametersv1alpha1.ParametersDefinition{
+				Spec: parametersv1alpha1.ParametersDefinitionSpec{
+					DynamicParameters: []string{"max_connections"},
+				},
+			}
+			patch := &parameterscore.ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{
+					testparameters.MysqlConfigFile: []byte(`{"max_connections":"200"}`),
+				},
+			}
+			rctx := &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{
+						ComponentName: defaultCompName,
+					},
+					ConfigMapObj:  configMap,
+					ClusterObj:    cluster,
+					ClusterComObj: componentSpec,
+				},
+				its:       its,
+				configMap: configMap,
+			}
+
+			task := (&ReconfigureReconciler{}).buildReloadTask(
+				reconfigure.SyncDynamicReloadPolicy,
+				templateSpec,
+				rctx,
+				pd,
+				configDesc,
+				patch,
+			)
+
+			Expect(task.Policy).Should(Equal(reconfigure.SyncDynamicReloadPolicy))
+			Expect(task.Ctx.ConfigTemplate).Should(Equal(*templateSpec))
+			Expect(task.Ctx.ConfigHash).ShouldNot(BeNil())
+			Expect(*task.Ctx.ConfigHash).Should(Equal(*computeTargetConfigHash(nil, configHashData)))
+			Expect(task.Ctx.Cluster).Should(BeIdenticalTo(cluster))
+			Expect(task.Ctx.ClusterComponent).Should(BeIdenticalTo(componentSpec))
+			Expect(task.Ctx.ITS).Should(BeIdenticalTo(its))
+			Expect(task.Ctx.ConfigDescription).Should(BeIdenticalTo(configDesc))
+			Expect(task.Ctx.ParametersDef).Should(BeIdenticalTo(&pd.Spec))
+			Expect(task.Ctx.Patch).Should(BeIdenticalTo(patch))
+		})
+
+		It("falls back to restart tasks when reload tasks are not applicable", func() {
+			reconciler := &ReconfigureReconciler{}
+			templateSpec := &appsv1.ComponentFileTemplate{Name: configSpecName}
+			rctx := &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{},
+				},
+				configMap: &corev1.ConfigMap{
+					Data: map[string]string{testparameters.MysqlConfigFile: "max_connections=100"},
+				},
+				configDescs: []parametersv1alpha1.ComponentConfigDescription{{
+					Name: testparameters.MysqlConfigFile,
+					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+						Format: parametersv1alpha1.Ini,
+						FormatterAction: parametersv1alpha1.FormatterAction{
+							IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+						},
+					},
+				}},
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{},
+			}
+
+			tasks, err := reconciler.buildReconfigureTasks(templateSpec, rctx, nil, false)
+			Expect(err).Should(Succeed())
+			Expect(tasks).Should(HaveLen(1))
+			Expect(tasks[0].Policy).Should(Equal(reconfigure.RestartPolicy))
+
+			tasks, err = reconciler.buildReconfigureTasks(templateSpec, rctx, &parameterscore.ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{
+					testparameters.MysqlConfigFile: []byte(`{"mysqld":{"max_connections":"200"}}`),
+				},
+			}, false)
+			Expect(err).Should(Succeed())
+			Expect(tasks).Should(HaveLen(1))
+			Expect(tasks[0].Policy).Should(Equal(reconfigure.RestartPolicy))
+		})
+
+		It("builds dynamic reload tasks from supported config patches", func() {
+			reconciler := &ReconfigureReconciler{}
+			templateSpec := &appsv1.ComponentFileTemplate{
+				Name: configSpecName,
+				Reconfigure: &appsv1.Action{
+					Exec: &appsv1.ExecAction{Command: []string{"reload"}},
+				},
+			}
+			rctx := &reconcileContext{
+				ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+					ResourceCtx: &render.ResourceCtx{},
+				},
+				configMap: &corev1.ConfigMap{
+					Data: map[string]string{testparameters.MysqlConfigFile: "max_connections=100"},
+				},
+				configDescs: []parametersv1alpha1.ComponentConfigDescription{{
+					Name: testparameters.MysqlConfigFile,
+					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+						Format: parametersv1alpha1.Ini,
+						FormatterAction: parametersv1alpha1.FormatterAction{
+							IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+						},
+					},
+				}},
+				parametersDefs: map[string]*parametersv1alpha1.ParametersDefinition{
+					testparameters.MysqlConfigFile: {
+						Spec: parametersv1alpha1.ParametersDefinitionSpec{
+							DynamicParameters: []string{"max_connections"},
+						},
+					},
+				},
+			}
+
+			tasks, err := reconciler.buildReconfigureTasks(templateSpec, rctx, &parameterscore.ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{
+					testparameters.MysqlConfigFile: []byte(`{"mysqld":{"max_connections":"200"}}`),
+				},
+			}, false)
+			Expect(err).Should(Succeed())
+			Expect(tasks).Should(HaveLen(1))
+			Expect(tasks[0].Policy).Should(Equal(reconfigure.SyncDynamicReloadPolicy))
+			Expect(tasks[0].Ctx.ConfigDescription.Name).Should(Equal(testparameters.MysqlConfigFile))
+		})
+
+		It("applies failed result options", func() {
+			status := reconfigure.Status{
+				Status:        reconfigure.StatusFailed,
+				Reason:        "original",
+				ExpectedCount: 2,
+				SucceedCount:  1,
+			}
+
+			retryResult := reconciled(status, string(reconfigure.SyncDynamicReloadPolicy), parametersv1alpha1.CFailedPhase, withFailed(nil, true))
+			Expect(retryResult.Retry).Should(BeTrue())
+			Expect(retryResult.Failed).Should(BeFalse())
+			Expect(retryResult.Message).Should(Equal("original"))
+
+			pauseResult := reconciled(status, string(reconfigure.SyncDynamicReloadPolicy), parametersv1alpha1.CFailedAndPausePhase, withFailed(errors.New("reload failed"), false))
+			Expect(pauseResult.Retry).Should(BeFalse())
+			Expect(pauseResult.Failed).Should(BeTrue())
+			Expect(pauseResult.Message).Should(Equal("reload failed"))
+		})
 	})
 
 	Context("reconfigure", func() {

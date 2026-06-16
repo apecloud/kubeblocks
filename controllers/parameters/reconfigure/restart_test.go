@@ -36,6 +36,12 @@ import (
 
 var _ = ginkgo.Describe("restartPolicy test", func() {
 	ginkgo.Context("restart policy", func() {
+		ginkgo.It("should reject unsupported task policies", func() {
+			status, err := Task{Policy: Policy("unsupported")}.Reconfigure()
+			Expect(err).Should(MatchError(ContainSubstring("not support reload action[unsupported]")))
+			Expect(status).Should(Equal(Status{}))
+		})
+
 		ginkgo.It("should success without error", func() {
 			configHash := "test-hash"
 			mockParam := Context{

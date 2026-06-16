@@ -136,7 +136,7 @@ func getGCFrequency() time.Duration {
 // isBackupDeletable returns true if the backup can be deleted.
 func (r *GCReconciler) isBackupDeletable(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (bool, error) {
 	if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
-		return true, nil
+		return backup.Status.Phase == dpv1alpha1.BackupPhaseFailed, nil
 	}
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	err := r.Get(reqCtx.Ctx, client.ObjectKey{

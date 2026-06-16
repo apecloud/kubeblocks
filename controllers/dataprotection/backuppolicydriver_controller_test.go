@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("BackupPolicyDriver Controller test", func() {
@@ -100,6 +102,96 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 	})
 
 	Context("expect to create a backup policy", func() {
+		It("resolves backup method env values by exact match before prefix match", func() {
+			exactValue := "tools:8.0.33"
+			prefixValue := "tools:8.0"
+			staticValue := "static"
+			builder := &backupPolicyAndScheduleBuilder{}
+
+			env := builder.resolveBackupMethodEnv(&appsv1.ClusterComponentSpec{
+				ServiceVersion: "8.0.33",
+			}, []dpv1alpha1.EnvVar{
+				{
+					Name:  "STATIC",
+					Value: &staticValue,
+				},
+				{
+					Name: "TOOLS_IMAGE",
+					ValueFrom: &dpv1alpha1.ValueFrom{
+						VersionMapping: []dpv1alpha1.VersionMapping{
+							{ServiceVersions: []string{"8.0"}, MappedValue: prefixValue},
+							{ServiceVersions: []string{"8.0.33"}, MappedValue: exactValue},
+						},
+					},
+				},
+				{
+					Name: "UNMATCHED",
+					ValueFrom: &dpv1alpha1.ValueFrom{
+						VersionMapping: []dpv1alpha1.VersionMapping{
+							{ServiceVersions: []string{"5.7"}, MappedValue: "tools:5.7"},
+						},
+					},
+				},
+			})
+
+			Expect(env).To(HaveLen(2))
+			Expect(env[0].Name).To(Equal("STATIC"))
+			Expect(env[0].Value).To(Equal(staticValue))
+			Expect(env[1].Name).To(Equal("TOOLS_IMAGE"))
+			Expect(env[1].Value).To(Equal(exactValue))
+			Expect(findBestMatchingValue([]dpv1alpha1.VersionMapping{
+				{ServiceVersions: []string{"^8\\.0\\.[0-9]+$"}, MappedValue: "regex"},
+			}, "8.0.34")).To(Equal("regex"))
+			Expect(findBestMatchingValue(nil, "8.0.34")).To(BeEmpty())
+		})
+
+		It("syncs role selectors when component replicas change", func() {
+			target := &dpv1alpha1.BackupTarget{
+				PodSelector: &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
+				},
+			}
+			builder := &backupPolicyAndScheduleBuilder{
+				compSpec: &appsv1.ClusterComponentSpec{Replicas: 3},
+			}
+
+			builder.syncRoleLabelSelectorWhenReplicaChanges(target, "leader", "follower", defaultCompName)
+
+			Expect(target.PodSelector.MatchLabels[constant.RoleLabelKey]).To(Equal("leader"))
+			Expect(target.PodSelector.FallbackLabelSelector.MatchLabels[constant.RoleLabelKey]).To(Equal("follower"))
+
+			builder.compSpec.Replicas = 1
+			builder.syncRoleLabelSelectorWhenReplicaChanges(target, "leader", "follower", defaultCompName)
+
+			Expect(target.PodSelector.MatchLabels).NotTo(HaveKey(constant.RoleLabelKey))
+			Expect(target.PodSelector.FallbackLabelSelector.MatchLabels).NotTo(HaveKey(constant.RoleLabelKey))
+		})
+
+		It("sets default encryption config from viper when valid", func() {
+			oldSecretKeyRef := viper.GetString(constant.CfgKeyDPBackupEncryptionSecretKeyRef)
+			oldAlgorithm := viper.GetString(constant.CfgKeyDPBackupEncryptionAlgorithm)
+			defer func() {
+				viper.Set(constant.CfgKeyDPBackupEncryptionSecretKeyRef, oldSecretKeyRef)
+				viper.Set(constant.CfgKeyDPBackupEncryptionAlgorithm, oldAlgorithm)
+			}()
+
+			viper.Set(constant.CfgKeyDPBackupEncryptionSecretKeyRef, `{"name":"backup-passphrase","key":"password"}`)
+			viper.Set(constant.CfgKeyDPBackupEncryptionAlgorithm, "")
+
+			backupPolicy := &dpv1alpha1.BackupPolicy{}
+			(&backupPolicyAndScheduleBuilder{}).setDefaultEncryptionConfig(backupPolicy)
+
+			Expect(backupPolicy.Spec.EncryptionConfig).NotTo(BeNil())
+			Expect(backupPolicy.Spec.EncryptionConfig.Algorithm).To(Equal(dpv1alpha1.DefaultEncryptionAlgorithm))
+			Expect(backupPolicy.Spec.EncryptionConfig.PassPhraseSecretKeyRef.Name).To(Equal("backup-passphrase"))
+			Expect(backupPolicy.Spec.EncryptionConfig.PassPhraseSecretKeyRef.Key).To(Equal("password"))
+
+			viper.Set(constant.CfgKeyDPBackupEncryptionSecretKeyRef, `{"name":"backup-passphrase"}`)
+			backupPolicy.Spec.EncryptionConfig = nil
+			(&backupPolicyAndScheduleBuilder{}).setDefaultEncryptionConfig(backupPolicy)
+			Expect(backupPolicy.Spec.EncryptionConfig).To(BeNil())
+		})
+
 		It("shortens overlength backup policy and schedule names", func() {
 			clusterName := strings.Repeat("c", 41)
 			componentName := strings.Repeat("d", 9)

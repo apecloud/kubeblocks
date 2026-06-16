@@ -21,25 +21,29 @@ package dataprotection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
 	"time"
 
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -98,6 +102,168 @@ var _ = Describe("Backup Controller test", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	Context("backup annotations", func() {
+		It("records cluster snapshot and encrypted system account secrets", func() {
+			cluster := clusterInfo.Cluster
+			cluster.Annotations = map[string]string{
+				constant.OpsRequestAnnotationKey:        "removed",
+				corev1.LastAppliedConfigAnnotation:      "removed",
+				"dataprotection.kubeblocks.io/retained": "true",
+			}
+
+			labels := constant.GetClusterLabels(cluster.Name)
+			componentLabels := constant.GetCompLabels(cluster.Name, testdp.ComponentName)
+			componentLabels[systemAccountSecretLabel] = "admin"
+			shardingLabels := constant.GetClusterLabels(cluster.Name, map[string]string{
+				constant.KBAppShardingNameLabelKey: "shard",
+			})
+			componentSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "component-account",
+					Labels:    componentLabels,
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("admin"),
+					constant.AccountPasswdForSecret: []byte("component-password"),
+				},
+			}
+			shardingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%s", cluster.Name, "shard", "root"),
+					Labels:    shardingLabels,
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("root"),
+					constant.AccountPasswdForSecret: []byte("sharding-password"),
+				},
+			}
+			ignoredSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "not-system-account",
+					Labels:    labels,
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret: []byte("ignored"),
+				},
+			}
+			ordinarySecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "ordinary-credentials",
+					Labels:    constant.GetCompLabels(cluster.Name, testdp.ComponentName),
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("ordinary"),
+					constant.AccountPasswdForSecret: []byte("ordinary-password"),
+				},
+			}
+			ordinaryShardingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "ordinary-sharding-credentials",
+					Labels:    constant.GetClusterLabels(cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: "shard"}),
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("ordinary-shard"),
+					constant.AccountPasswdForSecret: []byte("ordinary-sharding-password"),
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, componentSecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, shardingSecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, ignoredSecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, ordinarySecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, ordinaryShardingSecret)).Should(Succeed())
+
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   cluster.Namespace,
+					Name:        "annotation-backup",
+					Annotations: map[string]string{},
+				},
+			}
+			request := &dpbackup.Request{
+				RequestCtx: intctrlutil.RequestCtx{Ctx: ctx},
+				Client:     k8sClient,
+				Backup:     backup,
+			}
+
+			Expect(setClusterSnapshotAnnotation(request, cluster)).Should(Succeed())
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).To(ContainSubstring(`"name":"` + cluster.Name + `"`))
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).To(ContainSubstring(`"dataprotection.kubeblocks.io/retained":"true"`))
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).NotTo(ContainSubstring(constant.OpsRequestAnnotationKey))
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).NotTo(ContainSubstring(corev1.LastAppliedConfigAnnotation))
+
+			Expect(setEncryptedSystemAccountsAnnotation(request, cluster)).Should(Succeed())
+			accounts := map[string]map[string]string{}
+			Expect(json.Unmarshal([]byte(backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]), &accounts)).Should(Succeed())
+			Expect(accounts).To(HaveKey(testdp.ComponentName))
+			Expect(accounts[testdp.ComponentName]).To(HaveKey("admin"))
+			Expect(accounts[testdp.ComponentName]).NotTo(HaveKey("ordinary"))
+			Expect(accounts).To(HaveKey("shard"))
+			Expect(accounts["shard"]).To(HaveKey("root"))
+			Expect(accounts["shard"]).NotTo(HaveKey("ordinary-shard"))
+			Expect(accounts).NotTo(HaveKey(""))
+		})
+	})
+
+	Context("continuous backup validation", func() {
+		It("validates schedule ownership and waits for creating clusters", func() {
+			scheme := runtime.NewScheme()
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			Expect(dpv1alpha1.AddToScheme(scheme)).Should(Succeed())
+
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "continuous-backup",
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: "cluster",
+					},
+				},
+			}
+			creatingCluster := &kbappsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "cluster",
+				},
+				Status: kbappsv1.ClusterStatus{
+					Phase: kbappsv1.CreatingClusterPhase,
+				},
+			}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(creatingCluster).Build()
+
+			Expect(clusterIsCreating(reqCtx, backup, cli)).To(BeTrue())
+			Expect(validateContinuousBackup(backup, reqCtx, cli)).ShouldNot(Succeed())
+
+			readyCluster := creatingCluster.DeepCopy()
+			readyCluster.Status.Phase = kbappsv1.RunningClusterPhase
+			backup.Labels[dptypes.BackupScheduleLabelKey] = "schedule"
+			failedSchedule := &dpv1alpha1.BackupSchedule{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: backup.Namespace,
+					Name:      "schedule",
+				},
+				Status: dpv1alpha1.BackupScheduleStatus{
+					Phase: dpv1alpha1.BackupSchedulePhaseFailed,
+				},
+			}
+			cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(readyCluster, failedSchedule).Build()
+
+			Expect(clusterIsCreating(reqCtx, backup, cli)).To(BeFalse())
+			Expect(validateContinuousBackup(backup, reqCtx, cli)).ShouldNot(Succeed())
+
+			availableSchedule := failedSchedule.DeepCopy()
+			availableSchedule.Status.Phase = dpv1alpha1.BackupSchedulePhaseAvailable
+			cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(readyCluster, availableSchedule).Build()
+
+			Expect(validateContinuousBackup(backup, reqCtx, cli)).Should(Succeed())
+		})
 	})
 
 	When("with default settings", func() {

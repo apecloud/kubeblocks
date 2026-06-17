@@ -130,6 +130,7 @@ func (c *controller) Commit() (ctrl.Result, error) {
 	}
 	if c.err = plan.Execute(); c.err != nil {
 		if apierrors.IsConflict(c.err) {
+			c.logger.Info("reconcile plan hit conflict, requeueing", "request", c.req, "error", c.err.Error())
 			return ctrl.Result{Requeue: true}, nil
 		}
 		return ctrl.Result{}, c.err

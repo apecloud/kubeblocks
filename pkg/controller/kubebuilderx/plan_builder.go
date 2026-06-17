@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -37,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -283,8 +285,10 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 		reason = "SuccessfulUpdate"
 	}
 	if err != nil {
+		b.logPodConfigHashUpdate(ctx, vertex, err)
 		return fmt.Errorf("update %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
+	b.logPodConfigHashUpdate(ctx, vertex, nil)
 	b.emitEvent(vertex.Obj, reason, model.UPDATE)
 	return nil
 }
@@ -351,6 +355,53 @@ func getTypeName(i any) string {
 		t = t.Elem()
 	}
 	return t.Name()
+}
+
+func (b *PlanBuilder) logPodConfigHashUpdate(ctx context.Context, vertex *model.ObjectVertex, updateErr error) {
+	pod, ok := vertex.Obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+	if podConfigHash(vertex.OriObj) == "" && podConfigHash(vertex.Obj) == "" {
+		return
+	}
+	values := []any{
+		"pod", klog.KObj(pod),
+		"subResource", vertex.SubResource,
+		"oldResourceVersion", objectResourceVersion(vertex.OriObj),
+		"desiredResourceVersion", objectResourceVersion(vertex.Obj),
+		"oldConfigHash", podConfigHash(vertex.OriObj),
+		"desiredConfigHash", podConfigHash(vertex.Obj),
+	}
+	if updateErr != nil {
+		b.transCtx.logger.Error(updateErr, "pod config hash update failed", values...)
+		return
+	}
+	livePod := &corev1.Pod{}
+	if err := b.cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, livePod); err != nil {
+		b.transCtx.logger.Error(err, "pod config hash update succeeded but readback failed", values...)
+		return
+	}
+	values = append(values,
+		"liveResourceVersion", livePod.ResourceVersion,
+		"liveConfigHash", podConfigHash(livePod),
+	)
+	b.transCtx.logger.Info("pod config hash update succeeded", values...)
+}
+
+func podConfigHash(obj client.Object) string {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok || pod == nil || pod.Annotations == nil {
+		return ""
+	}
+	return pod.Annotations[constant.CMInsConfigurationHashLabelKey]
+}
+
+func objectResourceVersion(obj client.Object) string {
+	if obj == nil {
+		return ""
+	}
+	return obj.GetResourceVersion()
 }
 
 // NewPlanBuilder returns a PlanBuilder

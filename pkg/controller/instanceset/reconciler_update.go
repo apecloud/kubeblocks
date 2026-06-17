@@ -33,6 +33,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
@@ -171,6 +172,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err1 != nil {
 			return kubebuilderx.Continue, err1
 		}
+		if !allUpdated || updatePolicy != noOpsPolicy {
+			tree.Logger.Info("pod reconfigure update decision",
+				"pod", pod.Name,
+				"podResourceVersion", pod.ResourceVersion,
+				"podConfigHash", podConfigHashForLog(pod),
+				"desiredConfigHash", configHashesForLog(its.Spec.Configs),
+				"allConfigUpdated", allUpdated,
+				"updatePolicy", string(updatePolicy),
+				"specUpdatePolicy", string(specUpdatePolicy),
+				"recreateReason", recreateReason)
+		}
 		if !allUpdated && updatePolicy == noOpsPolicy {
 			updatingPods++
 		}
@@ -198,6 +210,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 						return kubebuilderx.Continue, err
 					}
 				}
+				logPodConfigHashUpdateScheduled(tree, pod, newMergedPod.(*corev1.Pod), "inPlaceUpdate")
 				err = tree.Update(newMergedPod)
 			}
 			if err != nil {
@@ -302,6 +315,13 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 	if err != nil {
 		return false, err
 	}
+	if len(toUpdate) > 0 {
+		tree.Logger.Info("pod has pending reconfigure configs",
+			"pod", pod.Name,
+			"podResourceVersion", pod.ResourceVersion,
+			"podConfigHash", podConfigHashForLog(pod),
+			"pendingConfigHash", configHashesForLog(toUpdate))
+	}
 	for _, config := range toUpdate {
 		if err = r.reconfigureInst(tree, its, pod, config); err != nil {
 			return false, err
@@ -341,8 +361,42 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 		}
 		return err
 	}
-	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
+	tree.Logger.Info("successfully reconfigure the pod",
+		"pod", pod.Name,
+		"podResourceVersion", pod.ResourceVersion,
+		"podConfigHashBeforeCommit", podConfigHashForLog(pod),
+		"configName", config.Name,
+		"desiredConfigHash", ptr.Deref(config.ConfigHash, ""))
 	return nil
+}
+
+func configHashesForLog(configs []workloads.ConfigTemplate) []string {
+	hashes := make([]string, 0, len(configs))
+	for _, config := range configs {
+		hashes = append(hashes, fmt.Sprintf("%s=%s", config.Name, ptr.Deref(config.ConfigHash, "")))
+	}
+	return hashes
+}
+
+func logPodConfigHashUpdateScheduled(tree *kubebuilderx.ObjectTree, oldPod, desiredPod *corev1.Pod, reason string) {
+	oldHash := podConfigHashForLog(oldPod)
+	desiredHash := podConfigHashForLog(desiredPod)
+	if oldHash == desiredHash {
+		return
+	}
+	tree.Logger.Info("scheduled pod config hash update",
+		"pod", oldPod.Name,
+		"reason", reason,
+		"oldResourceVersion", oldPod.ResourceVersion,
+		"oldConfigHash", oldHash,
+		"desiredConfigHash", desiredHash)
+}
+
+func podConfigHashForLog(pod *corev1.Pod) string {
+	if pod == nil || pod.Annotations == nil {
+		return ""
+	}
+	return pod.Annotations[constant.CMInsConfigurationHashLabelKey]
 }
 
 func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {

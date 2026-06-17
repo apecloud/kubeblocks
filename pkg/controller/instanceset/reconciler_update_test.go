@@ -526,6 +526,8 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(option.SubResource).Should(BeEmpty(),
 				"second reconcile should use normal pod patch, not resize subresource")
+			Expect(option.Patch).Should(BeTrue(),
+				"metadata-only config-hash commit should use PATCH to avoid full Pod update conflicts with kubelet status writes")
 
 			updatePolicy, _, _, err := getPodUpdatePolicy(its, patchedPod)
 			Expect(err).NotTo(HaveOccurred())
@@ -670,6 +672,10 @@ var _ = Describe("update reconciler test", func() {
 				"pod should be patched with the new config-hash annotation even though switchover is skipped")
 			Expect(spy.switchoverCalls).Should(Equal(0),
 				"switchover must not be invoked when only the config-hash annotation differs")
+			_, option, err := tree.GetWithOption(updatedPod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(option.Patch).Should(BeTrue(),
+				"metadata-only in-place updates should use PATCH instead of full Pod UPDATE")
 		})
 	})
 })

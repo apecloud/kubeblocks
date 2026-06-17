@@ -709,6 +709,9 @@ func TestUpdateReconcilerConvergesResizeAfterConfigMetadataWithOmittedRequest(t 
 	if option.SubResource != "" {
 		t.Fatalf("expected normal metadata patch after resize converged, got subresource %q", option.SubResource)
 	}
+	if !option.Patch {
+		t.Fatalf("expected metadata-only config-hash commit to use PATCH instead of full Pod UPDATE")
+	}
 
 	policy, _, err := getPodUpdatePolicy(inst, patchedPod)
 	if err != nil {

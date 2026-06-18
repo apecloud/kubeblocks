@@ -444,7 +444,8 @@ func (r *VolumePopulatorReconciler) resolveSourceTargetFromBackup(reqCtx intctrl
 	var matched []*dpv1alpha1.BackupStatusTarget
 	for i := range backup.Status.Targets {
 		target := &backup.Status.Targets[i]
-		if backupTargetMatchesPVC(target, pvc) {
+		matches, effective := backupTargetMatchesPVC(target, pvc)
+		if effective && matches {
 			matched = append(matched, target)
 		}
 	}
@@ -462,7 +463,8 @@ func (r *VolumePopulatorReconciler) resolveSourceTargetFromBackup(reqCtx intctrl
 }
 
 func resolveSingleSourceTargetForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) (*dpv1alpha1.BackupStatusTarget, bool, error) {
-	if backupTargetHasEffectivePVCSelector(target) && !backupTargetMatchesPVC(target, pvc) {
+	matched, effective := backupTargetMatchesPVC(target, pvc)
+	if effective && !matched {
 		return nil, true, nil
 	}
 	return target, false, nil
@@ -548,27 +550,9 @@ func componentLogicalName(component *appsv1.Component) string {
 	return component.Name
 }
 
-func backupTargetHasEffectivePVCSelector(target *dpv1alpha1.BackupStatusTarget) bool {
+func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) (bool, bool) {
 	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
-		return false
-	}
-	selector := target.PodSelector.LabelSelector
-	for k := range selector.MatchLabels {
-		if k != constant.AppInstanceLabelKey {
-			return true
-		}
-	}
-	for _, expression := range selector.MatchExpressions {
-		if expression.Key != constant.AppInstanceLabelKey {
-			return true
-		}
-	}
-	return false
-}
-
-func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) bool {
-	if target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
-		return false
+		return false, false
 	}
 	selector := target.PodSelector.LabelSelector
 	var effective bool
@@ -576,39 +560,61 @@ func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.P
 		if k == constant.AppInstanceLabelKey {
 			continue
 		}
+		pvcValue, exists := pvc.Labels[k]
+		if !exists {
+			if backupTargetSelectorKeyScopesPVC(k) {
+				return false, true
+			}
+			continue
+		}
 		effective = true
-		if pvc.Labels[k] != v {
-			return false
+		if pvcValue != v {
+			return false, true
 		}
 	}
 	for _, expression := range selector.MatchExpressions {
 		if expression.Key == constant.AppInstanceLabelKey {
 			continue
 		}
-		effective = true
 		value, exists := pvc.Labels[expression.Key]
+		if !exists {
+			if backupTargetSelectorKeyScopesPVC(expression.Key) {
+				return false, true
+			}
+			continue
+		}
+		effective = true
 		switch expression.Operator {
 		case metav1.LabelSelectorOpIn:
-			if !exists || !slices.Contains(expression.Values, value) {
-				return false
+			if !slices.Contains(expression.Values, value) {
+				return false, true
 			}
 		case metav1.LabelSelectorOpNotIn:
 			if exists && slices.Contains(expression.Values, value) {
-				return false
+				return false, true
 			}
 		case metav1.LabelSelectorOpExists:
 			if !exists {
-				return false
+				return false, true
 			}
 		case metav1.LabelSelectorOpDoesNotExist:
 			if exists {
-				return false
+				return false, true
 			}
 		default:
-			return false
+			return false, true
 		}
 	}
-	return effective
+	return true, effective
+}
+
+func backupTargetSelectorKeyScopesPVC(key string) bool {
+	switch key {
+	case constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey, constant.VolumeClaimTemplateNameLabelKey:
+		return true
+	default:
+		return false
+	}
 }
 
 func requiredPolicyForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.PersistentVolumeClaim) (*dpv1alpha1.RequiredPolicyForAllPodSelection, error) {

@@ -168,10 +168,36 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		// Always call reconfigure to execute reconfigure actions
+		reconfigureStartedAt := time.Now()
 		allUpdated, err1 := r.reconfigure(tree, its, pod)
+		reconfigureDuration := time.Since(reconfigureStartedAt)
 		if err1 != nil {
+			tree.Logger.Info("pod reconfigure reconcile timing",
+				"pod", pod.Name,
+				"podResourceVersion", pod.ResourceVersion,
+				"podConfigHash", podConfigHashForLog(pod),
+				"desiredConfigHash", configHashesForLog(its.Spec.Configs),
+				"updatePolicy", string(updatePolicy),
+				"specUpdatePolicy", string(specUpdatePolicy),
+				"recreateReason", recreateReason,
+				"reconfigureStartedAt", reconfigureStartedAt.Format(time.RFC3339Nano),
+				"reconfigureDuration", reconfigureDuration.String(),
+				"reconfigureDurationMillis", reconfigureDuration.Milliseconds(),
+				"error", err1.Error())
 			return kubebuilderx.Continue, err1
 		}
+		tree.Logger.Info("pod reconfigure reconcile timing",
+			"pod", pod.Name,
+			"podResourceVersion", pod.ResourceVersion,
+			"podConfigHash", podConfigHashForLog(pod),
+			"desiredConfigHash", configHashesForLog(its.Spec.Configs),
+			"allConfigUpdated", allUpdated,
+			"updatePolicy", string(updatePolicy),
+			"specUpdatePolicy", string(specUpdatePolicy),
+			"recreateReason", recreateReason,
+			"reconfigureStartedAt", reconfigureStartedAt.Format(time.RFC3339Nano),
+			"reconfigureDuration", reconfigureDuration.String(),
+			"reconfigureDurationMillis", reconfigureDuration.Milliseconds())
 		if !allUpdated || updatePolicy != noOpsPolicy {
 			tree.Logger.Info("pod reconfigure update decision",
 				"pod", pod.Name,

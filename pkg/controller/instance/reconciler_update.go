@@ -139,10 +139,34 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updatePolicy = recreatePolicy
 		}
 
+		reconfigureStartedAt := time.Now()
 		allUpdated, err := r.reconfigure(tree, inst, pod)
+		reconfigureDuration := time.Since(reconfigureStartedAt)
 		if err != nil {
+			tree.Logger.Info("pod reconfigure reconcile timing",
+				"pod", pod.Name,
+				"podResourceVersion", pod.ResourceVersion,
+				"podConfigHash", podConfigHashForLog(pod),
+				"desiredConfigHash", configHashesForLog(inst.Spec.Configs),
+				"updatePolicy", string(updatePolicy),
+				"specUpdatePolicy", string(specUpdatePolicy),
+				"reconfigureStartedAt", reconfigureStartedAt.Format(time.RFC3339Nano),
+				"reconfigureDuration", reconfigureDuration.String(),
+				"reconfigureDurationMillis", reconfigureDuration.Milliseconds(),
+				"error", err.Error())
 			return kubebuilderx.Continue, err
 		}
+		tree.Logger.Info("pod reconfigure reconcile timing",
+			"pod", pod.Name,
+			"podResourceVersion", pod.ResourceVersion,
+			"podConfigHash", podConfigHashForLog(pod),
+			"desiredConfigHash", configHashesForLog(inst.Spec.Configs),
+			"allConfigUpdated", allUpdated,
+			"updatePolicy", string(updatePolicy),
+			"specUpdatePolicy", string(specUpdatePolicy),
+			"reconfigureStartedAt", reconfigureStartedAt.Format(time.RFC3339Nano),
+			"reconfigureDuration", reconfigureDuration.String(),
+			"reconfigureDurationMillis", reconfigureDuration.Milliseconds())
 		if !allUpdated || updatePolicy != noOpsPolicy {
 			tree.Logger.Info("pod reconfigure update decision",
 				"pod", pod.Name,

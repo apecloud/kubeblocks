@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -277,6 +278,7 @@ func (b *PlanBuilder) createObject(ctx context.Context, vertex *model.ObjectVert
 func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVertex) error {
 	var err error
 	var reason string
+	startedAt := time.Now()
 	if vertex.SubResource != "" {
 		err = b.cli.SubResource(vertex.SubResource).Update(ctx, vertex.Obj, clientOption(vertex))
 		reason = "SuccessfulUpdateSubResource"
@@ -285,10 +287,10 @@ func (b *PlanBuilder) updateObject(ctx context.Context, vertex *model.ObjectVert
 		reason = "SuccessfulUpdate"
 	}
 	if err != nil {
-		b.logPodConfigHashUpdate(ctx, vertex, err)
+		b.logPodConfigHashUpdate(ctx, vertex, err, startedAt)
 		return fmt.Errorf("update %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
-	b.logPodConfigHashUpdate(ctx, vertex, nil)
+	b.logPodConfigHashUpdate(ctx, vertex, nil, startedAt)
 	b.emitEvent(vertex.Obj, reason, model.UPDATE)
 	return nil
 }
@@ -297,6 +299,7 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 	var err error
 	var reason string
 	patch := client.MergeFrom(vertex.OriObj)
+	startedAt := time.Now()
 	if vertex.SubResource != "" {
 		err = b.cli.SubResource(vertex.SubResource).Patch(ctx, vertex.Obj, patch, clientOption(vertex))
 		reason = "SuccessfulPatchSubResource"
@@ -305,8 +308,10 @@ func (b *PlanBuilder) patchObject(ctx context.Context, vertex *model.ObjectVerte
 		reason = "SuccessfulPatch"
 	}
 	if err != nil {
+		b.logPodConfigHashUpdate(ctx, vertex, err, startedAt)
 		return fmt.Errorf("patch %T %s failed: %w", vertex.Obj, klog.KObj(vertex.Obj), err)
 	}
+	b.logPodConfigHashUpdate(ctx, vertex, nil, startedAt)
 	b.emitEvent(vertex.Obj, reason, model.PATCH)
 	return nil
 }
@@ -357,7 +362,7 @@ func getTypeName(i any) string {
 	return t.Name()
 }
 
-func (b *PlanBuilder) logPodConfigHashUpdate(ctx context.Context, vertex *model.ObjectVertex, updateErr error) {
+func (b *PlanBuilder) logPodConfigHashUpdate(ctx context.Context, vertex *model.ObjectVertex, updateErr error, startedAt time.Time) {
 	pod, ok := vertex.Obj.(*corev1.Pod)
 	if !ok {
 		return
@@ -372,6 +377,9 @@ func (b *PlanBuilder) logPodConfigHashUpdate(ctx context.Context, vertex *model.
 		"desiredResourceVersion", objectResourceVersion(vertex.Obj),
 		"oldConfigHash", podConfigHash(vertex.OriObj),
 		"desiredConfigHash", podConfigHash(vertex.Obj),
+		"commitStartedAt", startedAt.Format(time.RFC3339Nano),
+		"commitDuration", time.Since(startedAt).String(),
+		"commitDurationMillis", time.Since(startedAt).Milliseconds(),
 	}
 	if updateErr != nil {
 		b.transCtx.logger.Error(updateErr, "pod config hash update failed", values...)

@@ -316,11 +316,14 @@ func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workl
 		return false, err
 	}
 	if len(toUpdate) > 0 {
+		detectedAt := time.Now()
 		tree.Logger.Info("pod has pending reconfigure configs",
 			"pod", pod.Name,
 			"podResourceVersion", pod.ResourceVersion,
 			"podConfigHash", podConfigHashForLog(pod),
-			"pendingConfigHash", configHashesForLog(toUpdate))
+			"pendingConfigHash", configHashesForLog(toUpdate),
+			"detectedAt", detectedAt.Format(time.RFC3339Nano),
+			"detectedAtUnixNano", detectedAt.UnixNano())
 	}
 	for _, config := range toUpdate {
 		if err = r.reconfigureInst(tree, its, pod, config); err != nil {
@@ -346,12 +349,32 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 	}
 
 	opts := reconfigureOptions(config)
+	actionStartedAt := time.Now()
+	tree.Logger.Info("starting pod reconfigure action",
+		"pod", pod.Name,
+		"podResourceVersion", pod.ResourceVersion,
+		"podConfigHashBeforeAction", podConfigHashForLog(pod),
+		"configName", config.Name,
+		"desiredConfigHash", ptr.Deref(config.ConfigHash, ""),
+		"actionStartedAt", actionStartedAt.Format(time.RFC3339Nano),
+		"actionStartedAtUnixNano", actionStartedAt.UnixNano())
 	if len(config.ReconfigureActionName) == 0 {
 		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
 	} else {
 		err = lfa.UserDefined(tree.Context, nil, opts, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
 	}
+	actionDuration := time.Since(actionStartedAt)
 	if err != nil {
+		tree.Logger.Info("pod reconfigure action failed",
+			"pod", pod.Name,
+			"podResourceVersion", pod.ResourceVersion,
+			"podConfigHashBeforeAction", podConfigHashForLog(pod),
+			"configName", config.Name,
+			"desiredConfigHash", ptr.Deref(config.ConfigHash, ""),
+			"actionStartedAt", actionStartedAt.Format(time.RFC3339Nano),
+			"actionDuration", actionDuration.String(),
+			"actionDurationMillis", actionDuration.Milliseconds(),
+			"error", err.Error())
 		if errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return nil
 		}
@@ -366,7 +389,10 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 		"podResourceVersion", pod.ResourceVersion,
 		"podConfigHashBeforeCommit", podConfigHashForLog(pod),
 		"configName", config.Name,
-		"desiredConfigHash", ptr.Deref(config.ConfigHash, ""))
+		"desiredConfigHash", ptr.Deref(config.ConfigHash, ""),
+		"actionStartedAt", actionStartedAt.Format(time.RFC3339Nano),
+		"actionDuration", actionDuration.String(),
+		"actionDurationMillis", actionDuration.Milliseconds())
 	return nil
 }
 
@@ -389,7 +415,8 @@ func logPodConfigHashUpdateScheduled(tree *kubebuilderx.ObjectTree, oldPod, desi
 		"reason", reason,
 		"oldResourceVersion", oldPod.ResourceVersion,
 		"oldConfigHash", oldHash,
-		"desiredConfigHash", desiredHash)
+		"desiredConfigHash", desiredHash,
+		"scheduledAt", time.Now().Format(time.RFC3339Nano))
 }
 
 func podConfigHashForLog(pod *corev1.Pod) string {

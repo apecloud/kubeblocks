@@ -187,13 +187,16 @@ func buildOrderedVertices(transCtx *transformContext, currentTree *ObjectTree, d
 					transCtx.logger.Error(err, "can't get GVKName from object", "object", newObj.GetName())
 					return
 				}
-				var v *model.ObjectVertex
-				subResource := desiredTree.childrenOptions[*name].SubResource
-				if subResource != "" {
-					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G(), model.WithSubResource(subResource))
-				} else {
-					v = model.NewObjectVertex(oldObj, newObj, model.ActionUpdatePtr(), inDataContext4G())
+				options := desiredTree.childrenOptions[*name]
+				action := model.ActionUpdatePtr()
+				if options.Patch {
+					action = model.ActionPatchPtr()
 				}
+				graphOptions := []model.GraphOption{inDataContext4G()}
+				if options.SubResource != "" {
+					graphOptions = append(graphOptions, model.WithSubResource(options.SubResource))
+				}
+				v := model.NewObjectVertex(oldObj, newObj, action, graphOptions...)
 				findAndAppend(v)
 			}
 		}

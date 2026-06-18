@@ -43,6 +43,9 @@ type ObjectOptions struct {
 
 	// if true, the object should not be reconciled
 	SkipToReconcile bool
+
+	// if true, update action should use Patch instead of Update
+	Patch bool
 }
 
 type WithSubResource string
@@ -55,6 +58,12 @@ type SkipToReconcile bool
 
 func (o SkipToReconcile) ApplyToObject(opts *ObjectOptions) {
 	opts.SkipToReconcile = bool(o)
+}
+
+type PatchObject bool
+
+func (o PatchObject) ApplyToObject(opts *ObjectOptions) {
+	opts.Patch = bool(o)
 }
 
 type ObjectTree struct {

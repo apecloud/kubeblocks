@@ -495,6 +495,10 @@ var _ = Describe("update reconciler test", func() {
 			updatedPod := postPods[0].(*corev1.Pod)
 			Expect(updatedPod.Annotations).Should(HaveKeyWithValue(constant.CMInsConfigurationHashLabelKey, "new-hash"),
 				"pod should be patched with the new config-hash annotation even though switchover is skipped")
+			_, options, err := tree.GetWithOption(updatedPod)
+			Expect(err).Should(BeNil())
+			Expect(options.Patch).Should(BeTrue(),
+				"metadata-only pod updates should commit with Patch to avoid resourceVersion conflicts with role probe annotations")
 			Expect(spy.switchoverCalls).Should(Equal(0),
 				"switchover must not be invoked when only the config-hash annotation differs")
 		})

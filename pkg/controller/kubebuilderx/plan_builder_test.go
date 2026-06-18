@@ -286,6 +286,32 @@ var _ = Describe("plan builder test", func() {
 				}
 				Expect(found).To(BeTrue())
 			})
+
+			It("should append a patch vertex when object update is marked for patch", func() {
+				oldPod := builder.NewPodBuilder("ns", "pod").
+					AddAnnotations(constant.CMInsConfigurationHashLabelKey, "old").
+					GetObject()
+				newPod := oldPod.DeepCopy()
+				newPod.Annotations[constant.CMInsConfigurationHashLabelKey] = "new"
+
+				currentTree := NewObjectTree()
+				desiredTree := NewObjectTree()
+				currentTree.SetRoot(builder.NewInstanceSetBuilder("ns", "root").GetObject())
+				desiredTree.SetRoot(currentTree.GetRoot())
+				Expect(currentTree.Add(oldPod)).Should(Succeed())
+				Expect(desiredTree.Update(newPod, PatchObject(true))).Should(Succeed())
+
+				vertices := buildOrderedVertices(transCtx, currentTree, desiredTree)
+
+				found := false
+				for _, v := range vertices {
+					if pod, ok := v.Obj.(*corev1.Pod); ok && pod.Name == "pod" {
+						found = true
+						Expect(*v.Action).To(Equal(model.PATCH))
+					}
+				}
+				Expect(found).To(BeTrue())
+			})
 		})
 	})
 })

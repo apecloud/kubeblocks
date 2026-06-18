@@ -71,7 +71,7 @@ type probeService struct {
 	actionService        *actionService
 	probes               map[string]*proto.Probe
 	runners              map[string]*probeRunner
-	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
+	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool, preserveEventTimeOnUpdate bool) error
 }
 
 var _ Service = &probeService{}
@@ -114,7 +114,7 @@ type probeRunner struct {
 	failedCount          int64
 	latestOutput         []byte
 	latestEvent          chan proto.ProbeEvent
-	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
+	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool, preserveEventTimeOnUpdate bool) error
 }
 
 type fileChangeWatch struct {
@@ -384,6 +384,9 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 
 		var event proto.ProbeEvent
 		var hasEvent bool
+		needsRetry := false
+		var lastDeliveredMessage string
+		hasDeliveredMessage := false
 
 		output := func() string {
 			prefixLen := min(len(event.Output), 32)
@@ -405,17 +408,23 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 				return true
 			}
 
-			msg, err := json.Marshal(event)
+			msgBytes, err := json.Marshal(event)
 			if err != nil {
 				log(err, "failed to marshal the probe event", retry, periodically)
 				return true
 			}
+			msg := string(msgBytes)
 
 			if r.sendEventWithMessage == nil {
-				r.sendEventWithMessage = util.SendEventWithMessage
+				r.sendEventWithMessage = util.SendEventWithMessageWithEventTimeOption
 			}
-			err = r.sendEventWithMessage(&r.logger, event.Probe, string(msg), true)
+			// A delivered same-output roleProbe re-report is the same observation,
+			// whether it came from the report ticker or a file-change trigger.
+			preserveEventTimeOnUpdate := event.Probe == "roleProbe" && hasDeliveredMessage && msg == lastDeliveredMessage
+			err = r.sendEventWithMessage(&r.logger, event.Probe, msg, true, preserveEventTimeOnUpdate)
 			if err == nil {
+				lastDeliveredMessage = msg
+				hasDeliveredMessage = true
 				log(nil, "succeed to send the probe event", retry, periodically)
 			} else {
 				log(err, "failed to send the probe event, will retry later", retry, periodically)
@@ -423,7 +432,6 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 			return err == nil
 		}
 
-		needsRetry := false
 		for {
 			select {
 			case latest := <-r.latestEvent:

@@ -46,8 +46,15 @@ const (
 )
 
 func SendEventWithMessage(logger *logr.Logger, reason string, message string, sync bool) error {
+	return SendEventWithMessageWithEventTimeOption(logger, reason, message, sync, false)
+}
+
+// SendEventWithMessageWithEventTimeOption sends a Kubernetes Event and can keep
+// an existing Event's EventTime when the caller is retrying delivery without a
+// new observation.
+func SendEventWithMessageWithEventTimeOption(logger *logr.Logger, reason string, message string, sync bool, preserveEventTimeOnUpdate bool) error {
 	send := func(retryInterval time.Duration, retryAttempts int32) error {
-		err := createOrUpdateEvent(reason, message, retryInterval, retryAttempts)
+		err := createOrUpdateEvent(reason, message, retryInterval, retryAttempts, preserveEventTimeOnUpdate)
 		if err != nil && logger != nil {
 			logger.Error(err, "failed to send event", "reason", reason, "message", message)
 		}
@@ -93,7 +100,7 @@ func newEvent(reason string, message string) *corev1.Event {
 	}
 }
 
-func createOrUpdateEvent(reason, message string, retryInterval time.Duration, retryAttempts int32) error {
+func createOrUpdateEvent(reason, message string, retryInterval time.Duration, retryAttempts int32, preserveEventTimeOnUpdate bool) error {
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return err
@@ -107,10 +114,12 @@ func createOrUpdateEvent(reason, message string, retryInterval time.Duration, re
 		event, err = eventsClient.Get(context.Background(), eventName, metav1.GetOptions{})
 		if err == nil {
 			event.Count++
-			// the granularity of lastTimestamp is second and it is not enough for the event.
-			// there may multiple events in the same second, so we need to use EventTime here.
-			// event.LastTimestamp = metav1.Now()
-			event.EventTime = metav1.NowMicro()
+			if !preserveEventTimeOnUpdate {
+				// the granularity of lastTimestamp is second and it is not enough for the event.
+				// there may multiple events in the same second, so we need to use EventTime here.
+				// event.LastTimestamp = metav1.Now()
+				event.EventTime = metav1.NowMicro()
+			}
 			_, err = eventsClient.Update(context.Background(), event, metav1.UpdateOptions{})
 		} else if k8serrors.IsNotFound(err) {
 			event = newEvent(reason, message)

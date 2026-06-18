@@ -123,7 +123,7 @@ var _ = Describe("probe", func() {
 				reason  string
 				message string
 			}, 128)
-			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool, _ bool) error {
 				eventChan <- struct{ reason, message string }{reason, message}
 				return nil
 			}
@@ -159,11 +159,16 @@ var _ = Describe("probe", func() {
 
 			By("mock send event function")
 			eventChan := make(chan struct {
-				reason  string
-				message string
+				reason                    string
+				message                   string
+				preserveEventTimeOnUpdate bool
 			}, 128)
-			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
-				eventChan <- struct{ reason, message string }{reason, message}
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool, preserveEventTimeOnUpdate bool) error {
+				eventChan <- struct {
+					reason                    string
+					message                   string
+					preserveEventTimeOnUpdate bool
+				}{reason, message, preserveEventTimeOnUpdate}
 				return nil
 			}
 
@@ -171,8 +176,13 @@ var _ = Describe("probe", func() {
 			Expect(service.Start()).Should(Succeed())
 
 			By("drain initial event")
-			var receivedData struct{ reason, message string }
+			var receivedData struct {
+				reason                    string
+				message                   string
+				preserveEventTimeOnUpdate bool
+			}
 			Eventually(eventChan).Should(Receive(&receivedData))
+			Expect(receivedData.preserveEventTimeOnUpdate).Should(BeFalse())
 
 			By("update watched file")
 			Expect(os.WriteFile(triggerPath, []byte("changed"), 0644)).Should(Succeed())
@@ -180,11 +190,119 @@ var _ = Describe("probe", func() {
 			By("check received event even though probe output has not changed")
 			Eventually(eventChan, 5*time.Second).Should(Receive(&receivedData))
 			Expect(receivedData.reason).Should(Equal(probeName))
+			Expect(receivedData.preserveEventTimeOnUpdate).Should(BeTrue())
 			var event proto.ProbeEvent
 			Expect(json.Unmarshal([]byte(receivedData.message), &event)).Should(Succeed())
 			Expect(event.Probe).Should(Equal(probeName))
 			Expect(event.Code).Should(Equal(int32(0)))
 			Expect(event.Output).Should(Equal([]byte("leader")))
+		})
+
+		It("preserves event time when periodically re-reporting unchanged roleProbe output", func() {
+			probesWithReport := append([]proto.Probe(nil), probes...)
+			probesWithReport[0].ReportPeriodSeconds = 1
+
+			service, err := newProbeService(logr.New(nil), actionSvc, probesWithReport)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			eventChan := make(chan struct {
+				reason                    string
+				message                   string
+				preserveEventTimeOnUpdate bool
+			}, 128)
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool, preserveEventTimeOnUpdate bool) error {
+				eventChan <- struct {
+					reason                    string
+					message                   string
+					preserveEventTimeOnUpdate bool
+				}{reason, message, preserveEventTimeOnUpdate}
+				return nil
+			}
+
+			Expect(service.Start()).Should(Succeed())
+
+			var receivedData struct {
+				reason                    string
+				message                   string
+				preserveEventTimeOnUpdate bool
+			}
+			Eventually(eventChan).Should(Receive(&receivedData))
+			Expect(receivedData.reason).Should(Equal(probeName))
+			Expect(receivedData.preserveEventTimeOnUpdate).Should(BeFalse())
+
+			Eventually(eventChan, 3*time.Second).Should(Receive(&receivedData))
+			Expect(receivedData.reason).Should(Equal(probeName))
+			Expect(receivedData.preserveEventTimeOnUpdate).Should(BeTrue())
+		})
+
+		It("refreshes event time when periodically retrying an unsent roleProbe observation", func() {
+			probesWithReport := append([]proto.Probe(nil), probes...)
+			probesWithReport[0].ReportPeriodSeconds = 1
+
+			service, err := newProbeService(logr.New(nil), actionSvc, probesWithReport)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			var count int
+			eventChan := make(chan bool, 128)
+			service.sendEventWithMessage = func(_ *logr.Logger, _ string, _ string, _ bool, preserveEventTimeOnUpdate bool) error {
+				count++
+				eventChan <- preserveEventTimeOnUpdate
+				if count == 1 {
+					return fmt.Errorf("API server error")
+				}
+				return nil
+			}
+
+			Expect(service.Start()).Should(Succeed())
+
+			var preserve bool
+			Eventually(eventChan).Should(Receive(&preserve))
+			Expect(preserve).Should(BeFalse())
+			Eventually(eventChan, 3*time.Second).Should(Receive(&preserve))
+			Expect(preserve).Should(BeFalse())
+		})
+
+		It("refreshes event time when periodically re-reporting non-roleProbe output", func() {
+			availableProbeName := "availableProbe"
+			availableActions := []proto.Action{
+				{
+					Name: availableProbeName,
+					Exec: &proto.ExecAction{
+						Commands: []string{"/bin/bash", "-c", "echo -n ok"},
+					},
+				},
+			}
+			availableProbes := []proto.Probe{
+				{
+					Action:              availableProbeName,
+					PeriodSeconds:       1,
+					SuccessThreshold:    1,
+					FailureThreshold:    1,
+					ReportPeriodSeconds: 1,
+				},
+			}
+
+			availableActionSvc, err := newActionService(logr.New(nil), availableActions)
+			Expect(err).Should(BeNil())
+			service, err := newProbeService(logr.New(nil), availableActionSvc, availableProbes)
+			Expect(err).Should(BeNil())
+			Expect(service).ShouldNot(BeNil())
+
+			eventChan := make(chan bool, 128)
+			service.sendEventWithMessage = func(_ *logr.Logger, _ string, _ string, _ bool, preserveEventTimeOnUpdate bool) error {
+				eventChan <- preserveEventTimeOnUpdate
+				return nil
+			}
+
+			Expect(service.Start()).Should(Succeed())
+
+			var preserve bool
+			Eventually(eventChan).Should(Receive(&preserve))
+			Expect(preserve).Should(BeFalse())
+			Eventually(eventChan, 3*time.Second).Should(Receive(&preserve))
+			Expect(preserve).Should(BeFalse())
 		})
 
 		It("matches file-change events by configured path type", func() {
@@ -227,7 +345,7 @@ var _ = Describe("probe", func() {
 			var (
 				count = 0
 			)
-			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool, _ bool) error {
 				count += 1
 				return fmt.Errorf("API server error")
 			}
@@ -255,7 +373,7 @@ var _ = Describe("probe", func() {
 					message string
 				}, 128)
 			)
-			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
+			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool, _ bool) error {
 				count += 1
 				if count <= 2 {
 					return fmt.Errorf("API server error")

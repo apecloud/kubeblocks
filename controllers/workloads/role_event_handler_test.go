@@ -161,6 +161,14 @@ func TestAcceptRoleProbeEventSingleTokenAcceptsNewerEventTime(t *testing.T) {
 	}
 }
 
+func TestAcceptRoleProbeEventSingleTokenRejectsEqualEventTime(t *testing.T) {
+	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550600000000"})
+	parsed := roleProbeOutput{role: "primary"}
+	if acceptRoleProbeEvent(pod, "1779550600000000", parsed) {
+		t.Fatalf("expected repeated single-token result with equal EventTime to be rejected")
+	}
+}
+
 func TestAcceptRoleProbeEventSingleTokenRejectsOlderEventTime(t *testing.T) {
 	pod := podWithAnnotations(map[string]string{constant.LastRoleEventVersionAnnotationKey: "1779550600000000"})
 	parsed := roleProbeOutput{role: "primary"}

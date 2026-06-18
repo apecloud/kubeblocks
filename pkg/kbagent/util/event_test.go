@@ -63,7 +63,7 @@ func TestSendEventWithMessageSyncConfigError(t *testing.T) {
 	if err := SendEventWithMessage(&logger, "Ready", "ok", true); err == nil {
 		t.Fatalf("expected kube config error")
 	}
-	if err := createOrUpdateEvent("Ready", "ok", 0, 0); err == nil {
+	if err := createOrUpdateEvent("Ready", "ok", 0, 0, false); err == nil {
 		t.Fatalf("expected create event kube config error")
 	}
 	if clientSet, err := getK8sClientSet(); clientSet != nil || err == nil {

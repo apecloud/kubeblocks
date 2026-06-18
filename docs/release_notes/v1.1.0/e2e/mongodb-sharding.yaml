@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: mongodb-sharding
+  name: mongo-sharding
   namespace: ${TEST_NAMESPACE}
 spec:
   clusterDef: mongodb
@@ -11,15 +11,23 @@ spec:
     - name: mongos
       replicas: 1
       resources:
-        limits: { cpu: 500m, memory: 512Mi }
-        requests: { cpu: 500m, memory: 512Mi }
-      serviceVersion: ${MONGO_VERSION}
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      serviceVersion: 6.0.27
     - name: config-server
       replicas: 1
       resources:
-        limits: { cpu: 500m, memory: 512Mi }
-        requests: { cpu: 500m, memory: 512Mi }
-      serviceVersion: ${MONGO_VERSION}
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      serviceVersion: 6.0.27
       systemAccounts:
         - disabled: false
           name: root
@@ -32,10 +40,11 @@ spec:
       volumeClaimTemplates:
         - name: data
           spec:
-            accessModes: [ReadWriteOnce]
+            accessModes:
+              - ReadWriteOnce
             resources:
               requests:
-                storage: 10Gi
+                storage: 1Gi
   shardings:
     - name: shard
       shards: 3
@@ -43,13 +52,18 @@ spec:
         name: shard
         replicas: 1
         resources:
-          limits: { cpu: 500m, memory: 512Mi }
-          requests: { cpu: 500m, memory: 512Mi }
-        serviceVersion: ${MONGO_VERSION}
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        serviceVersion: 6.0.27
         volumeClaimTemplates:
           - name: data
             spec:
-              accessModes: [ReadWriteOnce]
+              accessModes:
+                - ReadWriteOnce
               resources:
                 requests:
-                  storage: ${MONGO_SHARD_STORAGE}
+                  storage: 10Gi

@@ -17,7 +17,7 @@ Database components often need network behavior that differs from the Kubernetes
 * a database engine may need stable node ports for external clients;
 * a component may need host networking for performance, migration, or compatibility with an existing network design;
 * pods may need temporary `/etc/hosts` entries during hybrid migration or failover testing;
-* DNS search domains or resolver options may need to be tuned for multi-cluster or cross-domain discovery.
+* DNS search domains or resolver options may need to be tuned for cross-domain discovery.
 
 `ComponentNetwork` makes these settings part of the declarative database cluster spec, so operators can review, apply, and audit them with the rest of the workload configuration.
 

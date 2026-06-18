@@ -12,22 +12,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 MANIFEST_DIR="${MANIFEST_DIR:-${SCRIPT_DIR}}"
-WORK_DIR="${WORK_DIR:-./docs/release_notes/v1.1.0/e2e/}"
+WORK_DIR="${WORK_DIR:-/tmp/e2e}"
+CACHE_DIR="${CACHE_DIR:-${WORK_DIR}/cache}"
+SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.2.0}"
 
 KB_NAMESPACE="${KB_NAMESPACE:-kb-system}"
 TEST_NAMESPACE="${TEST_NAMESPACE:-kb-11-e2e}"
 KIND_CLUSTER="${KIND_CLUSTER:-kb-upgrade-103b9}"
 SOURCE_VERSION="${SOURCE_VERSION:-1.0.3-beta.9}"
 TARGET_VERSION="${TARGET_VERSION:-1.1.0-beta.6}"
-AUTO_INSTALLED_ADDONS="${AUTO_INSTALLED_ADDONS:-[\"mysql\",\"redis\",\"mongodb\"]}"
+AUTO_INSTALLED_ADDONS="${AUTO_INSTALLED_ADDONS:-[\"mysql\",\"mongodb\"]}"
 
 CREATE_KIND="${CREATE_KIND:-true}"
 RESET_KIND="${RESET_KIND:-false}"
-RESET_TEST_NAMESPACE="${RESET_TEST_NAMESPACE:-false}"
-SKIP_HELM_REPO_UPDATE="${SKIP_HELM_REPO_UPDATE:-false}"
+SKIP_HELM_REPO_UPDATE="${SKIP_HELM_REPO_UPDATE:-true}"
 
 MYSQL_CLUSTER="${MYSQL_CLUSTER:-mysql-cluster}"
-MYSQL_COMPDEF="${MYSQL_COMPDEF:-mysql-8.0-1.0.5}"
+MYSQL_COMPDEF="${MYSQL_COMPDEF:-mysql-8.0}"
 MYSQL_VERSION_BASE="${MYSQL_VERSION_BASE:-8.0.35}"
 MYSQL_VERSION_INPLACE="${MYSQL_VERSION_INPLACE:-8.0.36}"
 MYSQL_VERSION_REPLACE="${MYSQL_VERSION_REPLACE:-8.0.37}"
@@ -36,13 +37,12 @@ ROLLOUT_INSTANCE_INTERVAL_SECONDS="${ROLLOUT_INSTANCE_INTERVAL_SECONDS:-30}"
 ROLLOUT_SCALE_DOWN_DELAY_SECONDS="${ROLLOUT_SCALE_DOWN_DELAY_SECONDS:-30}"
 
 MONGO_COMPDEF="${MONGO_COMPDEF:-mongodb-1.1.0-alpha.0}"
+MONGO_COMPDEF_PREFIX="${MONGO_COMPDEF_PREFIX:-mongodb-}"
 MONGO_VERSION="${MONGO_VERSION:-6.0.27}"
+MONGO_VERSION_TARGET="${MONGO_VERSION_TARGET:-7.0.28}"
+MONGO_SHARD_COMPDEF="${MONGO_SHARD_COMPDEF:-mongo}"
+MONGO_SHARD_COMPDEF_PREFIX="${MONGO_SHARD_COMPDEF_PREFIX:-mongo-}"
 MONGO_SHARD_STORAGE="${MONGO_SHARD_STORAGE:-10Gi}"
-MONGO_NETWORK_STORAGE_CLASS="${MONGO_NETWORK_STORAGE_CLASS:-}"
-
-REDIS_COMPDEF="${REDIS_COMPDEF:-redis-cluster-7-1.1.0-alpha.0}"
-REDIS_VERSION_BASE="${REDIS_VERSION_BASE:-7.2.4}"
-REDIS_VERSION_TARGET="${REDIS_VERSION_TARGET:-7.2.5}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
@@ -60,6 +60,7 @@ Usage:
 
 Setup stages:
   setup-kind                    Create or select the kind cluster.
+  setup-cache                   Download release CRDs and Helm charts to CACHE_DIR.
   setup-kb                      Install or upgrade KB TARGET_VERSION for non-upgrade cases.
   cleanup                       Delete test namespace.
 
@@ -68,7 +69,7 @@ Test case stages:
   case-network                    ComponentNetwork DNS, hostPorts, and hostNetwork.
   case-rollout-api                Rollout API for MySQL and sharding targets.
   case-dynamic-instance-template  Dynamic InstanceSet template adoption.
-  case-sharding                   Sharding lifecycle, offline shard, and heterogeneous shards.
+  case-sharding                   MongoDB sharding scale, offline shard, and heterogeneous shards.
 
 Useful env vars:
   SOURCE_VERSION=1.0.3-beta.9
@@ -76,15 +77,20 @@ Useful env vars:
   KIND_CLUSTER=kb-upgrade-103b9
   CREATE_KIND=true|false
   RESET_KIND=true|false
-  RESET_TEST_NAMESPACE=true|false
-  AUTO_INSTALLED_ADDONS='["mysql","redis","mongodb"]'
-  MONGO_NETWORK_STORAGE_CLASS=''
+  SKIP_HELM_REPO_UPDATE=true|false
+  AUTO_INSTALLED_ADDONS='["mysql","mongodb"]'
+  MONGO_COMPDEF_PREFIX=mongodb-
+  MONGO_VERSION_TARGET=7.0.28
+  MONGO_SHARD_COMPDEF=mongo
+  MONGO_SHARD_COMPDEF_PREFIX=mongo-
   ROLLOUT_INSTANCE_INTERVAL_SECONDS=30
   ROLLOUT_SCALE_DOWN_DELAY_SECONDS=30
   MANIFEST_DIR=docs/release_notes/v1.1.0/e2e
   WORK_DIR=./docs/release_notes/v1.1.0/e2e/
+  CACHE_DIR=./docs/release_notes/v1.1.0/e2e/cache
 
 Examples:
+  bash docs/release_notes/v1.1.0/e2e/kb-1.1-e2e-reproduce.sh setup-cache
   CREATE_KIND=false bash docs/release_notes/v1.1.0/e2e/kb-1.1-e2e-reproduce.sh setup-kb
   RESET_KIND=true bash docs/release_notes/v1.1.0/e2e/kb-1.1-e2e-reproduce.sh case-upgrade
   CREATE_KIND=false bash docs/release_notes/v1.1.0/e2e/kb-1.1-e2e-reproduce.sh case-network
@@ -97,7 +103,7 @@ require_cmd() {
 }
 
 prepare_dirs() {
-  mkdir -p "${WORK_DIR}"
+  mkdir -p "${WORK_DIR}" "${CACHE_DIR}"
 }
 
 preflight() {
@@ -131,12 +137,12 @@ render_manifest() {
     "ROLLOUT_INSTANCE_INTERVAL_SECONDS=${ROLLOUT_INSTANCE_INTERVAL_SECONDS}"
     "ROLLOUT_SCALE_DOWN_DELAY_SECONDS=${ROLLOUT_SCALE_DOWN_DELAY_SECONDS}"
     "MONGO_COMPDEF=${MONGO_COMPDEF}"
+    "MONGO_COMPDEF_PREFIX=${MONGO_COMPDEF_PREFIX}"
     "MONGO_VERSION=${MONGO_VERSION}"
+    "MONGO_VERSION_TARGET=${MONGO_VERSION_TARGET}"
+    "MONGO_SHARD_COMPDEF=${MONGO_SHARD_COMPDEF}"
+    "MONGO_SHARD_COMPDEF_PREFIX=${MONGO_SHARD_COMPDEF_PREFIX}"
     "MONGO_SHARD_STORAGE=${MONGO_SHARD_STORAGE}"
-    "MONGO_NETWORK_STORAGE_CLASS=${MONGO_NETWORK_STORAGE_CLASS}"
-    "REDIS_COMPDEF=${REDIS_COMPDEF}"
-    "REDIS_VERSION_BASE=${REDIS_VERSION_BASE}"
-    "REDIS_VERSION_TARGET=${REDIS_VERSION_TARGET}"
   )
 
   [[ $(($# % 2)) -eq 0 ]] || fail "render_manifest extra variables must be KEY VALUE pairs"
@@ -192,9 +198,10 @@ create_or_select_kind() {
   fi
 
   if ! kind get clusters | grep -qx "${KIND_CLUSTER}"; then
-    log "creating kind cluster ${KIND_CLUSTER} without inherited proxy env"
-    env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
-      kind create cluster --name "${KIND_CLUSTER}" --config "$(manifest_path kind-three-node.yaml)"
+    log "creating single-node kind cluster ${KIND_CLUSTER} without proxy env"
+    noproxy
+    kind create cluster --name "${KIND_CLUSTER}" --config "$(manifest_path kind-single-node.yaml)"
+    proxy
   fi
 
   kubectl config use-context "$(kind_context)"
@@ -208,19 +215,6 @@ ensure_namespace() {
   else
     kubectl create namespace "${ns}"
   fi
-}
-
-reset_test_namespace_if_requested() {
-  if [[ "${RESET_TEST_NAMESPACE}" != "true" ]]; then
-    ensure_namespace "${TEST_NAMESPACE}"
-    return
-  fi
-
-  if kubectl get namespace "${TEST_NAMESPACE}" >/dev/null 2>&1; then
-    log "deleting test namespace ${TEST_NAMESPACE}"
-    kubectl delete namespace "${TEST_NAMESPACE}" --wait=true
-  fi
-  kubectl create namespace "${TEST_NAMESPACE}"
 }
 
 wait_deploy_if_exists() {
@@ -245,6 +239,31 @@ wait_component_definition() {
   fail "ComponentDefinition ${name} did not appear"
 }
 
+resolve_component_definition() {
+  local prefix="$1"
+  kubectl get componentdefinitions -o json \
+    | jq -r --arg prefix "${prefix}" '
+        [.items[].metadata.name | select(startswith($prefix))]
+        | sort
+        | .[0] // ""
+      '
+}
+
+wait_component_definition_prefix() {
+  local prefix="$1"
+  printf '\n[%s] waiting for ComponentDefinition prefix %s\n' "$(date '+%H:%M:%S')" "${prefix}" >&2
+  for _ in $(seq 1 120); do
+    local name
+    name="$(resolve_component_definition "${prefix}")"
+    if [[ -n "${name}" ]]; then
+      printf '%s\n' "${name}"
+      return
+    fi
+    sleep 5
+  done
+  fail "ComponentDefinition with prefix ${prefix} did not appear"
+}
+
 ensure_helm_repo() {
   require_cmd helm
   if ! helm repo list -o json | jq -e '.[] | select(.name == "kubeblocks")' >/dev/null; then
@@ -252,7 +271,84 @@ ensure_helm_repo() {
   fi
   if [[ "${SKIP_HELM_REPO_UPDATE}" != "true" ]]; then
     helm repo update kubeblocks
+  else
+    log "skipping helm repo update because SKIP_HELM_REPO_UPDATE=true"
   fi
+}
+
+kubeblocks_crds_cache_path() {
+  local version="$1"
+  printf '%s/kubeblocks_crds-v%s.yaml' "${CACHE_DIR}" "${version}"
+}
+
+kubeblocks_chart_cache_path() {
+  local version="$1"
+  printf '%s/kubeblocks-%s.tgz' "${CACHE_DIR}" "${version}"
+}
+
+snapshot_crds_cache_dir() {
+  printf '%s/snapshot-crds-%s' "${CACHE_DIR}" "${SNAPSHOTTER_VERSION}"
+}
+
+download_file_if_missing() {
+  local url="$1"
+  local path="$2"
+  local tmp
+  if [[ -s "${path}" ]]; then
+    log "using cached file ${path}"
+    return
+  fi
+
+  require_cmd curl
+  tmp="${path}.tmp"
+  log "downloading ${url} to ${path}"
+  wget --tries=5 --waitretry=3 --timeout=180 --connect-timeout=20 -O "${tmp}" "${url}"
+  mv "${tmp}" "${path}"
+}
+
+cache_snapshot_crds() {
+  local dir base url name
+  dir="$(snapshot_crds_cache_dir)"
+  mkdir -p "${dir}"
+  base="https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd"
+  for name in \
+    snapshot.storage.k8s.io_volumesnapshotclasses.yaml \
+    snapshot.storage.k8s.io_volumesnapshots.yaml \
+    snapshot.storage.k8s.io_volumesnapshotcontents.yaml; do
+    url="${base}/${name}"
+    download_file_if_missing "${url}" "${dir}/${name}"
+  done
+}
+
+cache_kubeblocks_crds() {
+  local version="$1"
+  local path url
+  path="$(kubeblocks_crds_cache_path "${version}")"
+  url="https://github.com/apecloud/kubeblocks/releases/download/v${version}/kubeblocks_crds.yaml"
+  download_file_if_missing "${url}" "${path}"
+}
+
+cache_kubeblocks_chart() {
+  local version="$1"
+  local path
+  path="$(kubeblocks_chart_cache_path "${version}")"
+  if [[ -s "${path}" ]]; then
+    log "using cached KubeBlocks chart ${path}"
+    return
+  fi
+
+  ensure_helm_repo
+  log "downloading kubeblocks chart ${version} to ${CACHE_DIR}"
+  helm pull kubeblocks/kubeblocks --version "${version}" --destination "${CACHE_DIR}"
+  [[ -s "${path}" ]] || fail "expected cached chart not found: ${path}"
+}
+
+prepare_release_cache() {
+  cache_snapshot_crds
+  cache_kubeblocks_crds "${SOURCE_VERSION}"
+  cache_kubeblocks_crds "${TARGET_VERSION}"
+  cache_kubeblocks_chart "${SOURCE_VERSION}"
+  cache_kubeblocks_chart "${TARGET_VERSION}"
 }
 
 install_snapshot_crds() {
@@ -260,62 +356,30 @@ install_snapshot_crds() {
   if kubectl get crd volumesnapshots.snapshot.storage.k8s.io >/dev/null 2>&1; then
     log "Snapshot CRDs already exist"
   else
-    kubectl create -f "${ROOT_DIR}/deploy/helm/crds/snapshot/"
+    cache_snapshot_crds
+    kubectl create -f "$(snapshot_crds_cache_dir)"
   fi
 }
 
-install_source_kubeblocks() {
-  ensure_helm_repo
+install_kubeblocks() {
+  local kb_version="$1"
   ensure_namespace "${KB_NAMESPACE}"
   install_snapshot_crds
+  cache_kubeblocks_crds "${kb_version}"
+  cache_kubeblocks_chart "${kb_version}"
 
-  log "installing KubeBlocks CRDs for v${SOURCE_VERSION}"
-  if kubectl get crd clusters.apps.kubeblocks.io >/dev/null 2>&1; then
-    log "KubeBlocks CRDs already exist; source CRD create is skipped"
-  else
-    kubectl create -f "https://github.com/apecloud/kubeblocks/releases/download/v${SOURCE_VERSION}/kubeblocks_crds.yaml"
-  fi
+  log "creating or replacing KubeBlocks CRDs for v${kb_version}"
+  kubectl create -f "$(kubeblocks_crds_cache_path "${kb_version}")" || kubectl replace -f "$(kubeblocks_crds_cache_path "${kb_version}")"
 
   if helm -n "${KB_NAMESPACE}" status kubeblocks >/dev/null 2>&1; then
-    log "Helm release kubeblocks already exists in ${KB_NAMESPACE}; install-source is skipped"
-  else
-    log "installing kubeblocks chart ${SOURCE_VERSION}"
-    helm install kubeblocks kubeblocks/kubeblocks \
-      --version "${SOURCE_VERSION}" \
-      -n "${KB_NAMESPACE}" \
-      --create-namespace \
-      --skip-crds \
-      --set-json "autoInstalledAddons=${AUTO_INSTALLED_ADDONS}"
-  fi
-
-  wait_deploy_if_exists "${KB_NAMESPACE}" kubeblocks
-  wait_deploy_if_exists "${KB_NAMESPACE}" kubeblocks-dataprotection
-  wait_component_definition "${MYSQL_COMPDEF}"
-}
-
-install_target_kubeblocks() {
-  ensure_helm_repo
-  ensure_namespace "${KB_NAMESPACE}"
-  install_snapshot_crds
-
-  log "installing or replacing KubeBlocks CRDs for v${TARGET_VERSION}"
-  if kubectl get crd clusters.apps.kubeblocks.io >/dev/null 2>&1; then
-    kubectl replace -f "https://github.com/apecloud/kubeblocks/releases/download/v${TARGET_VERSION}/kubeblocks_crds.yaml"
-  else
-    kubectl create -f "https://github.com/apecloud/kubeblocks/releases/download/v${TARGET_VERSION}/kubeblocks_crds.yaml"
-  fi
-
-  if helm -n "${KB_NAMESPACE}" status kubeblocks >/dev/null 2>&1; then
-    log "upgrading kubeblocks chart to ${TARGET_VERSION}"
-    helm -n "${KB_NAMESPACE}" upgrade kubeblocks kubeblocks/kubeblocks \
-      --version "${TARGET_VERSION}" \
+    log "upgrading kubeblocks chart to ${kb_version}"
+    helm -n "${KB_NAMESPACE}" upgrade kubeblocks "$(kubeblocks_chart_cache_path "${kb_version}")" \
       --skip-crds \
       --reuse-values \
       --set-json "autoInstalledAddons=${AUTO_INSTALLED_ADDONS}"
   else
-    log "installing kubeblocks chart ${TARGET_VERSION}"
-    helm install kubeblocks kubeblocks/kubeblocks \
-      --version "${TARGET_VERSION}" \
+    log "installing kubeblocks chart ${kb_version}"
+    helm install kubeblocks "$(kubeblocks_chart_cache_path "${kb_version}")" \
       -n "${KB_NAMESPACE}" \
       --create-namespace \
       --skip-crds \
@@ -324,7 +388,7 @@ install_target_kubeblocks() {
 
   wait_deploy_if_exists "${KB_NAMESPACE}" kubeblocks
   wait_deploy_if_exists "${KB_NAMESPACE}" kubeblocks-dataprotection
-  wait_component_definition "${MYSQL_COMPDEF}"
+  wait_component_definition_prefix "${MYSQL_COMPDEF}" >/dev/null
 }
 
 wait_cluster_running() {
@@ -379,7 +443,7 @@ snapshot_all_pvcs() {
 }
 
 create_mysql_test_cluster() {
-  reset_test_namespace_if_requested
+  ensure_namespace "${TEST_NAMESPACE}"
 
   if kubectl -n "${TEST_NAMESPACE}" get cluster "${MYSQL_CLUSTER}" >/dev/null 2>&1; then
     log "cluster ${MYSQL_CLUSTER} already exists; skipping create"
@@ -390,6 +454,52 @@ create_mysql_test_cluster() {
   wait_cluster_running "${MYSQL_CLUSTER}"
   kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" \
     -o jsonpath='{.spec.componentSpecs[0].componentDef}{"\t"}{.spec.componentSpecs[0].serviceVersion}{"\n"}'
+  assert_mysql_primary_standby_cluster "${MYSQL_CLUSTER}"
+}
+
+assert_mysql_primary_standby_cluster() {
+  local cluster="$1"
+  log "checking MySQL primary-standby example ${cluster}"
+  kubectl get cluster "${cluster}" -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --arg compdef "${MYSQL_COMPDEF}" --arg version "${MYSQL_VERSION_BASE}" '
+        .spec.componentSpecs[]
+        | select(.name == "mysql")
+        | (.componentDef | startswith($compdef))
+          and .serviceVersion == $version
+          and .replicas == 2
+      ' >/dev/null
+  kubectl get pod -n "${TEST_NAMESPACE}" -l "app.kubernetes.io/instance=${cluster}" -o json \
+    | jq -e '.items | length == 2 and all(.status.phase == "Running")' >/dev/null
+}
+
+assert_mysql_standalone_cluster() {
+  local cluster="$1"
+  log "checking MySQL standalone example ${cluster}"
+  kubectl get cluster "${cluster}" -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --arg compdef "${MYSQL_COMPDEF}" --arg version "${MYSQL_VERSION_BASE}" '
+        .spec.componentSpecs[]
+        | select(.name == "mysql")
+        | (.componentDef | startswith($compdef))
+          and .serviceVersion == $version
+          and .replicas == 1
+      ' >/dev/null
+  kubectl get pod -n "${TEST_NAMESPACE}" -l "app.kubernetes.io/instance=${cluster}" -o json \
+    | jq -e '.items | length == 1 and .[0].status.phase == "Running"' >/dev/null
+}
+
+assert_mongodb_standalone_cluster() {
+  local cluster="$1"
+  log "checking MongoDB standalone host-network example ${cluster}"
+  kubectl get cluster "${cluster}" -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --arg version "${MONGO_VERSION}" '
+        .spec.componentSpecs[]
+        | select(.name == "mongodb")
+        | .componentDef == "mongodb-1.0"
+          and .serviceVersion == $version
+          and .replicas == 1
+      ' >/dev/null
+  kubectl get pod -n "${TEST_NAMESPACE}" -l "app.kubernetes.io/instance=${cluster}" -o json \
+    | jq -e '.items | length == 1 and .[0].status.phase == "Running"' >/dev/null
 }
 
 create_mysql_base_cluster() {
@@ -400,32 +510,9 @@ create_mysql_base_cluster() {
 }
 
 upgrade_to_target_kubeblocks() {
-  ensure_helm_repo
-
-  log "creating new 1.1 CRDs if they do not exist"
-  kubectl get crd rollouts.apps.kubeblocks.io >/dev/null 2>&1 \
-    || kubectl create -f "${ROOT_DIR}/deploy/helm/crds/apps.kubeblocks.io_rollouts.yaml"
-  kubectl get crd instances.workloads.kubeblocks.io >/dev/null 2>&1 \
-    || kubectl create -f "${ROOT_DIR}/deploy/helm/crds/workloads.kubeblocks.io_instances.yaml"
-  kubectl get crd instancesets.workloads.kubeblocks.io >/dev/null 2>&1 \
-    || kubectl create -f "${ROOT_DIR}/deploy/helm/crds/workloads.kubeblocks.io_instancesets.yaml"
-
-  log "replacing CRDs with v${TARGET_VERSION} release asset"
-  kubectl replace -f "https://github.com/apecloud/kubeblocks/releases/download/v${TARGET_VERSION}/kubeblocks_crds.yaml"
-
-  log "upgrading Helm release to ${TARGET_VERSION}"
-  helm -n "${KB_NAMESPACE}" upgrade kubeblocks kubeblocks/kubeblocks \
-    --version "${TARGET_VERSION}" \
-    --skip-crds \
-    --reuse-values \
-    --set-json "autoInstalledAddons=${AUTO_INSTALLED_ADDONS}"
-
+  install_kubeblocks "${TARGET_VERSION}"
   wait_deploy_if_exists "${KB_NAMESPACE}" kubeblocks
   wait_deploy_if_exists "${KB_NAMESPACE}" kubeblocks-dataprotection
-  kubectl get crd clusters.apps.kubeblocks.io rollouts.apps.kubeblocks.io \
-    instances.workloads.kubeblocks.io instancesets.workloads.kubeblocks.io \
-    volumesnapshots.snapshot.storage.k8s.io
-
   wait_cluster_running "${MYSQL_CLUSTER}"
   snapshot_all_managed_pods "${WORK_DIR}/after-upgrade-managed-pods.json"
   snapshot_all_pvcs "${WORK_DIR}/after-upgrade-pvcs.json"
@@ -491,74 +578,230 @@ run_mysql_create_rollout() {
   kubectl get rollout mysql-create-8038 -n "${TEST_NAMESPACE}" -o yaml >"${WORK_DIR}/mysql-create-8038.result.yaml"
   kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" -o yaml >"${WORK_DIR}/mysql-after-create-rollout.cluster.yaml"
   snapshot_cluster_pods "${MYSQL_CLUSTER}" "${WORK_DIR}/mysql-after-create-rollout-pods.json"
+
   delete_rollout_if_exists mysql-create-8038
 }
 
-run_dynamic_hot_instance_test() {
+run_dynamic_mysql_instance_template_test() {
   wait_cluster_running "${MYSQL_CLUSTER}"
-  local hot_template
-  hot_template="$(
-    kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" -o json \
-      | jq -r --arg version "${MYSQL_VERSION_CANARY}" '.spec.componentSpecs[] | select(.name == "mysql") | .instances[]? | select(.serviceVersion == $version) | .name' \
-      | head -1
+  local dynamic_template="kb11-dynamic-adopt"
+  local default_pod default_ordinal
+  snapshot_cluster_pods "${MYSQL_CLUSTER}" "${WORK_DIR}/mysql-dynamic-before.json"
+  default_pod="$(
+    jq -r '[.[] | select(.template == "")] | sort_by(.name) | .[0].name // ""' \
+      "${WORK_DIR}/mysql-dynamic-before.json"
   )"
-  [[ -n "${hot_template}" ]] || fail "no MySQL instance template with serviceVersion ${MYSQL_VERSION_CANARY}; run case-rollout-api first"
+  [[ -n "${default_pod}" ]] || fail "no MySQL pod from default template found"
+  default_ordinal="${default_pod##*-}"
+  [[ "${default_ordinal}" =~ ^[0-9]+$ ]] || fail "cannot parse ordinal from pod ${default_pod}"
 
-  log "marking MySQL instance template ${hot_template} as hot"
-  kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" -o yaml >"${WORK_DIR}/mysql-hot-before.yaml"
+  log "adopting MySQL pod ${default_pod} from default template into ${dynamic_template}"
   kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" -o json \
-    | jq --arg name "${hot_template}" '
-        (.spec.componentSpecs[] | select(.name == "mysql").instances[] | select(.name == $name).labels) = {"workload-tier":"hot"}
-        | (.spec.componentSpecs[] | select(.name == "mysql").instances[] | select(.name == $name).resources) = {
-            "requests": {"cpu":"750m","memory":"768Mi"},
-            "limits": {"cpu":"750m","memory":"768Mi"}
-          }' \
+    | jq --arg name "${dynamic_template}" --argjson ordinal "${default_ordinal}" '
+        (.spec.componentSpecs[] | select(.name == "mysql")) |= (
+          .flatInstanceOrdinal = true
+          | .componentDef as $componentDef
+          | .serviceVersion as $serviceVersion
+          | .instances = ((.instances // []) | map(select(.name != $name)) + [{
+              "name": $name,
+              "compDef": $componentDef,
+              "serviceVersion": $serviceVersion,
+              "replicas": 1,
+              "ordinals": {"discrete": [$ordinal]},
+              "labels": {"workload-tier": "dynamic-adopt"}
+            }])
+        )' \
     | kubectl replace -f -
 
   wait_cluster_running "${MYSQL_CLUSTER}"
-  kubectl get pod -n "${TEST_NAMESPACE}" -l workload-tier=hot --show-labels -o wide
-  kubectl get pod -n "${TEST_NAMESPACE}" -l workload-tier=hot -o json \
-    | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, serviceVersionLabel: .metadata.labels["apps.kubeblocks.io/service-version"], template: (.metadata.labels["apps.kubeblocks.io/instance-template"] // .metadata.labels["workloads.kubeblocks.io/template-name"]), images: [.spec.containers[] | {name, image, resources}]}' \
-    >"${WORK_DIR}/mysql-hot-pods.json"
+  snapshot_cluster_pods "${MYSQL_CLUSTER}" "${WORK_DIR}/mysql-dynamic-after-adopt.json"
+  jq -e --arg pod "${default_pod}" --arg template "${dynamic_template}" '
+      .[] | select(.name == $pod and .template == $template)
+    ' "${WORK_DIR}/mysql-dynamic-after-adopt.json" >/dev/null
+  kubectl get pod "${default_pod}" -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --arg template "${dynamic_template}" '
+        {
+          name: .metadata.name,
+          uid: .metadata.uid,
+          labels: .metadata.labels,
+          template: (.metadata.labels["apps.kubeblocks.io/instance-template"] // .metadata.labels["workloads.kubeblocks.io/template-name"] // "")
+        }
+        | select(.template == $template and .labels["workload-tier"] == "dynamic-adopt")
+      ' >"${WORK_DIR}/mysql-dynamic-adopted-pod.json"
+
+  log "giving MySQL pod ${default_pod} back to default template"
+  kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" -o json \
+    | jq --arg name "${dynamic_template}" '
+        (.spec.componentSpecs[] | select(.name == "mysql")) |= (
+          .instances = ((.instances // []) | map(select(.name != $name)))
+        )' \
+    | kubectl replace -f -
+
+  wait_cluster_running "${MYSQL_CLUSTER}"
+  snapshot_cluster_pods "${MYSQL_CLUSTER}" "${WORK_DIR}/mysql-dynamic-after-giveback.json"
+  jq -e --arg pod "${default_pod}" '
+      .[] | select(.name == $pod and .template == "")
+    ' "${WORK_DIR}/mysql-dynamic-after-giveback.json" >/dev/null
 }
 
 create_mongodb_sharding_cluster() {
-  wait_component_definition mongodb || true
-  if kubectl -n "${TEST_NAMESPACE}" get cluster mongodb-sharding >/dev/null 2>&1; then
-    log "cluster mongodb-sharding already exists; skipping create"
+  wait_component_definition_prefix "${MONGO_SHARD_COMPDEF_PREFIX}" >/dev/null
+  if kubectl -n "${TEST_NAMESPACE}" get cluster mongo-sharding >/dev/null 2>&1; then
+    log "cluster mongo-sharding already exists; skipping create"
   else
     create_manifest mongodb-sharding.yaml
   fi
 
-  wait_cluster_running mongodb-sharding
-  kubectl get cluster mongodb-sharding -n "${TEST_NAMESPACE}" -o json \
+  wait_cluster_running mongo-sharding
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o json \
     | jq -e --arg version "${MONGO_VERSION}" '
         ([.spec.componentSpecs[]?.replicas, .spec.shardings[]?.template.replicas] | all(. != null and . > 0))
         and
         ([.spec.componentSpecs[]?.serviceVersion, .spec.shardings[]?.template.serviceVersion] | all(. == $version))
       ' >/dev/null
-  kubectl get components -n "${TEST_NAMESPACE}" -l app.kubernetes.io/instance=mongodb-sharding -o wide
+  kubectl get components -n "${TEST_NAMESPACE}" -l app.kubernetes.io/instance=mongo-sharding -o wide
 }
 
-run_mongodb_sharding_lifecycle() {
-  create_mongodb_sharding_cluster
+assert_mongodb_sharding_shards() {
+  local cluster="$1"
+  local expected="$2"
+  kubectl get cluster "${cluster}" -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --argjson expected "${expected}" '
+        .spec.shardings[]
+        | select(.name == "shard")
+        | .shards == $expected
+      ' >/dev/null
+}
 
-  patch_cluster_json mongodb-sharding mongodb-sharding-scale-out-patch.yaml
-  wait_cluster_running mongodb-sharding
-  wait_shard_component_count mongodb-sharding shard 4
+mongo_sharding_exec() {
+  local cluster="$1"
+  local script="$2"
+  local user password
+  user="$(kubectl -n "${TEST_NAMESPACE}" get secret "${cluster}-config-server-account-root" -o go-template='{{.data.username | base64decode}}')"
+  password="$(kubectl -n "${TEST_NAMESPACE}" get secret "${cluster}-config-server-account-root" -o go-template='{{.data.password | base64decode}}')"
+  kubectl -n "${TEST_NAMESPACE}" exec "${cluster}-mongos-0" -c mongos -- \
+    mongosh --quiet --username "${user}" --password "${password}" --authenticationDatabase admin --eval "${script}"
+}
+
+seed_mongodb_sharding_data() {
+  local cluster="$1"
+  local out="${WORK_DIR}/${cluster}-sharding-data-seed.json"
+  local live_shards
+  live_shards="$(
+    kubectl get components -n "${TEST_NAMESPACE}" \
+      -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=shard" \
+      -o json \
+      | jq -c '[.items[] | select(.status.phase == "Running") | .metadata.name] | sort'
+  )"
+  [[ "${live_shards}" != "[]" ]] || fail "no running MongoDB shard components found for ${cluster}"
+
+  log "seeding MongoDB data through ${cluster} mongos, one marker database per shard"
+  mongo_sharding_exec "${cluster}" "
+const clusterName = '${cluster}';
+const markerId = 'kb11-sharding-marker';
+const metaDbName = 'kb11_e2e_meta';
+const liveShards = ${live_shards};
+const listedShards = db.adminCommand({listShards: 1}).shards.map(s => s._id).sort();
+if (liveShards.length === 0) {
+  throw new Error('no MongoDB shards found');
+}
+const metaEnabled = db.adminCommand({enableSharding: metaDbName, primaryShard: liveShards[0]});
+if (!metaEnabled.ok) {
+  throw new Error('enableSharding failed for ' + metaDbName + ': ' + tojson(metaEnabled));
+}
+const metaDb = db.getSiblingDB(metaDbName);
+const seeded = [];
+for (let i = 0; i < liveShards.length; i++) {
+  const shard = liveShards[i];
+  if (!listedShards.includes(shard)) {
+    throw new Error('live shard component ' + shard + ' is not listed by mongos');
+  }
+  const dbName = 'kb11_e2e_marker_' + i;
+  const enabled = db.adminCommand({enableSharding: dbName, primaryShard: shard});
+  if (!enabled.ok) {
+    throw new Error('enableSharding failed for ' + dbName + ' on ' + shard + ': ' + tojson(enabled));
+  }
+  const markerDb = db.getSiblingDB(dbName);
+  markerDb.marker.updateOne(
+    {_id: markerId},
+    {\$set: {cluster: clusterName, dbName, markerIndex: i, seededAt: new Date()}},
+    {upsert: true}
+  );
+  const doc = markerDb.marker.findOne({_id: markerId});
+  if (!doc || doc.dbName !== dbName || doc.markerIndex !== i || doc.cluster !== clusterName) {
+    throw new Error('marker verification failed for ' + dbName);
+  }
+  seeded.push({dbName, markerIndex: i, initialShard: shard});
+}
+metaDb.shardingMarkers.updateOne(
+  {_id: clusterName},
+  {\$set: {cluster: clusterName, markerId, seeded, expectedCount: seeded.length, updatedAt: new Date()}},
+  {upsert: true}
+);
+print(JSON.stringify({ok: 1, cluster: clusterName, seeded}, null, 2));
+" >"${out}"
+}
+
+verify_mongodb_sharding_data() {
+  local cluster="$1"
+  local phase="$2"
+  local out="${WORK_DIR}/${cluster}-sharding-data-${phase}.json"
+  log "verifying MongoDB sharding data for ${cluster} (${phase})"
+  mongo_sharding_exec "${cluster}" "
+const clusterName = '${cluster}';
+const meta = db.getSiblingDB('kb11_e2e_meta').shardingMarkers.findOne({_id: clusterName});
+if (!meta || !Array.isArray(meta.seeded) || meta.seeded.length === 0) {
+  throw new Error('missing sharding marker metadata for ' + clusterName);
+}
+const verified = [];
+for (const expected of meta.seeded) {
+  const doc = db.getSiblingDB(expected.dbName).marker.findOne({_id: meta.markerId});
+  if (!doc) {
+    throw new Error('missing marker document in ' + expected.dbName);
+  }
+  if (doc.dbName !== expected.dbName || doc.markerIndex !== expected.markerIndex || doc.cluster !== clusterName) {
+    throw new Error('marker mismatch in ' + expected.dbName + ': ' + JSON.stringify(doc));
+  }
+  verified.push({dbName: expected.dbName, markerIndex: expected.markerIndex});
+}
+if (verified.length !== meta.expectedCount) {
+  throw new Error('verified marker count mismatch: expected ' + meta.expectedCount + ', got ' + verified.length);
+}
+print(JSON.stringify({ok: 1, cluster: clusterName, phase: '${phase}', verified}, null, 2));
+" >"${out}"
+}
+
+run_mongodb_sharding_scale() {
+  create_mongodb_sharding_cluster
+  seed_mongodb_sharding_data mongo-sharding
+
+  log "patching mongo-sharding spec.shardings[name=shard].shards to 4"
+  patch_cluster_json mongo-sharding mongodb-sharding-scale-out-patch.yaml
+  assert_mongodb_sharding_shards mongo-sharding 4
+  wait_cluster_running mongo-sharding
+  wait_shard_component_count mongo-sharding shard 4
+  verify_mongodb_sharding_data mongo-sharding after-scale-out
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
+    >"${WORK_DIR}/mongodb-sharding-after-scale-out.cluster.yaml"
   kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
     -o yaml >"${WORK_DIR}/mongodb-sharding-after-scale-out.components.yaml"
 
-  patch_cluster_json mongodb-sharding mongodb-sharding-scale-in-patch.yaml
-  wait_cluster_running mongodb-sharding
-  wait_shard_component_count mongodb-sharding shard 3
+  log "patching mongo-sharding spec.shardings[name=shard].shards to 3"
+  patch_cluster_json mongo-sharding mongodb-sharding-scale-in-patch.yaml
+  assert_mongodb_sharding_shards mongo-sharding 3
+  wait_cluster_running mongo-sharding
+  wait_shard_component_count mongo-sharding shard 3
+  verify_mongodb_sharding_data mongo-sharding after-scale-in
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
+    >"${WORK_DIR}/mongodb-sharding-after-scale-in.cluster.yaml"
   kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
     -o yaml >"${WORK_DIR}/mongodb-sharding-after-scale-in.components.yaml"
 }
 
 create_mongodb_heterogeneous_shards() {
+  wait_component_definition_prefix "${MONGO_SHARD_COMPDEF_PREFIX}" >/dev/null
   if kubectl -n "${TEST_NAMESPACE}" get cluster mongodb-hetero-shards >/dev/null 2>&1; then
     log "cluster mongodb-hetero-shards already exists; skipping create"
   else
@@ -573,29 +816,87 @@ create_mongodb_heterogeneous_shards() {
 
 run_mongodb_heterogeneous_offline() {
   create_mongodb_heterogeneous_shards
+  run_mongodb_heterogeneous_version_canary
+
+  local replacement_victim
+  replacement_victim="$(pick_mongodb_offline_ready_base_shard mongodb-hetero-shards offline-replacement)"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-hetero-before-offline-replacement.components.json"
+  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-before-offline-replacement-pods.json"
+  patch_cluster_json mongodb-hetero-shards mongodb-hetero-offline-replacement-patch.yaml MONGO_OFFLINE_SHARD "${replacement_victim}"
+  wait_component_absent "${replacement_victim}" mongodb-hetero-shards
+  wait_cluster_running mongodb-hetero-shards
+  wait_shard_component_count mongodb-hetero-shards shard 3
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-hetero-after-offline-replacement.components.json"
+  jq -e --slurp --arg victim "${replacement_victim}" '
+        .[0] as $before
+        | .[1] as $after
+        | ($before | index($victim)) != null
+          and (($after | index($victim)) == null)
+          and ($after | length == 3)
+          and ((($before - [$victim]) - $after) | length == 0)
+          and (($after - $before) | length == 1)
+      ' \
+      "${WORK_DIR}/mongodb-hetero-before-offline-replacement.components.json" \
+      "${WORK_DIR}/mongodb-hetero-after-offline-replacement.components.json" >/dev/null
+  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-after-offline-replacement-pods.json"
+  assert_non_victim_shard_pods_unchanged \
+    "${WORK_DIR}/mongodb-hetero-before-offline-replacement-pods.json" \
+    "${WORK_DIR}/mongodb-hetero-after-offline-replacement-pods.json" \
+    "${replacement_victim}"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq -e --arg victim "${replacement_victim}" '
+        [.items[] | .metadata.name] as $names
+        | ($names | length == 3)
+          and (($names | index($victim)) == null)
+      ' >/dev/null
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
+    -o yaml >"${WORK_DIR}/mongodb-hetero-after-offline-replacement.components.yaml"
 
   local victim
-  victim="$(
-    kubectl get components -n "${TEST_NAMESPACE}" \
-      -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-      -o json \
-      | jq -r '[.items[]
-          | select(.metadata.labels["apps.kubeblocks.io/shard-template"] != "hot")
-          | .metadata.name][0] // ""'
-  )"
-  [[ -n "${victim}" ]] || fail "no base-template shard found in mongodb-hetero-shards"
+  victim="$(pick_mongodb_offline_ready_base_shard mongodb-hetero-shards offline-scale-in)"
 
-  kubectl get pod -n "${TEST_NAMESPACE}" -o json \
-    | jq --arg cluster mongodb-hetero-shards '
-        [.items[]
-         | select(.metadata.labels["app.kubernetes.io/instance"] == $cluster)
-         | {name: .metadata.name, uid: .metadata.uid, component: .metadata.labels["apps.kubeblocks.io/component-name"]}]
-      ' >"${WORK_DIR}/mongodb-hetero-before-offline-pods.json"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-hetero-before-offline.components.json"
+  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-before-offline-pods.json"
 
   patch_cluster_json mongodb-hetero-shards mongodb-hetero-offline-patch.yaml MONGO_OFFLINE_SHARD "${victim}"
-  wait_component_absent "${victim}"
+  wait_component_absent "${victim}" mongodb-hetero-shards
   wait_cluster_running mongodb-hetero-shards
   wait_shard_component_count mongodb-hetero-shards shard 2
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-hetero-after-offline.components.json"
+  jq -e --slurp --arg victim "${victim}" '
+        .[0] as $before
+        | .[1] as $after
+        | ($before | index($victim)) != null
+          and (($after | index($victim)) == null)
+          and ($after | length == 2)
+          and (($after - ($before - [$victim])) | length == 0)
+      ' \
+      "${WORK_DIR}/mongodb-hetero-before-offline.components.json" \
+      "${WORK_DIR}/mongodb-hetero-after-offline.components.json" >/dev/null
+  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-after-offline-pods.json"
+  assert_non_victim_shard_pods_unchanged \
+    "${WORK_DIR}/mongodb-hetero-before-offline-pods.json" \
+    "${WORK_DIR}/mongodb-hetero-after-offline-pods.json" \
+    "${victim}"
 
   if kubectl get component "${victim}" -n "${TEST_NAMESPACE}" >/dev/null 2>&1; then
     fail "offline shard ${victim} still exists"
@@ -605,9 +906,142 @@ run_mongodb_heterogeneous_offline() {
     -o yaml >"${WORK_DIR}/mongodb-hetero-after-offline.components.yaml"
 }
 
+pick_mongodb_base_shard() {
+  local cluster="$1"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=shard" \
+    -o json \
+    | jq -r '[.items[]
+        | select(.metadata.labels["apps.kubeblocks.io/shard-template"] != "hot")
+        | .metadata.name][0] // ""'
+}
+
+write_mongodb_shard_offline_report() {
+  local cluster="$1"
+  local out="$2"
+  local js
+  js="$(cat <<'JS'
+const cfg = db.getSiblingDB('config');
+const chunks = cfg.chunks;
+const collectionByUUID = {};
+cfg.collections.find().toArray().forEach((collection) => {
+  if (collection.uuid !== undefined) {
+    collectionByUUID[String(collection.uuid)] = collection._id;
+  }
+});
+const report = cfg.shards.find().toArray().map((shard) => {
+  const shardName = shard._id;
+  const dbsToMove = cfg.databases.find({primary: shardName}).toArray().map((database) => database._id).sort();
+  const namespaceChunks = chunks.aggregate([
+    {$match: {shard: shardName}},
+    {$group: {_id: {$ifNull: ["$ns", "$uuid"]}, chunks: {$sum: 1}}},
+    {$sort: {chunks: -1}},
+    {$limit: 8}
+  ]).toArray().map((entry) => {
+    const key = String(entry._id);
+    return {namespace: collectionByUUID[key] || key, chunks: entry.chunks};
+  });
+  const chunkCount = chunks.countDocuments({shard: shardName});
+  const jumboChunkCount = chunks.countDocuments({shard: shardName, jumbo: true});
+  const blockers = [];
+  if (shard.draining === true) {
+    blockers.push('shard is already draining');
+  }
+  if (chunkCount > 0) {
+    blockers.push(chunkCount + ' chunks still live on this shard');
+  }
+  if (jumboChunkCount > 0) {
+    blockers.push(jumboChunkCount + ' jumbo chunks need manual handling');
+  }
+  if (dbsToMove.length > 0) {
+    blockers.push('primary databases must be moved or dropped: ' + dbsToMove.join(','));
+  }
+  return {
+    shard: shardName,
+    draining: shard.draining === true,
+    chunks: chunkCount,
+    jumboChunks: jumboChunkCount,
+    dbsToMove,
+    namespaceChunks,
+    offlineReady: blockers.length === 0,
+    blockers
+  };
+}).sort((a, b) => a.shard.localeCompare(b.shard));
+print(JSON.stringify(report, null, 2));
+JS
+)"
+  mongo_sharding_exec "${cluster}" "${js}" >"${out}"
+}
+
+pick_mongodb_offline_ready_base_shard() {
+  local cluster="$1"
+  local phase="$2"
+  local report="${WORK_DIR}/${cluster}-${phase}-offline-readiness.json"
+  local base_shards
+  local victim
+
+  base_shards="$(
+    kubectl get components -n "${TEST_NAMESPACE}" \
+      -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=shard" \
+      -o json \
+      | jq -c '[.items[]
+          | select(.metadata.labels["apps.kubeblocks.io/shard-template"] != "hot")
+          | .metadata.name] | sort'
+  )"
+  [[ "${base_shards}" != "[]" ]] || fail "no base-template shard found in ${cluster}"
+
+  write_mongodb_shard_offline_report "${cluster}" "${report}"
+  victim="$(
+    jq -r --argjson baseShards "${base_shards}" '
+      [.[] | select(($baseShards | index(.shard))
+                    and .offlineReady)
+       | .shard][0] // ""
+    ' "${report}"
+  )"
+  if [[ -z "${victim}" ]]; then
+    jq . "${report}"
+    fail "no base-template shard is ready for offline in ${cluster}; inspect ${report}"
+  fi
+  printf '\n[%s] selected offline-ready shard %s for %s (%s)\n' "$(date '+%H:%M:%S')" "${victim}" "${cluster}" "${phase}" >&2
+  printf '%s\n' "${victim}"
+}
+
+run_mongodb_heterogeneous_version_canary() {
+  if [[ "${MONGO_VERSION_TARGET}" == "${MONGO_VERSION}" ]]; then
+    log "MONGO_VERSION_TARGET equals MONGO_VERSION; skipping MongoDB shard template version canary"
+    return
+  fi
+
+  kubectl get pod -n "${TEST_NAMESPACE}" -o json \
+    | jq --arg cluster mongodb-hetero-shards '
+        [.items[]
+         | select(.metadata.labels["app.kubernetes.io/instance"] == $cluster)
+         | {name: .metadata.name, uid: .metadata.uid, component: .metadata.labels["apps.kubeblocks.io/component-name"], shardTemplate: .metadata.labels["apps.kubeblocks.io/shard-template"]}]
+      ' >"${WORK_DIR}/mongodb-hetero-before-version-pods.json"
+
+  patch_cluster_json mongodb-hetero-shards mongodb-hetero-version-patch.yaml
+  wait_cluster_running mongodb-hetero-shards
+
+  kubectl get pod -n "${TEST_NAMESPACE}" -o json \
+    | jq --arg cluster mongodb-hetero-shards '
+        [.items[]
+         | select(.metadata.labels["app.kubernetes.io/instance"] == $cluster)
+         | {name: .metadata.name, uid: .metadata.uid, component: .metadata.labels["apps.kubeblocks.io/component-name"], shardTemplate: .metadata.labels["apps.kubeblocks.io/shard-template"], images: [.spec.containers[] | {name, image}]}]
+      ' >"${WORK_DIR}/mongodb-hetero-after-version-pods.json"
+  kubectl get components -n "${TEST_NAMESPACE}" -l apps.kubeblocks.io/shard-template=hot -o yaml \
+    >"${WORK_DIR}/mongodb-hetero-after-version-hot.components.yaml"
+  kubectl get components -n "${TEST_NAMESPACE}" -l apps.kubeblocks.io/shard-template=hot -o json \
+    | jq -e --arg version "${MONGO_VERSION_TARGET}" '
+        .items | length == 1
+        and .[0].spec.serviceVersion == $version
+      ' >/dev/null
+}
+
 first_runtime_port_name() {
   local compdef="$1"
-  kubectl get componentdefinition "${compdef}" -o json \
+  local resolved
+  resolved="$(wait_component_definition_prefix "${compdef}")"
+  kubectl get componentdefinition "${resolved}" -o json \
     | jq -r '[.spec.runtime.containers[]?.ports[]?.name // empty] | .[0] // empty'
 }
 
@@ -619,39 +1053,86 @@ cluster_pod_json_by_instance() {
     -o json >"${out}"
 }
 
+snapshot_sharding_pods() {
+  local cluster="$1"
+  local sharding="$2"
+  local out="$3"
+  kubectl get pod -n "${TEST_NAMESPACE}" -o json \
+    | jq --arg cluster "${cluster}" --arg sharding "${sharding}" '
+        [.items[]
+         | select(.metadata.labels["app.kubernetes.io/instance"] == $cluster)
+         | select(.metadata.labels["apps.kubeblocks.io/sharding-name"] == $sharding)
+         | {
+             name: .metadata.name,
+             uid: .metadata.uid,
+             component: (.metadata.labels["workloads.kubeblocks.io/instance"] // ($cluster + "-" + .metadata.labels["apps.kubeblocks.io/component-name"]))
+           }]
+        | sort_by(.name)
+      ' >"${out}"
+}
+
+assert_non_victim_shard_pods_unchanged() {
+  local before="$1"
+  local after="$2"
+  local victim="$3"
+  local diff_out="${WORK_DIR}/$(basename "${after}" .json).non-victim.diff"
+  local survivors
+
+  survivors="$(
+    jq -c --arg victim "${victim}" '
+      [.[] | select(.component != $victim) | .component] | unique
+    ' "${before}"
+  )"
+
+  if ! diff -u \
+      <(jq --argjson survivors "${survivors}" '[.[] | select(.component as $component | $survivors | index($component)) | {name, uid, component}] | sort_by(.name)' "${before}") \
+      <(jq --argjson survivors "${survivors}" '[.[] | select(.component as $component | $survivors | index($component)) | {name, uid, component}] | sort_by(.name)' "${after}") \
+      >"${diff_out}"; then
+    cat "${diff_out}"
+    fail "non-victim shard pods changed while taking ${victim} offline; inspect ${diff_out}"
+  fi
+}
+
 wait_shard_component_count() {
   local cluster="$1"
   local sharding="$2"
   local expected="$3"
 
-  log "waiting for ${cluster}/${sharding} shard component count=${expected}"
+  log "waiting for ${cluster}/${sharding} shard component count=${expected} and all Running"
   for _ in $(seq 1 120); do
-    local count
-    count="$(
-      kubectl get components -n "${TEST_NAMESPACE}" \
+    if kubectl get components -n "${TEST_NAMESPACE}" \
         -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=${sharding}" \
         -o json \
-        | jq '.items | length'
-    )"
-    if [[ "${count}" == "${expected}" ]]; then
+        | jq -e --argjson expected "${expected}" '
+            .items as $items
+            | ($items | length == $expected)
+              and ($items | all(.status.phase == "Running"))
+          ' >/dev/null; then
       return
     fi
+    kubectl get components -n "${TEST_NAMESPACE}" \
+      -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=${sharding}" \
+      -o wide
     sleep 5
   done
 
   kubectl get components -n "${TEST_NAMESPACE}" \
     -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=${sharding}" \
     -o wide
-  fail "expected ${expected} shard components for ${cluster}/${sharding}"
+  fail "expected ${expected} Running shard components for ${cluster}/${sharding}"
 }
 
 wait_component_absent() {
   local name="$1"
+  local cluster="${2:-}"
 
   log "waiting for Component ${name} to be removed"
   for _ in $(seq 1 120); do
     if ! kubectl get component "${name}" -n "${TEST_NAMESPACE}" >/dev/null 2>&1; then
       return
+    fi
+    if [[ -n "${cluster}" ]]; then
+      print_component_remove_failures "${cluster}" "${name}"
     fi
     sleep 5
   done
@@ -659,8 +1140,36 @@ wait_component_absent() {
   fail "Component ${name} still exists"
 }
 
+print_component_remove_failures() {
+  local cluster="$1"
+  local component="$2"
+  local failures
+
+  failures="$(
+    kubectl get events -n "${TEST_NAMESPACE}" \
+      --field-selector "involvedObject.kind=Cluster,involvedObject.name=${cluster}" \
+      -o json \
+      | jq -c --arg component "${component}" '
+          [.items[]
+           | select((.message // "") | contains($component))
+           | select((.reason // "") == "ApplyResourcesFailed"
+                    or ((.message // "") | test("timedOut|action timed-out|failed to call the shard remove action")))
+           | {
+               lastTimestamp: (.lastTimestamp // .eventTime // .metadata.creationTimestamp),
+               reason: .reason,
+               message: .message
+             }]
+          | sort_by(.lastTimestamp)
+          | .[-3:]
+        '
+  )"
+  if [[ "${failures}" != "[]" ]]; then
+    printf '%s\n' "${failures}" | jq .
+  fi
+}
+
 create_network_dns_cluster() {
-  wait_component_definition "${MYSQL_COMPDEF}"
+  wait_component_definition_prefix "${MYSQL_COMPDEF}" >/dev/null
   if kubectl -n "${TEST_NAMESPACE}" get cluster network-dns >/dev/null 2>&1; then
     log "cluster network-dns already exists; skipping create"
   else
@@ -672,6 +1181,7 @@ create_network_dns_cluster() {
   fi
 
   wait_cluster_running network-dns
+  assert_mysql_standalone_cluster network-dns
   cluster_pod_json_by_instance network-dns "${WORK_DIR}/network-dns-pods.json"
   jq -e '
     .items | length == 1
@@ -686,7 +1196,7 @@ create_network_dns_cluster() {
 }
 
 create_network_runtime_hostport_cluster() {
-  wait_component_definition "${MYSQL_COMPDEF}"
+  wait_component_definition_prefix "${MYSQL_COMPDEF}" >/dev/null
   local port_name
   port_name="$(first_runtime_port_name "${MYSQL_COMPDEF}")"
   [[ -n "${port_name}" ]] || fail "ComponentDefinition ${MYSQL_COMPDEF} has no runtime container port name"
@@ -698,6 +1208,7 @@ create_network_runtime_hostport_cluster() {
   fi
 
   wait_cluster_running network-hostport
+  assert_mysql_standalone_cluster network-hostport
   cluster_pod_json_by_instance network-hostport "${WORK_DIR}/network-hostport-pods.json"
   jq -e --arg port_name "${port_name}" '
     .items | length == 1
@@ -716,64 +1227,97 @@ create_network_runtime_hostport_cluster() {
     >"${WORK_DIR}/network-hostport.result.json"
 }
 
-create_mongodb_hostnetwork_cluster() {
-  wait_component_definition $MONGO_COMPDEF
-  if kubectl -n "${TEST_NAMESPACE}" get cluster network-mongodb-hostnet >/dev/null 2>&1; then
-    log "cluster network-mongodb-hostnet already exists; skipping create"
+assert_pod_hostnetwork() {
+  local cluster="$1"
+  local expected="$2"
+  local out="$3"
+  cluster_pod_json_by_instance "${cluster}" "${out}"
+  jq -e --argjson expected "${expected}" '
+    .items | length == 1
+    and (.[0].spec.hostNetwork == $expected)
+    and (if $expected then (.[0].spec.dnsPolicy == "ClusterFirstWithHostNet" or .[0].spec.dnsPolicy == "Default") else true end)
+  ' "${out}" >/dev/null
+}
+
+create_mongodb_hostnetwork_annotation_cluster() {
+  wait_component_definition_prefix "${MONGO_COMPDEF_PREFIX}" >/dev/null
+  if kubectl -n "${TEST_NAMESPACE}" get cluster network-mongodb-hostnet-annotation >/dev/null 2>&1; then
+    log "cluster network-mongodb-hostnet-annotation already exists; skipping create"
   else
-    create_manifest network-mongodb-hostnet.yaml
+    create_manifest network-mongodb-hostnet-annotation.yaml
   fi
 
-  wait_cluster_running network-mongodb-hostnet
-  cluster_pod_json_by_instance network-mongodb-hostnet "${WORK_DIR}/network-mongodb-hostnet-pods.json"
-  jq -e '
-    .items | length == 1
-    and .[0].spec.hostNetwork == true
-    and (.[0].spec.dnsPolicy == "ClusterFirstWithHostNet" or .[0].spec.dnsPolicy == "Default")
-  ' "${WORK_DIR}/network-mongodb-hostnet-pods.json" >/dev/null
-  kubectl get pod -n "${TEST_NAMESPACE}" -l app.kubernetes.io/instance=network-mongodb-hostnet -o json \
+  wait_cluster_running network-mongodb-hostnet-annotation
+  assert_mongodb_standalone_cluster network-mongodb-hostnet-annotation
+  assert_pod_hostnetwork network-mongodb-hostnet-annotation true "${WORK_DIR}/network-mongodb-hostnet-annotation-pods.json"
+  kubectl get pod -n "${TEST_NAMESPACE}" -l app.kubernetes.io/instance=network-mongodb-hostnet-annotation -o json \
     | jq '.items[] | {name: .metadata.name, node: .spec.nodeName, hostIP: .status.hostIP, podIP: .status.podIP, hostNetwork: .spec.hostNetwork, dnsPolicy: .spec.dnsPolicy, ports: [.spec.containers[]?.ports[]?]}' \
-    >"${WORK_DIR}/network-mongodb-hostnet.result.json"
+    >"${WORK_DIR}/network-mongodb-hostnet-annotation.result.json"
+}
+
+create_mongodb_hostnetwork_api_cluster() {
+  wait_component_definition_prefix "${MONGO_COMPDEF_PREFIX}" >/dev/null
+  if kubectl -n "${TEST_NAMESPACE}" get cluster network-mongodb-hostnet-api >/dev/null 2>&1; then
+    log "cluster network-mongodb-hostnet-api already exists; skipping create"
+  else
+    create_manifest network-mongodb-hostnet-api.yaml
+  fi
+
+  wait_cluster_running network-mongodb-hostnet-api
+  assert_mongodb_standalone_cluster network-mongodb-hostnet-api
+  assert_pod_hostnetwork network-mongodb-hostnet-api true "${WORK_DIR}/network-mongodb-hostnet-api-pods.json"
+  kubectl get pod -n "${TEST_NAMESPACE}" -l app.kubernetes.io/instance=network-mongodb-hostnet-api -o json \
+    | jq '.items[] | {name: .metadata.name, node: .spec.nodeName, hostIP: .status.hostIP, podIP: .status.podIP, hostNetwork: .spec.hostNetwork, dnsPolicy: .spec.dnsPolicy, ports: [.spec.containers[]?.ports[]?]}' \
+    >"${WORK_DIR}/network-mongodb-hostnet-api.result.json"
+}
+
+create_mysql_hostnetwork_negative_cluster() {
+  wait_component_definition_prefix "${MYSQL_COMPDEF}" >/dev/null
+  if kubectl -n "${TEST_NAMESPACE}" get cluster network-mysql-hostnet-negative >/dev/null 2>&1; then
+    log "cluster network-mysql-hostnet-negative already exists; skipping create"
+  else
+    create_manifest network-mysql-hostnet-negative.yaml
+  fi
+
+  wait_cluster_running network-mysql-hostnet-negative
+  assert_mysql_standalone_cluster network-mysql-hostnet-negative
+  assert_pod_hostnetwork network-mysql-hostnet-negative false "${WORK_DIR}/network-mysql-hostnet-negative-pods.json"
+  kubectl get pod -n "${TEST_NAMESPACE}" -l app.kubernetes.io/instance=network-mysql-hostnet-negative -o json \
+    | jq '.items[] | {name: .metadata.name, node: .spec.nodeName, hostIP: .status.hostIP, podIP: .status.podIP, hostNetwork: .spec.hostNetwork, dnsPolicy: .spec.dnsPolicy, ports: [.spec.containers[]?.ports[]?]}' \
+    >"${WORK_DIR}/network-mysql-hostnet-negative.result.json"
   kubectl -n "${KB_NAMESPACE}" get configmap -o yaml >"${WORK_DIR}/network-hostport-configmaps.yaml"
 }
 
-create_redis_sharding_cluster() {
-  wait_component_definition "${REDIS_COMPDEF}"
-  if kubectl -n "${TEST_NAMESPACE}" get cluster redis-sharding >/dev/null 2>&1; then
-    log "cluster redis-sharding already exists; skipping create"
-  else
-    create_manifest redis-sharding.yaml
-  fi
-  wait_cluster_running redis-sharding
-}
+run_mongodb_sharding_rollout() {
+  create_mongodb_sharding_cluster
+  delete_rollout_if_exists mongodb-sharding-rollout
 
-run_redis_sharding_rollout() {
-  wait_cluster_running redis-sharding
-  delete_rollout_if_exists redis-sharding-rollout
+  create_manifest mongodb-sharding-rollout.yaml
+  wait_rollout_succeed mongodb-sharding-rollout
+  wait_cluster_running mongo-sharding
+  kubectl get rollout mongodb-sharding-rollout -n "${TEST_NAMESPACE}" -o yaml \
+    >"${WORK_DIR}/mongodb-sharding-rollout.result.yaml"
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
+    >"${WORK_DIR}/mongodb-sharding.after-rollout.yaml"
 
-  create_manifest redis-sharding-rollout.yaml
-  wait_rollout_succeed redis-sharding-rollout
-  wait_cluster_running redis-sharding
-  kubectl get rollout redis-sharding-rollout -n "${TEST_NAMESPACE}" -o yaml \
-    >"${WORK_DIR}/redis-sharding-rollout.result.yaml"
-  kubectl get cluster redis-sharding -n "${TEST_NAMESPACE}" -o yaml \
-    >"${WORK_DIR}/redis-sharding.after-rollout.yaml"
-  delete_rollout_if_exists redis-sharding-rollout
+  delete_rollout_if_exists mongodb-sharding-rollout
 }
 
 run_case_upgrade() {
   create_or_select_kind
-  install_source_kubeblocks
+  install_kubeblocks "${SOURCE_VERSION}"
   ensure_namespace "${TEST_NAMESPACE}"
   create_mysql_base_cluster
-  upgrade_to_target_kubeblocks
+  upgrade_to_target_kubeblocks "${TARGET_VERSION}"
 }
 
 run_case_network() {
   ensure_namespace "${TEST_NAMESPACE}"
   create_network_dns_cluster
   create_network_runtime_hostport_cluster
-  create_mongodb_hostnetwork_cluster
+  create_mongodb_hostnetwork_annotation_cluster
+  create_mongodb_hostnetwork_api_cluster
+  create_mysql_hostnetwork_negative_cluster
 }
 
 run_case_rollout_api() {
@@ -783,8 +1327,7 @@ run_case_rollout_api() {
   run_mysql_replace_rollout
   run_mysql_create_rollout
 
-  create_redis_sharding_cluster
-  run_redis_sharding_rollout
+  run_mongodb_sharding_rollout
 }
 
 run_case_dynamic_instance_template() {
@@ -795,12 +1338,12 @@ run_case_dynamic_instance_template() {
       '.spec.componentSpecs[] | select(.name == "mysql") | .instances[]? | select(.serviceVersion == $version)' >/dev/null; then
     run_mysql_create_rollout
   fi
-  run_dynamic_hot_instance_test
+  run_dynamic_mysql_instance_template_test
 }
 
 run_case_sharding() {
   ensure_namespace "${TEST_NAMESPACE}"
-  run_mongodb_sharding_lifecycle
+  run_mongodb_sharding_scale
   run_mongodb_heterogeneous_offline
 }
 
@@ -813,7 +1356,8 @@ cleanup() {
 run_stage() {
   case "$1" in
     setup-kind) preflight; create_or_select_kind ;;
-    setup-kb) preflight; install_target_kubeblocks ;;
+    setup-cache) preflight; prepare_release_cache ;;
+    setup-kb) preflight; install_kubeblocks "${TARGET_VERSION}" ;;
     case-upgrade) preflight; run_case_upgrade ;;
     case-network) preflight; run_case_network ;;
     case-rollout-api) preflight; run_case_rollout_api ;;

@@ -35,7 +35,7 @@ spec:
             accessModes: [ReadWriteOnce]
             resources:
               requests:
-                storage: 10Gi
+                storage: 1Gi
   shardings:
     - name: shard
       shards: 3

@@ -3,28 +3,26 @@ kind: Cluster
 metadata:
   annotations:
     kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
-  creationTimestamp: "2026-06-17T07:36:17Z"
+  creationTimestamp: "2026-06-17T05:30:50Z"
   finalizers:
   - cluster.kubeblocks.io/finalizer
   generation: 6
-  labels:
-    apps.kubeblocks.io/rollout-name: mysql-create-8038
   name: mysql-cluster
   namespace: kb-11-e2e
-  resourceVersion: "13674"
-  uid: e2f1b40b-3b91-45f8-bce4-066f780b035d
+  resourceVersion: "76397"
+  uid: 06c4484e-aeba-4112-84ef-1bf61a575907
 spec:
   componentSpecs:
-  - componentDef: mysql-8.0-1.1.0-alpha.0
+  - componentDef: mysql-8.0-1.0.3
     flatInstanceOrdinal: true
     instances:
     - annotations:
         rollout.apps.kubeblocks.io/version: 8.0.38
       canary: false
-      compDef: mysql-8.0-1.1.0-alpha.0
+      compDef: mysql-8.0-1.0.3
       labels:
         traffic: canary
-      name: c0323e3a
+      name: cdcb24ff
       ordinals: {}
       replicas: 1
       serviceVersion: 8.0.38
@@ -54,25 +52,26 @@ status:
     mysql:
       observedGeneration: 6
       phase: Running
+      upToDate: true
   conditions:
-  - lastTransitionTime: "2026-06-17T07:36:17Z"
+  - lastTransitionTime: "2026-06-17T05:30:50Z"
     message: 'The operator has started the provisioning of Cluster: mysql-cluster'
     observedGeneration: 6
     reason: PreCheckSucceed
     status: "True"
     type: ProvisioningStarted
-  - lastTransitionTime: "2026-06-17T07:37:42Z"
+  - lastTransitionTime: "2026-06-17T05:32:55Z"
     message: All components are available
     reason: Available
     status: "True"
     type: Available
-  - lastTransitionTime: "2026-06-17T07:36:17Z"
+  - lastTransitionTime: "2026-06-17T05:30:50Z"
     message: Successfully applied for resources
     observedGeneration: 6
     reason: ApplyResourcesSucceed
     status: "True"
     type: ApplyResources
-  - lastTransitionTime: "2026-06-17T07:36:37Z"
+  - lastTransitionTime: "2026-06-17T05:31:12Z"
     message: cluster mysql-cluster is ready
     reason: ClusterReady
     status: "True"

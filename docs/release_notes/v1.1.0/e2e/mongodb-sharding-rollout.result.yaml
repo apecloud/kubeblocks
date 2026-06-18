@@ -1,0 +1,36 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Rollout
+metadata:
+  creationTimestamp: "2026-06-17T05:27:14Z"
+  finalizers:
+  - rollout.kubeblocks.io/finalizer
+  generation: 1
+  name: mongodb-sharding-rollout
+  namespace: kb-11-e2e
+  resourceVersion: "73022"
+  uid: 8c1c800b-b07e-430f-a143-0a139bb32e42
+spec:
+  clusterName: mongo-sharding
+  shardings:
+  - name: shard
+    serviceVersion: 6.0.27
+    strategy:
+      replace:
+        perInstanceIntervalSeconds: 30
+        scaleDownDelaySeconds: 30
+status:
+  observedGeneration: 1
+  shardings:
+  - canaryReplicas: 0
+    compDef: mongo-shard-1.0.3
+    lastScaleDownTimestamp: "2026-06-17T05:28:32Z"
+    lastScaleUpTimestamp: "2026-06-17T05:27:31Z"
+    name: shard
+    newReplicas: 3
+    replicas: 3
+    rolledOutReplicas: 3
+    scaleDownInstances:
+    - mongo-sharding-shard-pcw-0
+    serviceVersion: 6.0.27
+    shardingDef: mongo-shard-1.0.3
+  state: Succeed

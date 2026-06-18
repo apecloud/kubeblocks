@@ -1,0 +1,264 @@
+apiVersion: v1
+items:
+- apiVersion: apps.kubeblocks.io/v1
+  kind: Component
+  metadata:
+    annotations:
+      apps.kubeblocks.io/cluster-uid: 387006c9-4d96-4362-9fbd-135b25bc3bb9
+      kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+      kubeblocks.io/generation: "4"
+      kubeblocks.io/post-provision-done: "2026-06-17T09:56:37.055941421Z"
+    creationTimestamp: "2026-06-17T09:56:07Z"
+    finalizers:
+    - cluster.kubeblocks.io/finalizer
+    - component.kubeblocks.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/component: mongo-shard-1.1.0-alpha.0
+      app.kubernetes.io/instance: mongo-sharding
+      app.kubernetes.io/managed-by: kubeblocks
+      apps.kubeblocks.io/component-name: shard-7gr
+      apps.kubeblocks.io/sharding-name: shard
+      componentdefinition.kubeblocks.io/name: mongo-shard-1.1.0-alpha.0
+    name: mongo-sharding-shard-7gr
+    namespace: kb-11-e2e
+    ownerReferences:
+    - apiVersion: apps.kubeblocks.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Cluster
+      name: mongo-sharding
+      uid: 387006c9-4d96-4362-9fbd-135b25bc3bb9
+    resourceVersion: "40138"
+    uid: d2c2aa11-16ea-476b-b9f3-90f7ebf11cb5
+  spec:
+    compDef: mongo-shard-1.1.0-alpha.0
+    configs:
+    - configMap:
+        name: mongo-sharding-shard-7gr-mongodb-config
+      name: mongodb-config
+    flatInstanceOrdinal: false
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 6.0.27
+    terminationPolicy: Delete
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  status:
+    conditions:
+    - lastTransitionTime: "2026-06-17T09:56:07Z"
+      message: 'The operator has started the provisioning of Cluster: mongo-sharding-shard-7gr'
+      observedGeneration: 2
+      reason: PreCheckSucceed
+      status: "True"
+      type: ProvisioningStarted
+    - lastTransitionTime: "2026-06-17T09:56:37Z"
+      message: 'the component phase is Running; '
+      observedGeneration: 2
+      reason: Available
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-06-17T09:56:37Z"
+      message: ""
+      observedGeneration: 2
+      reason: Completed
+      status: "False"
+      type: Progressing
+    - lastTransitionTime: "2026-06-17T09:56:37Z"
+      message: component is healthy
+      observedGeneration: 2
+      reason: Healthy
+      status: "True"
+      type: Healthy
+    observedGeneration: 2
+    phase: Running
+- apiVersion: apps.kubeblocks.io/v1
+  kind: Component
+  metadata:
+    annotations:
+      apps.kubeblocks.io/cluster-uid: 387006c9-4d96-4362-9fbd-135b25bc3bb9
+      kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+      kubeblocks.io/generation: "4"
+      kubeblocks.io/post-provision-done: "2026-06-17T09:56:58.801383834Z"
+    creationTimestamp: "2026-06-17T09:56:38Z"
+    finalizers:
+    - cluster.kubeblocks.io/finalizer
+    - component.kubeblocks.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/component: mongo-shard-1.1.0-alpha.0
+      app.kubernetes.io/instance: mongo-sharding
+      app.kubernetes.io/managed-by: kubeblocks
+      apps.kubeblocks.io/component-name: shard-7jc
+      apps.kubeblocks.io/sharding-name: shard
+      componentdefinition.kubeblocks.io/name: mongo-shard-1.1.0-alpha.0
+    name: mongo-sharding-shard-7jc
+    namespace: kb-11-e2e
+    ownerReferences:
+    - apiVersion: apps.kubeblocks.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Cluster
+      name: mongo-sharding
+      uid: 387006c9-4d96-4362-9fbd-135b25bc3bb9
+    resourceVersion: "40512"
+    uid: c5d8b82f-45b1-41a1-9ea9-45e8378a4d7d
+  spec:
+    compDef: mongo-shard-1.1.0-alpha.0
+    configs:
+    - configMap:
+        name: mongo-sharding-shard-7jc-mongodb-config
+      name: mongodb-config
+    flatInstanceOrdinal: false
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 6.0.27
+    terminationPolicy: Delete
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  status:
+    conditions:
+    - lastTransitionTime: "2026-06-17T09:56:38Z"
+      message: 'The operator has started the provisioning of Cluster: mongo-sharding-shard-7jc'
+      observedGeneration: 2
+      reason: PreCheckSucceed
+      status: "True"
+      type: ProvisioningStarted
+    - lastTransitionTime: "2026-06-17T09:56:58Z"
+      message: 'the component phase is Running; '
+      observedGeneration: 2
+      reason: Available
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-06-17T09:56:58Z"
+      message: ""
+      observedGeneration: 2
+      reason: Completed
+      status: "False"
+      type: Progressing
+    - lastTransitionTime: "2026-06-17T09:56:58Z"
+      message: component is healthy
+      observedGeneration: 2
+      reason: Healthy
+      status: "True"
+      type: Healthy
+    observedGeneration: 2
+    phase: Running
+- apiVersion: apps.kubeblocks.io/v1
+  kind: Component
+  metadata:
+    annotations:
+      apps.kubeblocks.io/cluster-uid: 387006c9-4d96-4362-9fbd-135b25bc3bb9
+      kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+      kubeblocks.io/generation: "4"
+      kubeblocks.io/post-provision-done: "2026-06-17T09:56:37.485872713Z"
+      kubeblocks.io/reconcile: config-server@2
+    creationTimestamp: "2026-06-17T09:56:07Z"
+    finalizers:
+    - cluster.kubeblocks.io/finalizer
+    - component.kubeblocks.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/component: mongo-shard-1.1.0-alpha.0
+      app.kubernetes.io/instance: mongo-sharding
+      app.kubernetes.io/managed-by: kubeblocks
+      apps.kubeblocks.io/component-name: shard-7nm
+      apps.kubeblocks.io/sharding-name: shard
+      componentdefinition.kubeblocks.io/name: mongo-shard-1.1.0-alpha.0
+    name: mongo-sharding-shard-7nm
+    namespace: kb-11-e2e
+    ownerReferences:
+    - apiVersion: apps.kubeblocks.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Cluster
+      name: mongo-sharding
+      uid: 387006c9-4d96-4362-9fbd-135b25bc3bb9
+    resourceVersion: "40136"
+    uid: 909f6878-f67b-45d2-a9f6-bfd1587875c2
+  spec:
+    compDef: mongo-shard-1.1.0-alpha.0
+    configs:
+    - configMap:
+        name: mongo-sharding-shard-7nm-mongodb-config
+      name: mongodb-config
+    flatInstanceOrdinal: false
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 6.0.27
+    terminationPolicy: Delete
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  status:
+    conditions:
+    - lastTransitionTime: "2026-06-17T09:56:07Z"
+      message: 'The operator has started the provisioning of Cluster: mongo-sharding-shard-7nm'
+      observedGeneration: 2
+      reason: PreCheckSucceed
+      status: "True"
+      type: ProvisioningStarted
+    - lastTransitionTime: "2026-06-17T09:56:37Z"
+      message: 'the component phase is Running; '
+      observedGeneration: 2
+      reason: Available
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-06-17T09:56:37Z"
+      message: ""
+      observedGeneration: 2
+      reason: Completed
+      status: "False"
+      type: Progressing
+    - lastTransitionTime: "2026-06-17T09:56:37Z"
+      message: component is healthy
+      observedGeneration: 2
+      reason: Healthy
+      status: "True"
+      type: Healthy
+    observedGeneration: 2
+    phase: Running
+kind: List
+metadata:
+  resourceVersion: ""

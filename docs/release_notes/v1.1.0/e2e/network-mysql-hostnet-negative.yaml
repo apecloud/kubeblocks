@@ -1,0 +1,28 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: network-mysql-hostnet-negative
+  namespace: ${TEST_NAMESPACE}
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: mysql
+      componentDef: ${MYSQL_COMPDEF}
+      serviceVersion: "${MYSQL_VERSION_BASE}"
+      replicas: 1
+      network:
+        hostNetwork: true
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 10Gi

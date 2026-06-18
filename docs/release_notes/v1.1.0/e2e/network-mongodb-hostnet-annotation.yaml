@@ -1,0 +1,28 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: network-mongodb-hostnet-annotation
+  namespace: ${TEST_NAMESPACE}
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: mongodb
+      componentDef: mongodb-1.0
+      serviceVersion: "${MONGO_VERSION}"
+      replicas: 1
+      annotations:
+        kubeblocks.io/host-network: mongodb
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 10Gi

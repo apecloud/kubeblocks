@@ -1,18 +1,18 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Rollout
 metadata:
-  creationTimestamp: "2026-06-15T11:52:10Z"
+  creationTimestamp: "2026-06-17T05:22:02Z"
   finalizers:
   - rollout.kubeblocks.io/finalizer
   generation: 1
   name: mysql-inplace-8036
   namespace: kb-11-e2e
-  resourceVersion: "232504804"
-  uid: 29a9892c-561e-4669-8066-3652205468c4
+  resourceVersion: "68102"
+  uid: 954f9815-af38-45e2-a464-52dfa05e4825
 spec:
   clusterName: mysql-cluster
   components:
-  - compDef: mysql-8.0-1.0.5
+  - compDef: mysql-8.0
     name: mysql
     serviceVersion: 8.0.36
     strategy:
@@ -20,11 +20,11 @@ spec:
 status:
   components:
   - canaryReplicas: 0
-    compDef: mysql-8.0-1.0.5
+    compDef: mysql-8.0-1.0.3
     name: mysql
     newReplicas: 0
-    replicas: 3
+    replicas: 2
     rolledOutReplicas: 0
-    serviceVersion: 8.0.37
+    serviceVersion: 8.0.35
   observedGeneration: 1
   state: Succeed

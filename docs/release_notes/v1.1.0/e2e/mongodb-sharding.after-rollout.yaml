@@ -1,0 +1,146 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  annotations:
+    kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+  creationTimestamp: "2026-06-17T05:26:41Z"
+  finalizers:
+  - cluster.kubeblocks.io/finalizer
+  generation: 6
+  labels:
+    apps.kubeblocks.io/rollout-name: mongodb-sharding-rollout
+    clusterdefinition.kubeblocks.io/name: mongodb
+  name: mongo-sharding
+  namespace: kb-11-e2e
+  resourceVersion: "73052"
+  uid: 1d394ef2-d8aa-41a8-960d-c68e7e8443e3
+spec:
+  clusterDef: mongodb
+  componentSpecs:
+  - componentDef: mongo-mongos-1.0.3
+    flatInstanceOrdinal: false
+    name: mongos
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 6.0.27
+  - componentDef: mongo-config-server-1.0.3
+    flatInstanceOrdinal: false
+    name: config-server
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 6.0.27
+    systemAccounts:
+    - disabled: false
+      name: root
+      passwordConfig:
+        length: 16
+        letterCase: MixedCases
+        numDigits: 8
+        numSymbols: 0
+        seed: mongo
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  shardings:
+  - name: shard
+    shardingDef: mongo-shard-1.0.3
+    shards: 3
+    template:
+      componentDef: mongodb-1.0.3
+      flatInstanceOrdinal: true
+      instances:
+      - annotations:
+          apps.kubeblocks.io/instance-template-created-by-rollout: "yes"
+        compDef: mongodb-1.0.3
+        name: 8c1c800b
+        ordinals: {}
+        replicas: 1
+        serviceVersion: 6.0.27
+      name: shard
+      ordinals: {}
+      podUpdatePolicy: PreferInPlace
+      replicas: 1
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      serviceVersion: 6.0.27
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+  terminationPolicy: Delete
+  topology: sharding
+status:
+  components:
+    config-server:
+      observedGeneration: 6
+      phase: Running
+      upToDate: true
+    mongos:
+      observedGeneration: 6
+      phase: Running
+      upToDate: true
+  conditions:
+  - lastTransitionTime: "2026-06-17T05:26:41Z"
+    message: 'The operator has started the provisioning of Cluster: mongo-sharding'
+    observedGeneration: 6
+    reason: PreCheckSucceed
+    status: "True"
+    type: ProvisioningStarted
+  - lastTransitionTime: "2026-06-17T05:28:32Z"
+    message: All components are available
+    reason: Available
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-06-17T05:26:41Z"
+    message: Successfully applied for resources
+    observedGeneration: 6
+    reason: ApplyResourcesSucceed
+    status: "True"
+    type: ApplyResources
+  - lastTransitionTime: "2026-06-17T05:27:14Z"
+    message: cluster mongo-sharding is ready
+    reason: ClusterReady
+    status: "True"
+    type: Ready
+  observedGeneration: 6
+  phase: Running
+  shardings:
+    shard:
+      observedGeneration: 6
+      phase: Running
+      postProvision:
+        completionTime: "2026-06-17T05:26:41Z"
+        message: the PostProvision action is not defined
+        phase: Skipped
+        startTime: "2026-06-17T05:26:41Z"
+      shardingDef: mongo-shard-1.0.3

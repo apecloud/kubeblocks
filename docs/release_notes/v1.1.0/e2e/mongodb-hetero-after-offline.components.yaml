@@ -1,0 +1,178 @@
+apiVersion: v1
+items:
+- apiVersion: apps.kubeblocks.io/v1
+  kind: Component
+  metadata:
+    annotations:
+      apps.kubeblocks.io/cluster-uid: 3f6bf22b-f14d-4788-948d-18627d539fe3
+      kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+      kubeblocks.io/generation: "4"
+      kubeblocks.io/post-provision-done: "2026-06-17T09:57:30.040669085Z"
+    creationTimestamp: "2026-06-17T09:56:59Z"
+    finalizers:
+    - cluster.kubeblocks.io/finalizer
+    - component.kubeblocks.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/component: mongo-shard-1.1.0-alpha.0
+      app.kubernetes.io/instance: mongodb-hetero-shards
+      app.kubernetes.io/managed-by: kubeblocks
+      apps.kubeblocks.io/component-name: shard-8mn
+      apps.kubeblocks.io/shard-template: hot
+      apps.kubeblocks.io/sharding-name: shard
+      componentdefinition.kubeblocks.io/name: mongo-shard-1.1.0-alpha.0
+    name: mongodb-hetero-shards-shard-8mn
+    namespace: kb-11-e2e
+    ownerReferences:
+    - apiVersion: apps.kubeblocks.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Cluster
+      name: mongodb-hetero-shards
+      uid: 3f6bf22b-f14d-4788-948d-18627d539fe3
+    resourceVersion: "42670"
+    uid: 2d82dfc3-bf2e-429d-920f-faa39c346d80
+  spec:
+    compDef: mongo-shard-1.1.0-alpha.0
+    configs:
+    - configMap:
+        name: mongodb-hetero-shards-shard-8mn-mongodb-config
+      name: mongodb-config
+    flatInstanceOrdinal: false
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    serviceVersion: 6.0.27
+    terminationPolicy: Delete
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  status:
+    conditions:
+    - lastTransitionTime: "2026-06-17T09:56:59Z"
+      message: 'The operator has started the provisioning of Cluster: mongodb-hetero-shards-shard-8mn'
+      observedGeneration: 2
+      reason: PreCheckSucceed
+      status: "True"
+      type: ProvisioningStarted
+    - lastTransitionTime: "2026-06-17T09:57:31Z"
+      message: 'the component phase is Running; '
+      observedGeneration: 2
+      reason: Available
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-06-17T09:57:31Z"
+      message: ""
+      observedGeneration: 2
+      reason: Completed
+      status: "False"
+      type: Progressing
+    - lastTransitionTime: "2026-06-17T09:57:31Z"
+      message: component is healthy
+      observedGeneration: 2
+      reason: Healthy
+      status: "True"
+      type: Healthy
+    observedGeneration: 2
+    phase: Running
+- apiVersion: apps.kubeblocks.io/v1
+  kind: Component
+  metadata:
+    annotations:
+      apps.kubeblocks.io/cluster-uid: 3f6bf22b-f14d-4788-948d-18627d539fe3
+      kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1
+      kubeblocks.io/generation: "4"
+      kubeblocks.io/post-provision-done: "2026-06-17T09:57:31.754912627Z"
+    creationTimestamp: "2026-06-17T09:56:59Z"
+    finalizers:
+    - cluster.kubeblocks.io/finalizer
+    - component.kubeblocks.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/component: mongo-shard-1.1.0-alpha.0
+      app.kubernetes.io/instance: mongodb-hetero-shards
+      app.kubernetes.io/managed-by: kubeblocks
+      apps.kubeblocks.io/component-name: shard-nx5
+      apps.kubeblocks.io/sharding-name: shard
+      componentdefinition.kubeblocks.io/name: mongo-shard-1.1.0-alpha.0
+    name: mongodb-hetero-shards-shard-nx5
+    namespace: kb-11-e2e
+    ownerReferences:
+    - apiVersion: apps.kubeblocks.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Cluster
+      name: mongodb-hetero-shards
+      uid: 3f6bf22b-f14d-4788-948d-18627d539fe3
+    resourceVersion: "42671"
+    uid: 87c25613-45a7-46c0-9593-71b8548a2999
+  spec:
+    compDef: mongo-shard-1.1.0-alpha.0
+    configs:
+    - configMap:
+        name: mongodb-hetero-shards-shard-nx5-mongodb-config
+      name: mongodb-config
+    flatInstanceOrdinal: false
+    ordinals: {}
+    podUpdatePolicy: PreferInPlace
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    serviceVersion: 6.0.27
+    terminationPolicy: Delete
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  status:
+    conditions:
+    - lastTransitionTime: "2026-06-17T09:56:59Z"
+      message: 'The operator has started the provisioning of Cluster: mongodb-hetero-shards-shard-nx5'
+      observedGeneration: 2
+      reason: PreCheckSucceed
+      status: "True"
+      type: ProvisioningStarted
+    - lastTransitionTime: "2026-06-17T09:57:31Z"
+      message: 'the component phase is Running; '
+      observedGeneration: 2
+      reason: Available
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-06-17T09:57:31Z"
+      message: ""
+      observedGeneration: 2
+      reason: Completed
+      status: "False"
+      type: Progressing
+    - lastTransitionTime: "2026-06-17T09:57:31Z"
+      message: component is healthy
+      observedGeneration: 2
+      reason: Healthy
+      status: "True"
+      type: Healthy
+    observedGeneration: 2
+    phase: Running
+kind: List
+metadata:
+  resourceVersion: ""

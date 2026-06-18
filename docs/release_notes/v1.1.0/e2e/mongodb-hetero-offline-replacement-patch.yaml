@@ -1,0 +1,7 @@
+- op: replace
+  path: /spec/shardings/0/shards
+  value: 3
+- op: add
+  path: /spec/shardings/0/offline
+  value:
+    - ${MONGO_OFFLINE_SHARD}

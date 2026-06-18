@@ -40,12 +40,21 @@ type ObjectOption interface {
 type ObjectOptions struct {
 	// if not empty, action should be done on the specified subresource
 	SubResource string
+
+	// if true, the object should be patched instead of fully updated.
+	Patch bool
 }
 
 type WithSubResource string
 
 func (w WithSubResource) ApplyToObject(opts *ObjectOptions) {
 	opts.SubResource = string(w)
+}
+
+type WithPatch bool
+
+func (w WithPatch) ApplyToObject(opts *ObjectOptions) {
+	opts.Patch = bool(w)
 }
 
 type ObjectTree struct {

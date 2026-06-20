@@ -65,6 +65,7 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 	if err := incrementConvertFrom(r, src, &componentDefinitionConverter{}); err != nil {
 		return err
 	}
+	r.fromV1Templates(src)
 
 	// status
 	if err := copier.Copy(&r.Status, &src.Status); err != nil {
@@ -138,6 +139,19 @@ func (r *ComponentDefinition) incrementConvertFrom(srcRaw metav1.Object, ic incr
 	r.Spec.SystemAccounts = c.SystemAccounts
 	// changed
 	return r.changesFromComponentDefinition(srcRaw.(*appsv1.ComponentDefinition))
+}
+
+func (r *ComponentDefinition) fromV1Templates(cmpd *appsv1.ComponentDefinition) {
+	for i := range r.Spec.Scripts {
+		if i < len(cmpd.Spec.Scripts) {
+			r.Spec.Scripts[i].TemplateRef = cmpd.Spec.Scripts[i].Template
+		}
+	}
+	for i := range r.Spec.Configs {
+		if i < len(cmpd.Spec.Configs) {
+			r.Spec.Configs[i].TemplateRef = cmpd.Spec.Configs[i].Template
+		}
+	}
 }
 
 func (r *ComponentDefinition) changesToComponentDefinition(cmpd *appsv1.ComponentDefinition) error {

@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package reconfigure
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -33,6 +36,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
+
+const configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 
 func init() {
 	registerPolicy(SyncDynamicReloadPolicy, syncPolicy)
@@ -116,11 +121,16 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, params, restart) {
 		return makeStatus(StatusFailed, withReason("parameter update reconfigure currently supports only exec actions"))
 	}
+	var systemParams map[string]string
+	if shouldUseTemplateReconfigureAction(ctx, params, restart) {
+		systemParams = buildUpdatedConfigFileChecksums(ctx)
+	}
 	config.ConfigHash = ctx.getTargetConfigHash()
 	// Keep restart explicit so an old persisted `restart: true` is actively cleared.
 	config.Restart = ptr.To(restart)
 	config.Reconfigure = ptr.To(false)
 	config.ReconfigureArgs = nil
+	config.Variables = clearReconfigureSystemParameters(config.Variables)
 	switch {
 	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
 		config.Reconfigure = ptr.To(true)
@@ -129,6 +139,7 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 		config.Reconfigure = ptr.To(true)
 		config.ReconfigureAction = nil
 		config.ReconfigureArgs = buildReconfigureArgs(params)
+		config.Variables = mergeReconfigureSystemParameters(config.Variables, systemParams)
 	default:
 		config.ReconfigureAction = nil
 	}
@@ -149,6 +160,61 @@ func buildReconfigureArgs(params map[string]string) [][]string {
 		args = append(args, []string{key, params[key]})
 	}
 	return args
+}
+
+func clearReconfigureSystemParameters(vars map[string]string) map[string]string {
+	if len(vars) == 0 {
+		return vars
+	}
+	delete(vars, configFilesUpdated)
+	return vars
+}
+
+func mergeReconfigureSystemParameters(vars map[string]string, params map[string]string) map[string]string {
+	if len(params) == 0 {
+		return vars
+	}
+	if vars == nil {
+		vars = make(map[string]string, len(params))
+	}
+	for k, v := range params {
+		vars[k] = v
+	}
+	return vars
+}
+
+func buildUpdatedConfigFileChecksums(ctx Context) map[string]string {
+	configFile := resolveConfigFile(ctx.ConfigDescription)
+	if configFile == "" || ctx.ConfigData == nil {
+		return nil
+	}
+	content, ok := ctx.ConfigData[configFile]
+	if !ok {
+		return nil
+	}
+	path := resolveMountedConfigFilePath(ctx, configFile)
+	if path == "" {
+		return nil
+	}
+	checksum := sha256.Sum256([]byte(content))
+	return map[string]string{
+		configFilesUpdated: fmt.Sprintf("%s:%x", path, checksum),
+	}
+}
+
+func resolveMountedConfigFilePath(ctx Context, file string) string {
+	volumeName := ctx.ConfigTemplate.VolumeName
+	if volumeName == "" || ctx.ITS == nil {
+		return ""
+	}
+	for _, container := range ctx.ITS.Spec.Template.Spec.Containers {
+		for _, mount := range container.VolumeMounts {
+			if mount.Name == volumeName {
+				return filepath.Join(mount.MountPath, file)
+			}
+		}
+	}
+	return ""
 }
 
 // shouldBuildLegacyReconfigureAction returns true only when this change should be translated

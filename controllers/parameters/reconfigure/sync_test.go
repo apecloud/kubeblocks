@@ -21,7 +21,9 @@ package reconfigure
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -675,19 +677,40 @@ func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
 func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 	ctx := Context{
 		ConfigTemplate: appsv1.ComponentFileTemplate{
-			Name: "my.cnf",
+			Name:       "my.cnf",
+			VolumeName: "config",
 			Reconfigure: &appsv1.Action{
 				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
 			},
 		},
-		ConfigHash:       ptr.To("hash"),
+		ConfigHash: ptr.To("hash"),
+		ConfigData: map[string]string{
+			"my.cnf": "timeout=30\nmaxmemory=1gb\n",
+		},
 		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
-		ParametersDef:    &parametersv1alpha1.ParametersDefinitionSpec{},
+		ITS: &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name: "mysql",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/etc/conf",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{Name: "my.cnf"},
+		ParametersDef:     &parametersv1alpha1.ParametersDefinitionSpec{},
 	}
 	config := &appsv1.ClusterComponentConfig{
 		Name: ptr.To("my.cnf"),
 		Variables: map[string]string{
-			"template_var": "kept",
+			"template_var":            "kept",
+			"KB_CONFIG_FILES_UPDATED": "stale",
 		},
 	}
 
@@ -708,6 +731,11 @@ func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 	}
 	if _, ok := config.Variables["timeout"]; ok {
 		t.Fatalf("expected updated params not to be written into variables, got %v", config.Variables)
+	}
+	checksum := sha256.Sum256([]byte(ctx.ConfigData["my.cnf"]))
+	expectedUpdated := fmt.Sprintf("/etc/conf/my.cnf:%x", checksum)
+	if got := config.Variables["KB_CONFIG_FILES_UPDATED"]; got != expectedUpdated {
+		t.Fatalf("expected updated file checksum %q, got %q", expectedUpdated, got)
 	}
 }
 

@@ -87,6 +87,40 @@ func TestConvertStringToInterfaceBySchemaType(t *testing.T) {
 	}
 }
 
+func TestConvertStringToInterfaceBySchemaTypeUint64(t *testing.T) {
+	schema := &apiextensionsv1.JSONSchemaProps{
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"max_queries": {Type: "integer", Format: "uint64"},
+		},
+	}
+
+	got, err := ConvertStringToInterfaceBySchemaType(schema, map[string]string{"max_queries": "50"})
+	if err != nil {
+		t.Fatalf("expected uint64 parse to succeed, got %v", err)
+	}
+	if got["max_queries"] != uint64(50) {
+		t.Fatalf("expected uint64(50), got %T(%v)", got["max_queries"], got["max_queries"])
+	}
+
+	_, err = ConvertStringToInterfaceBySchemaType(schema, map[string]string{"max_queries": "-1"})
+	if err == nil {
+		t.Fatalf("expected parse error for negative value with uint64 format")
+	}
+}
+
+func TestValidateDataWithSchemaUint64(t *testing.T) {
+	schema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"max_queries": {Type: "integer", Format: "uint64", Minimum: ptrFloat64(0)},
+		},
+	}
+
+	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_queries": uint64(50)}); err != nil {
+		t.Fatalf("expected uint64(50) to pass validation, got %v", err)
+	}
+}
+
 func ptrFloat64(v float64) *float64 {
 	return &v
 }

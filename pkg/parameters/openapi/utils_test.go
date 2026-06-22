@@ -21,6 +21,7 @@ package openapi
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -92,6 +93,37 @@ func TestGetFieldByLabel(t *testing.T) {
 				assert.NotNil(t, got)
 			}
 		})
+	}
+}
+
+func TestGenerateOpenAPISchemaUint64(t *testing.T) {
+	cueString := `
+#T: {
+	clickhouse: {
+		u: uint64 | *0
+	}
+}
+`
+	schema, err := GenerateOpenAPISchema(cueString, "T")
+	assert.Nil(t, err)
+	assert.NotNil(t, schema)
+
+	specSchema, ok := schema.Properties[DefaultSchemaName]
+	assert.True(t, ok)
+	chProps, ok := specSchema.Properties["clickhouse"]
+	assert.True(t, ok)
+	uProp, ok := chProps.Properties["u"]
+	assert.True(t, ok)
+	assert.Equal(t, "integer", uProp.Type)
+
+	if uProp.Minimum != nil {
+		assert.True(t, *uProp.Minimum >= 0, "minimum should be non-negative for uint64")
+	}
+	if uProp.Maximum != nil {
+		assert.True(t, *uProp.Maximum > float64(math.MaxInt64),
+			"maximum should exceed MaxInt64 (generated from CUE uint64 bounds)")
+		assert.True(t, *uProp.Maximum > 0,
+			"maximum must be positive (not corrupted by overflow)")
 	}
 }
 

@@ -43,6 +43,9 @@ func (d *defaultValueTransformer) resolveValueWithType(value string, fieldName s
 	default:
 		return value, nil
 	case "integer":
+		if isUnsignedIntegerFormat(schema.Format) {
+			return strconv.ParseUint(value, 10, 64)
+		}
 		return strconv.ParseInt(value, 10, 64)
 	case "number":
 		return strconv.ParseFloat(value, 64)
@@ -82,6 +85,14 @@ func (v *valueManager) BuildValueTransformer(key string) core.ValueTransformerFu
 		openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]),
 	}
 	return defaultTransformer.resolveValueWithType
+}
+
+func isUnsignedIntegerFormat(format string) bool {
+	switch format {
+	case "uint", "uint8", "uint16", "uint32", "uint64":
+		return true
+	}
+	return false
 }
 
 func NewValueManager(paramsDefs []*parametersv1alpha1.ParametersDefinition, configs []parametersv1alpha1.ComponentConfigDescription) *valueManager {

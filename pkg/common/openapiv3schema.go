@@ -68,7 +68,11 @@ func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONS
 		}
 		switch p.Type {
 		case "integer":
-			out[k], err = strconv.ParseInt(v, 10, 64)
+			if isUnsignedIntegerFormat(p.Format) {
+				out[k], err = strconv.ParseUint(v, 10, 64)
+			} else {
+				out[k], err = strconv.ParseInt(v, 10, 64)
+			}
 		case "number":
 			out[k], err = strconv.ParseFloat(v, 64)
 		case "boolean":
@@ -84,4 +88,12 @@ func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONS
 		}
 	}
 	return out, nil
+}
+
+func isUnsignedIntegerFormat(format string) bool {
+	switch format {
+	case "uint", "uint8", "uint16", "uint32", "uint64":
+		return true
+	}
+	return false
 }

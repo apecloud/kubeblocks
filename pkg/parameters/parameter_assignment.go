@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"fmt"
+	"math"
 
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -44,10 +45,11 @@ func ValidateComponentParameterAssignments(assignments parametersv1alpha1.Compon
 		if value == nil {
 			continue
 		}
+		validationSchema := capUint64Maximum(paramSchema)
 		schema := &apiext.JSONSchemaProps{
 			Type: "object",
 			Properties: map[string]apiext.JSONSchemaProps{
-				key: paramSchema,
+				key: validationSchema,
 			},
 		}
 		typedValue, err := common.ConvertStringToInterfaceBySchemaType(schema, map[string]string{key: *value})
@@ -68,6 +70,19 @@ func hasParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition) b
 		}
 	}
 	return false
+}
+
+// capUint64Maximum returns a copy of the schema with Maximum capped to MaxInt64
+// when it exceeds int64 range. The kube-openapi validator converts float64 Maximum
+// to int64 internally; values like CUE uint64's 2^64-1 overflow to MinInt64,
+// causing all positive values to fail validation. Capping preserves validation
+// for the int64 value range that ConvertStringToInterfaceBySchemaType can produce.
+func capUint64Maximum(schema apiext.JSONSchemaProps) apiext.JSONSchemaProps {
+	if schema.Type == "integer" && schema.Maximum != nil && *schema.Maximum > float64(math.MaxInt64) {
+		maxInt64 := float64(math.MaxInt64)
+		schema.Maximum = &maxInt64
+	}
+	return schema
 }
 
 func findParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition, key string) (apiext.JSONSchemaProps, bool) {

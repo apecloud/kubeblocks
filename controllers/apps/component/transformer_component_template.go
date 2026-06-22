@@ -108,7 +108,10 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 		}
 	}
 	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-	return protoObjs[objName]
+	if obj, ok := protoObjs[objName]; ok {
+		return obj
+	}
+	return nil
 }
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {

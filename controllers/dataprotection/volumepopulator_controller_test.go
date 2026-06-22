@@ -2399,9 +2399,8 @@ func TestRebindPVCAndPV_NilPopulatePVC_ReturnsFatalError(t *testing.T) {
 
 func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetComponentNotYetCreated(t *testing.T) {
 	// When the backup target component (tidb) hasn't been created yet (multi-component
-	// sequential creation: PD→TiKV→TiDB), the redirect path should requeue gracefully
-	// instead of returning an error. PVC provision-only already succeeded; this is the
-	// postReady restore step which can wait.
+	// sequential creation: PD→TiKV→TiDB), the redirect path should return (false,nil)
+	// for standard requeue — no Reconciler error, no Restore CR created.
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kbappsv1.AddToScheme(scheme))

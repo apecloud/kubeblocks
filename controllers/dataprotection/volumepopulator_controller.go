@@ -1211,6 +1211,12 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		Namespace: pvc.Namespace,
 		Name:      constant.GenerateClusterComponentName(clusterName, componentName),
 	}, comp); err != nil {
+		if restoreCtx.skipPostReady && apierrors.IsNotFound(err) {
+			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for backup target component to be created"); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
 		return false, err
 	}
 	if comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {

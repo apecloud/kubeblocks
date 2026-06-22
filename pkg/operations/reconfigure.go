@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	pkgparameters "github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -90,6 +91,9 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
 		if len(reconfigure.Parameters) == 0 {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters", reconfigure.ComponentName)
+		}
+		if err := r.validateReconfigureParameters(reqCtx, cli, resource.Cluster, reconfigure); err != nil {
+			return err
 		}
 		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
@@ -192,4 +196,38 @@ func (r *reconfigureAction) getRunningComponentParameter(ctx context.Context, cl
 		return nil, err
 	}
 	return compParam, nil
+}
+
+func (r *reconfigureAction) validateReconfigureParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	cluster *appsv1.Cluster, reconfigure opsv1alpha1.Reconfigure) error {
+	compDefName := r.resolveCompDefName(cluster, reconfigure.ComponentName)
+	if compDefName == "" {
+		return nil
+	}
+	cmpd := &appsv1.ComponentDefinition{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, cmpd); err != nil {
+		return err
+	}
+	_, paramsDefs, err := pkgparameters.ResolveCmpdParametersDefs(reqCtx.Ctx, cli, cmpd)
+	if err != nil {
+		return err
+	}
+	assignments := make(parametersv1alpha1.ComponentParameters, len(reconfigure.Parameters))
+	for _, param := range reconfigure.Parameters {
+		assignments[param.Key] = param.Value
+	}
+	if err := pkgparameters.ValidateComponentParameterAssignments(assignments, paramsDefs); err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	return nil
+}
+
+func (r *reconfigureAction) resolveCompDefName(cluster *appsv1.Cluster, compName string) string {
+	if compSpec := cluster.Spec.GetComponentByName(compName); compSpec != nil {
+		return compSpec.ComponentDef
+	}
+	if sharding := cluster.Spec.GetShardingByName(compName); sharding != nil {
+		return sharding.Template.ComponentDef
+	}
+	return ""
 }

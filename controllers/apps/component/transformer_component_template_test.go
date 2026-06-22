@@ -362,8 +362,11 @@ var _ = Describe("file templates transformer test", func() {
 
 			transformer := &componentFileTemplateTransformer{}
 			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+			Expect(err).Should(BeNil())
+
+			checkVolumes([]string{"logConf"})
+			checkTemplateObjects([]string{"logConf"})
+			Expect(transCtx.SynthesizeComponent.PodSpec.Volumes).Should(ContainElement(newVolume("serverConf")))
 		})
 	})
 })

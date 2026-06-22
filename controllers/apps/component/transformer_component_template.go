@@ -92,8 +92,9 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *componentTransformContext,
 	tpl component.SynthesizedFileTemplate, protoObjs map[string]*corev1.ConfigMap) client.Object {
 	if isExternalManaged(tpl) {
-		if len(tpl.Template) == 0 {
-			return nil
+		name := tpl.Template
+		if len(name) == 0 {
+			name = fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
 		}
 		namespace := tpl.Namespace
 		if len(namespace) == 0 {
@@ -102,7 +103,7 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 		return &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
-				Name:      tpl.Template,
+				Name:      name,
 			},
 		}
 	}
@@ -112,6 +113,9 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+		if isExternalManaged(tpl) {
+			continue
+		}
 		if len(tpl.Template) == 0 {
 			return fmt.Errorf("config/script template has no template specified: %s", tpl.Name)
 		}
@@ -148,7 +152,7 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 	for _, tpl := range synthesizedComp.FileTemplates {
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
 		// If the file template is managed by external, the volume mount object should be the external object.
-		if isExternalManaged(tpl) {
+		if isExternalManaged(tpl) && len(tpl.Template) > 0 {
 			objName = tpl.Template
 		}
 		createFn := func(_ string) corev1.Volume {

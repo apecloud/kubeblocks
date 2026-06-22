@@ -362,8 +362,24 @@ var _ = Describe("file templates transformer test", func() {
 
 			transformer := &componentFileTemplateTransformer{}
 			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+			Expect(err).Should(BeNil())
+
+			computedName := fileTemplateObjectName(transCtx.SynthesizeComponent, "serverConf")
+			checkAssistantObject("ConfigMap", transCtx.SynthesizeComponent.Namespace, computedName)
+
+			podSpec := transCtx.SynthesizeComponent.PodSpec
+			expectedVol := corev1.Volume{
+				Name: "serverConf",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: computedName,
+						},
+						DefaultMode: ptr.To[int32](0444),
+					},
+				},
+			}
+			Expect(podSpec.Volumes).Should(ContainElement(expectedVol))
 		})
 	})
 })

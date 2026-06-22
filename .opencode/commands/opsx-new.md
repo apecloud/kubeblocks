@@ -32,13 +32,13 @@ Start a new change using the experimental artifact-driven approach.
    openspec new change "<name>"
    ```
    Add `--schema <name>` only if the user requested a specific workflow.
-   This creates a scaffolded change at `openspec/changes/<name>/` with the selected schema.
+   This creates a scaffolded change in the planning home resolved by the CLI.
 
 4. **Show the artifact status**
    ```bash
-   openspec status --change "<name>"
+   openspec status --change "<name>" --json
    ```
-   This shows which artifacts need to be created and which are ready (dependencies satisfied).
+   Use the returned `planningHome`, `changeRoot`, `artifactPaths`, and `nextSteps` instead of assuming repo-local paths.
 
 5. **Get instructions for the first artifact**
    The first artifact depends on the schema. Check the status output to find the first artifact with status "ready".

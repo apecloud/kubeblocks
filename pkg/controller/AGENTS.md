@@ -1,48 +1,28 @@
-# pkg/controller/ AGENTS.md
+# Controller Building Blocks
 
-**Generated:** 2026-03-02
-**Purpose:** Controller Building Blocks
+`pkg/controller/` holds reusable reconciliation building blocks: object graph modeling, plan execution, builders, scheduling, lifecycle, component synthesis, and workload helpers.
 
-## OVERVIEW
+## Layout
 
-Reusable controller components for building K8s resources. Provides builders, state management, and resource lifecycle utilities.
+- `builder/`: typed Kubernetes object builders and functional options.
+- `model/`, `graph/`, `kubebuilderx/`: desired/current object graph modeling, transform pipelines, and reconciler scaffolding.
+- `component/`: component synthesis helpers shared outside `controllers/apps/component`.
+- `instance/`, `instanceset/`, `instanceset2/`, `instancetemplate/`: workload and instance reconciliation support.
+- `lifecycle/`: lifecycle action execution and kbagent integration helpers.
+- `plan/`: reusable plan helpers, including restore and TLS flows.
+- `render/`: template rendering and built-in render functions.
+- `scheduling/`, `sharding/`, `multicluster/`, `handler/`, `factory/`: shared scheduling, sharding, multicluster client, event handler, and factory helpers.
 
-## STRUCTURE
+## Editing Rules
 
-```
-pkg/controller/
-├── builder/        # Resource builders
-├── instanceset/    # InstanceSet controller logic
-├── component/      # Component utilities
-├── configuration/  # Config management
-├── scheduling/     # Scheduling utilities
-├── graph/          # Dependency graph
-├── multicluster/   # Multi-cluster support
-└── plan/           # Execution plans
-```
+- Preserve the graph/transformer separation: transformers should describe desired object changes, while plan/reconciler code applies them.
+- Builders should validate or surface errors through the existing builder error path; do not silently produce partially valid objects.
+- Keep object builders and synthesis helpers deterministic. Reconcile tests often compare generated objects and depend on stable names, labels, and ordering.
+- If changing InstanceSet or Instance behavior, check both legacy and newer paths (`instanceset`, `instanceset2`, and `instance`) for shared contracts before editing only one side.
+- Template/render changes can affect configuration, lifecycle, and component generation; add focused render tests when changing built-ins or input semantics.
+- Multicluster client changes must preserve the local controller-runtime client contract unless the caller explicitly opts into remote behavior.
 
-## WHERE TO LOOK
+## Testing
 
-| Task | Location | Notes |
-|------|----------|-------|
-| Build Deployments | `builder/` | Builder pattern |
-| Build Services | `builder/` | Service builders |
-| InstanceSet logic | `instanceset/` | Pod lifecycle |
-| Config templates | `configuration/` | CUE processing |
-| Scheduling | `scheduling/` | Affinity/Tolerations |
-| Execution plans | `plan/` | Ordered operations |
-
-## CONVENTIONS
-
-- Builder pattern for complex objects
-- Functional options pattern
-- Immutable builders
-- Error aggregation for builders
-
-## ANTI-PATTERNS
-
-| Don't | Do Instead |
-|-------|------------|
-| Inline object creation | Use builders |
-| Modify after Build() | Create new builder |
-| Ignore builder errors | Check each step |
+- Add table-driven unit tests for builders, graph transforms, scheduling, rendering, and instance template behavior.
+- For code that mutates Kubernetes objects, test finalizers, owner refs, labels, and status/resource version assumptions explicitly.

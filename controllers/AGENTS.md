@@ -1,51 +1,26 @@
-# controllers/ AGENTS.md
+# Controllers
 
-**Generated:** 2026-03-02
-**Purpose:** Kubernetes Controllers (Reconcilers)
+This tree contains controller-runtime reconcilers. Controllers should translate API state into Kubernetes objects and status while delegating reusable mechanics to `pkg/`.
 
-## OVERVIEW
+## Layout
 
-Implements Kubernetes controllers that reconcile CRDs to desired state. Uses controller-runtime framework with reconcile loops.
+- `apps/`: core app reconcilers for clusters, components, rollouts, definitions, versions, service descriptors, sidecars, and sharding definitions.
+- `workloads/`: `InstanceSet`, `Instance`, and workload event reconcilers.
+- `operations/`: `OpsRequest` and operation definition reconcilers.
+- `dataprotection/`: backup, restore, repository, schedule, GC, and data protection helpers.
+- `parameters/`: parameter and configuration reconcilers.
+- `extensions/`, `trace/`, `k8score`, `experimental/`: addon, trace, Kubernetes core wrapper, and experimental controllers.
 
-## STRUCTURE
+## Reconcile Rules
 
-```
-controllers/
-├── apps/           # Cluster & Component reconcilers (20+ subdirs)
-├── dataprotection/ # Backup & restore controllers
-├── operations/     # OpsRequest controllers
-├── parameters/     # Configuration controllers
-├── workloads/      # InstanceSet controller
-├── trace/          # Trace controllers
-├── extensions/     # Extension controllers
-├── k8score/        # Core K8s resource wrappers
-└── experimental/   # Experimental controllers
-```
+- Reconcile methods should stay short enough to expose the high-level flow. Move reusable or domain-heavy logic to package helpers.
+- Treat not-found root objects as successful deletion handling unless the existing controller has a specific reason to requeue.
+- Do not block inside reconcile for external systems or long-running work. Record intent/status and requeue or rely on watches.
+- Preserve finalizer ordering: add finalizers before creating dependent resources that need cleanup, and remove them only after cleanup succeeds.
+- Status updates should be conflict-aware. Follow nearby `Status().Patch(..., client.MergeFrom(...))` patterns unless a controller deliberately uses `Status().Update()`.
+- Set owner references or labels consistently so garbage collection, event handlers, and test cleanup continue to find dependent resources.
 
-## WHERE TO LOOK
+## Testing
 
-| Task | Location | Notes |
-|------|----------|-------|
-| Fix Cluster reconcile | `controllers/apps/cluster/` | Main cluster logic |
-| Fix Component reconcile | `controllers/apps/component/` | Component lifecycle |
-| Add new operation | `controllers/operations/` | Day-2 ops handlers |
-| Fix backup issues | `controllers/dataprotection/` | Backup controllers |
-| Find reconciler | `*/controller.go` or `*_controller.go` | Entry point |
-
-## CONVENTIONS
-
-- Controller files named `*_controller.go` or `controller.go`
-- Reconcile method signature: `Reconcile(ctx, req)`
-- Return `ctrl.Result{}, err` pattern
-- Use `r.Client.Get()` to fetch resources
-- Finalizers for cleanup logic
-
-## ANTI-PATTERNS
-
-| Don't | Do Instead |
-|-------|------------|
-| Long-running Reconcile | Return requeue with delay |
-| Ignore not-found errors | Return nil for deleted resources |
-| Direct status updates | Use `Status().Update()` |
-| Skip owner references | Set ownerRef for GC |
-| Block on external calls | Use conditions, not blocks |
+- Keep controller tests close to the reconciler package unless the scenario requires broader envtest setup.
+- When changing watches, predicates, owner references, labels, or finalizers, add tests that prove the reconcile is triggered and cleanup still works.

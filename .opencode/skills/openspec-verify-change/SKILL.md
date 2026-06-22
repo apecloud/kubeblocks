@@ -6,7 +6,7 @@ compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.1.1"
+  generatedBy: "1.4.1"
 ---
 
 Verify that an implementation matches the change artifacts (specs, tasks, design).
@@ -31,15 +31,18 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    ```
    Parse the JSON to understand:
    - `schemaName`: The workflow being used (e.g., "spec-driven")
+   - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context
    - Which artifacts exist for this change
 
-3. **Get the change directory and load artifacts**
+   If status reports `actionContext.mode: "workspace-planning"`, explain that full workspace implementation verification is not supported in this slice and STOP. Do not infer repo-local implementation ownership or edit linked repos.
+
+3. **Get planning context and load artifacts**
 
    ```bash
    openspec instructions apply --change "<name>" --json
    ```
 
-   This returns the change directory and context files. Read all available artifacts from `contextFiles`.
+   This returns the change directory and `contextFiles` (artifact ID -> array of concrete file paths). Read all available artifacts from `contextFiles`.
 
 4. **Initialize verification report structure**
 
@@ -53,7 +56,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 5. **Verify Completeness**
 
    **Task Completion**:
-   - If tasks.md exists in contextFiles, read it
+   - If `contextFiles.tasks` exists, read every file path in it
    - Parse checkboxes: `- [ ]` (incomplete) vs `- [x]` (complete)
    - Count complete vs total tasks
    - If incomplete tasks exist:
@@ -61,7 +64,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
      - Recommendation: "Complete task: <description>" or "Mark as done if already implemented"
 
    **Spec Coverage**:
-   - If delta specs exist in `openspec/changes/<name>/specs/`:
+   - If delta specs exist in `contextFiles.specs`:
      - Extract all requirements (marked with "### Requirement:")
      - For each requirement:
        - Search codebase for keywords related to the requirement
@@ -92,7 +95,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 7. **Verify Coherence**
 
    **Design Adherence**:
-   - If design.md exists in contextFiles:
+   - If `contextFiles.design` exists:
      - Extract key decisions (look for sections like "Decision:", "Approach:", "Architecture:")
      - Verify implementation follows those decisions
      - If contradiction detected:

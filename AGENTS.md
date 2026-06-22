@@ -1,106 +1,51 @@
-# KubeBlocks AGENTS.md
+# KubeBlocks
 
-**Generated:** 2026-03-02
-**Go Version:** 1.24.0
-**Project:** Kubernetes Database Control Plane
+KubeBlocks is a Kubernetes database control plane. The repo is organized around CRD APIs, controller-runtime reconcilers, shared controller/model packages, and generated deployment manifests.
 
-## OVERVIEW
+## Repository Map
 
-KubeBlocks is a Kubernetes operator that manages multiple database engines through unified APIs. It abstracts common database operations (lifecycle, backup, monitoring) into CRDs like `Cluster`, `Component`, and `OpsRequest`.
+- `apis/`: API type definitions, conversion/webhook code, and generated deepcopy code.
+- `controllers/`: reconcilers that watch KubeBlocks and Kubernetes resources.
+- `pkg/`: reusable libraries used by controllers and binaries; keep this layer independent from `controllers/`.
+- `cmd/`: binaries for `manager`, `dataprotection`, `kbagent`, and `reloader`.
+- `config/`: kustomize bases and generated CRDs/RBAC/webhooks.
+- `deploy/helm/`: Helm chart output.
+- `openspec/`: OpenSpec project configuration.
+- `.codex/skills/`, `.claude/skills/`, `.opencode/skills/`: matching OpenSpec agent skills. Keep behavior changes synchronized across the three agent surfaces.
+- `.claude/commands/opsx/` and `.opencode/commands/`: command wrappers for the OpenSpec skills.
 
-## STRUCTURE
+## Editing Rules
 
-```
-.
-├── apis/              # CRD type definitions (Cluster, Component, OpsRequest...)
-├── controllers/       # Kubernetes controllers (reconcilers)
-│   ├── apps/         # Cluster & Component controllers
-│   ├── dataprotection/ # Backup & restore controllers
-│   └── operations/   # OpsRequest controllers
-├── pkg/              # Shared libraries
-│   ├── controller/   # Controller building blocks
-│   ├── operations/   # Operation implementations
-│   └── common/       # Utilities
-├── cmd/              # Main entry points
-│   ├── manager/      # Main operator
-│   ├── dataprotection/ # Backup operator
-│   └── kbagent/      # Node agent
-├── config/           # Kubernetes manifests
-└── deploy/helm/      # Helm charts
-```
+- After changing API types under `apis/`, run `make generate` for deepcopy updates and `make manifests` for generated CRDs/RBAC/webhooks.
+- Do not edit `zz_generated.deepcopy.go`, `pkg/client/`, or `config/crd/bases/*.yaml` by hand unless the task is explicitly about generated output. Regenerate them from source changes.
+- Keep `pkg/` free of imports from `controllers/`; shared logic belongs in `pkg/`, while reconciliation wiring belongs in `controllers/`.
+- Prefer the controller-runtime client and local helper packages over direct `client-go` usage.
+- Status changes normally use `Status().Patch(..., client.MergeFrom(old.DeepCopy()))` or the existing package helper. Preserve conflict-safe patch patterns when editing reconcilers.
+- Preserve license headers and run formatting before handing off Go changes.
 
-## WHERE TO LOOK
-
-| Task | Location | Notes |
-|------|----------|-------|
-| Add new CRD | `apis/{group}/{version}/` | Run `make generate manifests` after changes |
-| Add controller | `controllers/{group}/` | Follow existing reconciler patterns |
-| Fix reconcile bug | `controllers/*/controller.go` | Look for `Reconcile()` method |
-| API type changes | `apis/*/v1*/types*.go` | Then regenerate clients |
-| Build operator | `cmd/manager/` | Entry point for main controller |
-| Build tools | `cmd/kbagent/`, `cmd/dataprotection/` | Separate binaries |
-| Shared utilities | `pkg/common/`, `pkg/controllerutil/` | Cross-cutting concerns |
-| Tests | `*_test.go` alongside source | Use `make test-fast` |
-
-## CONVENTIONS
-
-### Code Generation
-- **MUST** run `make generate` after modifying API types (generates deepcopy)
-- **MUST** run `make manifests` after API changes (generates CRD YAMLs)
-- Generated clients in `pkg/client/` (run `make client-sdk-gen`)
-- Skip generated files in linting: `zz_generated.*`, `pkg/client/`
-
-### Imports
-```go
-// Group imports: stdlib -> third-party -> kubeblocks
-import (
-    "context"
-    
-    "k8s.io/apimachinery/pkg/types"
-    "sigs.k8s.io/controller-runtime/pkg/client"
-    
-    appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-)
-```
-
-### Testing
-- Standard Go tests: `*_test.go`
-- BDD tests with Ginkgo/Gomega in `test/` directory
-- Mock generation with `go generate`
-
-## ANTI-PATTERNS
-
-| Don't | Do Instead |
-|-------|------------|
-| Edit `config/crd/bases/*.yaml` directly | Run `make manifests` |
-| Edit `zz_generated.deepcopy.go` | Run `make generate` |
-| Import controllers from pkg/ | Import only APIs and utils |
-| Use `k8s.io/client-go` directly | Use controller-runtime client |
-| Ignore `make build-checks` failures | Fix lint/format issues first |
-
-## COMMANDS
+## Commands
 
 ```bash
-# Development
-make generate          # Generate deepcopy code
-make manifests         # Generate CRDs
-make build-checks      # fmt + vet + lint-fast
-make test-fast         # Run unit tests
-
-# Building
-make manager           # Build main operator binary
-make dataprotection    # Build backup operator
-make kbagent          # Build node agent
-
-# Deployment
-make install          # Install CRDs to cluster
-make deploy           # Deploy operator
+make generate          # Generate deepcopy code.
+make manifests         # Generate CRDs, RBAC, and webhook manifests.
+make client-sdk-gen    # Generate typed clients under pkg/client/.
+make build-checks      # fmt, vet, goimports, and lint-fast.
+make test-fast         # Unit tests using envtest.
+make manager           # Build the manager binary.
+make dataprotection    # Build the dataprotection binary.
+make kbagent           # Build the kbagent binary.
+make install           # Install CRDs into the current kubeconfig cluster.
+make deploy            # Deploy the operator to the current kubeconfig cluster.
 ```
 
-## NOTES
+## Testing
 
-- Controller-runtime patterns throughout
-- Heavy use of CUE for configuration (see `pkg/configuration/`)
-- Multiple binary outputs (not a single binary)
-- Helm charts auto-generated from config/
-- License header check enforced (`make check-license-header`)
+- Put focused Go tests next to the package under test.
+- Controller and API tests use Ginkgo/Gomega and envtest patterns already present in the repo.
+- For API changes, include validation/default/conversion coverage when behavior changes, not only compile-time checks.
+
+## OpenSpec Agent Assets
+
+- The OpenSpec skill set is duplicated for Codex, Claude, and OpenCode. When changing a skill workflow, update all copies intentionally.
+- Keep OpenCode command files under `.opencode/commands/`; `.opencode/command/` is the old singular path.
+- `openspec/config.yaml` is the source of OpenSpec project identity and capability metadata; do not duplicate that data in individual command wrappers.

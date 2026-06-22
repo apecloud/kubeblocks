@@ -1287,7 +1287,7 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
-	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "")
+	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
 
 	require.NoError(t, err)
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
@@ -1325,7 +1325,7 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
-	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "")
+	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, restore.Spec.ReadyConfig.ConnectionCredential)
@@ -1676,6 +1676,7 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 		restoreMgr,
 		comp,
 		"",
+		nil,
 	)
 	require.NoError(t, err)
 	postReadyRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
@@ -2394,4 +2395,99 @@ func TestRebindPVCAndPV_NilPopulatePVC_ReturnsFatalError(t *testing.T) {
 			"nil populatePVC is an invalid contract state, should be fatal error: %v", err)
 		require.False(t, rebound)
 	}, "rebindPVCAndPV should not panic when populatePVC is nil")
+}
+
+func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *testing.T) {
+	// Regression: backup target in Status.Targets[0] (not Status.Target) must also
+	// trigger the postReady-only redirect. This mirrors resolveSourceTargetFromBackup
+	// which handles both Status.Target and len(Status.Targets)==1.
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target = nil
+	backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			Name: "tidb",
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constant.AppInstanceLabelKey:    "cluster",
+						constant.KBAppComponentLabelKey: "tidb",
+					},
+				},
+			},
+		},
+	}}
+
+	pdPVC := newPVCForRestoreDecision("data", "pd", "")
+	pdPVC.UID = types.UID("pd-pvc-uid")
+	pdPVC.Spec.VolumeName = "pd-data-pv"
+	pdPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	pdComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "pd"),
+			UID:       "pd-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	tidbComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "tidb"),
+			UID:       "tidb-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pdPVC).
+			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	pdDecision, err := reconciler.decidePVCRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, backup, nil)
+	require.NoError(t, err)
+
+	pdCtx := &pvcRestoreContext{
+		restoreMgr:    restoreMgr,
+		mode:          pdDecision.mode,
+		skipPostReady: pdDecision.skipPostReady,
+	}
+
+	_, err = reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, pdCtx)
+	require.NoError(t, err)
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
+	require.Len(t, restoreList.Items, 1,
+		"postReady-only with Status.Targets[0] should create exactly 1 Restore CR")
+
+	restore := restoreList.Items[0]
+	require.Equal(t, tidbComp.UID, restore.OwnerReferences[0].UID,
+		"Restore CR owner should be the backup target component (tidb) even when target is in Status.Targets[0]")
+	require.Equal(t, "tidb", restore.Spec.Backup.SourceTargetName)
+	require.Equal(t, postReadyRestoreName(tidbComp.UID), restore.Name)
 }

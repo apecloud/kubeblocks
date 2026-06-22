@@ -468,28 +468,46 @@ func resolveSingleSourceTargetForPVC(target *dpv1alpha1.BackupStatusTarget, pvc 
 	return target, false, nil
 }
 
-// backupTargetComponentName extracts the component name from the backup's target
-// PodSelector labels. Used for postReady-only ActionSets where the PVC's component
-// differs from the backup target component (e.g., TiDB logical backup: backup target
-// is "tidb" but data PVCs are in "pd"/"tikv").
+// backupTargetComponentName resolves the backup target and extracts the component name
+// from its PodSelector labels. Resolves from the same source-target contract as
+// resolveSourceTargetFromBackup (Status.Target or Status.Targets[0]).
+// Returns fatal error if the target cannot be resolved to a component name.
 func (r *VolumePopulatorReconciler) backupTargetComponentName(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim) (string, error) {
+	pvc *corev1.PersistentVolumeClaim) (string, *dpv1alpha1.BackupStatusTarget, error) {
 	backupNamespace, err := backupNamespaceFromPVC(pvc)
 	if err != nil {
-		return "", intctrlutil.NewFatalError(err.Error())
+		return "", nil, intctrlutil.NewFatalError(err.Error())
 	}
 	backup := &dpv1alpha1.Backup{}
 	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: backupNamespace,
 		Name:      pvc.Spec.DataSourceRef.Name,
 	}, backup); err != nil {
-		return "", err
+		return "", nil, err
 	}
-	target := backup.Status.Target
-	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
-		return "", nil
+	var target *dpv1alpha1.BackupStatusTarget
+	if backup.Status.Target != nil {
+		target = backup.Status.Target
+	} else if len(backup.Status.Targets) == 1 {
+		target = &backup.Status.Targets[0]
 	}
-	return target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey], nil
+	if target == nil {
+		return "", nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady-only redirect: cannot resolve unique backup target for PVC %s/%s (target=%v, targets=%d)",
+			pvc.Namespace, pvc.Name, backup.Status.Target != nil, len(backup.Status.Targets)))
+	}
+	if target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return "", nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady-only redirect: backup target %q has no PodSelector for PVC %s/%s",
+			target.Name, pvc.Namespace, pvc.Name))
+	}
+	compName := target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey]
+	if compName == "" {
+		return "", nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady-only redirect: backup target %q PodSelector has no %s label for PVC %s/%s",
+			target.Name, constant.KBAppComponentLabelKey, pvc.Namespace, pvc.Name))
+	}
+	return compName, target, nil
 }
 
 func (r *VolumePopulatorReconciler) resolveShardingSourceTarget(reqCtx intctrlutil.RequestCtx,
@@ -1179,14 +1197,14 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	}
 	// For postReady-only with skipPostReady (non-matching PVC), resolve the backup target
 	// component and use it for the Restore CR context instead of the PVC's component.
+	var backupTarget *dpv1alpha1.BackupStatusTarget
 	if restoreCtx.skipPostReady {
-		targetCompName, err := r.backupTargetComponentName(reqCtx, pvc)
+		var targetCompName string
+		targetCompName, backupTarget, err = r.backupTargetComponentName(reqCtx, pvc)
 		if err != nil {
 			return false, err
 		}
-		if targetCompName != "" {
-			componentName = targetCompName
-		}
+		componentName = targetCompName
 	}
 	comp := &appsv1.Component{}
 	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
@@ -1217,7 +1235,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 			return false, nil
 		}
 	}
-	postReadyRestore, err := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName)
+	postReadyRestore, err := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget)
 	if err != nil {
 		return false, err
 	}
@@ -1263,7 +1281,8 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	pvc *corev1.PersistentVolumeClaim,
 	restoreMgr *dprestore.RestoreManager,
 	comp *appsv1.Component,
-	targetComponentName string) (*dpv1alpha1.Restore, error) {
+	targetComponentName string,
+	redirectTarget *dpv1alpha1.BackupStatusTarget) (*dpv1alpha1.Restore, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	componentName := targetComponentName
 	if componentName == "" {
@@ -1347,16 +1366,8 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	}
 	if sourceTarget != nil {
 		restore.Spec.Backup.SourceTargetName = sourceTarget.Name
-	} else if targetComponentName != "" && targetComponentName != restoreComponentName(pvc) {
-		// postReady-only redirect: PVC doesn't match backup target, but we need the
-		// target name for the Restore CR. Read it from the backup status.
-		backup := &dpv1alpha1.Backup{}
-		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
-			return nil, err
-		}
-		if backup.Status.Target != nil {
-			restore.Spec.Backup.SourceTargetName = backup.Status.Target.Name
-		}
+	} else if redirectTarget != nil {
+		restore.Spec.Backup.SourceTargetName = redirectTarget.Name
 	}
 	if err = controllerutil.SetOwnerReference(comp, restore, r.Scheme); err != nil {
 		return nil, err

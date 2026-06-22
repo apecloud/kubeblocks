@@ -7,12 +7,13 @@ KubeBlocks is a Kubernetes database control plane. The repo is organized around 
 - `apis/`: API type definitions, conversion/webhook code, and generated deepcopy code.
 - `controllers/`: reconcilers that watch KubeBlocks and Kubernetes resources.
 - `pkg/`: reusable libraries used by controllers and binaries; keep this layer independent from `controllers/`.
-- `cmd/`: binaries for `manager`, `dataprotection`, `kbagent`, and `reloader`.
+- `cmd/`: binaries for `manager`, `dataprotection`, and `kbagent`.
 - `config/`: kustomize bases and generated CRDs/RBAC/webhooks.
 - `deploy/helm/`: Helm chart output.
 - `openspec/`: OpenSpec project configuration.
 - `.codex/skills/`, `.claude/skills/`, `.opencode/skills/`: matching OpenSpec agent skills. Keep behavior changes synchronized across the three agent surfaces.
 - `.claude/commands/opsx/` and `.opencode/commands/`: command wrappers for the OpenSpec skills.
+- `.github/PULL_REQUEST_TEMPLATE.md`: PR checklist used by the branch workflow; keep it aligned with repository policy checks.
 
 ## Editing Rules
 

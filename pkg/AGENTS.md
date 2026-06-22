@@ -8,7 +8,9 @@
 - `controllerutil/`: controller-runtime helper functions and common error handling.
 - `operations/`: day-2 operation implementation logic used by OpsRequest reconciliation.
 - `dataprotection/`: backup/restore/action managers and data protection utilities.
-- `configuration/`, `parameters/`, `gotemplate/`: configuration rendering, parameter management, and template support.
+- `configuration/`: generated mocks for legacy configuration container/proto clients.
+- `parameters/`: parameter metadata, assignment, schema, mutation, patch merge, template render/validate, OpenAPI, and CUE validation logic.
+- `gotemplate/`: template support shared by configuration flows.
 - `client/`: generated Kubernetes clients; regenerate rather than editing by hand.
 - `common/`, `constant/`, `generics/`, `apiutil/`, `unstructured/`, `viperx/`, `lru/`, `metrics/`: shared infrastructure utilities.
 - `kbagent/`: shared code for the node-side agent.
@@ -21,6 +23,8 @@
 - Pass `context.Context` first in functions that call Kubernetes, I/O, or long-running work.
 - Avoid package-level mutable state unless the package already owns a clear singleton contract.
 - Do not hand-edit `pkg/client/`; run `make client-sdk-gen`.
+- Do not hand-edit generated mocks under `pkg/configuration/**/mocks/`; update the source interface and regenerate them.
+- `pkg/parameters` is the active parameter implementation layer. Avoid reintroducing the removed `configmanager` or proto client paths.
 - When adding helpers used by multiple controllers, add package-level tests here rather than relying only on a controller integration test.
 
 ## Dependency Direction

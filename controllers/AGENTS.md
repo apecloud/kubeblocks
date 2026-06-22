@@ -8,7 +8,7 @@ This tree contains controller-runtime reconcilers. Controllers should translate 
 - `workloads/`: `InstanceSet`, `Instance`, and workload event reconcilers.
 - `operations/`: `OpsRequest` and operation definition reconcilers.
 - `dataprotection/`: backup, restore, repository, schedule, GC, and data protection helpers.
-- `parameters/`: parameter and configuration reconcilers.
+- `parameters/`: parameter/configuration reconcilers, including legacy parameter controllers, `ParameterView`, and the `reconfigure/` sync/restart helpers.
 - `extensions/`, `trace/`, `k8score`, `experimental/`: addon, trace, Kubernetes core wrapper, and experimental controllers.
 
 ## Reconcile Rules
@@ -19,6 +19,7 @@ This tree contains controller-runtime reconcilers. Controllers should translate 
 - Preserve finalizer ordering: add finalizers before creating dependent resources that need cleanup, and remove them only after cleanup succeeds.
 - Status updates should be conflict-aware. Follow nearby `Status().Patch(..., client.MergeFrom(...))` patterns unless a controller deliberately uses `Status().Update()`.
 - Set owner references or labels consistently so garbage collection, event handlers, and test cleanup continue to find dependent resources.
+- For user-editable resources such as `ParameterView`, keep spec-content initialization, conflict/invalid phases, and submission status transitions covered by controller tests.
 
 ## Testing
 

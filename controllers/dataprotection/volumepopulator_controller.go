@@ -1723,7 +1723,7 @@ func (r *VolumePopulatorReconciler) getProvisionOnlyPVC(reqCtx intctrlutil.Reque
 
 func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx, populatePVC, pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	if populatePVC == nil {
-		return false, nil
+		return false, intctrlutil.NewFatalError(fmt.Sprintf("populate PVC is nil for target PVC %s/%s; restoreData path entered without prepareData backup set", pvc.Namespace, pvc.Name))
 	}
 	if populatePVC.Spec.VolumeName == "" {
 		return false, nil
